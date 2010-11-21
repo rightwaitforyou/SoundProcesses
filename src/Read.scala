@@ -3,7 +3,7 @@ trait System {
    type Ctx
 }
 
-trait ESystem extends System {
+trait ESystem extends System with Cursor[ ESystem ] {
    type Var[ T ] = EVar[ ECtx, T ]
    type Ctx = ECtx
 }
