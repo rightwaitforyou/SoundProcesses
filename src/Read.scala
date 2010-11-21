@@ -1,16 +1,19 @@
 trait System {
    type Var[ _ ]
+   type Ctx
 }
 
 trait ESystem extends System {
-   type Var[ T ] = EVarX[ T ] // EVar[ ECtx, T ]
+   type Var[ T ] = EVar[ ECtx, T ]
+   type Ctx = ECtx
 }
 
 trait KSystem extends System {
-   override type Var[ T ] = KVarX[ T ] // KVar[ KCtx, T ]
+   type Var[ T ] = KVar[ KCtx, T ]
+   type Ctx = KCtx
 }
 
-trait Proc[ S <: ESystem ] {
+trait Proc[ S <: System ] {
    val sys : S
    def switch : sys.Var[ Boolean ]
 }

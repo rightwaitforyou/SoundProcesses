@@ -5,8 +5,8 @@ trait Listener[ -C, -T ] {
 trait EVar[ C, T ] {
    def get( implicit c: C ) : T
    def set( v: T )( implicit c: C ) : Unit
-   def addListener[    D <: ECtx ]( l: Listener[ C, T ])( implicit c: D ) : Unit
-   def removeListener[ D <: ECtx ]( l: Listener[ C, T ])( implicit c: D ) : Unit
+//   def addListener[    D <: ECtx ]( l: Listener[ C, T ])( implicit c: D ) : Unit
+//   def removeListener[ D <: ECtx ]( l: Listener[ C, T ])( implicit c: D ) : Unit
 }
 
 trait EVarX[ T ] extends EVar[ ECtx, T ]
