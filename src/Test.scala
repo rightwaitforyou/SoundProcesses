@@ -43,7 +43,7 @@ object Test {
    def test10[ S <: System with KAccessProvider[ S ]]( p: Proc[ S ]) {
       val kacc = p.sys.kaccess
       val res = p.sys.t { implicit c =>
-         kacc.range( p.switch, 1, 2 )
+         kacc.range( p.switch, 1, 2 )( c.eph )
       }
    }
 }
