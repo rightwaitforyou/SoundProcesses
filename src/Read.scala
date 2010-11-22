@@ -1,8 +1,7 @@
 trait System {
    type Var[ _ ]
    type Ctx
-//   def read[ T ]( v: Var[ T ])( implicit c: Ctx ) : T
-   def t[ R ]( fun: ECtx => R ) : R
+   def t[ R ]( fun: ECtx => R ) : R // any system can initiate an ephemeral transaction
 }
 
 object ESystem {
@@ -22,16 +21,6 @@ trait KSystem extends System with KAccessProvider[ KSystem ] {
    type Ctx = KCtx
    def in( v: Int ) : Cursor[ KSystem, KCtx, KSystem.FuckYou ]
 }
-
-//trait PSystem extends System with PAccessProvider[ PSystem ] {
-//   type Var[ T ] = PVar[ PCtx, T ]
-//   type Ctx = KCtx
-//   def in( v: Int ) : Cursor[ KSystem, KCtx, KSystem.FuckYou ]
-//}
-//
-//trait BSystem extends System {
-//   def kaccess( from: Double, to: Double ) : KAccessProvider[ KSystem ]
-//}
 
 trait Proc[ S <: System ] {
    val sys : S
