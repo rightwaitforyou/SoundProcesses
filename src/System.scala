@@ -1,6 +1,6 @@
 trait System {
    type Var[ _ ]
-   type Ctx <: CtxLike
+   type Ctx <: CtxLike[ _ ]
    def t[ R ]( fun: Ctx => R ) : R // any system can initiate an ephemeral transaction
 }
 
