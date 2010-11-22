@@ -1,16 +1,17 @@
 trait Txn
 
 trait CtxLike[ S <: System ] {
-   val sys : S 
+//   val sys : S
    def txn: Txn
    def eph : ECtx
+//   def v[ T ]( init: T ) : sys.Var[ T ] // EVar[ ECtx, T ]
 }
 
 trait ECtx extends CtxLike[ ESystem ] {
-   def v[ T ]( init: T ) : EVar[ ECtx, T ]
+//   def v[ T ]( init: T ) : EVar[ ECtx, T ]
 }
 
 trait KCtx extends CtxLike[ KSystem ] {
-   def v[ T ]( init: T ) : KVar[ KCtx, T ]
+//   def v[ T ]( init: T ) : KVar[ KCtx, T ]
 //   def eph : ECtx
 }
