@@ -1,8 +1,8 @@
 object ProcFactory {
-   def apply[ S <: System, C <: CtxLike[ S ]]( name: String )( implicit s: S, c: C ) : Proc[ S ] = {
+   def apply[ S <: System ]( name: String )( implicit cp: CtxProvider[ S ]) : Proc[ S ] = {
       new Proc[ S ] {
-         val sys = s
-         val switch = s.v( false )( c )
+         val sys : S = cp.sys
+         val switch = sys.v( false )( cp.ctx )
       }
 //      error( "FUCK YOU" )
    }

@@ -46,4 +46,12 @@ object Test {
          kacc.range( p.switch, 1, 2 )( c.eph )
       }
    }
+
+   // initiate a transaction and create a proc
+   def test11[ S <: System with CursorProvider[ S ]]( sys: S ) {
+      val csr = sys.cursor
+      val res = csr.tp { implicit cp =>
+         ProcFactory.apply[ S with CtxProvider[ S ]]( "Testin One Two" )( cp )
+      }
+   }
 }
