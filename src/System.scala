@@ -2,6 +2,7 @@ trait System[ C <: CtxLike, V[ _ ] <: EVar[ C, _ ]] {
 //   type Var[ _ ]
 //   type Ctx <: CtxLike
    def t[ R ]( fun: C => R ) : R // any system can initiate an ephemeral transaction
+   def v[ T ]( init: T )( implicit c: C ) : V[ T ]
 }
 
 object ESystem {
