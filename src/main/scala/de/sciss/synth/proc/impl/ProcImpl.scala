@@ -94,7 +94,7 @@ object ProcImpl {
 
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, tx0: S#Tx ) extends Impl[ S ] {
 //      val id                  = tx0.readID( in, access )
-      val name_#              = Strings.readVar[ S ]( in, access )( tx0 )
+      val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
       val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
 

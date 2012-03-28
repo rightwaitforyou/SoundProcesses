@@ -29,7 +29,7 @@ package impl
 import de.sciss.lucre.stm.Sys
 import de.sciss.collection.txn.{HASkipList, SkipList, Ordering => TxnOrdering}
 import de.sciss.lucre.{DataInput, event => evt, DataOutput}
-import evt.{Event, EventLike, Compound}
+import evt.Compound
 
 object ProcGroupImpl {
    private val SER_VERSION = 0
@@ -74,8 +74,11 @@ object ProcGroupImpl {
       }
 
       final def remove( procs: Proc[ S ]* )( implicit tx: S#Tx ) {
-         procs.foreach( seq.remove( _ ))
-         sys.error( "TODO" )
+         procs.foreach { p =>
+            seq -= p
+            elementChanged -= p
+         }
+         collectionChanged( Removed( this, procs.toIndexedSeq ))
       }
 
       final protected def writeData( out: DataOutput ) {

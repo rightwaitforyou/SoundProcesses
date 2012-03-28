@@ -26,7 +26,7 @@
 package de.sciss.synth.proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.lucre.event.{Event, EventLike}
+import de.sciss.lucre.event.Event
 import de.sciss.lucre.stm.{Disposable, Writer, Sys}
 import impl.ProcGroupImpl
 
