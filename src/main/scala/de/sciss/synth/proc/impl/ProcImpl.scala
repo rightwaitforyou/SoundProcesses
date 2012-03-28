@@ -26,6 +26,7 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.stm.Sys
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.expr.Expr
@@ -37,11 +38,38 @@ object ProcImpl {
 
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = new Read[ S ]( in, access, tx )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = {
+      sys.error( "TODO" )
+//      new Read[ S ]( in, access, tx )
+   }
 
    private val emptyGraph = SynthGraph {}
 
-   private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] {
+   @volatile private var declMap = Map.empty[ Class[ _ ], Decl[ _ ]]
+
+   private def getDecl[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Decl[ S ] = {
+      val clz = tx.system.manifest.erasure
+      declMap.getOrElse( clz, {
+         val declNew = new Decl[ S ]
+         declMap += clz -> declNew
+         declNew
+      }).asInstanceOf[ Decl[ S ]]
+   }
+
+   private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, Proc[ S ]] {
+      val serializer: evt.Reader[ S, Impl[ S ]] = new evt.Reader[ S, Impl[ S ]] {
+         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Impl[ S ] =
+            new Read( in, access, targets, tx )
+      }
+
+      type Update = Proc.Update[ S ]
+
+//      import Proc._
+//
+//      declare[ Collection[ S ]]( _.collectionChanged )
+   }
+
+   private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] with evt.Compound[ S, Proc[ S ], Decl[ S ]] {
 
       protected def graphVar : S#Var[ SynthGraph ]
 
@@ -54,6 +82,13 @@ object ProcImpl {
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
       final def play()( implicit tx: S#Tx ) { playing_#.set( true  )}
       final def stop()( implicit tx: S#Tx ) { playing_#.set( false )}
+
+      final def renamed             = sys.error( "TODO" )
+      final def graphChanged        = sys.error( "TODO" )
+      final def playingChanged      = sys.error( "TODO" )
+      final def started             = sys.error( "TODO" )
+      final def stopped             = sys.error( "TODO" )
+      final def changed             = sys.error( "TODO" )
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
@@ -76,36 +111,19 @@ object ProcImpl {
    }
 
    private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
-//      val id                  = tx0.newID()
+      protected val decl      = getDecl[ S ]( tx0 )
+      protected val targets   = evt.Targets[ S ]( tx0 )
       val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
       val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
-
-      def renamed             = sys.error( "TODO" )
-      def graphChanged        = sys.error( "TODO" )
-      def playingChanged      = sys.error( "TODO" )
-      def started             = sys.error( "TODO" )
-      def stopped             = sys.error( "TODO" )
-
-      def targets = sys.error( "TODO" )
-      def changed = sys.error( "TODO" )
-      def select( slot: Int, invariant: Boolean ) = sys.error( "TODO" )
    }
 
-   private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, tx0: S#Tx ) extends Impl[ S ] {
-//      val id                  = tx0.readID( in, access )
+   private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
+                                             tx0: S#Tx )
+   extends Impl[ S ] {
+      protected val decl      = getDecl[ S ]( tx0 )
       val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
       val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
-
-      def renamed             = sys.error( "TODO" )
-      def graphChanged        = sys.error( "TODO" )
-      def playingChanged      = sys.error( "TODO" )
-      def started             = sys.error( "TODO" )
-      def stopped             = sys.error( "TODO" )
-
-      def targets = sys.error( "TODO" )
-      def changed = sys.error( "TODO" )
-      def select( slot: Int, invariant: Boolean ) = sys.error( "TODO" )
    }
 }

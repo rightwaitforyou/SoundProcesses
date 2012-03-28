@@ -29,7 +29,6 @@ package impl
 import de.sciss.lucre.stm.Sys
 import de.sciss.collection.txn.{HASkipList, SkipList, Ordering => TxnOrdering}
 import de.sciss.lucre.{DataInput, event => evt, DataOutput}
-import evt.Compound
 
 object ProcGroupImpl {
    private val SER_VERSION = 0
@@ -60,7 +59,7 @@ object ProcGroupImpl {
       declare[ Collection[ S ]]( _.collectionChanged )
    }
 
-   private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with Compound[ S, ProcGroup[ S ], Decl[ S ]] {
+   private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with evt.Compound[ S, ProcGroup[ S ], Decl[ S ]] {
       protected def seq: SkipList[ S, Proc[ S ]]
 
       import ProcGroup._
