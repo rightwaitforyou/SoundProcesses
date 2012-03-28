@@ -50,8 +50,14 @@ object ProcGroupImpl {
    private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, Impl[ S ]] {
       val serializer: evt.Reader[ S, Impl[ S ]] = new evt.Reader[ S, Impl[ S ]] {
          def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Impl[ S ] =
-            sys.error( "TODO" )
+            new Read( in, access, targets, tx )
       }
+
+      type Update = ProcGroup.Update[ S ]
+
+      import ProcGroup._
+
+      declare[ Collection[ S ]]( _.collectionChanged )
    }
 
    private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with Compound[ S, Impl[ S ], Decl[ S ]] {
@@ -77,6 +83,10 @@ object ProcGroupImpl {
          seq.dispose()
          sys.error( "TODO" )
       }
+
+      final def collectionChanged   = sys.error( "TODO" )
+      final def elementChanged      = sys.error( "TODO" )
+      final def changed             = sys.error( "TODO" )
    }
 
    private def procOrdering[ S <: Sys[ S ]]( implicit tx: S#Tx ) : TxnOrdering[ S#Tx, Proc[ S ]] =
@@ -92,14 +102,19 @@ object ProcGroupImpl {
       protected val seq = {
          implicit val tx      = tx0
          implicit val procOrd = procOrdering[ S ]
-         implicit val listSer = HASkipList.serializer[ S, Proc[ S ]]()
-         // Proc.serializer[ S ]
+//         implicit val listSer = HASkipList.serializer[ S, Proc[ S ]]()
 //         tx0.newVar( id, )
          HASkipList.empty[ S, Proc[ S ]]
       }
+   }
 
-      def collectionChanged   = sys.error( "TODO" )
-      def elementChanged      = sys.error( "TODO" )
-      def changed             = sys.error( "TODO" )
+   private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ], tx0: S#Tx )
+   extends Impl[ S ] {
+      protected val decl      = getDecl[ S ]( tx0 )
+      protected val seq = {
+         implicit val tx      = tx0
+         implicit val procOrd = procOrdering[ S ]
+         HASkipList.read[ S, Proc[ S ]]( in, access )
+      }
    }
 }

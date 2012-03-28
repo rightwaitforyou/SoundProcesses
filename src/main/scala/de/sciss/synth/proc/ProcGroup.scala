@@ -35,10 +35,10 @@ object ProcGroup {
    sealed trait Update[ S <: Sys[ S ]] {
       def group: ProcGroup[ S ]
    }
-   sealed trait CollectionChanged[ S <: Sys[ S ]] extends Update[ S ]
-   final case class Added[ S <: Sys[ S ]](   group: ProcGroup[ S ], procs: IIdxSeq[ Proc[ S ]]) extends CollectionChanged[ S ]
-   final case class Removed[ S <: Sys[ S ]]( group: ProcGroup[ S ], procs: IIdxSeq[ Proc[ S ]]) extends CollectionChanged[ S ]
-   sealed trait ElementChanged[ S <: Sys[ S ]] extends Update[ S ]
+   sealed trait Collection[ S <: Sys[ S ]] extends Update[ S ]
+   final case class Added[ S <: Sys[ S ]](   group: ProcGroup[ S ], procs: IIdxSeq[ Proc[ S ]]) extends Collection[ S ]
+   final case class Removed[ S <: Sys[ S ]]( group: ProcGroup[ S ], procs: IIdxSeq[ Proc[ S ]]) extends Collection[ S ]
+   final case class Element[ S <: Sys[ S ]]( group: ProcGroup[ S ], changes: IIdxSeq[ Proc.Update[ S ]]) extends Update[ S ]
 }
 trait ProcGroup[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
    import ProcGroup._
@@ -48,7 +48,7 @@ trait ProcGroup[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
    def add( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
    def remove( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
 
-   def collectionChanged: EventLike[ S, CollectionChanged[ S ], ProcGroup[ S ]]
-   def elementChanged:    EventLike[ S, ElementChanged[ S ], ProcGroup[ S ]]
+   def collectionChanged: EventLike[ S, Collection[ S ], ProcGroup[ S ]]
+   def elementChanged:    EventLike[ S, Element[ S ], ProcGroup[ S ]]
    def changed:           EventLike[ S, Update[ S ], ProcGroup[ S ]]
 }
