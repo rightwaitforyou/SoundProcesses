@@ -27,23 +27,31 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.stm.Sys
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.expr._
 import de.sciss.lucre.{DataInput, DataOutput}
+import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
 
 object ProcImpl {
    private val SER_VERSION = 0
 
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = {
-      sys.error( "TODO" )
-//      new Read[ S ]( in, access, tx )
-   }
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] =
+      serializer[ S ].read( in, access )
+
+   def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] =
+      anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, Proc[ S ]]]
 
    private val emptyGraph = SynthGraph {}
+
+   private val anySer = new Serializer[ InMemory ]
+
+   private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Proc[ S ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Proc[ S ] =
+         new Read( in, access, targets, tx )
+   }
 
    @volatile private var declMap = Map.empty[ Class[ _ ], Decl[ _ ]]
 
@@ -64,12 +72,15 @@ object ProcImpl {
 
       type Update = Proc.Update[ S ]
 
-//      import Proc._
-//
-//      declare[ Collection[ S ]]( _.collectionChanged )
+      import Proc._
+
+      declare[ Renamed[        S ]]( _.renamed        )
+      declare[ GraphChanged[   S ]]( _.graphChanged   )
+      declare[ PlayingChanged[ S ]]( _.playingChanged )
    }
 
    private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] with evt.Compound[ S, Proc[ S ], Decl[ S ]] {
+      import Proc._
 
       protected def graphVar : S#Var[ SynthGraph ]
 
@@ -78,17 +89,23 @@ object ProcImpl {
       final def playing( implicit tx: S#Tx ) : Boolean = playing_#.value
       final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playing_#.set( b )}
       final def graph( implicit tx: S#Tx ) : SynthGraph = graphVar.get
-      final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) { graphVar.set( g )}
+      final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) {
+         val old = graphVar.get
+         if( old != g ) {
+            graphVar.set( g )
+            graphChanged( GraphChanged( this, evt.Change( old, g )))
+         }
+      }
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
       final def play()( implicit tx: S#Tx ) { playing_#.set( true  )}
       final def stop()( implicit tx: S#Tx ) { playing_#.set( false )}
 
-      final def renamed             = sys.error( "TODO" )
-      final def graphChanged        = sys.error( "TODO" )
-      final def playingChanged      = sys.error( "TODO" )
-      final def started             = sys.error( "TODO" )
-      final def stopped             = sys.error( "TODO" )
-      final def changed             = sys.error( "TODO" )
+      final def renamed             = name_#.changed.map( Renamed( this, _ ))
+      final def graphChanged        = event[ GraphChanged[ S ]]
+      final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
+//      final def started             = ...
+//      final def stopped             = ...
+      final def changed             = renamed | graphChanged | playingChanged
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )

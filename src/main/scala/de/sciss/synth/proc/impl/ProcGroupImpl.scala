@@ -26,14 +26,27 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.Sys
 import de.sciss.collection.txn.{HASkipList, SkipList, Ordering => TxnOrdering}
 import de.sciss.lucre.{DataInput, event => evt, DataOutput}
+import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
 
 object ProcGroupImpl {
    private val SER_VERSION = 0
 
    def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = new New[ S ]( tx )
+
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] =
+      serializer[ S ].read( in, access )
+
+   def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] =
+      anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, Proc[ S ]]]
+
+   private val anySer = new Serializer[ InMemory ]
+
+   private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, ProcGroup[ S ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ProcGroup[ S ] =
+         new Read( in, access, targets, tx )
+   }
 
    @volatile private var declMap = Map.empty[ Class[ _ ], Decl[ _ ]]
 

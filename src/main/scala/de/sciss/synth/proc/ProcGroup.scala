@@ -26,22 +26,31 @@
 package de.sciss.synth.proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.lucre.event.Event
-import de.sciss.lucre.stm.{Disposable, Writer, Sys}
+import de.sciss.lucre.{event => evt}
 import impl.ProcGroupImpl
+import de.sciss.lucre.DataInput
+import de.sciss.lucre.stm.{TxnSerializer, Disposable, Writer, Sys}
 
 object ProcGroup {
+   // ---- implementation forwards ----
+
    def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroupImpl.empty[ S ]
+
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ProcGroupImpl.read( in, access )
+
+   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] = ProcGroupImpl.serializer[ S ]
+
+   // ---- event types ----
 
    sealed trait Update[ S <: Sys[ S ]] {
       def group: ProcGroup[ S ]
    }
    sealed trait Collection[ S <: Sys[ S ]] extends Update[ S ]
-   final case class Added[ S <: Sys[ S ]](   group: ProcGroup[ S ], procs: IIdxSeq[ Proc[ S ]]) extends Collection[ S ]
-   final case class Removed[ S <: Sys[ S ]]( group: ProcGroup[ S ], procs: IIdxSeq[ Proc[ S ]]) extends Collection[ S ]
-   final case class Element[ S <: Sys[ S ]]( group: ProcGroup[ S ], changes: IIdxSeq[ Proc.Update[ S ]]) extends Update[ S ]
+   final case class Added[   S <: Sys[ S ]]( group: ProcGroup[ S ], procs:   IIdxSeq[ Proc[        S ]]) extends Collection[ S ]
+   final case class Removed[ S <: Sys[ S ]]( group: ProcGroup[ S ], procs:   IIdxSeq[ Proc[        S ]]) extends Collection[ S ]
+   final case class Element[ S <: Sys[ S ]]( group: ProcGroup[ S ], changes: IIdxSeq[ Proc.Update[ S ]]) extends Update[     S ]
 }
-trait ProcGroup[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
+trait ProcGroup[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import ProcGroup._
 
    def id: S#ID
@@ -49,7 +58,7 @@ trait ProcGroup[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
    def add( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
    def remove( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
 
-   def collectionChanged: Event[ S, Collection[ S ], ProcGroup[ S ]]
-   def elementChanged:    Event[ S, Element[ S ],    ProcGroup[ S ]]
-   def changed:           Event[ S, Update[ S ],     ProcGroup[ S ]]
+   def collectionChanged: evt.Event[ S, Collection[ S ], ProcGroup[ S ]]
+   def elementChanged:    evt.Event[ S, Element[ S ],    ProcGroup[ S ]]
+   def changed:           evt.Event[ S, Update[ S ],     ProcGroup[ S ]]
 }

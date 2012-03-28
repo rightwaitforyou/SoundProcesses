@@ -29,20 +29,19 @@ import de.sciss.lucre.expr.Expr
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.event.{EventLike, Change}
 import impl.ProcImpl
-import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
-import de.sciss.lucre.{event => evt, DataOutput, DataInput}
+import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import de.sciss.lucre.{event => evt, DataInput}
 
 object Proc {
+   // ---- implementation forwards ----
+
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl[ S ]()
 
-   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] = anySer.asInstanceOf[ Ser[ S ]]
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl.read( in, access )
 
-   private val anySer = new Ser[ InMemory ]
+   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] = ProcImpl.serializer[ S ]
 
-   private final class Ser[ S <: Sys[ S ]] extends TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] {
-      def write( v: Proc[ S ], out: DataOutput ) { v.write( out )}
-      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl.read( in, access )
-   }
+   // ---- event types ----
 
    sealed trait Update[ S <: Sys[ S ]] {
       def proc: Proc[ S ]
@@ -50,8 +49,8 @@ object Proc {
    final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: Change[ String ])     extends Update[ S ]
    final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: Change[ SynthGraph ]) extends Update[ S ]
    final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: Change[ Boolean ])    extends Update[ S ]
-   final case class Started[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
-   final case class Stopped[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
+//   final case class Started[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
+//   final case class Stopped[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
@@ -83,10 +82,10 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- events ----
 
-   def renamed:         EventLike[ S, Renamed[ S ],         Proc[ S ]]
-   def graphChanged:    EventLike[ S, GraphChanged[ S ],    Proc[ S ]]
-   def playingChanged:  EventLike[ S, PlayingChanged[ S ],  Proc[ S ]]
-   def started:         EventLike[ S, Started[ S ],         Proc[ S ]]
-   def stopped:         EventLike[ S, Stopped[ S ],         Proc[ S ]]
-   def changed:         EventLike[ S, Update[ S ],          Proc[ S ]]
+   def renamed:         evt.Event[ S, Renamed[ S ],         Proc[ S ]]
+   def graphChanged:    evt.Event[ S, GraphChanged[ S ],    Proc[ S ]]
+   def playingChanged:  evt.Event[ S, PlayingChanged[ S ],  Proc[ S ]]
+//   def started:         evt.Event[ S, Started[ S ],         Proc[ S ]]
+//   def stopped:         evt.Event[ S, Stopped[ S ],         Proc[ S ]]
+   def changed:         evt.Event[ S, Update[ S ],          Proc[ S ]]
 }
