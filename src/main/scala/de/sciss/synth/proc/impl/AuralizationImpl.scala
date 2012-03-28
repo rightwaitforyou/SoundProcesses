@@ -27,22 +27,67 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.{ServerConnection, Server}
-import de.sciss.lucre.stm.{Cursor, Sys}
+import concurrent.stm.TxnLocal
+import de.sciss.lucre.stm.{Sys, InMemory, Cursor}
 
 object AuralizationImpl {
    def run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ]) : Auralization[ S ] = new Run( group, config, cursor )
+                          ( implicit cursor: Cursor[ S ]) : Auralization[ S ] = {
+      val res = new Boot( group, config, cursor )
+      res.start()
+      res
+   }
 
-   private final class Run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config,
-                                            cursor: Cursor[ S ])
+   private object Actions {
+      def empty[ S <: Sys[ S ]] : Actions[ S ] = anyEmpty.asInstanceOf[ Actions[ S ]]
+
+      private val anyEmpty = Actions[ InMemory ]( Set.empty, Set.empty )
+   }
+   private case class Actions[ S <: Sys[ S ]]( play: Set[ Proc[ S ]], stop: Set[ Proc[ S ]]) {
+      def addPlay( p: Proc[ S ]) : Actions[ S ] = {
+         if( play.contains( p )) this else {
+            if( stop.contains( p )) {
+               copy( stop = stop - p )
+            } else {
+               copy( play = play + p )
+            }
+         }
+      }
+      def addStop( p: Proc[ S ]) : Actions[ S ] = {
+         if( stop.contains( p )) this else {
+            if( play.contains( p )) {
+               copy( play = play - p )
+            } else {
+               copy( stop = stop + p )
+            }
+         }
+      }
+   }
+
+   private final class Boot[ S <: Sys[ S ]]( groupA: S#Entry[ ProcGroup[ S ]], config: Server.Config,
+                                             cursor: Cursor[ S ])
    extends Auralization[ S ] {
-      val booting = Server.boot( "SoundProcesses", config ) {
-         case ServerConnection.Aborted =>
-         case ServerConnection.Running( s ) => booted( s )
+
+      private val actions = TxnLocal( Actions.empty[ S ])
+
+      def start() {
+         /* val booting = */ Server.boot( "SoundProcesses", config ) {
+            case ServerConnection.Aborted =>
+            case ServerConnection.Running( s ) => booted( s )
+         }
       }
 
       def booted( s: Server ) {
-
+         cursor.step { implicit tx =>
+            implicit val itx = tx.peer
+            val group = groupA.get
+            group.elements.foreach { p =>
+               if( p.playing ) actions.transform( _.addPlay( p ))
+            }
+            group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
+               case _ =>
+            }}
+         }
       }
    }
 }
