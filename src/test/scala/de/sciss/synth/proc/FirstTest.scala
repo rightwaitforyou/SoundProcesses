@@ -1,20 +1,21 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.InMemory
 import de.sciss.synth
 import synth.{SynthDef, Server, expr}
 import expr._
+import de.sciss.lucre.stm.{Sys, Cursor, InMemory}
 
 // for f***'s sake, `extends App` doesn't work, no method `main` found ???
 object FirstTest {
-   def main( args: Array[ String ]) { run() }
+   def main( args: Array[ String ]) {
+      implicit val system: InMemory = InMemory()
+      run[ InMemory ]()
+   }
 
-   def run() {
-      type S = InMemory
+   def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
       implicit val whyOhWhy = Proc.serializer[ S ]
 
-      val cursor: S = InMemory()
-      val access = cursor.root { implicit tx => Proc[ S ]() }
+      val access = system.root { implicit tx => Proc[ S ]() }
 
       cursor.step { implicit tx =>
          val p = access.get
