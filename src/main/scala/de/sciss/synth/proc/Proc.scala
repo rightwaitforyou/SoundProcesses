@@ -27,12 +27,22 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.SynthGraph
-import de.sciss.lucre.stm.{Writer, Disposable, Sys}
 import de.sciss.lucre.event.{EventLike, Change}
 import impl.ProcImpl
+import de.sciss.lucre.stm.{InMemory, TxnSerializer, Writer, Disposable, Sys}
+import de.sciss.lucre.{DataOutput, DataInput}
 
 object Proc {
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl[ S ]()
+
+   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] = anySer.asInstanceOf[ Ser[ S ]]
+
+   private val anySer = new Ser[ InMemory ]
+
+   private final class Ser[ S <: Sys[ S ]] extends TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] {
+      def write( v: Proc[ S ], out: DataOutput ) { v.write( out )}
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl.read( in, access )
+   }
 
    sealed trait Update[ S <: Sys[ S ]] {
       def proc: Proc[ S ]

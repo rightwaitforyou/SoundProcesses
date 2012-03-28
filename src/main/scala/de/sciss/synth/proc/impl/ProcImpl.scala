@@ -29,11 +29,15 @@ package impl
 import de.sciss.lucre.stm.Sys
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.DataOutput
 import de.sciss.synth.expr._
+import de.sciss.lucre.{DataInput, DataOutput}
 
 object ProcImpl {
+   private val SER_VERSION = 0
+
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
+
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = new Read[ S ]( in, access, tx )
 
    private val emptyGraph = SynthGraph {}
 
@@ -46,17 +50,24 @@ object ProcImpl {
       final def playing( implicit tx: S#Tx ) : Boolean = playing_#.value
       final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playing_#.set( b )}
       final def graph( implicit tx: S#Tx ) : SynthGraph = graphVar.get
-      final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) { sys.error( "TODO" )}
+      final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) { graphVar.set( g )}
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
-      final def play()( implicit tx: S#Tx ) { sys.error( "TODO" )} // { playing_#.set( true )}
-      final def stop()( implicit tx: S#Tx ) { sys.error( "TODO" )} // { playing_#.set( false )}
+      final def play()( implicit tx: S#Tx ) { playing_#.set( true  )}
+      final def stop()( implicit tx: S#Tx ) { playing_#.set( false )}
 
       final def write( out: DataOutput ) {
-         sys.error( "TODO" )
+         out.writeUnsignedByte( SER_VERSION )
+         id.write( out )
+         name_#.write( out )
+         playing_#.write( out )
+         graphVar.write( out )
       }
 
       final def dispose()( implicit tx: S#Tx ) {
-         sys.error( "TODO" )
+         id.dispose()
+         name_#.dispose()
+         playing_#.dispose()
+         graphVar.dispose()
       }
 
       override def toString = "Proc" + id
@@ -71,6 +82,19 @@ object ProcImpl {
       val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
       val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
+
+      def renamed             = sys.error( "TODO" )
+      def graphChanged        = sys.error( "TODO" )
+      def playingChanged      = sys.error( "TODO" )
+      def started             = sys.error( "TODO" )
+      def stopped             = sys.error( "TODO" )
+   }
+
+   private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, tx0: S#Tx ) extends Impl[ S ] {
+      val id                  = tx0.readID( in, access )
+      val name_#              = Strings.readVar[ S ]( in, access )( tx0 )
+      val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
+      protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
 
       def renamed             = sys.error( "TODO" )
       def graphChanged        = sys.error( "TODO" )
