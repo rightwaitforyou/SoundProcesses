@@ -1,5 +1,5 @@
 /*
- *  Strings.scala
+ *  Booleans.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -25,16 +25,14 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{DataInput, DataOutput}
+import de.sciss.lucre.stm.Sys
 
-object Strings extends Type[ String ] {
-   protected def readValue( in: DataInput ) : String = in.readString()
-   protected def writeValue( value: String, out: DataOutput ) { out.writeString( value )}
+object Booleans extends Type[ Boolean ] {
+   protected def readValue( in: DataInput ) : Boolean = in.readBoolean()
+   protected def writeValue( value: Boolean, out: DataOutput ) { out.writeBoolean( value )}
 
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ]) {
 
    }
-
-   // ---- private ----
 }

@@ -30,12 +30,15 @@ import de.sciss.lucre.stm.Sys
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.DataOutput
+import de.sciss.synth.expr._
 
 object ProcImpl {
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
 
+   private val emptyGraph = SynthGraph {}
+
    private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] {
-      def id: S#ID
+
       protected def graphVar : S#Var[ SynthGraph ]
 
       final def name( implicit tx: S#Tx ) : String = name_#.value
@@ -55,18 +58,24 @@ object ProcImpl {
       final def dispose()( implicit tx: S#Tx ) {
          sys.error( "TODO" )
       }
+
+      override def toString = "Proc" + id
+
+      override def hashCode : Int = id.##
+      override def equals( that: Any ) = that.isInstanceOf[ Proc[ _ ]] &&
+         (that.asInstanceOf[ Proc[ _ ]].id == id)
    }
 
    private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
-      val id               = tx0.newID()
-      val name_#           = sys.error( "TODO" )
-      val playing_#        = sys.error( "TODO" )
-      val graphVar         = sys.error( "TODO" )
+      val id                  = tx0.newID()
+      val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
+      val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
+      protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
 
-      def renamed          = sys.error( "TODO" )
-      def graphChanged     = sys.error( "TODO" )
-      def playingChanged   = sys.error( "TODO" )
-      def started          = sys.error( "TODO" )
-      def stopped          = sys.error( "TODO" )
+      def renamed             = sys.error( "TODO" )
+      def graphChanged        = sys.error( "TODO" )
+      def playingChanged      = sys.error( "TODO" )
+      def started             = sys.error( "TODO" )
+      def stopped             = sys.error( "TODO" )
    }
 }

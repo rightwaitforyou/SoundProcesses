@@ -46,6 +46,8 @@ object Proc {
 trait Proc[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
    import Proc._
 
+   def id: S#ID
+
    // ---- "fields" ----
 
    def name_# : Expr.Var[ S, String ]

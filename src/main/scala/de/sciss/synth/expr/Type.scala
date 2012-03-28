@@ -44,9 +44,22 @@ trait Type[ A ] {
 
    final def newConst[ S <: Sys[ S ]]( value: A ) : Ex[ S ] = new Const( value )
 
-   final def newVar[ S <: Sys[ S ]]( init: Ex[ S ]) : Expr.Var[ S, A ] = sys.error( "TODO" )
+   final def newVar[ S <: Sys[ S ]]( init: Ex[ S ])( implicit tx: S#Tx ) : Expr.Var[ S, A ] = {
+      val targets = Targets[ S ]
+      val ref     = tx.newVar[ Ex[ S ]]( targets.id, init )
+      new Var( ref, targets )
+   }
 
-   implicit def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Ex[ S ]] = anySer.asInstanceOf[ Ser[ S ]] // new Ser[ S ]
+   final def readVar[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr.Var[ S, A ] = {
+      val targets = Targets.read[ S ]( in, access )
+      val cookie  = in.readUnsignedByte
+      require( cookie == 0, "Unexpected cookie " + cookie )
+      val ref     = tx.readVar[ Ex[ S ]]( targets.id, in )
+      new Var( ref, targets )
+   }
+
+   implicit final def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Ex[ S ]] =
+      anySer.asInstanceOf[ Ser[ S ]] // new Ser[ S ]
 
    private val anySer = new Ser[ InMemory ]
 
@@ -54,7 +67,10 @@ trait Type[ A ] {
       def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
          // 0 = var, 1 = op
          (in.readUnsignedByte() /*: @switch */) match {
-            case 0      => sys.error( "TODO" ) // new VarRead( in, access, targets, tx )
+            case 0 =>
+               val ref = tx.readVar[ Ex[ S ]]( targets.id, in )
+               new Var( ref, targets )
+
             case arity  => sys.error( "TODO" )
 //               val clazz   = in.readInt()
 //               val opID    = in.readInt()
