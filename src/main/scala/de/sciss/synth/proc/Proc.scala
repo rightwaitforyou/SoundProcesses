@@ -29,8 +29,8 @@ import de.sciss.lucre.expr.Expr
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.event.{EventLike, Change}
 import impl.ProcImpl
-import de.sciss.lucre.stm.{InMemory, TxnSerializer, Writer, Disposable, Sys}
-import de.sciss.lucre.{DataOutput, DataInput}
+import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
+import de.sciss.lucre.{event => evt, DataOutput, DataInput}
 
 object Proc {
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl[ S ]()
@@ -53,7 +53,7 @@ object Proc {
    final case class Started[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
    final case class Stopped[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
 }
-trait Proc[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
+trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
 
    def id: S#ID
@@ -88,4 +88,5 @@ trait Proc[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
    def playingChanged:  EventLike[ S, PlayingChanged[ S ],  Proc[ S ]]
    def started:         EventLike[ S, Started[ S ],         Proc[ S ]]
    def stopped:         EventLike[ S, Stopped[ S ],         Proc[ S ]]
+   def changed:         EventLike[ S, Update[ S ],          Proc[ S ]]
 }

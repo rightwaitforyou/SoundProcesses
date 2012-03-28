@@ -29,7 +29,7 @@ package impl
 import de.sciss.lucre.stm.Sys
 import de.sciss.collection.txn.{HASkipList, SkipList, Ordering => TxnOrdering}
 import de.sciss.lucre.{DataInput, event => evt, DataOutput}
-import evt.Compound
+import evt.{Event, EventLike, Compound}
 
 object ProcGroupImpl {
    private val SER_VERSION = 0
@@ -47,7 +47,7 @@ object ProcGroupImpl {
       }).asInstanceOf[ Decl[ S ]]
    }
 
-   private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, Impl[ S ]] {
+   private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, ProcGroup[ S ]] {
       val serializer: evt.Reader[ S, Impl[ S ]] = new evt.Reader[ S, Impl[ S ]] {
          def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Impl[ S ] =
             new Read( in, access, targets, tx )
@@ -60,12 +60,17 @@ object ProcGroupImpl {
       declare[ Collection[ S ]]( _.collectionChanged )
    }
 
-   private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with Compound[ S, Impl[ S ], Decl[ S ]] {
+   private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with Compound[ S, ProcGroup[ S ], Decl[ S ]] {
       protected def seq: SkipList[ S, Proc[ S ]]
 
+      import ProcGroup._
+
       final def add( procs: Proc[ S ]* )( implicit tx: S#Tx ) {
-         procs.foreach( seq.add( _ ))
-         sys.error( "TODO" )
+         procs.foreach { p =>
+            seq += p
+            elementChanged += p
+         }
+         collectionChanged( Added( this, procs.toIndexedSeq ))
       }
 
       final def remove( procs: Proc[ S ]* )( implicit tx: S#Tx ) {
@@ -76,17 +81,17 @@ object ProcGroupImpl {
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
          seq.write( out )
-         sys.error( "TODO" )
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {
          seq.dispose()
-         sys.error( "TODO" )
       }
 
-      final def collectionChanged   = sys.error( "TODO" )
-      final def elementChanged      = sys.error( "TODO" )
-      final def changed             = sys.error( "TODO" )
+//      final lazy val collectionChanged : Compound.CollectionEvent[ S, Impl[ S ], Decl[ S ], Proc[ S ], Proc.Update[ S ], Collection[ S ]] =
+//         collection( (p: Proc[ S ]) => p.changed ).map( Element( this, _ ))
+      final lazy val collectionChanged : evt.Trigger[ S, Collection[ S ], ProcGroup[ S ]] = event[ Collection[ S ]]
+      final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.changed ).map( Element( this, _ ))
+      final lazy val changed           = collectionChanged | elementChanged
    }
 
    private def procOrdering[ S <: Sys[ S ]]( implicit tx: S#Tx ) : TxnOrdering[ S#Tx, Proc[ S ]] =

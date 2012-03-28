@@ -55,16 +55,14 @@ object ProcImpl {
       final def play()( implicit tx: S#Tx ) { playing_#.set( true  )}
       final def stop()( implicit tx: S#Tx ) { playing_#.set( false )}
 
-      final def write( out: DataOutput ) {
+      final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
-         id.write( out )
          name_#.write( out )
          playing_#.write( out )
          graphVar.write( out )
       }
 
-      final def dispose()( implicit tx: S#Tx ) {
-         id.dispose()
+      final protected def disposeData()( implicit tx: S#Tx ) {
          name_#.dispose()
          playing_#.dispose()
          graphVar.dispose()
@@ -78,7 +76,7 @@ object ProcImpl {
    }
 
    private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
-      val id                  = tx0.newID()
+//      val id                  = tx0.newID()
       val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
       val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
@@ -88,10 +86,14 @@ object ProcImpl {
       def playingChanged      = sys.error( "TODO" )
       def started             = sys.error( "TODO" )
       def stopped             = sys.error( "TODO" )
+
+      def targets = sys.error( "TODO" )
+      def changed = sys.error( "TODO" )
+      def select( slot: Int, invariant: Boolean ) = sys.error( "TODO" )
    }
 
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, tx0: S#Tx ) extends Impl[ S ] {
-      val id                  = tx0.readID( in, access )
+//      val id                  = tx0.readID( in, access )
       val name_#              = Strings.readVar[ S ]( in, access )( tx0 )
       val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
@@ -101,5 +103,9 @@ object ProcImpl {
       def playingChanged      = sys.error( "TODO" )
       def started             = sys.error( "TODO" )
       def stopped             = sys.error( "TODO" )
+
+      def targets = sys.error( "TODO" )
+      def changed = sys.error( "TODO" )
+      def select( slot: Int, invariant: Boolean ) = sys.error( "TODO" )
    }
 }

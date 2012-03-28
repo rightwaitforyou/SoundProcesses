@@ -26,11 +26,12 @@
 package de.sciss.synth.proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.lucre.event.EventLike
+import de.sciss.lucre.event.{Event, EventLike}
 import de.sciss.lucre.stm.{Disposable, Writer, Sys}
+import impl.ProcGroupImpl
 
 object ProcGroup {
-   def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = sys.error( "TODO" )
+   def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroupImpl.empty[ S ]
 
    sealed trait Update[ S <: Sys[ S ]] {
       def group: ProcGroup[ S ]
@@ -48,7 +49,7 @@ trait ProcGroup[ S <: Sys[ S ]] extends Disposable[ S#Tx ] with Writer {
    def add( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
    def remove( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
 
-   def collectionChanged: EventLike[ S, Collection[ S ], ProcGroup[ S ]]
-   def elementChanged:    EventLike[ S, Element[ S ], ProcGroup[ S ]]
-   def changed:           EventLike[ S, Update[ S ], ProcGroup[ S ]]
+   def collectionChanged: Event[ S, Collection[ S ], ProcGroup[ S ]]
+   def elementChanged:    Event[ S, Element[ S ],    ProcGroup[ S ]]
+   def changed:           Event[ S, Update[ S ],     ProcGroup[ S ]]
 }
