@@ -27,8 +27,9 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.{ServerConnection, Server}
-import concurrent.stm.TxnLocal
 import de.sciss.lucre.stm.{Sys, InMemory, Cursor}
+//import collection.immutable.{IndexedSeq => IIdxSeq}
+import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
 
 object AuralizationImpl {
    def run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config = Server.Config() )
@@ -38,28 +39,31 @@ object AuralizationImpl {
       res
    }
 
+   private sealed trait Action // [ S <: Sys[ S ]]
+   private final case class ActionPlay() extends Action
+   private final case class ActionStop() extends Action
+
    private object Actions {
       def empty[ S <: Sys[ S ]] : Actions[ S ] = anyEmpty.asInstanceOf[ Actions[ S ]]
 
-      private val anyEmpty = Actions[ InMemory ]( Set.empty, Set.empty )
+      private val anyEmpty = Actions[ InMemory ]( Map.empty )
    }
-   private case class Actions[ S <: Sys[ S ]]( play: Set[ Proc[ S ]], stop: Set[ Proc[ S ]]) {
+   private case class Actions[ S <: Sys[ S ]]( map: Map[ Proc[ S ], Action ]) {
+      def nonEmpty : Boolean = map.nonEmpty
+
       def addPlay( p: Proc[ S ]) : Actions[ S ] = {
-         if( play.contains( p )) this else {
-            if( stop.contains( p )) {
-               copy( stop = stop - p )
-            } else {
-               copy( play = play + p )
-            }
+         map.get( p ) match {
+            case Some( ActionStop() )  => this.copy( map = map - p )
+            case None                  => this.copy( map = map + (p -> ActionPlay()) )
+            case _                     => this
          }
       }
+
       def addStop( p: Proc[ S ]) : Actions[ S ] = {
-         if( stop.contains( p )) this else {
-            if( play.contains( p )) {
-               copy( play = play - p )
-            } else {
-               copy( stop = stop + p )
-            }
+         map.get( p ) match {
+            case Some( ActionPlay() )  => this.copy( map = map - p )
+            case None                  => this.copy( map = map + (p -> ActionStop()) )
+            case _                     => this
          }
       }
    }
@@ -68,7 +72,22 @@ object AuralizationImpl {
                                              cursor: Cursor[ S ])
    extends Auralization[ S ] {
 
-      private val actions = TxnLocal( Actions.empty[ S ])
+      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
+         ScalaTxn.beforeCommit { implicit itx =>
+            val m = actions().map
+            if( m.nonEmpty ) ScalaTxn.afterCommit { _ =>
+               processActions( m )
+            }
+         }
+         Actions.empty[ S ]
+      })
+
+      private def processActions( m: Map[ Proc[ S ], Action ]) {
+         m.foreach {
+            case (p, ActionPlay()) =>
+            case (p, ActionStop()) =>
+         }
+      }
 
       def start() {
          /* val booting = */ Server.boot( "SoundProcesses", config ) {
@@ -85,6 +104,12 @@ object AuralizationImpl {
                if( p.playing ) actions.transform( _.addPlay( p ))
             }
             group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
+               case ProcGroup.Added( _, procs ) =>
+                  println( procs.mkString( "added: ", ",", "" ))
+               case ProcGroup.Removed( _, procs ) =>
+                  println( procs.mkString( "removed: ", ",", "" ))
+               case ProcGroup.Element( _, changes ) =>
+                  println( changes.mkString( "changes: ", ",", "" ))
                case _ =>
             }}
          }
