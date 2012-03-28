@@ -36,9 +36,9 @@ object ProcGroup {
 
    def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroupImpl.empty[ S ]
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ProcGroupImpl.read( in, access )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroupImpl.read( in, access )
 
-   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] = ProcGroupImpl.serializer[ S ]
+   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroup[ S ]] = ProcGroupImpl.serializer[ S ]
 
    // ---- event types ----
 

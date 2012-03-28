@@ -27,7 +27,6 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.SynthGraph
-import de.sciss.lucre.event.{EventLike, Change}
 import impl.ProcImpl
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.lucre.{event => evt, DataInput}
@@ -46,9 +45,9 @@ object Proc {
    sealed trait Update[ S <: Sys[ S ]] {
       def proc: Proc[ S ]
    }
-   final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: Change[ String ])     extends Update[ S ]
-   final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: Change[ SynthGraph ]) extends Update[ S ]
-   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: Change[ Boolean ])    extends Update[ S ]
+   final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends Update[ S ]
+   final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends Update[ S ]
+   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: evt.Change[ Boolean ])    extends Update[ S ]
 //   final case class Started[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
 //   final case class Stopped[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
 }

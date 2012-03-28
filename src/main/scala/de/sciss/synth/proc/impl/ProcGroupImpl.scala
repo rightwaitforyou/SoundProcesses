@@ -35,11 +35,11 @@ object ProcGroupImpl {
 
    def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = new New[ S ]( tx )
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] =
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup[ S ] =
       serializer[ S ].read( in, access )
 
-   def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] =
-      anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, Proc[ S ]]]
+   def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroup[ S ]] =
+      anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, ProcGroup[ S ]]]
 
    private val anySer = new Serializer[ InMemory ]
 
