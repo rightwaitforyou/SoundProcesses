@@ -26,14 +26,23 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.synth.Server
-import de.sciss.lucre.stm.Sys
+import de.sciss.synth.{ServerConnection, Server}
+import de.sciss.lucre.stm.{Cursor, Sys}
 
 object AuralizationImpl {
-   def run[ S <: Sys[ S ]]( config: Server.Config = Server.Config() ) : Auralization[ S ] =
-      new Run( config )
+   def run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config = Server.Config() )
+                          ( implicit cursor: Cursor[ S ]) : Auralization[ S ] = new Run( group, config, cursor )
 
-   private final class Run[ S <: Sys[ S ]]( config: Server.Config ) extends Auralization[ S ] {
+   private final class Run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config,
+                                            cursor: Cursor[ S ])
+   extends Auralization[ S ] {
+      val booting = Server.boot( "SoundProcesses", config ) {
+         case ServerConnection.Aborted =>
+         case ServerConnection.Running( s ) => booted( s )
+      }
 
+      def booted( s: Server ) {
+
+      }
    }
 }

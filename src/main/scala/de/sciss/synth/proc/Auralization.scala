@@ -25,14 +25,15 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.Sys
 import de.sciss.synth.Server
 import impl.AuralizationImpl
+import de.sciss.lucre.stm.{Cursor, Sys}
 
 object Auralization {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ]]( config: Server.Config = Server.Config() ) : Auralization[ S ] =
-      AuralizationImpl.run( config )
+   def run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config = Server.Config() )
+                          ( implicit cursor: Cursor[ S ]) : Auralization[ S ] =
+      AuralizationImpl.run( group, config )
 }
 trait Auralization[ S <: Sys[ S ]]
