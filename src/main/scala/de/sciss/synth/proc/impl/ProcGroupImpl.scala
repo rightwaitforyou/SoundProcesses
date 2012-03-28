@@ -26,7 +26,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.collection.txn.{HASkipList, SkipList, Ordering => TxnOrdering}
+import de.sciss.collection.txn.{HASkipList, SkipList, Ordering => TxnOrdering, Iterator => TxnIterator}
 import de.sciss.lucre.{DataInput, event => evt, DataOutput}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
 
@@ -92,6 +92,8 @@ object ProcGroupImpl {
          }
          collectionChanged( Removed( this, procs.toIndexedSeq ))
       }
+
+      final def elements( implicit tx: S#Tx ): TxnIterator[ S#Tx, Proc[ S ]] = seq.iterator
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )

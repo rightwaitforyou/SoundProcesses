@@ -15,7 +15,7 @@ object SecondTest {
       implicit val whyOhWhy = ProcGroup.serializer[ S ]
 
       def group()( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
-      def proc()( implicit tx: S#Tx ) : Proc[ S ] = Proc()
+      def proc()(  implicit tx: S#Tx ) : Proc[ S ]      = Proc()
 
       val access = system.root { implicit tx => group() }
 

@@ -30,6 +30,7 @@ import de.sciss.lucre.{event => evt}
 import impl.ProcGroupImpl
 import de.sciss.lucre.DataInput
 import de.sciss.lucre.stm.{TxnSerializer, Disposable, Writer, Sys}
+import de.sciss.collection.txn.{Iterator => TxnIterator}
 
 object ProcGroup {
    // ---- implementation forwards ----
@@ -55,8 +56,16 @@ trait ProcGroup[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    def id: S#ID
 
+   // ---- actions ----
+
    def add( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
    def remove( procs: Proc[ S ]* )( implicit tx: S#Tx ) : Unit
+
+   // ---- querying ----
+
+   def elements( implicit tx: S#Tx ) : TxnIterator[ S#Tx, Proc[ S ]]
+
+   // ---- events ----
 
    def collectionChanged: evt.Event[ S, Collection[ S ], ProcGroup[ S ]]
    def elementChanged:    evt.Event[ S, Element[ S ],    ProcGroup[ S ]]
