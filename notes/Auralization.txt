@@ -1,0 +1,30 @@
+::::::: group :::::::
+  --> collection event : add
+     note: IDMap is transactional, so it's 'safe' to store the
+           view representation there instantly
+     - create view representation + store in IDMap
+       ; the problem here might be that the path is incomplete
+       ; before the txn commits
+     - determine if action is required
+        - if so --> store that action in TxnLocal
+
+  --> collection event : remove
+     - look up view representation + remove from IDMap
+         // there will be exactly one full entry in the map
+         // ; it should thus be possible to construct a
+         // removal algorithm without going into BDB cursors
+         // and other nasty stuff, keeping the KV store
+         // still opaque
+         // --> that is --> we find the full key, we can
+         // construct the partial keys and remove them?
+         // (is there any chance that we may accidentally
+         //  remove a partial key that points to another
+         //  full key?)
+     - determine if action is required
+        - if so --> store that action in TxnLocal
+
+  --> element event
+     - look up view representation
+     - determine if action is required
+        - if so --> store that action in TxnLocal
+
