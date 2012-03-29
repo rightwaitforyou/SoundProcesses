@@ -27,7 +27,8 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.{ServerConnection, Server}
-import de.sciss.lucre.stm.{Sys, InMemory, Cursor}
+import de.sciss.lucre.stm.{IdentifierMap, Sys, InMemory, Cursor}
+
 //import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
 
@@ -44,11 +45,12 @@ object AuralizationImpl {
    private final case class ActionStop() extends Action
 
    private object Actions {
-      def empty[ S <: Sys[ S ]] : Actions[ S ] = anyEmpty.asInstanceOf[ Actions[ S ]]
+      def empty[ S <: Sys[ S ]] : Actions[ S ] = // anyEmpty.asInstanceOf[ Actions[ S ]]
+         sys.error( "TODO" )
 
-      private val anyEmpty = Actions[ InMemory ]( Map.empty )
+//      private val anyEmpty = Actions[ InMemory ]( Map.empty )
    }
-   private case class Actions[ S <: Sys[ S ]]( map: Map[ Proc[ S ], Action ]) {
+   private case class Actions[ S <: Sys[ S ]]( map: IdentifierMap[ S#Tx, S#ID, Action ]) {
       def nonEmpty : Boolean = map.nonEmpty
 
       def addPlay( p: Proc[ S ]) : Actions[ S ] = {
