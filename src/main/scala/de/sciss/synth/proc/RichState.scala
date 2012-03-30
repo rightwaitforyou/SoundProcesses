@@ -1,5 +1,5 @@
 /*
- *  AuralProc.scala
+ *  RichState.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -24,33 +24,16 @@
  */
 
 package de.sciss.synth.proc
-package impl
 
-import de.sciss.lucre.{DataInput, DataOutput, stm}
-import de.sciss.synth.Synth
-import concurrent.stm.TxnLocal
-import stm.{InMemory, Durable, Writer}
+import concurrent.stm.{Ref => ScalaRef}
 
-object AuralProc {
-//   implicit object Serializer extends stm.Serializer[ AuralProc ] {
-//      def write( v: AuralProc, out: DataOutput ) { v.write( out )}
-//      def read( in: DataInput ) : AuralProc = {
-//         val name = in.readString()
-//         new Impl( name )
-//      }
-//   }
+final class RichState( obj: AnyRef, name: String, init: Boolean ) {
+   private val value = ScalaRef( init )
+//   def isSatisfied( value: Boolean )( implicit tx: ProcTxn ) : Boolean = this.value() == value
+//   def currentState( implicit tx: ProcTxn ) : AnyRef
+   def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = value.swap( newValue )( tx.peer )
+   def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer )
+   def set( newValue: Boolean )( implicit tx: ProcTxn ) { value.set( newValue )( tx.peer )}
 
-   def apply( name: String ) : AuralProc = new Impl( name )
-
-   private final class Impl( val name: String ) extends AuralProc {
-//      def write( out: DataOutput ) {
-//         out.writeString( name )
-//      }
-   }
-}
-sealed trait AuralProc /* extends Writer */ {
-   def name : String
-//   def group : I#Var[ Option[ RichGroup ]]
-
-//   def synth: Durable
+   override def toString = "<" + obj.toString + " " + name + ">"
 }

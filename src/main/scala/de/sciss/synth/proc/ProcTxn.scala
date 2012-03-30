@@ -1,5 +1,5 @@
 /*
- *  AuralProc.scala
+ *  ProcTxn.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -24,33 +24,26 @@
  */
 
 package de.sciss.synth.proc
-package impl
 
-import de.sciss.lucre.{DataInput, DataOutput, stm}
-import de.sciss.synth.Synth
-import concurrent.stm.TxnLocal
-import stm.{InMemory, Durable, Writer}
+import concurrent.stm.InTxn
+import de.sciss.osc
+import de.sciss.synth.{osc => sosc}
 
-object AuralProc {
-//   implicit object Serializer extends stm.Serializer[ AuralProc ] {
-//      def write( v: AuralProc, out: DataOutput ) { v.write( out )}
-//      def read( in: DataInput ) : AuralProc = {
-//         val name = in.readString()
-//         new Impl( name )
-//      }
-//   }
+object ProcTxn {
+   def apply()( implicit tx: InTxn ) : ProcTxn = sys.error( "TODO" )
 
-   def apply( name: String ) : AuralProc = new Impl( name )
+//   implicit def peer( implicit tx: ProcTxn ) : InTxn = tx.peer
 
-   private final class Impl( val name: String ) extends AuralProc {
-//      def write( out: DataOutput ) {
-//         out.writeString( name )
-//      }
-   }
+   sealed abstract class FilterMode
+   case object Always extends FilterMode
+   case object IfChanges extends FilterMode
+   case object RequiresChange extends FilterMode
 }
-sealed trait AuralProc /* extends Writer */ {
-   def name : String
-//   def group : I#Var[ Option[ RichGroup ]]
+sealed trait ProcTxn {
+   import ProcTxn.FilterMode
 
-//   def synth: Durable
+   def peer: InTxn
+
+   def add( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, RichState, Boolean) ], audible: Boolean,
+            dependancies: Map[ RichState, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
 }
