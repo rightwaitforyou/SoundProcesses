@@ -40,22 +40,26 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( name: String, server: Server ) : AuralProc = {
-      new Impl( name, server )
+   def apply( server: Server, initName: String, initGraph: SynthGraph ) : AuralProc = {
+      new Impl( server, initName, initGraph )
    }
 
-   private final class Impl( val name: String, val server: Server )
+   private final class Impl( val server: Server, name0: String, graph0: SynthGraph )
    extends AuralProc {
 
       private val groupRef = ScalaRef( Option.empty[ RichGroup ])
       private val synthRef = ScalaRef( Option.empty[ RichSynth ])
-      private val graphRef = ScalaRef( ProcImpl.emptyGraph )
+      private val nameRef  = ScalaRef( name0 )
+      private val graphRef = ScalaRef( graph0 )
 
       def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
       def graph( implicit tx: ProcTxn ) : SynthGraph          = graphRef.get( tx.peer )
       def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) {
          sys.error( "TODO" )
       }
+
+      def name( implicit tx: ProcTxn ) : String = nameRef.get( tx.peer )
+      def name_=( n: String )( implicit tx: ProcTxn ) { nameRef.set( n )( tx.peer )}
 
       def play()( implicit tx: ProcTxn ) {
          val gr         = graph
@@ -75,7 +79,8 @@ object AuralProc {
 }
 sealed trait AuralProc /* extends Writer */ {
    def server : Server
-   def name : String
+   def name( implicit tx: ProcTxn ) : String
+   def name_=( n: String )( implicit tx: ProcTxn ) : Unit
    def group( implicit tx: ProcTxn ) : Option[ RichGroup ]
    def play()( implicit tx: ProcTxn ) : Unit
 
