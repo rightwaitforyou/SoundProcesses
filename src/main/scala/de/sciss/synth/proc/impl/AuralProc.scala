@@ -29,7 +29,7 @@ package impl
 import de.sciss.lucre.{DataInput, DataOutput, stm}
 import stm.{InMemory, Durable, Writer}
 import concurrent.stm.{InTxn, TxnLocal, Ref => ScalaRef}
-import de.sciss.synth.{SynthGraph, Synth}
+import de.sciss.synth.{Server, SynthGraph, Synth}
 
 object AuralProc {
 //   implicit object Serializer extends stm.Serializer[ AuralProc ] {
@@ -40,11 +40,13 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( name: String ) : AuralProc = {
-      new Impl( name )
+   def apply( name: String, server: Server ) : AuralProc = {
+      new Impl( name, server )
    }
 
-   private final class Impl( val name: String ) extends AuralProc {
+   private final class Impl( val name: String, val server: Server )
+   extends AuralProc {
+
       private val groupRef = ScalaRef( Option.empty[ RichGroup ])
 //      private val synthRef = ScalaRef( Option.empty[ RichSynth ])
       private val graphRef = ScalaRef( ProcImpl.emptyGraph )
@@ -61,6 +63,7 @@ object AuralProc {
    }
 }
 sealed trait AuralProc /* extends Writer */ {
+   def server : Server
    def name : String
    def group( implicit tx: ProcTxn ) : Option[ RichGroup ]
    def play()( implicit tx: ProcTxn ) : Unit

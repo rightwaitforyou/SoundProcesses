@@ -98,10 +98,10 @@ object AuralizationImpl {
          }
       }
 
-      private def booted( s: Server ) {
+      private def booted( server: Server ) {
          cursor.step { implicit tx =>
             val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
-            val booted  = new Booted( viewMap )
+            val booted  = new Booted( server, viewMap )
             val group   = groupA.get
             group.elements.foreach( booted.procAdded( _ ))
             group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
@@ -118,11 +118,11 @@ object AuralizationImpl {
       }
    }
 
-   private final class Booted[ S <: Sys[ S ]]( viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
+   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx ) {
          if( p.playing ) {
             println( "aural added " + p )
-            viewMap.put( p.id, AuralProc( p.name ))
+            viewMap.put( p.id, AuralProc( p.name, server ))
 //            actions.transform( _.addPlay( p ))
          }
       }
