@@ -19,17 +19,33 @@ object SecondTest {
 
       val access = system.root { implicit tx => group() }
 
-      cursor.step { implicit tx =>
-         val group   = access.get
-         val p       = proc()
-         group.add( p )
-         p.graph = {
-            import synth._; import ugen._
-            val f = LFSaw.kr( 0.4 ).madd( 24, LFSaw.kr( Seq( 8, 7.23 )).madd( 3, 80 )).midicps
-            val c = CombN.ar( SinOsc.ar( f ) * 0.04, 0.2, 0.2, 4 )
-            Out.ar( 0, c )
+      def addProc( name: String ) {
+         cursor.step { implicit tx =>
+            val group   = access.get
+            val p       = proc()
+            p.name      = name
+            group.add( p )
+            p.graph = {
+               import synth._; import ugen._
+               val f = LFSaw.kr( 0.4 ).madd( 24, LFSaw.kr( Seq( 8, 7.23 )).madd( 3, 80 )).midicps
+               val c = CombN.ar( SinOsc.ar( f ) * 0.04, 0.2, 0.2, 4 )
+               Out.ar( 0, c )
+            }
          }
       }
+
+      addProc( "one" )
+      Auralization.run( access )
+
+      (new Thread {
+         override def run() {
+            Thread.sleep( 4000L )
+            println( "Aqui" )
+            addProc( "two" )
+            Thread.sleep( 1000L )
+            sys.exit( 0 )
+         }
+      }).start()
 
 //      Server.run { s =>
 //         val sd = SynthDef( "test", gr.expand )

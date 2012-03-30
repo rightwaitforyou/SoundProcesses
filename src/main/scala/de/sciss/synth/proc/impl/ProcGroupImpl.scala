@@ -70,6 +70,7 @@ object ProcGroupImpl {
       import ProcGroup._
 
       declare[ Collection[ S ]]( _.collectionChanged )
+      declare[ Element[    S ]]( _.elementChanged    )
    }
 
    private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with evt.Compound[ S, ProcGroup[ S ], Decl[ S ]] {

@@ -28,3 +28,7 @@
      - determine if action is required
         - if so --> store that action in TxnLocal
 
+::::::::::::::::::::::::::
+
+idmap should reside in memory
+

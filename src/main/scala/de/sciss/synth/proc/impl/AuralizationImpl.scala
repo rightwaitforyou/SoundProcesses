@@ -40,56 +40,56 @@ object AuralizationImpl {
       res
    }
 
-   private sealed trait Action // [ S <: Sys[ S ]]
-   private final case class ActionPlay() extends Action
-   private final case class ActionStop() extends Action
-
-   private object Actions {
-      def empty[ S <: Sys[ S ]] : Actions[ S ] = // anyEmpty.asInstanceOf[ Actions[ S ]]
-         sys.error( "TODO" )
-
-//      private val anyEmpty = Actions[ InMemory ]( Map.empty )
-   }
-   private case class Actions[ S <: Sys[ S ]]( map: IdentifierMap[ S#Tx, S#ID, Action ]) {
-      def nonEmpty : Boolean = map.nonEmpty
-
-      def addPlay( p: Proc[ S ]) : Actions[ S ] = {
-         map.get( p ) match {
-            case Some( ActionStop() )  => this.copy( map = map - p )
-            case None                  => this.copy( map = map + (p -> ActionPlay()) )
-            case _                     => this
-         }
-      }
-
-      def addStop( p: Proc[ S ]) : Actions[ S ] = {
-         map.get( p ) match {
-            case Some( ActionPlay() )  => this.copy( map = map - p )
-            case None                  => this.copy( map = map + (p -> ActionStop()) )
-            case _                     => this
-         }
-      }
-   }
+//   private sealed trait Action // [ S <: Sys[ S ]]
+//   private final case class ActionPlay() extends Action
+//   private final case class ActionStop() extends Action
+//
+//   private object Actions {
+//      def empty[ S <: Sys[ S ]] : Actions[ S ] = // anyEmpty.asInstanceOf[ Actions[ S ]]
+//         sys.error( "TODO" )
+//
+////      private val anyEmpty = Actions[ InMemory ]( Map.empty )
+//   }
+//   private case class Actions[ S <: Sys[ S ]]( map: Map[ AuralProc, Action ]) {
+//      def nonEmpty : Boolean = map.nonEmpty
+//
+//      def addPlay( p: Proc[ S ]) : Actions[ S ] = {
+//         map.get( p ) match {
+//            case Some( ActionStop() )  => this.copy( map = map - p )
+//            case None                  => this.copy( map = map + (p -> ActionPlay()) )
+//            case _                     => this
+//         }
+//      }
+//
+//      def addStop( p: Proc[ S ]) : Actions[ S ] = {
+//         map.get( p ) match {
+//            case Some( ActionPlay() )  => this.copy( map = map - p )
+//            case None                  => this.copy( map = map + (p -> ActionStop()) )
+//            case _                     => this
+//         }
+//      }
+//   }
 
    private final class Boot[ S <: Sys[ S ]]( groupA: S#Entry[ ProcGroup[ S ]], config: Server.Config,
                                              cursor: Cursor[ S ])
    extends Auralization[ S ] {
 
-      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
-         ScalaTxn.beforeCommit { implicit itx =>
-            val m = actions().map
-            if( m.nonEmpty ) ScalaTxn.afterCommit { _ =>
-               processActions( m )
-            }
-         }
-         Actions.empty[ S ]
-      })
+//      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
+//         ScalaTxn.beforeCommit { implicit itx =>
+//            val m = actions().map
+//            if( m.nonEmpty ) ScalaTxn.afterCommit { _ =>
+//               processActions( m )
+//            }
+//         }
+//         Actions.empty[ S ]
+//      })
 
-      private def processActions( m: Map[ Proc[ S ], Action ]) {
-         m.foreach {
-            case (p, ActionPlay()) =>
-            case (p, ActionStop()) =>
-         }
-      }
+//      private def processActions( m: Map[ Proc[ S ], Action ]) {
+//         m.foreach {
+//            case (p, ActionPlay()) =>
+//            case (p, ActionStop()) =>
+//         }
+//      }
 
       def start() {
          /* val booting = */ Server.boot( "SoundProcesses", config ) {
@@ -98,22 +98,32 @@ object AuralizationImpl {
          }
       }
 
-      def booted( s: Server ) {
+      private def booted( s: Server ) {
          cursor.step { implicit tx =>
-            implicit val itx = tx.peer
-            val group = groupA.get
-            group.elements.foreach { p =>
-               if( p.playing ) actions.transform( _.addPlay( p ))
-            }
+            val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
+            val booted  = new Booted( viewMap )
+            val group   = groupA.get
+            group.elements.foreach( booted.procAdded( _ ))
             group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
                case ProcGroup.Added( _, procs ) =>
-                  println( procs.mkString( "added: ", ",", "" ))
+                  procs.foreach( booted.procAdded( _ ))
+//                  println( procs.mkString( "added: ", ",", "" ))
                case ProcGroup.Removed( _, procs ) =>
-                  println( procs.mkString( "removed: ", ",", "" ))
+                  println( procs.mkString( "aural removed: ", ",", "" ))
                case ProcGroup.Element( _, changes ) =>
-                  println( changes.mkString( "changes: ", ",", "" ))
+                  println( changes.mkString( "aural changes: ", ",", "" ))
                case _ =>
             }}
+         }
+      }
+   }
+
+   private final class Booted[ S <: Sys[ S ]]( viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
+      def procAdded( p: Proc[ S ])( implicit tx: S#Tx ) {
+         if( p.playing ) {
+            println( "aural added " + p )
+            viewMap.put( p.id, AuralProc( p.name ))
+//            actions.transform( _.addPlay( p ))
          }
       }
    }
