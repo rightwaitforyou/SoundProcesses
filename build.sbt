@@ -20,6 +20,6 @@ libraryDependencies ++= Seq(
 
 retrieveManaged := true
 
-scalacOptions ++= Seq( "-deprecation", "-unchecked" )
+scalacOptions ++= Seq( "-deprecation", "-unchecked" )   // "-Xelide-below", "INFO"
 
 

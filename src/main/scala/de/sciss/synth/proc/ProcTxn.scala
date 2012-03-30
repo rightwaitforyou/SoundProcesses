@@ -25,12 +25,15 @@
 
 package de.sciss.synth.proc
 
-import concurrent.stm.InTxn
 import de.sciss.osc
 import de.sciss.synth.{osc => sosc}
+import concurrent.stm.{TxnLocal, InTxn}
+import impl.ProcTxnImpl
 
 object ProcTxn {
-   def apply()( implicit tx: InTxn ) : ProcTxn = sys.error( "TODO" )
+   private val current = TxnLocal( initialValue = ProcTxnImpl()( _ ))
+
+   def apply()( implicit tx: InTxn ) : ProcTxn = current.get
 
 //   implicit def peer( implicit tx: ProcTxn ) : InTxn = tx.peer
 
@@ -39,7 +42,7 @@ object ProcTxn {
    case object IfChanges extends FilterMode
    case object RequiresChange extends FilterMode
 }
-sealed trait ProcTxn {
+trait ProcTxn {
    import ProcTxn.FilterMode
 
    def peer: InTxn

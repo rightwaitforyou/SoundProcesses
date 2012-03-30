@@ -28,7 +28,7 @@ package de.sciss.synth.proc
 import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
 import impl.AuralProc
 import de.sciss.synth.{UGenGraph, addAfter, addBefore, Group, Server, SynthDef, SynthGraph}
-import concurrent.stm.{Ref => ScalaRef}
+import concurrent.stm.{TMap, InTxn, TSet, Ref => ScalaRef}
 
 object ProcWorld {
 // MMM
@@ -106,20 +106,24 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 
    var verbose = false
 
-   private val syn = new AnyRef
-   private var servers = Set.empty[ Server ]
+   private val servers = TSet.empty[ Server ]
 
-   private var uniqueDefID    = 0
-   private def nextDefID()    = { val res = uniqueDefID; uniqueDefID += 1; res }
+   private val uniqueDefID = ScalaRef( 0 )
+   private def nextDefID()( implicit tx: InTxn ) : Int = {
+      val res = uniqueDefID.get
+      uniqueDefID += 1
+      res
+   }
 
-   def addServer( server: Server ) { syn.synchronized {
+   def addServer( server: Server )( implicit tx: ProcTxn ) {
+      implicit val itx = tx.peer
       if( servers.contains( server )) return
       servers += server
       worlds += server -> new ProcWorld
-   }}
+   }
 
    // commented out for debugging inspection
-   var worlds = Map.empty[ Server, ProcWorld ]
+   private val worlds = TMap.empty[ Server, ProcWorld ]
 
 // FFF
 //   private val factoriesRef = Ref( Set.empty[ ProcFactory ])
@@ -150,15 +154,15 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //      })
 //   }
 
-   def addVertex( e: AuralProc )( implicit tx: ProcTxn ) { syn.synchronized {
-      val world = worlds( e.server )
+   def addVertex( e: AuralProc )( implicit tx: ProcTxn ) {
+      val world = worlds( e.server )( tx.peer )
       world.addProc( e )
-   }}
+   }
 
-   def removeVertex( e: AuralProc )( implicit tx: ProcTxn ) { syn.synchronized {
-      val world = worlds( e.server )
+   def removeVertex( e: AuralProc )( implicit tx: ProcTxn ) {
+      val world = worlds( e.server )( tx.peer )
       world.removeProc( e )
-   }}
+   }
 
 // EEE
 //   def addEdge( e: ProcEdge )( implicit tx: ProcTxn ) { syn.synchronized {
@@ -219,8 +223,9 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //      world.removeEdge( e )
 //   }}
 
-   def getSynthDef( server: Server, graph: SynthGraph )( implicit tx: ProcTxn ) : RichSynthDef = syn.synchronized {
-      val w    = worlds( server )
+   def getSynthDef( server: Server, graph: SynthGraph )( implicit tx: ProcTxn ) : RichSynthDef = {
+      implicit val itx = tx.peer
+      val w = worlds.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
 
       // XXX note: unfortunately we have sideeffects in the expansion, such as
       // includeParam for ProcAudioOutput ... And anyways, we might allow for
@@ -228,7 +233,6 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       // not SynthGraph equality
       val u = graph.expand
 
-      implicit val itx = tx.peer
       w.ugenGraphs.get.get( u ).getOrElse {
          val name = "proc" + nextDefID()
          val rd   = RichSynthDef( server, SynthDef( name, u ))
