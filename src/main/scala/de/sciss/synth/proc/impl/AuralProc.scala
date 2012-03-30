@@ -27,9 +27,9 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.{DataInput, DataOutput, stm}
-import de.sciss.synth.Synth
-import concurrent.stm.TxnLocal
 import stm.{InMemory, Durable, Writer}
+import concurrent.stm.{InTxn, TxnLocal, Ref => ScalaRef}
+import de.sciss.synth.{SynthGraph, Synth}
 
 object AuralProc {
 //   implicit object Serializer extends stm.Serializer[ AuralProc ] {
@@ -40,17 +40,31 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( name: String ) : AuralProc = new Impl( name )
+   def apply( name: String ) : AuralProc = {
+      new Impl( name )
+   }
 
    private final class Impl( val name: String ) extends AuralProc {
-//      def write( out: DataOutput ) {
-//         out.writeString( name )
-//      }
+      private val groupRef = ScalaRef( Option.empty[ RichGroup ])
+//      private val synthRef = ScalaRef( Option.empty[ RichSynth ])
+      private val graphRef = ScalaRef( ProcImpl.emptyGraph )
+
+      def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
+      def graph( implicit tx: ProcTxn ) : SynthGraph          = graphRef.get( tx.peer )
+      def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) {
+         sys.error( "TODO" )
+      }
+
+      def play()( implicit tx: ProcTxn ) {
+         val gr   = graph
+      }
    }
 }
 sealed trait AuralProc /* extends Writer */ {
    def name : String
-//   def group : I#Var[ Option[ RichGroup ]]
+   def group( implicit tx: ProcTxn ) : Option[ RichGroup ]
+   def play()( implicit tx: ProcTxn ) : Unit
 
-//   def synth: Durable
+   def graph( implicit tx: ProcTxn ) : SynthGraph
+   def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) : Unit
 }

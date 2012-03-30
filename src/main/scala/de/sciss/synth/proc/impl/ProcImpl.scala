@@ -44,7 +44,7 @@ object ProcImpl {
    def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] =
       anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, Proc[ S ]]]
 
-   private val emptyGraph = SynthGraph {}
+   val emptyGraph = SynthGraph {}
 
    private val anySer = new Serializer[ InMemory ]
 
