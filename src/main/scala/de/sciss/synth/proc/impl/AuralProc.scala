@@ -47,15 +47,20 @@ object AuralProc {
    private final class Impl( val server: Server, name0: String, graph0: SynthGraph )
    extends AuralProc {
 
-      private val groupRef = ScalaRef( Option.empty[ RichGroup ])
-      private val synthRef = ScalaRef( Option.empty[ RichSynth ])
-      private val nameRef  = ScalaRef( name0 )
-      private val graphRef = ScalaRef( graph0 )
+      private val groupRef    = ScalaRef( Option.empty[ RichGroup ])
+      private val synthRef    = ScalaRef( Option.empty[ RichSynth ])
+      private val nameRef     = ScalaRef( name0 )
+      private val graphRef    = ScalaRef( graph0 )
+//      private val synthDefRef = ScalaRef( Option.empty[ RichSynthDef ])
 
       def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
       def graph( implicit tx: ProcTxn ) : SynthGraph          = graphRef.get( tx.peer )
       def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) {
-         sys.error( "TODO" )
+         graphRef.set( g )( tx.peer )
+         if( playing ) {
+            stop()
+            play()
+         }
       }
 
       def name( implicit tx: ProcTxn ) : String = nameRef.get( tx.peer )
@@ -75,6 +80,16 @@ object AuralProc {
          val old        = synthRef.swap( Some( synth ))( tx.peer )
          old.foreach( _.free() )
       }
+
+      def stop()( implicit tx: ProcTxn ) {
+         val synth = synthRef.swap( None )( tx.peer )
+         synth.foreach( _.free() )
+      }
+
+      def playing( implicit tx: ProcTxn ) : Boolean = synthRef.get( tx.peer ).map( _.isOnline.get ).getOrElse( false )
+      def playing_=( p: Boolean )( implicit tx: ProcTxn ) {
+         if( p ) play() else stop()
+      }
    }
 }
 sealed trait AuralProc /* extends Writer */ {
@@ -83,6 +98,9 @@ sealed trait AuralProc /* extends Writer */ {
    def name_=( n: String )( implicit tx: ProcTxn ) : Unit
    def group( implicit tx: ProcTxn ) : Option[ RichGroup ]
    def play()( implicit tx: ProcTxn ) : Unit
+   def playing( implicit tx: ProcTxn ) : Boolean
+   def playing_=( p: Boolean )( implicit tx: ProcTxn ) : Unit
+   def stop()( implicit tx: ProcTxn ) : Unit
 
    def graph( implicit tx: ProcTxn ) : SynthGraph
    def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) : Unit

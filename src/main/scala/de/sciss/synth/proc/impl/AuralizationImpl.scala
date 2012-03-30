@@ -26,12 +26,14 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.synth.{ServerConnection, Server}
 import de.sciss.lucre.stm.{IdentifierMap, Sys, InMemory, Cursor}
 import de.sciss.osc.Dump
+import de.sciss.lucre.event.Change
+import de.sciss.synth.{SynthGraph, ServerConnection, Server}
 
 //import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
+import SoundProcesses.logConfig
 
 object AuralizationImpl {
    var dumpOSC = true
@@ -130,14 +132,21 @@ object AuralizationImpl {
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val group   = groupA.get
-            group.elements.foreach( booted.procAdded( _ ))
+            group.iterator.foreach( booted.procAdded( _ ))
             group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
                case ProcGroup.Added( _, procs ) =>
                   procs.foreach( booted.procAdded( _ ))
-//                  println( procs.mkString( "added: ", ",", "" ))
                case ProcGroup.Removed( _, procs ) =>
-                  println( procs.mkString( "aural removed: ", ",", "" ))
+                  procs.foreach( booted.procRemoved( _ ))
                case ProcGroup.Element( _, changes ) =>
+                  changes.foreach {
+                     case Proc.Renamed( proc, Change( _, newName )) =>
+                        booted.procRenamed( proc, newName )
+                     case Proc.PlayingChanged( proc, Change( _, newPlaying )) =>
+                        booted.procPlayingChanged( proc, newPlaying )
+                     case Proc.GraphChanged( proc, Change( _, newGraph )) =>
+                        booted.procGraphChanged( proc, newGraph )
+                  }
                   println( changes.mkString( "aural changes: ", ",", "" ))
                case _ =>
             }}
@@ -149,11 +158,58 @@ object AuralizationImpl {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx ) {
          val aural = AuralProc( server, p.name, p.graph )
          viewMap.put( p.id, aural )
-         println( "aural added " + p + " -- playing? " + p.playing )
+         logConfig( "aural added " + p + " -- playing? " + p.playing )
          if( p.playing ) {
             implicit val ptx = ProcTxn()( tx.peer )
             aural.play()
 //            actions.transform( _.addPlay( p ))
+         }
+      }
+
+      def procRemoved( p: Proc[ S ])( implicit tx: S#Tx ) {
+         viewMap.get( p.id ) match {
+            case Some( aural ) =>
+               viewMap.remove( p.id )
+               implicit val ptx = ProcTxn()( tx.peer )
+               logConfig( "aural removed " + p + " -- playing? " + aural.playing )
+               if( aural.playing ) {
+                  aural.stop()
+               }
+            case _ =>
+               println( "WARNING: could not find view for proc " + p )
+         }
+      }
+
+      def procRenamed( p: Proc[ S ], newName: String )( implicit tx: S#Tx ) {
+         viewMap.get( p.id ) match {
+            case Some( aural ) =>
+               implicit val ptx = ProcTxn()( tx.peer )
+               logConfig( "aural renamed " + p + " -- " + newName )
+               aural.name = newName
+            case _ =>
+               println( "WARNING: could not find view for proc " + p )
+         }
+      }
+
+      def procPlayingChanged( p: Proc[ S ], newPlaying: Boolean )( implicit tx: S#Tx ) {
+         viewMap.get( p.id ) match {
+            case Some( aural ) =>
+               implicit val ptx = ProcTxn()( tx.peer )
+               logConfig( "aural playing " + p + " -- " + newPlaying )
+               aural.playing = newPlaying
+            case _ =>
+               println( "WARNING: could not find view for proc " + p )
+         }
+      }
+
+      def procGraphChanged( p: Proc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ) {
+         viewMap.get( p.id ) match {
+            case Some( aural ) =>
+               implicit val ptx = ProcTxn()( tx.peer )
+               logConfig( "aural graph changed " + p )
+               aural.graph = newGraph
+            case _ =>
+               println( "WARNING: could not find view for proc " + p )
          }
       }
    }

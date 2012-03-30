@@ -63,7 +63,7 @@ trait ProcGroup[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- querying ----
 
-   def elements( implicit tx: S#Tx ) : TxnIterator[ S#Tx, Proc[ S ]]
+   def iterator( implicit tx: S#Tx ) : TxnIterator[ S#Tx, Proc[ S ]]
 
    // ---- events ----
 

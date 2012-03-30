@@ -94,7 +94,7 @@ object ProcGroupImpl {
          collectionChanged( Removed( this, procs.toIndexedSeq ))
       }
 
-      final def elements( implicit tx: S#Tx ): TxnIterator[ S#Tx, Proc[ S ]] = seq.iterator
+      final def iterator( implicit tx: S#Tx ): TxnIterator[ S#Tx, Proc[ S ]] = seq.iterator
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )

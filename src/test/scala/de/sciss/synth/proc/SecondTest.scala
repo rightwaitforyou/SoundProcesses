@@ -4,6 +4,7 @@ import de.sciss.synth
 import synth.{SynthDef, Server, expr}
 import expr._
 import de.sciss.lucre.stm.{Sys, Cursor, InMemory}
+import synth._; import ugen._
 
 object SecondTest {
    def main( args: Array[ String ]) {
@@ -19,30 +20,38 @@ object SecondTest {
 
       val access = system.root { implicit tx => group() }
 
-      def addProc( name: String ) {
+      def addProc( name: String )( graph: => Any ) {
          cursor.step { implicit tx =>
             val group   = access.get
             val p       = proc()
             p.name      = name
             group.add( p )
-            p.graph = {
-               import synth._; import ugen._
-               val f = LFSaw.kr( 0.4 ).madd( 24, LFSaw.kr( Seq( 8, 7.23 )).madd( 3, 80 )).midicps
-               val c = CombN.ar( SinOsc.ar( f ) * 0.04, 0.2, 0.2, 4 )
-               Out.ar( 0, c )
-            }
+            p.graph     = graph
          }
       }
 
-      addProc( "one" )
+      addProc( "one" ) {
+         val f = LFSaw.kr( 0.4 ).madd( 24, LFSaw.kr( Seq( 8, 7.23 )).madd( 3, 80 )).midicps
+         val c = CombN.ar( SinOsc.ar( f ) * 0.04, 0.2, 0.2, 4 )
+         Out.ar( 0, c )
+      }
+
       Auralization.run( access )
 
       (new Thread {
          override def run() {
-            Thread.sleep( 4000L )
-            println( "Aqui" )
-            addProc( "two" )
-            Thread.sleep( 1000L )
+            Thread.sleep( 2000L )
+            addProc( "two" ) {
+               val f = RLPF.ar( LFPulse.ar( SinOsc.kr( 0.2 ).madd( 10, 21 ), 0.1 ), 100, 0.1 ).clip2( 0.4 )
+               Out.ar( 0, Seq( f, f ))
+            }
+            Thread.sleep( 2000L )
+            cursor.step { implicit tx =>
+               val group = access.get
+               val procs = group.iterator.toIndexedSeq
+               procs.foreach( group.remove( _ ))
+            }
+            Thread.sleep( 2000L )
             sys.exit( 0 )
          }
       }).start()
