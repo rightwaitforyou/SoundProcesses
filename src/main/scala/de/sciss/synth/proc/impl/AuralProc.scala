@@ -29,7 +29,7 @@ package impl
 import de.sciss.lucre.{DataInput, DataOutput, stm}
 import stm.{InMemory, Durable, Writer}
 import concurrent.stm.{InTxn, TxnLocal, Ref => ScalaRef}
-import de.sciss.synth.{Server, SynthGraph, Synth}
+import de.sciss.synth.{addToHead, ControlSetMap, Server, SynthGraph, Synth}
 
 object AuralProc {
 //   implicit object Serializer extends stm.Serializer[ AuralProc ] {
@@ -48,7 +48,7 @@ object AuralProc {
    extends AuralProc {
 
       private val groupRef = ScalaRef( Option.empty[ RichGroup ])
-//      private val synthRef = ScalaRef( Option.empty[ RichSynth ])
+      private val synthRef = ScalaRef( Option.empty[ RichSynth ])
       private val graphRef = ScalaRef( ProcImpl.emptyGraph )
 
       def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
@@ -58,7 +58,18 @@ object AuralProc {
       }
 
       def play()( implicit tx: ProcTxn ) {
-         val gr   = graph
+         val gr         = graph
+         val df         = ProcDemiurg.getSynthDef( server, gr )
+
+         val target     = RichGroup.default( server )
+         val addAction  = addToHead
+         val args       = Seq.empty[ ControlSetMap ]
+         val bufs       = Seq.empty[ RichBuffer ]
+
+         val synth      = df.play( target, args, addAction, bufs )
+
+         val old        = synthRef.swap( Some( synth ))( tx.peer )
+         old.foreach( _.free() )
       }
    }
 }
