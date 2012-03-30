@@ -36,7 +36,7 @@ object SoundProcesses {
    val isSnapshot    = true
    val copyright     = "(C)opyright 2010-2012 Hanns Holger Rutz"
 
-   private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'Confluent' - ", Locale.US )
+   private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'Proc' - ", Locale.US )
    var showLog       = true
 
    def versionString = {

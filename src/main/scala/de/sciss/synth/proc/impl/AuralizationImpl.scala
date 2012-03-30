@@ -28,16 +28,22 @@ package impl
 
 import de.sciss.synth.{ServerConnection, Server}
 import de.sciss.lucre.stm.{IdentifierMap, Sys, InMemory, Cursor}
+import de.sciss.osc.Dump
 
 //import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
 
 object AuralizationImpl {
+   var dumpOSC = true
+
    def run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config = Server.Config() )
                           ( implicit cursor: Cursor[ S ]) : Auralization[ S ] = {
-      val res = new Boot( group, config, cursor )
-      res.start()
-      res
+      val boot = new Boot( group, config, cursor )
+      Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
+         def run() { boot.shutDown() }
+      }))
+      boot.start()
+      boot
    }
 
 //   private sealed trait Action // [ S <: Sys[ S ]]
@@ -91,14 +97,34 @@ object AuralizationImpl {
 //         }
 //      }
 
+      private val sync        = new AnyRef
+      private var connection  = Option.empty[ Either[ ServerConnection, Server ]]
+
       def start() {
-         /* val booting = */ Server.boot( "SoundProcesses", config ) {
-            case ServerConnection.Aborted =>
-            case ServerConnection.Running( s ) => booted( s )
+         sync.synchronized {
+            val c = Server.boot( "SoundProcesses", config ) {
+               case ServerConnection.Aborted =>
+                  sync.synchronized { connection = None }
+               case ServerConnection.Running( s ) =>
+                  sync.synchronized { connection = Some( Right( s ))}
+                  booted( s )
+            }
+            connection = Some( Left( c ))
+         }
+      }
+
+      def shutDown() {
+         sync.synchronized {
+            connection.foreach {
+               case Left( c )    => c.abort
+               case Right( s )   => s.quit
+            }
+            connection = None
          }
       }
 
       private def booted( server: Server ) {
+         if( dumpOSC ) server.dumpOSC( Dump.Text )
          cursor.step { implicit tx =>
             val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new Booted( server, viewMap )
