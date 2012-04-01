@@ -27,6 +27,8 @@ package de.sciss.synth.expr
 
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.expr.Type
+import de.sciss.lucre.event.Targets
 
 object Booleans extends Type[ Boolean ] {
    protected def readValue( in: DataInput ) : Boolean = in.readBoolean()
@@ -35,4 +37,9 @@ object Booleans extends Type[ Boolean ] {
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ]) {
 
    }
+
+   // ---- protected ----
+
+   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] =
+      sys.error( "Invalid cookie " + cookie )
 }

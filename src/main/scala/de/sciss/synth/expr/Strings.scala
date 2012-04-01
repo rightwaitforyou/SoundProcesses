@@ -27,6 +27,8 @@ package de.sciss.synth.expr
 
 import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{DataInput, DataOutput}
+import de.sciss.lucre.expr.Type
+import de.sciss.lucre.event.Targets
 
 object Strings extends Type[ String ] {
    protected def readValue( in: DataInput ) : String = in.readString()
@@ -36,5 +38,8 @@ object Strings extends Type[ String ] {
 
    }
 
-   // ---- private ----
+   // ---- protected ----
+
+   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] =
+      sys.error( "Invalid cookie " + cookie )
 }

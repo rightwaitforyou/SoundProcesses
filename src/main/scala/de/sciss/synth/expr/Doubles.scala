@@ -28,10 +28,15 @@ package de.sciss.synth.expr
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.Sys
 import de.sciss.synth.RichDouble
+import de.sciss.lucre.expr.Type
+import de.sciss.lucre.event.Targets
 
 object Doubles extends Type[ Double ] {
    protected def readValue( in: DataInput ) : Double = in.readDouble()
    protected def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}
+
+   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] =
+      sys.error( "Invalid cookie " + cookie )
 
    private object UnaryOp {
       import RichDouble._
