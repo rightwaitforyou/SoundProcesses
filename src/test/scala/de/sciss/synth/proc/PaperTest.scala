@@ -3,19 +3,27 @@ package de.sciss.synth.proc
 import de.sciss.synth
 import synth._
 import ugen._
-import de.sciss.lucre.stm.{TxnSerializer, Cursor, Sys, InMemory}
 import de.sciss.lucre.expr.Expr
 import expr._
 import de.sciss.lucre.{DataInput, DataOutput}
+import de.sciss.confluent.Confluent
+import de.sciss.lucre.stm.impl.BerkeleyDB
+import java.io.File
+import de.sciss.lucre.stm.{Durable, TxnSerializer, Cursor, Sys, InMemory}
 
-/**
- * TODO: Use Confluent instead, and then create a copy of proc1, and merge it in; use a binary expression
- * on the freqVar for it. Then see how both processes change when freqVar is changed.
- */
 object PaperTest {
    def main( args: Array[ String ]) {
-      implicit val system: InMemory = InMemory()
-      run[ InMemory ]()
+//      implicit val system: InMemory = InMemory()
+//      run[ InMemory ]()
+
+      val dir        = File.createTempFile( "database", "db" )
+      dir.delete()
+      val store      = BerkeleyDB.factory( dir )
+      implicit val s = Confluent( store )
+      run[ Confluent ]
+
+//      implicit val s = Durable( store )
+//      run[ Durable ]
    }
 
    def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {

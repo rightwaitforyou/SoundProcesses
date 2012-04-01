@@ -13,7 +13,7 @@ licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 scalaVersion := "2.9.1"
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "0.33",
+   "de.sciss" %% "scalacollider" % "0.34-SNAPSHOT",
    "de.sciss" %% "temporalobjects" % "0.31-SNAPSHOT",
    "org.scalatest" %% "scalatest" % "1.7.1" % "test"
 )

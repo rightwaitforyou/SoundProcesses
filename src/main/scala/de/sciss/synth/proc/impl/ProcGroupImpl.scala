@@ -31,7 +31,7 @@ import de.sciss.lucre.{DataInput, event => evt, DataOutput}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
 
 object ProcGroupImpl {
-   private val SER_VERSION = 0
+   private val SER_VERSION = 11
 
    def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = new New[ S ]( tx )
 
@@ -44,8 +44,9 @@ object ProcGroupImpl {
    private val anySer = new Serializer[ InMemory ]
 
    private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, ProcGroup[ S ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ProcGroup[ S ] =
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ProcGroup[ S ] = {
          new Read( in, access, targets, tx )
+      }
    }
 
    @volatile private var declMap = Map.empty[ Class[ _ ], Decl[ _ ]]
@@ -133,7 +134,13 @@ object ProcGroupImpl {
 
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ], tx0: S#Tx )
    extends Impl[ S ] {
-      protected val decl      = getDecl[ S ]( tx0 )
+      protected val decl      = getDecl[ S ]( tx0 );
+
+      {
+         val serVer = in.readUnsignedByte()
+         require( serVer == SER_VERSION, "Incompatible serialized  (found " + serVer + ", required " + SER_VERSION + ")" )
+      }
+
       protected val seq = {
          implicit val tx      = tx0
          implicit val procOrd = procOrdering[ S ]

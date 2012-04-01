@@ -34,7 +34,7 @@ import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
 
 object ProcImpl {
-   private val SER_VERSION = 0
+   private val SER_VERSION = 11
 
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
 
@@ -117,12 +117,18 @@ object ProcImpl {
          out.writeUnsignedByte( SER_VERSION )
          name_#.write( out )
          playing_#.write( out )
+
+         freq_#.write( out )
+
          graphVar.write( out )
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {
          name_#.dispose()
          playing_#.dispose()
+
+         freq_#.dispose()
+
          graphVar.dispose()
       }
 
@@ -145,7 +151,13 @@ object ProcImpl {
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
                                              tx0: S#Tx )
    extends Impl[ S ] {
-      protected val decl      = getDecl[ S ]( tx0 )
+      protected val decl      = getDecl[ S ]( tx0 );
+
+      {
+         val serVer = in.readUnsignedByte()
+         require( serVer == SER_VERSION, "Incompatible serialized  (found " + serVer + ", required " + SER_VERSION + ")" )
+      }
+
       val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
       val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
       val freq_#              = Doubles.readVar[ S ]( in, access )( tx0 )
