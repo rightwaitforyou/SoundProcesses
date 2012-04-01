@@ -14,6 +14,8 @@ import de.sciss.lucre.stm.{TxnSerializer, Cursor}
 import de.sciss.confluent.KSys
 
 object PaperTest extends App {
+   val DRY = true
+
 //   def main( args: Array[ String ]) {
 //      implicit val system: InMemory = InMemory()
 //      run[ InMemory ]()
@@ -86,38 +88,38 @@ object PaperTest extends App {
          tx.inputAccess
       }
 
-      println( "v1 = " + v1 )
+//      println( "v1 = " + v1 )
 
-//      cursor.stop { implicit tx =>
-//         val group   = access.get
-//         val p1   = proc1.meld( v1 )
-//         group.add( p1 )
-//      }
-
-      Auralization.run[ S ]( access )
-
-      (new Thread {
-         override def run() {
-            Thread.sleep( 4000L )
-            cursor.step { implicit tx =>
-               val group   = access.get
-               val p1   = proc1.meld( v1 )
-               group.add( p1 )
-            }
-            Thread.sleep( 4000L )
-            cursor.step { implicit tx =>
-               val freq = freqVar.get
-//println( "Aqui " + freq )
-               freq.set( 40.0 )
-            }
+      def meldStep() {
+         cursor.step { implicit tx =>
+            val group   = access.get
+            val p1   = proc1.meld( v1 )
+            group.add( p1 )
          }
-      }).start()
+      }
 
-//      Server.run { s =>
-//         val sd = SynthDef( "test", gr.expand )
-//         sd.play
-//         Thread.sleep( 4000 )
-//         sys.exit( 0 )
-//      }
+      def freqStep() {
+         cursor.step { implicit tx =>
+            val freq = freqVar.get
+            freq.set( 40.0 )
+         }
+      }
+
+      if( DRY ) {
+         meldStep()
+         freqStep()
+
+      } else  {
+         Auralization.run[ S ]( access )
+
+         (new Thread {
+            override def run() {
+               Thread.sleep( 4000L )
+               meldStep()
+               Thread.sleep( 4000L )
+               freqStep()
+            }
+         }).start()
+      }
    }
 }
