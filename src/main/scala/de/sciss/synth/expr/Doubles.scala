@@ -30,6 +30,7 @@ import de.sciss.lucre.stm.Sys
 import de.sciss.synth.RichDouble
 import de.sciss.lucre.expr.Type
 import de.sciss.lucre.event.Targets
+import annotation.switch
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string
@@ -39,8 +40,111 @@ object Doubles extends Type[ Double ] {
    protected def readValue( in: DataInput ) : Double = in.readDouble()
    protected def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] =
-      sys.error( "Invalid cookie " + cookie )
+   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
+                                ( implicit tx: S#Tx ) : Ex[ S ] = {
+      (cookie: @switch) match {
+         case 1 =>
+            val tpe  = in.readInt()
+            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
+            val opID = in.readInt()
+            import UnaryOp._
+            val op: Op = (opID: @switch) match {
+               case 0  => Neg
+               case 5  => Abs
+               case 8  => Ceil
+               case 9  => Floor
+               case 10 => Frac
+               case 11 => Signum
+               case 12 => Squared
+               case 13 => Cubed
+               case 14 => Sqrt
+               case 15 => Exp
+               case 16 => Reciprocal
+               case 17 => Midicps
+               case 18 => Cpsmidi
+               case 19 => Midiratio
+               case 20 => Ratiomidi
+               case 21 => Dbamp
+               case 22 => Ampdb
+               case 23 => Octcps
+               case 24 => Cpsoct
+               case 25 => Log
+               case 26 => Log2
+               case 27 => Log10
+               case 28 => Sin
+               case 29 => Cos
+               case 30 => Tan
+               case 31 => Asin
+               case 32 => Acos
+               case 33 => Atan
+               case 34 => Sinh
+               case 35 => Cosh
+               case 36 => Tanh
+               case _  => sys.error( "Invalid operation id " + opID )
+            }
+            val _1 = readExpr( in, access )
+            new Tuple1( typeID, op, targets, _1 )
+
+         case 2 =>
+            val tpe = in.readInt()
+            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
+            val opID = in.readInt()
+            import BinaryOp._
+            val op: Op = (opID: @switch) match {
+               case 0 => Plus
+               case 1 => Minus
+               case 2 => Times
+         //      case 3 => IDiv
+               case 4 => Div
+               case 5 => Mod
+         //      case 6 => Eq
+         //      case 7 => Neq
+         //      case 8 => Lt
+         //      case 9 => Gt
+         //      case 10 => Leq
+         //      case 11 => Geq
+               case 12 => Min
+               case 13 => Max
+         //      case 14 => BitAnd
+         //      case 15 => BitOr
+         //      case 16 => BitXor
+            // case 17 => Lcm
+            // case 18 => Gcd
+               case 19 => Round
+               case 20 => Roundup
+               case 21 => Trunc
+               case 22 => Atan2
+               case 23 => Hypot
+               case 24 => Hypotx
+               case 25 => Pow
+            // case 26 => <<
+            // case 27 => >>
+            // case 28 => UnsgnRghtShft
+            // case 29 => Fill
+         //      case 30 => Ring1
+         //      case 31 => Ring2
+         //      case 32 => Ring3
+         //      case 33 => Ring4
+               case 34 => Difsqr
+               case 35 => Sumsqr
+               case 36 => Sqrsum
+               case 37 => Sqrdif
+               case 38 => Absdif
+               case 39 => Thresh
+         //      case 40 => Amclip
+         //      case 41 => Scaleneg
+               case 42 => Clip2
+         //      case 43 => Excess
+               case 44 => Fold2
+               case 45 => Wrap2
+            }
+            val _1 = readExpr( in, access )
+            val _2 = readExpr( in, access )
+            new Tuple2( typeID, op, targets, _1, _2 )
+
+         case _ => sys.error( "Invalid cookie " + cookie )
+      }
+   }
 
    private object UnaryOp {
       import RichDouble._
@@ -179,9 +283,13 @@ object Doubles extends Type[ Double ] {
    private object BinaryOp {
       import RichDouble._
 
-      sealed abstract class Op( private[expr] val id: Int ) {
-         def make[ S <: Sys[ S ]]( a: Ex[ S ], b: Ex[ S ]) : Ex[ S ] = sys.error( "TODO" )
+      sealed abstract class Op( val id: Int ) extends Tuple2Op[ Double, Double ] {
+         final def make[ S <: Sys[ S ]]( a: Ex[ S ], b: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
+            new Tuple2( typeID, this, Targets[ S ], a, b )
+         }
          def value( a: Double, b: Double ) : Double
+
+         def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
@@ -190,27 +298,40 @@ object Doubles extends Type[ Double ] {
          }
       }
 
-      case object Plus           extends Op(  0 ) {
+      trait Infix {
+         _: Op =>
+
+         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
+            "(" + _1 + " " + name + " " + _2 + ")"
+      }
+
+//      sealed trait MathStyle {
+//         def name: String
+//         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
+//            "(" + _1 + " " + name + " " + _2 + ")"
+//      }
+
+      case object Plus           extends Op(  0 ) with Infix {
          override val name = "+"
          def value( a: Double, b: Double ) : Double = rd_+( a, b )
       }
-      case object Minus          extends Op(  1 ) {
+      case object Minus          extends Op(  1 ) with Infix {
          override val name = "-"
          def value( a: Double, b: Double ) : Double = rd_-( a, b )
       }
-      case object Times          extends Op(  2 ) {
+      case object Times          extends Op(  2 ) with Infix {
          override val name = "*"
-         def value( a: Double, b: Double ) : Double = rd_div( a, b )
+         def value( a: Double, b: Double ) : Double = rd_*( a, b )
       }
 //      case object IDiv           extends Op(  3 ) {
 //         override val name = "div"
 //         protected def make1( a: Double, b: Double ) : Int = rd_div( a, b )
 //      }
-      case object Div            extends Op(  4 ) {
+      case object Div            extends Op(  4 ) with Infix {
          override val name = "/"
          def value( a: Double, b: Double ) : Double = rd_/( a, b )
       }
-      case object Mod            extends Op(  5 ) {
+      case object Mod            extends Op(  5 ) with Infix {
          override val name = "%"
          def value( a: Double, b: Double ) : Double = rd_%( a, b )
       }
@@ -276,7 +397,7 @@ object Doubles extends Type[ Double ] {
          def value( a: Double, b: Double ) : Double = rd_absdif( a, b )
       }
       case object Thresh         extends Op( 39 ) {
-         def value( a: Double, b: Double ) : Double = rd_absdif( a, b )
+         def value( a: Double, b: Double ) : Double = rd_thresh( a, b )
       }
 //      case object Amclip         extends Op( 40 )
 //      case object Scaleneg       extends Op( 41 )
@@ -358,7 +479,7 @@ object Doubles extends Type[ Double ] {
 
       def +( b: E ) : E          = Plus.make( ex, b )
       def -( b: E ) : E          = Minus.make( ex, b )
-      def *[ A <% E ]( b: A ) : E = Times.make( ex, b )
+      def *( b: E ) : E          = Times.make( ex, b )
       def /( b: E ) : E          = Div.make( ex, b )
       def min( b: E ) : E        = Min.make( ex, b )
       def max( b: E ) : E        = Max.make( ex, b )

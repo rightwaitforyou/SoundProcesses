@@ -26,10 +26,8 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.{DataInput, DataOutput, stm}
-import stm.{InMemory, Durable, Writer}
-import concurrent.stm.{InTxn, TxnLocal, Ref => ScalaRef}
-import de.sciss.synth.{addToHead, ControlSetMap, Server, SynthGraph, Synth}
+import concurrent.stm.{Ref => ScalaRef}
+import de.sciss.synth.{addToHead, ControlSetMap, Server, SynthGraph}
 
 object AuralProc {
 //   implicit object Serializer extends stm.Serializer[ AuralProc ] {
@@ -40,11 +38,11 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( server: Server, initName: String, initGraph: SynthGraph ) : AuralProc = {
-      new Impl( server, initName, initGraph )
+   def apply( server: Server, initName: String, initGraph: SynthGraph, initFreq: Double ) : AuralProc = {
+      new Impl( server, initName, initGraph, initFreq )
    }
 
-   private final class Impl( val server: Server, name0: String, graph0: SynthGraph )
+   private final class Impl( val server: Server, name0: String, graph0: SynthGraph, freq0: Double )
    extends AuralProc {
 
       private val groupRef    = ScalaRef( Option.empty[ RichGroup ])
@@ -53,7 +51,7 @@ object AuralProc {
       private val graphRef    = ScalaRef( graph0 )
 //      private val synthDefRef = ScalaRef( Option.empty[ RichSynthDef ])
 
-      private val freqRef     = ScalaRef( 441.0 )
+      private val freqRef     = ScalaRef( freq0 )
 
       def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
       def graph( implicit tx: ProcTxn ) : SynthGraph          = graphRef.get( tx.peer )
@@ -74,7 +72,7 @@ object AuralProc {
 
          val target     = RichGroup.default( server )
          val addAction  = addToHead
-         val args       = Seq.empty[ ControlSetMap ]
+         val args: Seq[ ControlSetMap ] = Seq( "freq" -> freq.toFloat )
          val bufs       = Seq.empty[ RichBuffer ]
 
          val synth      = df.play( target, args, addAction, bufs )

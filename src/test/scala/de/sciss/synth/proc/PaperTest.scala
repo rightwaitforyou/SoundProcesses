@@ -63,12 +63,12 @@ object PaperTest extends App {
 
       val freqVar = cursor.step { implicit tx => newAccess( exprVar( 50.0 ))}
 
-      val (v1, proc1) = cursor.step { implicit tx =>
+      val proc1 = cursor.step { implicit tx =>
          val group   = access.get
          val p       = newProc()
          p.freq      = freqVar.get
          p.graph     = {
-            val f = "freq".kr(50)   // fundamental frequency
+            val f = "freq".kr       // fundamental frequency
             val p = 20              // number of partials per channel
             val m = Mix.tabulate(p) { i =>
                FSinOsc.ar(f * (i+1)) *
@@ -77,22 +77,38 @@ object PaperTest extends App {
             Out.ar( 0, m )
          }
          group.add( p )
-         tx.inputAccess -> newAccess( p )
+         newAccess( p )
       }
 
-      val v2 = cursor.step { implicit tx =>
+      val v1 = cursor.step { implicit tx =>
          val p    = proc1.get
          p.freq   = freqVar.get * 1.4
          tx.inputAccess
       }
 
+      println( "v1 = " + v1 )
+
+//      cursor.stop { implicit tx =>
+//         val group   = access.get
+//         val p1   = proc1.meld( v1 )
+//         group.add( p1 )
+//      }
+
       Auralization.run[ S ]( access )
 
       (new Thread {
          override def run() {
+//            Thread.sleep( 4000L )
+//            cursor.step { implicit tx =>
+//               val group   = access.get
+//               val p1   = proc1.meld( v1 )
+//               group.add( p1 )
+//            }
             Thread.sleep( 4000L )
             cursor.step { implicit tx =>
-               freqVar.get.set( 60.0  )
+               val freq = freqVar.get
+//println( "Aqui " + freq )
+               freq.set( 40.0 )
             }
          }
       }).start()
