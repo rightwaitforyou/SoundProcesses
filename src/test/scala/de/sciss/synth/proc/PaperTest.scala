@@ -2,9 +2,10 @@ package de.sciss.synth.proc
 
 import de.sciss.synth
 import synth._
+import expr.{Doubles, ExprImplicits}
 import ugen._
 import de.sciss.lucre.expr.Expr
-import expr._
+//import expr._
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.confluent.Confluent
 import de.sciss.lucre.stm.impl.BerkeleyDB
@@ -40,6 +41,9 @@ object PaperTest extends App {
    def run[ S <: KSys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
       implicit val whyOhWhy   = ProcGroup.serializer[ S ]
       implicit val whyOhWhy2  = Proc.serializer[ S ]
+      val imp = new ExprImplicits[ S ]
+      import imp._
+
       implicit object doubleVarSerializer extends TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Double ]] {
          def write( v: Expr.Var[ S, Double ], out: DataOutput ) { v.write( out )}
          def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr.Var[ S, Double ] =
@@ -78,8 +82,7 @@ object PaperTest extends App {
 
       val v2 = cursor.step { implicit tx =>
          val p    = proc1.get
-         freqVar.get.ampdb
-//         p.freq   = freqVar.get * 1.4
+         p.freq   = freqVar.get * 1.4
          tx.inputAccess
       }
 

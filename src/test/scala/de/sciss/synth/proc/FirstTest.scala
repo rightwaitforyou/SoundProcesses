@@ -11,6 +11,8 @@ object FirstTest extends App {
 
    def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
       implicit val whyOhWhy = Proc.serializer[ S ]
+      val imp = new ExprImplicits[ S ]
+      import imp._
 
       val access = system.root { implicit tx => Proc[ S ]() }
 

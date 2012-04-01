@@ -14,6 +14,8 @@ object SecondTest {
 
    def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
       implicit val whyOhWhy = ProcGroup.serializer[ S ]
+      val imp = new ExprImplicits[ S ]
+      import imp._
 
       def group()( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
       def proc()(  implicit tx: S#Tx ) : Proc[ S ]      = Proc()

@@ -32,6 +32,7 @@ import de.sciss.lucre.expr.Expr
 import de.sciss.synth.expr._
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
+import ExprImplicits._
 
 object ProcImpl {
    private val SER_VERSION = 11
