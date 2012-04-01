@@ -10,7 +10,7 @@ import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.confluent.Confluent
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
-import de.sciss.lucre.stm.{Durable, TxnSerializer, Cursor, Sys, InMemory}
+import de.sciss.lucre.stm.{TxnSerializer, Cursor}
 import de.sciss.confluent.KSys
 
 object PaperTest extends App {
@@ -98,12 +98,12 @@ object PaperTest extends App {
 
       (new Thread {
          override def run() {
-//            Thread.sleep( 4000L )
-//            cursor.step { implicit tx =>
-//               val group   = access.get
-//               val p1   = proc1.meld( v1 )
-//               group.add( p1 )
-//            }
+            Thread.sleep( 4000L )
+            cursor.step { implicit tx =>
+               val group   = access.get
+               val p1   = proc1.meld( v1 )
+               group.add( p1 )
+            }
             Thread.sleep( 4000L )
             cursor.step { implicit tx =>
                val freq = freqVar.get
