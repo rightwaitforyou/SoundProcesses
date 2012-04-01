@@ -27,8 +27,8 @@ package de.sciss.synth.expr
 
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.{DataInput, DataOutput, event}
-import event.{EventLikeSerializer, Targets, Observer}
 import de.sciss.lucre.stm.{InMemory, Sys}
+import event.{Pull, EventLikeSerializer, Targets, Observer}
 
 trait Type[ A ] {
    final protected type Ex[ S <: Sys[ S ]] = Expr[ S, A ]
@@ -83,6 +83,143 @@ trait Type[ A ] {
       }
 
       def readConstant( in: DataInput )( implicit tx: S#Tx ) : Ex[ S ] = newConst( readValue( in ))
+   }
+
+   /* protected */ sealed trait TupleOp /* extends event.Reader[ S, Ex ] */ {
+      def id: Int
+   }
+
+   /* protected */ trait Tuple1Op[ T1 ] extends TupleOp {
+//      final def apply( _1: Expr[ S, T1 ])( implicit tx: S#Tx ) : Ex =
+//         new Tuple1[ T1 ]( this, Targets[ S ], _1 )
+
+      def value( a: T1 ) : A
+
+      def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ]) : String
+   }
+
+   final /* protected */ class Tuple1[ S <: Sys[ S ], T1 ]( typeID: Int, op: Tuple1Op[ T1 ],
+                                       protected val targets: Targets[ S ],
+                                       _1: Expr[ S, T1 ])
+   extends Expr.Node[ S, A ] {
+//      protected def op: Tuple1Op[ T1 ]
+//      protected def _1: Expr[ S, T1 ]
+
+      private[lucre] def connect()( implicit tx: S#Tx ) {
+         _1.changed ---> this
+      }
+
+      private[lucre] def disconnect()( implicit tx: S#Tx ) {
+         _1.changed -/-> this
+      }
+
+      def value( implicit tx: S#Tx ) = op.value( _1.value )
+
+      protected def writeData( out: DataOutput ) {
+         out.writeUnsignedByte( 1 )
+//         out.writeShort( op.id )
+         out.writeInt( typeID /* tpe.id */)
+         out.writeInt( op.id )
+         _1.write( out )
+      }
+
+//      private[lucre] def pull( source: Event[ S, _, _ ], update: Any )( implicit tx: S#Tx ) : Option[ Change ] = {
+//         _1.changed.pull( source, update ).flatMap { ach =>
+//            change( op.value( ach.before ), op.value( ach.now ))
+//         }
+//      }
+
+      private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Change ] = {
+         _1.changed.pullUpdate( pull ).flatMap { ach =>
+            change( op.value( ach.before ), op.value( ach.now ))
+         }
+      }
+
+      override def toString = op.toString( _1 )
+   }
+
+   /* protected */  trait Tuple2Op[ T1, T2 ] extends TupleOp {
+//      final def apply( _1: Expr[ S, T1 ], _2: Expr[ S, T2 ])( implicit tx: S#Tx ) : Ex =
+//         new Tuple2[ T1, T2 ]( this, Targets[ S ], _1, _2 )
+
+      def value( a: T1, b: T2 ) : A
+
+      final protected def writeTypes( out: DataOutput ) {}
+
+      def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ], _2: Expr[ S, T2 ]) : String
+   }
+
+   final /* protected */  class Tuple2[ S <: Sys[ S ], T1, T2 ]( typeID: Int, op: Tuple2Op[ T1, T2 ],
+                                           protected val targets: Targets[ S ],
+                                           _1: Expr[ S, T1 ], _2: Expr[ S, T2 ])
+   extends Expr.Node[ S, A ] {
+//      protected def op: Tuple1Op[ T1 ]
+//      protected def _1: Expr[ S, T1 ]
+
+      private[lucre] def connect()( implicit tx: S#Tx ) {
+         _1.changed ---> this
+         _2.changed ---> this
+      }
+
+      private[lucre] def disconnect()( implicit tx: S#Tx ) {
+         _1.changed -/-> this
+         _2.changed -/-> this
+      }
+
+      def value( implicit tx: S#Tx ) = op.value( _1.value, _2.value )
+
+      protected def writeData( out: DataOutput ) {
+         out.writeUnsignedByte( 2 )
+         out.writeInt( typeID /* tpe.id */)
+         out.writeInt( op.id )
+         _1.write( out )
+         _2.write( out )
+      }
+
+//      private[lucre] def pull( source: Event[ S, _, _ ], update: Any )( implicit tx: S#Tx ) : Option[ Change ] = {
+//         (_1.changed.pull( source, update ), _2.changed.pull( source, update )) match {
+//            case (None, None)                => None
+//            case (Some( ach ), None )        =>
+//               val bv = _2.value
+//               change( op.value( ach.before, bv ), op.value( ach.now, bv ))
+//            case (None, Some( bch ))         =>
+//               val av = _1.value
+//               change( op.value( av, bch.before ), op.value( av, bch.now ))
+//            case (Some( ach ), Some( bch ))  =>
+//               change( op.value( ach.before, bch.before ), op.value( ach.now, bch.now ))
+//         }
+//      }
+
+      private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Change ] = {
+//         val sources = pull.parents( select() )
+         val _1c = _1.changed
+         val _2c = _2.changed
+
+         val _1ch = if( _1c.isSource( pull )) {
+            _1c.pullUpdate( pull )
+         } else {
+            None
+         }
+         val _2ch = if( _2c.isSource( pull )) {
+            _2c.pullUpdate( pull )
+         } else {
+            None
+         }
+
+         (_1ch, _2ch) match {
+            case (Some( ach ), None) =>
+               val bv = _2.value
+               change( op.value( ach.before, bv ), op.value( ach.now, bv ))
+            case (None, Some( bch )) =>
+               val av = _1.value
+               change( op.value( av, bch.before ), op.value( av, bch.now ))
+            case (Some( ach ), Some( bch )) =>
+               change( op.value( ach.before, bch.before ), op.value( ach.now, bch.now ))
+            case _ => None
+         }
+      }
+
+      override def toString = op.toString( _1, _2 )
    }
 
    // ---- private ----
