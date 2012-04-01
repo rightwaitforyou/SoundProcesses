@@ -26,6 +26,14 @@ object PaperTest {
 //      run[ Durable ]
    }
 
+//   object Access {
+//
+//   }
+//   trait Access[ S <: Sys[ S ]] {
+//      def group : S#Var[ ProcGroup[ S ]]
+//      def freq  : Expr.Var[ S, Double ]
+//   }
+
    def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
       implicit val whyOhWhy   = ProcGroup.serializer[ S ]
       implicit object doubleVarSerializer extends TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Double ]] {
@@ -36,13 +44,14 @@ object PaperTest {
 
       def newGroup()(  implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
       def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
+
+      val access = system.root { implicit tx => newGroup() }
+
       def newAccess[ A ]( block: => A )( implicit tx: S#Tx, ser: TxnSerializer[ S#Tx, S#Acc, A ]) : S#Entry[ A ] = {
-         val v = tx.newVar( tx.newID(), block )
+         val v = tx.newVar( access.get.id, /* tx.newID(), */ block )
          tx.system.asEntry( v )
       }
       def exprVar( init: Double )( implicit tx: S#Tx ) : Expr.Var[ S, Double ] = Doubles.newVar[ S ]( init )
-
-      val access = system.root { implicit tx => newGroup() }
 
       val freqVar = cursor.step { implicit tx => newAccess( exprVar( 50.0 ))}
 
