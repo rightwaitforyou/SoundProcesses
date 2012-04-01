@@ -63,7 +63,10 @@ object PaperTest extends App {
       }
       def exprVar( init: Double )( implicit tx: S#Tx ) : Expr.Var[ S, Double ] = Doubles.newVar[ S ]( init )
 
-      val freqVar = cursor.step { implicit tx => newAccess( exprVar( 50.0 ))}
+      val freqVar = cursor.step { implicit tx =>
+         val freq = exprVar( 50.0 )
+         newAccess( freq )
+      }
 
       val proc1 = cursor.step { implicit tx =>
          val group   = access.get

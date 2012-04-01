@@ -1,0 +1,33 @@
+group = Node<1 @ 0,1> (seq = SkipList<4 @ 0,1>)
+proc  = Proc<11 @ >
+
+# for outAccess = <0,2>
+Proc<11 @ >.freq_#.set(Expr.Var<6 @ 1,1>)
+--> Expr.Var<22 @ 2,2> set
+--> write Var(<25 @ 2,2>) : Expr.Var<6 @ 1,1>
+
+# for outAccess = <???>
+Expr.Var<22 @ 2,2> set (Expr.Var<6 @ 1,2> * 1.4)
+                       = BinOp (Targets<28 @ >)
+                         _1 = Expr.Var<6 @ 1,2> (ref = Var(<9 @ 1,2>))
+                         _2 = 1.4 const
+
+#### CONTINUE HERE
+
+TxnPath(0, 3, 4, 4)
+Expr.Var<6 @ 1,3,4,4> = freqVar (ref = Var(<9 @ >))
+Change(50.0,40.0)
+
+children
+(1,Targets<28 @ 3,3,4,4>.select(1))
+   children
+   (1,Targets<22 @ 2,3,4,4>.select(1))
+      children
+      (1,Targets<11 @ 2,3,4,4>.select(4))
+         children
+         (1,Targets<1 @ 0,3,4,4>.select(2)), (*)
+         (2,Targets<1 @ 0,3,4,4>.select(2)), 
+         (3,Targets<1 @ 0,3,4,4>.select(2)), 
+         (4,Targets<1 @ 0,3,4,4>.select(2))
+
+         (*)
