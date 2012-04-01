@@ -77,6 +77,8 @@ object ProcImpl {
       declare[ Renamed[        S ]]( _.renamed        )
       declare[ GraphChanged[   S ]]( _.graphChanged   )
       declare[ PlayingChanged[ S ]]( _.playingChanged )
+
+      declare[ FreqChanged[ S ]]( _.freqChanged )
    }
 
    private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] with evt.Compound[ S, Proc[ S ], Decl[ S ]] {
@@ -100,12 +102,16 @@ object ProcImpl {
       final def play()( implicit tx: S#Tx ) { playing_#.set( true  )}
       final def stop()( implicit tx: S#Tx ) { playing_#.set( false )}
 
+      final def freq( implicit tx: S#Tx ) : Double = freq_#.value
+      final def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) { freq_#.set( f )}
+
       final def renamed             = name_#.changed.map( Renamed( this, _ ))
       final def graphChanged        = event[ GraphChanged[ S ]]
       final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
+      final def freqChanged         = freq_#.changed.map( FreqChanged( this, _ ))
 //      final def started             = ...
 //      final def stopped             = ...
-      final def changed             = renamed | graphChanged | playingChanged
+      final def changed             = renamed | graphChanged | playingChanged | freqChanged
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
@@ -120,9 +126,9 @@ object ProcImpl {
          graphVar.dispose()
       }
 
-      override def toString = "Proc" + id
+      override def toString() = "Proc" + id
 
-      override def hashCode : Int = id.##
+      override def hashCode() : Int = id.##
       override def equals( that: Any ) = that.isInstanceOf[ Proc[ _ ]] &&
          (that.asInstanceOf[ Proc[ _ ]].id == id)
    }
@@ -132,6 +138,7 @@ object ProcImpl {
       protected val targets   = evt.Targets[ S ]( tx0 )
       val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
       val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
+      val freq_#              = Doubles.newVar[ S ]( 441 )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
    }
 
@@ -141,6 +148,7 @@ object ProcImpl {
       protected val decl      = getDecl[ S ]( tx0 )
       val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
       val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
+      val freq_#              = Doubles.readVar[ S ]( in, access )( tx0 )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
    }
 }

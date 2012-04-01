@@ -146,6 +146,8 @@ object AuralizationImpl {
                         booted.procPlayingChanged( proc, newPlaying )
                      case Proc.GraphChanged( proc, Change( _, newGraph )) =>
                         booted.procGraphChanged( proc, newGraph )
+                     case Proc.FreqChanged( proc, Change( _, newFreq )) =>
+                        booted.procFreqChanged( proc, newFreq )
                   }
                   println( changes.mkString( "aural changes: ", ",", "" ))
                case _ =>
@@ -208,6 +210,17 @@ object AuralizationImpl {
                implicit val ptx = ProcTxn()( tx.peer )
                logConfig( "aural graph changed " + p )
                aural.graph = newGraph
+            case _ =>
+               println( "WARNING: could not find view for proc " + p )
+         }
+      }
+
+      def procFreqChanged( p: Proc[ S ], newFreq: Double )( implicit tx: S#Tx ) {
+         viewMap.get( p.id ) match {
+            case Some( aural ) =>
+               implicit val ptx = ProcTxn()( tx.peer )
+               logConfig( "aural freq changed " + p )
+               aural.freq = newFreq
             case _ =>
                println( "WARNING: could not find view for proc " + p )
          }

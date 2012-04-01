@@ -53,6 +53,8 @@ object AuralProc {
       private val graphRef    = ScalaRef( graph0 )
 //      private val synthDefRef = ScalaRef( Option.empty[ RichSynthDef ])
 
+      private val freqRef     = ScalaRef( 441.0 )
+
       def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
       def graph( implicit tx: ProcTxn ) : SynthGraph          = graphRef.get( tx.peer )
       def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) {
@@ -90,6 +92,15 @@ object AuralProc {
       def playing_=( p: Boolean )( implicit tx: ProcTxn ) {
          if( p ) play() else stop()
       }
+
+      def freq( implicit tx: ProcTxn ) : Double = freqRef.get( tx.peer )
+      def freq_=( f: Double )( implicit tx: ProcTxn ) {
+         implicit val itx = tx.peer
+         val old = freqRef.swap( f )
+         if( f != old ) {
+            synthRef.get.foreach( _.set( true, "freq" -> f ))
+         }
+      }
    }
 }
 sealed trait AuralProc /* extends Writer */ {
@@ -104,4 +115,7 @@ sealed trait AuralProc /* extends Writer */ {
 
    def graph( implicit tx: ProcTxn ) : SynthGraph
    def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) : Unit
+
+   def freq( implicit tx: ProcTxn ) : Double
+   def freq_=( f: Double )( implicit tx: ProcTxn ) : Unit
 }

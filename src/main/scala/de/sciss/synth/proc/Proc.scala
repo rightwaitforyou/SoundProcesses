@@ -49,6 +49,7 @@ object Proc {
    final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends Update[ S ]
    final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: evt.Change[ Boolean ])    extends Update[ S ]
 //   final case class Started[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
+   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: evt.Change[ Double ])     extends Update[ S ]
 //   final case class Stopped[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
@@ -70,6 +71,12 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def playing( implicit tx: S#Tx ) : Boolean
    def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
 
+   // ---- controls preview demo ----
+
+   def freq_# : Expr.Var[ S, Double ]
+   def freq( implicit tx: S#Tx ) : Double
+   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) : Unit
+
    /**
     * Same as `playing = true`
     */
@@ -84,6 +91,9 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def renamed:         evt.Event[ S, Renamed[ S ],         Proc[ S ]]
    def graphChanged:    evt.Event[ S, GraphChanged[ S ],    Proc[ S ]]
    def playingChanged:  evt.Event[ S, PlayingChanged[ S ],  Proc[ S ]]
+
+   def freqChanged: evt.Event[ S, FreqChanged[ S ], Proc[ S ]]
+
 //   def started:         evt.Event[ S, Started[ S ],         Proc[ S ]]
 //   def stopped:         evt.Event[ S, Stopped[ S ],         Proc[ S ]]
    def changed:         evt.Event[ S, Update[ S ],          Proc[ S ]]
