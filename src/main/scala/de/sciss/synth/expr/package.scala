@@ -3,7 +3,13 @@ package de.sciss.synth
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm.Sys
 
-package object expr {
+package expr {
+   abstract private[synth] sealed class LowPriExprImplicit {
+      implicit def doubleOps1[ S <: Sys[ S ]]( ex: Expr[ S, Double ]) : Doubles.Ops[ S ] = new Doubles.Ops( ex )
+   }
+}
+
+package object expr extends LowPriExprImplicit {
    implicit def stringConst[ S <: Sys[ S ]]( s: String ) : Expr[ S, String ] = Strings.newConst( s )
    implicit def stringOps[ S <: Sys[ S ], A <% Expr[ S, String ]]( ex: A ) : Strings.Ops[ S ] = new Strings.Ops( ex )
 

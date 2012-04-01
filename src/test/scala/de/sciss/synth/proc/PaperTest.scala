@@ -78,7 +78,8 @@ object PaperTest extends App {
 
       val v2 = cursor.step { implicit tx =>
          val p    = proc1.get
-         p.freq   = freqVar.get * 1.4
+         freqVar.get.ampdb
+//         p.freq   = freqVar.get * 1.4
          tx.inputAccess
       }
 

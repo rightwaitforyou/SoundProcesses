@@ -39,6 +39,12 @@ object Doubles extends Type[ Double ] {
       sealed abstract class Op( private[expr] val id: Int ) {
          def make[ S <: Sys[ S ]]( a: Ex[ S ]) : Ex[ S ] = sys.error( "TODO" )
          def value( a: Double ) : Double
+
+         def name: String = { val cn = getClass.getName
+            val sz   = cn.length
+            val i    = cn.indexOf( '$' ) + 1
+            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
+         }
       }
       
       case object Neg extends Op( 0 ) {
@@ -155,6 +161,123 @@ object Doubles extends Type[ Double ] {
    // case object Scurve      extends Op( 53 )
    }
 
+   private object BinaryOp {
+      import RichDouble._
+
+      sealed abstract class Op( private[expr] val id: Int ) {
+         def make[ S <: Sys[ S ]]( a: Ex[ S ], b: Ex[ S ]) : Ex[ S ] = sys.error( "TODO" )
+         def value( a: Double, b: Double ) : Double
+
+         def name: String = { val cn = getClass.getName
+            val sz   = cn.length
+            val i    = cn.indexOf( '$' ) + 1
+            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
+         }
+      }
+
+      case object Plus           extends Op(  0 ) {
+         override val name = "+"
+         def value( a: Double, b: Double ) : Double = rd_+( a, b )
+      }
+      case object Minus          extends Op(  1 ) {
+         override val name = "-"
+         def value( a: Double, b: Double ) : Double = rd_-( a, b )
+      }
+      case object Times          extends Op(  2 ) {
+         override val name = "*"
+         def value( a: Double, b: Double ) : Double = rd_div( a, b )
+      }
+//      case object IDiv           extends Op(  3 ) {
+//         override val name = "div"
+//         protected def make1( a: Double, b: Double ) : Int = rd_div( a, b )
+//      }
+      case object Div            extends Op(  4 ) {
+         override val name = "/"
+         def value( a: Double, b: Double ) : Double = rd_/( a, b )
+      }
+      case object Mod            extends Op(  5 ) {
+         override val name = "%"
+         def value( a: Double, b: Double ) : Double = rd_%( a, b )
+      }
+//      case object Eq             extends Op(  6 )
+//      case object Neq            extends Op(  7 )
+//      case object Lt             extends Op(  8 )
+//      case object Gt             extends Op(  9 )
+//      case object Leq            extends Op( 10 )
+//      case object Geq            extends Op( 11 )
+      case object Min            extends Op( 12 ) {
+         def value( a: Double, b: Double ) : Double = rd_min( a, b )
+      }
+      case object Max            extends Op( 13 ) {
+         def value( a: Double, b: Double ) : Double = rd_max( a, b )
+      }
+//      case object BitAnd         extends Op( 14 )
+//      case object BitOr          extends Op( 15 )
+//      case object BitXor         extends Op( 16 )
+   // case object Lcm            extends Op( 17 )
+   // case object Gcd            extends Op( 18 )
+      case object Round          extends Op( 19 ) {
+         def value( a: Double, b: Double ) : Double = rd_round( a, b )
+      }
+      case object Roundup        extends Op( 20 ) {
+         def value( a: Double, b: Double ) : Double = rd_roundup( a, b )
+      }
+      case object Trunc          extends Op( 21 ) {
+         def value( a: Double, b: Double ) : Double = rd_trunc( a, b )
+      }
+      case object Atan2          extends Op( 22 ) {
+         def value( a: Double, b: Double ) : Double = rd_atan2( a, b )
+      }
+      case object Hypot          extends Op( 23 ) {
+         def value( a: Double, b: Double ) : Double = rd_hypot( a, b )
+      }
+      case object Hypotx         extends Op( 24 ) {
+         def value( a: Double, b: Double ) : Double = rd_hypotx( a, b )
+      }
+      case object Pow            extends Op( 25 ) {
+         def value( a: Double, b: Double ) : Double = rd_pow( a, b )
+      }
+   // case object <<             extends Op( 26 )
+   // case object >>             extends Op( 27 )
+   // case object UnsgnRghtShft  extends Op( 28 )
+   // case object Fill           extends Op( 29 )
+//      case object Ring1          extends Op( 30 )
+//      case object Ring2          extends Op( 31 )
+//      case object Ring3          extends Op( 32 )
+//      case object Ring4          extends Op( 33 )
+      case object Difsqr         extends Op( 34 ) {
+         def value( a: Double, b: Double ) : Double = rd_difsqr( a, b )
+      }
+      case object Sumsqr         extends Op( 35 ) {
+         def value( a: Double, b: Double ) : Double = rd_sumsqr( a, b )
+      }
+      case object Sqrsum         extends Op( 36 ) {
+         def value( a: Double, b: Double ) : Double = rd_sqrsum( a, b )
+      }
+      case object Sqrdif         extends Op( 37 ) {
+         def value( a: Double, b: Double ) : Double = rd_sqrdif( a, b )
+      }
+      case object Absdif         extends Op( 38 ) {
+         def value( a: Double, b: Double ) : Double = rd_absdif( a, b )
+      }
+      case object Thresh         extends Op( 39 ) {
+         def value( a: Double, b: Double ) : Double = rd_absdif( a, b )
+      }
+//      case object Amclip         extends Op( 40 )
+//      case object Scaleneg       extends Op( 41 )
+      case object Clip2          extends Op( 42 ) {
+         def value( a: Double, b: Double ) : Double = rd_clip2( a, b )
+      }
+//      case object Excess         extends Op( 43 )
+      case object Fold2          extends Op( 44 ) {
+         def value( a: Double, b: Double ) : Double = rd_fold2( a, b )
+      }
+      case object Wrap2          extends Op( 45 ) {
+         def value( a: Double, b: Double ) : Double = rd_wrap2( a, b )
+      }
+//      case object Firstarg       extends Op( 46 )
+   }
+
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ]) {
       private type E = Ex[ S ]
       
@@ -215,5 +338,44 @@ object Doubles extends Type[ Double ] {
    // def isStrictlyPositive : E= UnOp.make( 'isStrictlyPositive, ex )
    // def rho : E               = UnOp.make( 'rho, ex )
    // def theta : E             = UnOp.make( 'theta, ex )
+
+      import BinaryOp._
+
+      def +( b: E ) : E          = Plus.make( ex, b )
+      def -( b: E ) : E          = Minus.make( ex, b )
+      def *[ A <% E ]( b: A ) : E = Times.make( ex, b )
+      def /( b: E ) : E          = Div.make( ex, b )
+      def min( b: E ) : E        = Min.make( ex, b )
+      def max( b: E ) : E        = Max.make( ex, b )
+      def round( b: E ) : E      = Round.make( ex, b )
+      def roundup( b: E ) : E    = Roundup.make( ex, b )
+      def trunc( b: E ) : E      = Trunc.make( ex, b )
+      def atan2( b: E ) : E      = Atan2.make( ex, b )
+      def hypot( b: E ) : E      = Hypot.make( ex, b )
+      def hypotx( b: E ) : E     = Hypotx.make( ex, b )
+      def pow( b: E ) : E        = Pow.make( ex, b )
+//      def ring1( b: E ) : E     = Ring1.make( ex, b )
+//      def ring2( b: E ) : E     = Ring2.make( ex, b )
+//      def ring3( b: E ) : E     = Ring3.make( ex, b )
+//      def ring4( b: E ) : E     = Ring4.make( ex, b )
+      def difsqr( b: E ) : E    = Difsqr.make( ex, b )
+      def sumsqr( b: E ) : E    = Sumsqr.make( ex, b )
+      def sqrsum( b: E ) : E    = Sqrsum.make( ex, b )
+      def sqrdif( b: E ) : E    = Sqrdif.make( ex, b )
+      def absdif( b: E ) : E    = Absdif.make( ex, b )
+      def thresh( b: E ) : E    = Thresh.make( ex, b )
+//      def amclip( b: E ) : E    = Amclip.make( ex, b )
+//      def scaleneg( b: E ) : E  = Scaleneg.make( ex, b )
+      def clip2( b: E ) : E     = Clip2.make( ex, b )
+//      def excess( b: E ) : E    = Excess.make( ex, b )
+      def fold2( b: E ) : E     = Fold2.make( ex, b )
+      def wrap2( b: E ) : E     = Wrap2.make( ex, b )
+   // def firstarg( b: Double ) : Double  = d
+
+//      def linlin( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
+//         rd_linlin( d, srcLo, srcHi, dstLo, dstHi )
+//
+//      def linexp( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
+//         rd_linexp( d, srcLo, srcHi, dstLo, dstHi )
    }
 }
