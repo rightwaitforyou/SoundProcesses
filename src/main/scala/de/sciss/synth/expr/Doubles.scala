@@ -31,7 +31,11 @@ import de.sciss.synth.RichDouble
 import de.sciss.lucre.expr.Type
 import de.sciss.lucre.event.Targets
 
+// typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
+//           8 = string
 object Doubles extends Type[ Double ] {
+   private val typeID = 5
+
    protected def readValue( in: DataInput ) : Double = in.readDouble()
    protected def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}
 
@@ -41,9 +45,14 @@ object Doubles extends Type[ Double ] {
    private object UnaryOp {
       import RichDouble._
 
-      sealed abstract class Op( private[expr] val id: Int ) {
-         def make[ S <: Sys[ S ]]( a: Ex[ S ]) : Ex[ S ] = sys.error( "TODO" )
+      sealed abstract class Op( val id: Int ) extends Tuple1Op[ Double ] {
+         final def make[ S <: Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
+            new Tuple1( typeID, this, Targets[ S ], a )
+         }
+
          def value( a: Double ) : Double
+
+         def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = _1.toString + "." + name
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
@@ -54,6 +63,7 @@ object Doubles extends Type[ Double ] {
       
       case object Neg extends Op( 0 ) {
          def value( a: Double ) : Double = rd_neg( a )
+         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
       }
       case object Abs         extends Op(  5 ) {
          def value( a: Double ) : Double = rd_abs( a )
@@ -283,7 +293,7 @@ object Doubles extends Type[ Double ] {
 //      case object Firstarg       extends Op( 46 )
    }
 
-   final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ]) {
+   final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       private type E = Ex[ S ]
       
       import UnaryOp._

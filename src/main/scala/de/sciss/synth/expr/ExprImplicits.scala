@@ -16,5 +16,6 @@ class ExprImplicits[ S <: Sys[ S ]] {
    implicit def booleanOps[ A <% Expr[ S, Boolean ]]( ex: A ) : Booleans.Ops[ S ] = new Booleans.Ops( ex )
 
    implicit def doubleConst( d: Double ) : Expr[ S, Double ] = Doubles.newConst( d )
-   implicit def doubleOps[ A <% Expr[ S, Double ]]( ex: A ) : Doubles.Ops[ S ] = new Doubles.Ops( ex )
+   implicit def doubleOps[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, Double ]) : Doubles.Ops[ S ] =
+      new Doubles.Ops( ex )
 }
