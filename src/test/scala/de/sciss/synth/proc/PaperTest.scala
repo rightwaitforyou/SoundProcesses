@@ -10,21 +10,24 @@ import de.sciss.confluent.Confluent
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import de.sciss.lucre.stm.{Durable, TxnSerializer, Cursor, Sys, InMemory}
+import de.sciss.confluent.KSys
 
-object PaperTest {
-   def main( args: Array[ String ]) {
+object PaperTest extends App {
+//   def main( args: Array[ String ]) {
 //      implicit val system: InMemory = InMemory()
 //      run[ InMemory ]()
 
+   {
       val dir        = File.createTempFile( "database", "db" )
       dir.delete()
       val store      = BerkeleyDB.factory( dir )
       implicit val s = Confluent( store )
       run[ Confluent ]
+   }
 
 //      implicit val s = Durable( store )
 //      run[ Durable ]
-   }
+//   }
 
 //   object Access {
 //
@@ -34,8 +37,9 @@ object PaperTest {
 //      def freq  : Expr.Var[ S, Double ]
 //   }
 
-   def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
+   def run[ S <: KSys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
       implicit val whyOhWhy   = ProcGroup.serializer[ S ]
+      implicit val whyOhWhy2  = Proc.serializer[ S ]
       implicit object doubleVarSerializer extends TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Double ]] {
          def write( v: Expr.Var[ S, Double ], out: DataOutput ) { v.write( out )}
          def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr.Var[ S, Double ] =
@@ -55,7 +59,7 @@ object PaperTest {
 
       val freqVar = cursor.step { implicit tx => newAccess( exprVar( 50.0 ))}
 
-      val proc1 = cursor.step { implicit tx =>
+      val (v1, proc1) = cursor.step { implicit tx =>
          val group   = access.get
          val p       = newProc()
          p.freq      = freqVar.get
@@ -69,10 +73,16 @@ object PaperTest {
             Out.ar( 0, m )
          }
          group.add( p )
-         newAccess( p )
+         tx.inputAccess -> newAccess( p )
       }
 
-      Auralization.run( access )
+      val v2 = cursor.step { implicit tx =>
+         val p    = proc1.get
+         p.freq   = freqVar.get * 1.4
+         tx.inputAccess
+      }
+
+      Auralization.run[ S ]( access )
 
       (new Thread {
          override def run() {

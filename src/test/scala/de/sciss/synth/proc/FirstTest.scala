@@ -5,12 +5,9 @@ import synth.{SynthDef, Server, expr}
 import expr._
 import de.sciss.lucre.stm.{Sys, Cursor, InMemory}
 
-// for f***'s sake, `extends App` doesn't work, no method `main` found ???
-object FirstTest {
-   def main( args: Array[ String ]) {
-      implicit val system: InMemory = InMemory()
-      run[ InMemory ]()
-   }
+object FirstTest extends App {
+   implicit val system: InMemory = InMemory()
+   run[ InMemory ]()
 
    def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
       implicit val whyOhWhy = Proc.serializer[ S ]
