@@ -153,7 +153,7 @@ ____PAPER____ newAccess( p )
 [2 Apr 2012, 09:05'09.390] Confluent - txn read Var[Int](<3 @ 0,1>)
 [2 Apr 2012, 09:05'09.390] Confluent - txn readID <4 @ 0,1>
 [2 Apr 2012, 09:05'09.390] Confluent - txn read Var(<5 @ 0,1>)
-[2 Apr 2012, 09:05'09.391] Confluent - txn newVar Var(<18 @ 0,1>)
+[2 Apr 2012, 09:05'09.391] Confluent - txn newVar Var(<18 @ 0,1>)			// access-var for p
 [2 Apr 2012, 09:05'09.391] Confluent - Var(<18 @ 0,1>) ini Proc<11 @ >
 [2 Apr 2012, 09:05'09.396] Confluent - ::::::: txn flush - term = 2 :::::::
 [2 Apr 2012, 09:05'09.397] Confluent - txn flush write Node<1 @ 0,1> for <1 @ 0,2>
@@ -317,7 +317,7 @@ ____PAPER____ access group
 [2 Apr 2012, 09:05'09.651] Confluent - txn read Var(<5 @ 0,3>)
 ____PAPER____ p1 = p.meld( v1 )
 [2 Apr 2012, 09:05'09.652] Confluent - Var(<18 @ 0,1>) meld Path(0, 2)
-[2 Apr 2012, 09:05'09.658] Confluent - txn get' <18 @ 0,2>
+[2 Apr 2012, 09:05'09.658] Confluent - txn get' <18 @ 0,2>				// access-var for p
 [2 Apr 2012, 09:05'09.658] Confluent - txn readID <11 @ 2,2>
 [2 Apr 2012, 09:05'09.658] Confluent - txn read Var(<12 @ 2,2>)
 [2 Apr 2012, 09:05'09.658] Confluent - txn read Var[Int](<13 @ 2,2>)
@@ -335,11 +335,11 @@ ____PAPER____ group.add( p1 )
 [2 Apr 2012, 09:05'09.675] Confluent - txn read Var(<15 @ 2,3>)
 [2 Apr 2012, 09:05'09.675] Confluent - txn read Var[Int](<16 @ 2,3>)
 [2 Apr 2012, 09:05'09.675] Confluent - txn read Var(<17 @ 2,3>)
-[2 Apr 2012, 09:05'09.675] Confluent - Var(<5 @ 0,3>) set Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null)
+[2 Apr 2012, 09:05'09.675] Confluent - Var(<5 @ 0,3>) set Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null)	// OK
 [2 Apr 2012, 09:05'09.675] Confluent - ....... txn dirty .......
-[2 Apr 2012, 09:05'09.675] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.675] Confluent - Var(<12 @ 2,2>) get						//       proc(children)
 [2 Apr 2012, 09:05'09.675] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 09:05'09.676] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.676] Confluent - txn readID <1 @ 0,2>						//       -> group
 [2 Apr 2012, 09:05'09.676] Confluent - txn get' <1 @ 0,2>
 [2 Apr 2012, 09:05'09.677] Confluent - txn readID <1 @ 0,2>
 [2 Apr 2012, 09:05'09.677] Confluent - txn read Var(<2 @ 0,2>)
@@ -355,7 +355,7 @@ Added(Node<1 @ 0,3>,Vector(Proc<11 @ 2,2>))
 [2 Apr 2012, 09:05'09.679] Confluent - txn new tree 4
 [2 Apr 2012, 09:05'09.683] Confluent - ::::::: txn flush - meld term = 4 :::::::
 [2 Apr 2012, 09:05'09.687] Confluent - txn flush write Node<1 @ 0,3> for <1 @ 0,3,4,4>
-[2 Apr 2012, 09:05'09.690] Confluent - txn flush write Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null) for <5 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.690] Confluent - txn flush write Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null) for <5 @ 0,3,4,4>	// OK
 [2 Apr 2012, 09:05'09.691] Confluent - txn flush write Proc<11 @ 2,2> for <11 @ 0,3,4,4>
 [2 Apr 2012, 09:05'09.691] Confluent - txn flush write Vector((1,Node<1 @ 0,2>.event[Element[<?>]]), (1,Node<1 @ 0,3>.event[Element[<?>]])) for <12 @ 2,2,4,4>
 
