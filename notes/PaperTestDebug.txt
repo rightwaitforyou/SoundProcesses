@@ -125,24 +125,21 @@ ____PAPER____ p.freq = freqVar
 [2 Apr 2012, 09:05'09.311] Confluent - Var(<15 @ >) get
 [2 Apr 2012, 09:05'09.311] Confluent - txn get' <15 @ >
 [2 Apr 2012, 09:05'09.312] Confluent - Var(<17 @ >) set Expr.Var<6 @ 1,1>		// p.freq.set( freqVar )
-
-######## CONTINUE HERE ########
-
 ____PAPER____ group.add( p )
 [2 Apr 2012, 09:05'09.372] Confluent - Var(<5 @ 0,1>) get
 [2 Apr 2012, 09:05'09.372] Confluent - txn get' <5 @ 0,1>
 [2 Apr 2012, 09:05'09.373] Confluent - Var(<5 @ 0,1>) set Leaf(Proc<11 @ >,null)
 [2 Apr 2012, 09:05'09.376] Confluent - Var(<12 @ >) get
 [2 Apr 2012, 09:05'09.376] Confluent - txn get' <12 @ >
-[2 Apr 2012, 09:05'09.377] Confluent - Var(<12 @ >) set Vector((1,Node<1 @ 0,1>.event[Element[<?>]]))
+[2 Apr 2012, 09:05'09.377] Confluent - Var(<12 @ >) set Vector((1,Node<1 @ 0,1>.event[Element[<?>]]))	// proc(children) += group
 [2 Apr 2012, 09:05'09.377] Confluent - Var(<15 @ >) get
 [2 Apr 2012, 09:05'09.377] Confluent - txn get' <15 @ >
-[2 Apr 2012, 09:05'09.377] Confluent - Var(<15 @ >) set Vector((1,Expr.Var<14 @ >.map[FreqChanged[<?>]]))
+[2 Apr 2012, 09:05'09.377] Confluent - Var(<15 @ >) set Vector((1,Expr.Var<14 @ >.map[FreqChanged[<?>]])) // proc.freq(children) += proc.freq ('connect')
 [2 Apr 2012, 09:05'09.378] Confluent - Var(<17 @ >) get
 [2 Apr 2012, 09:05'09.378] Confluent - txn get' <17 @ >
 [2 Apr 2012, 09:05'09.378] Confluent - Var(<7 @ 1,1>) get
 [2 Apr 2012, 09:05'09.378] Confluent - txn get' <7 @ 1,1>
-[2 Apr 2012, 09:05'09.378] Confluent - Var(<7 @ 1,1>) set Vector((1,Expr.Var<14 @ >))
+[2 Apr 2012, 09:05'09.378] Confluent - Var(<7 @ 1,1>) set Vector((1,Expr.Var<14 @ >))	// freq.children += proc.freq
 [2 Apr 2012, 09:05'09.378] Confluent - Var(<9 @ 1,1>) get
 [2 Apr 2012, 09:05'09.378] Confluent - txn get' <9 @ 1,1>
 [2 Apr 2012, 09:05'09.385] Confluent - Var(<2 @ 0,1>) get
@@ -176,43 +173,43 @@ ____PAPER____ newAccess( p )
 ____PAPER____ access p
 [2 Apr 2012, 09:05'09.530] Confluent - Var(<18 @ 0,1>) get
 [2 Apr 2012, 09:05'09.530] Confluent - txn get' <18 @ 0,2>
-[2 Apr 2012, 09:05'09.530] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.530] Confluent - txn readID <11 @ 2,2>				// OK
 [2 Apr 2012, 09:05'09.530] Confluent - txn read Var(<12 @ 2,2>)
 [2 Apr 2012, 09:05'09.530] Confluent - txn read Var[Int](<13 @ 2,2>)
 [2 Apr 2012, 09:05'09.531] Confluent - txn readID <14 @ 2,2>
 [2 Apr 2012, 09:05'09.532] Confluent - txn read Var(<15 @ 2,2>)
 [2 Apr 2012, 09:05'09.532] Confluent - txn read Var[Int](<16 @ 2,2>)
-[2 Apr 2012, 09:05'09.532] Confluent - txn read Var(<17 @ 2,2>)
+[2 Apr 2012, 09:05'09.532] Confluent - txn read Var(<17 @ 2,2>)				
 ____PAPER____ access freqVar
 [2 Apr 2012, 09:05'09.532] Confluent - Var(<10 @ 0,0>) get
 [2 Apr 2012, 09:05'09.532] Confluent - txn get' <10 @ 0,2>
-[2 Apr 2012, 09:05'09.532] Confluent - txn readID <6 @ 1,2>
+[2 Apr 2012, 09:05'09.532] Confluent - txn readID <6 @ 1,2>				// OK
 [2 Apr 2012, 09:05'09.533] Confluent - txn read Var(<7 @ 1,2>)
 [2 Apr 2012, 09:05'09.533] Confluent - txn read Var[Int](<8 @ 1,2>)
 [2 Apr 2012, 09:05'09.533] Confluent - txn read Var(<9 @ 1,2>)
 ____PAPER____ p.freq = freqVar * 1.4
-[2 Apr 2012, 09:05'09.535] Confluent - txn newID <19 @ >
+[2 Apr 2012, 09:05'09.535] Confluent - txn newID <19 @ >				// the new BinOp i guess
 [2 Apr 2012, 09:05'09.536] Confluent - txn newVar Var(<20 @ >)
 [2 Apr 2012, 09:05'09.536] Confluent - Var(<20 @ >) ini Vector()
 [2 Apr 2012, 09:05'09.536] Confluent - ....... txn dirty .......
 [2 Apr 2012, 09:05'09.536] Confluent - txn newVar Var[Int](<21 @ >)
 [2 Apr 2012, 09:05'09.536] Confluent - Var[Int](<21 @ >) ini 0
-[2 Apr 2012, 09:05'09.538] Confluent - Var(<17 @ 2,2>) get
+[2 Apr 2012, 09:05'09.538] Confluent - Var(<17 @ 2,2>) get				// proc.freq(ref).get (read previous entry ???)
 [2 Apr 2012, 09:05'09.538] Confluent - txn get' <17 @ 2,2>
 [2 Apr 2012, 09:05'09.539] Confluent - txn readID <6 @ 1,2>
 [2 Apr 2012, 09:05'09.539] Confluent - txn read Var(<7 @ 1,2>)
 [2 Apr 2012, 09:05'09.539] Confluent - txn read Var[Int](<8 @ 1,2>)
 [2 Apr 2012, 09:05'09.539] Confluent - txn read Var(<9 @ 1,2>)
-[2 Apr 2012, 09:05'09.539] Confluent - Var(<15 @ 2,2>) get
+[2 Apr 2012, 09:05'09.539] Confluent - Var(<15 @ 2,2>) get				// proc.freq(children)
 [2 Apr 2012, 09:05'09.540] Confluent - txn get' <15 @ 2,2>
 [2 Apr 2012, 09:05'09.540] Confluent - txn readID <11 @ 2,2>
 [2 Apr 2012, 09:05'09.540] Confluent - txn get' <11 @ 2,2>
 [2 Apr 2012, 09:05'09.540] Confluent - txn readID <11 @ 2,2>
 [2 Apr 2012, 09:05'09.541] Confluent - txn read Var(<12 @ 2,2>)
 [2 Apr 2012, 09:05'09.541] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 09:05'09.541] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.541] Confluent - Var(<12 @ 2,2>) get				// proc(children)
 [2 Apr 2012, 09:05'09.541] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 09:05'09.541] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.541] Confluent - txn readID <1 @ 0,2>				//     -> group
 [2 Apr 2012, 09:05'09.541] Confluent - txn get' <1 @ 0,2>
 [2 Apr 2012, 09:05'09.542] Confluent - txn readID <1 @ 0,2>
 [2 Apr 2012, 09:05'09.542] Confluent - txn read Var(<2 @ 0,2>)
@@ -221,68 +218,68 @@ ____PAPER____ p.freq = freqVar * 1.4
 [2 Apr 2012, 09:05'09.542] Confluent - txn get' <2 @ 0,2>
 [2 Apr 2012, 09:05'09.545] Confluent - txn readID <4 @ 0,2>
 [2 Apr 2012, 09:05'09.545] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 09:05'09.546] Confluent - Var(<7 @ 1,2>) get
+[2 Apr 2012, 09:05'09.546] Confluent - Var(<7 @ 1,2>) get				// freq(children)
 [2 Apr 2012, 09:05'09.546] Confluent - txn get' <7 @ 1,2>
-[2 Apr 2012, 09:05'09.557] Confluent - txn readID <14 @ 2,2>
+[2 Apr 2012, 09:05'09.557] Confluent - txn readID <14 @ 2,2>				// -> proc.freq
 [2 Apr 2012, 09:05'09.557] Confluent - txn get' <14 @ 2,2>
 [2 Apr 2012, 09:05'09.558] Confluent - txn readID <14 @ 2,2>
 [2 Apr 2012, 09:05'09.558] Confluent - txn read Var(<15 @ 2,2>)
 [2 Apr 2012, 09:05'09.558] Confluent - txn read Var[Int](<16 @ 2,2>)
 [2 Apr 2012, 09:05'09.558] Confluent - Var(<15 @ 2,2>) get
-[2 Apr 2012, 09:05'09.558] Confluent - txn get' <15 @ 2,2>
-[2 Apr 2012, 09:05'09.558] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.558] Confluent - txn get' <15 @ 2,2>				//    proc.freq(children)
+[2 Apr 2012, 09:05'09.558] Confluent - txn readID <11 @ 2,2>				//    -> proc
 [2 Apr 2012, 09:05'09.558] Confluent - txn get' <11 @ 2,2>
 [2 Apr 2012, 09:05'09.559] Confluent - txn readID <11 @ 2,2>
 [2 Apr 2012, 09:05'09.559] Confluent - txn read Var(<12 @ 2,2>)
 [2 Apr 2012, 09:05'09.559] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 09:05'09.559] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.559] Confluent - Var(<12 @ 2,2>) get				//       proc(children)
 [2 Apr 2012, 09:05'09.559] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 09:05'09.560] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.560] Confluent - txn readID <1 @ 0,2>				//       -> group
 [2 Apr 2012, 09:05'09.560] Confluent - txn get' <1 @ 0,2>
 [2 Apr 2012, 09:05'09.560] Confluent - txn readID <1 @ 0,2>
 [2 Apr 2012, 09:05'09.561] Confluent - txn read Var(<2 @ 0,2>)
 [2 Apr 2012, 09:05'09.561] Confluent - txn read Var[Int](<3 @ 0,2>)
-[2 Apr 2012, 09:05'09.561] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.561] Confluent - Var(<2 @ 0,2>) get				//          group(children) (--> observer)
 [2 Apr 2012, 09:05'09.561] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 09:05'09.561] Confluent - txn readID <4 @ 0,2>
+[2 Apr 2012, 09:05'09.561] Confluent - txn readID <4 @ 0,2>				// group.seq
 [2 Apr 2012, 09:05'09.561] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 09:05'09.562] Confluent - Var(<7 @ 1,2>) set Vector()
+[2 Apr 2012, 09:05'09.562] Confluent - Var(<7 @ 1,2>) set Vector()			// freq(children) = Nil  (-= proc.freq)
 [2 Apr 2012, 09:05'09.563] Confluent - Var(<9 @ 1,2>) get
 [2 Apr 2012, 09:05'09.563] Confluent - txn get' <9 @ 1,2>
-[2 Apr 2012, 09:05'09.563] Confluent - Var(<17 @ 2,2>) set (Expr.Var<6 @ 1,2> * 1.4)
-[2 Apr 2012, 09:05'09.564] Confluent - Var(<20 @ >) get
+[2 Apr 2012, 09:05'09.563] Confluent - Var(<17 @ 2,2>) set (Expr.Var<6 @ 1,2> * 1.4)	// proc.freq.set	OK
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<20 @ >) get					// times(children)
 [2 Apr 2012, 09:05'09.564] Confluent - txn get' <20 @ >
-[2 Apr 2012, 09:05'09.564] Confluent - Var(<20 @ >) set Vector((1,Expr.Var<14 @ 2,2>))
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<20 @ >) set Vector((1,Expr.Var<14 @ 2,2>))	// times(children) += proc.freq
 [2 Apr 2012, 09:05'09.564] Confluent - Var(<7 @ 1,2>) get
 [2 Apr 2012, 09:05'09.564] Confluent - txn get' <7 @ 1,2>
-[2 Apr 2012, 09:05'09.564] Confluent - Var(<7 @ 1,2>) set Vector((1,(Expr.Var<6 @ 1,2> * 1.4)))
-[2 Apr 2012, 09:05'09.564] Confluent - Var(<9 @ 1,2>) get
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<7 @ 1,2>) set Vector((1,(Expr.Var<6 @ 1,2> * 1.4)))   // freq(children) += times
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<9 @ 1,2>) get				// (freq(ref))
 [2 Apr 2012, 09:05'09.564] Confluent - txn get' <9 @ 1,2>
 [2 Apr 2012, 09:05'09.565] Confluent - Var(<9 @ 1,2>) get
 [2 Apr 2012, 09:05'09.565] Confluent - txn get' <9 @ 1,2>
 [2 Apr 2012, 09:05'09.565] Confluent - Var(<9 @ 1,2>) get
 [2 Apr 2012, 09:05'09.565] Confluent - txn get' <9 @ 1,2>
-[2 Apr 2012, 09:05'09.570] Confluent - Var(<15 @ 2,2>) get
+[2 Apr 2012, 09:05'09.570] Confluent - Var(<15 @ 2,2>) get				// proc.freq(children)
 [2 Apr 2012, 09:05'09.570] Confluent - txn get' <15 @ 2,2>
 [2 Apr 2012, 09:05'09.570] Confluent - txn readID <11 @ 2,2>
 [2 Apr 2012, 09:05'09.571] Confluent - txn get' <11 @ 2,2>
-[2 Apr 2012, 09:05'09.571] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.571] Confluent - txn readID <11 @ 2,2>				//    -> proc
 [2 Apr 2012, 09:05'09.571] Confluent - txn read Var(<12 @ 2,2>)
 [2 Apr 2012, 09:05'09.571] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 09:05'09.571] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.571] Confluent - Var(<12 @ 2,2>) get				//       proc(children)
 [2 Apr 2012, 09:05'09.571] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 09:05'09.572] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.572] Confluent - txn readID <1 @ 0,2>				//       -> group
 [2 Apr 2012, 09:05'09.572] Confluent - txn get' <1 @ 0,2>
 [2 Apr 2012, 09:05'09.572] Confluent - txn readID <1 @ 0,2>
 [2 Apr 2012, 09:05'09.572] Confluent - txn read Var(<2 @ 0,2>)
 [2 Apr 2012, 09:05'09.572] Confluent - txn read Var[Int](<3 @ 0,2>)
-[2 Apr 2012, 09:05'09.572] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.572] Confluent - Var(<2 @ 0,2>) get				//          group(children) (--> observer)
 [2 Apr 2012, 09:05'09.572] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 09:05'09.573] Confluent - txn readID <4 @ 0,2>
+[2 Apr 2012, 09:05'09.573] Confluent - txn readID <4 @ 0,2>				// group.seq
 [2 Apr 2012, 09:05'09.573] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 09:05'09.574] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.574] Confluent - Var(<12 @ 2,2>) get				//       proc(children)
 [2 Apr 2012, 09:05'09.574] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 09:05'09.575] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.575] Confluent - txn readID <1 @ 0,2>				//       -> group
 [2 Apr 2012, 09:05'09.575] Confluent - txn get' <1 @ 0,2>
 [2 Apr 2012, 09:05'09.575] Confluent - txn readID <1 @ 0,2>
 [2 Apr 2012, 09:05'09.575] Confluent - txn read Var(<2 @ 0,2>)
@@ -293,7 +290,7 @@ ____PAPER____ p.freq = freqVar * 1.4
 [2 Apr 2012, 09:05'09.576] Confluent - txn read Var(<5 @ 0,2>)
 [2 Apr 2012, 09:05'09.580] Confluent - Var(<2 @ 0,2>) get
 [2 Apr 2012, 09:05'09.580] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 09:05'09.583] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.583] Confluent - txn readID <11 @ 2,2>				//    -> proc
 [2 Apr 2012, 09:05'09.583] Confluent - txn read Var(<12 @ 2,2>)
 [2 Apr 2012, 09:05'09.583] Confluent - txn read Var[Int](<13 @ 2,2>)
 [2 Apr 2012, 09:05'09.583] Confluent - txn readID <14 @ 2,2>
@@ -302,11 +299,11 @@ ____PAPER____ p.freq = freqVar * 1.4
 [2 Apr 2012, 09:05'09.583] Confluent - txn read Var(<17 @ 2,2>)
 Element(Node<1 @ 0,2>,Vector(FreqChanged(Proc<11 @ 2,2>,Change(50.0,70.0))))
 [2 Apr 2012, 09:05'09.591] Confluent - ::::::: txn flush - term = 3 :::::::
-[2 Apr 2012, 09:05'09.591] Confluent - txn flush write Vector((1,(Expr.Var<6 @ 1,2> * 1.4))) for <7 @ 1,3>
-[2 Apr 2012, 09:05'09.602] Confluent - txn flush write Expr.Var<14 @ 2,2> for <14 @ 2,3>
-[2 Apr 2012, 09:05'09.623] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <17 @ 2,3>
-[2 Apr 2012, 09:05'09.644] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <19 @ 3,3>
-[2 Apr 2012, 09:05'09.644] Confluent - txn flush write Vector((1,Expr.Var<14 @ 2,2>)) for <20 @ 3,3>
+[2 Apr 2012, 09:05'09.591] Confluent - txn flush write Vector((1,(Expr.Var<6 @ 1,2> * 1.4))) for <7 @ 1,3>  	// freq(children) = times
+[2 Apr 2012, 09:05'09.602] Confluent - txn flush write Expr.Var<14 @ 2,2> for <14 @ 2,3>			// proc.freq
+[2 Apr 2012, 09:05'09.623] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <17 @ 2,3>			// proc.freq.set(times)
+[2 Apr 2012, 09:05'09.644] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <19 @ 3,3>			// times (writeVal as target child)
+[2 Apr 2012, 09:05'09.644] Confluent - txn flush write Vector((1,Expr.Var<14 @ 2,2>)) for <20 @ 3,3>		// times(children) = proc.freq
 [2 Apr 2012, 09:05'09.645] Confluent - txn flush write 0 for <21 @ 3,3>
 
 [2 Apr 2012, 09:05'09.649] Confluent - ::::::: atomic - input access = Path(0, 3) :::::::
