@@ -39,14 +39,14 @@ children
 [2 Apr 2012, 08:38'45.725] Confluent - ::::::: root :::::::
 ____PAPER____ newGroup
 [2 Apr 2012, 08:38'45.785] Confluent - txn durable
-[2 Apr 2012, 08:38'45.786] Confluent - txn newID <1 @ >         	// group(ID)
-[2 Apr 2012, 08:38'45.813] Confluent - txn newVar Var(<2 @ >)		// group(children)
+[2 Apr 2012, 08:38'45.786] Confluent - txn newID <1 @ >         			// group(ID)
+[2 Apr 2012, 08:38'45.813] Confluent - txn newVar Var(<2 @ >)				// group(children)
 [2 Apr 2012, 08:38'45.814] Confluent - Var(<2 @ >) ini Vector()
 [2 Apr 2012, 08:38'45.829] Confluent - ....... txn dirty .......
-[2 Apr 2012, 08:38'45.831] Confluent - txn newVar Var[Int](<3 @ >)	// group(invalid)
+[2 Apr 2012, 08:38'45.831] Confluent - txn newVar Var[Int](<3 @ >)			// group(invalid)
 [2 Apr 2012, 08:38'45.832] Confluent - Var[Int](<3 @ >) ini 0
-[2 Apr 2012, 08:38'45.838] Confluent - txn newID <4 @ >			// group.seq(ID)
-[2 Apr 2012, 08:38'45.844] Confluent - txn newVar Var(<5 @ >)		// group.seq(downNode)
+[2 Apr 2012, 08:38'45.838] Confluent - txn newID <4 @ >					// group.seq(ID)
+[2 Apr 2012, 08:38'45.844] Confluent - txn newVar Var(<5 @ >)				// group.seq(downNode)
 [2 Apr 2012, 08:38'45.844] Confluent - Var(<5 @ >) ini null
 ____PAPER____ react to new group
 [2 Apr 2012, 08:38'45.858] Confluent - Var(<2 @ >) get
@@ -62,16 +62,17 @@ ____PAPER____ react to new group
 [2 Apr 2012, 08:38'45.902] Confluent - txn flush write Vector((1,ObserverKey(0)), (2,ObserverKey(0))) for <2 @ 0,0>
 [2 Apr 2012, 08:38'45.903] Confluent - txn flush write 0 for <3 @ 0,0>
 [2 Apr 2012, 08:38'45.904] Confluent - txn flush write null for <5 @ 0,0>
+
 [2 Apr 2012, 08:38'45.907] Confluent - ::::::: atomic - input access = Path(0, 0) :::::::
 ____PAPER____ freq = exprVar( 50.0 )
-[2 Apr 2012, 08:38'45.933] Confluent - txn newID <6 @ >
-[2 Apr 2012, 08:38'45.933] Confluent - txn newVar Var(<7 @ >)
-[2 Apr 2012, 08:38'45.933] Confluent - Var(<7 @ >) ini Vector()
+[2 Apr 2012, 08:38'45.933] Confluent - txn newID <6 @ >					// freq(ID)
+[2 Apr 2012, 08:38'45.933] Confluent - txn newVar Var(<7 @ >)				// freq(children)
+[2 Apr 2012, 08:38'45.933] Confluent - Var(<7 @ >) ini Vector()		
 [2 Apr 2012, 08:38'45.934] Confluent - ....... txn dirty .......
-[2 Apr 2012, 08:38'45.934] Confluent - txn newVar Var[Int](<8 @ >)
+[2 Apr 2012, 08:38'45.934] Confluent - txn newVar Var[Int](<8 @ >)			// freq(invalid)
 [2 Apr 2012, 08:38'45.934] Confluent - Var[Int](<8 @ >) ini 0
-[2 Apr 2012, 08:38'45.934] Confluent - txn newVar Var(<9 @ >)
-[2 Apr 2012, 08:38'45.934] Confluent - Var(<9 @ >) ini 50.0
+[2 Apr 2012, 08:38'45.934] Confluent - txn newVar Var(<9 @ >)				// freq(ref)
+[2 Apr 2012, 08:38'45.934] Confluent - Var(<9 @ >) ini 50.0		
 ____PAPER____ newAccess( freq )
 [2 Apr 2012, 08:38'45.937] Confluent - Root get
 [2 Apr 2012, 08:38'45.937] Confluent - txn get' <0 @ 0,0>
@@ -80,13 +81,14 @@ ____PAPER____ newAccess( freq )
 [2 Apr 2012, 08:38'46.004] Confluent - txn read Var[Int](<3 @ 0,0>)
 [2 Apr 2012, 08:38'46.006] Confluent - txn readID <4 @ 0,0>
 [2 Apr 2012, 08:38'46.006] Confluent - txn read Var(<5 @ 0,0>)
-[2 Apr 2012, 08:38'46.007] Confluent - txn newVar Var(<10 @ 0,0>)
+[2 Apr 2012, 08:38'46.007] Confluent - txn newVar Var(<10 @ 0,0>)			// access(freq)
 [2 Apr 2012, 08:38'46.007] Confluent - Var(<10 @ 0,0>) ini Expr.Var<6 @ >
 [2 Apr 2012, 08:38'46.024] Confluent - ::::::: txn flush - term = 1 :::::::
 [2 Apr 2012, 08:38'46.025] Confluent - txn flush write Vector() for <7 @ 1,1>
 [2 Apr 2012, 08:38'46.025] Confluent - txn flush write 0 for <8 @ 1,1>
 [2 Apr 2012, 08:38'46.026] Confluent - txn flush write 50.0 for <9 @ 1,1>
 [2 Apr 2012, 08:38'46.026] Confluent - txn flush write Expr.Var<6 @ > for <10 @ 0,1>
+
 [2 Apr 2012, 08:38'46.029] Confluent - ::::::: atomic - input access = Path(0, 1) :::::::
 ____PAPER____ access group
 [2 Apr 2012, 08:38'46.030] Confluent - Root get
@@ -97,406 +99,409 @@ ____PAPER____ access group
 [2 Apr 2012, 08:38'46.031] Confluent - txn readID <4 @ 0,1>
 [2 Apr 2012, 08:38'46.031] Confluent - txn read Var(<5 @ 0,1>)
 ____PAPER____ p = newProc()
-[2 Apr 2012, 08:38'46.038] Confluent - txn newID <11 @ >
-[2 Apr 2012, 08:38'46.038] Confluent - txn newVar Var(<12 @ >)
+[2 Apr 2012, 08:38'46.038] Confluent - txn newID <11 @ >				// proc(ID)
+[2 Apr 2012, 08:38'46.038] Confluent - txn newVar Var(<12 @ >)				// proc(children)
 [2 Apr 2012, 08:38'46.038] Confluent - Var(<12 @ >) ini Vector()
 [2 Apr 2012, 08:38'46.038] Confluent - ....... txn dirty .......
-[2 Apr 2012, 08:38'46.039] Confluent - txn newVar Var[Int](<13 @ >)
+[2 Apr 2012, 08:38'46.039] Confluent - txn newVar Var[Int](<13 @ >)			// proc(invalid)
 [2 Apr 2012, 08:38'46.039] Confluent - Var[Int](<13 @ >) ini 0
-[2 Apr 2012, 08:38'46.039] Confluent - txn newID <14 @ >
-[2 Apr 2012, 08:38'46.040] Confluent - txn newVar Var(<15 @ >)
+[2 Apr 2012, 08:38'46.039] Confluent - txn newID <14 @ >				// proc.freq(ID)
+[2 Apr 2012, 08:38'46.040] Confluent - txn newVar Var(<15 @ >)				// proc.freq(children)
 [2 Apr 2012, 08:38'46.040] Confluent - Var(<15 @ >) ini Vector()
-[2 Apr 2012, 08:38'46.040] Confluent - txn newVar Var[Int](<16 @ >)
+[2 Apr 2012, 08:38'46.040] Confluent - txn newVar Var[Int](<16 @ >)			// proc.freq(invalid)
 [2 Apr 2012, 08:38'46.040] Confluent - Var[Int](<16 @ >) ini 0
-[2 Apr 2012, 08:38'46.040] Confluent - txn newVar Var(<17 @ >)
+[2 Apr 2012, 08:38'46.040] Confluent - txn newVar Var(<17 @ >)				// proc.freq(ref)
 [2 Apr 2012, 08:38'46.040] Confluent - Var(<17 @ >) ini 441.0
-[2 Apr 2012, 08:38'46.042] Confluent - txn newVar Var(<18 @ >)
-[2 Apr 2012, 08:38'46.042] Confluent - Var(<18 @ >) ini SynthGraph(Vector(),Set())
 ____PAPER____ access freqVar
-[2 Apr 2012, 08:38'46.042] Confluent - Var(<10 @ 0,0>) get
-[2 Apr 2012, 08:38'46.043] Confluent - txn get' <10 @ 0,1>
-[2 Apr 2012, 08:38'46.043] Confluent - txn readID <6 @ 1,1>
-[2 Apr 2012, 08:38'46.043] Confluent - txn read Var(<7 @ 1,1>)
-[2 Apr 2012, 08:38'46.043] Confluent - txn read Var[Int](<8 @ 1,1>)
-[2 Apr 2012, 08:38'46.044] Confluent - txn read Var(<9 @ 1,1>)
+[2 Apr 2012, 09:05'09.310] Confluent - Var(<10 @ 0,0>) get
+[2 Apr 2012, 09:05'09.310] Confluent - txn get' <10 @ 0,1>
+[2 Apr 2012, 09:05'09.310] Confluent - txn readID <6 @ 1,1>
+[2 Apr 2012, 09:05'09.310] Confluent - txn read Var(<7 @ 1,1>)
+[2 Apr 2012, 09:05'09.310] Confluent - txn read Var[Int](<8 @ 1,1>)
+[2 Apr 2012, 09:05'09.311] Confluent - txn read Var(<9 @ 1,1>)
 ____PAPER____ p.freq = freqVar
-[2 Apr 2012, 08:38'46.044] Confluent - Var(<17 @ >) get
-[2 Apr 2012, 08:38'46.044] Confluent - txn get' <17 @ >
-[2 Apr 2012, 08:38'46.044] Confluent - Var(<15 @ >) get
-[2 Apr 2012, 08:38'46.044] Confluent - txn get' <15 @ >
-[2 Apr 2012, 08:38'46.044] Confluent - Var(<17 @ >) set Expr.Var<6 @ 1,1>
+[2 Apr 2012, 09:05'09.311] Confluent - Var(<17 @ >) get
+[2 Apr 2012, 09:05'09.311] Confluent - txn get' <17 @ >
+[2 Apr 2012, 09:05'09.311] Confluent - Var(<15 @ >) get
+[2 Apr 2012, 09:05'09.311] Confluent - txn get' <15 @ >
+[2 Apr 2012, 09:05'09.312] Confluent - Var(<17 @ >) set Expr.Var<6 @ 1,1>		// p.freq.set( freqVar )
+
+######## CONTINUE HERE ########
+
 ____PAPER____ group.add( p )
-[2 Apr 2012, 08:38'46.111] Confluent - Var(<5 @ 0,1>) get
-[2 Apr 2012, 08:38'46.111] Confluent - txn get' <5 @ 0,1>
-[2 Apr 2012, 08:38'46.112] Confluent - Var(<5 @ 0,1>) set Leaf(Proc<11 @ >,null)
-[2 Apr 2012, 08:38'46.116] Confluent - Var(<12 @ >) get
-[2 Apr 2012, 08:38'46.116] Confluent - txn get' <12 @ >
-[2 Apr 2012, 08:38'46.118] Confluent - Var(<12 @ >) set Vector((1,Node<1 @ 0,1>.event[Element[<?>]]))
-[2 Apr 2012, 08:38'46.118] Confluent - Var(<15 @ >) get
-[2 Apr 2012, 08:38'46.118] Confluent - txn get' <15 @ >
-[2 Apr 2012, 08:38'46.118] Confluent - Var(<15 @ >) set Vector((1,Expr.Var<14 @ >.map[FreqChanged[<?>]]))
-[2 Apr 2012, 08:38'46.118] Confluent - Var(<17 @ >) get
-[2 Apr 2012, 08:38'46.119] Confluent - txn get' <17 @ >
-[2 Apr 2012, 08:38'46.119] Confluent - Var(<7 @ 1,1>) get
-[2 Apr 2012, 08:38'46.119] Confluent - txn get' <7 @ 1,1>
-[2 Apr 2012, 08:38'46.119] Confluent - Var(<7 @ 1,1>) set Vector((1,Expr.Var<14 @ >))
-[2 Apr 2012, 08:38'46.119] Confluent - Var(<9 @ 1,1>) get
-[2 Apr 2012, 08:38'46.119] Confluent - txn get' <9 @ 1,1>
-[2 Apr 2012, 08:38'46.126] Confluent - Var(<2 @ 0,1>) get
-[2 Apr 2012, 08:38'46.126] Confluent - txn get' <2 @ 0,1>
+[2 Apr 2012, 09:05'09.372] Confluent - Var(<5 @ 0,1>) get
+[2 Apr 2012, 09:05'09.372] Confluent - txn get' <5 @ 0,1>
+[2 Apr 2012, 09:05'09.373] Confluent - Var(<5 @ 0,1>) set Leaf(Proc<11 @ >,null)
+[2 Apr 2012, 09:05'09.376] Confluent - Var(<12 @ >) get
+[2 Apr 2012, 09:05'09.376] Confluent - txn get' <12 @ >
+[2 Apr 2012, 09:05'09.377] Confluent - Var(<12 @ >) set Vector((1,Node<1 @ 0,1>.event[Element[<?>]]))
+[2 Apr 2012, 09:05'09.377] Confluent - Var(<15 @ >) get
+[2 Apr 2012, 09:05'09.377] Confluent - txn get' <15 @ >
+[2 Apr 2012, 09:05'09.377] Confluent - Var(<15 @ >) set Vector((1,Expr.Var<14 @ >.map[FreqChanged[<?>]]))
+[2 Apr 2012, 09:05'09.378] Confluent - Var(<17 @ >) get
+[2 Apr 2012, 09:05'09.378] Confluent - txn get' <17 @ >
+[2 Apr 2012, 09:05'09.378] Confluent - Var(<7 @ 1,1>) get
+[2 Apr 2012, 09:05'09.378] Confluent - txn get' <7 @ 1,1>
+[2 Apr 2012, 09:05'09.378] Confluent - Var(<7 @ 1,1>) set Vector((1,Expr.Var<14 @ >))
+[2 Apr 2012, 09:05'09.378] Confluent - Var(<9 @ 1,1>) get
+[2 Apr 2012, 09:05'09.378] Confluent - txn get' <9 @ 1,1>
+[2 Apr 2012, 09:05'09.385] Confluent - Var(<2 @ 0,1>) get
+[2 Apr 2012, 09:05'09.385] Confluent - txn get' <2 @ 0,1>
 Added(Node<1 @ 0,1>,Vector(Proc<11 @ >))
 ____PAPER____ newAccess( p )
-[2 Apr 2012, 08:38'46.131] Confluent - Root get
-[2 Apr 2012, 08:38'46.131] Confluent - txn get' <0 @ 0,1>
-[2 Apr 2012, 08:38'46.131] Confluent - txn readID <1 @ 0,1>
-[2 Apr 2012, 08:38'46.131] Confluent - txn read Var(<2 @ 0,1>)
-[2 Apr 2012, 08:38'46.131] Confluent - txn read Var[Int](<3 @ 0,1>)
-[2 Apr 2012, 08:38'46.132] Confluent - txn readID <4 @ 0,1>
-[2 Apr 2012, 08:38'46.132] Confluent - txn read Var(<5 @ 0,1>)
-[2 Apr 2012, 08:38'46.132] Confluent - txn newVar Var(<19 @ 0,1>)
-[2 Apr 2012, 08:38'46.132] Confluent - Var(<19 @ 0,1>) ini Proc<11 @ >
-[2 Apr 2012, 08:38'46.137] Confluent - ::::::: txn flush - term = 2 :::::::
-[2 Apr 2012, 08:38'46.138] Confluent - txn flush write Node<1 @ 0,1> for <1 @ 0,2>
-[2 Apr 2012, 08:38'46.139] Confluent - txn flush write Leaf(Proc<11 @ >,null) for <5 @ 0,2>
-[2 Apr 2012, 08:38'46.228] Confluent - txn flush write Vector((1,Expr.Var<14 @ >)) for <7 @ 1,2>
-[2 Apr 2012, 08:38'46.258] Confluent - txn flush write Proc<11 @ > for <11 @ 2,2>
-[2 Apr 2012, 08:38'46.259] Confluent - txn flush write Proc<11 @ > for <11 @ 0,2>
-[2 Apr 2012, 08:38'46.261] Confluent - txn flush write Vector((1,Node<1 @ 0,1>.event[Element[<?>]])) for <12 @ 2,2>
-[2 Apr 2012, 08:38'46.262] Confluent - txn flush write 0 for <13 @ 2,2>
-[2 Apr 2012, 08:38'46.262] Confluent - txn flush write Expr.Var<14 @ > for <14 @ 2,2>
-[2 Apr 2012, 08:38'46.262] Confluent - txn flush write Vector((1,Expr.Var<14 @ >.map[FreqChanged[<?>]])) for <15 @ 2,2>
-[2 Apr 2012, 08:38'46.262] Confluent - txn flush write 0 for <16 @ 2,2>
-[2 Apr 2012, 08:38'46.263] Confluent - txn flush write Expr.Var<6 @ 1,1> for <17 @ 2,2>
-[2 Apr 2012, 08:38'46.263] Confluent - txn flush write SynthGraph(Vector(),Set()) for <18 @ 2,2>
-[2 Apr 2012, 08:38'46.299] Confluent - txn flush write Proc<11 @ > for <19 @ 0,2>
-[2 Apr 2012, 08:38'46.304] Confluent - ::::::: atomic - input access = Path(0, 2) :::::::
+[2 Apr 2012, 09:05'09.390] Confluent - Root get
+[2 Apr 2012, 09:05'09.390] Confluent - txn get' <0 @ 0,1>
+[2 Apr 2012, 09:05'09.390] Confluent - txn readID <1 @ 0,1>
+[2 Apr 2012, 09:05'09.390] Confluent - txn read Var(<2 @ 0,1>)
+[2 Apr 2012, 09:05'09.390] Confluent - txn read Var[Int](<3 @ 0,1>)
+[2 Apr 2012, 09:05'09.390] Confluent - txn readID <4 @ 0,1>
+[2 Apr 2012, 09:05'09.390] Confluent - txn read Var(<5 @ 0,1>)
+[2 Apr 2012, 09:05'09.391] Confluent - txn newVar Var(<18 @ 0,1>)
+[2 Apr 2012, 09:05'09.391] Confluent - Var(<18 @ 0,1>) ini Proc<11 @ >
+[2 Apr 2012, 09:05'09.396] Confluent - ::::::: txn flush - term = 2 :::::::
+[2 Apr 2012, 09:05'09.397] Confluent - txn flush write Node<1 @ 0,1> for <1 @ 0,2>
+[2 Apr 2012, 09:05'09.398] Confluent - txn flush write Leaf(Proc<11 @ >,null) for <5 @ 0,2>
+[2 Apr 2012, 09:05'09.492] Confluent - txn flush write Vector((1,Expr.Var<14 @ >)) for <7 @ 1,2>
+[2 Apr 2012, 09:05'09.518] Confluent - txn flush write Proc<11 @ > for <11 @ 2,2>
+[2 Apr 2012, 09:05'09.519] Confluent - txn flush write Proc<11 @ > for <11 @ 0,2>
+[2 Apr 2012, 09:05'09.522] Confluent - txn flush write Vector((1,Node<1 @ 0,1>.event[Element[<?>]])) for <12 @ 2,2>
+[2 Apr 2012, 09:05'09.523] Confluent - txn flush write 0 for <13 @ 2,2>
+[2 Apr 2012, 09:05'09.523] Confluent - txn flush write Expr.Var<14 @ > for <14 @ 2,2>
+[2 Apr 2012, 09:05'09.524] Confluent - txn flush write Vector((1,Expr.Var<14 @ >.map[FreqChanged[<?>]])) for <15 @ 2,2>
+[2 Apr 2012, 09:05'09.524] Confluent - txn flush write 0 for <16 @ 2,2>
+[2 Apr 2012, 09:05'09.524] Confluent - txn flush write Expr.Var<6 @ 1,1> for <17 @ 2,2>
+[2 Apr 2012, 09:05'09.525] Confluent - txn flush write Proc<11 @ > for <18 @ 0,2>
+
+[2 Apr 2012, 09:05'09.529] Confluent - ::::::: atomic - input access = Path(0, 2) :::::::
 ____PAPER____ access p
-[2 Apr 2012, 08:38'46.304] Confluent - Var(<19 @ 0,1>) get
-[2 Apr 2012, 08:38'46.304] Confluent - txn get' <19 @ 0,2>
-[2 Apr 2012, 08:38'46.304] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.305] Confluent - txn read Var(<12 @ 2,2>)
-[2 Apr 2012, 08:38'46.305] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 08:38'46.306] Confluent - txn readID <14 @ 2,2>
-[2 Apr 2012, 08:38'46.306] Confluent - txn read Var(<15 @ 2,2>)
-[2 Apr 2012, 08:38'46.306] Confluent - txn read Var[Int](<16 @ 2,2>)
-[2 Apr 2012, 08:38'46.306] Confluent - txn read Var(<17 @ 2,2>)
+[2 Apr 2012, 09:05'09.530] Confluent - Var(<18 @ 0,1>) get
+[2 Apr 2012, 09:05'09.530] Confluent - txn get' <18 @ 0,2>
+[2 Apr 2012, 09:05'09.530] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.530] Confluent - txn read Var(<12 @ 2,2>)
+[2 Apr 2012, 09:05'09.530] Confluent - txn read Var[Int](<13 @ 2,2>)
+[2 Apr 2012, 09:05'09.531] Confluent - txn readID <14 @ 2,2>
+[2 Apr 2012, 09:05'09.532] Confluent - txn read Var(<15 @ 2,2>)
+[2 Apr 2012, 09:05'09.532] Confluent - txn read Var[Int](<16 @ 2,2>)
+[2 Apr 2012, 09:05'09.532] Confluent - txn read Var(<17 @ 2,2>)
 ____PAPER____ access freqVar
-[2 Apr 2012, 08:38'46.306] Confluent - Var(<10 @ 0,0>) get
-[2 Apr 2012, 08:38'46.306] Confluent - txn get' <10 @ 0,2>
-[2 Apr 2012, 08:38'46.307] Confluent - txn readID <6 @ 1,2>
-[2 Apr 2012, 08:38'46.307] Confluent - txn read Var(<7 @ 1,2>)
-[2 Apr 2012, 08:38'46.307] Confluent - txn read Var[Int](<8 @ 1,2>)
-[2 Apr 2012, 08:38'46.307] Confluent - txn read Var(<9 @ 1,2>)
+[2 Apr 2012, 09:05'09.532] Confluent - Var(<10 @ 0,0>) get
+[2 Apr 2012, 09:05'09.532] Confluent - txn get' <10 @ 0,2>
+[2 Apr 2012, 09:05'09.532] Confluent - txn readID <6 @ 1,2>
+[2 Apr 2012, 09:05'09.533] Confluent - txn read Var(<7 @ 1,2>)
+[2 Apr 2012, 09:05'09.533] Confluent - txn read Var[Int](<8 @ 1,2>)
+[2 Apr 2012, 09:05'09.533] Confluent - txn read Var(<9 @ 1,2>)
 ____PAPER____ p.freq = freqVar * 1.4
-[2 Apr 2012, 08:38'46.311] Confluent - txn newID <20 @ >
-[2 Apr 2012, 08:38'46.311] Confluent - txn newVar Var(<21 @ >)
-[2 Apr 2012, 08:38'46.311] Confluent - Var(<21 @ >) ini Vector()
-[2 Apr 2012, 08:38'46.311] Confluent - ....... txn dirty .......
-[2 Apr 2012, 08:38'46.311] Confluent - txn newVar Var[Int](<22 @ >)
-[2 Apr 2012, 08:38'46.311] Confluent - Var[Int](<22 @ >) ini 0
-[2 Apr 2012, 08:38'46.312] Confluent - Var(<17 @ 2,2>) get
-[2 Apr 2012, 08:38'46.312] Confluent - txn get' <17 @ 2,2>
-[2 Apr 2012, 08:38'46.313] Confluent - txn readID <6 @ 1,2>
-[2 Apr 2012, 08:38'46.313] Confluent - txn read Var(<7 @ 1,2>)
-[2 Apr 2012, 08:38'46.313] Confluent - txn read Var[Int](<8 @ 1,2>)
-[2 Apr 2012, 08:38'46.313] Confluent - txn read Var(<9 @ 1,2>)
-[2 Apr 2012, 08:38'46.313] Confluent - Var(<15 @ 2,2>) get
-[2 Apr 2012, 08:38'46.314] Confluent - txn get' <15 @ 2,2>
-[2 Apr 2012, 08:38'46.314] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.314] Confluent - txn get' <11 @ 2,2>
-[2 Apr 2012, 08:38'46.314] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.314] Confluent - txn read Var(<12 @ 2,2>)
-[2 Apr 2012, 08:38'46.314] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 08:38'46.315] Confluent - Var(<12 @ 2,2>) get
-[2 Apr 2012, 08:38'46.315] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 08:38'46.315] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.315] Confluent - txn get' <1 @ 0,2>
-[2 Apr 2012, 08:38'46.316] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.316] Confluent - txn read Var(<2 @ 0,2>)
-[2 Apr 2012, 08:38'46.316] Confluent - txn read Var[Int](<3 @ 0,2>)
-[2 Apr 2012, 08:38'46.316] Confluent - Var(<2 @ 0,2>) get
-[2 Apr 2012, 08:38'46.316] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 08:38'46.318] Confluent - txn readID <4 @ 0,2>
-[2 Apr 2012, 08:38'46.318] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 08:38'46.319] Confluent - Var(<7 @ 1,2>) get
-[2 Apr 2012, 08:38'46.319] Confluent - txn get' <7 @ 1,2>
-[2 Apr 2012, 08:38'46.330] Confluent - txn readID <14 @ 2,2>
-[2 Apr 2012, 08:38'46.330] Confluent - txn get' <14 @ 2,2>
-[2 Apr 2012, 08:38'46.331] Confluent - txn readID <14 @ 2,2>
-[2 Apr 2012, 08:38'46.331] Confluent - txn read Var(<15 @ 2,2>)
-[2 Apr 2012, 08:38'46.331] Confluent - txn read Var[Int](<16 @ 2,2>)
-[2 Apr 2012, 08:38'46.331] Confluent - Var(<15 @ 2,2>) get
-[2 Apr 2012, 08:38'46.331] Confluent - txn get' <15 @ 2,2>
-[2 Apr 2012, 08:38'46.332] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.332] Confluent - txn get' <11 @ 2,2>
-[2 Apr 2012, 08:38'46.332] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.332] Confluent - txn read Var(<12 @ 2,2>)
-[2 Apr 2012, 08:38'46.332] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 08:38'46.332] Confluent - Var(<12 @ 2,2>) get
-[2 Apr 2012, 08:38'46.332] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 08:38'46.333] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.333] Confluent - txn get' <1 @ 0,2>
-[2 Apr 2012, 08:38'46.334] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.334] Confluent - txn read Var(<2 @ 0,2>)
-[2 Apr 2012, 08:38'46.334] Confluent - txn read Var[Int](<3 @ 0,2>)
-[2 Apr 2012, 08:38'46.334] Confluent - Var(<2 @ 0,2>) get
-[2 Apr 2012, 08:38'46.334] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 08:38'46.335] Confluent - txn readID <4 @ 0,2>
-[2 Apr 2012, 08:38'46.335] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 08:38'46.336] Confluent - Var(<7 @ 1,2>) set Vector()
-[2 Apr 2012, 08:38'46.337] Confluent - Var(<9 @ 1,2>) get
-[2 Apr 2012, 08:38'46.337] Confluent - txn get' <9 @ 1,2>
-[2 Apr 2012, 08:38'46.337] Confluent - Var(<17 @ 2,2>) set (Expr.Var<6 @ 1,2> * 1.4)
-[2 Apr 2012, 08:38'46.337] Confluent - Var(<21 @ >) get
-[2 Apr 2012, 08:38'46.337] Confluent - txn get' <21 @ >
-[2 Apr 2012, 08:38'46.337] Confluent - Var(<21 @ >) set Vector((1,Expr.Var<14 @ 2,2>))
-[2 Apr 2012, 08:38'46.338] Confluent - Var(<7 @ 1,2>) get
-[2 Apr 2012, 08:38'46.338] Confluent - txn get' <7 @ 1,2>
-[2 Apr 2012, 08:38'46.338] Confluent - Var(<7 @ 1,2>) set Vector((1,(Expr.Var<6 @ 1,2> * 1.4)))
-[2 Apr 2012, 08:38'46.338] Confluent - Var(<9 @ 1,2>) get
-[2 Apr 2012, 08:38'46.338] Confluent - txn get' <9 @ 1,2>
-[2 Apr 2012, 08:38'46.338] Confluent - Var(<9 @ 1,2>) get
-[2 Apr 2012, 08:38'46.338] Confluent - txn get' <9 @ 1,2>
-[2 Apr 2012, 08:38'46.339] Confluent - Var(<9 @ 1,2>) get
-[2 Apr 2012, 08:38'46.339] Confluent - txn get' <9 @ 1,2>
-[2 Apr 2012, 08:38'46.345] Confluent - Var(<15 @ 2,2>) get
-[2 Apr 2012, 08:38'46.345] Confluent - txn get' <15 @ 2,2>
-[2 Apr 2012, 08:38'46.346] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.346] Confluent - txn get' <11 @ 2,2>
-[2 Apr 2012, 08:38'46.346] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.346] Confluent - txn read Var(<12 @ 2,2>)
-[2 Apr 2012, 08:38'46.346] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 08:38'46.346] Confluent - Var(<12 @ 2,2>) get
-[2 Apr 2012, 08:38'46.346] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 08:38'46.347] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.347] Confluent - txn get' <1 @ 0,2>
-[2 Apr 2012, 08:38'46.348] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.348] Confluent - txn read Var(<2 @ 0,2>)
-[2 Apr 2012, 08:38'46.348] Confluent - txn read Var[Int](<3 @ 0,2>)
-[2 Apr 2012, 08:38'46.348] Confluent - Var(<2 @ 0,2>) get
-[2 Apr 2012, 08:38'46.348] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 08:38'46.348] Confluent - txn readID <4 @ 0,2>
-[2 Apr 2012, 08:38'46.349] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 08:38'46.349] Confluent - Var(<12 @ 2,2>) get
-[2 Apr 2012, 08:38'46.349] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 08:38'46.350] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.350] Confluent - txn get' <1 @ 0,2>
-[2 Apr 2012, 08:38'46.351] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.351] Confluent - txn read Var(<2 @ 0,2>)
-[2 Apr 2012, 08:38'46.351] Confluent - txn read Var[Int](<3 @ 0,2>)
-[2 Apr 2012, 08:38'46.351] Confluent - Var(<2 @ 0,2>) get
-[2 Apr 2012, 08:38'46.351] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 08:38'46.352] Confluent - txn readID <4 @ 0,2>
-[2 Apr 2012, 08:38'46.352] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 08:38'46.356] Confluent - Var(<2 @ 0,2>) get
-[2 Apr 2012, 08:38'46.356] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 08:38'46.358] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.358] Confluent - txn read Var(<12 @ 2,2>)
-[2 Apr 2012, 08:38'46.359] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 08:38'46.359] Confluent - txn readID <14 @ 2,2>
-[2 Apr 2012, 08:38'46.359] Confluent - txn read Var(<15 @ 2,2>)
-[2 Apr 2012, 08:38'46.359] Confluent - txn read Var[Int](<16 @ 2,2>)
-[2 Apr 2012, 08:38'46.359] Confluent - txn read Var(<17 @ 2,2>)
+[2 Apr 2012, 09:05'09.535] Confluent - txn newID <19 @ >
+[2 Apr 2012, 09:05'09.536] Confluent - txn newVar Var(<20 @ >)
+[2 Apr 2012, 09:05'09.536] Confluent - Var(<20 @ >) ini Vector()
+[2 Apr 2012, 09:05'09.536] Confluent - ....... txn dirty .......
+[2 Apr 2012, 09:05'09.536] Confluent - txn newVar Var[Int](<21 @ >)
+[2 Apr 2012, 09:05'09.536] Confluent - Var[Int](<21 @ >) ini 0
+[2 Apr 2012, 09:05'09.538] Confluent - Var(<17 @ 2,2>) get
+[2 Apr 2012, 09:05'09.538] Confluent - txn get' <17 @ 2,2>
+[2 Apr 2012, 09:05'09.539] Confluent - txn readID <6 @ 1,2>
+[2 Apr 2012, 09:05'09.539] Confluent - txn read Var(<7 @ 1,2>)
+[2 Apr 2012, 09:05'09.539] Confluent - txn read Var[Int](<8 @ 1,2>)
+[2 Apr 2012, 09:05'09.539] Confluent - txn read Var(<9 @ 1,2>)
+[2 Apr 2012, 09:05'09.539] Confluent - Var(<15 @ 2,2>) get
+[2 Apr 2012, 09:05'09.540] Confluent - txn get' <15 @ 2,2>
+[2 Apr 2012, 09:05'09.540] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.540] Confluent - txn get' <11 @ 2,2>
+[2 Apr 2012, 09:05'09.540] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.541] Confluent - txn read Var(<12 @ 2,2>)
+[2 Apr 2012, 09:05'09.541] Confluent - txn read Var[Int](<13 @ 2,2>)
+[2 Apr 2012, 09:05'09.541] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.541] Confluent - txn get' <12 @ 2,2>
+[2 Apr 2012, 09:05'09.541] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.541] Confluent - txn get' <1 @ 0,2>
+[2 Apr 2012, 09:05'09.542] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.542] Confluent - txn read Var(<2 @ 0,2>)
+[2 Apr 2012, 09:05'09.542] Confluent - txn read Var[Int](<3 @ 0,2>)
+[2 Apr 2012, 09:05'09.542] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.542] Confluent - txn get' <2 @ 0,2>
+[2 Apr 2012, 09:05'09.545] Confluent - txn readID <4 @ 0,2>
+[2 Apr 2012, 09:05'09.545] Confluent - txn read Var(<5 @ 0,2>)
+[2 Apr 2012, 09:05'09.546] Confluent - Var(<7 @ 1,2>) get
+[2 Apr 2012, 09:05'09.546] Confluent - txn get' <7 @ 1,2>
+[2 Apr 2012, 09:05'09.557] Confluent - txn readID <14 @ 2,2>
+[2 Apr 2012, 09:05'09.557] Confluent - txn get' <14 @ 2,2>
+[2 Apr 2012, 09:05'09.558] Confluent - txn readID <14 @ 2,2>
+[2 Apr 2012, 09:05'09.558] Confluent - txn read Var(<15 @ 2,2>)
+[2 Apr 2012, 09:05'09.558] Confluent - txn read Var[Int](<16 @ 2,2>)
+[2 Apr 2012, 09:05'09.558] Confluent - Var(<15 @ 2,2>) get
+[2 Apr 2012, 09:05'09.558] Confluent - txn get' <15 @ 2,2>
+[2 Apr 2012, 09:05'09.558] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.558] Confluent - txn get' <11 @ 2,2>
+[2 Apr 2012, 09:05'09.559] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.559] Confluent - txn read Var(<12 @ 2,2>)
+[2 Apr 2012, 09:05'09.559] Confluent - txn read Var[Int](<13 @ 2,2>)
+[2 Apr 2012, 09:05'09.559] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.559] Confluent - txn get' <12 @ 2,2>
+[2 Apr 2012, 09:05'09.560] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.560] Confluent - txn get' <1 @ 0,2>
+[2 Apr 2012, 09:05'09.560] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.561] Confluent - txn read Var(<2 @ 0,2>)
+[2 Apr 2012, 09:05'09.561] Confluent - txn read Var[Int](<3 @ 0,2>)
+[2 Apr 2012, 09:05'09.561] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.561] Confluent - txn get' <2 @ 0,2>
+[2 Apr 2012, 09:05'09.561] Confluent - txn readID <4 @ 0,2>
+[2 Apr 2012, 09:05'09.561] Confluent - txn read Var(<5 @ 0,2>)
+[2 Apr 2012, 09:05'09.562] Confluent - Var(<7 @ 1,2>) set Vector()
+[2 Apr 2012, 09:05'09.563] Confluent - Var(<9 @ 1,2>) get
+[2 Apr 2012, 09:05'09.563] Confluent - txn get' <9 @ 1,2>
+[2 Apr 2012, 09:05'09.563] Confluent - Var(<17 @ 2,2>) set (Expr.Var<6 @ 1,2> * 1.4)
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<20 @ >) get
+[2 Apr 2012, 09:05'09.564] Confluent - txn get' <20 @ >
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<20 @ >) set Vector((1,Expr.Var<14 @ 2,2>))
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<7 @ 1,2>) get
+[2 Apr 2012, 09:05'09.564] Confluent - txn get' <7 @ 1,2>
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<7 @ 1,2>) set Vector((1,(Expr.Var<6 @ 1,2> * 1.4)))
+[2 Apr 2012, 09:05'09.564] Confluent - Var(<9 @ 1,2>) get
+[2 Apr 2012, 09:05'09.564] Confluent - txn get' <9 @ 1,2>
+[2 Apr 2012, 09:05'09.565] Confluent - Var(<9 @ 1,2>) get
+[2 Apr 2012, 09:05'09.565] Confluent - txn get' <9 @ 1,2>
+[2 Apr 2012, 09:05'09.565] Confluent - Var(<9 @ 1,2>) get
+[2 Apr 2012, 09:05'09.565] Confluent - txn get' <9 @ 1,2>
+[2 Apr 2012, 09:05'09.570] Confluent - Var(<15 @ 2,2>) get
+[2 Apr 2012, 09:05'09.570] Confluent - txn get' <15 @ 2,2>
+[2 Apr 2012, 09:05'09.570] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.571] Confluent - txn get' <11 @ 2,2>
+[2 Apr 2012, 09:05'09.571] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.571] Confluent - txn read Var(<12 @ 2,2>)
+[2 Apr 2012, 09:05'09.571] Confluent - txn read Var[Int](<13 @ 2,2>)
+[2 Apr 2012, 09:05'09.571] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.571] Confluent - txn get' <12 @ 2,2>
+[2 Apr 2012, 09:05'09.572] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.572] Confluent - txn get' <1 @ 0,2>
+[2 Apr 2012, 09:05'09.572] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.572] Confluent - txn read Var(<2 @ 0,2>)
+[2 Apr 2012, 09:05'09.572] Confluent - txn read Var[Int](<3 @ 0,2>)
+[2 Apr 2012, 09:05'09.572] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.572] Confluent - txn get' <2 @ 0,2>
+[2 Apr 2012, 09:05'09.573] Confluent - txn readID <4 @ 0,2>
+[2 Apr 2012, 09:05'09.573] Confluent - txn read Var(<5 @ 0,2>)
+[2 Apr 2012, 09:05'09.574] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.574] Confluent - txn get' <12 @ 2,2>
+[2 Apr 2012, 09:05'09.575] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.575] Confluent - txn get' <1 @ 0,2>
+[2 Apr 2012, 09:05'09.575] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.575] Confluent - txn read Var(<2 @ 0,2>)
+[2 Apr 2012, 09:05'09.575] Confluent - txn read Var[Int](<3 @ 0,2>)
+[2 Apr 2012, 09:05'09.575] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.575] Confluent - txn get' <2 @ 0,2>
+[2 Apr 2012, 09:05'09.576] Confluent - txn readID <4 @ 0,2>
+[2 Apr 2012, 09:05'09.576] Confluent - txn read Var(<5 @ 0,2>)
+[2 Apr 2012, 09:05'09.580] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.580] Confluent - txn get' <2 @ 0,2>
+[2 Apr 2012, 09:05'09.583] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.583] Confluent - txn read Var(<12 @ 2,2>)
+[2 Apr 2012, 09:05'09.583] Confluent - txn read Var[Int](<13 @ 2,2>)
+[2 Apr 2012, 09:05'09.583] Confluent - txn readID <14 @ 2,2>
+[2 Apr 2012, 09:05'09.583] Confluent - txn read Var(<15 @ 2,2>)
+[2 Apr 2012, 09:05'09.583] Confluent - txn read Var[Int](<16 @ 2,2>)
+[2 Apr 2012, 09:05'09.583] Confluent - txn read Var(<17 @ 2,2>)
 Element(Node<1 @ 0,2>,Vector(FreqChanged(Proc<11 @ 2,2>,Change(50.0,70.0))))
-[2 Apr 2012, 08:38'46.366] Confluent - ::::::: txn flush - term = 3 :::::::
-[2 Apr 2012, 08:38'46.367] Confluent - txn flush write Vector((1,(Expr.Var<6 @ 1,2> * 1.4))) for <7 @ 1,3>
-[2 Apr 2012, 08:38'46.379] Confluent - txn flush write Expr.Var<14 @ 2,2> for <14 @ 2,3>
-[2 Apr 2012, 08:38'46.405] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <17 @ 2,3>
-[2 Apr 2012, 08:38'46.426] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <20 @ 3,3>
-[2 Apr 2012, 08:38'46.427] Confluent - txn flush write Vector((1,Expr.Var<14 @ 2,2>)) for <21 @ 3,3>
-[2 Apr 2012, 08:38'46.427] Confluent - txn flush write 0 for <22 @ 3,3>
-[2 Apr 2012, 08:38'46.431] Confluent - ::::::: atomic - input access = Path(0, 3) :::::::
+[2 Apr 2012, 09:05'09.591] Confluent - ::::::: txn flush - term = 3 :::::::
+[2 Apr 2012, 09:05'09.591] Confluent - txn flush write Vector((1,(Expr.Var<6 @ 1,2> * 1.4))) for <7 @ 1,3>
+[2 Apr 2012, 09:05'09.602] Confluent - txn flush write Expr.Var<14 @ 2,2> for <14 @ 2,3>
+[2 Apr 2012, 09:05'09.623] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <17 @ 2,3>
+[2 Apr 2012, 09:05'09.644] Confluent - txn flush write (Expr.Var<6 @ 1,2> * 1.4) for <19 @ 3,3>
+[2 Apr 2012, 09:05'09.644] Confluent - txn flush write Vector((1,Expr.Var<14 @ 2,2>)) for <20 @ 3,3>
+[2 Apr 2012, 09:05'09.645] Confluent - txn flush write 0 for <21 @ 3,3>
+
+[2 Apr 2012, 09:05'09.649] Confluent - ::::::: atomic - input access = Path(0, 3) :::::::
 ____PAPER____ access group
-[2 Apr 2012, 08:38'46.432] Confluent - Root get
-[2 Apr 2012, 08:38'46.432] Confluent - txn get' <0 @ 0,3>
-[2 Apr 2012, 08:38'46.433] Confluent - txn readID <1 @ 0,3>
-[2 Apr 2012, 08:38'46.433] Confluent - txn read Var(<2 @ 0,3>)
-[2 Apr 2012, 08:38'46.433] Confluent - txn read Var[Int](<3 @ 0,3>)
-[2 Apr 2012, 08:38'46.433] Confluent - txn readID <4 @ 0,3>
-[2 Apr 2012, 08:38'46.433] Confluent - txn read Var(<5 @ 0,3>)
+[2 Apr 2012, 09:05'09.649] Confluent - Root get
+[2 Apr 2012, 09:05'09.650] Confluent - txn get' <0 @ 0,3>
+[2 Apr 2012, 09:05'09.650] Confluent - txn readID <1 @ 0,3>
+[2 Apr 2012, 09:05'09.650] Confluent - txn read Var(<2 @ 0,3>)
+[2 Apr 2012, 09:05'09.650] Confluent - txn read Var[Int](<3 @ 0,3>)
+[2 Apr 2012, 09:05'09.651] Confluent - txn readID <4 @ 0,3>
+[2 Apr 2012, 09:05'09.651] Confluent - txn read Var(<5 @ 0,3>)
 ____PAPER____ p1 = p.meld( v1 )
-[2 Apr 2012, 08:38'46.434] Confluent - Var(<19 @ 0,1>) meld Path(0, 2)
-[2 Apr 2012, 08:38'46.438] Confluent - txn get' <19 @ 0,2>
-[2 Apr 2012, 08:38'46.438] Confluent - txn readID <11 @ 2,2>
-[2 Apr 2012, 08:38'46.438] Confluent - txn read Var(<12 @ 2,2>)
-[2 Apr 2012, 08:38'46.439] Confluent - txn read Var[Int](<13 @ 2,2>)
-[2 Apr 2012, 08:38'46.439] Confluent - txn readID <14 @ 2,2>
-[2 Apr 2012, 08:38'46.439] Confluent - txn read Var(<15 @ 2,2>)
-[2 Apr 2012, 08:38'46.439] Confluent - txn read Var[Int](<16 @ 2,2>)
-[2 Apr 2012, 08:38'46.439] Confluent - txn read Var(<17 @ 2,2>)
+[2 Apr 2012, 09:05'09.652] Confluent - Var(<18 @ 0,1>) meld Path(0, 2)
+[2 Apr 2012, 09:05'09.658] Confluent - txn get' <18 @ 0,2>
+[2 Apr 2012, 09:05'09.658] Confluent - txn readID <11 @ 2,2>
+[2 Apr 2012, 09:05'09.658] Confluent - txn read Var(<12 @ 2,2>)
+[2 Apr 2012, 09:05'09.658] Confluent - txn read Var[Int](<13 @ 2,2>)
+[2 Apr 2012, 09:05'09.658] Confluent - txn readID <14 @ 2,2>
+[2 Apr 2012, 09:05'09.658] Confluent - txn read Var(<15 @ 2,2>)
+[2 Apr 2012, 09:05'09.658] Confluent - txn read Var[Int](<16 @ 2,2>)
+[2 Apr 2012, 09:05'09.659] Confluent - txn read Var(<17 @ 2,2>)
 ____PAPER____ group.add( p1 )
-[2 Apr 2012, 08:38'46.439] Confluent - Var(<5 @ 0,3>) get
-[2 Apr 2012, 08:38'46.439] Confluent - txn get' <5 @ 0,3>
-[2 Apr 2012, 08:38'46.452] Confluent - txn readID <11 @ 2,3>
-[2 Apr 2012, 08:38'46.452] Confluent - txn read Var(<12 @ 2,3>)
-[2 Apr 2012, 08:38'46.452] Confluent - txn read Var[Int](<13 @ 2,3>)
-[2 Apr 2012, 08:38'46.452] Confluent - txn readID <14 @ 2,3>
-[2 Apr 2012, 08:38'46.452] Confluent - txn read Var(<15 @ 2,3>)
-[2 Apr 2012, 08:38'46.452] Confluent - txn read Var[Int](<16 @ 2,3>)
-[2 Apr 2012, 08:38'46.452] Confluent - txn read Var(<17 @ 2,3>)
-[2 Apr 2012, 08:38'46.452] Confluent - Var(<5 @ 0,3>) set Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null)
-[2 Apr 2012, 08:38'46.453] Confluent - ....... txn dirty .......
-[2 Apr 2012, 08:38'46.453] Confluent - Var(<12 @ 2,2>) get
-[2 Apr 2012, 08:38'46.453] Confluent - txn get' <12 @ 2,2>
-[2 Apr 2012, 08:38'46.453] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.453] Confluent - txn get' <1 @ 0,2>
-[2 Apr 2012, 08:38'46.454] Confluent - txn readID <1 @ 0,2>
-[2 Apr 2012, 08:38'46.454] Confluent - txn read Var(<2 @ 0,2>)
-[2 Apr 2012, 08:38'46.454] Confluent - txn read Var[Int](<3 @ 0,2>)
-[2 Apr 2012, 08:38'46.454] Confluent - Var(<2 @ 0,2>) get
-[2 Apr 2012, 08:38'46.454] Confluent - txn get' <2 @ 0,2>
-[2 Apr 2012, 08:38'46.455] Confluent - txn readID <4 @ 0,2>
-[2 Apr 2012, 08:38'46.455] Confluent - txn read Var(<5 @ 0,2>)
-[2 Apr 2012, 08:38'46.455] Confluent - Var(<12 @ 2,2>) set Vector((1,Node<1 @ 0,2>.event[Element[<?>]]), (1,Node<1 @ 0,3>.event[Element[<?>]]))
-[2 Apr 2012, 08:38'46.455] Confluent - Var(<2 @ 0,3>) get
-[2 Apr 2012, 08:38'46.455] Confluent - txn get' <2 @ 0,3>
+[2 Apr 2012, 09:05'09.659] Confluent - Var(<5 @ 0,3>) get
+[2 Apr 2012, 09:05'09.659] Confluent - txn get' <5 @ 0,3>
+[2 Apr 2012, 09:05'09.674] Confluent - txn readID <11 @ 2,3>
+[2 Apr 2012, 09:05'09.675] Confluent - txn read Var(<12 @ 2,3>)
+[2 Apr 2012, 09:05'09.675] Confluent - txn read Var[Int](<13 @ 2,3>)
+[2 Apr 2012, 09:05'09.675] Confluent - txn readID <14 @ 2,3>
+[2 Apr 2012, 09:05'09.675] Confluent - txn read Var(<15 @ 2,3>)
+[2 Apr 2012, 09:05'09.675] Confluent - txn read Var[Int](<16 @ 2,3>)
+[2 Apr 2012, 09:05'09.675] Confluent - txn read Var(<17 @ 2,3>)
+[2 Apr 2012, 09:05'09.675] Confluent - Var(<5 @ 0,3>) set Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null)
+[2 Apr 2012, 09:05'09.675] Confluent - ....... txn dirty .......
+[2 Apr 2012, 09:05'09.675] Confluent - Var(<12 @ 2,2>) get
+[2 Apr 2012, 09:05'09.675] Confluent - txn get' <12 @ 2,2>
+[2 Apr 2012, 09:05'09.676] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.676] Confluent - txn get' <1 @ 0,2>
+[2 Apr 2012, 09:05'09.677] Confluent - txn readID <1 @ 0,2>
+[2 Apr 2012, 09:05'09.677] Confluent - txn read Var(<2 @ 0,2>)
+[2 Apr 2012, 09:05'09.677] Confluent - txn read Var[Int](<3 @ 0,2>)
+[2 Apr 2012, 09:05'09.677] Confluent - Var(<2 @ 0,2>) get
+[2 Apr 2012, 09:05'09.677] Confluent - txn get' <2 @ 0,2>
+[2 Apr 2012, 09:05'09.678] Confluent - txn readID <4 @ 0,2>
+[2 Apr 2012, 09:05'09.678] Confluent - txn read Var(<5 @ 0,2>)
+[2 Apr 2012, 09:05'09.678] Confluent - Var(<12 @ 2,2>) set Vector((1,Node<1 @ 0,2>.event[Element[<?>]]), (1,Node<1 @ 0,3>.event[Element[<?>]]))
+[2 Apr 2012, 09:05'09.678] Confluent - Var(<2 @ 0,3>) get
+[2 Apr 2012, 09:05'09.678] Confluent - txn get' <2 @ 0,3>
 Added(Node<1 @ 0,3>,Vector(Proc<11 @ 2,2>))
-[2 Apr 2012, 08:38'46.456] Confluent - txn new tree 4
-[2 Apr 2012, 08:38'46.460] Confluent - ::::::: txn flush - meld term = 4 :::::::
-[2 Apr 2012, 08:38'46.464] Confluent - txn flush write Node<1 @ 0,3> for <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.467] Confluent - txn flush write Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null) for <5 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.468] Confluent - txn flush write Proc<11 @ 2,2> for <11 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.470] Confluent - txn flush write Vector((1,Node<1 @ 0,2>.event[Element[<?>]]), (1,Node<1 @ 0,3>.event[Element[<?>]])) for <12 @ 2,2,4,4>
-[2 Apr 2012, 08:38'46.473] Confluent - ::::::: atomic - input access = Path(0, 3, 4, 4) :::::::
+[2 Apr 2012, 09:05'09.679] Confluent - txn new tree 4
+[2 Apr 2012, 09:05'09.683] Confluent - ::::::: txn flush - meld term = 4 :::::::
+[2 Apr 2012, 09:05'09.687] Confluent - txn flush write Node<1 @ 0,3> for <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.690] Confluent - txn flush write Leaf(Proc<11 @ 2,2>,Proc<11 @ 2,3>,null) for <5 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.691] Confluent - txn flush write Proc<11 @ 2,2> for <11 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.691] Confluent - txn flush write Vector((1,Node<1 @ 0,2>.event[Element[<?>]]), (1,Node<1 @ 0,3>.event[Element[<?>]])) for <12 @ 2,2,4,4>
+
+[2 Apr 2012, 09:05'09.694] Confluent - ::::::: atomic - input access = Path(0, 3, 4, 4) :::::::
 ____PAPER____ access freqVar
-[2 Apr 2012, 08:38'46.473] Confluent - Var(<10 @ 0,0>) get
-[2 Apr 2012, 08:38'46.473] Confluent - txn get' <10 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.474] Confluent - txn readID <6 @ 1,3,4,4>
-[2 Apr 2012, 08:38'46.474] Confluent - txn read Var(<7 @ 1,3,4,4>)
-[2 Apr 2012, 08:38'46.474] Confluent - txn read Var[Int](<8 @ 1,3,4,4>)
-[2 Apr 2012, 08:38'46.474] Confluent - txn read Var(<9 @ 1,3,4,4>)
+[2 Apr 2012, 09:05'09.695] Confluent - Var(<10 @ 0,0>) get
+[2 Apr 2012, 09:05'09.695] Confluent - txn get' <10 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.695] Confluent - txn readID <6 @ 1,3,4,4>
+[2 Apr 2012, 09:05'09.695] Confluent - txn read Var(<7 @ 1,3,4,4>)
+[2 Apr 2012, 09:05'09.695] Confluent - txn read Var[Int](<8 @ 1,3,4,4>)
+[2 Apr 2012, 09:05'09.695] Confluent - txn read Var(<9 @ 1,3,4,4>)
 ____PAPER____ freqVar.set( 40.0 )
-[2 Apr 2012, 08:38'46.475] Confluent - Var(<9 @ 1,3,4,4>) get
-[2 Apr 2012, 08:38'46.475] Confluent - txn get' <9 @ 1,3,4,4>
-[2 Apr 2012, 08:38'46.476] Confluent - Var(<7 @ 1,3,4,4>) get
-[2 Apr 2012, 08:38'46.476] Confluent - txn get' <7 @ 1,3,4,4>
-[2 Apr 2012, 08:38'46.478] Confluent - txn readID <20 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.478] Confluent - txn get' <20 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.478] Confluent - txn readID <20 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.479] Confluent - txn read Var(<21 @ 3,3,4,4>)
-[2 Apr 2012, 08:38'46.479] Confluent - txn read Var[Int](<22 @ 3,3,4,4>)
-[2 Apr 2012, 08:38'46.479] Confluent - Var(<21 @ 3,3,4,4>) get
-[2 Apr 2012, 08:38'46.479] Confluent - txn get' <21 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.479] Confluent - txn readID <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.479] Confluent - txn get' <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.481] Confluent - txn readID <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.481] Confluent - txn read Var(<15 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.481] Confluent - txn read Var[Int](<16 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.481] Confluent - Var(<15 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.481] Confluent - txn get' <15 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.482] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.482] Confluent - txn get' <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.482] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.482] Confluent - txn read Var(<12 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.482] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.482] Confluent - Var(<12 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.483] Confluent - txn get' <12 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.483] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.483] Confluent - txn get' <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.484] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.484] Confluent - txn read Var(<2 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.484] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.485] Confluent - Var(<2 @ 0,3,4,4>) get
-[2 Apr 2012, 08:38'46.485] Confluent - txn get' <2 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.485] Confluent - txn readID <4 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.485] Confluent - txn read Var(<5 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.485] Confluent - Var(<9 @ 1,3,4,4>) set 40.0
-[2 Apr 2012, 08:38'46.486] Confluent - ....... txn dirty .......
-[2 Apr 2012, 08:38'46.486] Confluent - Var(<7 @ 1,3,4,4>) get
-[2 Apr 2012, 08:38'46.486] Confluent - txn get' <7 @ 1,3,4,4>
-[2 Apr 2012, 08:38'46.487] Confluent - txn readID <20 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.487] Confluent - txn get' <20 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.488] Confluent - txn readID <20 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.488] Confluent - txn read Var(<21 @ 3,3,4,4>)
-[2 Apr 2012, 08:38'46.488] Confluent - txn read Var[Int](<22 @ 3,3,4,4>)
-[2 Apr 2012, 08:38'46.488] Confluent - Var(<21 @ 3,3,4,4>) get
-[2 Apr 2012, 08:38'46.488] Confluent - txn get' <21 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.488] Confluent - txn readID <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.489] Confluent - txn get' <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.490] Confluent - txn readID <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.490] Confluent - txn read Var(<15 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.490] Confluent - txn read Var[Int](<16 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.490] Confluent - Var(<15 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.490] Confluent - txn get' <15 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.491] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.491] Confluent - txn get' <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.491] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.491] Confluent - txn read Var(<12 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.491] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.491] Confluent - Var(<12 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.491] Confluent - txn get' <12 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.492] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.492] Confluent - txn get' <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.493] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.493] Confluent - txn read Var(<2 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.493] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.493] Confluent - Var(<2 @ 0,3,4,4>) get
-[2 Apr 2012, 08:38'46.493] Confluent - txn get' <2 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.494] Confluent - txn readID <4 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.494] Confluent - txn read Var(<5 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.494] Confluent - Var(<21 @ 3,3,4,4>) get
-[2 Apr 2012, 08:38'46.494] Confluent - txn get' <21 @ 3,3,4,4>
-[2 Apr 2012, 08:38'46.495] Confluent - txn readID <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.495] Confluent - txn get' <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.498] Confluent - txn readID <14 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.498] Confluent - txn read Var(<15 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.498] Confluent - txn read Var[Int](<16 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.498] Confluent - Var(<15 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.498] Confluent - txn get' <15 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.499] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.499] Confluent - txn get' <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.499] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.499] Confluent - txn read Var(<12 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.499] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.499] Confluent - Var(<12 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.499] Confluent - txn get' <12 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.500] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.500] Confluent - txn get' <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.500] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.500] Confluent - txn read Var(<2 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.501] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.501] Confluent - Var(<2 @ 0,3,4,4>) get
-[2 Apr 2012, 08:38'46.501] Confluent - txn get' <2 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.501] Confluent - txn readID <4 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.501] Confluent - txn read Var(<5 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.502] Confluent - Var(<15 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.502] Confluent - txn get' <15 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.502] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.502] Confluent - txn get' <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.503] Confluent - txn readID <11 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.503] Confluent - txn read Var(<12 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.503] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
-[2 Apr 2012, 08:38'46.503] Confluent - Var(<12 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.503] Confluent - txn get' <12 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.503] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.504] Confluent - txn get' <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.504] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.504] Confluent - txn read Var(<2 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.504] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.504] Confluent - Var(<2 @ 0,3,4,4>) get
-[2 Apr 2012, 08:38'46.504] Confluent - txn get' <2 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.505] Confluent - txn readID <4 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.505] Confluent - txn read Var(<5 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.511] Confluent - Var(<12 @ 2,3,4,4>) get
-[2 Apr 2012, 08:38'46.511] Confluent - txn get' <12 @ 2,3,4,4>
-[2 Apr 2012, 08:38'46.512] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.512] Confluent - txn get' <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.512] Confluent - txn readID <1 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.513] Confluent - txn read Var(<2 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.513] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.513] Confluent - Var(<2 @ 0,3,4,4>) get
-[2 Apr 2012, 08:38'46.513] Confluent - txn get' <2 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.513] Confluent - txn readID <4 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.514] Confluent - txn read Var(<5 @ 0,3,4,4>)
-[2 Apr 2012, 08:38'46.519] Confluent - Var(<2 @ 0,3,4,4>) get
-[2 Apr 2012, 08:38'46.520] Confluent - txn get' <2 @ 0,3,4,4>
-[2 Apr 2012, 08:38'46.521] Confluent - txn readID <11 @ 2,2,4,4>
-[2 Apr 2012, 08:38'46.521] Confluent - txn read Var(<12 @ 2,2,4,4>)
-[2 Apr 2012, 08:38'46.521] Confluent - txn read Var[Int](<13 @ 2,2,4,4>)
-[2 Apr 2012, 08:38'46.521] Confluent - txn readID <14 @ 2,2,4,4>
-[2 Apr 2012, 08:38'46.521] Confluent - txn read Var(<15 @ 2,2,4,4>)
-[2 Apr 2012, 08:38'46.521] Confluent - txn read Var[Int](<16 @ 2,2,4,4>)
-[2 Apr 2012, 08:38'46.521] Confluent - txn read Var(<17 @ 2,2,4,4>)
+[2 Apr 2012, 09:05'09.696] Confluent - Var(<9 @ 1,3,4,4>) get
+[2 Apr 2012, 09:05'09.696] Confluent - txn get' <9 @ 1,3,4,4>
+[2 Apr 2012, 09:05'09.696] Confluent - Var(<7 @ 1,3,4,4>) get
+[2 Apr 2012, 09:05'09.696] Confluent - txn get' <7 @ 1,3,4,4>
+[2 Apr 2012, 09:05'09.698] Confluent - txn readID <19 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.698] Confluent - txn get' <19 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.698] Confluent - txn readID <19 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.698] Confluent - txn read Var(<20 @ 3,3,4,4>)
+[2 Apr 2012, 09:05'09.699] Confluent - txn read Var[Int](<21 @ 3,3,4,4>)
+[2 Apr 2012, 09:05'09.699] Confluent - Var(<20 @ 3,3,4,4>) get
+[2 Apr 2012, 09:05'09.699] Confluent - txn get' <20 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.699] Confluent - txn readID <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.699] Confluent - txn get' <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.701] Confluent - txn readID <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.701] Confluent - txn read Var(<15 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.701] Confluent - txn read Var[Int](<16 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.702] Confluent - Var(<15 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.702] Confluent - txn get' <15 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.702] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.702] Confluent - txn get' <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.703] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.703] Confluent - txn read Var(<12 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.703] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.703] Confluent - Var(<12 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.703] Confluent - txn get' <12 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.704] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.704] Confluent - txn get' <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.705] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.705] Confluent - txn read Var(<2 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.705] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.705] Confluent - Var(<2 @ 0,3,4,4>) get
+[2 Apr 2012, 09:05'09.706] Confluent - txn get' <2 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.707] Confluent - txn readID <4 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.707] Confluent - txn read Var(<5 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.707] Confluent - Var(<9 @ 1,3,4,4>) set 40.0
+[2 Apr 2012, 09:05'09.707] Confluent - ....... txn dirty .......
+[2 Apr 2012, 09:05'09.707] Confluent - Var(<7 @ 1,3,4,4>) get
+[2 Apr 2012, 09:05'09.707] Confluent - txn get' <7 @ 1,3,4,4>
+[2 Apr 2012, 09:05'09.709] Confluent - txn readID <19 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.709] Confluent - txn get' <19 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.710] Confluent - txn readID <19 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.710] Confluent - txn read Var(<20 @ 3,3,4,4>)
+[2 Apr 2012, 09:05'09.710] Confluent - txn read Var[Int](<21 @ 3,3,4,4>)
+[2 Apr 2012, 09:05'09.710] Confluent - Var(<20 @ 3,3,4,4>) get
+[2 Apr 2012, 09:05'09.710] Confluent - txn get' <20 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.710] Confluent - txn readID <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.710] Confluent - txn get' <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.712] Confluent - txn readID <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.712] Confluent - txn read Var(<15 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.712] Confluent - txn read Var[Int](<16 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.712] Confluent - Var(<15 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.712] Confluent - txn get' <15 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.713] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.713] Confluent - txn get' <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.713] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.713] Confluent - txn read Var(<12 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.714] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.717] Confluent - Var(<12 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.718] Confluent - txn get' <12 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.719] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.719] Confluent - txn get' <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.719] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.719] Confluent - txn read Var(<2 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.719] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.720] Confluent - Var(<2 @ 0,3,4,4>) get
+[2 Apr 2012, 09:05'09.720] Confluent - txn get' <2 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.720] Confluent - txn readID <4 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.721] Confluent - txn read Var(<5 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.721] Confluent - Var(<20 @ 3,3,4,4>) get
+[2 Apr 2012, 09:05'09.721] Confluent - txn get' <20 @ 3,3,4,4>
+[2 Apr 2012, 09:05'09.722] Confluent - txn readID <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.722] Confluent - txn get' <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.724] Confluent - txn readID <14 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.724] Confluent - txn read Var(<15 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.724] Confluent - txn read Var[Int](<16 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.724] Confluent - Var(<15 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.724] Confluent - txn get' <15 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.725] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.725] Confluent - txn get' <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.725] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.726] Confluent - txn read Var(<12 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.726] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.726] Confluent - Var(<12 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.726] Confluent - txn get' <12 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.726] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.727] Confluent - txn get' <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.727] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.727] Confluent - txn read Var(<2 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.727] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.728] Confluent - Var(<2 @ 0,3,4,4>) get
+[2 Apr 2012, 09:05'09.728] Confluent - txn get' <2 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.728] Confluent - txn readID <4 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.728] Confluent - txn read Var(<5 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.729] Confluent - Var(<15 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.729] Confluent - txn get' <15 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.729] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.729] Confluent - txn get' <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.730] Confluent - txn readID <11 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.730] Confluent - txn read Var(<12 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.730] Confluent - txn read Var[Int](<13 @ 2,3,4,4>)
+[2 Apr 2012, 09:05'09.730] Confluent - Var(<12 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.730] Confluent - txn get' <12 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.730] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.730] Confluent - txn get' <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.731] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.731] Confluent - txn read Var(<2 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.731] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.731] Confluent - Var(<2 @ 0,3,4,4>) get
+[2 Apr 2012, 09:05'09.731] Confluent - txn get' <2 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.732] Confluent - txn readID <4 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.732] Confluent - txn read Var(<5 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.736] Confluent - Var(<12 @ 2,3,4,4>) get
+[2 Apr 2012, 09:05'09.737] Confluent - txn get' <12 @ 2,3,4,4>
+[2 Apr 2012, 09:05'09.738] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.738] Confluent - txn get' <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.738] Confluent - txn readID <1 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.738] Confluent - txn read Var(<2 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.738] Confluent - txn read Var[Int](<3 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.739] Confluent - Var(<2 @ 0,3,4,4>) get
+[2 Apr 2012, 09:05'09.739] Confluent - txn get' <2 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.739] Confluent - txn readID <4 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.739] Confluent - txn read Var(<5 @ 0,3,4,4>)
+[2 Apr 2012, 09:05'09.747] Confluent - Var(<2 @ 0,3,4,4>) get
+[2 Apr 2012, 09:05'09.747] Confluent - txn get' <2 @ 0,3,4,4>
+[2 Apr 2012, 09:05'09.748] Confluent - txn readID <11 @ 2,2,4,4>
+[2 Apr 2012, 09:05'09.748] Confluent - txn read Var(<12 @ 2,2,4,4>)
+[2 Apr 2012, 09:05'09.748] Confluent - txn read Var[Int](<13 @ 2,2,4,4>)
+[2 Apr 2012, 09:05'09.749] Confluent - txn readID <14 @ 2,2,4,4>
+[2 Apr 2012, 09:05'09.749] Confluent - txn read Var(<15 @ 2,2,4,4>)
+[2 Apr 2012, 09:05'09.749] Confluent - txn read Var[Int](<16 @ 2,2,4,4>)
+[2 Apr 2012, 09:05'09.749] Confluent - txn read Var(<17 @ 2,2,4,4>)
 Element(Node<1 @ 0,3,4,4>,Vector(FreqChanged(Proc<11 @ 2,2,4,4>,Change(50.0,40.0))))
-[2 Apr 2012, 08:38'46.529] Confluent - ::::::: txn flush - term = 5 :::::::
-[2 Apr 2012, 08:38'46.529] Confluent - txn flush write 40.0 for <9 @ 1,3,4,5>
+[2 Apr 2012, 09:05'09.755] Confluent - ::::::: txn flush - term = 5 :::::::
+[2 Apr 2012, 09:05'09.756] Confluent - txn flush write 40.0 for <9 @ 1,3,4,5>

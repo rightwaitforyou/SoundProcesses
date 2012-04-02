@@ -176,7 +176,8 @@ emptyGraph
 //      val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
 //      val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
       val freq_#              = Doubles.newVar[ S ]( 441 )( tx0 )
-      protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
+// OOO
+//      protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
    }
 
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
