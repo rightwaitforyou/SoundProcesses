@@ -106,10 +106,10 @@ object ProcGroupImpl {
          seq.dispose()
       }
 
-//      final lazy val collectionChanged : Compound.CollectionEvent[ S, Impl[ S ], Decl[ S ], Proc[ S ], Proc.Update[ S ], Collection[ S ]] =
-//         collection( (p: Proc[ S ]) => p.changed ).map( Element( this, _ ))
       final lazy val collectionChanged : evt.Trigger[ S, Collection[ S ], ProcGroup[ S ]] = event[ Collection[ S ]]
-      final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.changed ).map( Element( this, _ ))
+// OOO
+//      final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.changed ).map( Element( this, _ ))
+final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.freqChanged ).map( Element( this, _ ))
       final lazy val changed           = collectionChanged | elementChanged
    }
 

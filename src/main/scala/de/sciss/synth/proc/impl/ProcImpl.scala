@@ -75,9 +75,10 @@ object ProcImpl {
 
       import Proc._
 
-      declare[ Renamed[        S ]]( _.renamed        )
-      declare[ GraphChanged[   S ]]( _.graphChanged   )
-      declare[ PlayingChanged[ S ]]( _.playingChanged )
+// OOO
+//      declare[ Renamed[        S ]]( _.renamed        )
+//      declare[ GraphChanged[   S ]]( _.graphChanged   )
+//      declare[ PlayingChanged[ S ]]( _.playingChanged )
 
       declare[ FreqChanged[ S ]]( _.freqChanged )
    }
@@ -85,52 +86,80 @@ object ProcImpl {
    private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] with evt.Compound[ S, Proc[ S ], Decl[ S ]] {
       import Proc._
 
-      protected def graphVar : S#Var[ SynthGraph ]
+// OOO
+//      protected def graphVar : S#Var[ SynthGraph ]
 
-      final def name( implicit tx: S#Tx ) : String = name_#.value
-      final def name_=( s: Expr[ S, String ])( implicit tx: S#Tx ) { name_#.set( s )}
-      final def playing( implicit tx: S#Tx ) : Boolean = playing_#.value
-      final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playing_#.set( b )}
-      final def graph( implicit tx: S#Tx ) : SynthGraph = graphVar.get
+      final def name( implicit tx: S#Tx ) : String = {
+//         name_#.value
+"name"
+      }
+      final def name_=( s: Expr[ S, String ])( implicit tx: S#Tx ) {
+// OOO
+//         name_#.set( s )
+      }
+      final def playing( implicit tx: S#Tx ) : Boolean = {
+//         playing_#.value
+false
+      }
+      final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx ) {
+// OOO
+//         playing_#.set( b )
+      }
+      final def graph( implicit tx: S#Tx ) : SynthGraph = {
+// OOO
+//         graphVar.get
+emptyGraph
+      }
       final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) {
-         val old = graphVar.get
-         if( old != g ) {
-            graphVar.set( g )
-            graphChanged( GraphChanged( this, evt.Change( old, g )))
-         }
+// OOO
+//         val old = graphVar.get
+//         if( old != g ) {
+//            graphVar.set( g )
+//            graphChanged( GraphChanged( this, evt.Change( old, g )))
+//         }
       }
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
-      final def play()( implicit tx: S#Tx ) { playing_#.set( true  )}
-      final def stop()( implicit tx: S#Tx ) { playing_#.set( false )}
+      final def play()( implicit tx: S#Tx ) {
+// OOO
+//         playing_#.set( true  )
+      }
+      final def stop()( implicit tx: S#Tx ) {
+// OOO
+//         playing_#.set( false )
+      }
 
       final def freq( implicit tx: S#Tx ) : Double = freq_#.value
       final def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) { freq_#.set( f )}
 
-      final def renamed             = name_#.changed.map( Renamed( this, _ ))
-      final def graphChanged        = event[ GraphChanged[ S ]]
-      final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
+// OOO
+//      final def renamed             = name_#.changed.map( Renamed( this, _ ))
+//      final def graphChanged        = event[ GraphChanged[ S ]]
+//      final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
       final def freqChanged         = freq_#.changed.map( FreqChanged( this, _ ))
-//      final def started             = ...
-//      final def stopped             = ...
-      final def changed             = renamed | graphChanged | playingChanged | freqChanged
+// OOO
+//      final def changed             = renamed | graphChanged | playingChanged | freqChanged
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
-         name_#.write( out )
-         playing_#.write( out )
+// OOO
+//         name_#.write( out )
+//         playing_#.write( out )
 
          freq_#.write( out )
 
-         graphVar.write( out )
+// OOO
+//         graphVar.write( out )
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {
-         name_#.dispose()
-         playing_#.dispose()
+// OOO
+//         name_#.dispose()
+//         playing_#.dispose()
 
          freq_#.dispose()
 
-         graphVar.dispose()
+// OOO
+//          graphVar.dispose()
       }
 
       override def toString() = "Proc" + id
@@ -143,8 +172,9 @@ object ProcImpl {
    private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
       protected val decl      = getDecl[ S ]( tx0 )
       protected val targets   = evt.Targets[ S ]( tx0 )
-      val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
-      val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
+// OOO
+//      val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
+//      val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
       val freq_#              = Doubles.newVar[ S ]( 441 )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
    }
@@ -159,8 +189,9 @@ object ProcImpl {
          require( serVer == SER_VERSION, "Incompatible serialized  (found " + serVer + ", required " + SER_VERSION + ")" )
       }
 
-      val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
-      val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
+// OOO
+//      val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
+//      val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
       val freq_#              = Doubles.readVar[ S ]( in, access )( tx0 )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
    }

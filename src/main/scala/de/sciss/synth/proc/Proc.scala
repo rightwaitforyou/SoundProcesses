@@ -59,7 +59,8 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- "fields" ----
 
-   def name_# : Expr.Var[ S, String ]
+// OOO
+//   def name_# : Expr.Var[ S, String ]
    def name( implicit tx: S#Tx ) : String
    def name_=( expr: Expr[ S, String ])( implicit tx: S#Tx ) : Unit
 
@@ -67,7 +68,8 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def graph_=( g: SynthGraph )( implicit tx: S#Tx ) : Unit
    def graph_=( block: => Any )( implicit tx: S#Tx ) : Unit
 
-   def playing_# : Expr.Var[ S, Boolean ]
+// OOO
+//   def playing_# : Expr.Var[ S, Boolean ]
    def playing( implicit tx: S#Tx ) : Boolean
    def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
 
@@ -88,13 +90,13 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- events ----
 
-   def renamed:         evt.Event[ S, Renamed[ S ],         Proc[ S ]]
-   def graphChanged:    evt.Event[ S, GraphChanged[ S ],    Proc[ S ]]
-   def playingChanged:  evt.Event[ S, PlayingChanged[ S ],  Proc[ S ]]
+// OOO
+//   def renamed:         evt.Event[ S, Renamed[ S ],         Proc[ S ]]
+//   def graphChanged:    evt.Event[ S, GraphChanged[ S ],    Proc[ S ]]
+//   def playingChanged:  evt.Event[ S, PlayingChanged[ S ],  Proc[ S ]]
 
    def freqChanged: evt.Event[ S, FreqChanged[ S ], Proc[ S ]]
 
-//   def started:         evt.Event[ S, Started[ S ],         Proc[ S ]]
-//   def stopped:         evt.Event[ S, Stopped[ S ],         Proc[ S ]]
-   def changed:         evt.Event[ S, Update[ S ],          Proc[ S ]]
+// OOO
+//   def changed:         evt.Event[ S, Update[ S ],          Proc[ S ]]
 }

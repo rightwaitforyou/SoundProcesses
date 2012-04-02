@@ -55,7 +55,13 @@ object PaperTest extends App {
       def newGroup()(  implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
       def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
 
-      val access = system.root { implicit tx => newGroup() }
+      val access = system.root { implicit tx =>
+         val g = newGroup()
+         if( DRY ) {
+            g.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => println( e )}
+         }
+         g
+      }
 
       def newAccess[ A ]( block: => A )( implicit tx: S#Tx, ser: TxnSerializer[ S#Tx, S#Acc, A ]) : S#Entry[ A ] = {
          val v = tx.newVar( access.get.id, /* tx.newID(), */ block )
