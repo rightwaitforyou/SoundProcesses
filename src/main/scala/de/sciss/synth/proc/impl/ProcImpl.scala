@@ -193,6 +193,7 @@ emptyGraph
 //      val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
 //      val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
       val freq_#              = Doubles.readVar[ S ]( in, access )( tx0 )
-      protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
+// OOO
+//      protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
    }
 }

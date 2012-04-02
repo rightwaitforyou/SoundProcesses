@@ -55,9 +55,15 @@ object PaperTest extends App {
       def newGroup()(  implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
       def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
 
+      def log( what: => String ) {
+         println( "____PAPER____ " + what )
+      }
+
       val access = system.root { implicit tx =>
+         log( "newGroup" )
          val g = newGroup()
          if( DRY ) {
+            log( "react to new group" )
             g.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => println( e )}
          }
          g
@@ -70,14 +76,21 @@ object PaperTest extends App {
       def exprVar( init: Double )( implicit tx: S#Tx ) : Expr.Var[ S, Double ] = Doubles.newVar[ S ]( init )
 
       val freqVar = cursor.step { implicit tx =>
+         log( "freq = exprVar( 50.0 )" )
          val freq = exprVar( 50.0 )
+         log( "newAccess( freq )" )
          newAccess( freq )
       }
 
       val proc1 = cursor.step { implicit tx =>
+         log( "access group" )
          val group   = access.get
+         log( "p = newProc()" )
          val p       = newProc()
-         p.freq      = freqVar.get
+         log( "access freqVar" )
+         val freq    = freqVar.get
+         log( "p.freq = freqVar" )
+         p.freq      = freq
          p.graph     = {
             val f = "freq".kr       // fundamental frequency
             val p = 20              // number of partials per channel
@@ -87,13 +100,19 @@ object PaperTest extends App {
             }
             Out.ar( 0, m )
          }
+         log( "group.add( p )" )
          group.add( p )
+         log( "newAccess( p )" )
          newAccess( p )
       }
 
       val v1 = cursor.step { implicit tx =>
+         log( "access p" )
          val p    = proc1.get
-         p.freq   = freqVar.get * 1.4
+         log( "access freqVar" )
+         val freq    = freqVar.get
+         log( "p.freq = freqVar * 1.4" )
+         p.freq   = freq * 1.4
          tx.inputAccess
       }
 
@@ -101,15 +120,20 @@ object PaperTest extends App {
 
       def meldStep() {
          cursor.step { implicit tx =>
+            log( "access group" )
             val group   = access.get
+            log( "p1 = p.meld( v1 )" )
             val p1   = proc1.meld( v1 )
+            log( "group.add( p1 )" )
             group.add( p1 )
          }
       }
 
       def freqStep() {
          cursor.step { implicit tx =>
+            log( "access freqVar" )
             val freq = freqVar.get
+            log( "freqVar.set( 40.0 )" )
             freq.set( 40.0 )
          }
       }
