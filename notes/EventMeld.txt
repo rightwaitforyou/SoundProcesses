@@ -43,3 +43,58 @@ note that in 0,2 we would still find proc<0,2>.freq for freq(children)
 
 :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 
+- in a way, the behaviour is quite coherent: an object which re-enters through a meld is not observed initially;
+  it only enters the radar by being added to some object in the main access path, raising an event in that main
+  object which eventually results in the melded object receiving new live observers.
+- therefore, the error must be sought in the melded object wrongly believing that it is 'connected'
+- wouldn't it thus be sufficient to change the `--->` behaviour as follows
+
+   (InvariantEvent)
+
+   final private[lucre] def --->( r: ExpandedSelector[ S ])( implicit tx: S#Tx ) {
+      if( reactor._targets.add( slot, r )) connect()
+   }
+
+   (Targets)
+
+      private[event] def add( slot: Int, sel: ExpandedSelector[ S ])( implicit tx: S#Tx ) : Boolean = {
+         val tup  = (slot, sel)
+         val old  = childrenVar.get
+         sel.writeValue()
+         childrenVar.set( old :+ tup )
+         !old.exists( _._1 == slot )
+      }
+
+   --> always call into connect, where connect first checks if the source is already connected and only adds
+       source connections when they didn't exist. it would thus refresh the source connections?
+
+::::::::::
+
+the group.add( p_melded ) :
+
+Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]] ---> Node<1 @ 0,3>.event[Element[<?>]]
+= reactor Targets<11 @ 2,2>.add( slot = 1, sel = Node<1 @ 0,3>.event[Element[<?>]])
+  old children : Vector((1,Node<1 @ 0,2>.event[Element[<?>]]))
+
+---> all it needs to do!!
+     is to iterate through the sources, and ask each source if it connects to the node or not!
+     --> if not, reconnect that source
+     --> this may be a performance penality for collection objects being melded ...
+     --> not just melded, but any collection object -- because it doesn't have knowledge about whether it
+         was melded or not, hence any group would have to check each element whenever an observer is
+         attached to the group ...
+
+         --> therefore, a better approach would be to invent a mechanism by which Targets.read would
+             notice whether a reactor is accessed the first time after a meld?
+
+---> question: - sketch a case, where the un-melded proc's freq is _not_ modified before the meld, but _afterwards_
+               - what happens now? is the melded proc cut off (HOPE NOT) or still connected to the freq's source?
+
+:::::::::::::::::::::
+
+other question: this won't work for mutating events. thus, they need to be exempt from melding -- is that reasonable?
+
+:::::::::::::::::::::
+.:.:.:.:.:.:.:.:.:.:.
+ : : : : : : : : : :
+. . . . . . . . . . .
