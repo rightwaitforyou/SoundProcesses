@@ -64,7 +64,7 @@ object PaperTest extends App {
          val g = newGroup()
          if( DRY ) {
             log( "react to new group" )
-            g.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => println( e )}
+            g.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => println( "____OBSERVE____ " + e )}
          }
          g
       }
