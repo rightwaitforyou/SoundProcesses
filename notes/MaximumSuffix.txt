@@ -1,0 +1,172 @@
+<0> group
+<1> freqVar
+   <1> children = Empty
+<2> proc
+   <2> freq source = <1,2> freqVar
+
+<1,2> freqVar children = <2> proc-freq
+
+<0, 1> group sources = <2> proc
+<2> proc children = <0, 1> group
+
+<3> times
+   <3> sources = <1,2,3> freqVar
+   <3> children = <2,3> proc
+<1,2,3> freqVar children = <3> times
+<2,3> proc children = <3> times
+
+:::: meld ::::
+
+<0,1,2,3,4> group sources = [ <2> proc, <2> proc ]
+---> NEIN
+---> ist ja praktisch ein transform( _ :+ proc' )
+---> also
+
+<0,1,2,3,4> group sources = [ <2,3,4> proc, <2,4> proc ] ?
+
+<2,4> proc children = <0, 1, 2, 3, 4> group
+<2> proc children = <0, 1> group
+
+:::: event ::::
+
+access freqVar
+<1,2,3,4,5> freqVar --> fire change
+
+how do freqVar children look?
+   <1,2>   ---> <2> proc-freq
+   <1,2,3> ---> <3> times
+
+who sources freqVar?
+<2> proc.freq ---> <1,2> freqVar
+<3> times     ---> <1,2,3> freqVar
+
+........... that doesn't help
+
+::::::::::::::::::::::::::::::::::::::::::::::
+
+again with the observers
+
+<0> group
+   <0> children = observer
+
+<1> freqVar
+   <1> children = Empty
+<2> proc
+   <2> freq source = <1,2> freqVar
+
+<1,2> freqVar children = <2> proc-freq
+
+<0, 1> group sources = <2> proc
+<2> proc children = <0, 1> group
+   --> notify observer
+
+<3> times
+   <3> sources = <1,2,3> freqVar
+   <3> children = <2,3> proc
+<1,2,3> freqVar children = <3> times
+<2,3> proc children = <3> times
+   --> notify observer
+
+:::: meld ::::
+
+<0,1,2,3,4> group sources = [ <2,3,4> proc, <2,4> proc ] ?
+   --> notify observer
+
+in the moment of proc' ---> group 
+the proc could see that group is already listening. that is, it will find
+<2> proc children = <0, 1> group
+
+doesn't help -- we could have added the melded proc' to another group
+
+:::::::::::::::::::::::::::::::
+
+the groups also need lazy event source registration -- we won't have amortized costs when adding elements, but that doesn't make sense anyway: if a live view registers, it must iterate through the elements, so the step by step event registration doesn't pay off
+
+:::::::::::::::::::::::::::::::
+
+evaluate the id-tagging of melded objects
+
+imagine a different scenario: versions 0 ... 3 as above, then a branch <2,4> where an observer watches proc. what happens when freqVar is changed?
+
+how do freqVar children look?
+   <1,2>   ---> <2> proc-freq
+   <1,2,3> ---> <3> times
+
+it depends on whether freqVar is changed from either branch -- the reactions are correct.
+
+it is really just an issue in meld.
+
+:::::::::::::::::::::::::::::::
+
+the problem of id-tagging is that this has to happen in flush, that is with the writeTerm -- and that writeTerm may be read repeatedly, and it won't be 'untagged' even if the newly observed melded object has reconnected the children.
+
+a simpler solution could be to somehow store the connection path in the dependent object, and when adding an observer, find the maximum prefix of the connection path with respect to the current access path.
+
+in the compressed path method, it would be sufficient to store the index's hash?
+
+the tag could be part of event.Targets
+
+- does tag mismatch automatically mean a re-connect, or could that depend on information in the sources? (i.e. in this case, should a tag check in 'proc' be further processed by freqVar, instead of a mechanical `-/->` followed by `--->`?)
+
+say that method is `-*->`. what would freqVar do?
+
+:::::::::::::::::::::::::::::::
+
+the hash-tag doesn't make sense -- there can be several access paths, that's the point of the meld. so it would be a hash-tag-set ....
+
+it would correspond to the longest prefix associated with childrenVar.get !
+
+    Var[ Tx, Acc, A ] {
+       def getWithPrefix( implicit tx: Tx ) : (Acc, A)
+    }
+
+grmpff. better:
+
+    Var[ Tx, A ] {
+       private[lucre] def getWithRefresh( implicit tx: Tx ) : (Boolean, A)
+    }
+
+if children wouldn't be Vector but a mutable structure, it could be part of tx.readID, as well....
+
+.... or it could be part of var.set as that would anyway check the previous entry!!!
+
+   def add( s: Selector, slot: Int ) : ConnectState = {
+      val old = childrenVar.get
+      if( old.isEmpty ) {
+          childrenVar.set( old :+ new )
+          ConnectState.Connect
+      } else {
+          if( childrenVar.pingAndSet( old :+ new )) ConnectState.Refresh else ConnectState.None
+      }
+   }
+
+:::::::::::::::::::::::::::::::
+
+Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]].--->( Node<1 @ 0,3>.event[Element[<?>]] )
+
+ reactor.add:
+
+Targets<11 @ 2,2>.add( 1, Node<1 @ 0,3>.event[Element[<?>]] )
+
+   old = Vector((1,Node<1 @ 0,2>.event[Element[<?>]]))
+
+---> the problem is, only the tx knows at this point that it is going to produce a new index tree
+
+:::::::::::::::::::::::::::::::
+
+other problem is that index check needs to be performed on a per-slot base as add is called from a particular event
+
+we could use a skiplist instead of a vector for children, at least test-wise, where keys are slots and values are vectors of selectors
+
+--> that produces a refactoring, because LucreData is a dependent project of LucreSTM
+--> therefore, for now, and to demonstrate that the approach works, use -- instead of IIdxSeq[ (Int, Selector) ] -- a Map[ Int, SlotChildren ]
+    where SlotChildren contains a Vector of selectors and an S#Var[ Unit ] (?) to monitor connects
+
+ - the whole slot bundling becomes questionable
+   (however, there is still a reason for it to be there -- combinatory bit masks from or-produced events)
+   (another reason -- observer gathering ?)
+   
+:::::::::::::::::::::::::::::::
+
+indeed we could leave children as is, and introduce a separate connection monitor: S#Var[ Int ] in the targets... 
+that would hold a bitmask of slots updated in the latest index tree; it would almost be the same as the current invalid field?
