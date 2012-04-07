@@ -104,6 +104,7 @@ ____PAPER____ freqVar.set( 40.0 )
 [7 Apr 2012, 11:21'39.519] Lucre - evt         visit Node<1 @ 0,3,4,4>.event[Element[<?>]] (new ? true)			// group
 [7 Apr 2012, 11:21'39.526] Lucre - evt           addLeaf ObserverKey(0), parent = Node<1 @ 0,3,4,4>.event[Element[<?>]]
 
+[7 Apr 2012, 13:06'18.342] Confluent - partial get( 20, Path(3, 3, 4, 4) ) => preLen = 1, writeTerm = 3, value = [B@5e6ffd79
 [7 Apr 2012, 12:34'12.779] Confluent - txn readID <14 @ 2,3,4,4>		// proc.freq_# with wrong path
 [7 Apr 2012, 12:34'12.779] Confluent - txn get' <14 @ 2,3,4,4>
 [7 Apr 2012, 12:34'12.781] Confluent - txn readID <14 @ 2,3,4,4>

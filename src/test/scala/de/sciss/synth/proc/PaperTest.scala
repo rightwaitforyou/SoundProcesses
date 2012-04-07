@@ -15,8 +15,9 @@ import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
 object PaperTest extends App {
    val DRY = true
 
-   LucreSTM.showEventLog   = true
-   TemporalObjects.showLog = true
+   LucreSTM.showEventLog            = true
+   TemporalObjects.showConfluentLog = true
+   TemporalObjects.showPartialLog   = true
 
 //   def main( args: Array[ String ]) {
 //      implicit val system: InMemory = InMemory()
