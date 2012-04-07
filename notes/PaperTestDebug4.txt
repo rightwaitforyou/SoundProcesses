@@ -14,18 +14,18 @@ ____PAPER____ access freqVar
 ____PAPER____ p.freq = freqVar
 [7 Apr 2012, 11:21'39.140] Lucre - evt Expr.Var<14 @ > set Expr.Var<6 @ 1,1> (con = false)
 ____PAPER____ group.add( p )
-[7 Apr 2012, 11:21'39.199] Lucre - evt Targets<11 @ > add( 1, Node<1 @ 0,1>.event[Element[<?>]])	// proc ---> group
+[7 Apr 2012, 11:21'39.199] Lucre - evt Targets<11 @ > add( 1, Node<1 @ 0,1>.event[Element[<?>]])			// proc ---> group
 [7 Apr 2012, 11:21'39.199] Lucre - evt Targets<11 @ > old children = Vector()
-[7 Apr 2012, 11:21'39.200] Lucre - evt Expr.Var<14 @ >.map[FreqChanged[<?>]] connect			// proc.changed connect
-[7 Apr 2012, 11:21'39.200] Lucre - evt Targets<14 @ > add( 1, Expr.Var<14 @ >.map[FreqChanged[<?>]])	// proc.freq_# ---> proc.changed
+[7 Apr 2012, 11:21'39.200] Lucre - evt Expr.Var<14 @ >.map[FreqChanged[<?>]] connect					// proc.changed connect
+[7 Apr 2012, 11:21'39.200] Lucre - evt Targets<14 @ > add( 1, Expr.Var<14 @ >.map[FreqChanged[<?>]])			// proc.freq_# ---> proc.changed
 [7 Apr 2012, 11:21'39.200] Lucre - evt Targets<14 @ > old children = Vector()
-[7 Apr 2012, 11:21'39.201] Lucre - evt Expr.Var<14 @ > connect						// proc.freq_#.connect
-[7 Apr 2012, 11:21'39.201] Lucre - evt Targets<6 @ 1,1> add( 1, Expr.Var<14 @ >)			// freqVar ---> proc.freq_#
+[7 Apr 2012, 11:21'39.201] Lucre - evt Expr.Var<14 @ > connect								// proc.freq_#.connect
+[7 Apr 2012, 11:21'39.201] Lucre - evt Targets<6 @ 1,1> add( 1, Expr.Var<14 @ >)					// freqVar ---> proc.freq_#
 [7 Apr 2012, 11:21'39.203] Lucre - evt Targets<6 @ 1,1> old children = Vector()
 [7 Apr 2012, 11:21'39.203] Lucre - evt Expr.Var<6 @ 1,1> connect
 [7 Apr 2012, 11:21'39.207] Lucre - evt Node<1 @ 0,1>.event[Collection[<?>]] fire Added(Node<1 @ 0,1>,Vector(Proc<11 @ >))
 [7 Apr 2012, 11:21'39.210] Lucre - evt push begin
-[7 Apr 2012, 11:21'39.211] Lucre - evt addLeaf ObserverKey(0), parent = Node<1 @ 0,1>.event[Collection[<?>]]
+[7 Apr 2012, 11:21'39.211] Lucre - evt   addLeaf ObserverKey(0), parent = Node<1 @ 0,1>.event[Collection[<?>]]
 [7 Apr 2012, 11:21'39.213] Lucre - evt pull begin
 [7 Apr 2012, 11:21'39.213] Lucre - evt numReactions = 1
 ____OBSERVE____ Added(Node<1 @ 0,1>,Vector(Proc<11 @ >))
@@ -34,20 +34,20 @@ ____PAPER____ newAccess( p )
 ____PAPER____ access p
 ____PAPER____ access freqVar
 ____PAPER____ p.freq = freqVar * 1.4
-[7 Apr 2012, 11:21'39.331] Lucre - evt Expr.Var<14 @ 2,2> set (Expr.Var<6 @ 1,2> * 1.4) (con = true)	// proc.freq_#.set
-[7 Apr 2012, 11:21'39.332] Lucre - evt Targets<6 @ 1,2> remove( 1, Expr.Var<14 @ 2,2>)			// freqVar -/-> proc.freq_#
+[7 Apr 2012, 11:21'39.331] Lucre - evt Expr.Var<14 @ 2,2> set (Expr.Var<6 @ 1,2> * 1.4) (con = true)			// proc.freq_#.set
+[7 Apr 2012, 11:21'39.332] Lucre - evt Targets<6 @ 1,2> remove( 1, Expr.Var<14 @ 2,2>)					// freqVar -/-> proc.freq_#
 [7 Apr 2012, 11:21'39.335] Lucre - evt Targets<6 @ 1,2> old children = Vector((1,Targets<14 @ 2,2>.select(1)))
-[7 Apr 2012, 11:21'39.337] Lucre - evt Targets<19 @ > add( 1, Expr.Var<14 @ 2,2>)			// times ---> proc.freq_#
+[7 Apr 2012, 11:21'39.337] Lucre - evt Targets<19 @ > add( 1, Expr.Var<14 @ 2,2>)					// times ---> proc.freq_#
 [7 Apr 2012, 11:21'39.337] Lucre - evt Targets<19 @ > old children = Vector()
-[7 Apr 2012, 11:21'39.337] Lucre - evt (Expr.Var<6 @ 1,2> * 1.4) connect				// times.connect
-[7 Apr 2012, 11:21'39.337] Lucre - evt Targets<6 @ 1,2> add( 1, (Expr.Var<6 @ 1,2> * 1.4))		// freqVar ---> times
+[7 Apr 2012, 11:21'39.337] Lucre - evt (Expr.Var<6 @ 1,2> * 1.4) connect						// times.connect
+[7 Apr 2012, 11:21'39.337] Lucre - evt Targets<6 @ 1,2> add( 1, (Expr.Var<6 @ 1,2> * 1.4))				// freqVar ---> times
 [7 Apr 2012, 11:21'39.337] Lucre - evt Targets<6 @ 1,2> old children = Vector()
-[7 Apr 2012, 11:21'39.337] Lucre - evt Expr.Var<6 @ 1,2> connect					// freqVar.connect
-[7 Apr 2012, 11:21'39.343] Lucre - evt Expr.Var<14 @ 2,2> fire Change(50.0,70.0)			// proc.freq_#.fire
+[7 Apr 2012, 11:21'39.337] Lucre - evt Expr.Var<6 @ 1,2> connect							// freqVar.connect
+[7 Apr 2012, 11:21'39.343] Lucre - evt Expr.Var<14 @ 2,2> fire Change(50.0,70.0)					// proc.freq_#.fire
 [7 Apr 2012, 11:21'39.344] Lucre - evt push begin
-[7 Apr 2012, 11:21'39.347] Lucre - evt visit Targets<11 @ 2,2>.select(1) (new ? true)			// = proc (changed)
-[7 Apr 2012, 11:21'39.348] Lucre - evt visit Node<1 @ 0,2>.event[Element[<?>]] (new ? true)		// = group (element)
-[7 Apr 2012, 11:21'39.353] Lucre - evt addLeaf ObserverKey(0), parent = Node<1 @ 0,2>.event[Element[<?>]]
+[7 Apr 2012, 11:21'39.347] Lucre - evt   visit Targets<11 @ 2,2>.select(1) (new ? true)					// = proc (changed)
+[7 Apr 2012, 11:21'39.348] Lucre - evt     visit Node<1 @ 0,2>.event[Element[<?>]] (new ? true)				// = group (element)
+[7 Apr 2012, 11:21'39.353] Lucre - evt       addLeaf ObserverKey(0), parent = Node<1 @ 0,2>.event[Element[<?>]]
 [7 Apr 2012, 11:21'39.354] Lucre - evt pull begin
 [7 Apr 2012, 11:21'39.354] Lucre - evt numReactions = 1
 ____OBSERVE____ Element(Node<1 @ 0,2>,Vector(FreqChanged(Proc<11 @ 2,2>,Change(50.0,70.0))))
@@ -55,22 +55,23 @@ ____OBSERVE____ Element(Node<1 @ 0,2>,Vector(FreqChanged(Proc<11 @ 2,2>,Change(5
 ____PAPER____ access group
 ____PAPER____ p1 = p.meld( v1 )
 ____PAPER____ group.add( p1 )
-[7 Apr 2012, 11:21'39.448] Lucre - evt Targets<11 @ 2,2> add( 1, Node<1 @ 0,3>.event[Element[<?>]])
-[7 Apr 2012, 11:21'39.450] Lucre - evt Targets<11 @ 2,2> old children = Vector((1,Node<1 @ 0,2>.event[Element[<?>]]))
-[7 Apr 2012, 11:21'39.450] Lucre - evt Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]] re-connect
-[7 Apr 2012, 11:21'39.451] Lucre - evt Targets<14 @ 2,2> remove( 1, Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]])
-[7 Apr 2012, 11:21'39.451] Lucre - evt Targets<14 @ 2,2> old children = Vector((1,Targets<11 @ 2,2>.select(1)))
-[7 Apr 2012, 11:21'39.453] Lucre - evt Targets<6 @ 1,2> remove( 1, Expr.Var<14 @ 2,2>)
+[7 Apr 2012, 11:21'39.448] Lucre - evt Targets<11 @ 2,2> add( 1, Node<1 @ 0,3>.event[Element[<?>]])			// proc ---> group
+[7 Apr 2012, 11:21'39.450] Lucre - evt Targets<11 @ 2,2> old children = Vector((1,Node<1 @ 0,2>.event[Element[<?>]]))	// previous proc->group
+[7 Apr 2012, 11:21'39.450] Lucre - evt Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]] re-connect				// ::::: proc.freq_# reconnect :::::
+[7 Apr 2012, 11:21'39.451] Lucre - evt Targets<14 @ 2,2> remove( 1, Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]])		// proc.freq_# -/-> proc.changed
+[7 Apr 2012, 11:21'39.451] Lucre - evt Targets<14 @ 2,2> old children = Vector((1,Targets<11 @ 2,2>.select(1)))		
+[7 Apr 2012, 11:21'39.453] Lucre - evt Targets<6 @ 1,2> remove( 1, Expr.Var<14 @ 2,2>)					// freqVar -/-> proc.freq_#
 [7 Apr 2012, 11:21'39.455] Lucre - evt Targets<6 @ 1,2> old children = Vector((1,Targets<19 @ 3,2>.select(1)))
-[7 Apr 2012, 11:21'39.455] Lucre - evt Targets<14 @ 2,2> add( 1, Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]])
+[7 Apr 2012, 12:05'51.193] Lucre - evt Targets<6 @ 1,2> selector not found						// XXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+[7 Apr 2012, 11:21'39.455] Lucre - evt Targets<14 @ 2,2> add( 1, Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]])		// proc.freq_# ---> proc.changed
 [7 Apr 2012, 11:21'39.455] Lucre - evt Targets<14 @ 2,2> old children = Vector()
 [7 Apr 2012, 11:21'39.455] Lucre - evt Expr.Var<14 @ 2,2> connect
-[7 Apr 2012, 11:21'39.457] Lucre - evt Targets<6 @ 1,2> add( 1, Expr.Var<14 @ 2,2>)
+[7 Apr 2012, 11:21'39.457] Lucre - evt Targets<6 @ 1,2> add( 1, Expr.Var<14 @ 2,2>)					// freqVar ---> proc.freq_#
 [7 Apr 2012, 11:21'39.459] Lucre - evt Targets<6 @ 1,2> old children = Vector((1,Targets<19 @ 3,2>.select(1)))
-[7 Apr 2012, 11:21'39.459] Lucre - evt Expr.Var<6 @ 1,2> re-connect
+[7 Apr 2012, 11:21'39.459] Lucre - evt Expr.Var<6 @ 1,2> re-connect							// ::::: freqVar reconnect :::::
 [7 Apr 2012, 11:21'39.460] Lucre - evt Node<1 @ 0,3>.event[Collection[<?>]] fire Added(Node<1 @ 0,3>,Vector(Proc<11 @ 2,2>))
 [7 Apr 2012, 11:21'39.461] Lucre - evt push begin
-[7 Apr 2012, 11:21'39.461] Lucre - evt addLeaf ObserverKey(0), parent = Node<1 @ 0,3>.event[Collection[<?>]]
+[7 Apr 2012, 11:21'39.461] Lucre - evt   addLeaf ObserverKey(0), parent = Node<1 @ 0,3>.event[Collection[<?>]]
 [7 Apr 2012, 11:21'39.461] Lucre - evt pull begin
 [7 Apr 2012, 11:21'39.461] Lucre - evt numReactions = 1
 ____OBSERVE____ Added(Node<1 @ 0,3>,Vector(Proc<11 @ 2,2>))
@@ -80,12 +81,12 @@ ____PAPER____ freqVar.set( 40.0 )
 [7 Apr 2012, 11:21'39.499] Lucre - evt Expr.Var<6 @ 1,3,4,4> set 40.0 (con = true)
 [7 Apr 2012, 11:21'39.499] Lucre - evt Expr.Var<6 @ 1,3,4,4> fire Change(50.0,40.0)
 [7 Apr 2012, 11:21'39.499] Lucre - evt push begin
-[7 Apr 2012, 11:21'39.507] Lucre - evt visit Targets<19 @ 3,3,4,4>.select(1) (new ? true)
-[7 Apr 2012, 11:21'39.511] Lucre - evt visit Targets<14 @ 2,3,4,4>.select(1) (new ? true)
-[7 Apr 2012, 11:21'39.513] Lucre - evt visit Targets<11 @ 2,3,4,4>.select(1) (new ? true)
-[7 Apr 2012, 11:21'39.519] Lucre - evt visit Node<1 @ 0,3,4,4>.event[Element[<?>]] (new ? true)
-[7 Apr 2012, 11:21'39.526] Lucre - evt addLeaf ObserverKey(0), parent = Node<1 @ 0,3,4,4>.event[Element[<?>]]
-[7 Apr 2012, 11:21'39.526] Lucre - evt visit Targets<14 @ 2,3,4,4>.select(1) (new ? false)
+[7 Apr 2012, 11:21'39.507] Lucre - evt   visit Targets<19 @ 3,3,4,4>.select(1) (new ? true)				// times
+[7 Apr 2012, 11:21'39.511] Lucre - evt     visit Targets<14 @ 2,3,4,4>.select(1) (new ? true)				// proc.freq_#
+[7 Apr 2012, 11:21'39.513] Lucre - evt       visit Targets<11 @ 2,3,4,4>.select(1) (new ? true)				// proc
+[7 Apr 2012, 11:21'39.519] Lucre - evt         visit Node<1 @ 0,3,4,4>.event[Element[<?>]] (new ? true)			// group
+[7 Apr 2012, 11:21'39.526] Lucre - evt           addLeaf ObserverKey(0), parent = Node<1 @ 0,3,4,4>.event[Element[<?>]]
+[7 Apr 2012, 11:21'39.526] Lucre - evt   visit Targets<14 @ 2,3,4,4>.select(1) (new ? false)
 [7 Apr 2012, 11:21'39.526] Lucre - evt pull begin
 [7 Apr 2012, 11:21'39.526] Lucre - evt numReactions = 1
 ____OBSERVE____ Element(Node<1 @ 0,3,4,4>,Vector(FreqChanged(Proc<11 @ 2,2,4,4>,Change(50.0,40.0))))

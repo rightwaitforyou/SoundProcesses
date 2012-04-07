@@ -7,7 +7,6 @@ import ugen._
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.{LucreSTM, DataInput, DataOutput}
 
-//import expr._
 import de.sciss.confluent.Confluent
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
