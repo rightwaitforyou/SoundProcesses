@@ -5,8 +5,9 @@ import synth._
 import expr.{Doubles, ExprImplicits}
 import ugen._
 import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.{LucreSTM, DataInput, DataOutput}
+
 //import expr._
-import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.confluent.Confluent
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
@@ -15,6 +16,8 @@ import de.sciss.confluent.KSys
 
 object PaperTest extends App {
    val DRY = true
+
+   LucreSTM.showEventLog = true
 
 //   def main( args: Array[ String ]) {
 //      implicit val system: InMemory = InMemory()
