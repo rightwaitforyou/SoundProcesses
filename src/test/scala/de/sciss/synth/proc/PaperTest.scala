@@ -7,16 +7,16 @@ import ugen._
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.{LucreSTM, DataInput, DataOutput}
 
-import de.sciss.confluent.Confluent
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import de.sciss.lucre.stm.{TxnSerializer, Cursor}
-import de.sciss.confluent.KSys
+import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
 
 object PaperTest extends App {
    val DRY = true
 
-   LucreSTM.showEventLog = true
+   LucreSTM.showEventLog   = true
+   TemporalObjects.showLog = true
 
 //   def main( args: Array[ String ]) {
 //      implicit val system: InMemory = InMemory()
