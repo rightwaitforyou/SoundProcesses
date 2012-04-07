@@ -151,7 +151,7 @@ object Doubles extends Type[ Double ] {
 
       sealed abstract class Op( val id: Int ) extends Tuple1Op[ Double ] {
          final def make[ S <: Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple1( typeID, this, Targets[ S ], a )
+            new Tuple1( typeID, this, Targets.partial[ S ], a )
          }
 
          def value( a: Double ) : Double
@@ -285,7 +285,7 @@ object Doubles extends Type[ Double ] {
 
       sealed abstract class Op( val id: Int ) extends Tuple2Op[ Double, Double ] {
          final def make[ S <: Sys[ S ]]( a: Ex[ S ], b: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple2( typeID, this, Targets[ S ], a, b )
+            new Tuple2( typeID, this, Targets.partial[ S ], a, b )
          }
          def value( a: Double, b: Double ) : Double
 
