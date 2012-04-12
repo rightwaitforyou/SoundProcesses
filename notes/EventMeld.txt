@@ -98,3 +98,17 @@ other question: this won't work for mutating events. thus, they need to be exemp
 .:.:.:.:.:.:.:.:.:.:.
  : : : : : : : : : :
 . . . . . . . . . . .
+
+::::::::: 12-Apr-12 :::::::::
+
+hypothese: 
+- Expr.Var must be a combination of
+  partial persistence and quasi-retroactive (retroChild) modification
+
+- everything that is not reactive/observable can be driven if quasi-retroactive insertions
+  (because they won't generate an event)
+
+Proc
+   freqVar: S#Var[ Expr[ Double ]]  // aka confluent
+   
+   
