@@ -111,4 +111,199 @@ hypothese:
 Proc
    freqVar: S#Var[ Expr[ Double ]]  // aka confluent
    
+:::::::::::::::::::::
+
+'catapult'
+
+first: say freqVar was created in v0, proc in v1
+
+... v1 ...
+   proc<>
+   proc.freq<> init freqVar<0,0>
+      freqVar.children<0,0> += (writeTerm 1) proc<>
+
+traverse v1
+   proc<1,1>
+   proc.freq<1,1>.value
+      freqVar<0,1>.value
+
+... v2 ...
+   times<>
+      a: freqVar<0,1>
+   proc.freq<1,1> set times<>
+      freqVar.children<0,1> -= proc<1,1>
+      times.children<> += (writeTerm 2) proc<1,1>
+      freqVar.children<0,1> += times<>
+
+traverse v2
+   proc<1,2>
+   proc.freq<1,2>.value
+      times<2,2>.value
+      freqVar<0,2>.value
+
+... v3 ...
+   group += proc<1,1>MELD
+-----> how to detect existence of proc<1,2> ??
+-----> ask for live views involving proc?
+-----> but then there might be a different proc being in freqVar.children
+(unless the whole chain is kept live, but that's exactly what we tried
+ to avoid with collection events)
+
+thus the question is: how to know all the children of freqVar that will be
+visible in version 3...
+
+-----> we would need to store outgoing edges in the versions?
+if v8 was actually before v3, how would we gather freqVar.children in v3?
+
+
+
+proc.freq
+  <1,1> : freqVar<0,0>
+  <1,2> : times<>
+freqVar.children
+  <0,0> : []
+  <0,1> : [ proc<> ]
+  <0,2> : [ times<> ]
+  <0,8> : [ otra cosa ]
+
+:::::::::::::::::::::
+
+doppel key bestehend aus event source _und_ event target? something like a bi-directional dictionary.
+
+[ <int> sourceID, <int> targetID, <long> (partial-hash) ] -> partial or full entry?
+
+:::::::::::::::::::::
+
+is there a primary access path for a vertex? that is, can we distinguish one of its in-edges as prioritised?
+(meld is called from _within an access path_)
+
+:::::::::::::::::::::
+
+- 'v8 otra cosa' is actually not a problem -- if it _is_ a child of freqVar, it is because it has a live view,
+and then naturally it should be notified about changes to freqVar.
+- if is not viewed, it is detached, and thus does not appear in freqVar.children
+- still, it would destroy the preservation of the linear version history
+
+:::::::::::::::::::::
+
+what we currently anyway need to do is read the whole children vector, so that's already O(n) with n = numChildren.
+it is thus not degrading performance to perform an additional check on each child, e.g. whether it has an outEdge
+going to the new melded tree?
+
+:::::::::::::::::::::
+
+a _stale_ view would only evaluate the expressions (even to save their values in view proxies), but not
+register observers!
+
+do we allow multiple live views corresponding to different cursors?
+(it doesn't really seem to make any practical sense...?)
+
+:::::::::::::::::::::
+
+Expr.Var : Targets = ephemeral
+           Ref     = partially persistent (but if we carry around confluent paths, may also be regularly confluent)
+
+v0
+   new group
+       children += live observer
+
+v0 -> v1
+   new exprVar freqVar
+       value : write <1,1> --> 50.0
+       children : write Nil
+
+v1 -> v2
+   access freqVar = freqVar<1,1>
+
+   new proc
+       id = <y @ >
+       freq.set( freqVar<1,1> ) : write<2,2>
+ 
+   access group = group<0,1>
+
+   group.add( proc<> ) : write<0,2>
+      group<0,1> ---> proc<>
+      proc.children<> += group<0,1> (write <2,2>)
+      proc<> ---> freqVar
+         proc.freq<>.get --> freqVar<1,1>
+         proc<> ---> freqVar<1,1>
+         freqVar<1,1>.children += proc<>
+         = freqVar.childrenEph      += <1,1> -> proc<>
+           freqVar.childrenPar<1,1> += proc<> : write <1,2>
+
+v2 -> v3
+   access proc = proc<2,2>
+   proc.freq = freqVar * 1.4
+      proc -/-> freqVar
+      proc.freq<2,2>.get --> freqVar<1,2>
+      proc<2,2> -/-> freqVar<1,2>
+      freqVar<1,2>.children -= proc<2,2>
+      = freqVar.childrenPar<1,2>.get --> proc<2,2> + info that it was stored at <1,1> -> proc<>
+        freqVar.childrenEph -= <1,1> -> proc<???>
+
+      proc ---> times<>
+      proc.freq<2,2>.set --> times<>
+      times<>.children += proc<2,2>
+      = times.childrenEph   += <> -> proc<2,2>
+        times.childrenPar<> += proc<2,2> : write<3,3>
+      times<> ---> freqVar
+         times.a<>.get --> freqVar<1,2>
+         freqVar<1,2>.children += times<>
+         = freqVar.childrenEph      += <1,2> -> times<>
+           freqVar.childrenPar<1,2> += times : write <1,3>
+
+v3 -> v4
+   access group = group<0,3>
    
+   proc' = v2.meld( proc ) = proc<2,2>
+   group.add( proc' )
+      group<0,3> ---> proc<2,2>
+      proc.children<2,2> += group<0,3> (write <2,2,4,4>)
+      ---- now was proc.children empty or not?
+      ---- XXX let's assume we can detect that freqVar should be reconnected
+	      proc<2,2> -*-> freqVar
+	      proc.freq<2,2>.get --> freqVar<1,2>
+	      proc<2,2> -*-> freqVar<1,2>
+	      freqVar<1,2>.children refresh (and add-if-necessary proc<2,2>)
+
+              ---> in-vertices = [ 3, 2 ]
+
+              at <1,3> we find times<> --> expand to times<3,3>
+              at <1,2> we find proc<>  --> expand to proc<2,2>
+
+              ---> re-write
+
+              freqVar.childrenEph := <1,?> -> [
+                 times<3,3>, proc<2,2>, ((( NEIN: proc<2,3> ?? )))]
+
+              freqVar.childrenPar<1,2> := [ times<3,3>, proc<2,2>, proc<2,3> ?? ] : write <1,4,4> !
+
+v4 -> v5
+   freqVar.set( 40.0 )
+
+   access freqVar = freqVar<1,(3,)4,4>
+   
+   freqVar<1,(3,)4,4>.set( 40.0 )
+   -> fire
+
+   finds children : [ times<3,3>, proc<2,2>, proc<2,3> ?? ] at 1,4,4
+      how are they expanded?
+         times<3,(3,)4,4>
+         proc<2,2,4,4>
+         ((( NEIN: proc<2,3,4,4> )))
+
+      ...and propagated
+         proc.children<2,2,4,4> --> finds group<0,3> right?
+            thus expands to group<0,3,4,4>, right?
+
+         times.children<3,(3,)4,4> --> finds proc<2,2> written at <3,3> right?
+            thus expands to proc<2,3,4,4>, right?
+            thus finds group<0,2>, expands to group<0,3,4,4>, right?
+
+looks all good, despite the question marks ....
+
+:::::::::::::::::::::
+
+the main question mark is how to properly remove a child (in v2)
+
+         
