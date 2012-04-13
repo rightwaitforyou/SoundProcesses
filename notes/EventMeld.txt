@@ -203,6 +203,8 @@ do we allow multiple live views corresponding to different cursors?
 Expr.Var : Targets = ephemeral
            Ref     = partially persistent (but if we carry around confluent paths, may also be regularly confluent)
 
+BRAIN RUN 1
+
 v0
    new group
        children += live observer
@@ -306,4 +308,140 @@ looks all good, despite the question marks ....
 
 the main question mark is how to properly remove a child (in v2)
 
+:::::::::::::::::::::
+
+BRAIN RUN 2
+- childrenEph is not needed it seems?
+- exprVar Ref _does_ need to be partially persistent
+
+v0
+   new group
+       children += live observer : write <0,0>
+
+v0 -> v1
+   new exprVar freqVar
+       value : write <1,1> --> 50.0
+       children : write <1,1> --> Nil
+
+v1 -> v2
+   access freqVar = freqVar<1,1>
+
+   new proc
+       id = <y @ >
+       freq.set( freqVar<1,1> ) : write<2,2>
+   
+   access group = group<0,1>
+   
+   group.add( proc<> ) : write<0,2>
+      group<0,1> ---> proc<>
+      proc.children<> += group<0,1> : write <2,2>
+      ; is first child, thus engage:
+      proc<> ---> freqVar
+         proc.freq<>.get --> freqVar<1,1>
+         proc<> ---> freqVar<1,1>
+         freqVar<1,1>.children += proc<>
+         = freqVar.childrenPar<1,1> += proc<> : write <1,2>
+
++--- let's see how the live view is built
+|
+|  fire Group.Added( group<0,1> --> proc<> )
+|  proc.freq<>.get --> freqVar<1,1>
+|  freqVar<1,1>.value --> finds 50.0  (OK)
+|
++---
+
+v2 -> v3
+   access proc = proc<2,2>
+   proc.freq set freqVar * 1.4
+      ? is proc.freq connected ?
+         proc.children<2,2>.get --> [ group<0,1 (expanded to group<0,2>) ] --> YES
+      proc -/-> freqVar
+      proc.freq<2,2>.get --> freqVar<1,2>
+      proc<2,2> -/-> freqVar<1,2>
+      freqVar<1,2>.children -= proc<2,2>
+      = freqVar.childrenPar<1,2>.get --> [ proc<> (expanded to proc<2,2>) ]
+        freqVar.childrenPar<1,2> := []  : cache
+
+      proc ---> times<>
+      proc.freq<2,2>.set --> times<>
+      times<>.children += proc<2,2>
+      = times.childrenPar<> += proc<2,2> : write<3,3>
+      ; is first child, thus engage:
+      times<> ---> freqVar
+         times.a<>.get --> freqVar<1,2>
+         freqVar<1,2>.children += times<>
+         = freqVar.childrenPar<1,2> := [ times<> ] : write <1,3>
+
++--- events
+|
+|  proc.freq<2,2> fire
+|     before.value
+|        freqVar<1,2>.value --> finds 50.0
+|     now.value
+|        times<>.value -->  yields 70.0
+|     children<2,2> --> expanded group<0,2>
+|     Group.Element( group<0,2>, [ FreqChanged( proc<2,2>, 50.0 -> 70.0 )])  (OK)
+|
++---
+
+v3 -> v4
+   access group = group<0,3>
+   
+   proc' = (v0,v2).meld( proc ) = proc<2,2>   : add in-edge v2 to tx-info
+   group.add( proc' )
+      group<0,3> ---> proc<2,2>
+      proc.children<2,2> += group<0,3>
+         proc.children<2,2>.get --> [ group<0,1> expanded to group<0,3> ]
+         ; what should be do here?
+CONTINUE HERE
+         ; could use a Map instead with use-count?
+
+ (write <2,2,4,4>)
          
+
+      ---- now was proc.children empty or not?
+      ---- XXX let's assume we can detect that freqVar should be reconnected
+
+
+
+	      proc<2,2> -*-> freqVar
+	      proc.freq<2,2>.get --> freqVar<1,2>
+	      proc<2,2> -*-> freqVar<1,2>
+	      freqVar<1,2>.children refresh (and add-if-necessary proc<2,2>)
+
+              ---> in-vertices = [ 3, 2 ]
+
+              at <1,3> we find times<> --> expand to times<3,3>
+              at <1,2> we find proc<>  --> expand to proc<2,2>
+
+              ---> re-write
+
+              freqVar.childrenEph := <1,?> -> [
+                 times<3,3>, proc<2,2>, ((( NEIN: proc<2,3> ?? )))]
+
+              freqVar.childrenPar<1,2> := [ times<3,3>, proc<2,2>, proc<2,3> ?? ] : write <1,4,4> !
+
+v4 -> v5
+   freqVar.set( 40.0 )
+
+   access freqVar = freqVar<1,(3,)4,4>
+   
+   freqVar<1,(3,)4,4>.set( 40.0 )
+   -> fire
+
+   finds children : [ times<3,3>, proc<2,2>, proc<2,3> ?? ] at 1,4,4
+      how are they expanded?
+         times<3,(3,)4,4>
+         proc<2,2,4,4>
+         ((( NEIN: proc<2,3,4,4> )))
+
+      ...and propagated
+         proc.children<2,2,4,4> --> finds group<0,3> right?
+            thus expands to group<0,3,4,4>, right?
+
+         times.children<3,(3,)4,4> --> finds proc<2,2> written at <3,3> right?
+            thus expands to proc<2,3,4,4>, right?
+            thus finds group<0,2>, expands to group<0,3,4,4>, right?
+
+:::::::::::::::::::::
+
