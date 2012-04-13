@@ -393,16 +393,12 @@ v3 -> v4
       proc.children<2,2> += group<0,3>
          proc.children<2,2>.get --> [ group<0,1> expanded to group<0,3> ]
          ; what should be do here?
-CONTINUE HERE
-         ; could use a Map instead with use-count?
-
- (write <2,2,4,4>)
+         ; could use a Map instead with use-count? let's try...
+         proc.children<2,2> := [ group<0,3> {cnt=2} ] : write <2,2,4,4>
          
-
-      ---- now was proc.children empty or not?
-      ---- XXX let's assume we can detect that freqVar should be reconnected
-
-
+      ---- XXX let's assume we can detect that freqVar should be reconnected.
+      ---- doesn't a detected un-updated meld indicate that the children value
+      ---- is completely invalid? that it should be re-established anyways?
 
 	      proc<2,2> -*-> freqVar
 	      proc.freq<2,2>.get --> freqVar<1,2>
@@ -416,10 +412,23 @@ CONTINUE HERE
 
               ---> re-write
 
-              freqVar.childrenEph := <1,?> -> [
-                 times<3,3>, proc<2,2>, ((( NEIN: proc<2,3> ?? )))]
+              freqVar.childrenPar<1,2> := [ times<3,3>, proc<2,2> ] : write <1,4,4> !
 
-              freqVar.childrenPar<1,2> := [ times<3,3>, proc<2,2>, proc<2,3> ?? ] : write <1,4,4> !
++--- events
+|
+|  fire Group.Added( group<0,3> --> proc<2,2> )
+|  proc.freq<2,2>.get --> freqVar<1,1>
+|  freqVar<1,1>.value --> finds 50.0  (OK)
+|
++---
+
++--- what if the melded proc was not observed?
+|
+|  - freqVar.children wouldn't have been refreshed
+|  - searching in <1,(3,)4,4 finds freqVar.childrenPar<1,2> := [ times<> ] : writeTerm 3
+|  - hence, yields times<3,(3,)4,4> --> correct
+|
++---
 
 v4 -> v5
    freqVar.set( 40.0 )
@@ -427,21 +436,57 @@ v4 -> v5
    access freqVar = freqVar<1,(3,)4,4>
    
    freqVar<1,(3,)4,4>.set( 40.0 )
-   -> fire
+   -> fire change 50 -> 40
 
-   finds children : [ times<3,3>, proc<2,2>, proc<2,3> ?? ] at 1,4,4
+   finds children : [ times<3,3>, proc<2,2>] at 1,4,4
       how are they expanded?
          times<3,(3,)4,4>
          proc<2,2,4,4>
-         ((( NEIN: proc<2,3,4,4> )))
 
       ...and propagated
-         proc.children<2,2,4,4> --> finds group<0,3> right?
-            thus expands to group<0,3,4,4>, right?
+         proc.children<2,2,4,4> --> group<0,3> expands to group<0,3,4,4>
 
-         times.children<3,(3,)4,4> --> finds proc<2,2> written at <3,3> right?
-            thus expands to proc<2,3,4,4>, right?
-            thus finds group<0,2>, expands to group<0,3,4,4>, right?
+         times.children<3,(3,)4,4> --> finds proc<2,2> written at <3,3>
+            thus expands to proc<2,3,4,4>
+            thus finds group<0,2>, expands to group<0,3,4,4>
+
++--- events
+|
+|  freqVar<1,(3,)4,4> fire
+|     Group.Element( group<0,3,4,4>, [ 
+|        FreqChanged( proc<2,2,4,4>, 50.0 -> 40.0 )
+|        FreqChanged( proc<2,3,4,4>, 70.0 -> 64.0 )
+|     ])
+|
++---
+
+- todo: how does the view distinguish the newly melded procs?
 
 :::::::::::::::::::::
+
+      ---- XXX let's assume we can detect that freqVar should be reconnected.
+      ---- doesn't a detected un-updated meld indicate that the children value
+      ---- is completely invalid? that it should be re-established anyways?
+
+The refresh can be interpreted differently: Indeed we _only_ need to read the
+main in version, that is, look at in-vertex 3 -->
+
+      at <1,3> we find times<> --> expand to times<3,3>
+
+and then the freshly melded dependent is added
+
+      for <1,2> add proc<2,2>
+
+thus the result is the same:
+
+      freqVar.childrenPar<1,2> := [ times<3,3>, proc<2,2> ] : write <1,4,4> !
+
+but it doesn't make the mistake of adding old dependants which are not explicitly re-added
+as observations in the new melded version
+
+:::::::::::::::::::::
+
+So we can restate: In a meld, the melded objects are initially unobserved. When they are added to an observing structure, a refresh is enforced; the refresh will add the melded object to the children of its sources, where those children are initialised to the value read at the main access terminal version (those are the children already observed).
+
+It remains to clarify how the need for refresh is detected.
 
