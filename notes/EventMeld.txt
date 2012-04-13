@@ -490,3 +490,11 @@ So we can restate: In a meld, the melded objects are initially unobserved. When 
 
 It remains to clarify how the need for refresh is detected.
 
+      proc.children<2,2> += group<0,3>
+      proc.children<2,2>.get ---> write was at <2,2>
+      ; we could ask tx.currentTargetLevel and compare that with the children.get found prefix tree level
+      ; --> if they diverge, a refresh is needed
+
+:::::::::::::::::::::
+
+should test a few other cases to make sure this still works
