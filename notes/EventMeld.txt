@@ -494,7 +494,16 @@ It remains to clarify how the need for refresh is detected.
       proc.children<2,2>.get ---> write was at <2,2>
       ; we could ask tx.currentTargetLevel and compare that with the children.get found prefix tree level
       ; --> if they diverge, a refresh is needed
+      (that would be an overly cautious measure, though; there might be cases where this is not necessary)
 
 :::::::::::::::::::::
 
 should test a few other cases to make sure this still works
+
+e.g.
+v2 -> v6 modify proc.freq
+v5 -> v7 meld with proc from v6
+
+best would be to add test scenario with lucre.stm.test.Confluent first
+
+e.g.
