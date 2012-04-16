@@ -128,30 +128,33 @@ emptyGraph
 //         playing_#.set( false )
       }
 
-      protected def freqVar : S#Var[ Expr[ S, Double ]]
+//      protected def freqVar : S#Var[ Expr[ S, Double ]]
 
-      final def freq( implicit tx: S#Tx ) : Double = freqVar.get.value
+      final def freq( implicit tx: S#Tx ) : Double = freq_#.value // freqVar.get.value
       final def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) {
-         val before = freqVar.get
-         if( before != f ) {
-            val con = targets.nonEmpty
-//            logEvent( this.toString + " set " + expr + " (con = " + con + ")" )
-            if( con ) evt.Intruder.-/->( before.changed, freqChanged )
-            freqVar.set( f )
-            if( con ) {
-               evt.Intruder.--->( f.changed, freqChanged )
-               val beforeV = before.value
-               val exprV   = f.value
-               freqChanged( FreqChanged( this, evt.Change( beforeV, exprV )))
-            }
-         }
+//         val before = freqVar.get
+//         if( before != f ) {
+//            val con = targets.nonEmpty
+////            logEvent( this.toString + " set " + expr + " (con = " + con + ")" )
+//            if( con ) evt.Intruder.-/->( before.changed, freqChanged )
+//            freqVar.set( f )
+//            if( con ) {
+//               evt.Intruder.--->( f.changed, freqChanged )
+//               val beforeV = before.value
+//               val exprV   = f.value
+//               freqChanged( FreqChanged( this, evt.Change( beforeV, exprV )))
+//            }
+//         }
+         freq_#.set( f )
       }
 
 // OOO
 //      final def renamed             = name_#.changed.map( Renamed( this, _ ))
 //      final def graphChanged        = event[ GraphChanged[ S ]]
 //      final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
-      final def freqChanged         = event[ FreqChanged[ S ]] // freq_#.changed.map( FreqChanged( this, _ ))
+
+//      final def freqChanged         = event[ FreqChanged[ S ]]
+      final def freqChanged         = freq_#.changed.map( FreqChanged( this, _ ))
 // OOO
 //      final def changed             = renamed | graphChanged | playingChanged | freqChanged
 
@@ -161,7 +164,8 @@ emptyGraph
 //         name_#.write( out )
 //         playing_#.write( out )
 
-         freqVar.write( out )
+//         freqVar.write( out )
+         freq_#.write( out )
 
 // OOO
 //         graphVar.write( out )
@@ -172,7 +176,8 @@ emptyGraph
 //         name_#.dispose()
 //         playing_#.dispose()
 
-         freqVar.dispose()
+//         freqVar.dispose()
+         freq_#.dispose()
 
 // OOO
 //          graphVar.dispose()
@@ -191,10 +196,11 @@ emptyGraph
 // OOO
 //      val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
 //      val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
-      protected val freqVar = {
-         implicit val peerSer = Doubles.serializer[ S ]
-         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
-      } //            = Doubles.newVar[ S ]( 441 )( tx0 )
+//      protected val freqVar = {
+//         implicit val peerSer = Doubles.serializer[ S ]
+//         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
+//      }
+      val freq_# = Doubles.newConfluentVar[ S ]( 441 )( tx0 )
 // OOO
 //      protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
    }
@@ -212,10 +218,11 @@ emptyGraph
 // OOO
 //      val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
 //      val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
-      protected val freqVar = {
-         implicit val peerSer = Doubles.serializer[ S ]
-         tx0.readVar[ Expr[ S, Double ]]( id, in )
-      }  // = Doubles.readVar[ S ]( in, access )( tx0 )
+//      protected val freqVar = {
+//         implicit val peerSer = Doubles.serializer[ S ]
+//         tx0.readVar[ Expr[ S, Double ]]( id, in )
+//      }
+      val freq_# = Doubles.readVar[ S ]( in, access )( tx0 )
 // OOO
 //      protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
    }

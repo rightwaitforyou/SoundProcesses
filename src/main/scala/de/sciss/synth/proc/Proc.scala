@@ -75,8 +75,7 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- controls preview demo ----
 
-// OOO
-//   def freq_# : Expr.Var[ S, Double ]
+   def freq_# : Expr.Var[ S, Double ]
    def freq( implicit tx: S#Tx ) : Double
    def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) : Unit
 
