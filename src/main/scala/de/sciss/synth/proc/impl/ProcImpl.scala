@@ -129,7 +129,9 @@ emptyGraph
       }
 
       final def freq( implicit tx: S#Tx ) : Double = freq_#.value
-      final def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) { freq_#.set( f )}
+      final def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) {
+         freq_#.set( f )
+      }
 
 // OOO
 //      final def renamed             = name_#.changed.map( Renamed( this, _ ))

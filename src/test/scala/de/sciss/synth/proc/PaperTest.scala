@@ -16,8 +16,8 @@ object PaperTest extends App {
    val DRY = true
 
    LucreSTM.showEventLog            = true
-   TemporalObjects.showConfluentLog = true
-   TemporalObjects.showPartialLog   = true
+//   TemporalObjects.showConfluentLog = true
+//   TemporalObjects.showPartialLog   = true
 
 //   def main( args: Array[ String ]) {
 //      implicit val system: InMemory = InMemory()
