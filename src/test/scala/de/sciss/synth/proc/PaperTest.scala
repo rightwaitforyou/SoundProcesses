@@ -115,7 +115,8 @@ object PaperTest extends App {
          log( "access freqVar" )
          val freq    = freqVar.get
          log( "p.freq = freqVar * 1.4" )
-         p.freq   = freq * 1.4
+         val newFreq = freq * 1.4
+         p.freq   = newFreq
          tx.inputAccess
       }
 

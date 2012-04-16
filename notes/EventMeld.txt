@@ -507,3 +507,25 @@ v5 -> v7 meld with proc from v6
 best would be to add test scenario with lucre.stm.test.Confluent first
 
 e.g.
+
+:::::::::::::::::::::
+
+todo: - re-connect noch falsch (doesn't read inputAccess version)
+      - proc.freq should not be an Expr.Var, but a plain S#Var (confluent)
+
+:::::::::::::::::::::
+
+16-apr-12
+
+the problem remains: constructing a partial path by leaving out the inner terminating vertices only works when the meld has been issued from the same previous path. but consier vertex 7 in EventMeld.svg: When group.add( proc<1,1> ) is called,
+it will detect the necessity to refresh, but from proc<1,1> will re-connect to freqVar<0,(1,)5,5> which is not freqVar<0,(x,)3,(x,)5,5>. Unless we change the rule to not include any inner trees at all. Does that make sense? Certainly, not, because imagine that there was an assignment freqVar<0,(x,)3,(x)> -- that wouldn't be visible any more
+
+Therefore, there must be another mechanism to create the paths for 'joining' elements such as expression variables. Paths which uniquely identify the expression variables such that assignments are correctly performed, not propagating to disjoint paths, and including 'automagically' the melds of confluent elements.
+
+Maybe there needs to be a different level-function l' which produces different compressed representations? To evaluate that idea, two steps are needed. (1) Define the level function, and how a level increment is detected. (2) define the inter-operability between confluent ('splitting') compression and 'joining' compression. (1) is probably related to EventMeld_rvs.svg.
+
+:::::::::::::::::::::
+
+!!! another unrelated thought -- if we do not use the quasi-retroactive insertions which require the octree to be 3D, can't we just exploit the summing-hashing for the index trees themselves? (because we essentially search again for the longest prefix inside the index)
+
+(it might be tricky, because we'd need to be able to reconstruct the partial sums within the index tree as we put a new value)
