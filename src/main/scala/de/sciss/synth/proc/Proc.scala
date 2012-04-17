@@ -28,7 +28,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.SynthGraph
 import impl.ProcImpl
-import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{event => evt, DataInput}
 
 object Proc {
@@ -38,7 +38,7 @@ object Proc {
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl.read( in, access )
 
-   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] = ProcImpl.serializer[ S ]
+   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = ProcImpl.serializer[ S ]
 
    // ---- event types ----
 

@@ -54,9 +54,11 @@ ____OBSERVE____ Element(Node<1 @ 0,2>,Vector(FreqChanged(Proc<11 @ 2,2>,Change(5
 [16 Apr 2012, 23:12'59.687] Lucre - evt pull end
 ____PAPER____ access group
 ____PAPER____ p1 = p.meld( v1 )
-____PAPER____ group.add( p1 )
+____PAPER____ group.add( p1 ) 
 [16 Apr 2012, 23:12'59.791] Lucre - evt Targets<11 @ 2,2> add( 1, Node<1 @ 0,3>.event[Element[<?>]])
-[16 Apr 2012, 23:12'59.792] Lucre - evt Targets<11 @ 2,2> old children = Vector((1,Node<1 @ 0,2>.event[Element[<?>]]))
+[16 Apr 2012, 23:12'59.792] Lucre - evt Targets<11 @ 2,2> old children = Vector((1,Node<1 @ 0,2>.event[Element[<?>]]))	  // this should use the main access, yielding Node<1 @ 0,3> ???
+    but then this is the proc which has confluent children...
+
 [16 Apr 2012, 23:12'59.793] Lucre - evt Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]] re-connect
 [16 Apr 2012, 23:12'59.793] Lucre - evt Targets<14 @ 2,2> remove( 1, Expr.Var<14 @ 2,2>.map[FreqChanged[<?>]])
 [16 Apr 2012, 23:12'59.794] Lucre - evt Targets<14 @ 2,2> old children = Vector((1,Targets<11 @ 2,2>.select(1)))
@@ -96,3 +98,28 @@ ____PAPER____ freqVar.set( 40.0 )
 ____OBSERVE____ Element(Node<1 @ 0,3,4,4>,Vector(FreqChanged(Proc<11 @ 2,2,4,4>,Change(50.0,40.0)), FreqChanged(Proc<11 @ 2,2,4,4>,Change(50.0,40.0))))
 ____OBSERVE____ Element(Node<1 @ 0,2,4,4>,Vector(FreqChanged(Proc<11 @ 2,2,4,4>,Change(50.0,40.0))))
 [16 Apr 2012, 23:12'59.925] Lucre - evt pull end
+
+::: visited :::
+Targets<14 @ 2,2,4,4>.select(1) -> Set(Expr.Var<6 @ 1,3,4,4>),
+Targets<14 @ 2,3,4,4>.select(1) -> Set(Targets<19 @ 3,3,4,4>.select(1)),
+Expr.Var<6 @ 1,3,4,4> -> Set(),
+Targets<11 @ 2,3,4,4>.select(1) -> Set(Targets<14 @ 2,3,4,4>.select(1)),
+Node<1 @ 0,2,4,4>.event[Element[<?>]] -> Set(Targets<11 @ 2,2,4,4>.select(1)), 
+Node<1 @ 0,3,4,4>.event[Element[<?>]] -> Set(Targets<11 @ 2,3,4,4>.select(1), Targets<11 @ 2,2,4,4>.select(1)), 
+Targets<19 @ 3,3,4,4>.select(1) -> Set(Expr.Var<6 @ 1,3,4,4>), 
+Targets<11 @ 2,2,4,4>.select(1) -> Set(Targets<14 @ 2,2,4,4>.select(1))
+
+::: first parent :::
+Node<1 @ 0,3,4,4>.event[Element[<?>]] pull
+   elems = Targets<11 @ 2,3,4,4>.select(1)  // proc.freq
+   tx._readUgly[ Elem ]( reactor.id, sel.reactor.id ) (where reactor = Node<1 @ 0,3,4,4>; sel.reactor = Targets<11 @ 2,3,4,4>)
+   --> elem = Proc<11 @ 2,2,4,4>
+
+that's why it's called _readUgly I guess...
+
+readUgly --> cacheGetTxn
+   index = Path(0, 3, 4)
+   preLen = 3
+   writeTerm = 4
+   --> therefore we end up with <4,4> as suffix :-/
+

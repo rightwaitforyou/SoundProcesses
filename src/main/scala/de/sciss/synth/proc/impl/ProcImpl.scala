@@ -42,8 +42,8 @@ object ProcImpl {
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] =
       serializer[ S ].read( in, access )
 
-   def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Proc[ S ]] =
-      anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, Proc[ S ]]]
+   def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] =
+      anySer.asInstanceOf[ evt.NodeSerializer[ S, Proc[ S ]]]
 
    val emptyGraph = SynthGraph {}
 
