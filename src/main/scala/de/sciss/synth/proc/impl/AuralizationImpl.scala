@@ -158,10 +158,11 @@ object AuralizationImpl {
 
    private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx ) {
-         val aural = AuralProc( server, p.name, p.graph, p.freq )
+         val aural = AuralProc( server, p.name.value, p.graph, p.freq.value )
          viewMap.put( p.id, aural )
-         logConfig( "aural added " + p + " -- playing? " + p.playing )
-         if( p.playing ) {
+        val playing = p.playing.value
+         logConfig( "aural added " + p + " -- playing? " + playing )
+         if( playing ) {
             implicit val ptx = ProcTxn()( tx.peer )
             aural.play()
 //            actions.transform( _.addPlay( p ))

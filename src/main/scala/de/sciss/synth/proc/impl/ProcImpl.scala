@@ -31,7 +31,7 @@ import de.sciss.synth.SynthGraph
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.expr._
 import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.stm.{InMemory, TxnSerializer, Sys}
+import de.sciss.lucre.stm.{InMemory, Sys}
 import ExprImplicits._
 
 object ProcImpl {
@@ -75,69 +75,60 @@ object ProcImpl {
 
       import Proc._
 
-// OOO
-//      declare[ Renamed[        S ]]( _.renamed        )
-//      declare[ GraphChanged[   S ]]( _.graphChanged   )
-//      declare[ PlayingChanged[ S ]]( _.playingChanged )
-
-      declare[ FreqChanged[ S ]]( _.freqChanged )
+      declare[ Renamed[        S ]]( _.renamed        )
+      declare[ GraphChanged[   S ]]( _.graphChanged   )
+      declare[ PlayingChanged[ S ]]( _.playingChanged )
+      declare[ FreqChanged[    S ]]( _.freqChanged    )
    }
 
    private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] with evt.Compound[ S, Proc[ S ], Decl[ S ]] {
       import Proc._
 
-// OOO
-//      protected def graphVar : S#Var[ SynthGraph ]
+      protected def graphVar : S#Var[ SynthGraph ]
+      protected def playing_# : Expr.Var[ S, Boolean ]
+      protected def name_# : Expr.Var[ S, String ]
+      protected def freq_# : Expr.Var[ S, Double ]
 
-      final def name( implicit tx: S#Tx ) : String = {
-//         name_#.value
-"name"
+      final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
+         name_#.get
       }
       final def name_=( s: Expr[ S, String ])( implicit tx: S#Tx ) {
-// OOO
-//         name_#.set( s )
+         name_#.set( s )
       }
-      final def playing( implicit tx: S#Tx ) : Boolean = {
-//         playing_#.value
-false
+      final def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = {
+         playing_#.get
       }
       final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx ) {
-// OOO
-//         playing_#.set( b )
+         playing_#.set( b )
       }
       final def graph( implicit tx: S#Tx ) : SynthGraph = {
-// OOO
-//         graphVar.get
-emptyGraph
+         graphVar.get
       }
       final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) {
-// OOO
-//         val old = graphVar.get
-//         if( old != g ) {
-//            graphVar.set( g )
-//            graphChanged( GraphChanged( this, evt.Change( old, g )))
-//         }
+         val old = graphVar.get
+         if( old != g ) {
+            graphVar.set( g )
+            graphChanged( GraphChanged( this, evt.Change( old, g )))
+         }
       }
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
       final def play()( implicit tx: S#Tx ) {
-// OOO
-//         playing_#.set( true  )
+         playing_#.set( true  )
       }
       final def stop()( implicit tx: S#Tx ) {
-// OOO
-//         playing_#.set( false )
+         playing_#.set( false )
       }
 
 //      protected def freqVar : S#Var[ Expr[ S, Double ]]
 
-      final def freq( implicit tx: S#Tx ) : Double = freq_#.value // freqVar.get.value
+      final def freq( implicit tx: S#Tx ) : Expr[ S, Double ] = freq_#.get
       final def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) {
-//         val before = freqVar.get
+//         val before = freq_#.get
 //         if( before != f ) {
 //            val con = targets.nonEmpty
 ////            logEvent( this.toString + " set " + expr + " (con = " + con + ")" )
 //            if( con ) evt.Intruder.-/->( before.changed, freqChanged )
-//            freqVar.set( f )
+//            freq_#.set( f )
 //            if( con ) {
 //               evt.Intruder.--->( f.changed, freqChanged )
 //               val beforeV = before.value
@@ -148,39 +139,25 @@ emptyGraph
          freq_#.set( f )
       }
 
-// OOO
-//      final def renamed             = name_#.changed.map( Renamed( this, _ ))
-//      final def graphChanged        = event[ GraphChanged[ S ]]
-//      final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
-
-//      final def freqChanged         = event[ FreqChanged[ S ]]
+      final def renamed             = name_#.changed.map( Renamed( this, _ ))
+      final def graphChanged        = event[ GraphChanged[ S ]]
+      final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
       final def freqChanged         = freq_#.changed.map( FreqChanged( this, _ ))
-// OOO
-//      final def changed             = renamed | graphChanged | playingChanged | freqChanged
+      final def changed             = renamed | graphChanged | playingChanged | freqChanged
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
-// OOO
-//         name_#.write( out )
-//         playing_#.write( out )
-
-//         freqVar.write( out )
+         name_#.write( out )
+         playing_#.write( out )
          freq_#.write( out )
-
-// OOO
-//         graphVar.write( out )
+         graphVar.write( out )
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {
-// OOO
-//         name_#.dispose()
-//         playing_#.dispose()
-
-//         freqVar.dispose()
+         name_#.dispose()
+         playing_#.dispose()
          freq_#.dispose()
-
-// OOO
-//          graphVar.dispose()
+          graphVar.dispose()
       }
 
       override def toString() = "Proc" + id
@@ -193,16 +170,15 @@ emptyGraph
    private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
       protected val decl      = getDecl[ S ]( tx0 )
       protected val targets   = evt.Targets[ S ]( tx0 )
-// OOO
-//      val name_#              = Strings.newVar[ S ]( "unnamed" )( tx0 )
-//      val playing_#           = Booleans.newVar[ S ]( true )( tx0 )
-//      protected val freqVar = {
+
+      protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
+      protected val playing_# = Booleans.newVar[ S ]( true )( tx0 )
+//      protected val freqVar   = {
 //         implicit val peerSer = Doubles.serializer[ S ]
 //         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
 //      }
-      val freq_# = Doubles.newConfluentVar[ S ]( 441 )( tx0 )
-// OOO
-//      protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
+      protected val freq_#    = Doubles.newConfluentVar[ S ]( 441 )( tx0 )
+      protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
    }
 
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
@@ -215,15 +191,9 @@ emptyGraph
          require( serVer == SER_VERSION, "Incompatible serialized  (found " + serVer + ", required " + SER_VERSION + ")" )
       }
 
-// OOO
-//      val name_#              = Strings.readVar[  S ]( in, access )( tx0 )
-//      val playing_#           = Booleans.readVar[ S ]( in, access )( tx0 )
-//      protected val freqVar = {
-//         implicit val peerSer = Doubles.serializer[ S ]
-//         tx0.readVar[ Expr[ S, Double ]]( id, in )
-//      }
-      val freq_# = Doubles.readVar[ S ]( in, access )( tx0 )
-// OOO
-//      protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
+      protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
+      protected val playing_# = Booleans.readVar[ S ]( in, access )( tx0 )
+      protected val freq_#    = Doubles.readVar[ S ]( in, access )( tx0 )
+      protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
    }
 }

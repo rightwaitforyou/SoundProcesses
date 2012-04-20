@@ -29,7 +29,7 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.{event => evt}
 import impl.ProcGroupImpl
 import de.sciss.lucre.DataInput
-import de.sciss.lucre.stm.{TxnSerializer, Disposable, Writer, Sys}
+import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.collection.txn.{Iterator => TxnIterator}
 
 object ProcGroup {

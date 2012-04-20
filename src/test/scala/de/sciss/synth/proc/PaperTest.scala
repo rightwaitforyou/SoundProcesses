@@ -13,7 +13,7 @@ import de.sciss.lucre.stm.{TxnSerializer, Cursor}
 import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
 
 object PaperTest extends App {
-   val DRY = true
+   val DRY = false
 
    LucreSTM.showEventLog            = true
 //   TemporalObjects.showConfluentLog = true
@@ -120,25 +120,27 @@ object PaperTest extends App {
          tx.inputAccess
       }
 
+      val v2 = cursor.step( _.inputAccess )
+
 //      println( "v1 = " + v1 )
 
-      def meldStep() {
+      def meldStep( version: S#Acc = v1 ) {
          cursor.step { implicit tx =>
             log( "access group" )
             val group   = access.get
             log( "p1 = p.meld( v1 )" )
-            val p1   = proc1.meld( v1 )
+            val p1   = proc1.meld( version )
             log( "group.add( p1 )" )
             group.add( p1 )
          }
       }
 
-      def freqStep() {
+      def freqStep( f: Double = 40.0 ) {
          cursor.step { implicit tx =>
             log( "access freqVar" )
             val freq = freqVar.get
             log( "freqVar.set( 40.0 )" )
-            freq.set( 40.0 )
+            freq.set( f ) // 40.0
          }
       }
 
@@ -152,9 +154,26 @@ object PaperTest extends App {
          (new Thread {
             override def run() {
                Thread.sleep( 4000L )
-               meldStep()
+               meldStep( v1 )
                Thread.sleep( 4000L )
-               freqStep()
+               freqStep( 80.0 )
+               Thread.sleep( 4000L )
+               freqStep( 60.0 )
+               Thread.sleep( 4000L )
+
+               val v3 = cursor.step { implicit tx =>
+                  val p       = proc1.get
+                  val freq    = freqVar.get
+                  val newFreq = freq * (1.4 * 1.4)
+                  p.freq      = newFreq
+                  tx.inputAccess
+               }
+
+               Thread.sleep( 4000L )
+//               meldStep( v2 )
+               meldStep( v3 )
+               Thread.sleep( 4000L )
+               freqStep( 50.0 )
             }
          }).start()
       }
