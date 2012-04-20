@@ -10,12 +10,12 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
-scalaVersion := "2.9.1"
+scalaVersion := "2.9.2"
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "0.34-SNAPSHOT",
+   "de.sciss" %% "scalacollider" % "0.34",
    "de.sciss" %% "temporalobjects" % "0.32-SNAPSHOT",
-   "org.scalatest" %% "scalatest" % "1.7.1" % "test"
+   "org.scalatest" %% "scalatest" % "1.7.2" % "test"
 )
 
 retrieveManaged := true
