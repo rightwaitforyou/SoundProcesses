@@ -173,7 +173,7 @@ object PaperTest extends App {
 //               meldStep( v2 )
                meldStep( v3 )
                Thread.sleep( 4000L )
-//               freqStep( 50.0 )
+               freqStep( 50.0 )
             }
          }).start()
       }
