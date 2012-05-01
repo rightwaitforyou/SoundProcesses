@@ -191,7 +191,15 @@ println( "......yields " + p1 )
 //               meldStep( v2 )
                meldStep( v3 )
                Thread.sleep( 4000L )
+LucreSTM.showEventLog = true
                freqStep( 50.0 )
+
+               Thread.sleep( 4000L )
+               val procs = cursor.step { implicit tx =>
+                  val group = access.get
+                  group.iterator.toList
+               }
+               println( "\nFinal list of procs in group is " + procs )
             }
          }).start()
       }
