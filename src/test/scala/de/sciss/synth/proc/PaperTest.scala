@@ -197,9 +197,9 @@ LucreSTM.showEventLog = true
                Thread.sleep( 4000L )
                val procs = cursor.step { implicit tx =>
                   val group = access.get
-                  group.iterator.toList
+                  group.iterator.toList.map( p => (p, p.freq.value) )
                }
-               println( "\nFinal list of procs in group is " + procs )
+               println( "\nFinal list of procs in group is " + procs.mkString( "[ ", ", ", " ]" ))
             }
          }).start()
       }

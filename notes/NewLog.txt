@@ -87,29 +87,30 @@ ______ACT______ freqVar.set( 50.0 )
 [1 May 2012, 22:43'45.555] Lucre - evt Expr.Var<6 @ 1,4,5,8,9,9> set 50.0 (con = true)
 [1 May 2012, 22:43'45.556] Lucre - evt Expr.Var<6 @ 1,4,5,8,9,9> fire Change(60.0,50.0)
 [1 May 2012, 22:43'45.556] Lucre - evt push begin
-[1 May 2012, 22:43'45.559] Lucre - evt   visit VirtualNode.Raw<22 @ 2,2,5,7,9,9>.select(1) (new ? true)
-[1 May 2012, 22:43'45.560] Lucre - evt     visit VirtualNode.Raw<11 @ 2,2,5,7,9,9>.select(4) (new ? true)
-[1 May 2012, 22:43'45.561] Lucre - evt       visit VirtualNode.Raw<1 @ 0,4,5,7,9,9>.select(2) (new ? true)
+[1 May 2012, 22:43'45.559] Lucre - evt   visit VirtualNode.Raw<22 @ 2,2,5,7,9,9>.select(1) (new ? true)				// proc.freq.ref
+[1 May 2012, 22:43'45.560] Lucre - evt     visit VirtualNode.Raw<11 @ 2,2,5,7,9,9>.select(4) (new ? true)			// proc
+[1 May 2012, 22:43'45.561] Lucre - evt       visit VirtualNode.Raw<1 @ 0,4,5,7,9,9>.select(2) (new ? true)			// group
 [1 May 2012, 22:43'45.562] Lucre - evt         addLeaf ObserverKey(0), parent = VirtualNode.Raw<1 @ 0,4,5,7,9,9>.select(2)
-[1 May 2012, 22:43'45.562] Lucre - evt   visit VirtualNode.Raw<31 @ 8,7,9,9>.select(1) (new ? true)
-[1 May 2012, 22:43'45.563] Lucre - evt     visit VirtualNode.Raw<22 @ 2,4,5,8,9,9>.select(1) (new ? true)
-[1 May 2012, 22:43'45.564] Lucre - evt       visit VirtualNode.Raw<11 @ 2,4,5,8,9,9>.select(4) (new ? true)
-[1 May 2012, 22:43'45.564] Lucre - evt         visit VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2) (new ? true)
+[1 May 2012, 22:43'45.562] Lucre - evt   visit VirtualNode.Raw<31 @ 8,7,9,9>.select(1) (new ? true)				// times (1.4*1.4)
+[1 May 2012, 22:43'45.563] Lucre - evt     visit VirtualNode.Raw<22 @ 2,4,5,8,9,9>.select(1) (new ? true)			// proc.freq.ref
+[1 May 2012, 22:43'45.564] Lucre - evt       visit VirtualNode.Raw<11 @ 2,4,5,8,9,9>.select(4) (new ? true)			// proc
+[1 May 2012, 22:43'45.564] Lucre - evt         visit VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2) (new ? true)			// group
 [1 May 2012, 22:43'45.566] Lucre - evt           addLeaf ObserverKey(0), parent = VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2)
-[1 May 2012, 22:43'45.566] Lucre - evt   visit VirtualNode.Raw<28 @ 5,7,9,9>.select(1) (new ? true)
-[1 May 2012, 22:43'45.568] Lucre - evt     visit VirtualNode.Raw<22 @ 2,4,5,7,9,9>.select(1) (new ? true)
-[1 May 2012, 22:43'45.568] Lucre - evt       visit VirtualNode.Raw<11 @ 2,4,5,7,9,9>.select(4) (new ? true)
-[1 May 2012, 22:43'45.568] Lucre - evt         visit VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2) (new ? false)
+[1 May 2012, 22:43'45.566] Lucre - evt   visit VirtualNode.Raw<28 @ 5,7,9,9>.select(1) (new ? true)				// times (1.4)
+[1 May 2012, 22:43'45.568] Lucre - evt     visit VirtualNode.Raw<22 @ 2,4,5,7,9,9>.select(1) (new ? true)			// proc.freq.ref
+[1 May 2012, 22:43'45.568] Lucre - evt       visit VirtualNode.Raw<11 @ 2,4,5,7,9,9>.select(4) (new ? true)			// proc
+[1 May 2012, 22:43'45.568] Lucre - evt         visit VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2) (new ? false)			// group --- why not new?
 [1 May 2012, 22:43'45.569] Lucre - evt pull begin
 [1 May 2012, 22:43'45.569] Lucre - evt numReactions = 2
 [1 May 2012, 22:33'45.090] Proc - aural freq changed Proc<11 @ 2,2,5,7,9,9>
 aural changes: FreqChanged(Proc<11 @ 2,2,5,7,9,9>,Change(60.0,50.0))
 [1 May 2012, 22:33'45.090] Proc - aural freq changed Proc<11 @ 2,4,5,8,9,9>
-aural changes: FreqChanged(Proc<11 @ 2,4,5,8,9,9>,Change(117.59999999999998,97.99999999999999))
+aural changes: FreqChanged(Proc<11 @ 2,4,5,8,9,9>,Change(117.59999999999998,97.99999999999999))  // this should have a second proc!
 s: [ #bundle, <now>,
   [ "/n_set", 1001, "freq", 50.0 ],
   [ "/n_set", 1000, "freq", 98.0 ] ]
 
-Final list of procs in group is List(Proc<11 @ 2,4,5,7,9,10>, Proc<11 @ 2,4,5,8,9,10>, Proc<11 @ 2,2,5,8,9,10>)
+Final list of procs in group is [ (Proc<11 @ 2,4,5,7,9,10>,70.0), (Proc<11 @ 2,4,5,8,9,10>,97.99999999999999), (Proc<11 @ 2,2,5,8,9,10>,50.0) ]
 
-therefore in v10 we miss an update for Proc<11 @ 2,4,5,7,9,9>
+therefore in v10 we miss an update for Proc<11 @ 2,4,5,7,9,9> ; the query yields freq 70.0 Hz, but the view has seen only 84.0 Hz
+
