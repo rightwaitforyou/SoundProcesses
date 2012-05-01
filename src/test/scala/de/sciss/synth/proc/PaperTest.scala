@@ -15,7 +15,7 @@ import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
 object PaperTest extends App {
    val DRY = false
 
-   LucreSTM.showEventLog            = true
+//   LucreSTM.showEventLog            = true
 //   TemporalObjects.showConfluentLog = true
 //   TemporalObjects.showPartialLog   = true
 
@@ -59,9 +59,18 @@ object PaperTest extends App {
       def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
 
       def log( what: => String ) {
-         println( "____PAPER____ " + what )
+         println( "______ACT______ " + what )
       }
 
+      var logStepCnt = 0
+      def logStep() {
+         val versionID = if( logStepCnt == 0 ) "v0 (root)" else "v" + logStepCnt
+         println( "\n____VERSION____ " + versionID )
+         logStepCnt += 1
+      }
+
+
+      logStep()
       val access = system.root { implicit tx =>
          log( "newGroup" )
          val g = newGroup()
@@ -78,6 +87,7 @@ object PaperTest extends App {
       }
       def exprVar( init: Double )( implicit tx: S#Tx ) : Expr.Var[ S, Double ] = Doubles.newVar[ S ]( init )
 
+      logStep()
       val freqVar = cursor.step { implicit tx =>
          log( "freq = exprVar( 50.0 )" )
          val freq = exprVar( 50.0 )
@@ -85,12 +95,13 @@ object PaperTest extends App {
          newAccess( freq )
       }
 
+      logStep()
       val proc1 = cursor.step { implicit tx =>
-         log( "access group" )
+//         log( "access group" )
          val group   = access.get
          log( "p = newProc()" )
          val p       = newProc()
-         log( "access freqVar" )
+//         log( "access freqVar" )
          val freq    = freqVar.get
          log( "p.freq = freqVar" )
          p.freq      = freq
@@ -109,10 +120,11 @@ object PaperTest extends App {
          newAccess( p )
       }
 
+      logStep()
       val v1 = cursor.step { implicit tx =>
-         log( "access p" )
+//         log( "access p" )
          val p    = proc1.get
-         log( "access freqVar" )
+//         log( "access freqVar" )
          val freq    = freqVar.get
          log( "p.freq = freqVar * 1.4" )
          val newFreq = freq * 1.4
@@ -120,24 +132,26 @@ object PaperTest extends App {
          tx.inputAccess
       }
 
-      val v2 = cursor.step( _.inputAccess )
+//      val v2 = cursor.step( _.inputAccess )
 
 //      println( "v1 = " + v1 )
 
       def meldStep( version: S#Acc = v1 ) {
+         logStep()
          cursor.step { implicit tx =>
-            log( "access group" )
+//            log( "access group" )
             val group   = access.get
-            log( "p1 = p.meld( v1 )" )
+            log( "p' = p.meld( " + version + " )" )
             val p1   = proc1.meld( version )
-            log( "group.add( p1 )" )
+            log( "group.add( p' )" )
             group.add( p1 )
          }
       }
 
       def freqStep( f: Double = 40.0 ) {
+         logStep()
          cursor.step { implicit tx =>
-            log( "access freqVar" )
+//            log( "access freqVar" )
             val freq = freqVar.get
             log( "freqVar.set( " + f + " )" )
             freq.set( f ) // 40.0
@@ -161,10 +175,12 @@ object PaperTest extends App {
                freqStep( 60.0 )
                Thread.sleep( 4000L )
 
+               logStep()
                val v3 = cursor.step { implicit tx =>
                   val p       = proc1.get
                   val freq    = freqVar.get
                   val newFreq = freq * (1.4 * 1.4)
+                  log( "p.freq = freqVar * (1.4 * 1.4)" )
                   p.freq      = newFreq
                   tx.inputAccess
                }
