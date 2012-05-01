@@ -212,6 +212,13 @@ object PaperTest3 extends App {
                // freq.set tests if the var is connected (`val con = targets.nonEmpty`)
                // and that fails when reading the children:
                // `No value for <26 @ 5,7,9,9>`
+
+               // the problem seems to be the following:
+               // freqVar is partially persistent, including the children var.
+               // however, selectors are stored and retrieved using writeVal / readVal
+               // (`Targets.readAndExpand[ S ]( in, access )`
+               //  --> `tx.readVal[ VirtualNode[ S ]]( id )`)
+               // --- and this is probably wrong, because it goes back to confluent ids ???
                freqStep( 50.0 )
             }
          }).start()
