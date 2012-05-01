@@ -99,7 +99,7 @@ ______ACT______ freqVar.set( 50.0 )
 [1 May 2012, 22:43'45.566] Lucre - evt   visit VirtualNode.Raw<28 @ 5,7,9,9>.select(1) (new ? true)				// times (1.4)
 [1 May 2012, 22:43'45.568] Lucre - evt     visit VirtualNode.Raw<22 @ 2,4,5,7,9,9>.select(1) (new ? true)			// proc.freq.ref
 [1 May 2012, 22:43'45.568] Lucre - evt       visit VirtualNode.Raw<11 @ 2,4,5,7,9,9>.select(4) (new ? true)			// proc
-[1 May 2012, 22:43'45.568] Lucre - evt         visit VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2) (new ? false)			// group --- why not new?
+[1 May 2012, 22:43'45.568] Lucre - evt         visit VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2) (new ? false)			// group
 [1 May 2012, 22:43'45.569] Lucre - evt pull begin
 [1 May 2012, 22:43'45.569] Lucre - evt numReactions = 2
 [1 May 2012, 22:33'45.090] Proc - aural freq changed Proc<11 @ 2,2,5,7,9,9>
@@ -114,3 +114,41 @@ Final list of procs in group is [ (Proc<11 @ 2,4,5,7,9,10>,70.0), (Proc<11 @ 2,4
 
 therefore in v10 we miss an update for Proc<11 @ 2,4,5,7,9,9> ; the query yields freq 70.0 Hz, but the view has seen only 84.0 Hz
 
+::::::::::::::
+
+Node<1 @ 0,4,5,8,9,9>.event[Element[<?>]] : parents = Set(VirtualNode.Raw<11 @ 2,4,5,8,9,9>.select(4), VirtualNode.Raw<11 @ 2,4,5,7,9,9>.select(4))  [OK]
+flatMap:
+(1)
+   sel 		= VirtualNode.Raw<11 @ 2,4,5,8,9,9>.select(4)
+   elem		= Proc<11 @ 2,4,5,8,9,9>
+   event	= Expr.Var<22 @ 2,4,5,8,9,9>.map[FreqChanged[<?>]]
+   pulled	= Some(FreqChanged(Proc<11 @ 2,4,5,8,9,9>,Change(117.59999999999998,97.99999999999999)))
+(2)
+   sel		= VirtualNode.Raw<11 @ 2,4,5,7,9,9>.select(4)
+   elem		= Proc<11 @ 2,4,5,7,9,9>
+   event	= Expr.Var<22 @ 2,4,5,7,9,9>.map[FreqChanged[<?>]]
+       Expr.Var<22 @ 2,4,5,7,9,9> pull
+       --> parents = Set(VirtualNode.Raw<28 @ 5,7,9,9>.select(1))
+       --> thus branch to get.changed.pullUpdate( pull )
+
+	get = (Expr.Var<6 @ 1,2,5,7,9,9> * 1.4) aka `times` (Targets<28 @ 5,7,9,9>)
+           _1c = Expr.Var<6 @ 1,2,5,7,9,9>
+           _2c = (dummy)
+
+           Expr.Var<6 @ 1,2,5,7,9,9> isSource ? aka pull.hasVisited( Expr.Var<6 @ 1,2,5,7,9,9> )
+
+           visited.keys = Set(VirtualNode.Raw<22 @ 2,4,5,7,9,9>.select(1),
+                              VirtualNode.Raw<1 @ 0,4,5,8,9,9>.select(2),
+                              VirtualNode.Raw<11 @ 2,4,5,8,9,9>.select(4),
+                              VirtualNode.Raw<22 @ 2,4,5,8,9,9>.select(1),
+                              VirtualNode.Raw<11 @ 2,4,5,7,9,9>.select(4) 
+                              VirtualNode.Raw<31 @ 8,7,9,9>.select(1),
+                              VirtualNode.Raw<1 @ 0,4,5,7,9,9>.select(2),
+                              VirtualNode.Raw<22 @ 2,2,5,7,9,9>.select(1),
+                              VirtualNode.Raw<28 @ 5,7,9,9>.select(1),
+                              Expr.Var<6 @ 1,4,5,8,9,9>,                             // !
+                              VirtualNode.Raw<11 @ 2,2,5,7,9,9>.select(4))
+
+          ---> returns false **because the confluent ID is checked, and not the partial one**
+
+That at least let's us hope that the problem is solveable
