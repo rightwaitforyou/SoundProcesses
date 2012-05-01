@@ -15,10 +15,11 @@ ______ACT______ newAccess( p )
 ____VERSION____ v3
 ______ACT______ p.freq = freqVar * 1.4
 
+____VERSION____ v4
 [...]
 SuperCollider 3 server ready (debug build).
 r: [ "/n_go", 1, 0, -1, -1, 1, -1, -1 ]
-[1 May 2012, 22:07'54.935] Proc - aural added Proc<11 @ 2,3> -- playing? true
+[1 May 2012, 22:33'18.769] Proc - aural added Proc<11 @ 2,3> -- playing? true
 s: [ #bundle, <now>,
   [ "/d_recv", DATA[7453] ],
   [ "/sync", 0 ] ]
@@ -28,10 +29,11 @@ s: [ #bundle, <now>,
   [ "/s_new", "proc0", 1000, 0, 1, "freq", 70.0 ] ]
 r: [ "/n_go", 1000, 1, -1, -1, 0 ]
 
-____VERSION____ v4
+____VERSION____ v5
 ______ACT______ p' = p.meld( Path(0, 2) )
+......yields Proc<11 @ 2,2>
 ______ACT______ group.add( p' )
-[1 May 2012, 22:07'58.759] Proc - aural added Proc<11 @ 2,2> -- playing? true
+[1 May 2012, 22:33'24.585] Proc - aural added Proc<11 @ 2,2> -- playing? true
 s: [ #bundle, <now>,
   [ "/d_recv", DATA[7453] ],
   [ "/sync", 1 ] ]
@@ -41,36 +43,36 @@ s: [ #bundle, <now>,
   [ "/s_new", "proc1", 1001, 0, 1, "freq", 50.0 ] ]
 r: [ "/n_go", 1001, 1, -1, 1000, 0 ]
 
-____VERSION____ v5
+____VERSION____ v6
 ______ACT______ freqVar.set( 80.0 )
-[1 May 2012, 22:08'02.891] Proc - aural freq changed Proc<11 @ 2,4,5,5>
-[1 May 2012, 22:08'02.893] Proc - aural freq changed Proc<11 @ 2,2,5,5>
+[1 May 2012, 22:33'28.721] Proc - aural freq changed Proc<11 @ 2,4,5,5>
+[1 May 2012, 22:33'28.723] Proc - aural freq changed Proc<11 @ 2,2,5,5>
 aural changes: FreqChanged(Proc<11 @ 2,4,5,5>,Change(70.0,112.0)),FreqChanged(Proc<11 @ 2,2,5,5>,Change(50.0,80.0))
 s: [ #bundle, <now>,
   [ "/n_set", 1000, "freq", 112.0 ],
   [ "/n_set", 1001, "freq", 80.0 ] ]
 
-____VERSION____ v6
+____VERSION____ v7
 ______ACT______ freqVar.set( 60.0 )
-[1 May 2012, 22:08'06.951] Proc - aural freq changed Proc<11 @ 2,4,5,6>
-[1 May 2012, 22:08'06.951] Proc - aural freq changed Proc<11 @ 2,2,5,6>
+[1 May 2012, 22:33'32.781] Proc - aural freq changed Proc<11 @ 2,4,5,6>
+[1 May 2012, 22:33'32.781] Proc - aural freq changed Proc<11 @ 2,2,5,6>
 aural changes: FreqChanged(Proc<11 @ 2,4,5,6>,Change(112.0,84.0)),FreqChanged(Proc<11 @ 2,2,5,6>,Change(80.0,60.0))
 s: [ #bundle, <now>,
   [ "/n_set", 1000, "freq", 84.0 ],
   [ "/n_set", 1001, "freq", 60.0 ] ]
 
-____VERSION____ v7
+____VERSION____ v8
 ______ACT______ p.freq = freqVar * (1.4 * 1.4)
-[1 May 2012, 22:08'10.997] Proc - aural freq changed Proc<11 @ 2,4,5,7>
+[1 May 2012, 22:33'36.826] Proc - aural freq changed Proc<11 @ 2,4,5,7>
 aural changes: FreqChanged(Proc<11 @ 2,4,5,7>,Change(84.0,117.59999999999998))
 s: [ #bundle, <now>,
   [ "/n_set", 1000, "freq", 117.6 ] ]
-[1 May 2012, 22:08'11.091] Proc - txn flush
 
-____VERSION____ v8
+____VERSION____ v9
 ______ACT______ p' = p.meld( Path(0, 4, 5, 7) )
+......yields Proc<11 @ 2,4,5,7>
 ______ACT______ group.add( p' )
-[1 May 2012, 22:08'15.128] Proc - aural added Proc<11 @ 2,4,5,7> -- playing? true
+[1 May 2012, 22:33'40.957] Proc - aural added Proc<11 @ 2,4,5,7> -- playing? true
 s: [ #bundle, <now>,
   [ "/d_recv", DATA[7453] ],
   [ "/sync", 2 ] ]
@@ -80,11 +82,11 @@ s: [ #bundle, <now>,
   [ "/s_new", "proc2", 1002, 0, 1, "freq", 84.0 ] ]
 r: [ "/n_go", 1002, 1, -1, 1001, 0 ]
 
-____VERSION____ v9
+____VERSION____ v10
 ______ACT______ freqVar.set( 50.0 )
-[1 May 2012, 22:08'19.261] Proc - aural freq changed Proc<11 @ 2,2,5,7,9,9>
+[1 May 2012, 22:33'45.090] Proc - aural freq changed Proc<11 @ 2,2,5,7,9,9>
 aural changes: FreqChanged(Proc<11 @ 2,2,5,7,9,9>,Change(60.0,50.0))
-[1 May 2012, 22:08'19.261] Proc - aural freq changed Proc<11 @ 2,4,5,8,9,9>
+[1 May 2012, 22:33'45.090] Proc - aural freq changed Proc<11 @ 2,4,5,8,9,9>
 aural changes: FreqChanged(Proc<11 @ 2,4,5,8,9,9>,Change(117.59999999999998,97.99999999999999))
 s: [ #bundle, <now>,
   [ "/n_set", 1001, "freq", 50.0 ],

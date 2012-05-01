@@ -38,6 +38,7 @@ object SoundProcesses {
 
    private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'Proc' - ", Locale.US )
    var showLog       = true
+   var showTxnLog    = false
 
    def versionString = {
       val s = (version + 0.001).toString.substring( 0, 4 )
@@ -56,5 +57,9 @@ object SoundProcesses {
 
    @elidable(CONFIG) private[proc] def logConfig( what: => String ) {
       if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
+   }
+
+   @elidable(CONFIG) private[proc] def logTxn( what: => String ) {
+      if( showTxnLog ) Console.out.println( logHeader.format( new Date() ) + "txn " + what )
    }
 }

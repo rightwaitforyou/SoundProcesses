@@ -32,7 +32,7 @@ import actors.Futures
 import collection.breakOut
 import collection.immutable.{IntMap, Queue => IQueue, IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn, InTxn}
-import SoundProcesses.logConfig
+import SoundProcesses.logTxn
 
 object ProcTxnImpl {
    def apply()( implicit tx: InTxn ) : ProcTxn = {
@@ -66,7 +66,7 @@ object ProcTxnImpl {
       private var entryCnt    = 0
 
       def flush() {
-         logConfig( "txn flush" )
+         logTxn( "flush" )
          val (clumps, maxSync) = establishDependancies
 val server = Server.default // XXX vergación
          clumps.foreach { tup =>
@@ -181,7 +181,7 @@ val server = Server.default // XXX vergación
       def add( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, RichState, Boolean) ], audible: Boolean,
                dependencies: Map[ RichState, Boolean ], noError: Boolean = false ) {
 
-         logConfig( "txn add " + ((msg, change, audible, dependencies, noError)) )
+         logTxn( "add " + ((msg, change, audible, dependencies, noError)) )
 
          def processDeps : Entry = {
             dependencies.foreach { tup =>

@@ -143,6 +143,7 @@ object PaperTest extends App {
             val group   = access.get
             log( "p' = p.meld( " + version + " )" )
             val p1   = proc1.meld( version )
+println( "......yields " + p1 )
             log( "group.add( p' )" )
             group.add( p1 )
          }
@@ -163,11 +164,12 @@ object PaperTest extends App {
          freqStep()
 
       } else  {
+         logStep()
          Auralization.run[ S, ProcGroup[ S ]]( access )
 
          (new Thread {
             override def run() {
-               Thread.sleep( 4000L )
+               Thread.sleep( 6000L )
                meldStep( v1 )
                Thread.sleep( 4000L )
                freqStep( 80.0 )
