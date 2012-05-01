@@ -93,7 +93,7 @@ class Example2(implicit s: Confluent, c: Cursor[Confluent]) {
   import imp._
 
   val group = s.root(newGroup()(_))
-  Auralization.run[S](group)
+  Auralization.run[S, ProcGroup[S]](group)
 
   val freq = c.step { implicit tx =>
     exprVar(50.0).asAccess

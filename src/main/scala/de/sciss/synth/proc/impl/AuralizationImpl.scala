@@ -38,9 +38,9 @@ import SoundProcesses.logConfig
 object AuralizationImpl {
    var dumpOSC = true
 
-   def run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ]) : Auralization[ S ] = {
-      val boot = new Boot( group, config, cursor )
+   def run[ S <: Sys[ S ], A ]( group: S#Entry[ A ], config: Server.Config = Server.Config() )
+                          ( implicit cursor: Cursor[ S ], groupView: A => ProcGroup[ S ]) : Auralization[ S ] = {
+      val boot = new Boot( group, config, cursor, groupView )
       Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
          def run() { boot.shutDown() }
       }))
@@ -78,8 +78,8 @@ object AuralizationImpl {
 //      }
 //   }
 
-   private final class Boot[ S <: Sys[ S ]]( groupA: S#Entry[ ProcGroup[ S ]], config: Server.Config,
-                                             cursor: Cursor[ S ])
+   private final class Boot[ S <: Sys[ S ], A ]( groupA: S#Entry[ A ], config: Server.Config,
+                                             cursor: Cursor[ S ], groupView: A => ProcGroup[ S ])
    extends Auralization[ S ] {
 
 //      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
@@ -131,7 +131,7 @@ object AuralizationImpl {
             val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-            val group   = groupA.get
+            val group   = groupView( groupA.get )
             group.iterator.foreach( booted.procAdded( _ ))
             group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
                case ProcGroup.Added( _, procs ) =>

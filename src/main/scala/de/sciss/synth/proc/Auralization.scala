@@ -32,8 +32,8 @@ import de.sciss.lucre.stm.{Cursor, Sys}
 object Auralization {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ]]( group: S#Entry[ ProcGroup[ S ]], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ]) : Auralization[ S ] =
+   def run[ S <: Sys[ S ], A ]( group: S#Entry[ A ], config: Server.Config = Server.Config() )
+                          ( implicit cursor: Cursor[ S ], groupView: A => ProcGroup[ S ]) : Auralization[ S ] =
       AuralizationImpl.run( group, config )
 }
 trait Auralization[ S <: Sys[ S ]]
