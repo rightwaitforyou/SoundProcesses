@@ -9,6 +9,14 @@ object ExprImplicits {
    implicit def doubleConst[  S <: Sys[ S ]]( d: Double )  : Expr[ S, Double  ] = Doubles.newConst(  d )
    implicit def longConst[    S <: Sys[ S ]]( n: Long )    : Expr[ S, Long    ] = Longs.newConst(    n )
 }
+
+/**
+ * This class helps overcome the limitation of scala's implicit resolution -- by resolving an expression
+ * system's type parameter `S`. There are two types of conversions, those that can be run from the underlying
+ * expression type (e.g. `longOps1` provides operations which can be invoked with a plain `Long`), and those
+ * that require an existing expression (e.g. `longOps2`). This is so that primitive standard operations remain
+ * outside the implicit scope (e.g. addition on longs).
+ */
 class ExprImplicits[ S <: Sys[ S ]] {
    implicit def stringConst( s: String ) : Expr[ S, String ] = Strings.newConst( s )
 //   implicit def stringOps[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, String ]) : Strings.Ops[ S ] =
