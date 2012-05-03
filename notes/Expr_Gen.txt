@@ -1,0 +1,19 @@
+a memorising RNG
+
+RNG {
+   time: S#Var[ S#Acc ]
+   realisations: S#Var[ Double ]
+
+   def current : Double = realisations.access( time() )()  // ?
+}
+
+aka Expr.Gen ?
+
+would be nice to have a form of incremental indices, too. like rng.numRealisations; rng.select( idx )
+
+so an alternative representation would be
+
+Expr.Gen[ A ] {
+   current: S#Var[ A ]
+   ?
+}

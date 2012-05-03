@@ -1,0 +1,40 @@
+Bitemporal var
+
+Expr[ Expr[ Long ], A ]
+
+::::::::::::::::
+
+in a meld, will we have a time offset? (time base)
+
+::::::::::::::::
+
+BiTemp {
+    def add( t: Expr[ T ], v: Expr[ A ])
+    def remove( t: Expr[ T ])  // ?
+}
+
+--> again, decompose in a sink and source,
+so that a regular source can be used when a bitemporal source is asked for
+
+BiTempSource {
+   def at( t: T ) : Expr[ A ]
+   def spanAt( t: T ) : (Expr[ A ], T)  // value and duration?
+}
+
+the disadvantage of spanAt would be that we need an extra handler for changes to the region structure. it might thus be better to have rather something like an iterator (micro transport)
+
+BiTempSource[ T, A ] {
+   def transport( from: T ) : ExprSource[ (T, A) ]
+}
+
+biTemp.transport( t ).react { (time, value) => ... }
+
+::::::::::::::::
+
+Transport
+
+::::::::::::::::
+
+txn.SkipList[ (Long, A) ] with _._1 ordering view
+
+

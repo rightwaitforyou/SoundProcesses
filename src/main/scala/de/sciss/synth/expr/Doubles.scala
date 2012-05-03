@@ -416,14 +416,26 @@ object Doubles extends Type[ Double ] {
 
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       private type E = Ex[ S ]
-      
+
       import UnaryOp._
-      
       def unary_- : E   = Neg.make( ex )
    // def bitNot : E	         = BitNot.make( ex )
-      def abs : E       = Abs.make( ex )
    // def toDouble : E	         = UnOp.make( 'asDouble, ex )
    // def toInteger : E	      = UnOp.make( 'asInteger, ex )
+
+      import BinaryOp._
+
+      def +( b: E ) : E          = Plus.make( ex, b )
+      def -( b: E ) : E          = Minus.make( ex, b )
+      def *( b: E ) : E          = Times.make( ex, b )
+      def /( b: E ) : E          = Div.make( ex, b )
+   }
+
+   final class RichOps[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
+      private type E = Ex[ S ]
+      
+      import UnaryOp._
+      def abs : E       = Abs.make( ex )
       def ceil : E      = Ceil.make( ex )
       def floor : E     = Floor.make( ex )
       def frac : E      = Frac.make( ex )
@@ -477,10 +489,6 @@ object Doubles extends Type[ Double ] {
 
       import BinaryOp._
 
-      def +( b: E ) : E          = Plus.make( ex, b )
-      def -( b: E ) : E          = Minus.make( ex, b )
-      def *( b: E ) : E          = Times.make( ex, b )
-      def /( b: E ) : E          = Div.make( ex, b )
       def min( b: E ) : E        = Min.make( ex, b )
       def max( b: E ) : E        = Max.make( ex, b )
       def round( b: E ) : E      = Round.make( ex, b )

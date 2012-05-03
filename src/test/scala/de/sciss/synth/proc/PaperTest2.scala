@@ -116,7 +116,7 @@ class Example2(implicit s: Confluent, c: Cursor[Confluent]) {
 
   sleep(4.0)
   c.step { implicit tx =>
-    w.freq = freq * 1.4
+    w.freq = freq.get * 1.4
   }
 
   sleep(4.0)
