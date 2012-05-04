@@ -107,15 +107,17 @@ object Bi {
    with Root[ S, Change[ A ]] {
       protected def reader  = serializer[ S, A ]
 
-      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = {
+      private def getEntry( time: Long )( implicit tx: S#Tx ) : ((Long, Expr[ S, A ]), Int) = {
          // XXX TODO should be an efficient method in skiplist itself
          ordered.isomorphicQuery( new Ordered[ S#Tx, (Long, Expr[ S, A ])] {
             def compare( that: (Long, Expr[ S, A ]))( implicit tx: S#Tx ) = {
                val t = that._1
-               if( t < time ) -1 else if( t > time ) 1 else 0
+               if( time < t ) -1 else if( time > t ) 1 else 0
             }
-         })._1._2
+         })
       }
+
+      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = getEntry( time )._1._2
 
       def value( time: Long )( implicit tx: S#Tx ) : A = get( time ).value
 
@@ -132,9 +134,12 @@ object Bi {
       def changed : Event[ S, Change[ A ], Bi[ S, A ]] = this
 
       def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
-         val tv   = time.value
-         ordered.add( (tv, value) )
-         val span = Span( tv, tv )  // XXX TODO determine stop time
+         val start               = time.value
+         val ((stop0, _), cmp)   = getEntry( start + 1 )
+//println( "set " + tv + " -> succ = " + succ + ", cmp = " + cmp )
+         ordered.add( (start, value) )
+         val stop                = if( cmp <= 0 ) stop0 else 0x4000000000000000L  // XXX TODO should have special version of Span
+         val span = Span( start, stop )
          fire( span -> value.value )
       }
    }
