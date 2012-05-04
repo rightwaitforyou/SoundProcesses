@@ -33,7 +33,7 @@ import event.{Selector, Pull, Targets, Trigger, StandaloneLike, Event}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Bi {
-   type Change[ A ] = (Span, A)
+   type Change[ A ] = IIdxSeq[ Region[ A ]]
 
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
                                                         peerType: BiType[ A ]) : Var[ S, A ] = {
@@ -143,6 +143,8 @@ println( "...........disconnect " + this )
       }
    }
 
+   final case class Region[ A ]( span: Span, value: A )
+
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ],
                                                  ordered: SkipList[ S, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
@@ -234,7 +236,7 @@ println( "...........disconnect " + this )
             if( con ) newEntry ---> this
             val stop = if( cmp <= 0 ) succ.timeVal else 0x4000000000000000L  // XXX TODO should have special version of Span
             val span = Span( start, stop )
-            fire( span -> value.value )
+            fire( IIdxSeq( Region( span, value.value )))
          }
       }
    }

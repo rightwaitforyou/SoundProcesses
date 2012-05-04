@@ -103,15 +103,18 @@ trait BiType[ A ] extends Type[ A ] {
          // there are three cases
          // - if the time value changes, we need to read the bi at the new
          //   value (independent of biChanged)
-         // - if the time value didn't change, we see if biChanged affects the
+         // - if the time value didn't change, we see if biChange affects the
          //   current time position
          // - all other cases are dropped
          val res = (biChange, timeChange) match {
-            case (Some( bch ), None) if bch._1.contains( time.value ) =>
-               val before  = cache.get
-               val now     = bch._2
-               cache.set( now )
-               change( before, now )
+            case (Some( bch ), None) =>
+               val timeVal = time.value
+               bch.find( _.span.contains( timeVal )).flatMap { region =>
+                  val before  = cache.get
+                  val now     = region.value
+                  cache.set( now )
+                  change( before, now )
+               }
             case (_, Some( tch )) =>
                val before  = cache.get
 //               val before  = bi.value( tch.before )
