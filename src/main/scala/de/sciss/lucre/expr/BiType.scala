@@ -45,15 +45,17 @@ trait BiType[ A ] extends Type[ A ] {
       new Cursor[ S ]( targets, cache, bi, time )
    }
 
-   protected def readLongExpr[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr[ S, Long ]
+   protected def longType : BiType[ Long ]
+
+//   def readLongExpr[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr[ S, Long ]
 
    // assumes it was identified (cookie 3 read)
    protected def readCursor[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
                                            ( implicit tx: S#Tx ) : Ex[ S ] = {
 //      val bi   =
-      val cache   = tx.readVar[ A ]( targets.id, in )
+      val cache   = tx.readPartialVar[ A ]( targets.id, in )
       val bi      = Bi.readVar[ S, A ]( in, access )( tx, this )
-      val time    = readLongExpr[ S ]( in, access )
+      val time    = longType.readExpr( in, access )
       new Cursor[ S ]( targets, cache, bi, time )
    }
 
@@ -97,22 +99,22 @@ trait BiType[ A ] extends Type[ A ] {
          }
 
          (biChange, timeChange) match {
-            case (Some( bch ), None) /* if bch._1.contains( time.value ) */ =>
+            case (Some( bch ), None) if bch._1.contains( time.value ) =>
                val before  = cache.get
                val now     = bch._2
                cache.set( now )
                change( before, now )
-            case (None, Some( tch )) =>
+            case (_, Some( tch )) =>
                val before  = cache.get
 //               val before  = bi.value( tch.before )
                val now     = bi.value( tch.now )
                cache.set( now )
                change( before, now )
-            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
-               val before  = cache.get
-               val now     = bi.value( tch.now )
-               cache.set( now )
-               change( before, now )
+//            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
+//               val before  = cache.get
+//               val now     = bi.value( tch.now )
+//               cache.set( now )
+//               change( before, now )
             case _ => None
          }
       }

@@ -41,6 +41,7 @@ object Bi {
          implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
          HASkipList.empty[ S, (Long, Expr[ S, A ])]
       }
+      ordered.add( (0L, init) )
       new Impl[ S, A ]( targets, ordered )
    }
 
