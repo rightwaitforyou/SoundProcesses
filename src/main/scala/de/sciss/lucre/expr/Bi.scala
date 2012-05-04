@@ -58,6 +58,9 @@ object Bi {
    implicit def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
       event.Reader[ S, Bi[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Bi[ S, A ]] = new Ser[ S, A ]
 
+   implicit def varSerializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
+      event.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] = new VarSer[ S, A ]
+
    private final class Ser[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
    extends event.Reader[ S, Bi[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Bi[ S, A ]] {
       def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Bi[ S, A ] = {
@@ -72,6 +75,22 @@ object Bi {
          new Impl[ S, A ]( targets, ordered )
       }
       def write( v: Bi[ S, A ], out: DataOutput ) { v.write( out )}
+   }
+
+   private final class VarSer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
+   extends event.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] {
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Var[ S, A ] = {
+         read( in, access, Targets.read[ S ]( in, access ))
+      }
+      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Var[ S, A ] = {
+         val ordered = {
+            implicit val _peerSer   = peerType.serializer[ S ]
+            implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+            HASkipList.read[ S, (Long, Expr[ S, A ])]( in, access )
+         }
+         new Impl[ S, A ]( targets, ordered )
+      }
+      def write( v: Var[ S, A ], out: DataOutput ) { v.write( out )}
    }
 
    trait Var[ S <: Sys[ S ], A ] extends Bi[ S, A ] {
