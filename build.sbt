@@ -14,7 +14,8 @@ scalaVersion := "2.9.2"
 
 libraryDependencies ++= Seq(
    "de.sciss" %% "scalacollider" % "0.34",
-   "de.sciss" %% "temporalobjects" % "0.32-SNAPSHOT",
+   "de.sciss" %% "temporalobjects" % "0.32",
+   "de.sciss" %% "lucreexpr" % "0.10",
    "org.scalatest" %% "scalatest" % "1.7.2" % "test"
 )
 

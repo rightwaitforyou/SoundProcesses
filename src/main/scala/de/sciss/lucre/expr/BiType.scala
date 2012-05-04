@@ -98,6 +98,12 @@ trait BiType[ A ] extends Type[ A ] {
             None
          }
 
+         // there are three cases
+         // - if the time value changes, we need to read the bi at the new
+         //   value (independent of biChanged)
+         // - if the time value didn't change, we see if biChanged affects the
+         //   current time position
+         // - all other cases are dropped
          (biChange, timeChange) match {
             case (Some( bch ), None) if bch._1.contains( time.value ) =>
                val before  = cache.get
