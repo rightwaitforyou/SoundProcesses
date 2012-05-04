@@ -25,10 +25,10 @@
 
 package de.sciss.lucre.expr
 
-import de.sciss.lucre.stm.{Writer, Sys}
-import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.collection.txn.{SkipList, Ordered, HASkipList}
-import de.sciss.lucre.event.{EventLikeSerializer, Targets, Root, Trigger, StandaloneLike, Singleton, Event}
+import de.sciss.lucre.event.{Targets, Root, Trigger, StandaloneLike, Event}
+import de.sciss.lucre.stm.{TxnSerializer, Writer, Sys}
+import de.sciss.lucre.{event, DataInput, DataOutput}
 
 object Bi {
    type Change[ A ] = (Span, A)
@@ -55,8 +55,24 @@ object Bi {
       new Impl[ S, A ]( targets, ordered )
    }
 
-   implicit private def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) : EventLikeSerializer[ S, Bi[ S, A ]] =
-      sys.error( "TODO" )
+   implicit def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
+      event.Reader[ S, Bi[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Bi[ S, A ]] = new Ser[ S, A ]
+
+   private final class Ser[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
+   extends event.Reader[ S, Bi[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Bi[ S, A ]] {
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Bi[ S, A ] = {
+         read( in, access, Targets.read[ S ]( in, access ))
+      }
+      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Bi[ S, A ] = {
+         val ordered = {
+            implicit val _peerSer   = peerType.serializer[ S ]
+            implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+            HASkipList.read[ S, (Long, Expr[ S, A ])]( in, access )
+         }
+         new Impl[ S, A ]( targets, ordered )
+      }
+      def write( v: Bi[ S, A ], out: DataOutput ) { v.write( out )}
+   }
 
    trait Var[ S <: Sys[ S ], A ] extends Bi[ S, A ] {
       def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
