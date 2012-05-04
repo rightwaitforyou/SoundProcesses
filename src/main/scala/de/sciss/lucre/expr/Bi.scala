@@ -1,28 +1,64 @@
+/*
+ *  Bi.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either
+ *  version 2, june 1991 of the License, or (at your option) any later version.
+ *
+ *  This software is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public
+ *  License (gpl.txt) along with this software; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.lucre.expr
 
 import de.sciss.lucre.event.Event
-import de.sciss.collection.txn.{Ordered, HASkipList}
 import de.sciss.lucre.stm.{Writer, Sys}
-import de.sciss.lucre.DataOutput
+import de.sciss.lucre.{DataInput, DataOutput}
+import de.sciss.collection.txn.{SkipList, Ordered, HASkipList}
 
 object Bi {
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
-                                                        peerType: BiType[ A ]) : Var[ S, A ] =
-      new NewVar[ S, A ]( tx, peerType )
+                                                        peerType: BiType[ A ]) : Var[ S, A ] = {
+      val ordered = {
+         implicit val _peerSer   = peerType.serializer[ S ]
+         implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+         HASkipList.empty[ S, (Long, Expr[ S, A ])]
+      }
+      new Impl[ S, A ]( ordered, peerType )
+   }
+
+   def readVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
+                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, A ] = {
+      sys.error( "TODO" )
+//      new Impl[ S, A ]( ordered, peerType )
+   }
 
    trait Var[ S <: Sys[ S ], A ] extends Bi[ S, A ] {
       def set( time: Expr[ S, Long ], value: Expr[ S, A ]) : Unit
    }
 
-   private final class NewVar[ S <: Sys[ S ], A ]( tx0: S#Tx,
-                                                   peerType: BiType[ A ])
+   private final class Impl[ S <: Sys[ S ], A ]( ordered: SkipList[ S, (Long, Expr[ S, A ])], peerType: BiType[ A ])
    extends Var[ S, A ] {
-      private val ordered = {
-         implicit val tx         = tx0
-         implicit val _peerSer   = peerType.serializer[ S ]
-         implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.empty[ S, (Long, Expr[ S, A ])]
-      }
+//      private val ordered = {
+//         implicit val tx         = tx0
+//         implicit val _peerSer   = peerType.serializer[ S ]
+//         implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+//         HASkipList.empty[ S, (Long, Expr[ S, A ])]
+//      }
 
       def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = {
          // XXX TODO should be an efficient method in skiplist itself

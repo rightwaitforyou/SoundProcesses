@@ -34,7 +34,7 @@ import annotation.switch
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string
-object Doubles extends Type[ Double ] {
+object Doubles extends BiTypeImpl[ Double ] {
    private val typeID = 5
 
    protected def readValue( in: DataInput ) : Double = in.readDouble()
@@ -141,6 +141,9 @@ object Doubles extends Type[ Double ] {
             val _1 = readExpr( in, access )
             val _2 = readExpr( in, access )
             new Tuple2( typeID, op, targets, _1, _2 )
+
+         case 3 =>
+            readCursor[ S ]( in, access, targets )
 
          case _ => sys.error( "Invalid cookie " + cookie )
       }

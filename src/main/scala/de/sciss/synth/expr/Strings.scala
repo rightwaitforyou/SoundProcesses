@@ -31,7 +31,7 @@ import de.sciss.lucre.expr.Type
 import de.sciss.lucre.event.Targets
 import annotation.switch
 
-object Strings extends Type[ String ] {
+object Strings extends BiTypeImpl[ String ] {
    private val typeID = 8
 
    protected def readValue( in: DataInput ) : String = in.readString()
@@ -92,6 +92,9 @@ object Strings extends Type[ String ] {
             val _1 = readExpr( in, access )
             val _2 = readExpr( in, access )
             new Tuple2( typeID, op, targets, _1, _2 )
+
+         case 3 =>
+            readCursor[ S ]( in, access, targets )
 
          case _ => sys.error( "Invalid cookie " + cookie )
       }
