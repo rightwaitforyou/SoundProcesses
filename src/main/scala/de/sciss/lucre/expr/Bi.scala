@@ -34,8 +34,10 @@ object Bi {
          })._1._2
       }
 
+      def value( time: Long )( implicit tx: S#Tx ) : A = get( time ).value
+
       def write( out: DataOutput ) {
-         sys.error( "TODO" )
+         ordered.write( out )
       }
 
       def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ] = peerType.newCursor[ S ]( this, time )
@@ -49,6 +51,7 @@ object Bi {
 }
 trait Bi[ S <: Sys[ S ], A ] extends Writer {
    def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
+   def value( time: Long )( implicit tx: S#Tx ) : A
    def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ]
    def changed : Event[ S, (Span, A), Bi[ S, A ]]
 }
