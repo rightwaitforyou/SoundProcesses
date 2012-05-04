@@ -28,8 +28,9 @@ package de.sciss.lucre.expr
 import de.sciss.collection.txn
 import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
-import event.{Pull, Targets, Trigger, StandaloneLike, Event}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Writer, Sys}
+import event.{Selector, Pull, Targets, Trigger, StandaloneLike, Event}
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Bi {
    type Change[ A ] = (Span, A)
@@ -128,7 +129,19 @@ object Bi {
          }
       }
    }
-   private final case class Entry[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ])
+   private final case class Entry[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ]) {
+      def --->( sel: Selector[ S ])( implicit tx: S#Tx ) {
+println( "...........connect " + this )
+         time.changed  ---> sel
+         value.changed ---> sel
+      }
+
+      def -/->( sel: Selector[ S ])( implicit tx: S#Tx ) {
+println( "...........disconnect " + this )
+         time.changed  -/-> sel
+         value.changed -/-> sel
+      }
+   }
 
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ],
                                                  ordered: SkipList[ S, Entry[ S, A ]])
@@ -140,14 +153,39 @@ object Bi {
       protected def reader = serializer[ S, A ]
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
-//         getEntry(0)._1._2.changed.--->(this)
+         var remove  = IIdxSeq.empty[ Entry[ S, A ]]
+         var add     = IIdxSeq.empty[ Entry[ S, A ]]
+
+         ordered.iterator.foreach { e =>
+            val tNow = e.time.value
+            if( e.timeVal != tNow ) {
+               remove :+= e
+               add    :+= e.copy( timeVal = tNow )
+            } else {
+               e ---> this
+            }
+         }
+
+         if( remove.nonEmpty ) {
+            remove.foreach( ordered -= _ )
+            add.foreach { e =>
+               ordered += e
+               e ---> this
+            }
+         }
       }
       private[lucre] def disconnect()( implicit tx: S#Tx ) {
-
+         ordered.iterator.foreach( _ -/-> this )
       }
 
       private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Change[ A ]] = {
-         pull.resolve[ Change[ A ]]
+         val p = pull.parents( this )
+         if( p.isEmpty ) {
+            pull.resolve[ Change[ A ]]
+         } else {
+            println( "Wooopa. Underlying data fired: " + p )
+            None
+         }
       }
 
       private def getEntry( time: Long )( implicit tx: S#Tx ) : (Entry[ S, A ], Int) = {
@@ -183,13 +221,21 @@ object Bi {
       def changed : Event[ S, Change[ A ], Bi[ S, A ]] = this
 
       def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
-         val start                        = time.value
-         val (Entry( stop0, _, _), cmp)   = getEntry( start + 1 )
+         val start         = time.value
+         val (succ, cmp)   = getEntry( start + 1 )
 //println( "set " + tv + " -> succ = " + succ + ", cmp = " + cmp )
-         ordered.add( Entry( start, time, value ))
-         val stop                = if( cmp <= 0 ) stop0 else 0x4000000000000000L  // XXX TODO should have special version of Span
-         val span = Span( start, stop )
-         fire( span -> value.value )
+         val newEntry      = Entry( start, time, value )
+         val con           = targets.nonEmpty
+         if( con && cmp == 0 ) {  // overwriting entry!
+            succ -/-> this
+         }
+         ordered.add( newEntry )
+         if( con ) {
+            if( con ) newEntry ---> this
+            val stop = if( cmp <= 0 ) succ.timeVal else 0x4000000000000000L  // XXX TODO should have special version of Span
+            val span = Span( start, stop )
+            fire( span -> value.value )
+         }
       }
    }
 }
