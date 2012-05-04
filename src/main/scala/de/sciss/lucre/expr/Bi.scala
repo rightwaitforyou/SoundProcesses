@@ -33,7 +33,7 @@ import event.{Selector, Pull, Targets, Trigger, StandaloneLike, Event}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Bi {
-   type Change[ A ] = IIdxSeq[ Region[ A ]]
+   type Update[ A ] = IIdxSeq[ Region[ A ]]
 
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
                                                         peerType: BiType[ A ]) : Var[ S, A ] = {
@@ -131,13 +131,13 @@ object Bi {
    }
    private final case class Entry[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ]) {
       def --->( sel: Selector[ S ])( implicit tx: S#Tx ) {
-println( "...........connect " + this )
+//println( "...........connect " + this )
          time.changed  ---> sel
          value.changed ---> sel
       }
 
       def -/->( sel: Selector[ S ])( implicit tx: S#Tx ) {
-println( "...........disconnect " + this )
+//println( "...........disconnect " + this )
          time.changed  -/-> sel
          value.changed -/-> sel
       }
@@ -149,8 +149,8 @@ println( "...........disconnect " + this )
                                                  ordered: SkipList[ S, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
    extends Var[ S, A ]
-   with Trigger.Impl[ S, Change[ A ], Change[ A ], Bi[ S, A ]]
-   with StandaloneLike[ S, Change[ A ], Bi[ S, A ]]
+   with Trigger.Impl[ S, Update[ A ], Update[ A ], Bi[ S, A ]]
+   with StandaloneLike[ S, Update[ A ], Bi[ S, A ]]
    /* with Root[ S, Change[ A ]] */ {
       protected def reader = serializer[ S, A ]
 
@@ -180,10 +180,10 @@ println( "...........disconnect " + this )
          ordered.iterator.foreach( _ -/-> this )
       }
 
-      private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Change[ A ]] = {
+      private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Update[ A ]] = {
          val p = pull.parents( this )
          if( p.isEmpty ) {
-            pull.resolve[ Change[ A ]]
+            pull.resolve[ Update[ A ]]
          } else {
             println( "Wooopa. Underlying data fired: " + p )
             None
@@ -220,7 +220,7 @@ println( "...........disconnect " + this )
 
       def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ] = peerType.newCursor[ S ]( this, time )
 
-      def changed : Event[ S, Change[ A ], Bi[ S, A ]] = this
+      def changed : Event[ S, Update[ A ], Bi[ S, A ]] = this
 
       def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
          val start         = time.value
@@ -245,7 +245,7 @@ sealed trait Bi[ S <: Sys[ S ], A ] extends Writer {
    def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
    def value( time: Long )( implicit tx: S#Tx ) : A
    def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ]
-   def changed : Event[ S, Bi.Change[ A ], Bi[ S, A ]]
+   def changed : Event[ S, Bi.Update[ A ], Bi[ S, A ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (Long, A)]
 }
