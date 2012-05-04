@@ -2,7 +2,7 @@ package de.sciss.synth.expr
 
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.event.Event
-import de.sciss.collection.txn.HASkipList
+import de.sciss.collection.txn.{Ordered, HASkipList}
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 
 object Bi {
@@ -24,7 +24,15 @@ object Bi {
          HASkipList.empty[ S, (Long, Expr[ S, A ])]
       }
 
-      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = sys.error( "TODO" )
+      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = {
+         // XXX TODO should be an efficient method in skiplist itself
+         ordered.isomorphicQuery( new Ordered[ S#Tx, (Long, Expr[ S, A ])] {
+            def compare( that: (Long, Expr[ S, A ]))( implicit tx: S#Tx ) = {
+               val t = that._1
+               if( t < time ) -1 else if( t > time ) 1 else 0
+            }
+         })._1._2
+      }
 
       def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ] = sys.error( "TODO" )
 
