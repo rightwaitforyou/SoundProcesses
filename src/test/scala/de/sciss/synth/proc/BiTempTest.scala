@@ -24,18 +24,16 @@ object BiTempTest extends App {
       import exprImp._
 
       implicit def biSer[ A ]( implicit peer: BiType[ A ]) = Bi.serializer[ S, A ]
-      implicit val doubles = Doubles
-      implicit val longVarSer: TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Long ]] = new TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Long ]] {
-         def write( v: Expr.Var[ S, Long ], out: DataOutput ) { v.write( out )}
-         def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr.Var[ S, Long ] = Longs.readVar( in, access )
-      }
+      implicit val doubles       = Doubles
+      implicit val longVarSer    = Longs.varSerializer[ S ]
+      implicit val doubleVarSer  = Doubles.varSerializer[ S ]
 
 //      implicit val accessSer = implicitly[ TxnSerializer[ S#Tx, S#Acc, (Bi.Var[ S, Double ], IIdxSeq[ Expr.Var[ S, Long ]])]]
 
       println( "__STEP__ root" )
       val access = system.root { implicit tx =>
          val bi = Bi.newVar( 0.0 )
-         (bi, IIdxSeq.empty[ Expr.Var[ S, Long ]])
+         (bi, IIdxSeq.empty[ Expr.Var[ S, Long ]], IIdxSeq.empty[ Expr.Var[ S, Double ]])
       }
 
       println( "__STEP__ create bi and cursor" )
@@ -46,7 +44,7 @@ object BiTempTest extends App {
          bi.at( biCsr ).changed.react {
             case Change( before, now ) => println( "__CURSOR__ " + before + " -> " + now )
          }
-         access.set( (bi -> IIdxSeq( biCsr )))
+         access.transform( a => a.copy( _2 = a._2 :+ biCsr ))
       }
 
       println( "__STEP__ bi.set( 10000, 441.0 )" )
@@ -72,10 +70,33 @@ object BiTempTest extends App {
          biCsr.set( 7000 )
       }
 
-      println( "__STEP__ biCsr.set( 11000 )" )
+      println( "__STEP__ biCsr.set( 12000 )" )
       cursor.step { implicit tx =>
          val biCsr = access.get._2.head
-         biCsr.set( 11000 )
+         biCsr.set( 12000 )
+      }
+
+      println( "__STEP__ bi.set( varTime( 11000 ), varVal( 666.0 ))" )
+      cursor.step { implicit tx =>
+         val bi      = access.get._1
+         val varTime = Longs.newVar[ S ]( 11000 )
+         val varVal  = Doubles.newVar[ S ]( 666.0 )
+         bi.set( varTime, varVal )
+         access.transform( a => a.copy( _2 = a._2 :+ varTime, _3 = a._3 :+ varVal ))
+      }
+
+      // XXX this one is not working yet (no events)
+      println( "__STEP__ varVal.set( 777.0 )" )
+      cursor.step { implicit tx =>
+         val varVal = access.get._3.head
+         varVal.set( 777.0 )
+      }
+
+      // XXX this one is not working yet (no events)
+      println( "__STEP__ varTime.set( 9000 )" )
+      cursor.step { implicit tx =>
+         val varTime = access.get._2.last
+         varTime.set( 9000 )
       }
    }
 }
