@@ -29,8 +29,8 @@ import de.sciss.collection.txn
 import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Writer, Sys}
-import event.{Selector, Pull, Targets, Trigger, StandaloneLike, Event}
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import event.{Dummy, EventLike, EventImpl, Selector, Pull, Targets, Trigger, StandaloneLike, Event}
 
 object Bi {
    type Update[ A ] = IIdxSeq[ Region[ A ]]
@@ -106,11 +106,7 @@ object Bi {
 
       private final class Ser[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ])
       extends TxnSerializer[ S#Tx, S#Acc, Entry[ S, A ]] {
-         def write( e: Entry[ S, A ], out: DataOutput ) {
-            out.writeLong( e.timeVal )
-            e.time.write( out )
-            e.value.write( out )
-         }
+         def write( e: Entry[ S, A ], out: DataOutput ) { e.write( out )}
 
          def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Entry[ S, A ] = {
             val timeVal = in.readLong()
@@ -128,20 +124,68 @@ object Bi {
             if( a.timeVal < b.timeVal ) -1 else if( a.timeVal > b.timeVal ) 1 else 0
          }
       }
-   }
-   private final case class Entry[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ]) {
-      def --->( sel: Selector[ S ])( implicit tx: S#Tx ) {
-//println( "...........connect " + this )
-         time.changed  ---> sel
-         value.changed ---> sel
+
+      def apply[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ])
+                                   ( implicit tx: S#Tx ) : Entry[ S, A ] = {
+         if( time.isInstanceOf[ Expr.Const[ _, _ ]] && value.isInstanceOf[ Expr.Const[ _, _ ]]) {
+            new DummyImpl[ S, A ]( timeVal, time, value )
+         } else {
+            new FullImpl[ S, A ]( Targets[ S ], timeVal, time, value )
+         }
       }
 
-      def -/->( sel: Selector[ S ])( implicit tx: S#Tx ) {
-//println( "...........disconnect " + this )
-         time.changed  -/-> sel
-         value.changed -/-> sel
+      private sealed trait Impl[ S <: Sys[ S ], A ] extends Entry[ S, A ] {
+         protected def cookie: Int
+
+         final def write( out: DataOutput ) {
+            out.writeUnsignedByte( cookie )
+            out.writeLong( e.timeVal )
+            e.time.write( out )
+            e.value.write( out )
+         }
+      }
+
+      private final class DummyImpl[ S <: Sys[ S ], A ]( timeVal: Long, val time: Expr[ S, Long ], val value: Expr[ S, A ])
+      extends Impl[ S, A ] with Dummy[ S, Either[ Long, A ], Entry[ S, A ]] {
+         def cookie = 0
+
+         def timeCache( implicit tx: S#Tx ) : Long = timeVal
+
+         def updateTime()( implicit tx: S#Tx ) {
+            sys.error( "Illegal state -- a constant region should not change its time value : " + this )
+         }
+      }
+
+      private final class FullImpl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ], timeCacheVar: S#Var[ Long ],
+                                                        val time: Expr[ S, Long ], val value: Expr[ S, A ])
+      extends Impl[ S, A ] {
+         def cookie = 1
+
+         def updateTime()( implicit tx: S#Tx ) {
+            timeCacheVar.set( time.value )
+         }
       }
    }
+   private sealed trait Entry[ S <: Sys[ S ], A ] extends EventLike[ S, Either[ Long, A ], Entry[ S, A ]] with Writer {
+      def timeCache( implicit tx: S#Tx ) : Long
+      def time: Expr[ S, Long ]
+      def value: Expr[ S, A ]
+      def updateTime()( implicit tx: S#Tx ) : Unit
+   }
+//   private final class EntryXX[ S <: Sys[ S ], A ]( val timeVal: Long, val time: Expr[ S, Long ], val value: Expr[ S, A ])
+//   extends EventImpl[ S, Either[ Long, A ], Either[ Long, A ], Entry[ S, A ]] {
+//      def --->( sel: Selector[ S ])( implicit tx: S#Tx ) {
+////println( "...........connect " + this )
+//         time.changed  ---> sel
+//         value.changed ---> sel
+//      }
+//
+//      def -/->( sel: Selector[ S ])( implicit tx: S#Tx ) {
+////println( "...........disconnect " + this )
+//         time.changed  -/-> sel
+//         value.changed -/-> sel
+//      }
+//   }
 
    final case class Region[ A ]( span: Span, value: A )
 
@@ -162,7 +206,7 @@ object Bi {
             val tNow = e.time.value
             if( e.timeVal != tNow ) {
                remove :+= e
-               add    :+= e.copy( timeVal = tNow )
+               add    :+= e.updateTime( tNow )
             } else {
                e ---> this
             }
