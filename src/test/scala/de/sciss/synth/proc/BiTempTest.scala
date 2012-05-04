@@ -7,8 +7,7 @@ import de.sciss.lucre.event.Change
 import de.sciss.lucre.expr.{Expr, BiType, Bi}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
-import de.sciss.lucre.stm.{TxnSerializer, Cursor, Sys}
-import de.sciss.lucre.{DataInput, DataOutput}
+import de.sciss.lucre.stm.{Cursor, Sys}
 
 object BiTempTest extends App {
    {

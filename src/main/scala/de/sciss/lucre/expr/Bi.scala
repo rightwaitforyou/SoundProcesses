@@ -25,10 +25,11 @@
 
 package de.sciss.lucre.expr
 
-import de.sciss.collection.txn.{SkipList, Ordered, HASkipList}
-import de.sciss.lucre.event.{Targets, Root, Trigger, StandaloneLike, Event}
-import de.sciss.lucre.stm.{TxnSerializer, Writer, Sys}
+import de.sciss.collection.txn
+import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
+import event.{Pull, Targets, Trigger, StandaloneLike, Event}
+import de.sciss.lucre.stm.{InMemory, TxnSerializer, Writer, Sys}
 
 object Bi {
    type Change[ A ] = (Span, A)
@@ -37,11 +38,11 @@ object Bi {
                                                         peerType: BiType[ A ]) : Var[ S, A ] = {
       val targets = Targets.partial[ S ]
       val ordered = {
-         implicit val _peerSer   = peerType.serializer[ S ]
-         implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.empty[ S, (Long, Expr[ S, A ])]
+         implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
+         implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+         HASkipList.empty[ S, Entry[ S, A ]]
       }
-      ordered.add( (0L, init) )
+      ordered.add( Entry( 0L, peerType.longType.newConst( 0L ), init ))
       new Impl[ S, A ]( targets, ordered )
    }
 
@@ -49,9 +50,9 @@ object Bi {
                                   ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, A ] = {
       val targets = Targets.read[ S ]( in, access )
       val ordered = {
-         implicit val _peerSer   = peerType.serializer[ S ]
-         implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.read[ S, (Long, Expr[ S, A ])]( in, access )
+         implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
+         implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+         HASkipList.read[ S, Entry[ S, A ]]( in, access )
       }
       new Impl[ S, A ]( targets, ordered )
    }
@@ -69,9 +70,9 @@ object Bi {
       }
       def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Bi[ S, A ] = {
          val ordered = {
-            implicit val _peerSer   = peerType.serializer[ S ]
-            implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-            HASkipList.read[ S, (Long, Expr[ S, A ])]( in, access )
+            implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
+            implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+            HASkipList.read[ S, Entry[ S, A ]]( in, access )
          }
          new Impl[ S, A ]( targets, ordered )
       }
@@ -85,9 +86,9 @@ object Bi {
       }
       def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Var[ S, A ] = {
          val ordered = {
-            implicit val _peerSer   = peerType.serializer[ S ]
+            implicit val ser        = Entry.serializer[ S, A ] // peerType.serializer[ S ]
             implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-            HASkipList.read[ S, (Long, Expr[ S, A ])]( in, access )
+            HASkipList.read[ S, Entry[ S, A ]]( in, access )
          }
          new Impl[ S, A ]( targets, ordered )
       }
@@ -98,31 +99,73 @@ object Bi {
       def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
    }
 
+   private object Entry {
+      def serializer[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, Entry[ S, A ]] =
+         new Ser[ S, A ]
+
+      private final class Ser[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ])
+      extends TxnSerializer[ S#Tx, S#Acc, Entry[ S, A ]] {
+         def write( e: Entry[ S, A ], out: DataOutput ) {
+            out.writeLong( e.timeVal )
+            e.time.write( out )
+            e.value.write( out )
+         }
+
+         def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Entry[ S, A ] = {
+            val timeVal = in.readLong()
+            val time    = peer.longType.readExpr[ S ]( in, access )
+            val value   = peer.readExpr[ S ]( in, access )
+            Entry( timeVal, time, value )
+         }
+      }
+
+      implicit def ordering[ S <: Sys[ S ], A ] : txn.Ordering[ S#Tx, Entry[ S, A ]] =
+         Ord.asInstanceOf[ txn.Ordering[ Any, Entry[ S, A ]]]
+
+      private object Ord extends txn.Ordering[ Any, Entry[ InMemory, _ ]] {
+         def compare( a: Entry[ InMemory, _ ], b: Entry[ InMemory, _ ])( implicit tx: Any ) : Int = {
+            if( a.timeVal < b.timeVal ) -1 else if( a.timeVal > b.timeVal ) 1 else 0
+         }
+      }
+   }
+   private final case class Entry[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ])
+
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ],
-                                                 ordered: SkipList[ S, (Long, Expr[ S, A ])])
+                                                 ordered: SkipList[ S, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
    extends Var[ S, A ]
    with Trigger.Impl[ S, Change[ A ], Change[ A ], Bi[ S, A ]]
    with StandaloneLike[ S, Change[ A ], Bi[ S, A ]]
-   with Root[ S, Change[ A ]] {
-      protected def reader  = serializer[ S, A ]
+   /* with Root[ S, Change[ A ]] */ {
+      protected def reader = serializer[ S, A ]
 
-      private def getEntry( time: Long )( implicit tx: S#Tx ) : ((Long, Expr[ S, A ]), Int) = {
+      private[lucre] def connect()( implicit tx: S#Tx ) {
+//         getEntry(0)._1._2.changed.--->(this)
+      }
+      private[lucre] def disconnect()( implicit tx: S#Tx ) {
+
+      }
+
+      private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Change[ A ]] = {
+         pull.resolve[ Change[ A ]]
+      }
+
+      private def getEntry( time: Long )( implicit tx: S#Tx ) : (Entry[ S, A ], Int) = {
          // XXX TODO should be an efficient method in skiplist itself
-         ordered.isomorphicQuery( new Ordered[ S#Tx, (Long, Expr[ S, A ])] {
-            def compare( that: (Long, Expr[ S, A ]))( implicit tx: S#Tx ) = {
-               val t = that._1
+         ordered.isomorphicQuery( new Ordered[ S#Tx, Entry[ S, A ]] {
+            def compare( that: Entry[ S, A ])( implicit tx: S#Tx ) = {
+               val t = that.timeVal
                if( time < t ) -1 else if( time > t ) 1 else 0
             }
          })
       }
 
-      def debugList()( implicit tx: S#Tx ) : List[ (Long, Expr[ S, A ])] = ordered.toList
+      def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] = ordered.toList.map( e => (e.timeVal, e.value.value) )
 
       def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = {
 //         val ((succ, _), cmp) = getEntry( time )._1._2
 //         if( cmp > 0 ) ???
-         ordered.toList.takeWhile( _._1 <= time ).last._2   // XXX TODO ouch... we do need a pred method for skiplist
+         ordered.toList.takeWhile( _.timeVal <= time ).last.value // XXX TODO ouch... we do need a pred method for skiplist
       }
 
       def value( time: Long )( implicit tx: S#Tx ) : A = get( time ).value
@@ -140,21 +183,21 @@ object Bi {
       def changed : Event[ S, Change[ A ], Bi[ S, A ]] = this
 
       def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
-         val start               = time.value
-         val ((stop0, _), cmp)   = getEntry( start + 1 )
+         val start                        = time.value
+         val (Entry( stop0, _, _), cmp)   = getEntry( start + 1 )
 //println( "set " + tv + " -> succ = " + succ + ", cmp = " + cmp )
-         ordered.add( (start, value) )
+         ordered.add( Entry( start, time, value ))
          val stop                = if( cmp <= 0 ) stop0 else 0x4000000000000000L  // XXX TODO should have special version of Span
          val span = Span( start, stop )
          fire( span -> value.value )
       }
    }
 }
-trait Bi[ S <: Sys[ S ], A ] extends Writer {
+sealed trait Bi[ S <: Sys[ S ], A ] extends Writer {
    def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
    def value( time: Long )( implicit tx: S#Tx ) : A
    def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ]
    def changed : Event[ S, Bi.Change[ A ], Bi[ S, A ]]
 
-   def debugList()( implicit tx: S#Tx ) : List[ (Long, Expr[ S, A ])]
+   def debugList()( implicit tx: S#Tx ) : List[ (Long, A)]
 }

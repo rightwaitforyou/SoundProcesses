@@ -45,7 +45,7 @@ trait BiType[ A ] extends Type[ A ] {
       new Cursor[ S ]( targets, cache, bi, time )
    }
 
-   protected def longType : BiType[ Long ]
+   def longType : BiType[ Long ]
 
 //   def readLongExpr[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr[ S, Long ]
 

@@ -37,4 +37,31 @@ Transport
 
 txn.SkipList[ (Long, A) ] with _._1 ordering view
 
+::::::::::::::::
 
+Bi.Entry[ S, A ] {
+   def time : Expr[ S, Long ]
+   def value : Expr[ S, A ]
+   def changed = time.changed.map( ... ) | value.changed.map( ... )
+}
+
+the main questions to answer
+ - are we eagerly or lazily connecting Bi to the entries?
+ - if the former, how do we invalidate the Bi (mark dirty)?
+ - if the latter, how do we store them? independently of the skip-list? if in the skiplist, how to verify their positions upon connect?
+
+::::::::::::::::
+
+let's go for the easier(?) solution first -- lazy connect
+
+ - we must be able to remove (overwrite) entries even if the skiplist is not maintained?
+ - or do we maintain the skiplist anyways?
+
+let's just go with the skiplist... as we anticipate that the number of updates is probably small, so we might get away with connect just going once through the iterator
+
+a straightforward approach requires the dirty items to be kept in memory... not perfect, but ok for the moment:
+
+    val dirty = IIdxSeq.empty[ (Long, Long, Bi.Entry) ]
+    ordered.iterator.foreach { case (tOld, entry) => val tNew = entry.time.value; if( tNew != tOld ) dirty :+= (tOld, tNew, entry)}
+    dirty.foreach { case (tOld, tNew, entry) => ordered.removeWhere( _._1 == tOld ); ordered += tNew -> entry }
+    // this ensures that the iterator is completely processed before updating the structure, so it doesn't get invalid
