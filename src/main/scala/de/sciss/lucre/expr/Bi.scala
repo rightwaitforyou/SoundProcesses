@@ -117,7 +117,13 @@ object Bi {
          })
       }
 
-      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = getEntry( time )._1._2
+      def debugList()( implicit tx: S#Tx ) : List[ (Long, Expr[ S, A ])] = ordered.toList
+
+      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = {
+//         val ((succ, _), cmp) = getEntry( time )._1._2
+//         if( cmp > 0 ) ???
+         ordered.toList.takeWhile( _._1 <= time ).last._2   // XXX TODO ouch... we do need a pred method for skiplist
+      }
 
       def value( time: Long )( implicit tx: S#Tx ) : A = get( time ).value
 
@@ -149,4 +155,6 @@ trait Bi[ S <: Sys[ S ], A ] extends Writer {
    def value( time: Long )( implicit tx: S#Tx ) : A
    def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ]
    def changed : Event[ S, Bi.Change[ A ], Bi[ S, A ]]
+
+   def debugList()( implicit tx: S#Tx ) : List[ (Long, Expr[ S, A ])]
 }

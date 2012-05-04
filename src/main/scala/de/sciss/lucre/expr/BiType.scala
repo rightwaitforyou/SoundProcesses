@@ -74,11 +74,13 @@ trait BiType[ A ] extends Type[ A ] {
       def value( implicit tx: S#Tx ): A = bi.get( time.value ).value
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
+//println( "CONNECT CURSOR" )
          bi.changed   ---> this
          time.changed ---> this
       }
 
       private[lucre] def disconnect()( implicit tx: S#Tx ) {
+//println( "DISCONNECT CURSOR" )
          bi.changed   -/-> this
          time.changed -/-> this
       }
@@ -104,7 +106,7 @@ trait BiType[ A ] extends Type[ A ] {
          // - if the time value didn't change, we see if biChanged affects the
          //   current time position
          // - all other cases are dropped
-         (biChange, timeChange) match {
+         val res = (biChange, timeChange) match {
             case (Some( bch ), None) if bch._1.contains( time.value ) =>
                val before  = cache.get
                val now     = bch._2
@@ -114,6 +116,7 @@ trait BiType[ A ] extends Type[ A ] {
                val before  = cache.get
 //               val before  = bi.value( tch.before )
                val now     = bi.value( tch.now )
+//println( "CACHE WAS " + before + " NOW (AT " + tch.now + ") IS " + now )
                cache.set( now )
                change( before, now )
 //            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
@@ -123,6 +126,8 @@ trait BiType[ A ] extends Type[ A ] {
 //               change( before, now )
             case _ => None
          }
+//println( "CURSOR UPDATE. TIME = " + timeChange + ", BI = " + biChange + ", RES = " + res )
+         res
       }
    }
 }

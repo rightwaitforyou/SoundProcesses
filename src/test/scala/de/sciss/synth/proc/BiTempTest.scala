@@ -61,6 +61,11 @@ object BiTempTest extends App {
          bi.set( 5000, 882.0 )
       }
 
+//      println( ".....lookup at 7000: " + cursor.step { implicit tx =>
+//         val bi = access.get._1
+//         (bi.get( 7000 ) -> bi.debugList())
+//      })
+
       println( "__STEP__ biCsr.set( 7000 )" )
       cursor.step { implicit tx =>
          val biCsr = access.get._2.head
