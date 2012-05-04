@@ -97,7 +97,7 @@ trait BiType[ A ] extends Type[ A ] {
          }
 
          (biChange, timeChange) match {
-            case (Some( bch ), None) =>
+            case (Some( bch ), None) /* if bch._1.contains( time.value ) */ =>
                val before  = cache.get
                val now     = bch._2
                cache.set( now )
@@ -108,7 +108,7 @@ trait BiType[ A ] extends Type[ A ] {
                val now     = bi.value( tch.now )
                cache.set( now )
                change( before, now )
-            case (Some( bch ), Some( tch )) =>
+            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
                val before  = cache.get
                val now     = bi.value( tch.now )
                cache.set( now )
