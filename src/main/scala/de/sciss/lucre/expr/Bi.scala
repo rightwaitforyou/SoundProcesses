@@ -30,7 +30,7 @@ import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Writer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import event.{Change, Reader, Constant, Dummy, EventLike, EventImpl, Selector, Pull, Targets, Trigger, StandaloneLike, Event}
+import event.{EventLikeSerializer, Change, Reader, Constant, Dummy, EventLike, EventImpl, Selector, Pull, Targets, Trigger, StandaloneLike, Event}
 
 object Bi {
    type Update[ A ] = IIdxSeq[ Region[ A ]]
@@ -101,18 +101,22 @@ object Bi {
    }
 
    private object Entry {
-      def serializer[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, Entry[ S, A ]] =
+      def serializer[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ]) : Reader[ S, Entry[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Entry[ S, A ]] =
          new Ser[ S, A ]
 
       private final class Ser[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ])
-      extends TxnSerializer[ S#Tx, S#Acc, Entry[ S, A ]] {
-         def write( e: Entry[ S, A ], out: DataOutput ) { e.write( out )}
+      extends EventLikeSerializer[ S, Entry[ S, A ]] {
+         def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Entry[ S, A ] = {
+            val timeCacheVar  = tx.readVar[ Long ]( targets.id, in )
+            val time          = peer.longType.readExpr[ S ]( in, access )
+            val value         = peer.readExpr[ S ]( in, access )
+            new FullImpl[ S, A ]( targets, timeCacheVar, time, value )
+         }
 
-         def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Entry[ S, A ] = {
-            val timeVal = in.readLong()
-            val time    = peer.longType.readExpr[ S ]( in, access )
-            val value   = peer.readExpr[ S ]( in, access )
-            Entry( timeVal, time, value )
+         def readConstant( in: DataInput )( implicit tx: S#Tx ) : Entry[ S, A ] = {
+            val timeVal       = in.readLong()
+//            val value         = peer.readExpr[ S ]( in, access )
+            new DummyImpl[ S, A ]( timeVal, null )( peer.longType )
          }
       }
 
