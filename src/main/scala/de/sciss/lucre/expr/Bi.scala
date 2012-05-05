@@ -30,7 +30,7 @@ import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
 import de.sciss.lucre.stm.{InMemory, TxnSerializer, Writer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import event.{Dummy, EventLike, EventImpl, Selector, Pull, Targets, Trigger, StandaloneLike, Event}
+import event.{Change, Reader, Constant, Dummy, EventLike, EventImpl, Selector, Pull, Targets, Trigger, StandaloneLike, Event}
 
 object Bi {
    type Update[ A ] = IIdxSeq[ Region[ A ]]
@@ -117,63 +117,126 @@ object Bi {
       }
 
       implicit def ordering[ S <: Sys[ S ], A ] : txn.Ordering[ S#Tx, Entry[ S, A ]] =
-         Ord.asInstanceOf[ txn.Ordering[ Any, Entry[ S, A ]]]
+         Ord.asInstanceOf[ txn.Ordering[ S#Tx, Entry[ S, A ]]]
 
-      private object Ord extends txn.Ordering[ Any, Entry[ InMemory, _ ]] {
-         def compare( a: Entry[ InMemory, _ ], b: Entry[ InMemory, _ ])( implicit tx: Any ) : Int = {
-            if( a.timeVal < b.timeVal ) -1 else if( a.timeVal > b.timeVal ) 1 else 0
+      private object Ord extends txn.Ordering[ InMemory#Tx, Entry[ InMemory, _ ]] {
+         def compare( a: Entry[ InMemory, _ ], b: Entry[ InMemory, _ ])( implicit tx: InMemory#Tx ) : Int = {
+            val at = a.timeCache
+            val bt = b.timeCache
+            if( at < bt ) -1 else if( at > bt ) 1 else 0
          }
       }
 
       def apply[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ])
-                                   ( implicit tx: S#Tx ) : Entry[ S, A ] = {
+                                   ( implicit tx: S#Tx, peerType: BiType[ A ]) : Entry[ S, A ] = {
          if( time.isInstanceOf[ Expr.Const[ _, _ ]] && value.isInstanceOf[ Expr.Const[ _, _ ]]) {
-            new DummyImpl[ S, A ]( timeVal, time, value )
+            new DummyImpl[ S, A ]( timeVal, value )( peerType.longType )
          } else {
-            new FullImpl[ S, A ]( Targets[ S ], timeVal, time, value )
+            val targets       = Targets[ S ]
+            val timeCacheVar  = tx.newVar( targets.id, timeVal )
+            new FullImpl[ S, A ]( targets, timeCacheVar, time, value )
          }
       }
 
-      private sealed trait Impl[ S <: Sys[ S ], A ] extends Entry[ S, A ] {
-         protected def cookie: Int
+//      private sealed trait Impl[ S <: Sys[ S ], A ] extends Entry[ S, A ] {
+//      }
 
-         final def write( out: DataOutput ) {
-            out.writeUnsignedByte( cookie )
-            out.writeLong( e.timeVal )
-            e.time.write( out )
-            e.value.write( out )
+      private final class DummyImpl[ S <: Sys[ S ], A ]( timeVal: Long, val value: Expr[ S, A ])( implicit longType: BiType[ Long ])
+      extends Entry[ S, A ] with Dummy[ S, Change[ (Long, A) ], Entry[ S, A ]] with Constant[ S ] {
+         protected def writeData( out: DataOutput ) {
+            out.writeLong( timeVal )
+            value.write( out )
          }
-      }
-
-      private final class DummyImpl[ S <: Sys[ S ], A ]( timeVal: Long, val time: Expr[ S, Long ], val value: Expr[ S, A ])
-      extends Impl[ S, A ] with Dummy[ S, Either[ Long, A ], Entry[ S, A ]] {
-         def cookie = 0
 
          def timeCache( implicit tx: S#Tx ) : Long = timeVal
+
+         def time : Expr[ S, Long ] = longType.newConst[ S ]( timeVal )
 
          def updateTime()( implicit tx: S#Tx ) {
             sys.error( "Illegal state -- a constant region should not change its time value : " + this )
          }
+
+         def isDummy = true
       }
 
       private final class FullImpl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ], timeCacheVar: S#Var[ Long ],
                                                         val time: Expr[ S, Long ], val value: Expr[ S, A ])
-      extends Impl[ S, A ] {
-         def cookie = 1
+      extends Entry[ S, A ] with StandaloneLike[ S, Change[ (Long, A) ], Entry[ S, A ]] {
+         def timeCache( implicit tx: S#Tx ) : Long = timeCacheVar.get
+
+         protected def writeData( out: DataOutput ) {
+            targets.write( out )
+            timeCacheVar.write( out )
+            time.write( out )
+            value.write( out )
+         }
+
+         protected def disposeData()( implicit tx: S#Tx ) {
+            timeCacheVar.dispose()
+         }
+
+         private[lucre] def connect()( implicit tx: S#Tx ) {
+            time.changed  ---> this
+            value.changed ---> this
+         }
+
+         private[lucre] def disconnect()( implicit tx: S#Tx ) {
+            time.changed  -/-> this
+            value.changed -/-> this
+         }
+
+         protected def reader : Reader[ S, Entry[ S, A ]] = {
+            sys.error( "TODO" )
+         }
+
+         @inline private def change[ B ]( before: B, now: B ) : Option[ Change[ B ]] = Change( before, now ).toOption
+
+         private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Change[ (Long, A) ]] = {
+            val timeChanged   = time.changed
+            val valueChanged  = value.changed
+
+            val timeChange = if( timeChanged.isSource( pull )) {
+               timeChanged.pullUpdate( pull )
+            } else {
+               None
+            }
+            val valueChange = if( valueChanged.isSource( pull )) {
+               valueChanged.pullUpdate( pull )
+            } else {
+               None
+            }
+
+            (timeChange, valueChange) match {
+               case (Some( tch ), None) =>
+                  val vv   = value.value
+                  change( (tch.before, vv), (tch.now, vv) )
+               case (None, Some( vch )) =>
+                  val tv = timeCache
+                  change( (tv, vch.before), (tv, vch.now) )
+               case (Some( tch ), Some( vch )) =>
+                  change( (tch.before, vch.before), (tch.now, vch.now) )
+               case _ => None
+            }
+         }
 
          def updateTime()( implicit tx: S#Tx ) {
             timeCacheVar.set( time.value )
          }
+
+         def isDummy = false
       }
    }
-   private sealed trait Entry[ S <: Sys[ S ], A ] extends EventLike[ S, Either[ Long, A ], Entry[ S, A ]] with Writer {
+   private sealed trait Entry[ S <: Sys[ S ], A ] extends EventLike[ S, Change[ (Long, A) ], Entry[ S, A ]] with Writer {
       def timeCache( implicit tx: S#Tx ) : Long
       def time: Expr[ S, Long ]
       def value: Expr[ S, A ]
       def updateTime()( implicit tx: S#Tx ) : Unit
+      def isDummy: Boolean
+//      def --->( sel: Selector[ S ])( implicit tx: S#Tx ) : Unit
+//      def -/->( sel: Selector[ S ])( implicit tx: S#Tx ) : Unit
    }
 //   private final class EntryXX[ S <: Sys[ S ], A ]( val timeVal: Long, val time: Expr[ S, Long ], val value: Expr[ S, A ])
-//   extends EventImpl[ S, Either[ Long, A ], Either[ Long, A ], Entry[ S, A ]] {
+//   extends EventImpl[ S, Change[ (Long, A) ], Change[ (Long, A) ], Entry[ S, A ]] {
 //      def --->( sel: Selector[ S ])( implicit tx: S#Tx ) {
 ////println( "...........connect " + this )
 //         time.changed  ---> sel
@@ -199,25 +262,24 @@ object Bi {
       protected def reader = serializer[ S, A ]
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
-         var remove  = IIdxSeq.empty[ Entry[ S, A ]]
-         var add     = IIdxSeq.empty[ Entry[ S, A ]]
+         var dirty   = IIdxSeq.empty[ Entry[ S, A ]]
 
          ordered.iterator.foreach { e =>
-            val tNow = e.time.value
-            if( e.timeVal != tNow ) {
-               remove :+= e
-               add    :+= e.updateTime( tNow )
-            } else {
-               e ---> this
+            if( !e.isDummy ) {
+               val tNow = e.time.value
+               if( e.timeCache != tNow ) {
+                  dirty :+= e
+               } else {
+                  e ---> this
+               }
             }
          }
 
-         if( remove.nonEmpty ) {
-            remove.foreach( ordered -= _ )
-            add.foreach { e =>
-               ordered += e
-               e ---> this
-            }
+         dirty.foreach { e =>
+            ordered -= e
+            e.updateTime()
+            ordered += e
+            e ---> this
          }
       }
       private[lucre] def disconnect()( implicit tx: S#Tx ) {
@@ -238,18 +300,18 @@ object Bi {
          // XXX TODO should be an efficient method in skiplist itself
          ordered.isomorphicQuery( new Ordered[ S#Tx, Entry[ S, A ]] {
             def compare( that: Entry[ S, A ])( implicit tx: S#Tx ) = {
-               val t = that.timeVal
+               val t = that.timeCache
                if( time < t ) -1 else if( time > t ) 1 else 0
             }
          })
       }
 
-      def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] = ordered.toList.map( e => (e.timeVal, e.value.value) )
+      def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] = ordered.toList.map( e => (e.time.value, e.value.value) )
 
       def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = {
 //         val ((succ, _), cmp) = getEntry( time )._1._2
 //         if( cmp > 0 ) ???
-         ordered.toList.takeWhile( _.timeVal <= time ).last.value // XXX TODO ouch... we do need a pred method for skiplist
+         ordered.toList.takeWhile( _.timeCache <= time ).last.value // XXX TODO ouch... we do need a pred method for skiplist
       }
 
       def value( time: Long )( implicit tx: S#Tx ) : A = get( time ).value
@@ -278,7 +340,7 @@ object Bi {
          ordered.add( newEntry )
          if( con ) {
             if( con ) newEntry ---> this
-            val stop = if( cmp <= 0 ) succ.timeVal else 0x4000000000000000L  // XXX TODO should have special version of Span
+            val stop = if( cmp <= 0 ) succ.timeCache else 0x4000000000000000L  // XXX TODO should have special version of Span
             val span = Span( start, stop )
             fire( IIdxSeq( Region( span, value.value )))
          }
