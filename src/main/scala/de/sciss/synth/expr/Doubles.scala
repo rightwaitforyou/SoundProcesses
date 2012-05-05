@@ -37,8 +37,8 @@ import annotation.switch
 object Doubles extends BiTypeImpl[ Double ] {
    private val typeID = 5
 
-   protected def readValue( in: DataInput ) : Double = in.readDouble()
-   protected def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}
+   /* protected */ def readValue( in: DataInput ) : Double = in.readDouble()
+   /* protected */ def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}
 
    def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
                                 ( implicit tx: S#Tx ) : Ex[ S ] = {

@@ -31,8 +31,8 @@ import de.sciss.lucre.expr.Type
 import de.sciss.lucre.event.Targets
 
 object Booleans extends BiTypeImpl[ Boolean ] {
-   protected def readValue( in: DataInput ) : Boolean = in.readBoolean()
-   protected def writeValue( value: Boolean, out: DataOutput ) { out.writeBoolean( value )}
+   /* protected */ def readValue( in: DataInput ) : Boolean = in.readBoolean()
+   /* protected */ def writeValue( value: Boolean, out: DataOutput ) { out.writeBoolean( value )}
 
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ]) {
 

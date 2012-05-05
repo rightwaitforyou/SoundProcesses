@@ -34,8 +34,8 @@ import annotation.switch
 object Strings extends BiTypeImpl[ String ] {
    private val typeID = 8
 
-   protected def readValue( in: DataInput ) : String = in.readString()
-   protected def writeValue( value: String, out: DataOutput ) { out.writeString( value )}
+   /* protected */ def readValue( in: DataInput ) : String = in.readString()
+   /* protected */ def writeValue( value: String, out: DataOutput ) { out.writeString( value )}
 
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       private type E = Ex[ S ]

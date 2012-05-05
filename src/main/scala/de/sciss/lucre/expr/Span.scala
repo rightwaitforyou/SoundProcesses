@@ -26,6 +26,9 @@
 package de.sciss.lucre
 package expr
 
+object Span {
+   def from( start: Long ) : Span = Span( start, 0x4000000000000000L )  // XXX TODO should have special version of Span)
+}
 final case class Span( start: Long, stop: Long ) {
    def length: Long = stop - start
 

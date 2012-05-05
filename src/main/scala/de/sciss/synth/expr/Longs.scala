@@ -36,8 +36,8 @@ import annotation.switch
 object Longs extends BiTypeImpl[ Long ] {
    private val typeID = 3
 
-   protected def readValue( in: DataInput ) : Long = in.readLong()
-   protected def writeValue( value: Long, out: DataOutput ) { out.writeLong( value )}
+   /* protected */ def readValue( in: DataInput ) : Long = in.readLong()
+   /* protected */ def writeValue( value: Long, out: DataOutput ) { out.writeLong( value )}
 
    def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
                                 ( implicit tx: S#Tx ) : Ex[ S ] = {
