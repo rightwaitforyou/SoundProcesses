@@ -15,3 +15,28 @@ that would mean we create a possibly infinite chain of signification here as wel
 
 :::::::::::::::
 
+BiSource[ S <: Sys[ S ], A ] {
+   def get( implicit tx: S#Tx, time: TimeSource[ S ]) : A
+}
+
+BiSink[ S <: Sys[ S ], A ]
+   def set( value: A )( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
+}
+
+BiVar extends BiSource with BiSink
+
+that is to say, no mention of Expr in Bi's type parameter A
+
+:::::::::::::::
+
+object Bi {
+   trait Var[ S <: Sys[ S ], A ] extends Bi[ S, A ] with BiVar[ S, Expr[ S, A ]]
+}
+trait Bi[ S <: Sys[ S ], A ] {
+   def projection( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, A ]
+   def value( implicit tx: S#Tx, time:  TimeSource[ S ]) : A
+   def changed: EventLike[ S, Bi.Update[ S, A ], Bi[ S, A ]]
+}
+
+:::::::::::::::
+

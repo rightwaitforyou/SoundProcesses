@@ -38,11 +38,11 @@ trait BiType[ A ] extends Type[ A ] {
       def read( in: DataInput ) : A = readValue( in )
    }
 
-   def newCursor[ S <: Sys[ S ]]( bi: Bi[ S, A ], time: Expr[ S, Long ])( implicit tx: S#Tx ): Ex[ S ] = {
+   def newProjection[ S <: Sys[ S ]]( bi: BiExpr[ S, A ])( implicit tx: S#Tx, time: TimeSource[ S ]): Ex[ S ] = {
       val targets = Targets.partial[ S ]
-      val init    = bi.value( time.value )
+      val init    = bi.value
       val cache   = tx.newPartialVar[ A ]( targets.id, init )
-      new Cursor[ S ]( targets, cache, bi, time )
+      new Projection[ S ]( targets, cache, bi, time )
    }
 
    def longType : BiType[ Long ]
@@ -50,17 +50,17 @@ trait BiType[ A ] extends Type[ A ] {
 //   def readLongExpr[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr[ S, Long ]
 
    // assumes it was identified (cookie 3 read)
-   protected def readCursor[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                           ( implicit tx: S#Tx ) : Ex[ S ] = {
+   protected def readProjection[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
+                                               ( implicit tx: S#Tx ) : Ex[ S ] = {
 //      val bi   =
       val cache   = tx.readPartialVar[ A ]( targets.id, in )
-      val bi      = Bi.readVar[ S, A ]( in, access )( tx, this )
-      val time    = longType.readExpr( in, access )
-      new Cursor[ S ]( targets, cache, bi, time )
+      val bi      = BiExpr.readVar[ S, A ]( in, access )( tx, this )
+      val time    = TimeSource( longType.readExpr( in, access ))
+      new Projection[ S ]( targets, cache, bi, time )
    }
 
-   private final class Cursor[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
-                                               bi: Bi[ S, A ], time: Expr[ S, Long ])
+   private final class Projection[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
+                                                   bi: BiExpr[ S, A ], ts: TimeSource[ S ])
       extends Expr.Node[ S, A ] {
       def reader: event.Reader[ S, Ex[ S ]] = serializer[ S ]
 
@@ -68,26 +68,26 @@ trait BiType[ A ] extends Type[ A ] {
          out.writeUnsignedByte( 3 )
          cache.write( out )
          bi.write( out )
-         time.write( out )
+         ts.time.write( out )
       }
 
-      def value( implicit tx: S#Tx ): A = bi.get( time.value ).value
+      def value( implicit tx: S#Tx ): A = bi.value( tx, ts )
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
 //println( "CONNECT CURSOR" )
          bi.changed   ---> this
-         time.changed ---> this
+         ts.time.changed ---> this
       }
 
       private[lucre] def disconnect()( implicit tx: S#Tx ) {
 //println( "DISCONNECT CURSOR" )
          bi.changed   -/-> this
-         time.changed -/-> this
+         ts.time.changed -/-> this
       }
 
       private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ): Option[ Change[ S ]] = {
          val biChanged     = bi.changed
-         val timeChanged   = time.changed
+         val timeChanged   = ts.time.changed
 
          val biChange = if( biChanged.isSource( pull )) {
             biChanged.pullUpdate( pull )
@@ -108,7 +108,7 @@ trait BiType[ A ] extends Type[ A ] {
          // - all other cases are dropped
          val res = (biChange, timeChange) match {
             case (Some( bch ), None) =>
-               val timeVal = time.value
+               val timeVal = ts.time.value
                bch.find( _.span.contains( timeVal )).flatMap { region =>
                   val before  = cache.get
                   val now     = region.value
@@ -118,7 +118,7 @@ trait BiType[ A ] extends Type[ A ] {
             case (_, Some( tch )) =>
                val before  = cache.get
 //               val before  = bi.value( tch.before )
-               val now     = bi.value( tch.now )
+               val now     = bi.valueAt( tch.now )
 //println( "CACHE WAS " + before + " NOW (AT " + tch.now + ") IS " + now )
                cache.set( now )
                change( before, now )

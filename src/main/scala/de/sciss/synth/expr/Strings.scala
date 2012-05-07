@@ -94,7 +94,7 @@ object Strings extends BiTypeImpl[ String ] {
             new Tuple2( typeID, op, targets, _1, _2 )
 
          case 3 =>
-            readCursor[ S ]( in, access, targets )
+            readProjection[ S ]( in, access, targets )
 
          case _ => sys.error( "Invalid cookie " + cookie )
       }

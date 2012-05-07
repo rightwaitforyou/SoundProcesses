@@ -4,10 +4,10 @@ import de.sciss.confluent.Confluent
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import de.sciss.lucre.event.Change
-import de.sciss.lucre.expr.{Expr, BiType, Bi}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
 import de.sciss.lucre.stm.{Cursor, Sys}
+import de.sciss.lucre.expr.{TimeSource, Expr, BiType, BiExpr}
 
 object BiTempTest extends App {
    {
@@ -22,7 +22,7 @@ object BiTempTest extends App {
       val exprImp = new ExprImplicits[ S ]
       import exprImp._
 
-      implicit def biSer[ A ]( implicit peer: BiType[ A ]) = Bi.serializer[ S, A ]
+      implicit def biSer[ A ]( implicit peer: BiType[ A ]) = BiExpr.serializer[ S, A ]
       implicit val doubles       = Doubles
       implicit val longVarSer    = Longs.varSerializer[ S ]
       implicit val doubleVarSer  = Doubles.varSerializer[ S ]
@@ -31,7 +31,7 @@ object BiTempTest extends App {
 
       println( "__STEP__ root" )
       val access = system.root { implicit tx =>
-         val bi = Bi.newVar( 0.0 )
+         val bi = BiExpr.newVar( 0.0 )
          (bi, IIdxSeq.empty[ Expr.Var[ S, Long ]], IIdxSeq.empty[ Expr.Var[ S, Double ]])
       }
 
@@ -40,7 +40,8 @@ object BiTempTest extends App {
          val bi = access.get._1
          bi.changed.react { tup => println( "__OBSERVE__ " + tup )}
          val biCsr = Longs.newVar[ S ]( 6000 )
-         bi.at( biCsr ).changed.react {
+         implicit val ts = TimeSource( biCsr )
+         bi.projection.changed.react {
             case Change( before, now ) => println( "__CURSOR__ " + before + " -> " + now )
          }
          access.transform( a => a.copy( _2 = a._2 :+ biCsr ))
@@ -49,13 +50,13 @@ object BiTempTest extends App {
       println( "__STEP__ bi.set( 10000, 441.0 )" )
       cursor.step { implicit tx =>
          val bi = access.get._1
-         bi.set( 10000, 441.0 )
+         bi.setAt( 10000, 441.0 )
       }
 
       println( "__STEP__ bi.set( 5000, 882.0 )" )
       cursor.step { implicit tx =>
          val bi = access.get._1
-         bi.set( 5000, 882.0 )
+         bi.setAt( 5000, 882.0 )
       }
 
 //      println( ".....lookup at 7000: " + cursor.step { implicit tx =>
@@ -80,7 +81,7 @@ object BiTempTest extends App {
          val bi      = access.get._1
          val varTime = Longs.newVar[ S ]( 11000 )
          val varVal  = Doubles.newVar[ S ]( 666.0 )
-         bi.set( varTime, varVal )
+         bi.setAt( varTime, varVal )
          access.transform( a => a.copy( _2 = a._2 :+ varTime, _3 = a._3 :+ varVal ))
       }
 

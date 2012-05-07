@@ -1,8 +1,9 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.expr.TimeSource
 
 trait Transport[ S <: Sys[ S ]] {
-   def play()( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
-   def stop()( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
+   def play()( implicit time: TimeSource[ S ]) : Unit
+   def stop()( implicit time: TimeSource[ S ]) : Unit
 }

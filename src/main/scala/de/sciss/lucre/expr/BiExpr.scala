@@ -1,5 +1,5 @@
 /*
- *  Bi.scala
+ *  BiExpr.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -30,9 +30,9 @@ import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import event.{Node, Intruder, EventLikeSerializer, Change, Reader, Constant, Dummy, EventLike, Pull, Targets, Trigger, StandaloneLike, Event}
-import de.sciss.lucre.stm.{Serializer, InMemory, TxnSerializer, Writer, Sys}
+import de.sciss.lucre.stm.{Disposable, Serializer, InMemory, TxnSerializer, Writer, Sys, Var => _Var}
 
-object Bi {
+object BiExpr {
    type Update[ A ] = IIdxSeq[ Region[ A ]]
 
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
@@ -59,17 +59,17 @@ object Bi {
    }
 
    implicit def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
-      event.Reader[ S, Bi[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Bi[ S, A ]] = new Ser[ S, A ]
+      event.Reader[ S, BiExpr[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiExpr[ S, A ]] = new Ser[ S, A ]
 
    implicit def varSerializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
       event.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] = new VarSer[ S, A ]
 
    private final class Ser[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
-   extends event.Reader[ S, Bi[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Bi[ S, A ]] {
-      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Bi[ S, A ] = {
+   extends event.Reader[ S, BiExpr[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiExpr[ S, A ]] {
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : BiExpr[ S, A ] = {
          read( in, access, Targets.read[ S ]( in, access ))
       }
-      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Bi[ S, A ] = {
+      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : BiExpr[ S, A ] = {
          val ordered = {
             implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
             implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
@@ -77,7 +77,7 @@ object Bi {
          }
          new Impl[ S, A ]( targets, ordered )
       }
-      def write( v: Bi[ S, A ], out: DataOutput ) { v.write( out )}
+      def write( v: BiExpr[ S, A ], out: DataOutput ) { v.write( out )}
    }
 
    private final class VarSer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
@@ -96,8 +96,21 @@ object Bi {
       def write( v: Var[ S, A ], out: DataOutput ) { v.write( out )}
    }
 
-   trait Var[ S <: Sys[ S ], A ] extends Bi[ S, A ] {
-      def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
+//   trait Source[ S <: Sys[ S ], +A ] extends Writer with Disposable[ S#Tx ] {
+//      def get( implicit time: TimeSource[ S ]) : Expr[ S, A ]
+//   }
+//
+//   sealed trait Sink[ S <: Sys[ S ], -A ] {
+//      def set( value: Expr[ S, A ])( implicit time: TimeSource[ S ]) : Unit
+//   }
+
+   trait Var[ S <: Sys[ S ], A ] extends BiExpr[ S, A ] /* with Source[ S, A ] with Sink[ S, A ] */ {
+//      def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
+//      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
+      def get( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, A ]
+      def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
+      def set( value: Expr[ S, A ])( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
+      def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
    }
 
    private object Entry {
@@ -269,8 +282,8 @@ object Bi {
                                                  ordered: SkipList[ S, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
    extends Var[ S, A ]
-   with Trigger.Impl[ S, Update[ A ], Update[ A ], Bi[ S, A ]]
-   with StandaloneLike[ S, Update[ A ], Bi[ S, A ]] {
+   with Trigger.Impl[ S, Update[ A ], Update[ A ], BiExpr[ S, A ]]
+   with StandaloneLike[ S, Update[ A ], BiExpr[ S, A ]] {
       protected def reader = serializer[ S, A ]
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
@@ -353,25 +366,13 @@ object Bi {
          ordered.toList.takeWhile( _.timeCache <= time ).last // XXX TODO ouch... we do need a pred method for skiplist
       }
 
-      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = getLeq( time ).value
+      def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = getLeq( time ).value
+      def get( implicit tx: S#Tx, ts: TimeSource[ S ]) : Expr[ S, A ] = getAt( ts.time.value )
 
-      def value( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).value.value
+      def valueAt( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).value.value
+      def value( implicit tx: S#Tx, ts: TimeSource[ S ]) : A = valueAt( ts.time.value )
 
-      private def valueCache( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).valueCache
-
-      protected def writeData( out: DataOutput ) {
-         ordered.write( out )
-      }
-
-      protected def disposeData()( implicit tx: S#Tx ) {
-         ordered.dispose()
-      }
-
-      def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ] = peerType.newCursor[ S ]( this, time )
-
-      def changed : Event[ S, Update[ A ], Bi[ S, A ]] = this
-
-      def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
+      def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
          val start         = time.value
          val (succ, cmp)   = getGeq( start + 1 )
 //println( "set " + tv + " -> succ = " + succ + ", cmp = " + cmp )
@@ -387,13 +388,30 @@ object Bi {
             fire( IIdxSeq( Region( span, value.value )))
          }
       }
+      def set( value: Expr[ S, A ])( implicit tx: S#Tx, ts: TimeSource[ S ]) { setAt( ts.time, value )}
+
+      private def valueCache( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).valueCache
+
+      protected def writeData( out: DataOutput ) {
+         ordered.write( out )
+      }
+
+      protected def disposeData()( implicit tx: S#Tx ) {
+         ordered.dispose()
+      }
+
+      def projection( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, A ] =
+         peerType.newProjection[ S ]( this )
+
+      def changed : Event[ S, Update[ A ], BiExpr[ S, A ]] = this
    }
 }
-sealed trait Bi[ S <: Sys[ S ], A ] extends Writer {
-   def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
-   def value( time: Long )( implicit tx: S#Tx ) : A
-   def at( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ]
-   def changed : Event[ S, Bi.Update[ A ], Bi[ S, A ]]
+sealed trait BiExpr[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, TimeSource[ S ], Expr[ S, A ]] with */ Writer {
+   def value( implicit tx: S#Tx, time: TimeSource[ S ]) : A
+   def valueAt( time: Long )( implicit tx: S#Tx ) : A
+   def projection( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, A ]
+
+   def changed : Event[ S, BiExpr.Update[ A ], BiExpr[ S, A ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (Long, A)]
 }
