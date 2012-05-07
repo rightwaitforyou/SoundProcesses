@@ -27,8 +27,227 @@ package de.sciss.lucre
 package expr
 
 object Span {
-   def from( start: Long ) = SpanFrom( start )
-   def until( stop: Long ) = SpanUntil( stop )
+   def from( start: Long ) : From                     = From( start )
+   def until( stop: Long ) : Until                    = Until( stop )
+   def apply( start: Long, stop: Long ) : Span        = Apply( start ,stop )
+   def unapply( span: Span ) : Option[ (Long, Long) ] = Some( (span.start, span.stop) )
+
+   sealed trait Open extends SpanLike {
+      final def isEmpty    = false
+      final def nonEmpty   = true
+   
+      def shift( delta: Long ) : Open
+      def union( that: SpanLike ) : Open
+   }
+   case object All extends Open {
+      def shift( delta: Long ) : Open = this
+      def union( that: SpanLike ) : Open = this
+      def intersect( that: SpanLike ) : SpanLike = that
+      def clip( pos: Long ) : Long = pos
+   
+      def contains( pos: Long )        = true
+      def contains( that: SpanLike )   = true
+      def overlaps( that: SpanLike )   = true
+      def touches( that: SpanLike )    = true
+   }
+   final case class From( start: Long ) extends Open {
+      def clip( pos: Long ) : Long = math.max( start, pos )
+      def shift( delta: Long ) : Open = From( start + delta )
+   
+      def contains( pos: Long ) : Boolean = pos >= start
+   
+      def contains( that: SpanLike ) : Boolean = that match {
+         case From( thatStart )     => thatStart >= start
+         case Span( thatStart, _ )  => thatStart >= start
+         case _                     => false
+      }
+   
+      def overlaps( that: SpanLike ) : Boolean = that match {
+         case From( _ )             => true
+         case Until( thatStop )     => start < thatStop
+         case Span( _, thatStop )   => start < thatStop
+         case Void                  => false
+         case All                   => true
+      }
+   
+      def touches( that: SpanLike ) : Boolean = that match {
+         case From( _ )             => true
+         case Until( thatStop )     => start <= thatStop
+         case Span( _, thatStop )   => start <= thatStop
+         case Void                  => false
+         case All                   => true
+      }
+   
+      def union( that: SpanLike ) : Open = that match {
+         case From( thatStart )     => From( math.min( start, thatStart ))
+         case Span( thatStart, _ )  => From( math.min( start, thatStart ))
+         case Void                  => this
+         case _                     => All
+      }
+   
+      def intersect( that: SpanLike ) : SpanLike = that match {
+         case From( thatStart ) => From( math.max( start, thatStart ))
+         case Until( thatStop ) => if( start <= thatStop ) Span( start, thatStop ) else Void
+         case Span( thatStart, thatStop ) =>
+            val maxStart = math.max( start, thatStart )
+            if( maxStart <= thatStop ) Span( maxStart, thatStop ) else Void
+         case Void  => Void
+         case All   => this
+      }
+   }
+   final case class Until( stop: Long ) extends Open {
+      def clip( pos: Long ) : Long = math.min( stop, pos )
+      def shift( delta: Long ) : Open = Until( stop + delta )
+   
+      def contains( pos: Long ) : Boolean = pos < stop
+   
+      def contains( that: SpanLike ) : Boolean = that match {
+         case Until( thatStop )     => thatStop <= stop
+         case Span( _, thatStop )   => thatStop <= stop
+         case _                     => false
+      }
+   
+      def overlaps( that: SpanLike ) : Boolean = that match {
+         case Until( _ )            => true
+         case From( thatStart )     => thatStart < stop
+         case Span( thatStart, _ )  => thatStart < stop
+         case Void                  => false
+         case All                   => true
+      }
+   
+      def touches( that: SpanLike ) : Boolean = that match {
+         case Until( _ )            => true
+         case From( thatStart )     => thatStart <= stop
+         case Span( thatStart, _ )  => thatStart <= stop
+         case Void                  => false
+         case All                   => true
+      }
+   
+      def union( that: SpanLike ) : Open = that match {
+         case Until( thatStop )     => Until( math.max( stop, thatStop ))
+         case Span( _, thatStop )   => Until( math.max( stop, thatStop ))
+         case Void                  => this
+         case _                     => All
+      }
+   
+      def intersect( that: SpanLike ) : SpanLike = that match {
+         case From( thatStart ) => if( thatStart <= stop ) Span( thatStart, stop ) else Void
+         case Until( thatStop ) => Until( math.min( stop, thatStop ))
+         case Span( thatStart, thatStop ) =>
+            val minStop = math.min( stop, thatStop )
+            if( thatStart <= minStop ) Span( thatStart, minStop ) else Void
+         case Void  => Void
+         case All   => this
+      }
+   }
+   sealed trait Closed extends SpanLike {
+      def length: Long
+   
+      def shift( delta: Long ) : Closed
+      def intersect( that: SpanLike ) : Closed
+   }
+   case object Void extends Closed {
+      val length = 0L
+   
+      def shift( delta: Long ) : Closed = this
+      def union( that: SpanLike ) : SpanLike = that
+      def intersect( that: SpanLike ) : Closed = this
+      def clip( pos: Long ) : Long = pos
+   
+      def contains( pos: Long )        = false
+      def contains( that: SpanLike )   = false
+      def overlaps( that: SpanLike )   = false
+      def touches( that: SpanLike )    = false
+   
+      val isEmpty    = true
+      val nonEmpty   = false
+   }
+
+   private final case class Apply( start: Long, stop: Long ) extends Span {
+      require( start <= stop, "A span's start (" + start + ") must be <= its stop (" + stop + ")" )
+
+      override def toString = "Span(" + start + "," + stop + ")"
+
+      def length: Long = stop - start
+
+      def contains( pos: Long ) : Boolean = pos >= start && pos < stop
+
+      def shift( delta: Long ) : Span.Closed = Span( start + delta, stop + delta )
+
+      def clip( pos: Long ) : Long = math.max( start, math.min( stop, pos ))
+
+      def isEmpty : Boolean = start == stop
+
+      def nonEmpty : Boolean = start != stop
+
+      def contains( that: SpanLike ) : Boolean = that match {
+         case Span( thatStart, thatStop ) => (thatStart >= start) && (thatStop <= stop)
+         case _ => false
+      }
+
+      def union( that: SpanLike ) : SpanLike = that match {
+         case Span.From(  thatStart )     => Span.From( math.min( start, thatStart ))
+         case Span.Until( thatStop )      => Span.Until( math.max( stop, thatStop ))
+         case Span( thatStart, thatStop ) => Span( math.min( start, thatStart ), math.max( stop, thatStop ))
+         case Span.Void                   => this
+         case Span.All                    => Span.All
+      }
+
+      def intersect( that: SpanLike ) : Span.Closed = that match {
+         case Span.From( thatStart ) =>
+            val maxStart   = math.max( start, thatStart )
+            if( maxStart <= stop ) Span( maxStart, stop ) else Span.Void
+         case Span.Until( thatStop ) =>
+            val minStop    = math.min( stop, thatStop )
+            if( start <= minStop ) Span( start, minStop ) else Span.Void
+         case Span( thatStart, thatStop ) =>
+            val maxStart   = math.max( start, thatStart )
+            val minStop    = math.min( stop, thatStop )
+            if( maxStart <= minStop ) Span( maxStart, minStop ) else Span.Void
+         case Span.Void  => Span.Void
+         case Span.All   => this
+      }
+
+      def overlaps( that: SpanLike ) : Boolean = that match {
+         case Span.From( thatStart ) =>
+            val maxStart = math.max( start, thatStart )
+            maxStart < stop
+         case Span.Until( thatStop ) =>
+            val minStop = math.min( stop, thatStop )
+            start < minStop
+         case Span( thatStart, thatStop ) =>
+            val maxStart   = math.max( start, thatStart )
+            val minStop    = math.min( stop, thatStop )
+            maxStart < minStop
+         case Span.Void  => false
+         case Span.All   => true
+      }
+
+      def touches( that: SpanLike ) : Boolean = that match {
+         case Span.From( thatStart ) =>
+            val maxStart = math.max( start, thatStart )
+            maxStart <= stop
+         case Span.Until( thatStop ) =>
+            val minStop = math.min( stop, thatStop )
+            start <= minStop
+         case Span( thatStart, thatStop ) =>
+            val maxStart   = math.max( start, thatStart )
+            val minStop    = math.min( stop, thatStop )
+            maxStart <= minStop
+         case Span.Void  => false
+         case Span.All   => true
+      }
+
+   //   // where overlapping results in negative spacing
+   //   def spacing( b: Span ) : Long = {
+   //      val bStart = b.start
+   //      if( start < bStart ) {
+   //         bStart - stop
+   //      } else {
+   //         start - b.stop
+   //      }
+   //   }
+   }
 }
 sealed trait SpanLike {
    def clip( pos: Long ) : Long
@@ -79,216 +298,7 @@ sealed trait SpanLike {
    def union( that: SpanLike ) : SpanLike
    def intersect( that: SpanLike ) : SpanLike
 }
-sealed trait OpenSpan extends SpanLike {
-   final def isEmpty    = false
-   final def nonEmpty   = true
-
-   def shift( delta: Long ) : OpenSpan
-   def union( that: SpanLike ) : OpenSpan
-}
-case object AllSpan extends OpenSpan {
-   def shift( delta: Long ) : OpenSpan = this
-   def union( that: SpanLike ) : OpenSpan = this
-   def intersect( that: SpanLike ) : SpanLike = that
-   def clip( pos: Long ) : Long = pos
-
-   def contains( pos: Long )        = true
-   def contains( that: SpanLike )   = true
-   def overlaps( that: SpanLike )   = true
-   def touches( that: SpanLike )    = true
-}
-final case class SpanFrom( start: Long ) extends OpenSpan {
-   def clip( pos: Long ) : Long = math.max( start, pos )
-   def shift( delta: Long ) : OpenSpan = SpanFrom( start + delta )
-
-   def contains( pos: Long ) : Boolean = pos >= start
-
-   def contains( that: SpanLike ) : Boolean = that match {
-      case SpanFrom( thatStart ) => thatStart >= start
-      case Span( thatStart, _ )  => thatStart >= start
-      case _                     => false
-   }
-
-   def overlaps( that: SpanLike ) : Boolean = that match {
-      case SpanFrom( _ )         => true
-      case SpanUntil( thatStop ) => start < thatStop
-      case Span( _, thatStop )   => start < thatStop
-      case VoidSpan              => false
-      case AllSpan               => true
-   }
-
-   def touches( that: SpanLike ) : Boolean = that match {
-      case SpanFrom( _ )         => true
-      case SpanUntil( thatStop ) => start <= thatStop
-      case Span( _, thatStop )   => start <= thatStop
-      case VoidSpan              => false
-      case AllSpan               => true
-   }
-
-   def union( that: SpanLike ) : OpenSpan = that match {
-      case SpanFrom( thatStart ) => SpanFrom( math.min( start, thatStart ))
-      case Span( thatStart, _ )  => SpanFrom( math.min( start, thatStart ))
-      case VoidSpan              => this
-      case _                     => AllSpan
-   }
-
-   def intersect( that: SpanLike ) : SpanLike = that match {
-      case SpanFrom( thatStart ) => SpanFrom( math.max( start, thatStart ))
-      case SpanUntil( thatStop ) => if( start <= thatStop ) Span( start, thatStop ) else VoidSpan
-      case Span( thatStart, thatStop ) =>
-         val maxStart = math.max( start, thatStart )
-         if( maxStart <= thatStop ) Span( maxStart, thatStop ) else VoidSpan
-      case VoidSpan  => VoidSpan
-      case AllSpan   => this
-   }
-}
-final case class SpanUntil( stop: Long ) extends OpenSpan {
-   def clip( pos: Long ) : Long = math.min( stop, pos )
-   def shift( delta: Long ) : OpenSpan = SpanUntil( stop + delta )
-
-   def contains( pos: Long ) : Boolean = pos < stop
-
-   def contains( that: SpanLike ) : Boolean = that match {
-      case SpanUntil( thatStop ) => thatStop <= stop
-      case Span( _, thatStop )   => thatStop <= stop
-      case _                     => false
-   }
-
-   def overlaps( that: SpanLike ) : Boolean = that match {
-      case SpanUntil( _ )        => true
-      case SpanFrom( thatStart ) => thatStart < stop
-      case Span( thatStart, _ )  => thatStart < stop
-      case VoidSpan              => false
-      case AllSpan               => true
-   }
-
-   def touches( that: SpanLike ) : Boolean = that match {
-      case SpanUntil( _ )        => true
-      case SpanFrom( thatStart ) => thatStart <= stop
-      case Span( thatStart, _ )  => thatStart <= stop
-      case VoidSpan              => false
-      case AllSpan               => true
-   }
-
-   def union( that: SpanLike ) : OpenSpan = that match {
-      case SpanUntil( thatStop ) => SpanUntil( math.max( stop, thatStop ))
-      case Span( _, thatStop )   => SpanUntil( math.max( stop, thatStop ))
-      case VoidSpan              => this
-      case _                     => AllSpan
-   }
-
-   def intersect( that: SpanLike ) : SpanLike = that match {
-      case SpanFrom( thatStart ) => if( thatStart <= stop ) Span( thatStart, stop ) else VoidSpan
-      case SpanUntil( thatStop ) => SpanUntil( math.min( stop, thatStop ))
-      case Span( thatStart, thatStop ) =>
-         val minStop = math.min( stop, thatStop )
-         if( thatStart <= minStop ) Span( thatStart, minStop ) else VoidSpan
-      case VoidSpan  => VoidSpan
-      case AllSpan   => this
-   }
-}
-sealed trait ClosedSpan extends SpanLike {
-   def length: Long
-
-   def shift( delta: Long ) : ClosedSpan
-   def intersect( that: SpanLike ) : ClosedSpan
-}
-case object VoidSpan extends ClosedSpan {
-   val length = 0L
-
-   def shift( delta: Long ) : ClosedSpan = this
-   def union( that: SpanLike ) : SpanLike = that
-   def intersect( that: SpanLike ) : ClosedSpan = this
-   def clip( pos: Long ) : Long = pos
-
-   def contains( pos: Long )        = false
-   def contains( that: SpanLike )   = false
-   def overlaps( that: SpanLike )   = false
-   def touches( that: SpanLike )    = false
-
-   val isEmpty    = true
-   val nonEmpty   = false
-}
-final case class Span( start: Long, stop: Long ) extends ClosedSpan {
-   require( start <= stop, "A span's start (" + start + ") must be <= its stop (" + stop + ")" )
-
-   def length: Long = stop - start
-
-   def contains( pos: Long ) : Boolean = pos >= start && pos < stop
-
-   def shift( delta: Long ) : ClosedSpan = Span( start + delta, stop + delta )
-
-   def clip( pos: Long ) : Long = math.max( start, math.min( stop, pos ))
-
-   def isEmpty : Boolean = start == stop
-
-   def nonEmpty : Boolean = start != stop
-
-   def contains( that: SpanLike ) : Boolean = that match {
-      case Span( thatStart, thatStop ) => (thatStart >= start) && (thatStop <= stop)
-      case _ => false
-   }
-
-   def union( that: SpanLike ) : SpanLike = that match {
-      case SpanFrom(  thatStart )      => SpanFrom( math.min( start, thatStart ))
-      case SpanUntil( thatStop )       => SpanUntil( math.max( stop, thatStop ))
-      case Span( thatStart, thatStop ) => Span( math.min( start, thatStart ), math.max( stop, thatStop ))
-      case VoidSpan                    => this
-      case AllSpan                     => AllSpan
-   }
-
-   def intersect( that: SpanLike ) : ClosedSpan = that match {
-      case SpanFrom( thatStart ) =>
-         val maxStart   = math.max( start, thatStart )
-         if( maxStart <= stop ) Span( maxStart, stop ) else VoidSpan
-      case SpanUntil( thatStop ) =>
-         val minStop    = math.min( stop, thatStop )
-         if( start <= minStop ) Span( start, minStop ) else VoidSpan
-      case Span( thatStart, thatStop ) =>
-         val maxStart   = math.max( start, thatStart )
-         val minStop    = math.min( stop, thatStop )
-         if( maxStart <= minStop ) Span( maxStart, minStop ) else VoidSpan
-      case VoidSpan  => VoidSpan
-      case AllSpan   => this
-   }
-
-   def overlaps( that: SpanLike ) : Boolean = that match {
-      case SpanFrom( thatStart ) =>
-         val maxStart = math.max( start, thatStart )
-         maxStart < stop
-      case SpanUntil( thatStop ) =>
-         val minStop = math.min( stop, thatStop )
-         start < minStop
-      case Span( thatStart, thatStop ) =>
-         val maxStart   = math.max( start, thatStart )
-         val minStop    = math.min( stop, thatStop )
-         maxStart < minStop
-      case VoidSpan  => false
-      case AllSpan   => true
-   }
-
-   def touches( that: SpanLike ) : Boolean = that match {
-      case SpanFrom( thatStart ) =>
-         val maxStart = math.max( start, thatStart )
-         maxStart <= stop
-      case SpanUntil( thatStop ) =>
-         val minStop = math.min( stop, thatStop )
-         start <= minStop
-      case Span( thatStart, thatStop ) =>
-         val maxStart   = math.max( start, thatStart )
-         val minStop    = math.min( stop, thatStop )
-         maxStart <= minStop
-      case VoidSpan  => false
-      case AllSpan   => true
-   }
-
-//   // where overlapping results in negative spacing
-//   def spacing( b: Span ) : Long = {
-//      val bStart = b.start
-//      if( start < bStart ) {
-//         bStart - stop
-//      } else {
-//         start - b.stop
-//      }
-//   }
+sealed trait Span extends Span.Closed {
+   def start: Long
+   def stop: Long
 }
