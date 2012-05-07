@@ -30,7 +30,7 @@ import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import event.{Node, Intruder, EventLikeSerializer, Change, Reader, Constant, Dummy, EventLike, Pull, Targets, Trigger, StandaloneLike, Event}
-import de.sciss.lucre.stm.{Disposable, Serializer, InMemory, TxnSerializer, Writer, Sys, Var => _Var}
+import de.sciss.lucre.stm.{Disposable, Serializer, InMemory, TxnSerializer, Writer, Sys}
 
 object BiExpr {
    type Update[ A ] = IIdxSeq[ Region[ A ]]
@@ -38,6 +38,17 @@ object BiExpr {
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
                                                         peerType: BiType[ A ]) : Var[ S, A ] = {
       val targets = Targets.partial[ S ]
+      newVar( targets, init )
+   }
+
+   def newConfluentVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
+                                                                 peerType: BiType[ A ]) : Var[ S, A ] = {
+      val targets = Targets[ S ]
+      newVar( targets, init )
+   }
+
+   private def newVar[ S <: Sys[ S ], A ]( targets: Targets[ S ], init: Expr[ S, A ])( implicit tx: S#Tx,
+                                                        peerType: BiType[ A ]) : Var[ S, A ] = {
       val ordered = {
          implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
          implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
@@ -104,7 +115,7 @@ object BiExpr {
 //      def set( value: Expr[ S, A ])( implicit time: Chronos[ S ]) : Unit
 //   }
 
-   trait Var[ S <: Sys[ S ], A ] extends BiExpr[ S, A ] /* with Source[ S, A ] with Sink[ S, A ] */ {
+   trait Var[ S <: Sys[ S ], A ] extends BiExpr[ S, A ] with Disposable[ S#Tx ] /* with Source[ S, A ] with Sink[ S, A ] */ {
 //      def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
 //      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
       def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]

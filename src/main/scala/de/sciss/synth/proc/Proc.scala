@@ -26,7 +26,6 @@
 package de.sciss.synth.proc
 
 import de.sciss.synth.SynthGraph
-import impl.ProcImpl
 import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{event => evt, DataInput}
 import de.sciss.lucre.expr.{Chronos, Expr}
@@ -34,11 +33,11 @@ import de.sciss.lucre.expr.{Chronos, Expr}
 object Proc {
    // ---- implementation forwards ----
 
-   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl[ S ]()
+   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = sys.error( "TODO" ) // impl.ProcImpl[ S ]()
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ProcImpl.read( in, access )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = sys.error( "TODO" ) // impl.ProcImpl.read( in, access )
 
-   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = ProcImpl.serializer[ S ]
+   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = sys.error( "TODO" ) // impl.ProcImpl.serializer[ S ]
 
    // ---- event types ----
 
