@@ -48,9 +48,7 @@ object Proc {
    final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends Update[ S ]
    final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends Update[ S ]
    final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: evt.Change[ Boolean ])    extends Update[ S ]
-//   final case class Started[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
    final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: evt.Change[ Double ])     extends Update[ S ]
-//   final case class Stopped[ S <: Sys[ S ]](        proc: Proc[ S ])                               extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
@@ -65,28 +63,28 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def name_=( expr: Expr[ S, String ])( implicit tx: S#Tx ) : Unit
 
    def graph( implicit tx: S#Tx ) : SynthGraph
-   def graph_=( g: SynthGraph )( implicit tx: S#Tx ) : Unit
-   def graph_=( block: => Any )( implicit tx: S#Tx ) : Unit
+   def graph_=( g: SynthGraph )( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
+   def graph_=( block: => Any )( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
 
 // OOO
 //   def playing_# : Expr.Var[ S, Boolean ]
-   def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
-   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
+   def playing( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, Boolean ]
+   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
 
    // ---- controls preview demo ----
 
 //   def freq_# : Expr.Var[ S, Double ]
-   def freq( implicit tx: S#Tx ) : Expr[ S, Double ]
-   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) : Unit
+   def freq( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, Double ]
+   def freq_=( f: Expr[ S, Double ], time: TimeSource[ S ])( implicit tx: S#Tx ) : Unit
 
    /**
     * Same as `playing = true`
     */
-   def play()( implicit tx: S#Tx ) : Unit
+   def play()( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
    /**
     * Same as `playing = false`
     */
-   def stop()( implicit tx: S#Tx ) : Unit
+   def stop()( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
 
    // ---- events ----
 

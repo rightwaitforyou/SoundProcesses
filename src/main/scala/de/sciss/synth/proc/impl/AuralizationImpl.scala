@@ -160,7 +160,7 @@ object AuralizationImpl {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx ) {
          val aural = AuralProc( server, p.name.value, p.graph, p.freq.value )
          viewMap.put( p.id, aural )
-        val playing = p.playing.value
+         val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )
          if( playing ) {
             implicit val ptx = ProcTxn()( tx.peer )

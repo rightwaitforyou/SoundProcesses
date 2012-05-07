@@ -1,0 +1,17 @@
+:::::::::::::::
+
+proc
+   freq
+
+proc in time
+   freq -> bi
+
+:::::::::::::::
+
+transport
+   play( implicit source: TimeSource )
+
+that would mean we create a possibly infinite chain of signification here as well! that means there is a re-entry of p time
+
+:::::::::::::::
+
