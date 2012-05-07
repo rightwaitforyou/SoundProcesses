@@ -29,7 +29,7 @@ import de.sciss.collection.txn
 import txn.{SkipList, Ordered, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import event.{Node, Intruder, EventLikeSerializer, Change, Reader, Constant, Dummy, EventLike, EventImpl, Selector, Pull, Targets, Trigger, StandaloneLike, Event}
+import event.{Node, Intruder, EventLikeSerializer, Change, Reader, Constant, Dummy, EventLike, Pull, Targets, Trigger, StandaloneLike, Event}
 import de.sciss.lucre.stm.{Serializer, InMemory, TxnSerializer, Writer, Sys}
 
 object Bi {
@@ -263,7 +263,7 @@ object Bi {
       def isDummy: Boolean
    }
 
-   final case class Region[ A ]( span: Span, value: A )
+   final case class Region[ A ]( span: SpanLike, value: A )
 
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ],
                                                  ordered: SkipList[ S, Entry[ S, A ]])
