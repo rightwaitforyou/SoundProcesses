@@ -40,3 +40,4 @@ trait Bi[ S <: Sys[ S ], A ] {
 
 :::::::::::::::
 
+valueSpan( time: Long ) : (Long, A)
