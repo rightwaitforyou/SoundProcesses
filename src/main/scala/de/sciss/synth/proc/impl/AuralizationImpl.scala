@@ -30,6 +30,7 @@ import de.sciss.lucre.stm.{IdentifierMap, Sys, InMemory, Cursor}
 import de.sciss.osc.Dump
 import de.sciss.lucre.event.Change
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
+import de.sciss.lucre.expr.Chronos
 
 //import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
@@ -39,7 +40,7 @@ object AuralizationImpl {
    var dumpOSC = true
 
    def run[ S <: Sys[ S ], A ]( group: S#Entry[ A ], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ], groupView: A => ProcGroup[ S ]) : Auralization[ S ] = {
+                          ( implicit cursor: Cursor[ S ], chr: Chronos[ S ], groupView: A => ProcGroup[ S ]) : Auralization[ S ] = {
       val boot = new Boot( group, config, cursor, groupView )
       Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
          def run() { boot.shutDown() }
@@ -79,7 +80,8 @@ object AuralizationImpl {
 //   }
 
    private final class Boot[ S <: Sys[ S ], A ]( groupA: S#Entry[ A ], config: Server.Config,
-                                             cursor: Cursor[ S ], groupView: A => ProcGroup[ S ])
+                                                 cursor: Cursor[ S ], groupView: A => ProcGroup[ S ])
+                                               ( implicit chr: Chronos[ S ])
    extends Auralization[ S ] {
 
 //      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
@@ -156,7 +158,8 @@ object AuralizationImpl {
       }
    }
 
-   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
+   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ])
+                                             ( implicit chr: Chronos[ S ]) {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx ) {
          val aural = AuralProc( server, p.name.value, p.graph, p.freq.value )
          viewMap.put( p.id, aural )
