@@ -97,19 +97,19 @@ object BiExpr {
    }
 
 //   trait Source[ S <: Sys[ S ], +A ] extends Writer with Disposable[ S#Tx ] {
-//      def get( implicit time: TimeSource[ S ]) : Expr[ S, A ]
+//      def get( implicit time: Chronos[ S ]) : Expr[ S, A ]
 //   }
 //
 //   sealed trait Sink[ S <: Sys[ S ], -A ] {
-//      def set( value: Expr[ S, A ])( implicit time: TimeSource[ S ]) : Unit
+//      def set( value: Expr[ S, A ])( implicit time: Chronos[ S ]) : Unit
 //   }
 
    trait Var[ S <: Sys[ S ], A ] extends BiExpr[ S, A ] /* with Source[ S, A ] with Sink[ S, A ] */ {
 //      def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
 //      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
-      def get( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, A ]
+      def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
       def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
-      def set( value: Expr[ S, A ])( implicit tx: S#Tx, time: TimeSource[ S ]) : Unit
+      def set( value: Expr[ S, A ])( implicit tx: S#Tx, time: Chronos[ S ]) : Unit
       def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
    }
 
@@ -367,10 +367,10 @@ object BiExpr {
       }
 
       def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = getLeq( time ).value
-      def get( implicit tx: S#Tx, ts: TimeSource[ S ]) : Expr[ S, A ] = getAt( ts.time.value )
+      def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time.value )
 
       def valueAt( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).value.value
-      def value( implicit tx: S#Tx, ts: TimeSource[ S ]) : A = valueAt( ts.time.value )
+      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A = valueAt( chr.time.value )
 
       def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
          val start         = time.value
@@ -388,7 +388,7 @@ object BiExpr {
             fire( IIdxSeq( Region( span, value.value )))
          }
       }
-      def set( value: Expr[ S, A ])( implicit tx: S#Tx, ts: TimeSource[ S ]) { setAt( ts.time, value )}
+      def set( value: Expr[ S, A ])( implicit tx: S#Tx, chr: Chronos[ S ]) { setAt( chr.time, value )}
 
       private def valueCache( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).valueCache
 
@@ -400,16 +400,16 @@ object BiExpr {
          ordered.dispose()
       }
 
-      def projection( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, A ] =
+      def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ] =
          peerType.newProjection[ S ]( this )
 
       def changed : Event[ S, Update[ A ], BiExpr[ S, A ]] = this
    }
 }
-sealed trait BiExpr[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, TimeSource[ S ], Expr[ S, A ]] with */ Writer {
-   def value( implicit tx: S#Tx, time: TimeSource[ S ]) : A
+sealed trait BiExpr[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, Chronos[ S ], Expr[ S, A ]] with */ Writer {
+   def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
    def valueAt( time: Long )( implicit tx: S#Tx ) : A
-   def projection( implicit tx: S#Tx, time: TimeSource[ S ]) : Expr[ S, A ]
+   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
    def changed : Event[ S, BiExpr.Update[ A ], BiExpr[ S, A ]]
 

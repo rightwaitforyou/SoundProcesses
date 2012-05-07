@@ -25,11 +25,11 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.Expr
 import de.sciss.synth.SynthGraph
 import impl.ProcImpl
 import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{event => evt, DataInput}
+import de.sciss.lucre.expr.{Chronos, Expr}
 
 object Proc {
    // ---- implementation forwards ----
@@ -68,23 +68,23 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
 // OOO
 //   def playing_# : Expr.Var[ S, Boolean ]
-   def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
-   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
+   def playing( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Boolean ]
+   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
    // ---- controls preview demo ----
 
 //   def freq_# : Expr.Var[ S, Double ]
-   def freq( implicit tx: S#Tx ) : Expr[ S, Double ]
-   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx ) : Unit
+   def freq( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Double ]
+   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
    /**
     * Same as `playing = true`
     */
-   def play()( implicit tx: S#Tx ) : Unit
+   def play()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
    /**
     * Same as `playing = false`
     */
-   def stop()( implicit tx: S#Tx ) : Unit
+   def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
    // ---- events ----
 

@@ -7,7 +7,7 @@ import de.sciss.lucre.event.Change
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
 import de.sciss.lucre.stm.{Cursor, Sys}
-import de.sciss.lucre.expr.{TimeSource, Expr, BiType, BiExpr}
+import de.sciss.lucre.expr.{Chronos, Expr, BiType, BiExpr}
 
 object BiTempTest extends App {
    {

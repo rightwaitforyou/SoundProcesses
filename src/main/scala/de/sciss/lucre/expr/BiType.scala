@@ -38,7 +38,7 @@ trait BiType[ A ] extends Type[ A ] {
       def read( in: DataInput ) : A = readValue( in )
    }
 
-   def newProjection[ S <: Sys[ S ]]( bi: BiExpr[ S, A ])( implicit tx: S#Tx, time: TimeSource[ S ]): Ex[ S ] = {
+   def newProjection[ S <: Sys[ S ]]( bi: BiExpr[ S, A ])( implicit tx: S#Tx, time: Chronos[ S ]): Ex[ S ] = {
       val targets = Targets.partial[ S ]
       val init    = bi.value
       val cache   = tx.newPartialVar[ A ]( targets.id, init )
@@ -55,12 +55,12 @@ trait BiType[ A ] extends Type[ A ] {
 //      val bi   =
       val cache   = tx.readPartialVar[ A ]( targets.id, in )
       val bi      = BiExpr.readVar[ S, A ]( in, access )( tx, this )
-      val time    = TimeSource( longType.readExpr( in, access ))
+      val time    = Chronos( longType.readExpr( in, access ))
       new Projection[ S ]( targets, cache, bi, time )
    }
 
    private final class Projection[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
-                                                   bi: BiExpr[ S, A ], ts: TimeSource[ S ])
+                                                   bi: BiExpr[ S, A ], ts: Chronos[ S ])
       extends Expr.Node[ S, A ] {
       def reader: event.Reader[ S, Ex[ S ]] = serializer[ S ]
 
