@@ -1,5 +1,5 @@
 /*
- *  Auralization.scala
+ *  AuralPresentation.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -26,15 +26,15 @@
 package de.sciss.synth.proc
 
 import de.sciss.synth.Server
-import impl.AuralizationImpl
+import impl.AuralPresentationImpl
 import de.sciss.lucre.stm.{Cursor, Sys}
 import de.sciss.lucre.expr.Chronos
 
-object Auralization {
+object AuralPresentation {
    // ---- implementation forwards ----
 
    def run[ S <: Sys[ S ], A ]( group: S#Entry[ A ], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ], chr: Chronos[ S ], groupView: A => ProcGroup[ S ]) : Auralization[ S ] =
-      AuralizationImpl.run( group, config )
+                          ( implicit cursor: Cursor[ S ], chr: Chronos[ S ], groupView: A => ProcGroup[ S ]) : AuralPresentation[ S ] =
+      AuralPresentationImpl.run( group, config )
 }
-trait Auralization[ S <: Sys[ S ]]
+trait AuralPresentation[ S <: Sys[ S ]]

@@ -4,13 +4,13 @@ import de.sciss.synth
 import synth._
 import expr.{Doubles, ExprImplicits}
 import ugen._
-import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.{LucreSTM, DataInput, DataOutput}
 
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import de.sciss.lucre.stm.{TxnSerializer, Cursor}
 import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
+import de.sciss.lucre.expr.{Chronos, Expr}
 
 object PaperTest extends App {
    val DRY = false
@@ -54,6 +54,8 @@ object PaperTest extends App {
          def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr.Var[ S, Double ] =
             Doubles.readVar[ S ]( in, access )
       }
+
+      implicit val ts = Chronos[ S ]( 0L )
 
       def newGroup()(  implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
       def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
@@ -165,7 +167,7 @@ println( "......yields " + p1 )
 
       } else  {
          logStep()
-         Auralization.run[ S, ProcGroup[ S ]]( access )
+         AuralPresentation.run[ S, ProcGroup[ S ]]( access )
 
          (new Thread {
             override def run() {

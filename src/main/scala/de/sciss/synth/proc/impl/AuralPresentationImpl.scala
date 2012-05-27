@@ -1,5 +1,5 @@
 /*
- *  AuralizationImpl.scala
+ *  AuralPresentationImpl.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -36,11 +36,11 @@ import de.sciss.lucre.expr.Chronos
 import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
 import SoundProcesses.logConfig
 
-object AuralizationImpl {
+object AuralPresentationImpl {
    var dumpOSC = true
 
    def run[ S <: Sys[ S ], A ]( group: S#Entry[ A ], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ], chr: Chronos[ S ], groupView: A => ProcGroup[ S ]) : Auralization[ S ] = {
+                          ( implicit cursor: Cursor[ S ], chr: Chronos[ S ], groupView: A => ProcGroup[ S ]) : AuralPresentation[ S ] = {
       val boot = new Boot( group, config, cursor, groupView )
       Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
          def run() { boot.shutDown() }
@@ -82,7 +82,7 @@ object AuralizationImpl {
    private final class Boot[ S <: Sys[ S ], A ]( groupA: S#Entry[ A ], config: Server.Config,
                                                  cursor: Cursor[ S ], groupView: A => ProcGroup[ S ])
                                                ( implicit chr: Chronos[ S ])
-   extends Auralization[ S ] {
+   extends AuralPresentation[ S ] {
 
 //      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
 //         ScalaTxn.beforeCommit { implicit itx =>

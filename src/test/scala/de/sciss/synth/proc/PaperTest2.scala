@@ -4,13 +4,13 @@ import de.sciss.synth
 import synth._
 import expr.{Doubles, ExprImplicits}
 import ugen._
-import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.{LucreSTM, DataInput, DataOutput}
 
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import de.sciss.confluent.{TemporalObjects, Confluent}
 import de.sciss.lucre.stm.{Sys, TxnSerializer, Cursor}
+import de.sciss.lucre.expr.{Chronos, Expr}
 
 object PaperTest2 extends App {
    val DRY = true
@@ -92,8 +92,9 @@ class Example2(implicit s: Confluent, c: Cursor[Confluent]) {
   import helper._
   import imp._
 
+   implicit val ts = Chronos[ S ]( 0L )
   val group = s.root(newGroup()(_))
-  Auralization.run[S, ProcGroup[S]](group)
+  AuralPresentation.run[S, ProcGroup[S]](group)
 
   val freq = c.step { implicit tx =>
     exprVar(50.0).asAccess

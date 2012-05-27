@@ -4,7 +4,6 @@ import de.sciss.synth
 import synth._
 import expr.{Doubles, ExprImplicits}
 import ugen._
-import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.{LucreSTM, DataInput, DataOutput}
 
 import de.sciss.lucre.stm.impl.BerkeleyDB
@@ -12,6 +11,7 @@ import java.io.File
 import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.stm.{Serializer, TxnSerializer, Cursor}
+import de.sciss.lucre.expr.{Chronos, Expr}
 
 object PaperTest3 extends App {
    val DRY = false
@@ -33,6 +33,8 @@ object PaperTest3 extends App {
       implicit val whyOhWhy2  = Proc.serializer[ S ]
       val imp = new ExprImplicits[ S ]
       import imp._
+
+      implicit val ts = Chronos[ S ]( 0L )
 
       implicit object doubleVarSerializer extends TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Double ]] {
          def write( v: Expr.Var[ S, Double ], out: DataOutput ) { v.write( out )}
@@ -183,7 +185,7 @@ object PaperTest3 extends App {
 
       } else  {
          implicit val whyOhWhy4 = Access.group _
-         Auralization.run[ S, Access ]( access )
+         AuralPresentation.run[ S, Access ]( access )
 
          (new Thread {
             override def run() {

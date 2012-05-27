@@ -5,6 +5,7 @@ import synth.{SynthDef, Server, expr}
 import expr._
 import de.sciss.lucre.stm.{Sys, Cursor, InMemory}
 import synth._; import ugen._
+import de.sciss.lucre.expr.Chronos
 
 object SecondTest {
    def main( args: Array[ String ]) {
@@ -16,6 +17,8 @@ object SecondTest {
       implicit val whyOhWhy = ProcGroup.serializer[ S ]
       val imp = new ExprImplicits[ S ]
       import imp._
+
+      implicit val ts = Chronos[ S ]( 0L )
 
       def group()( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
       def proc()(  implicit tx: S#Tx ) : Proc[ S ]      = Proc()
@@ -38,7 +41,7 @@ object SecondTest {
          Out.ar( 0, c )
       }
 
-      Auralization.run( access )
+      AuralPresentation.run( access )
 
       (new Thread {
          override def run() {

@@ -41,3 +41,40 @@ trait Bi[ S <: Sys[ S ], A ] {
 :::::::::::::::
 
 valueSpan( time: Long ) : (Long, A)
+
+:::::::::::::::
+
+the problem of Chronus is that most likely that would be a Transport, and that in turn can not be serialized _along with chronus_, because that essentially depends on system thus, i.e. must be a live view
+
+:::::::::::::::
+
+so let's rethink --- as simple as possible first:
+
+trait BiExpr[ S <: Sys[ S ], A ] {
+   def projection( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Expr[ S, A ]
+   def valueAt( time: Long )( implicit tx: S#Tx ) : A
+   def changed: EventLike[ S, Bi.Update[ S, A ], Bi[ S, A ]]
+}
+
+BiVar
+   setAt( time: Long, value: A )
+   getAt( time: Long )
+
+:::::::::::::::
+
+Proc {
+   controls
+}
+
+maxWaitSpan = p.controls.foldLeft( Span.from( now )) { case ((span, _), min) => min intersect span }
+
+:::::::::::::::
+
+actor {
+   loopWhile( isRunning ) {
+      reactWithin ( ... )
+         case TIMEOUT => advance( logicalTargetTime )
+         case x => ...
+      }
+   }
+}
