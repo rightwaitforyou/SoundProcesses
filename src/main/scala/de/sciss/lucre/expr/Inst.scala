@@ -32,7 +32,7 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import event.{Node, Intruder, EventLikeSerializer, Change, Reader, Constant, Dummy, EventLike, Pull, Targets, Trigger, StandaloneLike, Event}
 import de.sciss.lucre.stm.{Disposable, Serializer, InMemory, TxnSerializer, Writer, Sys}
 
-object BiExpr {
+object Inst {
    type Update[ A ] = IIdxSeq[ Region[ A ]]
 
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
@@ -70,17 +70,17 @@ object BiExpr {
    }
 
    implicit def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
-      event.Reader[ S, BiExpr[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiExpr[ S, A ]] = new Ser[ S, A ]
+      event.Reader[ S, Inst[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Inst[ S, A ]] = new Ser[ S, A ]
 
    implicit def varSerializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
       event.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] = new VarSer[ S, A ]
 
    private final class Ser[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
-   extends event.Reader[ S, BiExpr[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiExpr[ S, A ]] {
-      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : BiExpr[ S, A ] = {
+   extends event.Reader[ S, Inst[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Inst[ S, A ]] {
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Inst[ S, A ] = {
          read( in, access, Targets.read[ S ]( in, access ))
       }
-      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : BiExpr[ S, A ] = {
+      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Inst[ S, A ] = {
          val ordered = {
             implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
             implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
@@ -88,7 +88,7 @@ object BiExpr {
          }
          new Impl[ S, A ]( targets, ordered )
       }
-      def write( v: BiExpr[ S, A ], out: DataOutput ) { v.write( out )}
+      def write( v: Inst[ S, A ], out: DataOutput ) { v.write( out )}
    }
 
    private final class VarSer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
@@ -115,7 +115,7 @@ object BiExpr {
 //      def set( value: Expr[ S, A ])( implicit time: Chronos[ S ]) : Unit
 //   }
 
-   trait Var[ S <: Sys[ S ], A ] extends BiExpr[ S, A ] with Disposable[ S#Tx ] /* with Source[ S, A ] with Sink[ S, A ] */ {
+   trait Var[ S <: Sys[ S ], A ] extends Inst[ S, A ] with Disposable[ S#Tx ] /* with Source[ S, A ] with Sink[ S, A ] */ {
 //      def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
 //      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
       def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
@@ -293,8 +293,8 @@ object BiExpr {
                                                  ordered: SkipList[ S, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
    extends Var[ S, A ]
-   with Trigger.Impl[ S, Update[ A ], Update[ A ], BiExpr[ S, A ]]
-   with StandaloneLike[ S, Update[ A ], BiExpr[ S, A ]] {
+   with Trigger.Impl[ S, Update[ A ], Update[ A ], Inst[ S, A ]]
+   with StandaloneLike[ S, Update[ A ], Inst[ S, A ]] {
       protected def reader = serializer[ S, A ]
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
@@ -414,15 +414,15 @@ object BiExpr {
       def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ] =
          peerType.newProjection[ S ]( this )
 
-      def changed : Event[ S, Update[ A ], BiExpr[ S, A ]] = this
+      def changed : Event[ S, Update[ A ], Inst[ S, A ]] = this
    }
 }
-sealed trait BiExpr[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, Chronos[ S ], Expr[ S, A ]] with */ Writer {
+sealed trait Inst[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, Chronos[ S ], Expr[ S, A ]] with */ Writer {
    def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
    def valueAt( time: Long )( implicit tx: S#Tx ) : A
    def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
-   def changed : Event[ S, BiExpr.Update[ A ], BiExpr[ S, A ]]
+   def changed : Event[ S, Inst.Update[ A ], Inst[ S, A ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (Long, A)]
 }

@@ -28,16 +28,16 @@ package de.sciss.synth.proc
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{event => evt, DataInput}
-import de.sciss.lucre.expr.{BiExpr, Chronos, Expr}
+import de.sciss.lucre.expr.{Inst, Chronos, Expr}
 
 object Proc {
    // ---- implementation forwards ----
 
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = impl.ProcImpl[ S ]()
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = sys.error( "TODO" ) // impl.ProcImpl.read( in, access )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = impl.ProcImpl.read( in, access )
 
-   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = sys.error( "TODO" ) // impl.ProcImpl.serializer[ S ]
+   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = impl.ProcImpl.serializer[ S ]
 
    // ---- event types ----
 
@@ -46,8 +46,8 @@ object Proc {
    }
    final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends Update[ S ]
    final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends Update[ S ]
-   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiExpr.Update[ Boolean ]) extends Update[ S ]
-   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiExpr.Update[ Double ])  extends Update[ S ]
+   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: Inst.Update[ Boolean ]) extends Update[ S ]
+   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: Inst.Update[ Double ])  extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
