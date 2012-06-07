@@ -144,12 +144,13 @@ object AuralPresentationImpl {
                   changes.foreach {
                      case Proc.Renamed( proc, Change( _, newName )) =>
                         booted.procRenamed( proc, newName )
-                     case Proc.PlayingChanged( proc, Change( _, newPlaying )) =>
-                        booted.procPlayingChanged( proc, newPlaying )
                      case Proc.GraphChanged( proc, Change( _, newGraph )) =>
                         booted.procGraphChanged( proc, newGraph )
-                     case Proc.FreqChanged( proc, Change( _, newFreq )) =>
-                        booted.procFreqChanged( proc, newFreq )
+//                     case Proc.PlayingChanged( proc, Change( _, newPlaying )) =>
+//                        booted.procPlayingChanged( proc, newPlaying )
+//                     case Proc.FreqChanged( proc, Change( _, newFreq )) =>
+//                        booted.procFreqChanged( proc, newFreq )
+case _ =>
                   }
                   println( changes.mkString( "aural changes: ", ",", "" ))
                case _ =>
