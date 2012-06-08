@@ -120,8 +120,13 @@ object Inst {
 //      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
       def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
       def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
-      def set( value: Expr[ S, A ])( implicit tx: S#Tx, time: Chronos[ S ]) : Unit
-      def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
+      def set( value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
+//      def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
+//      def setFrom( time: Expr[ S, Long ])
+      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Boolean
+      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Boolean
+      def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]]
+      def removeAll( span: SpanLike )( implicit tx: S#Tx ) : Unit
    }
 
    private object Entry {
@@ -383,7 +388,7 @@ object Inst {
       def valueAt( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).value.value
       def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A = valueAt( chr.time.value )
 
-      def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) {
+      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Boolean = {
          val start         = time.value
          val (succ, cmp)   = getGeq( start + 1 )
 //println( "set " + tv + " -> succ = " + succ + ", cmp = " + cmp )
@@ -398,8 +403,22 @@ object Inst {
             val span = if( cmp <= 0 ) Span( start, succ.timeCache ) else Span.from( start )
             fire( IIdxSeq( Region( span, value.value )))
          }
+         sys.error( "TODO" )
       }
-      def set( value: Expr[ S, A ])( implicit tx: S#Tx, chr: Chronos[ S ]) { setAt( chr.time, value )}
+      def set( value: Expr[ S, A ])( implicit tx: S#Tx ) {
+//         setAt( chr.time, value )
+//         ordered.clear()
+         sys.error( "TODO" )
+      }
+      def removeAll( span: SpanLike )( implicit tx: S#Tx ) {
+         sys.error( "TODO" )
+      }
+      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Boolean = {
+         sys.error( "TODO" )
+      }
+      def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]] = {
+         sys.error( "TODO" )
+      }
 
       private def valueCache( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).valueCache
 
