@@ -407,7 +407,7 @@ object Inst {
       }
       def set( value: Expr[ S, A ])( implicit tx: S#Tx ) {
 //         setAt( chr.time, value )
-//         ordered.clear()
+         ordered.clear()
          sys.error( "TODO" )
       }
       def removeAll( span: SpanLike )( implicit tx: S#Tx ) {
