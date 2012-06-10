@@ -32,7 +32,13 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.stm.{Disposable, Serializer, TxnSerializer, Writer, Sys}
 import event.{Constant, Node, Intruder, EventLikeSerializer, Change, Reader, Dummy, EventLike, Pull, Targets, Trigger, StandaloneLike, Event}
 
+/**
+ * TODO: Entry.Dynamic should not require its own targets. It would be much better to realise a group event
+ * in the var itself.
+ */
 object Inst {
+   private val MIN_TIME = Long.MinValue
+
    type Update[ A ] = IIdxSeq[ Region[ A ]]
 
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
@@ -54,7 +60,7 @@ object Inst {
          implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
          HASkipList.Map.empty[ S, Long, Entry[ S, A ]]
       }
-      ordered.add( 0L -> Entry( 0L, peerType.longType.newConst( 0L ), init ))
+      ordered.add( MIN_TIME -> Entry( MIN_TIME, peerType.longType.newConst( MIN_TIME ), init ))
       new Impl[ S, A ]( targets, ordered )
    }
 
@@ -165,7 +171,7 @@ object Inst {
          }
       }
 
-      private final case class Static[ S <: Sys[ S ], A ]( valueVal: A )( implicit peerType: BiType[ A ])
+      final private[Inst] case class Static[ S <: Sys[ S ], A ]( valueVal: A )( implicit peerType: BiType[ A ])
       extends Entry[ S, A ] with Dummy[ S, Change[ (Long, A) ], Entry[ S, A ]] with Constant[ S ] {
          protected def writeData( out: DataOutput ) {
             peerType.writeValue( valueVal, out )
@@ -339,10 +345,12 @@ object Inst {
       def valueAt( time: Long )( implicit tx: S#Tx )   : A  = getAt( time ).value
       def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time.value )
 
+      private def isConnected( implicit tx: S#Tx ) : Boolean = targets.nonEmpty
+
       def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Option[ Expr[ S, A ]] = {
          val start         = time.value
          val newEntry      = Entry( start, time, value )
-         val con           = targets.nonEmpty
+         val con           = isConnected
          val succ          = ordered.ceil( start + 1 )
 
          val oldOption = ordered.add( start -> newEntry )
@@ -359,7 +367,10 @@ object Inst {
       }
       def set( value: Expr[ S, A ])( implicit tx: S#Tx ) {
          ordered.clear()
-         sys.error( "TODO" )
+         ordered.add( MIN_TIME -> Entry( MIN_TIME, peerType.longType.newConst( MIN_TIME ), value ))
+         if( isConnected ) {
+            fire( IIdxSeq( Region( Span.All, value.value )))
+         }
       }
       def removeAll( span: SpanLike )( implicit tx: S#Tx ) {
          sys.error( "TODO" )
