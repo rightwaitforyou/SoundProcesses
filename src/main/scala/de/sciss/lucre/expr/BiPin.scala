@@ -1,5 +1,5 @@
 /*
- *  Inst.scala
+ *  BiPin.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -36,10 +36,20 @@ import event.{Constant, Node, Intruder, EventLikeSerializer, Change, Reader, Dum
  * TODO: Entry.Dynamic should not require its own targets. It would be much better to realise a group event
  * in the var itself.
  */
-object Inst {
+object BiPin {
    private val MIN_TIME = Long.MinValue
 
    type Update[ A ] = IIdxSeq[ Region[ A ]]
+
+   trait Var[ S <: Sys[ S ], A ] extends BiPin[ S, A ] with Disposable[ S#Tx ] /* with Source[ S, A ] with Sink[ S, A ] */ {
+      def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
+      def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
+      def set( value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
+      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Option[ Expr[ S, A ]]
+      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Boolean
+      def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]]
+      def removeAll( span: SpanLike )( implicit tx: S#Tx ) : Unit
+   }
 
    def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
                                                         peerType: BiType[ A ]) : Var[ S, A ] = {
@@ -51,17 +61,6 @@ object Inst {
                                                                  peerType: BiType[ A ]) : Var[ S, A ] = {
       val targets = Targets[ S ]
       newVar( targets, init )
-   }
-
-   private def newVar[ S <: Sys[ S ], A ]( targets: Targets[ S ], init: Expr[ S, A ])( implicit tx: S#Tx,
-                                                        peerType: BiType[ A ]) : Var[ S, A ] = {
-      val ordered = {
-         implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
-         implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.Map.empty[ S, Long, Entry[ S, A ]]
-      }
-      ordered.add( MIN_TIME -> Entry( MIN_TIME, peerType.longType.newConst( MIN_TIME ), init ))
-      new Impl[ S, A ]( targets, ordered )
    }
 
    def readVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
@@ -76,17 +75,28 @@ object Inst {
    }
 
    implicit def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
-      event.Reader[ S, Inst[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Inst[ S, A ]] = new Ser[ S, A ]
+      event.Reader[ S, BiPin[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiPin[ S, A ]] = new Ser[ S, A ]
 
    implicit def varSerializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
       event.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] = new VarSer[ S, A ]
 
+   private def newVar[ S <: Sys[ S ], A ]( targets: Targets[ S ], init: Expr[ S, A ])( implicit tx: S#Tx,
+                                                        peerType: BiType[ A ]) : Var[ S, A ] = {
+      val ordered = {
+         implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
+         implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
+         HASkipList.Map.empty[ S, Long, Entry[ S, A ]]
+      }
+      ordered.add( MIN_TIME -> Entry( MIN_TIME, peerType.longType.newConst( MIN_TIME ), init ))
+      new Impl[ S, A ]( targets, ordered )
+   }
+
    private final class Ser[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
-   extends event.Reader[ S, Inst[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Inst[ S, A ]] {
-      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Inst[ S, A ] = {
+   extends event.Reader[ S, BiPin[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiPin[ S, A ]] {
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : BiPin[ S, A ] = {
          read( in, access, Targets.read[ S ]( in, access ))
       }
-      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Inst[ S, A ] = {
+      def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : BiPin[ S, A ] = {
          val ordered = {
             implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
             implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
@@ -94,7 +104,7 @@ object Inst {
          }
          new Impl[ S, A ]( targets, ordered )
       }
-      def write( v: Inst[ S, A ], out: DataOutput ) { v.write( out )}
+      def write( v: BiPin[ S, A ], out: DataOutput ) { v.write( out )}
    }
 
    private final class VarSer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
@@ -111,16 +121,6 @@ object Inst {
          new Impl[ S, A ]( targets, ordered )
       }
       def write( v: Var[ S, A ], out: DataOutput ) { v.write( out )}
-   }
-
-   trait Var[ S <: Sys[ S ], A ] extends Inst[ S, A ] with Disposable[ S#Tx ] /* with Source[ S, A ] with Sink[ S, A ] */ {
-      def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
-      def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
-      def set( value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
-      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Option[ Expr[ S, A ]]
-      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Boolean
-      def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]]
-      def removeAll( span: SpanLike )( implicit tx: S#Tx ) : Unit
    }
 
    private object Entry {
@@ -171,7 +171,7 @@ object Inst {
          }
       }
 
-      final private[Inst] case class Static[ S <: Sys[ S ], A ]( valueVal: A )( implicit peerType: BiType[ A ])
+      final private[BiPin] case class Static[ S <: Sys[ S ], A ]( valueVal: A )( implicit peerType: BiType[ A ])
       extends Entry[ S, A ] with Dummy[ S, Change[ (Long, A) ], Entry[ S, A ]] with Constant[ S ] {
          protected def writeData( out: DataOutput ) {
             peerType.writeValue( valueVal, out )
@@ -181,7 +181,7 @@ object Inst {
          def value : Expr[ S, A ]      = peerType.newConst[ S ]( valueVal )
       }
 
-      final private[Inst] case class Dynamic[ S <: Sys[ S ], A ]( targets: Targets[ S ], cacheVar: S#Var[ (Long, A) ],
+      final private[BiPin] case class Dynamic[ S <: Sys[ S ], A ]( targets: Targets[ S ], cacheVar: S#Var[ (Long, A) ],
                                                                   time: Expr[ S, Long ], value: Expr[ S, A ])
       extends Entry[ S, A ] with StandaloneLike[ S, Change[ (Long, A) ], Entry[ S, A ]] {
          private def timeCache(  implicit tx: S#Tx ) : Long = cacheVar.get._1
@@ -262,8 +262,8 @@ object Inst {
                                                  ordered: SkipList.Map[ S, Long, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
    extends Var[ S, A ]
-   with Trigger.Impl[ S, Update[ A ], Update[ A ], Inst[ S, A ]]
-   with StandaloneLike[ S, Update[ A ], Inst[ S, A ]] {
+   with Trigger.Impl[ S, Update[ A ], Update[ A ], BiPin[ S, A ]]
+   with StandaloneLike[ S, Update[ A ], BiPin[ S, A ]] {
       protected def reader = serializer[ S, A ]
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
@@ -395,15 +395,15 @@ object Inst {
       def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ] =
          peerType.newProjection[ S ]( this )
 
-      def changed : Event[ S, Update[ A ], Inst[ S, A ]] = this
+      def changed : Event[ S, Update[ A ], BiPin[ S, A ]] = this
    }
 }
-sealed trait Inst[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, Chronos[ S ], Expr[ S, A ]] with */ Writer {
+sealed trait BiPin[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, Chronos[ S ], Expr[ S, A ]] with */ Writer {
    def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
    def valueAt( time: Long )( implicit tx: S#Tx ) : A
    def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
-   def changed : Event[ S, Inst.Update[ A ], Inst[ S, A ]]
+   def changed : Event[ S, BiPin.Update[ A ], BiPin[ S, A ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (Long, A)]
 }

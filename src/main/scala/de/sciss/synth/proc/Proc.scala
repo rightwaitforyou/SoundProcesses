@@ -28,7 +28,7 @@ package de.sciss.synth.proc
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{event => evt, DataInput}
-import de.sciss.lucre.expr.{Inst, Chronos, Expr}
+import de.sciss.lucre.expr.{BiPin, Chronos, Expr}
 
 object Proc {
    // ---- implementation forwards ----
@@ -46,8 +46,8 @@ object Proc {
    }
    final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends Update[ S ]
    final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends Update[ S ]
-   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: Inst.Update[ Boolean ]) extends Update[ S ]
-   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: Inst.Update[ Double ])  extends Update[ S ]
+   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Update[ Boolean ]) extends Update[ S ]
+   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.Update[ Double ])  extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._

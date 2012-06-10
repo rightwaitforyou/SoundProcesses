@@ -78,3 +78,14 @@ actor {
       }
    }
 }
+
+:::::::::::::::
+
+- proc's do not come into existence outside-time; for an auralpresentation, the time at which they are added or removed from the group matters
+- therefore, ProcGroup should be bitemporal as well
+- if not, it would mean that the transport needs to iterate over all procs no matter when they have been created, to gather the next interval
+- it should thus be modelled similar to Inst.Var (formerly BiExpr.Var); but must be capable of having an iterable as its value
+- clearly, the plain skiplist doesn't work, since we will need to iterate on its ordering domain and detect incremental changes (proc removed, proc added)
+
+- first idea: use a 2D octree with one axis for start time, one for stop time; values must be able to accomodate multiple procs!
+  ; possible disadvantage: half of the space will be unused (since start <= stop); must be possible to represented open intervals

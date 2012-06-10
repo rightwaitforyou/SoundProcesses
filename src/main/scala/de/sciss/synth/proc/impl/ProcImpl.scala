@@ -32,7 +32,7 @@ import de.sciss.synth.expr._
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.{InMemory, Sys}
 import ExprImplicits._
-import de.sciss.lucre.expr.{Chronos, Inst, Expr}
+import de.sciss.lucre.expr.{Chronos, BiPin, Expr}
 
 object ProcImpl {
    private val SER_VERSION = 1
@@ -86,10 +86,10 @@ object ProcImpl {
 
       protected def graphVar : S#Var[ SynthGraph ]
 //      protected def playing_# : Expr.Var[ S, Boolean ]
-      protected def playing_# : Inst.Var[ S, Boolean ]
+      protected def playing_# : BiPin.Var[ S, Boolean ]
       protected def name_# : Expr.Var[ S, String ]
 //      protected def freq_# : Expr.Var[ S, Double ]
-      protected def freq_# : Inst.Var[ S, Double ]
+      protected def freq_# : BiPin.Var[ S, Double ]
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
          name_#.get
@@ -174,12 +174,12 @@ object ProcImpl {
       protected val targets   = evt.Targets[ S ]( tx0 )
 
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
-      protected val playing_# = Inst.newConfluentVar[ S, Boolean ]( true )( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
+      protected val playing_# = BiPin.newConfluentVar[ S, Boolean ]( true )( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
 //      protected val freqVar   = {
 //         implicit val peerSer = Doubles.serializer[ S ]
 //         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
 //      }
-      protected val freq_#    = Inst.newConfluentVar[ S, Double ]( 441 )( tx0, Doubles ) // Doubles.newConfluentVar[ S ]( 441 )( tx0 )
+      protected val freq_#    = BiPin.newConfluentVar[ S, Double ]( 441 )( tx0, Doubles ) // Doubles.newConfluentVar[ S ]( 441 )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
    }
 
@@ -196,8 +196,8 @@ object ProcImpl {
       protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
 //      protected val playing_# = Booleans.readVar[ S ]( in, access )( tx0 )
 //      protected val freq_#    = Doubles.readVar[ S ]( in, access )( tx0 )
-      protected val playing_# = Inst.readVar[ S, Boolean ]( in, access )( tx0, Booleans )
-      protected val freq_#    = Inst.readVar[ S, Double  ]( in, access )( tx0, Doubles  )
+      protected val playing_# = BiPin.readVar[ S, Boolean ]( in, access )( tx0, Booleans )
+      protected val freq_#    = BiPin.readVar[ S, Double  ]( in, access )( tx0, Doubles  )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
    }
 }

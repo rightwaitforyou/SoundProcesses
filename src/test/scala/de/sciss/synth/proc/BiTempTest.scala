@@ -7,7 +7,7 @@ import de.sciss.lucre.event.Change
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
 import de.sciss.lucre.stm.{Cursor, Sys}
-import de.sciss.lucre.expr.{Chronos, Expr, BiType, Inst}
+import de.sciss.lucre.expr.{Chronos, Expr, BiType, BiPin}
 
 object BiTempTest extends App {
    {
@@ -22,7 +22,7 @@ object BiTempTest extends App {
       val exprImp = new ExprImplicits[ S ]
       import exprImp._
 
-      implicit def biSer[ A ]( implicit peer: BiType[ A ]) = Inst.serializer[ S, A ]
+      implicit def biSer[ A ]( implicit peer: BiType[ A ]) = BiPin.serializer[ S, A ]
       implicit val doubles       = Doubles
       implicit val longVarSer    = Longs.varSerializer[ S ]
       implicit val doubleVarSer  = Doubles.varSerializer[ S ]
@@ -31,7 +31,7 @@ object BiTempTest extends App {
 
       println( "__STEP__ root" )
       val access = system.root { implicit tx =>
-         val bi = Inst.newVar( 0.0 )
+         val bi = BiPin.newVar( 0.0 )
          (bi, IIdxSeq.empty[ Expr.Var[ S, Long ]], IIdxSeq.empty[ Expr.Var[ S, Double ]])
       }
 
