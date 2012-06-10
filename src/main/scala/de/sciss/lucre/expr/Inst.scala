@@ -52,9 +52,9 @@ object Inst {
       val ordered = {
          implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
          implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.empty[ S, Entry[ S, A ]]
+         HASkipList.Map.empty[ S, Long, Entry[ S, A ]]
       }
-      ordered.add( Entry( 0L, peerType.longType.newConst( 0L ), init ))
+      ordered.add( 0L -> Entry( 0L, peerType.longType.newConst( 0L ), init ))
       new Impl[ S, A ]( targets, ordered )
    }
 
@@ -64,7 +64,7 @@ object Inst {
       val ordered = {
          implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
          implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.read[ S, Entry[ S, A ]]( in, access )
+         HASkipList.Map.read[ S, Long, Entry[ S, A ]]( in, access )
       }
       new Impl[ S, A ]( targets, ordered )
    }
@@ -84,7 +84,7 @@ object Inst {
          val ordered = {
             implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
             implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-            HASkipList.read[ S, Entry[ S, A ]]( in, access )
+            HASkipList.Map.read[ S, Long, Entry[ S, A ]]( in, access )
          }
          new Impl[ S, A ]( targets, ordered )
       }
@@ -100,7 +100,7 @@ object Inst {
          val ordered = {
             implicit val ser        = Entry.serializer[ S, A ] // peerType.serializer[ S ]
             implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-            HASkipList.read[ S, Entry[ S, A ]]( in, access )
+            HASkipList.Map.read[ S, Long, Entry[ S, A ]]( in, access )
          }
          new Impl[ S, A ]( targets, ordered )
       }
@@ -166,16 +166,16 @@ object Inst {
          }
       }
 
-      implicit def ordering[ S <: Sys[ S ], A ] : txn.Ordering[ S#Tx, Entry[ S, A ]] =
-         Ord.asInstanceOf[ txn.Ordering[ S#Tx, Entry[ S, A ]]]
-
-      private object Ord extends txn.Ordering[ InMemory#Tx, Entry[ InMemory, _ ]] {
-         def compare( a: Entry[ InMemory, _ ], b: Entry[ InMemory, _ ])( implicit tx: InMemory#Tx ) : Int = {
-            val at = a.timeCache
-            val bt = b.timeCache
-            if( at < bt ) -1 else if( at > bt ) 1 else 0
-         }
-      }
+//      implicit def ordering[ S <: Sys[ S ], A ] : txn.Ordering[ S#Tx, Entry[ S, A ]] =
+//         Ord.asInstanceOf[ txn.Ordering[ S#Tx, Entry[ S, A ]]]
+//
+//      private object Ord extends txn.Ordering[ InMemory#Tx, Entry[ InMemory, _ ]] {
+//         def compare( a: Entry[ InMemory, _ ], b: Entry[ InMemory, _ ])( implicit tx: InMemory#Tx ) : Int = {
+//            val at = a.timeCache
+//            val bt = b.timeCache
+//            if( at < bt ) -1 else if( at > bt ) 1 else 0
+//         }
+//      }
 
       def apply[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ])
                                    ( implicit tx: S#Tx, peerType: BiType[ A ]) : Entry[ S, A ] = {
@@ -206,7 +206,7 @@ object Inst {
          def time  : Expr[ S, Long ]   = peerType.longType.newConst[ S ]( timeVal )
          def value : Expr[ S, A ]      = peerType.newConst[ S ]( valueVal )
 
-         def updateCache()( implicit tx: S#Tx ) {
+         def updateCache()( implicit tx: S#Tx ) : Long = {
             sys.error( "Illegal state -- a constant region should not change its time value : " + this )
          }
 
@@ -276,26 +276,28 @@ object Inst {
             }
          }
 
-         def updateCache()( implicit tx: S#Tx ) {
-            cacheVar.set( (time.value, value.value) )
+         def updateCache()( implicit tx: S#Tx ) : Long = {
+            val newTime = time.value
+            cacheVar.set( (newTime, value.value) )
+            newTime
          }
 
          def isDummy = false
       }
    }
    private sealed trait Entry[ S <: Sys[ S ], A ] extends EventLike[ S, Change[ (Long, A) ], Entry[ S, A ]] with Writer {
-      def timeCache(  implicit tx: S#Tx ) : Long
+//      def timeCache(  implicit tx: S#Tx ) : Long
       def valueCache( implicit tx: S#Tx ) : A
       def time: Expr[ S, Long ]
       def value: Expr[ S, A ]
-      def updateCache()( implicit tx: S#Tx ) : Unit
+      def updateCache()( implicit tx: S#Tx ) : Long
       def isDummy: Boolean
    }
 
    final case class Region[ A ]( span: SpanLike, value: A )
 
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ],
-                                                 ordered: SkipList[ S, Entry[ S, A ]])
+                                                 ordered: SkipList.Map[ S, Long, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
    extends Var[ S, A ]
    with Trigger.Impl[ S, Update[ A ], Update[ A ], Inst[ S, A ]]
@@ -303,28 +305,28 @@ object Inst {
       protected def reader = serializer[ S, A ]
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
-         var dirty   = IIdxSeq.empty[ Entry[ S, A ]]
+         var dirty   = IIdxSeq.empty[ (Long, Entry[ S, A ])]
 
-         ordered.iterator.foreach { e =>
+         ordered.iterator.foreach { case tup @ (timeCache, e) =>
             if( !e.isDummy ) {
                val tNow = e.time.value
-               if( e.timeCache != tNow ) {
-                  dirty :+= e
+               if( timeCache != tNow ) {
+                  dirty :+= tup
                } else {
                   e ---> this
                }
             }
          }
 
-         dirty.foreach { e =>
-            ordered -= e
-            e.updateCache()
-            ordered += e
+         dirty.foreach { case (timeCache, e) =>
+            ordered -= timeCache
+            val newTime = e.updateCache()
+            ordered += newTime -> e
             e ---> this
          }
       }
       private[lucre] def disconnect()( implicit tx: S#Tx ) {
-         ordered.iterator.foreach( _ -/-> this )
+         ordered.valuesIterator.foreach( _ -/-> this )
       }
 
       private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ) : Option[ Update[ A ]] = {
@@ -341,22 +343,35 @@ object Inst {
                e.pullUpdate( pull ).foreach {
                   case Change( (tOld, vOld), (tNew, vNew) ) =>
                      if( tOld == tNew ) { // time didn't change -- only one region changed
-                        val (succ, cmp) = getGeq( tOld + 1 )
-                        val span = if( cmp <= 0 ) Span( tOld, succ.timeCache ) else Span.from( tOld )
+//                        val (succ, cmp) = getGeq( tOld + 1 )
+//                        val span = if( cmp <= 0 ) Span( tOld, succ.timeCache ) else Span.from( tOld )
+                        val span = ordered.ceil( tOld + 1 ) match {
+                           case Some( (tSucc, _) ) => Span( tOld, tSucc )
+                           case None               => Span.from( tOld )
+                        }
                         regions :+= Region( span, vNew )
                      } else {             // time did change -- two changed regions, and need to re-insert entries
-                        val (succ1, cmp1) = getGeq( tOld + 1 )
-                        val span1   = if( cmp1 <= 0 ) Span( tOld, succ1.timeCache ) else Span.from( tOld )
+//                        val (succ1, cmp1) = getGeq( tOld + 1 )
+//                        val span1   = if( cmp1 <= 0 ) Span( tOld, succ1.timeCache ) else Span.from( tOld )
+                        val span1 = ordered.ceil( tOld + 1 ) match {
+                           case Some( (tSucc, _) ) => Span( tOld, tSucc )
+                           case None               => Span.from( tOld )
+                        }
                         val r1      = Region( span1, valueCache( tOld ))
                         regions :+= r1
-                        val (succ2, cmp2) = getGeq( tNew + 1 )
-                        val span2   = if( cmp2 <= 0 ) Span( tNew, succ2.timeCache ) else Span.from( tNew )
+//                        val (succ2, cmp2) = getGeq( tNew + 1 )
+//                        val span2   = if( cmp2 <= 0 ) Span( tNew, succ2.timeCache ) else Span.from( tNew )
+                        val span2 = ordered.ceil( tNew + 1 ) match {
+                           case Some( (tSucc, _) ) => Span( tNew, tSucc )
+                           case None               => Span.from( tNew )
+                        }
                         val r2      = Region( span2, vNew )
                         regions :+= r2
 
-                        ordered -= e
-                        e.updateCache()
-                        ordered += e
+                        ordered -= tOld
+                        val tNew2 = e.updateCache()
+                        assert( tNew2 == tNew )
+                        ordered += tNew -> e
                      }
                }
             }
@@ -364,46 +379,51 @@ object Inst {
          }
       }
 
-      private def getGeq( time: Long )( implicit tx: S#Tx ) : (Entry[ S, A ], Int) = {
-         // XXX TODO should be an efficient method in skiplist itself
-         ordered.isomorphicQuery( new Ordered[ S#Tx, Entry[ S, A ]] {
-            def compare( that: Entry[ S, A ])( implicit tx: S#Tx ) = {
-               val t = that.timeCache
-               if( time < t ) -1 else if( time > t ) 1 else 0
-            }
-         })
-      }
+//      private def getGeq( time: Long )( implicit tx: S#Tx ) : (Entry[ S, A ], Int) = {
+//         // XXX TODO should be an efficient method in skiplist itself
+//         ordered.isomorphicQuery( new Ordered[ S#Tx, Entry[ S, A ]] {
+//            def compare( that: Entry[ S, A ])( implicit tx: S#Tx ) = {
+//               val t = that.timeCache
+//               if( time < t ) -1 else if( time > t ) 1 else 0
+//            }
+//         })
+//      }
 
-      def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] = ordered.toList.map( e => (e.time.value, e.value.value) )
+      def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] =
+         ordered.valuesIterator.map( e => (e.time.value, e.value.value) ).toList
 
-      private def getLeq( time: Long )( implicit tx: S#Tx ) : Entry[ S, A ] = {
-//         val ((succ, _), cmp) = getEntry( time )._1._2
-//         if( cmp > 0 ) ???
-         ordered.toList.takeWhile( _.timeCache <= time ).last // XXX TODO ouch... we do need a pred method for skiplist
-      }
+//      private def getLeq( time: Long )( implicit tx: S#Tx ) : Entry[ S, A ] = {
+////         val ((succ, _), cmp) = getEntry( time )._1._2
+////         if( cmp > 0 ) ???
+//         ordered.toList.takeWhile( _.timeCache <= time ).last // XXX TODO ouch... we do need a pred method for skiplist
+//      }
 
-      def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ] = getLeq( time ).value
+      def getAt( time: Long )( implicit tx: S#Tx )   : Expr[ S, A ] = ordered.floor( time ).get._2.value
       def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time.value )
 
-      def valueAt( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).value.value
-      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A = valueAt( chr.time.value )
+      def valueAt( time: Long )( implicit tx: S#Tx )   : A  = getAt( time ).value
+      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time.value )
 
       def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Boolean = {
          val start         = time.value
-         val (succ, cmp)   = getGeq( start + 1 )
-//println( "set " + tv + " -> succ = " + succ + ", cmp = " + cmp )
          val newEntry      = Entry( start, time, value )
          val con           = targets.nonEmpty
-         if( con && cmp == 0 ) {  // overwriting entry!
-            succ -/-> this
-         }
-         ordered.add( newEntry )
+         val succ          = ordered.ceil( start + 1 )
+
+//         if( con && cmp == 0 ) {  // overwriting entry!
+//            succ -/-> this
+//         }
+         val oldOption = ordered.add( start -> newEntry )
          if( con ) {
-            if( con ) newEntry ---> this
-            val span = if( cmp <= 0 ) Span( start, succ.timeCache ) else Span.from( start )
+            oldOption.foreach( _ -/-> this )
+            newEntry ---> this
+            val span = succ match {
+               case Some( (tSucc, _) ) => Span( start, tSucc )
+               case None               => Span.from( start )
+            }
             fire( IIdxSeq( Region( span, value.value )))
          }
-         sys.error( "TODO" )
+         oldOption.isEmpty // XXX should return the oldEntry instead
       }
       def set( value: Expr[ S, A ])( implicit tx: S#Tx ) {
 //         setAt( chr.time, value )
@@ -420,7 +440,7 @@ object Inst {
          sys.error( "TODO" )
       }
 
-      private def valueCache( time: Long )( implicit tx: S#Tx ) : A = getLeq( time ).valueCache
+      private def valueCache( time: Long )( implicit tx: S#Tx ) : A = ordered.floor( time ).get._2.valueCache
 
       protected def writeData( out: DataOutput ) {
          ordered.write( out )

@@ -75,7 +75,7 @@ object ProcGroupImpl {
    }
 
    private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with evt.Compound[ S, ProcGroup[ S ], Decl[ S ]] {
-      protected def seq: SkipList[ S, Proc[ S ]]
+      protected def seq: SkipList.Set[ S, Proc[ S ]]
 
       import ProcGroup._
 
@@ -128,7 +128,7 @@ final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.freqChanged )
          implicit val procOrd = procOrdering[ S ]
 //         implicit val listSer = HASkipList.serializer[ S, Proc[ S ]]()
 //         tx0.newVar( id, )
-         HASkipList.empty[ S, Proc[ S ]]
+         HASkipList.Set.empty[ S, Proc[ S ]]
       }
    }
 
@@ -144,7 +144,7 @@ final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.freqChanged )
       protected val seq = {
          implicit val tx      = tx0
          implicit val procOrd = procOrdering[ S ]
-         HASkipList.read[ S, Proc[ S ]]( in, access )
+         HASkipList.Set.read[ S, Proc[ S ]]( in, access )
       }
    }
 }
