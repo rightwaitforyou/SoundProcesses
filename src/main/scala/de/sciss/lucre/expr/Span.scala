@@ -26,6 +26,9 @@
 package de.sciss.lucre
 package expr
 
+import stm.{Writer, Serializer}
+import annotation.switch
+
 object Span {
    def from( start: Long ) : From                     = From( start )
    def until( stop: Long ) : Until                    = Until( stop )
@@ -49,6 +52,10 @@ object Span {
       def contains( that: SpanLike )   = true
       def overlaps( that: SpanLike )   = true
       def touches( that: SpanLike )    = true
+
+      def write( out: DataOutput ) {
+         out.writeUnsignedByte( 3 )
+      }
    }
    final case class From( start: Long ) extends Open {
       def clip( pos: Long ) : Long = math.max( start, pos )
@@ -93,6 +100,11 @@ object Span {
             if( maxStart <= thatStop ) Span( maxStart, thatStop ) else Void
          case Void  => Void
          case All   => this
+      }
+
+      def write( out: DataOutput ) {
+         out.writeUnsignedByte( 1 )
+         out.writeLong( start )
       }
    }
    final case class Until( stop: Long ) extends Open {
@@ -139,6 +151,11 @@ object Span {
          case Void  => Void
          case All   => this
       }
+
+      def write( out: DataOutput ) {
+         out.writeUnsignedByte( 2 )
+         out.writeLong( stop )
+      }
    }
    sealed trait Closed extends SpanLike {
       def length: Long
@@ -161,6 +178,10 @@ object Span {
    
       val isEmpty    = true
       val nonEmpty   = false
+
+      def write( out: DataOutput ) {
+         out.writeUnsignedByte( 4 )
+      }
    }
 
    private final case class Apply( start: Long, stop: Long ) extends Span {
@@ -247,9 +268,30 @@ object Span {
    //         start - b.stop
    //      }
    //   }
+
+      def write( out: DataOutput ) {
+         out.writeUnsignedByte( 0 )
+         out.writeLong( start )
+         out.writeLong( stop )
+      }
    }
 }
-sealed trait SpanLike {
+object SpanLike {
+   implicit object serializer extends Serializer[ SpanLike ] {
+      def write( v: SpanLike, out: DataOutput ) { v.write( out )}
+      def read( in: DataInput ) : SpanLike = SpanLike.read( in )
+   }
+
+   def read( in: DataInput ) : SpanLike = (in.readUnsignedByte(): @switch) match {
+      case 0 => Span( in.readLong(), in.readLong() )
+      case 1 => Span.from( in.readLong() )
+      case 2 => Span.until( in.readLong() )
+      case 3 => Span.All
+      case 4 => Span.Void
+      case cookie => sys.error( "Unrecognized cookie " + cookie )
+   }
+}
+sealed trait SpanLike extends Writer {
    def clip( pos: Long ) : Long
    def shift( delta: Long ) : SpanLike
 
