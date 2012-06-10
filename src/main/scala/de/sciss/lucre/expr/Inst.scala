@@ -107,22 +107,10 @@ object Inst {
       def write( v: Var[ S, A ], out: DataOutput ) { v.write( out )}
    }
 
-//   trait Source[ S <: Sys[ S ], +A ] extends Writer with Disposable[ S#Tx ] {
-//      def get( implicit time: Chronos[ S ]) : Expr[ S, A ]
-//   }
-//
-//   sealed trait Sink[ S <: Sys[ S ], -A ] {
-//      def set( value: Expr[ S, A ])( implicit time: Chronos[ S ]) : Unit
-//   }
-
    trait Var[ S <: Sys[ S ], A ] extends Inst[ S, A ] with Disposable[ S#Tx ] /* with Source[ S, A ] with Sink[ S, A ] */ {
-//      def set( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
-//      def get( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
       def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
       def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
       def set( value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
-//      def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
-//      def setFrom( time: Expr[ S, Long ])
       def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Option[ Expr[ S, A ]]
       def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Boolean
       def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]]
@@ -135,7 +123,6 @@ object Inst {
 
       private def readFull[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc, targets: Targets[ S ])
                                               ( implicit tx: S#Tx, peer: BiType[ A ]) : Dynamic[ S, A ] = {
-//         import peer.ValueSer
          implicit val cacheSer   = TxnSerializer.tuple2[ S#Tx, S#Acc, Long, A ]( Serializer.Long, peer.ValueSer )
          val cacheVar            = tx.readVar[ (Long, A) ]( targets.id, in )
          val time                = peer.longType.readExpr[ S ]( in, access )
@@ -165,17 +152,6 @@ object Inst {
          }
       }
 
-//      implicit def ordering[ S <: Sys[ S ], A ] : txn.Ordering[ S#Tx, Entry[ S, A ]] =
-//         Ord.asInstanceOf[ txn.Ordering[ S#Tx, Entry[ S, A ]]]
-//
-//      private object Ord extends txn.Ordering[ InMemory#Tx, Entry[ InMemory, _ ]] {
-//         def compare( a: Entry[ InMemory, _ ], b: Entry[ InMemory, _ ])( implicit tx: InMemory#Tx ) : Int = {
-//            val at = a.timeCache
-//            val bt = b.timeCache
-//            if( at < bt ) -1 else if( at > bt ) 1 else 0
-//         }
-//      }
-
       def apply[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ])
                                    ( implicit tx: S#Tx, peerType: BiType[ A ]) : Entry[ S, A ] = {
          val valueVal = value.value
@@ -189,9 +165,6 @@ object Inst {
          }
       }
 
-//      private sealed trait Impl[ S <: Sys[ S ], A ] extends Entry[ S, A ] {
-//      }
-
       private final case class Static[ S <: Sys[ S ], A ]( valueVal: A )( implicit peerType: BiType[ A ])
       extends Entry[ S, A ] with Dummy[ S, Change[ (Long, A) ], Entry[ S, A ]] with Constant[ S ] {
          protected def writeData( out: DataOutput ) {
@@ -199,15 +172,7 @@ object Inst {
          }
 
          def valueCache( implicit tx: S#Tx ) : A = valueVal
-
-//         def time  : Expr[ S, Long ]   = peerType.longType.newConst[ S ]( timeVal )
          def value : Expr[ S, A ]      = peerType.newConst[ S ]( valueVal )
-
-//         def updateCache()( implicit tx: S#Tx ) : Long = {
-//            sys.error( "Illegal state -- a constant region should not change its time value : " + this )
-//         }
-
-//         def isDummy = true
       }
 
       final private[Inst] case class Dynamic[ S <: Sys[ S ], A ]( targets: Targets[ S ], cacheVar: S#Var[ (Long, A) ],
@@ -278,17 +243,11 @@ object Inst {
             cacheVar.set( (newTime, value.value) )
             newTime
          }
-
-//         def isDummy = false
       }
    }
    private sealed trait Entry[ S <: Sys[ S ], A ] extends EventLike[ S, Change[ (Long, A) ], Entry[ S, A ]] with Writer {
-//      def timeCache(  implicit tx: S#Tx ) : Long
       def valueCache( implicit tx: S#Tx ) : A
-//      def time: Expr[ S, Long ]
       def value: Expr[ S, A ]
-//      def updateCache()( implicit tx: S#Tx ) : Long
-//      def isDummy: Boolean
    }
 
    final case class Region[ A ]( span: SpanLike, value: A )
@@ -341,24 +300,18 @@ object Inst {
                e.pullUpdate( pull ).foreach {
                   case Change( (tOld, vOld), (tNew, vNew) ) =>
                      if( tOld == tNew ) { // time didn't change -- only one region changed
-//                        val (succ, cmp) = getGeq( tOld + 1 )
-//                        val span = if( cmp <= 0 ) Span( tOld, succ.timeCache ) else Span.from( tOld )
                         val span = ordered.ceil( tOld + 1 ) match {
                            case Some( (tSucc, _) ) => Span( tOld, tSucc )
                            case None               => Span.from( tOld )
                         }
                         regions :+= Region( span, vNew )
                      } else {             // time did change -- two changed regions, and need to re-insert entries
-//                        val (succ1, cmp1) = getGeq( tOld + 1 )
-//                        val span1   = if( cmp1 <= 0 ) Span( tOld, succ1.timeCache ) else Span.from( tOld )
                         val span1 = ordered.ceil( tOld + 1 ) match {
                            case Some( (tSucc, _) ) => Span( tOld, tSucc )
                            case None               => Span.from( tOld )
                         }
                         val r1      = Region( span1, valueCache( tOld ))
                         regions :+= r1
-//                        val (succ2, cmp2) = getGeq( tNew + 1 )
-//                        val span2   = if( cmp2 <= 0 ) Span( tNew, succ2.timeCache ) else Span.from( tNew )
                         val span2 = ordered.ceil( tNew + 1 ) match {
                            case Some( (tSucc, _) ) => Span( tNew, tSucc )
                            case None               => Span.from( tNew )
@@ -377,24 +330,8 @@ object Inst {
          }
       }
 
-//      private def getGeq( time: Long )( implicit tx: S#Tx ) : (Entry[ S, A ], Int) = {
-//         // XXX TODO should be an efficient method in skiplist itself
-//         ordered.isomorphicQuery( new Ordered[ S#Tx, Entry[ S, A ]] {
-//            def compare( that: Entry[ S, A ])( implicit tx: S#Tx ) = {
-//               val t = that.timeCache
-//               if( time < t ) -1 else if( time > t ) 1 else 0
-//            }
-//         })
-//      }
-
       def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] =
          ordered.iterator.map( tup => (tup._1, tup._2.value.value) ).toList
-
-//      private def getLeq( time: Long )( implicit tx: S#Tx ) : Entry[ S, A ] = {
-////         val ((succ, _), cmp) = getEntry( time )._1._2
-////         if( cmp > 0 ) ???
-//         ordered.toList.takeWhile( _.timeCache <= time ).last // XXX TODO ouch... we do need a pred method for skiplist
-//      }
 
       def getAt( time: Long )( implicit tx: S#Tx )   : Expr[ S, A ] = ordered.floor( time ).get._2.value
       def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time.value )
@@ -408,9 +345,6 @@ object Inst {
          val con           = targets.nonEmpty
          val succ          = ordered.ceil( start + 1 )
 
-//         if( con && cmp == 0 ) {  // overwriting entry!
-//            succ -/-> this
-//         }
          val oldOption = ordered.add( start -> newEntry )
          if( con ) {
             oldOption.foreach( _ -/-> this )
@@ -424,7 +358,6 @@ object Inst {
          oldOption.map( _.value )
       }
       def set( value: Expr[ S, A ])( implicit tx: S#Tx ) {
-//         setAt( chr.time, value )
          ordered.clear()
          sys.error( "TODO" )
       }
