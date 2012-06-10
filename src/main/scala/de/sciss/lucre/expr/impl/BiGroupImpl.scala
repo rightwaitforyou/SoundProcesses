@@ -19,6 +19,8 @@ object BiGroupImpl {
    private val MIN_COORD   = MAX_SQUARE.left
    private val MAX_COORD   = MAX_SQUARE.right
 
+//   private final case class Entry[ Elem ]( )
+
    def newVar[ S <: Sys[ S ], Elem, U <: EventLike[ S, _, Elem ]]( eventView: Elem => U )(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ]) : Var[ S, Elem, U ] = {
 
@@ -27,7 +29,7 @@ object BiGroupImpl {
          case Span.From( start ) => Point2D( start.toInt, MAX_COORD )
          case Span.Until( stop ) => Point2D( MIN_COORD, (stop + 1).toInt )
          case Span.All           => Point2D( MIN_COORD, MAX_COORD )
-         case Span.Void          => Point2D( MAX_COORD, MAX_COORD )  // ???
+         case Span.Void          => Point2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
       }
       implicit val hyperSer = SpaceSerializers.SquareSerializer
       val tree = SkipOctree.empty[ S, TwoDim, (SpanLike, Elem) ]( MAX_SQUARE )
@@ -38,12 +40,12 @@ object BiGroupImpl {
    extends Var[ S, Elem, U ] {
       protected def tree: SkipOctree[ S, TwoDim, (SpanLike, Elem) ]
 
-      final def add( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) {
-         sys.error( "TODO" )
-      }
-      final def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Option[ Elem ] = {
-         sys.error( "TODO" )
-      }
+//      final def add( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) {
+//         sys.error( "TODO" )
+//      }
+//      final def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Option[ Elem ] = {
+//         sys.error( "TODO" )
+//      }
 
       final def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, Elem) ] =
          sys.error( "TODO" )

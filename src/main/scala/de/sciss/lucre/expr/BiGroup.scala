@@ -45,8 +45,8 @@ object BiGroup {
       sys.error( "TODO" )
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
-      def add( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Unit
-      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Option[ Elem ]
+//      def add( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Unit
+//      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Option[ Elem ]
    }
 }
 trait BiGroup[ S <: Sys[ S ], Elem, U ] {
