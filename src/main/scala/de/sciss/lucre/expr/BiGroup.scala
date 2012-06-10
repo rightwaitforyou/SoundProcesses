@@ -29,6 +29,7 @@ import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike}
 import de.sciss.collection.txn
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import impl.BiGroupImpl
 
 object BiGroup {
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
@@ -41,12 +42,11 @@ object BiGroup {
    final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], elem: Elem, elemUpdate: U ) extends Update[ S, Elem, U ]
 
    def newVar[ S <: Sys[ S ], Elem, U <: EventLike[ S, _, Elem ] ]( eventView: Elem => U )
-                                       ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ]) : Var[ S, Elem, U ] =
-      sys.error( "TODO" )
+      ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ]) : Var[ S, Elem, U ] = BiGroupImpl.newVar( eventView )
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
-//      def add( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Unit
-//      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Option[ Elem ]
+      def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Unit
+      def remove( span: Expr[ S, SpanLike ])( implicit tx: S#Tx ) : Option[ Elem ]
    }
 }
 trait BiGroup[ S <: Sys[ S ], Elem, U ] {
