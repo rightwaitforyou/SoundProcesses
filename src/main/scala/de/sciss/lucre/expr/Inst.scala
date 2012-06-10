@@ -1,5 +1,5 @@
 /*
- *  BiExpr.scala
+ *  Inst.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -26,11 +26,11 @@
 package de.sciss.lucre.expr
 
 import de.sciss.collection.txn
-import txn.{SkipList, Ordered, HASkipList}
+import txn.{SkipList, HASkipList}
 import de.sciss.lucre.{event, DataInput, DataOutput}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import event.{Node, Intruder, EventLikeSerializer, Change, Reader, Constant, Dummy, EventLike, Pull, Targets, Trigger, StandaloneLike, Event}
-import de.sciss.lucre.stm.{Disposable, Serializer, InMemory, TxnSerializer, Writer, Sys}
+import de.sciss.lucre.stm.{Disposable, Serializer, TxnSerializer, Writer, Sys}
+import event.{Constant, Node, Intruder, EventLikeSerializer, Change, Reader, Dummy, EventLike, Pull, Targets, Trigger, StandaloneLike, Event}
 
 object Inst {
    type Update[ A ] = IIdxSeq[ Region[ A ]]
@@ -123,7 +123,7 @@ object Inst {
       def set( value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
 //      def setAt( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Unit
 //      def setFrom( time: Expr[ S, Long ])
-      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Boolean
+      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Option[ Expr[ S, A ]]
       def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Boolean
       def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]]
       def removeAll( span: SpanLike )( implicit tx: S#Tx ) : Unit
@@ -134,13 +134,13 @@ object Inst {
          new Ser[ S, A ]
 
       private def readFull[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                              ( implicit tx: S#Tx, peer: BiType[ A ]) : FullImpl[ S, A ] = {
+                                              ( implicit tx: S#Tx, peer: BiType[ A ]) : Dynamic[ S, A ] = {
 //         import peer.ValueSer
          implicit val cacheSer   = TxnSerializer.tuple2[ S#Tx, S#Acc, Long, A ]( Serializer.Long, peer.ValueSer )
          val cacheVar            = tx.readVar[ (Long, A) ]( targets.id, in )
          val time                = peer.longType.readExpr[ S ]( in, access )
          val value               = peer.readExpr[ S ]( in, access )
-         new FullImpl[ S, A ]( targets, cacheVar, time, value )
+         new Dynamic[ S, A ]( targets, cacheVar, time, value )
       }
 
       private final class Ser[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ])
@@ -150,9 +150,8 @@ object Inst {
          }
 
          def readConstant( in: DataInput )( implicit tx: S#Tx ) : Entry[ S, A ] = {
-            val timeVal       = in.readLong()
-            val valueVal      = peer.readValue( in )
-            new DummyImpl[ S, A ]( timeVal, valueVal )
+            val valueVal = peer.readValue( in )
+            new Static[ S, A ]( valueVal )
          }
       }
 
@@ -181,42 +180,40 @@ object Inst {
                                    ( implicit tx: S#Tx, peerType: BiType[ A ]) : Entry[ S, A ] = {
          val valueVal = value.value
          if( time.isInstanceOf[ Expr.Const[ _, _ ]] && value.isInstanceOf[ Expr.Const[ _, _ ]]) {
-            new DummyImpl[ S, A ]( timeVal, valueVal )
+            new Static[ S, A ]( valueVal )
          } else {
             val targets             = Targets[ S ]
             implicit val cacheSer   = TxnSerializer.tuple2[ S#Tx, S#Acc, Long, A ]( Serializer.Long, peerType.ValueSer )
             val cacheVar            = tx.newVar( targets.id, (timeVal, valueVal) )
-            new FullImpl[ S, A ]( targets, cacheVar, time, value )
+            new Dynamic[ S, A ]( targets, cacheVar, time, value )
          }
       }
 
 //      private sealed trait Impl[ S <: Sys[ S ], A ] extends Entry[ S, A ] {
 //      }
 
-      private final class DummyImpl[ S <: Sys[ S ], A ]( timeVal: Long, val valueVal: A )( implicit peerType: BiType[ A ])
+      private final case class Static[ S <: Sys[ S ], A ]( valueVal: A )( implicit peerType: BiType[ A ])
       extends Entry[ S, A ] with Dummy[ S, Change[ (Long, A) ], Entry[ S, A ]] with Constant[ S ] {
          protected def writeData( out: DataOutput ) {
-            out.writeLong( timeVal )
             peerType.writeValue( valueVal, out )
          }
 
-         def timeCache( implicit tx: S#Tx ) : Long = timeVal
          def valueCache( implicit tx: S#Tx ) : A = valueVal
 
-         def time  : Expr[ S, Long ]   = peerType.longType.newConst[ S ]( timeVal )
+//         def time  : Expr[ S, Long ]   = peerType.longType.newConst[ S ]( timeVal )
          def value : Expr[ S, A ]      = peerType.newConst[ S ]( valueVal )
 
-         def updateCache()( implicit tx: S#Tx ) : Long = {
-            sys.error( "Illegal state -- a constant region should not change its time value : " + this )
-         }
+//         def updateCache()( implicit tx: S#Tx ) : Long = {
+//            sys.error( "Illegal state -- a constant region should not change its time value : " + this )
+//         }
 
-         def isDummy = true
+//         def isDummy = true
       }
 
-      final class FullImpl[ S <: Sys[ S ], A ]( protected val targets: Targets[ S ], cacheVar: S#Var[ (Long, A) ],
-                                                val time: Expr[ S, Long ], val value: Expr[ S, A ])
+      final private[Inst] case class Dynamic[ S <: Sys[ S ], A ]( targets: Targets[ S ], cacheVar: S#Var[ (Long, A) ],
+                                                                  time: Expr[ S, Long ], value: Expr[ S, A ])
       extends Entry[ S, A ] with StandaloneLike[ S, Change[ (Long, A) ], Entry[ S, A ]] {
-         def timeCache(  implicit tx: S#Tx ) : Long = cacheVar.get._1
+         private def timeCache(  implicit tx: S#Tx ) : Long = cacheVar.get._1
          def valueCache( implicit tx: S#Tx ) : A    = cacheVar.get._2
 
          // LucreSTM issue #7 !!!
@@ -282,16 +279,16 @@ object Inst {
             newTime
          }
 
-         def isDummy = false
+//         def isDummy = false
       }
    }
    private sealed trait Entry[ S <: Sys[ S ], A ] extends EventLike[ S, Change[ (Long, A) ], Entry[ S, A ]] with Writer {
 //      def timeCache(  implicit tx: S#Tx ) : Long
       def valueCache( implicit tx: S#Tx ) : A
-      def time: Expr[ S, Long ]
+//      def time: Expr[ S, Long ]
       def value: Expr[ S, A ]
-      def updateCache()( implicit tx: S#Tx ) : Long
-      def isDummy: Boolean
+//      def updateCache()( implicit tx: S#Tx ) : Long
+//      def isDummy: Boolean
    }
 
    final case class Region[ A ]( span: SpanLike, value: A )
@@ -305,17 +302,18 @@ object Inst {
       protected def reader = serializer[ S, A ]
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
-         var dirty   = IIdxSeq.empty[ (Long, Entry[ S, A ])]
+         var dirty   = IIdxSeq.empty[ (Long, Entry.Dynamic[ S, A ])]
 
-         ordered.iterator.foreach { case tup @ (timeCache, e) =>
-            if( !e.isDummy ) {
-               val tNow = e.time.value
+         ordered.iterator.foreach {
+            case (timeCache, e @ Entry.Dynamic( _, _, timeVar, _ )) =>
+               val tNow = timeVar.value
                if( timeCache != tNow ) {
-                  dirty :+= tup
+                  dirty :+= (timeCache, e)
                } else {
                   e ---> this
                }
-            }
+
+            case _ =>
          }
 
          dirty.foreach { case (timeCache, e) =>
@@ -339,7 +337,7 @@ object Inst {
             p.foreach { sel =>
 // need to change package private modifier from `event` to `lucre`
 //               n.devirtualize()
-               val e = Intruder.devirtualize( sel, reader ).asInstanceOf[ Entry[ S, A ]]
+               val e = Intruder.devirtualize( sel, reader ).asInstanceOf[ Entry.Dynamic[ S, A ]]
                e.pullUpdate( pull ).foreach {
                   case Change( (tOld, vOld), (tNew, vNew) ) =>
                      if( tOld == tNew ) { // time didn't change -- only one region changed
@@ -390,7 +388,7 @@ object Inst {
 //      }
 
       def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] =
-         ordered.valuesIterator.map( e => (e.time.value, e.value.value) ).toList
+         ordered.iterator.map( tup => (tup._1, tup._2.value.value) ).toList
 
 //      private def getLeq( time: Long )( implicit tx: S#Tx ) : Entry[ S, A ] = {
 ////         val ((succ, _), cmp) = getEntry( time )._1._2
@@ -404,7 +402,7 @@ object Inst {
       def valueAt( time: Long )( implicit tx: S#Tx )   : A  = getAt( time ).value
       def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time.value )
 
-      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Boolean = {
+      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Option[ Expr[ S, A ]] = {
          val start         = time.value
          val newEntry      = Entry( start, time, value )
          val con           = targets.nonEmpty
@@ -423,7 +421,7 @@ object Inst {
             }
             fire( IIdxSeq( Region( span, value.value )))
          }
-         oldOption.isEmpty // XXX should return the oldEntry instead
+         oldOption.map( _.value )
       }
       def set( value: Expr[ S, A ])( implicit tx: S#Tx ) {
 //         setAt( chr.time, value )
