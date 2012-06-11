@@ -33,7 +33,7 @@ import de.sciss.lucre.event.Targets
 import annotation.switch
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
-//           8 = string
+//           8 = string, 9 = spanlike
 object Doubles extends BiTypeImpl[ Double ] {
    private val typeID = 5
 
@@ -157,13 +157,13 @@ object Doubles extends BiTypeImpl[ Double ] {
             new Tuple1( typeID, this, Targets.partial[ S ], a )
          }
 
-         def value( a: Double ) : Double
+//         def value( a: Double ) : Double
 
          def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = _1.toString + "." + name
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
-            val i    = cn.indexOf( '$' ) + 1
+            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
             "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
          }
       }
@@ -296,7 +296,7 @@ object Doubles extends BiTypeImpl[ Double ] {
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
-            val i    = cn.indexOf( '$' ) + 1
+            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
             "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
          }
       }

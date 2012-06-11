@@ -35,6 +35,17 @@ object Span {
    def apply( start: Long, stop: Long ) : Span        = Apply( start ,stop )
    def unapply( span: Span ) : Option[ (Long, Long) ] = Some( (span.start, span.stop) )
 
+   implicit object serializer extends Serializer[ Span ] {
+      def write( v: Span, out: DataOutput ) { v.write( out )}
+      def read( in: DataInput ) : Span = Span.read( in )
+   }
+
+   def read( in: DataInput ) : Span = {
+      val cookie = in.readUnsignedByte()
+      require( cookie == 0, "Unexpected cookie " + cookie )
+      Span( in.readLong(), in.readLong() )
+   }
+
    sealed trait Open extends SpanLike {
       final def isEmpty    = false
       final def nonEmpty   = true
@@ -193,7 +204,7 @@ object Span {
 
       def contains( pos: Long ) : Boolean = pos >= start && pos < stop
 
-      def shift( delta: Long ) : Span.Closed = Span( start + delta, stop + delta )
+      def shift( delta: Long ) : Span = Span( start + delta, stop + delta )
 
       def clip( pos: Long ) : Long = math.max( start, math.min( stop, pos ))
 
@@ -343,4 +354,5 @@ sealed trait SpanLike extends Writer {
 sealed trait Span extends Span.Closed {
    def start: Long
    def stop: Long
+   def shift( delta: Long ) : Span
 }

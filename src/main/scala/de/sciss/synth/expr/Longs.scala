@@ -27,12 +27,12 @@ package de.sciss.synth.expr
 
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.expr.Type
 import de.sciss.lucre.event.Targets
 import annotation.switch
+import de.sciss.lucre.expr.{Span, Expr, Type}
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
-//           8 = string
+//           8 = string, 9 = spanlike
 object Longs extends BiTypeImpl[ Long ] {
    private val typeID = 3
 
@@ -47,17 +47,25 @@ object Longs extends BiTypeImpl[ Long ] {
             require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
             val opID = in.readInt()
             import UnaryOp._
-            val op: Op = (opID: @switch) match {
+            val op: Op[ _ ] = (opID: @switch) match {
+               // ---- Long ----
                case 0  => Neg
                case 4  => BitNot
                case 5  => Abs
                case 11 => Signum
                case 12 => Squared
                case 13 => Cubed
+
+               // ---- Span ----
+               case 0x1000 => Spans.UnaryOp.Start
+               case 0x1001 => Spans.UnaryOp.Stop
+               case 0x1002 => Spans.UnaryOp.Length
+
                case _  => sys.error( "Invalid operation id " + opID )
             }
-            val _1 = readExpr( in, access )
-            new Tuple1( typeID, op, targets, _1 )
+            op.read( in, access, targets )
+//            val _1 = readExpr( in, access )
+//            new Tuple1( typeID, op, targets, _1 )
 
          case 2 =>
             val tpe = in.readInt()
@@ -105,43 +113,60 @@ object Longs extends BiTypeImpl[ Long ] {
       }
    }
 
-   private object UnaryOp {
-      sealed abstract class Op( val id: Int ) extends Tuple1Op[ Long ] {
-         final def make[ S <: Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
+   object UnaryOp {
+      /* sealed */ trait Op[ T1 ] extends Tuple1Op[ T1 ] {
+         def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
+                                 ( implicit tx: S#Tx ) : Tuple1[ S, T1 ]
+
+         def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ]) : String = _1.toString + "." + name
+
+         def make[ S <: Sys[ S ]]( a: Expr[ S, T1 ])( implicit tx: S#Tx ) : Ex[ S ] = {
             new Tuple1( typeID, this, Targets.partial[ S ], a )
          }
 
-         def value( a: Long ) : Long
-
-         def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = _1.toString + "." + name
-
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
-            val i    = cn.indexOf( '$' ) + 1
+            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
             "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
          }
       }
+
+      sealed abstract class LongOp( val id: Int ) extends Op[ Long ] {
+         final def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
+                                       ( implicit tx: S#Tx ) : Tuple1[ S, Long ] = {
+            val _1 = readExpr( in, access )
+            new Tuple1( typeID, this, targets, _1 )
+         }
+      }
+
+//      sealed abstract class SpanOp( val id: Int ) extends Op[ Span ] {
+//         final def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
+//                                       ( implicit tx: S#Tx ) : Tuple1[ S, Span ] = {
+//            val _1 = Spans.readExpr( in, access )
+//            new Tuple1( typeID, this, targets, _1 )
+//         }
+//      }
       
-      case object Neg extends Op( 0 ) {
+      case object Neg extends LongOp( 0 ) {
          def value( a: Long ) : Long = -a
          override def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
       }
-      case object Abs         extends Op(  5 ) {
+      case object Abs         extends LongOp(  5 ) {
          def value( a: Long ) : Long = math.abs( a )
       }
-      case object BitNot extends Op( 4 ) {
+      case object BitNot extends LongOp( 4 ) {
          def value( a: Long ) : Long = ~a
          override def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = "~" + _1
       }
    // case object ToLong     extends Op(  6 )
    // case object ToInt       extends Op(  7 )
-      case object Signum      extends Op( 11 ) {
+      case object Signum      extends LongOp( 11 ) {
          def value( a: Long ) : Long = math.signum( a )
       }
-      case object Squared     extends Op( 12 ) {
+      case object Squared     extends LongOp( 12 ) {
          def value( a: Long ) : Long = a * a
       }
-      case object Cubed       extends Op( 13 ) {
+      case object Cubed       extends LongOp( 13 ) {
          def value( a: Long ) : Long = a * a * a
       }
    }

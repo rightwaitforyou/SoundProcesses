@@ -1,13 +1,15 @@
 package de.sciss.synth.expr
 
 import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{SpanLike, Span, Expr}
 
 object ExprImplicits {
-   implicit def stringConst[  S <: Sys[ S ]]( s: String )  : Expr[ S, String  ] = Strings.newConst(  s )
-   implicit def booleanConst[ S <: Sys[ S ]]( b: Boolean ) : Expr[ S, Boolean ] = Booleans.newConst( b )
-   implicit def doubleConst[  S <: Sys[ S ]]( d: Double )  : Expr[ S, Double  ] = Doubles.newConst(  d )
-   implicit def longConst[    S <: Sys[ S ]]( n: Long )    : Expr[ S, Long    ] = Longs.newConst(    n )
+   implicit def stringConst[   S <: Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )
+   implicit def booleanConst[  S <: Sys[ S ]]( b: Boolean )  : Expr[ S, Boolean  ] = Booleans.newConst(  b )
+   implicit def doubleConst[   S <: Sys[ S ]]( d: Double )   : Expr[ S, Double   ] = Doubles.newConst(   d )
+   implicit def longConst[     S <: Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
+   implicit def spanConst[     S <: Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
+   implicit def spanLikeConst[ S <: Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
 }
 
 /**
@@ -35,4 +37,9 @@ class ExprImplicits[ S <: Sys[ S ]] {
    implicit def longOps1[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, Long ]) : Longs.RichOps[ S ] =
       new Longs.RichOps( ex )
    implicit def longOps2( ex: Expr[ S, Long ])( implicit tx: S#Tx ) : Longs.Ops[ S ] = new Longs.Ops( ex )
+
+   implicit def spanConst( s: Span ) : Expr[ S, Span ] = Spans.newConst( s )
+   implicit def spanOps( ex: Expr[ S, Span ])( implicit tx: S#Tx ) : Spans.Ops[ S ] = new Spans.Ops( ex )
+   implicit def spanLikeConst( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
+   implicit def spanLikeOps( ex: Expr[ S, SpanLike ])( implicit tx: S#Tx ) : SpanLikes.Ops[ S ] = new SpanLikes.Ops( ex )
 }
