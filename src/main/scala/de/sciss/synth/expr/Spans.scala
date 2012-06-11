@@ -38,6 +38,8 @@ object Spans extends BiTypeImpl[ Span ] {
    /* protected */ def readValue( in: DataInput ) : Span = Span.read( in )
    /* protected */ def writeValue( value: Span, out: DataOutput ) { value.write( out )}
 
+//   def apply[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ]) : Ex[ S ] = sys.error( "TODO" ) // ( start ,stop )
+
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       // ---- unary ----
       def start  : Expr[ S, Long ] = UnaryOp.Start.make(  ex )
@@ -96,7 +98,7 @@ object Spans extends BiTypeImpl[ Span ] {
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
-            val i    = cn.indexOf( '$' ) + 1
+            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
             "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
          }
       }
@@ -114,7 +116,7 @@ object Spans extends BiTypeImpl[ Span ] {
          }
       }
 
-      case object Shift extends LongSpanOp( 0x2000 ) {
+      case object Shift extends LongSpanOp( 0x1100 ) {
          def value( a: Span, b: Long ) : Span = a.shift( b )
       }
    }
