@@ -25,7 +25,8 @@ scalacOptions ++= Seq( "-deprecation", "-unchecked" )   // "-Xelide-below", "INF
 
 initialCommands in console := """import de.sciss.synth._; import ugen._; import proc._
 import de.sciss.lucre.stm.InMemory
-type S = InMemory
-implicit val system: S = de.sciss.lucre.stm.InMemory()
-def t[ A ]( fun: S#Tx => A ) : A = system.step( fun )
+import de.sciss.lucre.expr.Span
+// type S = InMemory
+// implicit val system: S = de.sciss.lucre.stm.InMemory()
+// def t[ A ]( fun: S#Tx => A ) : A = system.step( fun )
 """

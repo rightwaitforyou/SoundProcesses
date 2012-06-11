@@ -10,6 +10,12 @@ object ExprImplicits {
    implicit def longConst[     S <: Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
    implicit def spanConst[     S <: Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
    implicit def spanLikeConst[ S <: Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
+
+//   trait LowPriority[ S <: Sys[ S ]] {
+//      implicit def lowSpanLikeConst( s: Span ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
+////      implicit def lowSpanLikeOps( ex: Expr[ S, Span ])( implicit tx: S#Tx ) : SpanLikes.Ops[ S ] = new SpanLikes.Ops( ex )
+////      implicit def lowDoubleConst( d: Float ) : Expr[ S, Double ] = Doubles.newConst( d )
+//   }
 }
 
 /**
@@ -19,7 +25,7 @@ object ExprImplicits {
  * that require an existing expression (e.g. `longOps2`). This is so that primitive standard operations remain
  * outside the implicit scope (e.g. addition on longs).
  */
-class ExprImplicits[ S <: Sys[ S ]] {
+class ExprImplicits[ S <: Sys[ S ]] /* extends ExprImplicits.LowPriority[ S ] */ {
    implicit def stringConst( s: String ) : Expr[ S, String ] = Strings.newConst( s )
 //   implicit def stringOps[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, String ]) : Strings.Ops[ S ] =
 //      new Strings.Ops( ex )

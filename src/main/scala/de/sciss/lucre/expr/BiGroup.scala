@@ -41,12 +41,16 @@ object BiGroup {
    final case class Moved[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], elem: Elem ) extends Update[ S, Elem, U ]
    final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], elem: Elem, elemUpdate: U ) extends Update[ S, Elem, U ]
 
-   def newVar[ S <: Sys[ S ], Elem, U <: EventLike[ S, _, Elem ] ]( eventView: Elem => U )
-      ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ]) : Var[ S, Elem, U ] = BiGroupImpl.newVar( eventView )
+   def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+      BiGroupImpl.newGenericVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
+
+   def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+      ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
+        spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.newGenericVar( eventView )
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
       def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Unit
-      def remove( span: Expr[ S, SpanLike ])( implicit tx: S#Tx ) : Option[ Elem ]
+      def remove( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean
    }
 }
 trait BiGroup[ S <: Sys[ S ], Elem, U ] {
@@ -57,4 +61,6 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] {
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
    def changed : Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+
+   def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ]
 }

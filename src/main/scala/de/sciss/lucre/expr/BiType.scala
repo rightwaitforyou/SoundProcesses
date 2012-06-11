@@ -46,6 +46,7 @@ trait BiType[ A ] extends Type[ A ] {
    }
 
    def longType : BiType[ Long ]
+   def spanLikeType : BiType[ SpanLike ]
 
 //   def readLongExpr[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr[ S, Long ]
 
