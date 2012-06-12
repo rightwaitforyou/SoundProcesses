@@ -90,7 +90,10 @@ object BiGroupImpl {
 
       final def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
          val ti = time.toInt
-         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
+//         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
+         // horizontally: from query_stop; vertically: until query_start
+         val shape = Rectangle( ti + 1, MIN_COORD, MAX_COORD - ti, ti - MIN_COORD + 1 )
+println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom )
          tree.rangeQuery( shape ) // .flatMap ....
       }
 
