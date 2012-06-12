@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{InMemory, Cursor, Sys}
 import de.sciss.synth.expr.{ExprImplicits, Longs}
-import de.sciss.lucre.expr.{Span, BiGroup}
+import de.sciss.lucre.expr.{SpanLike, Span, BiGroup}
 
 object BiGroupTest {
    def apply() : BiGroupTest[ InMemory ] = new BiGroupTest( InMemory() )
@@ -21,5 +21,15 @@ class BiGroupTest[ S <: Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S
 
    def at( time: Long ) = t { implicit tx =>
       bi.iteratorAt( time ).toIndexedSeq
+   }
+
+   def within( span: SpanLike ) = t { implicit tx =>
+      bi.iteratorWithin( span ).toIndexedSeq
+   }
+
+   def list() { val li = t { implicit tx =>
+         bi.debugList()
+      }
+      println( li )
    }
 }

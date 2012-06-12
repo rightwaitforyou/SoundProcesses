@@ -7,7 +7,7 @@ import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.collection.txn
 import txn.{SpaceSerializers, SkipOctree}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.collection.geom.{Rectangle, Point2D, Point2DLike, Square, Space}
+import de.sciss.collection.geom.{QueryShape, Rectangle, Point2D, Point2DLike, Square, Space}
 import Space.TwoDim
 
 /**
@@ -15,6 +15,8 @@ import Space.TwoDim
  */
 object BiGroupImpl {
    import BiGroup.Var
+
+   var VERBOSE = true
 
    private val MAX_SQUARE  = Square( 0, 0, 0x40000000 )
    private val MIN_COORD   = MAX_SQUARE.left
@@ -26,9 +28,9 @@ object BiGroupImpl {
    private type Tree[ S <: Sys[ S ], Elem ] = SkipOctree[ S, TwoDim, Leaf[ S, Elem ]]
 
    private def spanToPoint( span: SpanLike ) : Point2D = span match {
-      case Span( start, stop )=> Point2D( start.toInt, (stop + 1).toInt )
+      case Span( start, stop )=> Point2D( start.toInt, (stop - 1).toInt )
       case Span.From( start ) => Point2D( start.toInt, MAX_COORD )
-      case Span.Until( stop ) => Point2D( MIN_COORD, (stop + 1).toInt )
+      case Span.Until( stop ) => Point2D( MIN_COORD, (stop - 1).toInt )
       case Span.All           => Point2D( MIN_COORD, MAX_COORD )
       case Span.Void          => Point2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
    }
@@ -52,6 +54,7 @@ object BiGroupImpl {
       final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
          val spanVal = span.value
          val point   = spanToPoint( spanVal )
+if( VERBOSE ) println( "add at point " + point )
          val entry   = (span, elem)
          tree.transformAt( point ) {
             case None               => Some( spanVal -> IIdxSeq( entry ))
@@ -89,16 +92,44 @@ object BiGroupImpl {
          iteratorAt( time.time.value )
 
       final def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
-         val ti = time.toInt
+         val ti      = time.toInt
+         val start   = ti
+         val stop    = ti + 1
 //         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
-         // horizontally: from query_stop; vertically: until query_start
-         val shape = Rectangle( ti + 1, MIN_COORD, MAX_COORD - ti, ti - MIN_COORD + 1 )
-println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom )
-         tree.rangeQuery( shape ) // .flatMap ....
+         // horizontally: until query_stop; vertically: from query_start
+         val shape = Rectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start + 1 )
+         rangeSearch( shape )
       }
 
-      final def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] =
-         sys.error( "TODO" )
+      final def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
+         // horizontally: until query_stop; vertically: from query_start
+         span match {
+            case Span( startL, stopL ) =>
+               val start = startL.toInt
+               val stop  = stopL.toInt
+               val shape = Rectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start /* + 1 XXX int overflow */ )
+               rangeSearch( shape )
+
+            case Span.From( startL ) =>
+               val start = startL.toInt
+               val shape = Rectangle( MIN_COORD, start, MAX_COORD - MIN_COORD /* + 1 XXX int overflow */, MAX_COORD - start /* + 1 XXX int overflow */ )
+               rangeSearch( shape )
+
+            case Span.Until( stopL ) =>
+               val stop  = stopL.toInt
+               val shape = Rectangle( MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_COORD - MIN_COORD /* + 1 XXX int overflow */ )
+               rangeSearch( shape )
+
+            case Span.All  => tree.iterator
+            case Span.Void => sys.error( "TODO" ) // txn.Iterator.empty
+         }
+      }
+
+      private def rangeSearch( shape: Rectangle )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
+         val res = tree.rangeQuery( shape ) // .flatMap ....
+if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
+         res
+      }
 
       final def changed : Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] = sys.error( "TODO" )
    }
