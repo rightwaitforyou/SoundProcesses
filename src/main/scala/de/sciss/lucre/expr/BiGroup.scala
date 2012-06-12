@@ -30,6 +30,7 @@ import evt.{Event, EventLike}
 import de.sciss.collection.txn
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import impl.BiGroupImpl
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object BiGroup {
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
@@ -54,9 +55,11 @@ object BiGroup {
    }
 }
 trait BiGroup[ S <: Sys[ S ], Elem, U ] {
-   def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
-   def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
-   def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
+//   def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
+   def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]
+//   def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
+   def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ]) ]
+   def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]
 
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 

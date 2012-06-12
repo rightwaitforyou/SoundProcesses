@@ -5,10 +5,10 @@ import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike}
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.collection.txn
-import de.sciss.collection.geom.{Point2D, Point2DLike, Square, Space}
-import Space.TwoDim
 import txn.{SpaceSerializers, SkipOctree}
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import de.sciss.collection.geom.{Rectangle, Point2D, Point2DLike, Square, Space}
+import Space.TwoDim
 
 /**
  * TODO need a Long based 2D space
@@ -85,13 +85,16 @@ object BiGroupImpl {
       final def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ] =
          tree.toList.flatMap { case (span, seq) => seq.map { case (_, elem) => span -> elem }}
 
-      final def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, Elem) ] =
-         sys.error( "TODO" )
+      final def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]  =
+         iteratorAt( time.time.value )
 
-      final def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ] =
-         sys.error( "TODO" )
+      final def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
+         val ti = time.toInt
+         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
+         tree.rangeQuery( shape ) // .flatMap ....
+      }
 
-      final def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ] =
+      final def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] =
          sys.error( "TODO" )
 
       final def changed : Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] = sys.error( "TODO" )

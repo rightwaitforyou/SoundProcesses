@@ -18,4 +18,8 @@ class BiGroupTest[ S <: Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S
    def testAdd() {
       t { implicit tx => bi.add( Span( 33, 44 ), 55 )}
    }
+
+   def at( time: Long ) = t { implicit tx =>
+      bi.iteratorAt( time ).toIndexedSeq
+   }
 }
