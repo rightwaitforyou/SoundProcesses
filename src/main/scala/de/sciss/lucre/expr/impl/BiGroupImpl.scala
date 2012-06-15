@@ -1,13 +1,38 @@
+/*
+ *  BiGroupImpl.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either
+ *  version 2, june 1991 of the License, or (at your option) any later version.
+ *
+ *  This software is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public
+ *  License (gpl.txt) along with this software; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.lucre.expr
 package impl
 
-import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.{event => evt, DataInput, DataOutput}
 import evt.{Event, EventLike}
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.collection.txn
 import txn.{SpaceSerializers, SkipOctree}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.collection.geom.{QueryShape, Rectangle, Point2D, Point2DLike, Square, Space}
+import de.sciss.collection.geom.{Rectangle, Point2D, Point2DLike, Square, Space}
 import Space.TwoDim
 
 /**
@@ -42,14 +67,77 @@ object BiGroupImpl {
       implicit val hyperSer   = SpaceSerializers.SquareSerializer
       implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
       val tree: Tree[ S, Elem ] = SkipOctree.empty[ S, TwoDim, Leaf[ S, Elem ]]( MAX_SQUARE )
-      new ImplNew( tree, eventView )
+      new ImplNew( evt.Targets[ S ], tree, eventView )
+   }
+
+   private def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
+      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S , Impl[ S, Elem, U ]] = new Ser( eventView )
+
+   private class Ser[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+                                              ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
+                                                spanType: Type[ SpanLike ])
+   extends evt.NodeSerializer[ S , Impl[ S, Elem, U ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Impl[ S, Elem, U ] = {
+         implicit val pointView: (Leaf[ S, Elem ], S#Tx) => Point2DLike = (tup, tx) => spanToPoint( tup._1 )
+         implicit val hyperSer   = SpaceSerializers.SquareSerializer
+         implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
+         val tree: Tree[ S, Elem ] = SkipOctree.read[ S, TwoDim, Leaf[ S, Elem ]]( in, access )
+         new ImplNew( targets, tree, eventView )
+      }
    }
 
    private sealed trait Impl[ S <: Sys[ S ], Elem, U ]
-   extends Var[ S, Elem, U ] {
+   extends Var[ S, Elem, U ]
+   with evt.Trigger.Impl[ S, BiGroup.Update[ S, Elem, U ], BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+   with evt.StandaloneLike[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+   {
       protected def tree: Tree[ S, Elem ]
+      protected def eventView: Elem => EventLike[ S, U, Elem ]
+      implicit protected def elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ]
+      implicit protected def spanType: Type[ SpanLike ]
 
-      override def toString = "BiGroup" + tree.id
+      override def toString() = "BiGroup" + tree.id
+
+      // ---- event behaviour ----
+
+      final protected def disposeData()( implicit tx: S#Tx ) {
+         tree.dispose()
+      }
+
+      final protected def writeData( out: DataOutput ) {
+         tree.write( out )
+      }
+
+      private def foreach( fun: Elem => Unit )( implicit tx: S#Tx ) {
+         tree.iterator.foreach { case (_, seq) =>
+            seq.foreach { case (_, elem) =>
+               fun( elem )
+            }
+         }
+      }
+
+      final def connect()( implicit tx: S#Tx ) {
+         foreach( eventView( _ ) ---> this )
+      }
+
+      final def disconnect()( implicit tx: S#Tx ) {
+         foreach( eventView( _ ) -/-> this )
+      }
+
+      protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
+
+      final def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Update[ S, Elem, U ]] = {
+         if( pull.parents( this ).isEmpty ) {
+            pull.resolve[ BiGroup.Update[ S, Elem, U ]]
+
+         } else {
+            println( "TODO" )
+            None
+         }
+      }
+
+      // ---- collection behaviour ----
 
       final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
          val spanVal = span.value
@@ -60,12 +148,13 @@ if( VERBOSE ) println( "add at point " + point )
             case None               => Some( spanVal -> IIdxSeq( entry ))
             case Some( (_, seq) )   => Some( spanVal -> (seq :+ entry) )
          }
+         fire( BiGroup.Added( this, elem ))
       }
       final def remove( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean = {
          val spanVal = span.value
          val point   = spanToPoint( spanVal )
          val entry   = (span, elem)
-         tree.get( point ) match {
+         val res     = tree.get( point ) match {
             case Some( (_, IIdxSeq( single )) ) =>
                if( single == entry ) {
                   tree.removeAt( point )
@@ -83,6 +172,8 @@ if( VERBOSE ) println( "add at point " + point )
                }
             case None => false
          }
+         if( res ) fire( BiGroup.Removed( this, elem ))
+         res
       }
 
       final def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ] =
@@ -131,12 +222,13 @@ if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; 
          res
       }
 
-      final def changed : Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] = sys.error( "TODO" )
+      final def changed : Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] = this
    }
 
-   private final class ImplNew[ S <: Sys[ S ], Elem, U ](
-      protected val tree: Tree[ S, Elem ], eventView: Elem => EventLike[ S, U, Elem ])
-   extends Impl[ S, Elem, U ] {
-
-   }
+   private final class ImplNew[ S <: Sys[ S ], Elem, U ]( protected val targets: evt.Targets[ S ],
+                                                          protected val tree: Tree[ S, Elem ],
+                                                          protected val eventView: Elem => EventLike[ S, U, Elem ])
+                                                        ( implicit protected val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
+                                                          protected val spanType: Type[ SpanLike ])
+   extends Impl[ S, Elem, U ]
 }
