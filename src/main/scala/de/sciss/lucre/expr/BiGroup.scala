@@ -35,18 +35,21 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 object BiGroup {
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
       def group: BiGroup[ S, Elem, U ]
-      def elem: Elem
    }
-   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], elem: Elem ) extends Update[ S, Elem, U ]
-   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], elem: Elem ) extends Update[ S, Elem, U ]
-   final case class Moved[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], elem: Elem ) extends Update[ S, Elem, U ]
-   final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], elem: Elem, elemUpdate: U ) extends Update[ S, Elem, U ]
+   sealed trait Collection[ S <: Sys[ S ], Elem, U ] extends Update[ S, Elem, U ] {
+      def elem: Elem
+      def span: SpanLike
+   }
+   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: Elem ) extends Collection[ S, Elem, U ]
+   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: Elem ) extends Collection[ S, Elem, U ]
+   final case class Moved[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: Elem ) extends Collection[ S, Elem, U ]
+   final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ]) extends Update[ S, Elem, U ]
 
    def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
       BiGroupImpl.newGenericVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
 
    def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
-      ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
+      ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
         spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.newGenericVar( eventView )
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
@@ -54,7 +57,7 @@ object BiGroup {
       def remove( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean
    }
 }
-trait BiGroup[ S <: Sys[ S ], Elem, U ] {
+trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
 //   def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
    def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]
 //   def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
@@ -63,7 +66,9 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] {
 
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
-   def changed : Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+   def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+   def elementChanged:     Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]]
+   def changed :           Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ]
 }

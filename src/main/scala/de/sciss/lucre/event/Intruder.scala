@@ -12,4 +12,7 @@ object Intruder {
 //   }
    def devirtualize[ S <: Sys[ S ]]( sel: VirtualNodeSelector[ S ], reader: Reader[ S, Node[ S ]])( implicit tx: S#Tx ) : NodeSelector[ S, _ ] =
       sel.devirtualize( reader )
+
+   def devirtualizeNode[ S <: Sys[ S ]]( sel: VirtualNodeSelector[ S ], reader: Reader[ S, Node[ S ]])( implicit tx: S#Tx ) : Node[ S ] =
+      sel.devirtualize( reader ).node
 }
