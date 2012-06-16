@@ -118,10 +118,32 @@ object BiGroupImpl {
       extends evt.Trigger.Impl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-      with evt.Root[ S, BiGroup.Collection[ S, Elem, U ]] {
+//      with evt.Root[ S, BiGroup.Collection[ S, Elem, U ]]
+      {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 1
          def node: evt.Node[ S ] = group
+
+         def connect()( implicit tx: S#Tx ) {}
+         def disconnect()( implicit tx: S#Tx ) {}
+
+         def +=( elem: Expr[ S, Long ])( implicit tx: S#Tx ) {
+            elem.changed ---> this
+         }
+
+         def -=( elem: Expr[ S, Long ])( implicit tx: S#Tx ) {
+            elem.changed -/-> this
+         }
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Collection[ S, Elem, U ]] = {
+            val par = pull.parents( this )
+            if( par.isEmpty ) {
+               pull.resolve[ BiGroup.Collection[ S, Elem, U ]]
+            } else {
+               println( "AQUI" + pull )
+               None
+            }
+         }
       }
 
       private object ElemChanged
