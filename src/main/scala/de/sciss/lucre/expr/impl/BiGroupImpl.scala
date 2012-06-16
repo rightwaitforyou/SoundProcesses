@@ -27,7 +27,7 @@ package de.sciss.lucre.expr
 package impl
 
 import de.sciss.lucre.{event => evt, DataInput, DataOutput}
-import evt.{Event, EventLike}
+import evt.{Change, Event, EventLike}
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.collection.txn
 import txn.{SpaceSerializers, SkipOctree}
@@ -140,8 +140,24 @@ object BiGroupImpl {
             if( par.isEmpty ) {
                pull.resolve[ BiGroup.Collection[ S, Elem, U ]]
             } else {
-               println( "AQUI" + pull )
-               None
+               val changes: IIdxSeq[ (Change[ SpanLike ], Elem) ] = par.flatMap( sel => {
+                  val span          = evt.Intruder.devirtualizeNode( sel, sys.error( "gagaismo" )).asInstanceOf[ Expr[ S, SpanLike ]]
+                  val changeOption  = span.changed.pullUpdate( pull )
+                  // somehow the flatMap is shadowed in Option, so the implicit conversion
+                  // to Iterable doesn't kick in...
+                  (changeOption: Iterable[ Change[ SpanLike ]]).flatMap({ case change @ Change( spanValOld, spanValNew ) =>
+                     val pointOld   = spanToPoint( spanValOld )
+                     (tree.get( pointOld ): Iterable[ Leaf[ S, Elem ]]).flatMap({ case (_, seq) =>
+                        val moved: IIdxSeq[ Elem ] = seq.collect { case (span2, elem) if span2 == span => elem }
+                        moved.foreach { elem =>
+                           removeNoFire( spanValOld, span, elem )
+                           addNoFire(    spanValNew, span, elem )
+                        }
+                        moved.map( elem => (change, elem) )
+                     })
+                  })
+               })( breakOut )
+               if( changes.isEmpty ) None else Some( BiGroup.Moved( group, changes ))
             }
          }
       }
@@ -258,6 +274,14 @@ object BiGroupImpl {
 
       final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
          val spanVal = span.value
+         addNoFire( spanVal, span, elem )
+         if( isConnected ) {
+            ElemChanged += elem
+            CollChanged( BiGroup.Added( this, spanVal, elem ))
+         }
+      }
+
+      private def addNoFire( spanVal: SpanLike, span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
          val point   = spanToPoint( spanVal )
 if( VERBOSE ) println( "add at point " + point )
          val entry   = (span, elem)
@@ -265,16 +289,22 @@ if( VERBOSE ) println( "add at point " + point )
             case None               => Some( spanVal -> IIdxSeq( entry ))
             case Some( (_, seq) )   => Some( spanVal -> (seq :+ entry) )
          }
-         if( isConnected ) {
-            ElemChanged += elem
-            CollChanged( BiGroup.Added( this, spanVal, elem ))
-         }
       }
+
       final def remove( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean = {
          val spanVal = span.value
+         val res     = removeNoFire( spanVal, span, elem )
+         if( res && isConnected ) {
+            ElemChanged -= elem
+            CollChanged( BiGroup.Removed( this, spanVal, elem ))
+         }
+         res
+      }
+
+      private def removeNoFire( spanVal: SpanLike, span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean = {
          val point   = spanToPoint( spanVal )
          val entry   = (span, elem)
-         val res     = tree.get( point ) match {
+         tree.get( point ) match {
             case Some( (_, IIdxSeq( single )) ) =>
                if( single == entry ) {
                   tree.removeAt( point )
@@ -292,11 +322,6 @@ if( VERBOSE ) println( "add at point " + point )
                }
             case None => false
          }
-         if( res && isConnected ) {
-            ElemChanged -= elem
-            CollChanged( BiGroup.Removed( this, spanVal, elem ))
-         }
-         res
       }
 
       final def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ] =

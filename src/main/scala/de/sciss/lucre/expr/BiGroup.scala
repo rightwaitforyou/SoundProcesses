@@ -42,7 +42,7 @@ object BiGroup {
    }
    final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: Elem ) extends Collection[ S, Elem, U ]
    final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: Elem ) extends Collection[ S, Elem, U ]
-   final case class Moved[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changeds: IIdxSeq[ ( evt.Change[ SpanLike ], Elem) ]) extends Collection[ S, Elem, U ]
+   final case class Moved[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (evt.Change[ SpanLike ], Elem) ]) extends Collection[ S, Elem, U ]
    final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ]) extends Update[ S, Elem, U ]
 
    def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
