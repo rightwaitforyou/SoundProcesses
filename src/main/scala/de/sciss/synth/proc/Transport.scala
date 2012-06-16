@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.{BiType, Expr, Chronos}
+import de.sciss.lucre.expr.{Expr, Chronos}
 import de.sciss.lucre.stm.{Writer, Disposable, Sys}
 
 object Transport {
