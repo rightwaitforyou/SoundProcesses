@@ -33,19 +33,16 @@ import de.sciss.collection.txn
 import txn.{SpaceSerializers, SkipOctree}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
-import de.sciss.collection.geom.{Rectangle, Point2D, Point2DLike, Square, Space}
-import Space.TwoDim
 import annotation.switch
+import de.sciss.collection.geom.{LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare}
+import de.sciss.collection.geom.LongSpace.TwoDim
 
-/**
- * TODO need a Long based 2D space
- */
 object BiGroupImpl {
    import BiGroup.Var
 
 //   var VERBOSE = true
 
-   private val MAX_SQUARE  = Square( 0, 0, 0x40000000 )
+   private val MAX_SQUARE  = LongSquare( 0, 0, 0x4000000000000000L )
    private val MIN_COORD   = MAX_SQUARE.left
    private val MAX_COORD   = MAX_SQUARE.right
 
@@ -57,20 +54,20 @@ object BiGroupImpl {
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   private def spanToPoint( span: SpanLike ) : Point2D = span match {
-      case Span( start, stop )=> Point2D( start.toInt, (stop - 1).toInt )
-      case Span.From( start ) => Point2D( start.toInt, MAX_COORD )
-      case Span.Until( stop ) => Point2D( MIN_COORD, (stop - 1).toInt )
-      case Span.All           => Point2D( MIN_COORD, MAX_COORD )
-      case Span.Void          => Point2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
+   private def spanToPoint( span: SpanLike ) : LongPoint2D = span match {
+      case Span( start, stop )=> LongPoint2D( start, stop - 1 )
+      case Span.From( start ) => LongPoint2D( start, MAX_COORD )
+      case Span.Until( stop ) => LongPoint2D( MIN_COORD, stop - 1 )
+      case Span.All           => LongPoint2D( MIN_COORD, MAX_COORD )
+      case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
    }
 
    def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = {
 
-      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => Point2DLike = (tup, tx) => spanToPoint( tup._1 )
-      implicit val hyperSer   = SpaceSerializers.SquareSerializer
+      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+      implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
       implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
       val tree: Tree[ S, Elem ] = SkipOctree.empty[ S, TwoDim, Leaf[ S, Elem ]]( MAX_SQUARE )
       new ImplNew( evt.Targets[ S ], tree, eventView )
@@ -85,17 +82,14 @@ object BiGroupImpl {
                                                 spanType: Type[ SpanLike ])
    extends evt.NodeSerializer[ S, BiGroup[ S, Elem, U ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiGroup[ S, Elem, U ] = {
-         implicit val pointView: (Leaf[ S, Elem ], S#Tx) => Point2DLike = (tup, tx) => spanToPoint( tup._1 )
-         implicit val hyperSer   = SpaceSerializers.SquareSerializer
+         implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+         implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
          implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
          val tree: Tree[ S, Elem ] = SkipOctree.read[ S, TwoDim, Leaf[ S, Elem ]]( in, access )
          new ImplNew( targets, tree, eventView )
       }
    }
 
-//   private object Impl extends evt.Decl[ S, Impl ] {
-//
-//   }
    private sealed trait Impl[ S <: Sys[ S ], Elem, U ]
    extends Var[ S, Elem, U ]
 //   with evt.Compound[ S, Impl[ S, Elem, U ], Impl.type ]
@@ -333,36 +327,31 @@ object BiGroupImpl {
       final def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ] =
          tree.toList.flatMap { case (span, seq) => seq.map { case (_, elem) => span -> elem }}
 
-      final def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]  =
-         iteratorAt( time.time.value )
+      final def iterator( implicit tx: S#Tx, chr: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]  =
+         iteratorAt( chr.time.value )
 
       final def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
-         val ti      = time.toInt
-         val start   = ti
-         val stop    = ti + 1
+         val start   = time
+         val stop    = time + 1
 //         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
          // horizontally: until query_stop; vertically: from query_start
-         val shape = Rectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start + 1 )
+         val shape = LongRectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start + 1 )
          rangeSearch( shape )
       }
 
       final def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
          // horizontally: until query_stop; vertically: from query_start
          span match {
-            case Span( startL, stopL ) =>
-               val start = startL.toInt
-               val stop  = stopL.toInt
-               val shape = Rectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start /* + 1 XXX int overflow */ )
+            case Span( start, stop ) =>
+               val shape = LongRectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start + 1 )
                rangeSearch( shape )
 
-            case Span.From( startL ) =>
-               val start = startL.toInt
-               val shape = Rectangle( MIN_COORD, start, MAX_COORD - MIN_COORD /* + 1 XXX int overflow */, MAX_COORD - start /* + 1 XXX int overflow */ )
+            case Span.From( start ) =>
+               val shape = LongRectangle( MIN_COORD, start, MAX_COORD - MIN_COORD + 1, MAX_COORD - start + 1 )
                rangeSearch( shape )
 
-            case Span.Until( stopL ) =>
-               val stop  = stopL.toInt
-               val shape = Rectangle( MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_COORD - MIN_COORD /* + 1 XXX int overflow */ )
+            case Span.Until( stop ) =>
+               val shape = LongRectangle( MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_COORD - MIN_COORD + 1 )
                rangeSearch( shape )
 
             case Span.All  => tree.iterator
@@ -370,7 +359,7 @@ object BiGroupImpl {
          }
       }
 
-      private def rangeSearch( shape: Rectangle )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
+      private def rangeSearch( shape: LongRectangle )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
          val res = tree.rangeQuery( shape ) // .flatMap ....
 //if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
          res
