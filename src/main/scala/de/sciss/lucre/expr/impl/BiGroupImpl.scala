@@ -43,7 +43,7 @@ import annotation.switch
 object BiGroupImpl {
    import BiGroup.Var
 
-   var VERBOSE = true
+//   var VERBOSE = true
 
    private val MAX_SQUARE  = Square( 0, 0, 0x40000000 )
    private val MIN_COORD   = MAX_SQUARE.left
@@ -127,28 +127,30 @@ object BiGroupImpl {
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
 
-         def +=( elem: Expr[ S, Long ])( implicit tx: S#Tx ) {
+         def +=( elem: Expr[ S, SpanLike ])( implicit tx: S#Tx ) {
             elem.changed ---> this
          }
 
-         def -=( elem: Expr[ S, Long ])( implicit tx: S#Tx ) {
+         def -=( elem: Expr[ S, SpanLike ])( implicit tx: S#Tx ) {
             elem.changed -/-> this
          }
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Collection[ S, Elem, U ]] = {
             val par = pull.parents( this )
-            if( par.isEmpty ) {
+            if( par.isEmpty ) {  // add or remove
                pull.resolve[ BiGroup.Collection[ S, Elem, U ]]
-            } else {
+            } else {             // span key changed
                val changes: IIdxSeq[ (Change[ SpanLike ], Elem) ] = par.flatMap( sel => {
-                  val span          = evt.Intruder.devirtualizeNode( sel, sys.error( "gagaismo" )).asInstanceOf[ Expr[ S, SpanLike ]]
-                  val changeOption  = span.changed.pullUpdate( pull )
+                  val span = evt.Intruder.devirtualizeNode( sel,
+                     spanType.serializer[ S ].asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).asInstanceOf[ Expr[ S, SpanLike ]]
+                  val changeOption = span.changed.pullUpdate( pull )
                   // somehow the flatMap is shadowed in Option, so the implicit conversion
                   // to Iterable doesn't kick in...
                   (changeOption: Iterable[ Change[ SpanLike ]]).flatMap({ case change @ Change( spanValOld, spanValNew ) =>
-                     val pointOld   = spanToPoint( spanValOld )
+                     val pointOld = spanToPoint( spanValOld )
                      (tree.get( pointOld ): Iterable[ Leaf[ S, Elem ]]).flatMap({ case (_, seq) =>
                         val moved: IIdxSeq[ Elem ] = seq.collect { case (span2, elem) if span2 == span => elem }
+                        // update in spatial structure
                         moved.foreach { elem =>
                            removeNoFire( spanValOld, span, elem )
                            addNoFire(    spanValNew, span, elem )
@@ -202,11 +204,11 @@ object BiGroupImpl {
          def disconnect()( implicit tx: S#Tx ) {}
 
          private[lucre] def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
-            CollChanged     ---> r
+            CollChanged ---> r
             ElemChanged ---> r
          }
          private[lucre] def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
-            CollChanged     -/-> r
+            CollChanged -/-> r
             ElemChanged -/-> r
          }
 
@@ -243,12 +245,14 @@ object BiGroupImpl {
 
       final def connect()( implicit tx: S#Tx ) {
          foreach { case (span, elem) =>
+            CollChanged += span
             ElemChanged += elem
          }
       }
 
       final def disconnect()( implicit tx: S#Tx ) {
          foreach { case (span, elem) =>
+            CollChanged -= span
             ElemChanged -= elem
          }
       }
@@ -276,6 +280,7 @@ object BiGroupImpl {
          val spanVal = span.value
          addNoFire( spanVal, span, elem )
          if( isConnected ) {
+            CollChanged += span
             ElemChanged += elem
             CollChanged( BiGroup.Added( this, spanVal, elem ))
          }
@@ -283,7 +288,7 @@ object BiGroupImpl {
 
       private def addNoFire( spanVal: SpanLike, span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
          val point   = spanToPoint( spanVal )
-if( VERBOSE ) println( "add at point " + point )
+//if( VERBOSE ) println( "add at point " + point )
          val entry   = (span, elem)
          tree.transformAt( point ) {
             case None               => Some( spanVal -> IIdxSeq( entry ))
@@ -295,6 +300,7 @@ if( VERBOSE ) println( "add at point " + point )
          val spanVal = span.value
          val res     = removeNoFire( spanVal, span, elem )
          if( res && isConnected ) {
+            CollChanged -= span
             ElemChanged -= elem
             CollChanged( BiGroup.Removed( this, spanVal, elem ))
          }
@@ -366,7 +372,7 @@ if( VERBOSE ) println( "add at point " + point )
 
       private def rangeSearch( shape: Rectangle )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])] = {
          val res = tree.rangeQuery( shape ) // .flatMap ....
-if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
+//if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
          res
       }
 

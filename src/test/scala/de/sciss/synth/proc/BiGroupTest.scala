@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{InMemory, Cursor, Sys}
-import de.sciss.synth.expr.{ExprImplicits, Longs}
+import de.sciss.synth.expr.{SpanLikes, ExprImplicits, Longs}
 import de.sciss.lucre.expr.{Expr, SpanLike, Span, BiGroup}
 
 object BiGroupTest {
@@ -19,15 +19,23 @@ class BiGroupTest[ S <: Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S
       res
    }
 
-   def add( span: Span = Span( 33, 44 ), elem: Long = 55 ) {
+   def add( span: SpanLike = Span( 33, 44 ), elem: Long = 55 ) {
       t { implicit tx => bi.add( span, elem )}
    }
 
-   def addVar( span: Span = Span( 33, 44 ), init: Long = 66 ) : Expr.Var[ S, Long ] = {
+   def addValVar( span: SpanLike = Span( 33, 44 ), init: Long = 66 ) : Expr.Var[ S, Long ] = {
       t { implicit tx =>
          val elem = Longs.newVar[ S ]( init )
          bi.add( span, elem )
          elem
+      }
+   }
+
+   def addKeyVar( init: SpanLike = Span( 33, 44 ), elem: Long = 77 ) : Expr.Var[ S, SpanLike ] = {
+      t { implicit tx =>
+         val span = SpanLikes.newVar[ S ]( init )
+         bi.add( span, elem )
+         span
       }
    }
 
