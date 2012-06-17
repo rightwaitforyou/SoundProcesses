@@ -62,9 +62,9 @@ object BiGroupImpl {
    }
 
    private def spanToPoint( span: SpanLike ) : LongPoint2D = span match {
-      case Span( start, stop )=> LongPoint2D( start, stop - 1 )
+      case Span( start, stop )=> LongPoint2D( start, stop )
       case Span.From( start ) => LongPoint2D( start, MAX_COORD )
-      case Span.Until( stop ) => LongPoint2D( MIN_COORD, stop - 1 )
+      case Span.Until( stop ) => LongPoint2D( MIN_COORD, stop )
       case Span.All           => LongPoint2D( MIN_COORD, MAX_COORD )
       case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
    }
@@ -342,7 +342,8 @@ object BiGroupImpl {
          val stop    = time + 1
 //         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
          // horizontally: until query_stop; vertically: from query_start
-         val shape = LongRectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start + 1 )
+         // start < query.stop && stop > query.start
+         val shape = LongRectangle( MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start )
          rangeSearch( shape )
       }
 
@@ -350,11 +351,11 @@ object BiGroupImpl {
          // horizontally: until query_stop; vertically: from query_start
          span match {
             case Span( start, stop ) =>
-               val shape = LongRectangle( MIN_COORD, start, stop - MIN_COORD, MAX_COORD - start + 1 )
+               val shape = LongRectangle( MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start )
                rangeSearch( shape )
 
             case Span.From( start ) =>
-               val shape = LongRectangle( MIN_COORD, start, MAX_SIDE, MAX_COORD - start + 1 )
+               val shape = LongRectangle( MIN_COORD, start + 1, MAX_SIDE, MAX_COORD - start )
                rangeSearch( shape )
 
             case Span.Until( stop ) =>
@@ -383,7 +384,7 @@ object BiGroupImpl {
       }
 
       final def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
-         val point   = LongPoint2D( time + 1, time + 1)
+         val point   = LongPoint2D( time, time )
          val metric  = LongDistanceMeasure2D.chebyshev.exceptOrthant( 1 )
          val span    = tree.nearestNeighborOption( point, metric ).map( _._1 ).getOrElse( Span.Void )
          span match {
@@ -400,7 +401,7 @@ object BiGroupImpl {
       }
 
       final def nearestEventBefore( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
-         val point   = LongPoint2D( time - 1, time - 1)
+         val point   = LongPoint2D( time, time )
          val metric  = LongDistanceMeasure2D.chebyshev.exceptOrthant( 3 )
          val span    = tree.nearestNeighborOption( point, metric ).map( _._1 ).getOrElse( Span.Void )
          span match {

@@ -47,6 +47,19 @@ class BiGroupTest[ S <: Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S
       bi.intersect( span ).toIndexedSeq
    }
 
+   def after( time: Long ) = t { implicit tx =>
+      bi.nearestEventAfter( time )
+   }
+
+   def before( time: Long ) = t { implicit tx =>
+      bi.nearestEventBefore( time )
+   }
+
+   def eventsAt( time: Long ) = t { implicit tx =>
+      val (a, b) = bi.eventsAt( time )
+      (a.toIndexedSeq, b.toIndexedSeq)
+   }
+
    def list() { val li = t { implicit tx =>
          bi.debugList()
       }
