@@ -45,6 +45,9 @@ object BiGroup {
    final case class Moved[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (evt.Change[ SpanLike ], Elem) ]) extends Collection[ S, Elem, U ]
    final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ]) extends Update[ S, Elem, U ]
 
+   type TimedElem[ S <: Sys[ S ], Elem ] = (Expr[ S, SpanLike ], Elem)
+   type Leaf[      S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem ]])
+
    def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
       BiGroupImpl.newGenericVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
 
@@ -58,11 +61,62 @@ object BiGroup {
    }
 }
 trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
-//   def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
-   def iterator( implicit tx: S#Tx, time: Chronos[ S ]) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]
-//   def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
-   def iteratorAt( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ]) ]
-   def iteratorWithin( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Elem) ])]
+   import BiGroup.Leaf
+
+   /**
+    * Generates an iterator over all elements in the group which intersect (whose span contains)
+    * the current time as given by the implicit `chronos` argument.
+    *
+    * This methods makes no guarantees about the ordering of the returned iterator.
+    *
+    * @param chronos a reference to the current time cursor
+    * @return  a (possibly empty) iterator of the intersecting elements
+    */
+   def iterator( implicit tx: S#Tx, chronos: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+
+   /**
+    * Queries all elements intersecting a given point in time.
+    * That is, returns an iterator of all elements whose span contains the time point
+    * `(span start <= time && span.stop > time)`
+    *
+    * This methods makes no guarantees about the ordering of the returned iterator.
+    *
+    * @param time the point in time to search at
+    * @return  a (possibly empty) iterator of the intersecting elements
+    */
+   def intersect( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+
+   /**
+    * Queries all elements intersecting a given time span.
+    * That is, returns an iterator of all elements whose span contains or partly overlaps the query span.
+    * `(span start < query.stop && span.stop > query.start)`
+    *
+    * This methods makes no guarantees about the ordering of the returned iterator.
+    *
+    * @param span the the span to search within (this may be a half-bounded interval or even `Span.All`)
+    * @return  a (possibly empty) iterator of the intersecting elements
+    */
+   def intersect( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+
+   /**
+    * Performs a range query according to separate intervals for the allowed start and stop positions
+    * of the element spans. That is, returns an iterator of all elements whose span satisfies the
+    * constraints given for start and stop positions
+    * `(start.contains( elem.span.start ) && stop.contains( elem.span.stop ))`
+    *
+    * Both for the start and stop constraint, half-bounded or unbounded (`Span.All`) intervals can be used.
+    * Examples
+    *
+    *  - to find all elements which start between 10 (inclusive) and 20 (exclusive), use `start = Span( 10, 20 ), stop = Span.All`.
+    *  - to find all elements which start before (<) 10 and stop from (>=) 20, use `start = Span.until( 10 ), stop = Span.from( 20 )`.
+    *
+    * This methods makes no guarantees about the ordering of the returned iterator.
+    *
+    * @param start   the constraint for the start position of the spans of the elements filtered.
+    * @param stop    the constraint for the stop position of the spans of the elements filtered.
+    * @return  a (possibly empty) iterator of the intersecting elements
+    */
+   def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
 
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 

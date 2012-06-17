@@ -40,11 +40,11 @@ class BiGroupTest[ S <: Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S
    }
 
    def at( time: Long ) = t { implicit tx =>
-      bi.iteratorAt( time ).toIndexedSeq
+      bi.intersect( time ).toIndexedSeq
    }
 
    def within( span: SpanLike ) = t { implicit tx =>
-      bi.iteratorWithin( span ).toIndexedSeq
+      bi.intersect( span ).toIndexedSeq
    }
 
    def list() { val li = t { implicit tx =>
