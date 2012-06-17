@@ -34,7 +34,7 @@ import txn.{SpaceSerializers, SkipOctree}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 import annotation.switch
-import de.sciss.collection.geom.{LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare}
+import de.sciss.collection.geom.{DistanceMeasure, LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare}
 import de.sciss.collection.geom.LongSpace.TwoDim
 import java.util
 
@@ -43,9 +43,10 @@ object BiGroupImpl {
 
 //   var VERBOSE = true
 
-   private val MAX_SQUARE  = LongSquare( 0, 0, 0x4000000000000000L )
-   private val MIN_COORD   = MAX_SQUARE.left + 1  // +1 to avoid overflow in the case of `MAX_COORD - MIN_COORD + 1`
+   private val MAX_SQUARE  = LongSquare( 0, 0, 0x2000000000000000L )
+   private val MIN_COORD   = MAX_SQUARE.left
    private val MAX_COORD   = MAX_SQUARE.right
+   private val MAX_SIDE    = MAX_SQUARE.side
 
 //   private final case class Entry[ Elem ]( )
 
@@ -353,11 +354,11 @@ object BiGroupImpl {
                rangeSearch( shape )
 
             case Span.From( start ) =>
-               val shape = LongRectangle( MIN_COORD, start, MAX_COORD - MIN_COORD + 1, MAX_COORD - start + 1 )
+               val shape = LongRectangle( MIN_COORD, start, MAX_SIDE, MAX_COORD - start + 1 )
                rangeSearch( shape )
 
             case Span.Until( stop ) =>
-               val shape = LongRectangle( MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_COORD - MIN_COORD + 1 )
+               val shape = LongRectangle( MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_SIDE )
                rangeSearch( shape )
 
             case Span.All  => tree.iterator
@@ -365,13 +366,54 @@ object BiGroupImpl {
          }
       }
 
-      def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+      final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          if( start == Span.Void || stop == Span.Void ) return EmptyIterator
 
          val startP  = spanToPoint( start )
          val stopP   = spanToPoint( stop  )
          val shape   = LongRectangle( startP.x, stopP.x, startP.y - startP.x + 1, stopP.y - stopP.x + 1 )
          rangeSearch( shape )
+      }
+
+      // this can be easily implemented with two rectangular range searches
+      final def eventsAt( time: Long )( implicit tx: S#Tx ) : (txn.Iterator[ S#Tx, Leaf[ S, Elem ]], txn.Iterator[ S#Tx, Leaf[ S, Elem ]]) = {
+         val startShape = LongRectangle( time, MIN_COORD, 1, MAX_SIDE )
+         val stopShape  = LongRectangle( MIN_COORD, time, MAX_SIDE, 1 )
+         (rangeSearch( startShape ), rangeSearch( stopShape ))
+      }
+
+      final def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
+         val point   = LongPoint2D( time + 1, time + 1)
+         val metric  = LongDistanceMeasure2D.chebyshev.exceptOrthant( 1 )
+         val span    = tree.nearestNeighborOption( point, metric ).map( _._1 ).getOrElse( Span.Void )
+         span match {
+            case Span.From( start ) => assert( start > time ); Some( start )
+            case Span.Until( stop ) => assert( stop  > time ); Some( stop )
+            case Span( start, stop )=>
+               if( start > time && (stop <= time || stop > start) ) {
+                  assert( start > time ); Some( start )
+               } else {
+                  assert( stop > time ); Some( stop )
+               }
+            case _ => None
+         }
+      }
+
+      final def nearestEventBefore( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
+         val point   = LongPoint2D( time - 1, time - 1)
+         val metric  = LongDistanceMeasure2D.chebyshev.exceptOrthant( 3 )
+         val span    = tree.nearestNeighborOption( point, metric ).map( _._1 ).getOrElse( Span.Void )
+         span match {
+            case Span.From( start ) => assert( start < time ); Some( start )
+            case Span.Until( stop ) => assert( stop  < time ); Some( stop )
+            case Span( start, stop )=>
+               if( start < time && (stop >= time || stop < start) ) {
+                  assert( start < time ); Some( start )
+               } else {
+                  assert( stop < time ); Some( stop )
+               }
+            case _ => None
+         }
       }
 
       private def rangeSearch( shape: LongRectangle )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {

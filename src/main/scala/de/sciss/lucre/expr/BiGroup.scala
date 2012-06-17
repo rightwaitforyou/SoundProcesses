@@ -118,6 +118,34 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     */
    def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
 
+   /**
+    * Queries the closest event (an element's span starting or stopping) later than the given time
+    *
+    * @param time the query time
+    * @return a time, greater than the query time, at which the next event occurs, or `None` if
+    *         there are no events after the query time
+    */
+   def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
+
+   /**
+    * Queries the closest event (an element's span starting or stopping) earlier than the given time
+    *
+    * @param time the query time
+    * @return a time, smaller than the query time, at which the previous event occurs, or `None` if
+    *         there are no events before the query time
+    */
+   def nearestEventBefore( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
+
+   /**
+    * Queries all elements which produce an event (starting or stopping) at a given time.
+    *
+    * @param time the time instant for which to gather the events
+    * @return  a tuple of two iterators. the first iterator (`_1`) contains the events which
+    *          start at the query time, the second iterator (_2) contains the event which
+    *          stop at the query time
+    */
+   def eventsAt( time: Long )( implicit tx: S#Tx ) : (txn.Iterator[ S#Tx, Leaf[ S, Elem ]], txn.Iterator[ S#Tx, Leaf[ S, Elem ]])
+
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
    def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]

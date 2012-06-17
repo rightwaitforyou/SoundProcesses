@@ -23,10 +23,18 @@ retrieveManaged := true
 
 scalacOptions ++= Seq( "-deprecation", "-unchecked" )   // "-Xelide-below", "INFO"
 
-initialCommands in console := """import de.sciss.synth._; import ugen._; import proc._
+initialCommands in console := """// thanks to Rex Kerr for this trick (http://www.scala-lang.org/node/11813)
+def shortresults[T](t: => T) = {
+   val s = t.toString
+   val name = s.takeWhile(_ != ':')
+   val idx = s.indexOf(" = ")
+   val full = if (idx >= 0) name + s.substring(idx) else s
+   val short = if (full.length>799) full.substring(0,796)+"..." else full
+   print(short)
+   t
+}
+import de.sciss.synth._; import ugen._; import proc._
 import de.sciss.lucre.stm.InMemory
 import de.sciss.lucre.expr.Span
-// type S = InMemory
-// implicit val system: S = de.sciss.lucre.stm.InMemory()
-// def t[ A ]( fun: S#Tx => A ) : A = system.step( fun )
+println( "To disable result types:\n :power\n :wrap shortresults\n: silent" )
 """
