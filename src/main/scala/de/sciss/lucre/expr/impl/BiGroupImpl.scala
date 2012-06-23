@@ -34,7 +34,7 @@ import txn.{SpaceSerializers, SkipOctree}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 import annotation.switch
-import de.sciss.collection.geom.{DistanceMeasure, LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare}
+import de.sciss.collection.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare}
 import de.sciss.collection.geom.LongSpace.TwoDim
 import java.util
 
@@ -257,16 +257,6 @@ object BiGroupImpl {
             ElemChanged -= elem
          }
       }
-
-//      final def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Update[ S, Elem, U ]] = {
-//         if( pull.parents( this ).isEmpty ) {
-//            pull.resolve[ BiGroup.Update[ S, Elem, U ]]
-//
-//         } else {
-//            println( "TODO" )
-//            None
-//         }
-//      }
 
       final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
          case 1 => CollChanged
