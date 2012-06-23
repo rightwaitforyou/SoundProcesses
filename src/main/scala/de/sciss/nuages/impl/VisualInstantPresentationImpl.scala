@@ -41,20 +41,13 @@ object VisualInstantPresentationImpl {
 
       require( EventQueue.isDispatchThread, "Must be called on EDT" )
 
-      val res = new Impl( transport, cursor, transportView )
+      val vis = new Impl( transport, cursor, transportView )
       cursor.step { implicit tx =>
          val map     = tx.newInMemoryIDMap[ VisualProc ]
          val t       = transportView( transport.get )
-         val vps     = t.iterator.toIndexedSeq.map { proc =>
-            val n    = proc.name.value
-            val vp   = new VisualProc( n )
-            map.put( proc.id, vp )
-            vp
-         }
-         if( vps.nonEmpty ) Txn.afterCommit( _ => {
-            res.add( vps: _* )
-         })( tx.peer )
+         val all     = t.iterator.toIndexedSeq
 
+         addRemove( all, IIdxSeq.empty )
 //         t.changed.react {
 //            case BiGroup.Added(   group, span, elem ) =>
 //            case BiGroup.Removed( group, span, elem ) =>
@@ -62,15 +55,46 @@ object VisualInstantPresentationImpl {
 //            case BiGroup.Element( group, changes ) =>
 //         }
 
+         def onEDT( thunk: => Unit )( implicit tx: S#Tx ) {
+            Txn.afterCommit( _ => EventQueue.invokeLater( new Runnable {
+               def run() {
+                  thunk
+               }
+            }))( tx.peer )
+         }
+         def playStop( b: Boolean )( implicit tx: S#Tx ) {
+            onEDT( vis.playing = b )
+         }
+
+         def addRemove( added: IIdxSeq[ Proc[ S ]], removed: IIdxSeq[ Proc[ S ]])( implicit tx: S#Tx ) {
+            val vpRem = removed.flatMap { proc =>
+               val vpO = map.get( proc.id )
+               if( vpO.isDefined ) map.remove( proc.id )
+               vpO
+            }
+            val hasRem = vpRem.nonEmpty
+            val vpAdd = added.map { proc =>
+               val n    = proc.name.value
+               val vp   = new VisualProc( n )
+               map.put( proc.id, vp )
+               vp
+            }
+            val hasAdd = vpAdd.nonEmpty
+            if( hasAdd || hasRem ) onEDT {
+               if( hasAdd ) vis.add(    vpAdd: _* )
+               if( hasRem ) vis.remove( vpRem: _* )
+            }
+         }
+
          t.changed.reactTx { implicit tx => {
-            case Transport.Seek(    tFresh, time, added, removed ) =>
-            case Transport.Advance( tFresh, time, added, removed ) =>
-            case Transport.Play(    tFresh ) => Txn.afterCommit( _ => res.playing = true )(  tx.peer )
-            case Transport.Stop(    tFresh ) => Txn.afterCommit( _ => res.playing = false )( tx.peer )
+            case Transport.Seek(    _, time, added, removed ) => addRemove( added, removed )
+            case Transport.Advance( _, time, added, removed ) => addRemove( added, removed )
+            case Transport.Play( _ ) => playStop( b = true  )
+            case Transport.Stop( _ ) => playStop( b = false )
          }}
       }
 
-      res
+      vis
    }
 
    private final class VisualProc( val name: String )
