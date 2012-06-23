@@ -92,7 +92,8 @@ object BiGroupImpl {
          ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
            spanType: Type[ SpanLike ]) : BiGroup.Var[ S, Elem, U ] = {
 
-      sys.error( "TODO" )
+      val targets = evt.Targets.read[ S ]( in, access )
+      read( in, access, targets, eventView )
    }
 
    private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
