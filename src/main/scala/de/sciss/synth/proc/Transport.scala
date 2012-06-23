@@ -1,9 +1,10 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.{Expr, Chronos}
+import de.sciss.lucre.expr.{BiGroup, Expr, Chronos}
 import de.sciss.lucre.stm.{Writer, Disposable, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.event.Event
+import de.sciss.collection.txn
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
@@ -34,6 +35,8 @@ trait Transport[ S <: Sys[ S ], Elem ] extends Chronos[ S ] with Writer with Dis
    def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
 
    def sampleRate: Double
+
+   def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Elem ]
 
    def changed: Event[ S, Transport.Update[ S, Elem ], Transport[ S, Elem ]]
 

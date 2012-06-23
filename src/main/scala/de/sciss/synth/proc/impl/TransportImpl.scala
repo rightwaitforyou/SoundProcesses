@@ -6,6 +6,10 @@ import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.DataOutput
 import de.sciss.lucre.event.{Event, Reader, Targets, Change, Root}
 import de.sciss.synth.expr.{Longs, Booleans}
+import de.sciss.collection.txn
+import concurrent.stm.{Ref => STMRef}
+import annotation.tailrec
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object TransportImpl {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )
@@ -25,6 +29,47 @@ object TransportImpl {
       protected def reader : Reader[ S, Expr[ S, Long ]] = Longs.serializer[ S ]
    }
 
+   private def flatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]])( fun: A => B )
+                                             ( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, B ] = {
+      val res = new FlatMap( it, fun )
+      res.init()
+      res
+   }
+
+   private final class FlatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]], fun: A => B )
+   extends txn.Iterator[ S#Tx, B ] {
+      private val coll        = STMRef( (IIdxSeq.empty[ A ], -1) )
+      private var hasNextVar  = false
+
+      def init()( implicit tx: S#Tx ) {
+         val tup = findNext()
+         coll.set( tup )( tx.peer )
+         hasNextVar = tup._2 >= 0
+      }
+
+      @tailrec private def findNext()( implicit tx: S#Tx ) : (IIdxSeq[ A ], Int) = {
+         if( !it.hasNext ) (IIdxSeq.empty, -1) else {
+            val n = it.next()
+            if( n.nonEmpty ) (n, 0) else findNext()
+         }
+      }
+
+      def hasNext : Boolean = hasNextVar
+
+      def next()( implicit tx: S#Tx ) : B = {
+         implicit val itx = tx.peer
+         val (seq, idx) = coll.get
+         val res  = fun( seq( idx ))
+         val idx1 = idx + 1
+         if( idx1 < seq.size ) {
+            coll.set( (seq, idx1) )
+         } else {
+            init()
+         }
+         res
+      }
+   }
+
    private final class Impl[ S <: Sys[ S ]]( group: ProcGroup[ S ],
                                              val sampleRate: Double, tx0: S#Tx )
    extends Transport[ S, Proc[ S ]] {
@@ -41,6 +86,8 @@ object TransportImpl {
       def dispose()( implicit tx: S#Tx ) {
          playingVar.dispose()
       }
+
+      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Proc[ S ]] = flatMap( group.intersect( time.value ).map( _._2 ))( _._2 )
 
       def seek( time: Long )( implicit tx: S#Tx ) {
          sys.error( "TODO" )
