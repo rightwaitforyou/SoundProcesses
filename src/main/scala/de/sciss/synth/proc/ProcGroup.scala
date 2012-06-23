@@ -1,6 +1,10 @@
-import de.sciss.lucre.expr.BiGroup
-import de.sciss.lucre.stm.Sys
-import de.sciss.synth.proc.Proc
+package de.sciss.synth.proc
+
+import de.sciss.lucre.expr.{Type, SpanLike, BiGroup}
+import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import de.sciss.synth.expr.SpanLikes
+import de.sciss.lucre.event.EventLike
+import de.sciss.lucre.DataInput
 
 ///*
 // *  ProcGroup.scala
@@ -78,4 +82,24 @@ import de.sciss.synth.proc.Proc
 
 object ProcGroup {
    type Update[ S <: Sys[ S ]] = BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]]
+
+   type Var[ S <: Sys[ S ]] = BiGroup.Var[ S, Proc[ S ], Proc.Update[ S ]]
+
+   private implicit val spanType : Type[ SpanLike ] = SpanLikes
+
+   private def eventView[ S <: Sys[ S ]]( proc: Proc[ S ]) : EventLike[ S, Proc.Update[ S ], Proc[ S ]] = proc.changed
+
+   def newVar[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup.Var[ S ] =
+      BiGroup.newGenericVar[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
+
+   def readVar[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup.Var[ S ] =
+      BiGroup.readGenericVar[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
+
+   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroup[ S ]] = {
+      BiGroup.serializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
+   }
+
+   implicit def varSerializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroup.Var[ S ]] = {
+      BiGroup.varSerializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
+   }
 }

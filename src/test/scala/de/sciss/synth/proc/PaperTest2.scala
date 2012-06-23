@@ -10,7 +10,7 @@ import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import de.sciss.confluent.{TemporalObjects, Confluent}
 import de.sciss.lucre.stm.{Sys, TxnSerializer, Cursor}
-import de.sciss.lucre.expr.{Chronos, Expr}
+import de.sciss.lucre.expr.{Span, Chronos, Expr}
 
 object PaperTest2 extends App {
    val DRY = true
@@ -50,7 +50,7 @@ object PaperTest2 extends App {
    class Helper[ S <: Sys[ S ]]( imp: ExprImplicits[ S ]) {
       import imp._
 
-      implicit val whyOhWhy   = ProcGroup.serializer[ S ]
+      implicit val whyOhWhy   = ProcGroup.varSerializer[ S ]
       implicit val whyOhWhy2  = Proc.serializer[ S ]
 
       implicit object doubleVarSerializer extends TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Double ]] {
@@ -59,8 +59,8 @@ object PaperTest2 extends App {
             Doubles.readVar[ S ]( in, access )
       }
 
-      def newGroup()(  implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
-      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
+      def newGroup()(  implicit tx: S#Tx ) : ProcGroup.Var[ S ]   = ProcGroup.newVar
+      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]            = Proc()
 
       def newAccess[ A ]( block: => A )( implicit tx: S#Tx, ser: TxnSerializer[ S#Tx, S#Acc, A ]) : S#Entry[ A ] = {
          val v = tx.newVar( /* access.get.id, */ tx.newID(), block )
@@ -94,7 +94,7 @@ class Example2(implicit s: Confluent, c: Cursor[Confluent]) {
 
    implicit val ts = Chronos[ S ]( 0L )
   val group = s.root(newGroup()(_))
-  AuralPresentation.run[S, ProcGroup[S]](group)
+  AuralPresentation.run[S, ProcGroup.Var[S]](group)
 
   val freq = c.step { implicit tx =>
     exprVar(50.0).asAccess
@@ -110,7 +110,7 @@ class Example2(implicit s: Confluent, c: Cursor[Confluent]) {
       }
       Out.ar(0, m)
     }
-    group add p
+    group.add( Span.All, p )
     p.asAccess
   }
   val v1 = c.step(_.inputAccess)
@@ -122,7 +122,7 @@ class Example2(implicit s: Confluent, c: Cursor[Confluent]) {
 
   sleep(4.0)
   c.step { implicit tx =>
-    group.add(w meld v1)
+    group.add( Span.All, w meld v1 )
   }
 
   sleep(4.0)

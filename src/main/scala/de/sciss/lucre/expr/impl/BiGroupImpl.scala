@@ -80,20 +80,47 @@ object BiGroupImpl {
       new ImplNew( evt.Targets[ S ], tree, eventView )
    }
 
-   private def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+   def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S , BiGroup[ S, Elem, U ]] = new Ser( eventView )
+
+   def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S , BiGroup.Var[ S, Elem, U ]] = new VarSer( eventView )
+
+   def readGenericVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+         ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+           spanType: Type[ SpanLike ]) : BiGroup.Var[ S, Elem, U ] = {
+
+      sys.error( "TODO" )
+   }
+
+   private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
+                                             ( implicit tx: S#Tx,
+                                               elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                               spanType: Type[ SpanLike ]) : Impl[ S, Elem, U ] = {
+      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+      implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
+      implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
+      val tree: Tree[ S, Elem ] = SkipOctree.read[ S, TwoDim, Leaf[ S, Elem ]]( in, access )
+      new ImplNew( targets, tree, eventView )
+   }
 
    private class Ser[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                               ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                                 spanType: Type[ SpanLike ])
    extends evt.NodeSerializer[ S, BiGroup[ S, Elem, U ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiGroup[ S, Elem, U ] = {
-         implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
-         implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
-         implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
-         val tree: Tree[ S, Elem ] = SkipOctree.read[ S, TwoDim, Leaf[ S, Elem ]]( in, access )
-         new ImplNew( targets, tree, eventView )
+         BiGroupImpl.read( in, access, targets, eventView )
+      }
+   }
+
+   private class VarSer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+                                                 ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                   spanType: Type[ SpanLike ])
+   extends evt.NodeSerializer[ S, BiGroup.Var[ S, Elem, U ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiGroup.Var[ S, Elem, U ] = {
+         BiGroupImpl.read( in, access, targets, eventView )
       }
    }
 
@@ -266,6 +293,19 @@ object BiGroupImpl {
       // ---- collection behaviour ----
 
       @inline private def isConnected( implicit tx: S#Tx ) : Boolean = targets.nonEmpty
+
+      final def clear()( implicit tx: S#Tx ) {
+         if( isConnected ) {
+            val changes = tree.iterator.toIndexedSeq.flatMap { case (spanVal, seq) =>
+               seq.map { case (_, elem) => BiGroup.Removed( this, spanVal, elem )}
+            }
+            tree.clear()
+            changes.foreach( CollChanged.apply )
+
+         } else {
+            tree.clear()
+         }
+      }
 
       final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
          val spanVal = span.value

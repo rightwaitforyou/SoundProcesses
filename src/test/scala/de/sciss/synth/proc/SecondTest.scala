@@ -5,7 +5,7 @@ import synth.{SynthDef, Server, expr}
 import expr._
 import de.sciss.lucre.stm.{Sys, Cursor, InMemory}
 import synth._; import ugen._
-import de.sciss.lucre.expr.Chronos
+import de.sciss.lucre.expr.{Span, Chronos}
 
 object SecondTest {
    def main( args: Array[ String ]) {
@@ -14,14 +14,14 @@ object SecondTest {
    }
 
    def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
-      implicit val whyOhWhy = ProcGroup.serializer[ S ]
+      implicit val whyOhWhy = ProcGroup.varSerializer[ S ]
       val imp = new ExprImplicits[ S ]
       import imp._
 
       implicit val ts = Chronos[ S ]( 0L )
 
-      def group()( implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
-      def proc()(  implicit tx: S#Tx ) : Proc[ S ]      = Proc()
+      def group()( implicit tx: S#Tx ) : ProcGroup.Var[ S ] = ProcGroup.newVar
+      def proc()(  implicit tx: S#Tx ) : Proc[ S ]          = Proc()
 
       val access = system.root { implicit tx => group() }
 
@@ -30,7 +30,7 @@ object SecondTest {
             val group   = access.get
             val p       = proc()
             p.name      = name
-            group.add( p )
+            group.add( Span.All, p )
             p.graph     = graph
          }
       }
@@ -53,8 +53,9 @@ object SecondTest {
             Thread.sleep( 2000L )
             cursor.step { implicit tx =>
                val group = access.get
-               val procs = group.iterator.toIndexedSeq
-               procs.foreach( group.remove( _ ))
+//               val procs = group.iterator.toIndexedSeq
+//               procs.foreach( group.remove( _ ))
+               group.clear()
             }
             Thread.sleep( 2000L )
             sys.exit( 0 )

@@ -25,7 +25,7 @@
 
 package de.sciss.lucre.expr
 
-import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.{event => evt, DataInput}
 import evt.{Event, EventLike}
 import de.sciss.collection.txn
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
@@ -55,10 +55,25 @@ object BiGroup {
       ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
         spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.newGenericVar( eventView )
 
+   def readGenericVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+         ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+           spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.readGenericVar( in, access, eventView )
+
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
       def add(    span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Unit
       def remove( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean
+      def clear()( implicit tx: S#Tx ) : Unit
    }
+
+   def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+                                           ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                             spanType: Type[ SpanLike ]) : TxnSerializer[ S#Tx, S#Acc, BiGroup[ S, Elem, U ]] =
+      BiGroupImpl.serializer[ S, Elem, U ]( eventView )
+
+   def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+                                              ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                spanType: Type[ SpanLike ]) : TxnSerializer[ S#Tx, S#Acc, BiGroup.Var[ S, Elem, U ]] =
+      BiGroupImpl.varSerializer[ S, Elem, U ]( eventView )
 }
 trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    import BiGroup.Leaf

@@ -10,7 +10,7 @@ import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import de.sciss.lucre.stm.{TxnSerializer, Cursor}
 import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
-import de.sciss.lucre.expr.{Chronos, Expr}
+import de.sciss.lucre.expr.{Span, Chronos, Expr}
 
 object PaperTest extends App {
    val DRY = false
@@ -44,7 +44,7 @@ object PaperTest extends App {
 //   }
 
    def run[ S <: KSys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
-      implicit val whyOhWhy   = ProcGroup.serializer[ S ]
+      implicit val whyOhWhy   = ProcGroup.varSerializer[ S ]
       implicit val whyOhWhy2  = Proc.serializer[ S ]
       val imp = new ExprImplicits[ S ]
       import imp._
@@ -57,8 +57,8 @@ object PaperTest extends App {
 
       implicit val ts = Chronos[ S ]( 0L )
 
-      def newGroup()(  implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
-      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
+      def newGroup()(  implicit tx: S#Tx ) : ProcGroup.Var[ S ]   = ProcGroup.newVar
+      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]            = Proc()
 
       def log( what: => String ) {
          println( "______ACT______ " + what )
@@ -117,7 +117,7 @@ object PaperTest extends App {
             Out.ar( 0, m )
          }
          log( "group.add( p )" )
-         group.add( p )
+         group.add( Span.All, p )
          log( "newAccess( p )" )
          newAccess( p )
       }
@@ -147,7 +147,7 @@ object PaperTest extends App {
             val p1   = proc1.meld( version )
 println( "......yields " + p1 )
             log( "group.add( p' )" )
-            group.add( p1 )
+            group.add( Span.All, p1 )
          }
       }
 
@@ -167,7 +167,7 @@ println( "......yields " + p1 )
 
       } else  {
          logStep()
-         AuralPresentation.run[ S, ProcGroup[ S ]]( access )
+         AuralPresentation.run[ S, ProcGroup.Var[ S ]]( access )
 
          (new Thread {
             override def run() {
@@ -199,7 +199,8 @@ LucreSTM.showEventLog = true
                Thread.sleep( 4000L )
                val procs = cursor.step { implicit tx =>
                   val group = access.get
-                  group.iterator.toList.map( p => (p, p.freq.value) )
+//                  group.iterator.toList.map( p => (p, p.freq.value) )
+                  group.iterator.toList.flatMap { case (_, seq) => seq.map { case (_, p) => (p, p.freq.value) }}
                }
                println( "\nFinal list of procs in group is " + procs.mkString( "[ ", ", ", " ]" ))
             }

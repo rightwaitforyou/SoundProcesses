@@ -11,7 +11,7 @@ import java.io.File
 import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.stm.{Serializer, TxnSerializer, Cursor}
-import de.sciss.lucre.expr.{Chronos, Expr}
+import de.sciss.lucre.expr.{Span, Chronos, Expr}
 
 object PaperTest3 extends App {
    val DRY = false
@@ -42,17 +42,17 @@ object PaperTest3 extends App {
             Doubles.readVar[ S ]( in, access )
       }
 
-      def newGroup()(  implicit tx: S#Tx ) : ProcGroup[ S ] = ProcGroup.empty
-      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]      = Proc()
+      def newGroup()(  implicit tx: S#Tx ) : ProcGroup.Var[ S ]   = ProcGroup.newVar
+      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]            = Proc()
 
       def log( what: => String ) {
          println( "____PAPER____ " + what )
       }
 
       object Access {
-         def apply( g: ProcGroup[ S ]) : Access = new Impl( g, IIdxSeq.empty )
+         def apply( g: ProcGroup.Var[ S ]) : Access = new Impl( g, IIdxSeq.empty )
 
-         implicit def group( a: Access ) : ProcGroup[ S ] = a.group
+         implicit def group( a: Access ) : ProcGroup.Var[ S ] = a.group
 
          private val varsSer = TxnSerializer.indexedSeq[ S#Tx, S#Acc, Expr.Var[ S, Double ]]
 
@@ -63,7 +63,7 @@ object PaperTest3 extends App {
             }
 
             def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Access = {
-               val g       = ProcGroup.read[ S ]( in, access )
+               val g       = ProcGroup.readVar[ S ]( in, access )
                val vars    = varsSer.read( in, access )
                new Impl( g, vars )
             }
@@ -73,14 +73,14 @@ object PaperTest3 extends App {
 //            def get( implicit tx: S#Tx ) : Expr.Var[ S, Double ]
 //         }
 
-         private final class Impl( val group: ProcGroup[ S ], val vars: IIdxSeq[ Expr.Var[ S, Double ]])
+         private final class Impl( val group: ProcGroup.Var[ S ], val vars: IIdxSeq[ Expr.Var[ S, Double ]])
          extends Access {
             override def toString = "Access"
             def addVar( v: Expr.Var[ S, Double ]) : Access = new Impl( group, vars :+ v )
          }
       }
       trait Access {
-         def group : ProcGroup[ S ]
+         def group : ProcGroup.Var[ S ]
          def vars  : IIdxSeq[ Expr.Var[ S, Double ]]
          def addVar( v: Expr.Var[ S, Double ]) : Access
       }
@@ -114,11 +114,11 @@ object PaperTest3 extends App {
          access.transform( _.addVar( freq ))
       }
 
-      def groupGet()( implicit tx: S#Tx ) : ProcGroup[ S ] = access.get.group
+      def groupGet()( implicit tx: S#Tx ) : ProcGroup.Var[ S ] = access.get.group
       def freqVar()( implicit tx: S#Tx ) : Expr.Var[ S, Double ] = access.get.vars.head
-      def procGet()( implicit tx: S#Tx ) : Proc[ S ] = groupGet().iterator.next()
+      def procGet()( implicit tx: S#Tx ) : Proc[ S ] = groupGet().iterator.next()._2.head._2
       def procMeld( version: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = {
-         access.meld( version ).group.iterator.next()
+         access.meld( version ).group.iterator.next()._2.head._2
       }
 
       cursor.step { implicit tx =>
@@ -140,7 +140,7 @@ object PaperTest3 extends App {
             Out.ar( 0, m )
          }
          log( "group.add( p )" )
-         group.add( p )
+         group.add( Span.All, p )
          log( "newAccess( p )" )
       }
 
@@ -166,7 +166,7 @@ object PaperTest3 extends App {
             log( "p1 = p.meld( v1 )" )
             val p1   = procMeld( version )
             log( "group.add( p1 )" )
-            group.add( p1 )
+            group.add( Span.All, p1 )
          }
       }
 
