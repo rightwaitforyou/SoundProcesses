@@ -4,8 +4,9 @@
 //import de.sciss.lucre.stm.InMemory
 //
 //object EqualsTest {
-//   class Test extends EventImpl[ InMemory, Unit, Unit, Test ]
-//   with StandaloneLike[ InMemory, Unit, Test ]
+//   class Test
+//   extends StandaloneLike[ InMemory, Unit, Test ]
+//   with EventImpl[ InMemory, Unit, Unit, Test ]
 //
 //   val t = new Test {
 //      val i = hashCode()
