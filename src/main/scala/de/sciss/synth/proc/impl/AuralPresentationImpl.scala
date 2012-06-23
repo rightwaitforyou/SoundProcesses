@@ -134,27 +134,27 @@ object AuralPresentationImpl {
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val group   = groupView( groupA.get )
-            group.iterator.foreach( booted.procAdded( _ ))
-            group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
-               case ProcGroup.Added( _, procs ) =>
-                  procs.foreach( booted.procAdded( _ ))
-               case ProcGroup.Removed( _, procs ) =>
-                  procs.foreach( booted.procRemoved( _ ))
-               case ProcGroup.Element( _, changes ) =>
-                  changes.foreach {
-                     case Proc.Renamed( proc, Change( _, newName )) =>
-                        booted.procRenamed( proc, newName )
-                     case Proc.GraphChanged( proc, Change( _, newGraph )) =>
-                        booted.procGraphChanged( proc, newGraph )
-//                     case Proc.PlayingChanged( proc, Change( _, newPlaying )) =>
-//                        booted.procPlayingChanged( proc, newPlaying )
-//                     case Proc.FreqChanged( proc, Change( _, newFreq )) =>
-//                        booted.procFreqChanged( proc, newFreq )
-case _ =>
-                  }
-                  println( changes.mkString( "aural changes: ", ",", "" ))
-               case _ =>
-            }}
+//            group.iterator.foreach( booted.procAdded( _ ))
+//            group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
+//               case ProcGroup.Added( _, procs ) =>
+//                  procs.foreach( booted.procAdded( _ ))
+//               case ProcGroup.Removed( _, procs ) =>
+//                  procs.foreach( booted.procRemoved( _ ))
+//               case ProcGroup.Element( _, changes ) =>
+//                  changes.foreach {
+//                     case Proc.Renamed( proc, Change( _, newName )) =>
+//                        booted.procRenamed( proc, newName )
+//                     case Proc.GraphChanged( proc, Change( _, newGraph )) =>
+//                        booted.procGraphChanged( proc, newGraph )
+////                     case Proc.PlayingChanged( proc, Change( _, newPlaying )) =>
+////                        booted.procPlayingChanged( proc, newPlaying )
+////                     case Proc.FreqChanged( proc, Change( _, newFreq )) =>
+////                        booted.procFreqChanged( proc, newFreq )
+//case _ =>
+//                  }
+//                  println( changes.mkString( "aural changes: ", ",", "" ))
+//               case _ =>
+//            }}
          }
       }
    }
