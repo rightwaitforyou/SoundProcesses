@@ -170,8 +170,8 @@ object BiGroupImpl {
                pull.resolve[ BiGroup.Collection[ S, Elem, U ]]
             } else {             // span key changed
                val changes: IIdxSeq[ (Change[ SpanLike ], Elem) ] = par.flatMap( sel => {
-                  val span = evt.Intruder.devirtualizeNode( sel,
-                     spanType.serializer[ S ].asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).asInstanceOf[ Expr[ S, SpanLike ]]
+                  val span = sel.devirtualize( spanType.serializer[ S ].asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+                     .node.asInstanceOf[ Expr[ S, SpanLike ]]
                   val changeOption = span.changed.pullUpdate( pull )
                   // somehow the flatMap is shadowed in Option, so the implicit conversion
                   // to Iterable doesn't kick in...
@@ -214,8 +214,8 @@ object BiGroupImpl {
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Element[ S, Elem, U ]] = {
             val changes: IIdxSeq[ (Elem, U) ] = pull.parents( this ).flatMap( sel => {
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
-               val elem0 = evt.Intruder.devirtualizeNode( sel, elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
-               val elem = elem0.asInstanceOf[ Elem ]
+               val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
+                  asInstanceOf[ Elem ]
                eventView( elem ).pullUpdate( pull ).map( u => (elem, u) )
             })( breakOut )
 

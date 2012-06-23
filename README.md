@@ -6,7 +6,7 @@ SoundProcesses is an extension for ScalaCollider to describe, create and manage 
 
 ### compilation
 
-SoundProcesses builds with sbt 0.11.2 and Scala 2.9.1. Dependency [TemporalObjects](http://github.com/Sciss/TemporalObjects) must be cloned from github and published first using `sbt publish-local`. Dependency [ScalaCollider](http://github.com/Sciss/ScalaCollider) will be downloaded automatically from its online repository.
+SoundProcesses builds with sbt 0.11.3 and Scala 2.9.2. The dependencies should be downloaded automatically from maven central repository.
 
 ### REPL example
 

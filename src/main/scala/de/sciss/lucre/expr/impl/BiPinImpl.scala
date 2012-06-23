@@ -298,7 +298,7 @@ object BiPinImpl {
             p.foreach { sel =>
 // need to change package private modifier from `event` to `lucre`
 //               n.devirtualize()
-               val e = evt.Intruder.devirtualize( sel, reader ).asInstanceOf[ Entry.Dynamic[ S, A ]]
+               val e = sel.devirtualize( reader ).asInstanceOf[ Entry.Dynamic[ S, A ]]
                e.pullUpdate( pull ).foreach {
                   case evt.Change( (tOld, vOld), (tNew, vNew) ) =>
                      if( tOld == tNew ) { // time didn't change -- only one region changed
