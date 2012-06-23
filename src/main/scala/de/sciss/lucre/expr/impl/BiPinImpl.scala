@@ -247,13 +247,20 @@ object BiPinImpl {
       def value: Expr[ S, A ]
    }
 
+   /*
+    * XXX dangerous stuff: http://stackoverflow.com/questions/11172062/messed-up-trait-linearisation
+    *
+    * It works when StandaloneLike comes before Trigger.Impl, but not vice versa
+    */
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: evt.Targets[ S ],
                                                  ordered: SkipList.Map[ S, Long, Entry[ S, A ]])
                                                ( implicit peerType: BiType[ A ])
    extends Var[ S, A ]
-   with evt.Trigger.Impl[ S, Update[ A ], Update[ A ], BiPin[ S, A ]]
-   with evt.StandaloneLike[ S, Update[ A ], BiPin[ S, A ]] {
+   with evt.StandaloneLike[ S, Update[ A ], BiPin[ S, A ]]
+   with evt.Trigger.Impl[ S, Update[ A ], Update[ A ], BiPin[ S, A ]] {
       protected def reader = serializer[ S, A ]
+
+      override def toString() = "BiPin" + id
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
          var dirty   = IIdxSeq.empty[ (Long, Entry.Dynamic[ S, A ])]

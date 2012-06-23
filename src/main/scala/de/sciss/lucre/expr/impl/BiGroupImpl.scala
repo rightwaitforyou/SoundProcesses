@@ -214,7 +214,8 @@ object BiGroupImpl {
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Element[ S, Elem, U ]] = {
             val changes: IIdxSeq[ (Elem, U) ] = pull.parents( this ).flatMap( sel => {
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
-               val elem = evt.Intruder.devirtualizeNode( sel, elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).asInstanceOf[ Elem ]
+               val elem0 = evt.Intruder.devirtualizeNode( sel, elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+               val elem = elem0.asInstanceOf[ Elem ]
                eventView( elem ).pullUpdate( pull ).map( u => (elem, u) )
             })( breakOut )
 

@@ -134,6 +134,7 @@ object AuralPresentationImpl {
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val group   = groupView( groupA.get )
+            group.changed.react { x => println( "Aural observation: " + x )}
 //            group.iterator.foreach( booted.procAdded( _ ))
 //            group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
 //               case ProcGroup.Added( _, procs ) =>
