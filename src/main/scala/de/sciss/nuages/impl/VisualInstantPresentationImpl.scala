@@ -40,6 +40,7 @@ import prefuse.controls.{PanControl, WheelZoomControl, ZoomControl}
 import javax.swing.event.{AncestorEvent, AncestorListener}
 import prefuse.data
 import prefuse.visual.VisualItem
+import de.sciss.lucre.expr.SpanLike
 
 object VisualInstantPresentationImpl {
    def apply[ S <: Sys[ S ], A ]( transport: S#Entry[ A ])
@@ -73,24 +74,26 @@ object VisualInstantPresentationImpl {
             onEDT( vis.playing = b )
          }
 
-         def addRemove( added: IIdxSeq[ Proc[ S ]], removed: IIdxSeq[ Proc[ S ]])( implicit tx: S#Tx ) {
-            val vpRem = removed.flatMap { proc =>
-               val vpO = map.get( proc.id )
-               if( vpO.isDefined ) map.remove( proc.id )
-               vpO
-            }
-            val hasRem = vpRem.nonEmpty
-            val vpAdd = added.map { proc =>
-               val n    = proc.name.value
-               val vp   = new VisualProc( n )
-               map.put( proc.id, vp )
-               vp
-            }
-            val hasAdd = vpAdd.nonEmpty
-            if( hasAdd || hasRem ) onEDT {
-               if( hasAdd ) vis.add(    vpAdd: _* )
-               if( hasRem ) vis.remove( vpRem: _* )
-            }
+         def addRemove( added:   IIdxSeq[ (SpanLike, Proc[ S ])],
+                        removed: IIdxSeq[ (SpanLike, Proc[ S ])])( implicit tx: S#Tx ) {
+//            val vpRem = removed.flatMap { proc =>
+//               val vpO = map.get( proc.id )
+//               if( vpO.isDefined ) map.remove( proc.id )
+//               vpO
+//            }
+//            val hasRem = vpRem.nonEmpty
+//            val vpAdd = added.map { proc =>
+//               val n    = proc.name.value
+//               val vp   = new VisualProc( n )
+//               map.put( proc.id, vp )
+//               vp
+//            }
+//            val hasAdd = vpAdd.nonEmpty
+//            if( hasAdd || hasRem ) onEDT {
+//               if( hasAdd ) vis.add(    vpAdd: _* )
+//               if( hasRem ) vis.remove( vpRem: _* )
+//            }
+            sys.error( "TODO" )
          }
 
          t.changed.reactTx { implicit tx => {

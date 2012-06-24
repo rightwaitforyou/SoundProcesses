@@ -54,13 +54,6 @@ object BiGroupImpl {
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   // XXX until we have txn.Iterator.empty
-   private object EmptyIterator extends txn.Iterator[ Any, Nothing ] {
-      def hasNext = false
-      def next()( implicit tx: Any ) : Nothing = throw new util.NoSuchElementException( "next on an empty iterator" )
-      override def toString = "empty iterator"
-   }
-
    private def spanToPoint( span: SpanLike ) : LongPoint2D = span match {
       case Span( start, stop )=> LongPoint2D( start, stop )
       case Span.From( start ) => LongPoint2D( start, MAX_COORD )
@@ -395,12 +388,12 @@ object BiGroupImpl {
                rangeSearch( shape )
 
             case Span.All  => tree.iterator
-            case Span.Void => EmptyIterator
+            case Span.Void => txn.Iterator.empty
          }
       }
 
       final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
-         if( start == Span.Void || stop == Span.Void ) return EmptyIterator
+         if( start == Span.Void || stop == Span.Void ) return txn.Iterator.empty
 
          val startP  = spanToPoint( start )
          val stopP   = spanToPoint( stop  )

@@ -2,14 +2,12 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{SpanLike, Span, Expr}
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.{event => evt}
 import evt.Event
 import de.sciss.synth.expr.Booleans
 import de.sciss.collection.txn
-import concurrent.stm.{Ref => STMRef}
-import annotation.tailrec
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object TransportImpl {
@@ -47,46 +45,47 @@ object TransportImpl {
 //      protected def reader : Reader[ S, Expr[ S, Long ]] = Longs.serializer[ S ]
 //   }
 
-   private def flatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]])( fun: A => B )
-                                             ( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, B ] = {
-      val res = new FlatMap( it, fun )
-      res.init()
-      res
-   }
+//   private def flatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]])( fun: A => B )
+//                                             ( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, B ] = {
+//      val res = new FlatMap( it, fun )
+//      res.init()
+//      res
+//   }
+//
+//   private final class FlatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]], fun: A => B )
+//   extends txn.Iterator[ S#Tx, B ] {
+//      private val coll        = STMRef( (IIdxSeq.empty[ A ], -1) )
+//      private var hasNextVar  = false
+//
+//      def init()( implicit tx: S#Tx ) {
+//         val tup = findNext()
+//         coll.set( tup )( tx.peer )
+//         hasNextVar = tup._2 >= 0
+//      }
+//
+//      @tailrec private def findNext()( implicit tx: S#Tx ) : (IIdxSeq[ A ], Int) = {
+//         if( !it.hasNext ) (IIdxSeq.empty, -1) else {
+//            val n = it.next()
+//            if( n.nonEmpty ) (n, 0) else findNext()
+//         }
+//      }
+//
+//      def hasNext : Boolean = hasNextVar
+//
+//      def next()( implicit tx: S#Tx ) : B = {
+//         implicit val itx = tx.peer
+//         val (seq, idx) = coll.get
+//         val res  = fun( seq( idx ))
+//         val idx1 = idx + 1
+//         if( idx1 < seq.size ) {
+//            coll.set( (seq, idx1) )
+//         } else {
+//            init()
+//         }
+//         res
+//      }
+//   }
 
-   private final class FlatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]], fun: A => B )
-   extends txn.Iterator[ S#Tx, B ] {
-      private val coll        = STMRef( (IIdxSeq.empty[ A ], -1) )
-      private var hasNextVar  = false
-
-      def init()( implicit tx: S#Tx ) {
-         val tup = findNext()
-         coll.set( tup )( tx.peer )
-         hasNextVar = tup._2 >= 0
-      }
-
-      @tailrec private def findNext()( implicit tx: S#Tx ) : (IIdxSeq[ A ], Int) = {
-         if( !it.hasNext ) (IIdxSeq.empty, -1) else {
-            val n = it.next()
-            if( n.nonEmpty ) (n, 0) else findNext()
-         }
-      }
-
-      def hasNext : Boolean = hasNextVar
-
-      def next()( implicit tx: S#Tx ) : B = {
-         implicit val itx = tx.peer
-         val (seq, idx) = coll.get
-         val res  = fun( seq( idx ))
-         val idx1 = idx + 1
-         if( idx1 < seq.size ) {
-            coll.set( (seq, idx1) )
-         } else {
-            init()
-         }
-         res
-      }
-   }
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], group: ProcGroup[ S ],
                                              val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ], lastTime: S#Var[ Long ])
@@ -112,12 +111,16 @@ object TransportImpl {
          playingVar.dispose()
       }
 
-      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Proc[ S ]] = flatMap( group.intersect( time ).map( _._2 ))( _._2 )
+      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Proc[ S ])] =
+         group.intersect( time ).flatMap { case (span, seq) => seq.map { case (_, elem) => (span, elem)}}
 
       def seek( time: Long )( implicit tx: S#Tx ) {
          val old = lastTime.get
          if( time != old ) {
             lastTime.set( time )
+            // ... those which end in the interval (LRP, t] must be removed ...
+            val rem = group.rangeSearch( Span.All, Span( old, time )).flatMap { case (span, seq) => seq.map { case (_, elem) => (span, elem)}}
+
                // see Transport.svg
             val ch = if( time > old ) {
             } else {

@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.{BiGroup, Expr, Chronos}
+import de.sciss.lucre.expr.{SpanLike, BiGroup, Expr, Chronos}
 import de.sciss.lucre.stm.{TxnSerializer, Writer, Disposable, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.event.Event
@@ -18,16 +18,18 @@ object Transport {
    sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}
    sealed trait TimeUpdate[ S <: Sys[ S ], Elem ] extends Update[ S, Elem ] {
       def time: Long
-      def added: IIdxSeq[ Elem ]
-      def removed: IIdxSeq[ Elem ]
+      def added:   IIdxSeq[ (SpanLike, Elem) ]
+      def removed: IIdxSeq[ (SpanLike, Elem) ]
    }
 
-   final case class Seek[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ],
-                                                 time: Long, added: IIdxSeq[ Elem ], removed: IIdxSeq[ Elem ])
+   final case class Seek[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], time: Long,
+                                                 added:   IIdxSeq[ (SpanLike, Elem) ],
+                                                 removed: IIdxSeq[ (SpanLike, Elem) ])
    extends TimeUpdate[ S, Elem ]
 
-   final case class Advance[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ],
-                                                    time: Long, added: IIdxSeq[ Elem ], removed: IIdxSeq[ Elem ])
+   final case class Advance[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], time: Long,
+                                                    added:   IIdxSeq[ (SpanLike, Elem) ],
+                                                    removed: IIdxSeq[ (SpanLike, Elem) ])
    extends TimeUpdate[ S, Elem ]
 
    final case class Play[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
@@ -42,7 +44,7 @@ trait Transport[ S <: Sys[ S ], Elem ] extends evt.Node[ S ] with Chronos[ S ] {
 
    def sampleRate: Double
 
-   def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Elem ]
+   def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
 
    def changed: Event[ S, Transport.Update[ S, Elem ], Transport[ S, Elem ]]
 
