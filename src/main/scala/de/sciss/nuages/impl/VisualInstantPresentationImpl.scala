@@ -41,6 +41,9 @@ import javax.swing.event.{AncestorEvent, AncestorListener}
 import prefuse.data
 import prefuse.visual.VisualItem
 import de.sciss.lucre.expr.SpanLike
+import prefuse.action.assignment.ColorAction
+import prefuse.util.ColorLib
+import prefuse.render.{LabelRenderer, DefaultRendererFactory}
 
 object VisualInstantPresentationImpl {
    def apply[ S <: Sys[ S ], A ]( transport: S#Entry[ A ])
@@ -51,7 +54,7 @@ object VisualInstantPresentationImpl {
 
       val vis = new Impl( transport, cursor, transportView )
       cursor.step { implicit tx =>
-         val map     = tx.newInMemoryIDMap[ VisualProc ]
+         val map     = tx.newInMemoryIDMap[ Map[ SpanLike, List[ VisualProc ]]]
          val t       = transportView( transport.get )
          val all     = t.iterator.toIndexedSeq
 
@@ -76,23 +79,38 @@ object VisualInstantPresentationImpl {
 
          def addRemove( added:   IIdxSeq[ (SpanLike, Proc[ S ])],
                         removed: IIdxSeq[ (SpanLike, Proc[ S ])])( implicit tx: S#Tx ) {
-//            val vpRem = removed.flatMap { proc =>
-//               val vpO = map.get( proc.id )
-//               if( vpO.isDefined ) map.remove( proc.id )
-//               vpO
-//            }
-//            val hasRem = vpRem.nonEmpty
-//            val vpAdd = added.map { proc =>
-//               val n    = proc.name.value
-//               val vp   = new VisualProc( n )
-//               map.put( proc.id, vp )
-//               vp
-//            }
-//            val hasAdd = vpAdd.nonEmpty
-//            if( hasAdd || hasRem ) onEDT {
-//               if( hasAdd ) vis.add(    vpAdd: _* )
-//               if( hasRem ) vis.remove( vpRem: _* )
-//            }
+            val vpRem = removed.flatMap { case (span, proc) =>
+               map.get( proc.id ).flatMap { vpm =>
+                  map.remove( proc.id )
+                  vpm.get( span ).flatMap {
+                     case vp :: tail =>
+                        if( tail.nonEmpty ) {
+                           map.put( proc.id, vpm + (span -> tail) )
+                        }
+                        Some( vp )
+                     case _ =>
+                        None
+                  }
+               }
+            }
+            val hasRem = vpRem.nonEmpty
+            val vpAdd = added.map { case (span, proc) =>
+               val n    = proc.name.value
+               val vp   = new VisualProc( n )
+               map.get( proc.id ) match {
+                  case Some( vpm ) =>
+                     map.remove( proc.id )
+                     map.put( proc.id, vpm + (span -> (vp :: vpm.getOrElse( span, Nil ))))
+                  case _ =>
+                     map.put( proc.id, Map( span -> (vp :: Nil) ))
+               }
+               vp
+            }
+            val hasAdd = vpAdd.nonEmpty
+            if( hasAdd || hasRem ) onEDT {
+               if( hasAdd ) vis.add(    vpAdd: _* )
+               if( hasRem ) vis.remove( vpRem: _* )
+            }
          }
 
          t.changed.reactTx { implicit tx => {
@@ -112,6 +130,8 @@ object VisualInstantPresentationImpl {
    private val ACTION_COLOR   = "color"
    private val ACTION_LAYOUT  = "layout"
    private val GROUP_GRAPH    = "graph"
+   private val GROUP_NODES    = "graph.nodes"
+   private val GROUP_EDGES    = "graph.edges"
    private val LAYOUT_TIME    = 50
    private val colrPlay       = new Color( 0, 0x80, 0 )
    private val colrStop       = Color.black
@@ -123,7 +143,11 @@ object VisualInstantPresentationImpl {
 //      private var vps      = Set.empty[ VisualProc ]
       private var nodeMap  = Map.empty[ VisualProc, data.Node ]
 
-      private val g        = new data.Graph
+      private val g        = {
+         val res = new data.Graph
+         res.addColumn( VisualItem.LABEL, classOf[ String ])
+         res
+      }
       private val pVis     = {
          val res = new Visualization()
          res.addGraph( GROUP_GRAPH, g )
@@ -136,8 +160,20 @@ object VisualInstantPresentationImpl {
       def init() {
          val lay = new ForceDirectedLayout( GROUP_GRAPH )
 
+         val lbRend = new LabelRenderer( VisualItem.LABEL )
+         val rf = new DefaultRendererFactory( lbRend )
+         pVis.setRendererFactory( rf )
+
+         // colors
+         val actionNodeStroke = new ColorAction( GROUP_NODES, VisualItem.STROKECOLOR, ColorLib.rgb( 255, 255, 255 ))
+         val actionNodeFill   = new ColorAction( GROUP_NODES, VisualItem.FILLCOLOR, ColorLib.rgb( 0, 0, 0 ))
+         val actionTextColor  = new ColorAction( GROUP_NODES, VisualItem.TEXTCOLOR, ColorLib.rgb( 255, 255, 255 ))
+
          // quick repaint
          val actionColor = new ActionList()
+         actionColor.add( actionTextColor )
+         actionColor.add( actionNodeStroke )
+         actionColor.add( actionNodeFill )
          pVis.putAction( ACTION_COLOR, actionColor )
 
          val actionLayout = new ActionList( Activity.INFINITY, LAYOUT_TIME )
@@ -188,8 +224,9 @@ object VisualInstantPresentationImpl {
 
       private def add1( vp: VisualProc ) {
          val pNode   = g.addNode()
-         val vi      = pVis.getVisualItem( GROUP_GRAPH, pNode )
-         vi.setString( VisualItem.LABEL, vp.name )
+//         val vi      = pVis.getVisualItem( GROUP_GRAPH, pNode )
+//         vi.setString( VisualItem.LABEL, vp.name )
+         pNode.setString( VisualItem.LABEL, vp.name )
          nodeMap    += vp -> pNode
       }
 
