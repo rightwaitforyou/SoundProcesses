@@ -9,6 +9,7 @@ import evt.Event
 import de.sciss.synth.expr.Booleans
 import de.sciss.collection.txn
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import actors.Actor
 
 object TransportImpl {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )
@@ -44,6 +45,14 @@ object TransportImpl {
 //
 //      protected def reader : Reader[ S, Expr[ S, Long ]] = Longs.serializer[ S ]
 //   }
+
+   private lazy val Runner = new Actor {
+      override def toString = "Transport.Runner"
+
+      def act() {
+
+      }
+   }
 
    private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Proc[ S ])])) : IIdxSeq[ (SpanLike, Proc[ S ])] = {
       val span = in._1
@@ -108,8 +117,17 @@ object TransportImpl {
          val isPlaying  = expr.value
          playingVar.set( expr )
          if( wasPlaying != isPlaying ) {
-            fire( if( isPlaying ) Transport.Play( this ) else Transport.Stop( this ))
+            if( isPlaying ) play() else stop()
          }
+      }
+
+      private def play()( implicit tx: S#Tx ) {
+         fire( Transport.Play( this ))
+//         group.nearestEventAfter()
+      }
+
+      private def stop()( implicit tx: S#Tx ) {
+         fire( Transport.Stop( this ))
       }
 
       def time( implicit tx: S#Tx ) : Long = lastTime.get   // XXX // Expr[ S, Long ] = timeExpr

@@ -36,6 +36,14 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       res
    }
 
+   def next( time: Long ) : Option[ Long ] = t { implicit tx =>
+      group.nearestEventAfter( time )
+   }
+
+   def prev( time: Long ) : Option[ Long ] = t { implicit tx =>
+      group.nearestEventBefore( time )
+   }
+
    def add( span: SpanLike = Span( 33, 44 ), name: String = "Proc" ) {
       t { implicit tx => group.add( span, proc( name ))}
    }
@@ -71,17 +79,19 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
    private var frameVar: JFrame = null
    def frame = frameVar
 
-   defer {
-      val f    = new JFrame( "Vis" )
-      frameVar = f
-      val cp   = f.getContentPane
-      val vis  = VisualInstantPresentation( system.asEntry( trans ))
-      cp.add( vis.view, BorderLayout.CENTER )
-      f.pack()
-      f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
-      f.setLocationRelativeTo( null )
-      f.setLocation( f.getX, 0 )
-      f.setAlwaysOnTop( true )
-      f.setVisible( true )
+   def gui() {
+      if( frame == null ) defer {
+         val f    = new JFrame( "Vis" )
+         frameVar = f
+         val cp   = f.getContentPane
+         val vis  = VisualInstantPresentation( system.asEntry( trans ))
+         cp.add( vis.view, BorderLayout.CENTER )
+         f.pack()
+         f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
+         f.setLocationRelativeTo( null )
+         f.setLocation( f.getX, 0 )
+         f.setAlwaysOnTop( true )
+         f.setVisible( true )
+      }
    }
 }

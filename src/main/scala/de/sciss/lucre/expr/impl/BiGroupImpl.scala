@@ -125,6 +125,12 @@ object BiGroupImpl {
       }
    }
 
+      // ... accepted are points with x > LRP || y > LRP ...
+      private val advanceNNMetric   = LongDistanceMeasure2D.chebyshev.exceptOrthant( 1 )
+//   private val advanceNNMetric   = LongDistanceMeasure2D.vehsybehc.exceptOrthant( 1 )
+
+   private val regressNNMetric   = LongDistanceMeasure2D.chebyshev.exceptOrthant( 3 )
+
    private sealed trait Impl[ S <: Sys[ S ], Elem, U ]
    extends Var[ S, Elem, U ]
 //   with evt.Compound[ S, Impl[ S, Elem, U ], Impl.type ]
@@ -417,36 +423,34 @@ object BiGroupImpl {
       }
 
       final def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
-         val point   = LongPoint2D( time, time )
-         val metric  = LongDistanceMeasure2D.chebyshev.exceptOrthant( 1 )
-         val span    = tree.nearestNeighborOption( point, metric ).map( _._1 ).getOrElse( Span.Void )
+         val point   = LongPoint2D( time, time ) // + 1
+         val span    = tree.nearestNeighborOption( point, advanceNNMetric ).map( _._1 ).getOrElse( Span.Void )
          span match {
-            case Span.From( start ) => assert( start > time ); Some( start )
-            case Span.Until( stop ) => assert( stop  > time ); Some( stop )
-            case Span( start, stop )=>
-               if( start > time && (stop <= time || stop > start) ) {
-                  assert( start > time ); Some( start )
+            case sp @ Span.From( start ) => if( start >= time ) Some( start ) else None
+            case sp @ Span.Until( stop ) => if( stop  >= time ) Some( stop  ) else None
+            case sp @ Span( start, stop ) =>
+               if( start >= time ) {
+                  Some( start )
                } else {
-                  assert( stop > time ); Some( stop )
+                  assert( stop >= time, sp.toString ); Some( stop )
                }
-            case _ => None
+            case _ => None // All or Void
          }
       }
 
       final def nearestEventBefore( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
          val point   = LongPoint2D( time, time )
-         val metric  = LongDistanceMeasure2D.chebyshev.exceptOrthant( 3 )
-         val span    = tree.nearestNeighborOption( point, metric ).map( _._1 ).getOrElse( Span.Void )
+         val span    = tree.nearestNeighborOption( point, regressNNMetric ).map( _._1 ).getOrElse( Span.Void )
          span match {
-            case Span.From( start ) => assert( start < time ); Some( start )
-            case Span.Until( stop ) => assert( stop  < time ); Some( stop )
+            case Span.From( start ) => if( start <= time ) Some( start ) else None
+            case Span.Until( stop ) => if( stop  <= time ) Some( stop  ) else None
             case Span( start, stop )=>
-               if( start < time && (stop >= time || stop < start) ) {
-                  assert( start < time ); Some( start )
+               if( stop <= time ) {
+                  Some( stop )
                } else {
-                  assert( stop < time ); Some( stop )
+                  assert( start <= time ); Some( start )
                }
-            case _ => None
+            case _ => None // All or Void
          }
       }
 
