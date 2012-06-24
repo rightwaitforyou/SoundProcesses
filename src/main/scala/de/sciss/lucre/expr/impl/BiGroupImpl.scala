@@ -61,6 +61,14 @@ object BiGroupImpl {
       case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
    }
 
+   private def searchSpanToPoint( span: SpanLike ) : LongPoint2D = span match {
+      case Span( start, stop )=> LongPoint2D( start, stop )
+      case Span.From( start ) => LongPoint2D( start, MAX_COORD + 1 )
+      case Span.Until( stop ) => LongPoint2D( MIN_COORD, stop )
+      case Span.All           => LongPoint2D( MIN_COORD, MAX_COORD + 1 )
+      case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
+   }
+
    def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = {
@@ -394,8 +402,8 @@ object BiGroupImpl {
       final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          if( start == Span.Void || stop == Span.Void ) return txn.Iterator.empty
 
-         val startP  = spanToPoint( start )
-         val stopP   = spanToPoint( stop  )
+         val startP  = searchSpanToPoint( start )
+         val stopP   = searchSpanToPoint( stop  )
          val shape   = LongRectangle( startP.x, stopP.x, startP.y - startP.x /* + 1 */, stopP.y - stopP.x /* + 1 */)
 //println( "RANGE " + shape )
          rangeSearch( shape )

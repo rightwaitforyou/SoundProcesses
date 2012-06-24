@@ -28,7 +28,7 @@ package impl
 
 import de.sciss.lucre.stm.{Sys, Cursor}
 import de.sciss.synth.proc.{Proc, Transport}
-import java.awt.{Color, EventQueue}
+import java.awt.{RenderingHints, Graphics2D, Graphics, Color, EventQueue}
 import javax.swing.JComponent
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.Txn
@@ -36,7 +36,7 @@ import prefuse.{Display, Visualization}
 import prefuse.action.layout.graph.ForceDirectedLayout
 import prefuse.action.{RepaintAction, ActionList}
 import prefuse.activity.Activity
-import prefuse.controls.{PanControl, WheelZoomControl, ZoomControl}
+import prefuse.controls.{DragControl, ZoomToFitControl, PanControl, WheelZoomControl, ZoomControl}
 import javax.swing.event.{AncestorEvent, AncestorListener}
 import prefuse.data
 import prefuse.visual.VisualItem
@@ -44,6 +44,7 @@ import de.sciss.lucre.expr.SpanLike
 import prefuse.action.assignment.ColorAction
 import prefuse.util.ColorLib
 import prefuse.render.{LabelRenderer, DefaultRendererFactory}
+import prefuse.util.force.{AbstractForce, ForceItem, CircularWallForce}
 
 object VisualInstantPresentationImpl {
    def apply[ S <: Sys[ S ], A ]( transport: S#Entry[ A ])
@@ -153,12 +154,48 @@ object VisualInstantPresentationImpl {
          res.addGraph( GROUP_GRAPH, g )
          res
       }
-      private val display  = new Display( pVis )
+      private val display  = new Display( pVis ) {
+         override protected def setRenderingHints( g: Graphics2D ) {
+            g.setRenderingHint( RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON )
+            g.setRenderingHint( RenderingHints.KEY_RENDERING,         RenderingHints.VALUE_RENDER_QUALITY )
+            // XXX somehow this has now effect:
+            g.setRenderingHint( RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON )
+            g.setRenderingHint( RenderingHints.KEY_STROKE_CONTROL,    RenderingHints.VALUE_STROKE_PURE )
+         }
+      }
 
       def view : JComponent = display
 
       def init() {
          val lay = new ForceDirectedLayout( GROUP_GRAPH )
+         val fs = lay.getForceSimulator
+
+         // a somewhat weird force that keeps unconnected vertices
+         // within some bounds :)
+         fs.addForce( new AbstractForce {
+            private val x     = 0f
+            private val y     = 0f
+            private val r     = 150f
+            private val grav  = 0.4f
+
+            protected def getParameterNames : Array[ String ] = Array[ String ]()
+
+            override def isItemForce = true
+
+            override def getForce( item: ForceItem ) {
+               val n = item.location
+               val dx = x-n(0)
+               val dy = y-n(1)
+               val d = math.sqrt(dx*dx+dy*dy).toFloat
+               val dr = r-d
+               val v = grav*item.mass / (dr*dr)
+               if( d == 0.0 ) return
+               item.force(0) += v*dx/d
+               item.force(1) += v*dy/d
+
+//               println( "" + (dx/d) + "," + (dy/d) + "," + dr + "," + v )
+            }
+         })
 
          val lbRend = new LabelRenderer( VisualItem.LABEL )
          val rf = new DefaultRendererFactory( lbRend )
@@ -185,11 +222,15 @@ object VisualInstantPresentationImpl {
          // ------------------------------------------------
 
          // initialize the display
-         display.setSize( 800, 600 )
+         display.setSize( 600, 600 )
+         val origin = new java.awt.Point( 0, 0 )
+         display.zoom( origin, 2.0 )
+         display.panTo( origin )
          display.addControlListener( new ZoomControl() )
          display.addControlListener( new WheelZoomControl() )
+         display.addControlListener( new ZoomToFitControl() )
          display.addControlListener( new PanControl() )
-//         display.addControlListener( new DragControl( pref ))
+         display.addControlListener( new DragControl() )
          display.setHighQuality( true )
 
          display.setForeground( Color.WHITE )
