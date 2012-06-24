@@ -17,7 +17,8 @@ object TransportImpl {
                             ( implicit tx: S#Tx /*, longs: BiType[ Long ]*/) : Transport[ S, Proc[ S ]] = {
       val targets    = evt.Targets[ S ]
       val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
-      new Impl[ S ]( targets, group, sampleRate, playingVar )
+      val lastTime   = tx.newLongVar( targets.id, 0L )
+      new Impl[ S ]( targets, group, sampleRate, playingVar, lastTime )
    }
 
    implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] =
@@ -28,7 +29,8 @@ object TransportImpl {
          val group      = ProcGroupX.read( in, access )
          val sampleRate = in.readDouble()
          val playingVar = Booleans.readVar( in, access )
-         new Impl( targets, group, sampleRate, playingVar )
+         val lastTime   = tx.readLongVar( targets.id, in )
+         new Impl( targets, group, sampleRate, playingVar, lastTime )
       }
    }
 
@@ -87,7 +89,7 @@ object TransportImpl {
    }
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], group: ProcGroup[ S ],
-                                             val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ])
+                                             val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ], lastTime: S#Var[ Long ])
    extends Transport[ S, Proc[ S ]]
    with evt.Trigger.Impl[ S, Transport.Update[ S, Proc[ S ]], Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
    with evt.StandaloneLike[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
@@ -103,6 +105,7 @@ object TransportImpl {
          group.write( out )
          out.writeDouble( sampleRate )
          playingVar.write( out )
+         lastTime.write( out )
       }
 
       protected def disposeData()( implicit tx: S#Tx ) {
@@ -112,7 +115,15 @@ object TransportImpl {
       def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Proc[ S ]] = flatMap( group.intersect( time ).map( _._2 ))( _._2 )
 
       def seek( time: Long )( implicit tx: S#Tx ) {
-//         sys.error( "TODO" )
+         val old = lastTime.get
+         if( time != old ) {
+            lastTime.set( time )
+               // see Transport.svg
+            val ch = if( time > old ) {
+            } else {
+
+            }
+         }
       }
 
       def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
@@ -126,7 +137,7 @@ object TransportImpl {
          }
       }
 
-      def time( implicit tx: S#Tx ) : Long = 0L // Expr[ S, Long ] = timeExpr
+      def time( implicit tx: S#Tx ) : Long = lastTime.get   // XXX // Expr[ S, Long ] = timeExpr
 
       // ---- event stuff ----
 

@@ -33,7 +33,7 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       res
    }
 
-   def add( span: SpanLike = Span( 33, 44 ), name: String ) {
+   def add( span: SpanLike = Span( 33, 44 ), name: String = "Proc" ) {
       t { implicit tx => group.add( span, proc( name ))}
    }
 
@@ -45,10 +45,12 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       t { implicit tx => trans.get.playing = false }
    }
 
-   def rewind() { t { implicit tx =>
+   def rewind() { seek( 0L )}
+
+   def seek( pos: Long ) { t { implicit tx =>
       val tr = trans.get
       tr.playing = false
-      tr.seek( 0L )
+      tr.seek( pos )
    }}
 
    def defer( thunk: => Unit ) { EventQueue.invokeLater( new Runnable {
@@ -67,6 +69,8 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       f.pack()
       f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
       f.setLocationRelativeTo( null )
+      f.setLocation( f.getX, 0 )
+      f.setAlwaysOnTop( true )
       f.setVisible( true )
    }
 }
