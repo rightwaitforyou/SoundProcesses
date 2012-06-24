@@ -83,13 +83,13 @@ object TransportImpl {
             val (remStart, remStop, addStart, addStop) = if( time > old ) {
                // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
                // ... those which begin in the interval (LRP, t] && end > t must be added ...
-               val skipInt = Span( old + 1, time )
+               val skipInt = Span( old + 1, time + 1 )
 //               (Span.All, skipInt, skipInt, Span.from( time + 1 ))
                (Span.until( old + 1 ), skipInt, skipInt, Span.from( time + 1 ))
             } else {
                // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
                // ... those which end in the interval (t, LRP] && begin <=t must be added ...
-               val skipInt = Span( time + 1, old )
+               val skipInt = Span( time + 1, old + 1 )
 //               (skipInt, Span.All, Span.until( time + 1 ), skipInt)
                (skipInt, Span.from( old + 1 ), Span.until( time + 1 ), skipInt)
             }

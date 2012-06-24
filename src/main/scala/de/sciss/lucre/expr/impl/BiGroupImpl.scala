@@ -36,7 +36,6 @@ import collection.breakOut
 import annotation.switch
 import de.sciss.collection.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare}
 import de.sciss.collection.geom.LongSpace.TwoDim
-import java.util
 
 object BiGroupImpl {
    import BiGroup.{Leaf, TimedElem, Var}
@@ -397,7 +396,8 @@ object BiGroupImpl {
 
          val startP  = spanToPoint( start )
          val stopP   = spanToPoint( stop  )
-         val shape   = LongRectangle( startP.x, stopP.x, startP.y - startP.x + 1, stopP.y - stopP.x + 1 )
+         val shape   = LongRectangle( startP.x, stopP.x, startP.y - startP.x /* + 1 */, stopP.y - stopP.x /* + 1 */)
+//println( "RANGE " + shape )
          rangeSearch( shape )
       }
 

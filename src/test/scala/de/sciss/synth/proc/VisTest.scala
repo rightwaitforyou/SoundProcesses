@@ -56,6 +56,14 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       tr.seek( pos )
    }}
 
+   def within( span: SpanLike ) = t { implicit tx =>
+      group.intersect( span ).toIndexedSeq
+   }
+
+   def range( start: SpanLike, stop: SpanLike ) = t { implicit tx =>
+      group.rangeSearch( start, stop ).toIndexedSeq
+   }
+
    def defer( thunk: => Unit ) { EventQueue.invokeLater( new Runnable {
       def run() { thunk }
    })}

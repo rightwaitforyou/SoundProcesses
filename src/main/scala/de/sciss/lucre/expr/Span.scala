@@ -34,6 +34,7 @@ object Span {
    def until( stop: Long ) : Until                    = Until( stop )
    def apply( start: Long, stop: Long ) : Span        = Apply( start ,stop )
    def unapply( span: Span ) : Option[ (Long, Long) ] = Some( (span.start, span.stop) )
+   def all : All.type                                 = All
 
    implicit object serializer extends Serializer[ Span ] {
       def write( v: Span, out: DataOutput ) { v.write( out )}
