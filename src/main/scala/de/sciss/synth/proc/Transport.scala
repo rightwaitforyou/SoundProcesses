@@ -20,17 +20,23 @@ object Transport {
       def time: Long
       def added:   IIdxSeq[ (SpanLike, Elem) ]
       def removed: IIdxSeq[ (SpanLike, Elem) ]
+
+      protected def name: String
+
+      override def toString =
+         name + "(" + transport + (if( added.nonEmpty ) added.mkString( ", added = ", ",", "" ) else "") +
+                                  (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", ")" ) else ")")
    }
 
    final case class Seek[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], time: Long,
                                                  added:   IIdxSeq[ (SpanLike, Elem) ],
                                                  removed: IIdxSeq[ (SpanLike, Elem) ])
-   extends TimeUpdate[ S, Elem ]
+   extends TimeUpdate[ S, Elem ] { def name = "Seek" }
 
    final case class Advance[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], time: Long,
                                                     added:   IIdxSeq[ (SpanLike, Elem) ],
                                                     removed: IIdxSeq[ (SpanLike, Elem) ])
-   extends TimeUpdate[ S, Elem ]
+   extends TimeUpdate[ S, Elem ] { def name = "Advance" }
 
    final case class Play[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
    final case class Stop[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]

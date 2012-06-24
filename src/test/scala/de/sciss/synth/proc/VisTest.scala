@@ -20,9 +20,12 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       implicit def longType = Longs
       val g = ProcGroupX.newVar[ S ]
       g.changed.react { upd =>
-         println( "Observed: " + upd )
+         println( "Group observed: " + upd )
       }
       val tr   = Transport( g )
+      tr.changed.react { upd =>
+         println( "Transport observed: " + upd )
+      }
       val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
       (g, trv)
    }

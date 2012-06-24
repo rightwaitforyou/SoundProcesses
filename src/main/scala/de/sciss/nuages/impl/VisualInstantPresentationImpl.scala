@@ -93,7 +93,6 @@ object VisualInstantPresentationImpl {
 //               if( hasAdd ) vis.add(    vpAdd: _* )
 //               if( hasRem ) vis.remove( vpRem: _* )
 //            }
-            sys.error( "TODO" )
          }
 
          t.changed.reactTx { implicit tx => {

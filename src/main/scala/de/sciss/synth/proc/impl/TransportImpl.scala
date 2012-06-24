@@ -45,47 +45,10 @@ object TransportImpl {
 //      protected def reader : Reader[ S, Expr[ S, Long ]] = Longs.serializer[ S ]
 //   }
 
-//   private def flatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]])( fun: A => B )
-//                                             ( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, B ] = {
-//      val res = new FlatMap( it, fun )
-//      res.init()
-//      res
-//   }
-//
-//   private final class FlatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]], fun: A => B )
-//   extends txn.Iterator[ S#Tx, B ] {
-//      private val coll        = STMRef( (IIdxSeq.empty[ A ], -1) )
-//      private var hasNextVar  = false
-//
-//      def init()( implicit tx: S#Tx ) {
-//         val tup = findNext()
-//         coll.set( tup )( tx.peer )
-//         hasNextVar = tup._2 >= 0
-//      }
-//
-//      @tailrec private def findNext()( implicit tx: S#Tx ) : (IIdxSeq[ A ], Int) = {
-//         if( !it.hasNext ) (IIdxSeq.empty, -1) else {
-//            val n = it.next()
-//            if( n.nonEmpty ) (n, 0) else findNext()
-//         }
-//      }
-//
-//      def hasNext : Boolean = hasNextVar
-//
-//      def next()( implicit tx: S#Tx ) : B = {
-//         implicit val itx = tx.peer
-//         val (seq, idx) = coll.get
-//         val res  = fun( seq( idx ))
-//         val idx1 = idx + 1
-//         if( idx1 < seq.size ) {
-//            coll.set( (seq, idx1) )
-//         } else {
-//            init()
-//         }
-//         res
-//      }
-//   }
-
+   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Proc[ S ])])) : IIdxSeq[ (SpanLike, Proc[ S ])] = {
+      val span = in._1
+      in._2.map { case (_, proc) => (span, proc) }
+   }
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], group: ProcGroup[ S ],
                                              val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ], lastTime: S#Var[ Long ])
@@ -97,7 +60,6 @@ object TransportImpl {
       override def toString() = "Transport(" + sampleRate + ")" + id
 
 //      private val timeExpr    = new TimeExpr( Targets[ S ]( tx0 ), this )
-//      private val playingVar  = Booleans.newVar[ S ]( Booleans.newConst( false ))( tx0 )
 //      private val systemRef   = System.currentTimeMillis()
 
       protected def writeData( out: DataOutput ) {
@@ -112,19 +74,29 @@ object TransportImpl {
       }
 
       def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Proc[ S ])] =
-         group.intersect( time ).flatMap { case (span, seq) => seq.map { case (_, elem) => (span, elem)}}
+         group.intersect( time ).flatMap( flatSpans )
 
       def seek( time: Long )( implicit tx: S#Tx ) {
          val old = lastTime.get
          if( time != old ) {
             lastTime.set( time )
-            // ... those which end in the interval (LRP, t] must be removed ...
-            val rem = group.rangeSearch( Span.All, Span( old, time )).flatMap { case (span, seq) => seq.map { case (_, elem) => (span, elem)}}
-
-               // see Transport.svg
-            val ch = if( time > old ) {
+            val (remStart, remStop, addStart, addStop) = if( time > old ) {
+               // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
+               // ... those which begin in the interval (LRP, t] && end > t must be added ...
+               val skipInt = Span( old + 1, time )
+//               (Span.All, skipInt, skipInt, Span.from( time + 1 ))
+               (Span.until( old + 1 ), skipInt, skipInt, Span.from( time + 1 ))
             } else {
-
+               // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
+               // ... those which end in the interval (t, LRP] && begin <=t must be added ...
+               val skipInt = Span( time + 1, old )
+//               (skipInt, Span.All, Span.until( time + 1 ), skipInt)
+               (skipInt, Span.from( old + 1 ), Span.until( time + 1 ), skipInt)
+            }
+            val removed = group.rangeSearch( remStart, remStop ).flatMap( flatSpans )
+            val added   = group.rangeSearch( addStart, addStop ).flatMap( flatSpans )
+            if( removed.nonEmpty || added.nonEmpty ) {
+               fire( Transport.Seek( this, time, added.toIndexedSeq, removed.toIndexedSeq ))
             }
          }
       }
