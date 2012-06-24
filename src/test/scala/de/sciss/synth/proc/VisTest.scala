@@ -44,6 +44,10 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       group.nearestEventBefore( time )
    }
 
+   def clear() { t { implicit tx =>
+      group.clear()
+   }}
+
    def add( span: SpanLike = Span( 33, 44 ), name: String = "Proc" ) {
       t { implicit tx => group.add( span, proc( name ))}
    }
