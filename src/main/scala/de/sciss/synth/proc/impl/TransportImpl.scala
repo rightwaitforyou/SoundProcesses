@@ -91,6 +91,7 @@ object TransportImpl {
    extends Transport[ S, Proc[ S ]]
    with evt.Trigger.Impl[ S, Transport.Update[ S, Proc[ S ]], Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
    with evt.StandaloneLike[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
+   with evt.Root[ S, Transport.Update[ S, Proc[ S ]]]
    {
       override def toString() = "Transport(" + sampleRate + ")" + id
 
@@ -121,6 +122,7 @@ object TransportImpl {
          val isPlaying  = expr.value
          playingVar.set( expr )
          if( wasPlaying != isPlaying ) {
+            fire( if( isPlaying ) Transport.Play( this ) else Transport.Stop( this ))
          }
       }
 
@@ -129,17 +131,17 @@ object TransportImpl {
       // ---- event stuff ----
 
 
-      def connect()( implicit tx: S#Tx ) {
-
-      }
-
-      def disconnect()( implicit tx: S#Tx ) {
-
-      }
-
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Transport.Update[ S, Proc[ S ]]] = {
-         sys.error( "TODO" )
-      }
+//      def connect()( implicit tx: S#Tx ) {
+//
+//      }
+//
+//      def disconnect()( implicit tx: S#Tx ) {
+//
+//      }
+//
+//      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Transport.Update[ S, Proc[ S ]]] = {
+//         sys.error( "TODO" )
+//      }
 
       def changed : Event[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]] = this
 

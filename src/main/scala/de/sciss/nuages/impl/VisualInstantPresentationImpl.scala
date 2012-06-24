@@ -93,12 +93,12 @@ object VisualInstantPresentationImpl {
             }
          }
 
-//         t.changed.reactTx { implicit tx => {
-//            case Transport.Seek(    _, time, added, removed ) => addRemove( added, removed )
-//            case Transport.Advance( _, time, added, removed ) => addRemove( added, removed )
-//            case Transport.Play( _ ) => playStop( b = true  )
-//            case Transport.Stop( _ ) => playStop( b = false )
-//         }}
+         t.changed.reactTx { implicit tx => {
+            case Transport.Seek(    _, time, added, removed ) => addRemove( added, removed )
+            case Transport.Advance( _, time, added, removed ) => addRemove( added, removed )
+            case Transport.Play( _ ) => playStop( b = true  )
+            case Transport.Stop( _ ) => playStop( b = false )
+         }}
       }
 
       vis.init()
@@ -111,6 +111,8 @@ object VisualInstantPresentationImpl {
    private val ACTION_LAYOUT  = "layout"
    private val GROUP_GRAPH    = "graph"
    private val LAYOUT_TIME    = 50
+   private val colrPlay       = new Color( 0, 0x80, 0 )
+   private val colrStop       = Color.black
 
    private final class Impl[ S <: Sys[ S ], A ]( transport: S#Entry[ A ], cursor: Cursor[ S ],
                                                  transportView: A => Transport[ S, Proc[ S ]])
@@ -202,6 +204,7 @@ object VisualInstantPresentationImpl {
       def playing_=( b: Boolean ) {
          if( playingVar != b ) {
             playingVar = b
+            display.setBackground( if( b ) colrPlay else colrStop )
             view.repaint()
          }
       }
