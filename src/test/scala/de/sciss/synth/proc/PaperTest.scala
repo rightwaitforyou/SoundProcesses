@@ -44,7 +44,7 @@ object PaperTest extends App {
 //   }
 
    def run[ S <: KSys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
-      implicit val whyOhWhy   = ProcGroup.varSerializer[ S ]
+      implicit val whyOhWhy   = ProcGroupX.varSerializer[ S ]
       implicit val whyOhWhy2  = Proc.serializer[ S ]
       val imp = new ExprImplicits[ S ]
       import imp._
@@ -57,7 +57,7 @@ object PaperTest extends App {
 
       implicit val ts = Chronos[ S ]( 0L )
 
-      def newGroup()(  implicit tx: S#Tx ) : ProcGroup.Var[ S ]   = ProcGroup.newVar
+      def newGroup()(  implicit tx: S#Tx ) : ProcGroupX.Var[ S ]   = ProcGroupX.newVar
       def newProc()(   implicit tx: S#Tx ) : Proc[ S ]            = Proc()
 
       def log( what: => String ) {
@@ -78,7 +78,7 @@ object PaperTest extends App {
          val g = newGroup()
          if( DRY ) {
             log( "react to new group" )
-            g.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => println( "____OBSERVE____ " + e )}
+            g.changed.reactTx { implicit tx => (e: ProcGroupX.Update[ S ]) => println( "____OBSERVE____ " + e )}
          }
          g
       }
@@ -167,7 +167,7 @@ println( "......yields " + p1 )
 
       } else  {
          logStep()
-         AuralPresentation.run[ S, ProcGroup.Var[ S ]]( access )
+         AuralPresentation.run[ S, ProcGroupX.Var[ S ]]( access )
 
          (new Thread {
             override def run() {

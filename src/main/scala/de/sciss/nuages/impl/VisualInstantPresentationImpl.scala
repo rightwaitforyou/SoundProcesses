@@ -26,13 +26,20 @@
 package de.sciss.nuages
 package impl
 
-import de.sciss.lucre.expr.{BiGroup, Chronos}
 import de.sciss.lucre.stm.{Sys, Cursor}
-import de.sciss.synth.proc.{Proc, Transport, ProcGroup}
-import java.awt.EventQueue
+import de.sciss.synth.proc.{Proc, Transport}
+import java.awt.{Color, EventQueue}
 import javax.swing.JComponent
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.Txn
+import prefuse.{Display, Visualization}
+import prefuse.action.layout.graph.ForceDirectedLayout
+import prefuse.action.{RepaintAction, ActionList}
+import prefuse.activity.Activity
+import prefuse.controls.{PanControl, WheelZoomControl, ZoomControl}
+import javax.swing.event.{AncestorEvent, AncestorListener}
+import prefuse.data
+import prefuse.visual.VisualItem
 
 object VisualInstantPresentationImpl {
    def apply[ S <: Sys[ S ], A ]( transport: S#Entry[ A ])
@@ -99,22 +106,95 @@ object VisualInstantPresentationImpl {
 
    private final class VisualProc( val name: String )
 
+   private val ACTION_COLOR   = "color"
+   private val ACTION_LAYOUT  = "layout"
+   private val GROUP_GRAPH    = "graph"
+   private val LAYOUT_TIME    = 50
+
    private final class Impl[ S <: Sys[ S ], A ]( transport: S#Entry[ A ], cursor: Cursor[ S ],
                                                  transportView: A => Transport[ S, Proc[ S ]])
    extends VisualInstantPresentation[ S ] {
       private var playingVar = false
-      private var vps = Set.empty[ VisualProc ]
+//      private var vps      = Set.empty[ VisualProc ]
+      private var nodeMap  = Map.empty[ VisualProc, data.Node ]
 
-      def view : JComponent = sys.error( "TODO" )
+      private val g        = new data.Graph
+      private val pVis     = {
+         val res = new Visualization()
+         res.addGraph( GROUP_GRAPH, g )
+         res
+      }
+      private val display  = new Display( pVis )
 
-      def add( procs: VisualProc* ) {
-         vps ++= procs
-         view.repaint()
+      def view : JComponent = display
+
+      def init() {
+         val lay = new ForceDirectedLayout( GROUP_GRAPH )
+
+         // quick repaint
+         val actionColor = new ActionList()
+         pVis.putAction( ACTION_COLOR, actionColor )
+
+         val actionLayout = new ActionList( Activity.INFINITY, LAYOUT_TIME )
+         actionLayout.add( lay )
+         actionLayout.add( new RepaintAction() )
+         pVis.putAction( ACTION_LAYOUT, actionLayout )
+         pVis.alwaysRunAfter( ACTION_COLOR, ACTION_LAYOUT )
+
+         // ------------------------------------------------
+
+         // initialize the display
+         display.setSize( 800, 600 )
+         display.addControlListener( new ZoomControl() )
+         display.addControlListener( new WheelZoomControl() )
+         display.addControlListener( new PanControl() )
+//         display.addControlListener( new DragControl( pref ))
+         display.setHighQuality( true )
+
+         display.setForeground( Color.WHITE )
+         display.setBackground( Color.BLACK )
+
+         display.addAncestorListener( new AncestorListener {
+            def ancestorAdded( e: AncestorEvent ) {
+               startAnimation()
+            }
+
+            def ancestorRemoved( e: AncestorEvent) {
+               stopAnimation()
+            }
+
+            def ancestorMoved( e: AncestorEvent) {}
+         })
       }
 
-      def remove( procs: VisualProc* ) {
-         vps --= procs
-         view.repaint()
+      def add( vps: VisualProc* ) {
+//         vps ++= procs
+         visDo {
+            vps.foreach( add1 )
+         }
+      }
+
+      def remove( vps: VisualProc* ) {
+//         vps --= procs
+         visDo {
+            vps.foreach( rem1 )
+         }
+      }
+
+      private def add1( vp: VisualProc ) {
+         val pNode   = g.addNode()
+         val vi      = pVis.getVisualItem( GROUP_GRAPH, pNode )
+         vi.setString( VisualItem.LABEL, vp.name )
+         nodeMap    += vp -> pNode
+      }
+
+      private def rem1( vp: VisualProc ) {
+         nodeMap.get( vp ) match {
+            case Some( n ) =>
+               g.removeNode( n )
+               nodeMap -= vp
+            case _ =>
+         }
       }
 
       def playing : Boolean = playingVar
@@ -122,6 +202,26 @@ object VisualInstantPresentationImpl {
          if( playingVar != b ) {
             playingVar = b
             view.repaint()
+         }
+      }
+
+      private def stopAnimation() {
+         pVis.cancel( ACTION_COLOR )
+         pVis.cancel( ACTION_LAYOUT )
+      }
+
+      private def startAnimation() {
+         pVis.run( ACTION_COLOR )
+      }
+
+      private def visDo( thunk: => Unit ) {
+         pVis.synchronized {
+            stopAnimation()
+            try {
+               thunk
+            } finally {
+               startAnimation()
+            }
          }
       }
    }

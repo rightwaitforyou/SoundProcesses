@@ -1,9 +1,9 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.DataOutput
+import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.event.{Event, Reader, Targets, Change, Root}
 import de.sciss.synth.expr.{Longs, Booleans}
 import de.sciss.collection.txn
@@ -13,8 +13,22 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object TransportImpl {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )
-                            ( implicit tx: S#Tx /*, longs: BiType[ Long ]*/) : Transport[ S, Proc[ S ]] =
-      new Impl[ S ]( group, sampleRate, tx )
+                            ( implicit tx: S#Tx /*, longs: BiType[ Long ]*/) : Transport[ S, Proc[ S ]] = {
+      val id = tx.newID()
+      new Impl[ S ]( id, group, sampleRate, tx )
+   }
+
+   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
+      new Ser[ S ]
+
+   private final class Ser[ S <: Sys[ S ]] extends TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] {
+      def write( v: Transport[ S, Proc[ S ] ], out: DataOutput ) { v.write( out )}
+
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]] = {
+         val id = tx.readID( in, access )
+         sys.error( "TODO" )
+      }
+   }
 
    private final class TimeExpr[ S <: Sys[ S ]]( protected val targets: Targets[ S ], t: Impl[ S ])
    extends Expr.Node[ S, Long ]
@@ -70,7 +84,7 @@ object TransportImpl {
       }
    }
 
-   private final class Impl[ S <: Sys[ S ]]( group: ProcGroup[ S ],
+   private final class Impl[ S <: Sys[ S ]]( val id: S#ID, group: ProcGroup[ S ],
                                              val sampleRate: Double, tx0: S#Tx )
    extends Transport[ S, Proc[ S ]] {
       override def toString = "Transport(" + sampleRate + ")"

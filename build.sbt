@@ -22,7 +22,7 @@ libraryDependencies ++= Seq(
 
 retrieveManaged := true
 
-scalacOptions ++= Seq( "-deprecation", "-unchecked" )   // "-Xelide-below", "INFO"
+scalacOptions ++= Seq( "-deprecation", "-unchecked", "-no-specialization" )   // "-Xelide-below", "INFO"
 
 initialCommands in console := """// thanks to Rex Kerr for this trick (http://www.scala-lang.org/node/11813)
 def shortresults[T](t: => T) = {
