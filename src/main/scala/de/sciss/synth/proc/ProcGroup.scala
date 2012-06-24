@@ -95,6 +95,9 @@ object ProcGroupX {
    def readVar[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroupX.Var[ S ] =
       BiGroup.readGenericVar[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
 
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup[ S ] =
+      BiGroup.readGenericVar[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
+
 //   def readVar[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : BiGroup.Var[ S, Proc[ S ], Proc.Update[ S ]] =
 //      BiGroup.readGenericVar[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
 

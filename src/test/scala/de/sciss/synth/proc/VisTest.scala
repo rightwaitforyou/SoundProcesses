@@ -45,9 +45,11 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       t { implicit tx => trans.get.playing = false }
    }
 
-   def rewind() {
-      t { implicit tx => val tr = trans.get; tr.playing = false; tr.seek( 0L )}
-   }
+   def rewind() { t { implicit tx =>
+      val tr = trans.get
+      tr.playing = false
+      tr.seek( 0L )
+   }}
 
    def defer( thunk: => Unit ) { EventQueue.invokeLater( new Runnable {
       def run() { thunk }

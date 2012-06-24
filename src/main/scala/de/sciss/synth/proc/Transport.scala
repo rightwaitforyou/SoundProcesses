@@ -5,6 +5,7 @@ import de.sciss.lucre.stm.{TxnSerializer, Writer, Disposable, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.event.Event
 import de.sciss.collection.txn
+import de.sciss.lucre.{event => evt}
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
@@ -32,7 +33,7 @@ object Transport {
    final case class Play[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
    final case class Stop[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
 }
-trait Transport[ S <: Sys[ S ], Elem ] extends Chronos[ S ] with Writer with Disposable[ S#Tx ] {
+trait Transport[ S <: Sys[ S ], Elem ] extends evt.Node[ S ] with Chronos[ S ] {
    def id: S#ID
 
    def seek( time: Long )( implicit tx: S#Tx ) : Unit
