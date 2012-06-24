@@ -366,8 +366,8 @@ object BiGroupImpl {
       final def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ] =
          tree.toList.flatMap { case (span, seq) => seq.map { case (_, elem) => span -> elem }}
 
-      final def iterator( implicit tx: S#Tx, chr: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]  =
-         intersect( chr.time.value )
+//      final def iterator( implicit tx: S#Tx, chr: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]  =
+//         intersect( chr.time.value )
 
       final def intersect( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          val start   = time

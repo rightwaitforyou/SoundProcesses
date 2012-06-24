@@ -336,10 +336,12 @@ object BiPinImpl {
          ordered.iterator.map( tup => (tup._1, tup._2.value.value) ).toList
 
       def getAt( time: Long )( implicit tx: S#Tx )   : Expr[ S, A ] = ordered.floor( time ).get._2.value
-      def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time.value )
+//      def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time.value )
+      def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time )
 
       def valueAt( time: Long )( implicit tx: S#Tx )   : A  = getAt( time ).value
-      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time.value )
+//      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time.value )
+      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time )
 
       private def isConnected( implicit tx: S#Tx ) : Boolean = targets.nonEmpty
 
@@ -388,8 +390,8 @@ object BiPinImpl {
          ordered.dispose()
       }
 
-      def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ] =
-         peerType.newProjection[ S ]( this )
+//      def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ] =
+//         peerType.newProjection[ S ]( this )
 
       def changed : evt.Event[ S, Update[ A ], BiPin[ S, A ]] = this
    }

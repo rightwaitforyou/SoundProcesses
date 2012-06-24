@@ -38,12 +38,12 @@ trait BiType[ A ] extends Type[ A ] {
       def read( in: DataInput ) : A = readValue( in )
    }
 
-   def newProjection[ S <: Sys[ S ]]( bi: BiPin[ S, A ])( implicit tx: S#Tx, time: Chronos[ S ]): Ex[ S ] = {
-      val targets = Targets.partial[ S ]
-      val init    = bi.value
-      val cache   = tx.newPartialVar[ A ]( targets.id, init )
-      new Projection[ S ]( targets, cache, bi, time )
-   }
+//   def newProjection[ S <: Sys[ S ]]( bi: BiPin[ S, A ])( implicit tx: S#Tx, time: Chronos[ S ]): Ex[ S ] = {
+//      val targets = Targets.partial[ S ]
+//      val init    = bi.value
+//      val cache   = tx.newPartialVar[ A ]( targets.id, init )
+//      new Projection[ S ]( targets, cache, bi, time )
+//   }
 
    def longType : BiType[ Long ]
    def spanLikeType : BiType[ SpanLike ]
@@ -56,12 +56,12 @@ trait BiType[ A ] extends Type[ A ] {
 //      val bi   =
       val cache   = tx.readPartialVar[ A ]( targets.id, in )
       val bi      = BiPin.readVar[ S, A ]( in, access )( tx, this )
-      val time    = Chronos( longType.readExpr( in, access ))
+      val time    = longType.readExpr( in, access )
       new Projection[ S ]( targets, cache, bi, time )
    }
 
    private final class Projection[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
-                                                   bi: BiPin[ S, A ], ts: Chronos[ S ])
+                                                   bi: BiPin[ S, A ], ts: Expr[ S, Long ])
       extends Expr.Node[ S, A ] {
       def reader: event.Reader[ S, Ex[ S ]] = serializer[ S ]
 
@@ -69,26 +69,31 @@ trait BiType[ A ] extends Type[ A ] {
          out.writeUnsignedByte( 3 )
          cache.write( out )
          bi.write( out )
-         ts.time.write( out )
+//         ts.time.write( out )
+         ts.write( out )
       }
 
-      def value( implicit tx: S#Tx ): A = bi.value( tx, ts )
+//      def value( implicit tx: S#Tx ): A = bi.value( tx, ts )
+      def value( implicit tx: S#Tx ): A = bi.valueAt( ts.value )
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
 //println( "CONNECT CURSOR" )
          bi.changed   ---> this
-         ts.time.changed ---> this
+//         ts.time.changed ---> this
+         ts.changed ---> this
       }
 
       private[lucre] def disconnect()( implicit tx: S#Tx ) {
 //println( "DISCONNECT CURSOR" )
          bi.changed   -/-> this
-         ts.time.changed -/-> this
+//         ts.time.changed -/-> this
+         ts.changed -/-> this
       }
 
       private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ): Option[ Change[ S ]] = {
          val biChanged     = bi.changed
-         val timeChanged   = ts.time.changed
+//         val timeChanged   = ts.time.changed
+         val timeChanged   = ts.changed
 
          val biChange = if( biChanged.isSource( pull )) {
             biChanged.pullUpdate( pull )
@@ -109,7 +114,8 @@ trait BiType[ A ] extends Type[ A ] {
          // - all other cases are dropped
          val res = (biChange, timeChange) match {
             case (Some( bch ), None) =>
-               val timeVal = ts.time.value
+//               val timeVal = ts.time.value
+               val timeVal = ts.value
                bch.find( _.span.contains( timeVal )).flatMap { region =>
                   val before  = cache.get
                   val now     = region.value

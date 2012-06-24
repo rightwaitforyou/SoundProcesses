@@ -40,10 +40,10 @@ object BiTempTest extends App {
          val bi = access.get._1
          bi.changed.react { tup => println( "__OBSERVE__ " + tup )}
          val biCsr = Longs.newVar[ S ]( 6000 )
-         implicit val ts = Chronos( biCsr )
-         bi.projection.changed.react {
-            case Change( before, now ) => println( "__CURSOR__ " + before + " -> " + now )
-         }
+//         implicit val ts = Chronos( biCsr )
+//         bi.projection.changed.react {
+//            case Change( before, now ) => println( "__CURSOR__ " + before + " -> " + now )
+//         }
          access.transform( a => a.copy( _2 = a._2 :+ biCsr ))
       }
 

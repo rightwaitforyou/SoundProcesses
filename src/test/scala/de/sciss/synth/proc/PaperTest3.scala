@@ -116,9 +116,11 @@ object PaperTest3 extends App {
 
       def groupGet()( implicit tx: S#Tx ) : ProcGroupX.Var[ S ] = access.get.group
       def freqVar()( implicit tx: S#Tx ) : Expr.Var[ S, Double ] = access.get.vars.head
-      def procGet()( implicit tx: S#Tx ) : Proc[ S ] = groupGet().iterator.next()._2.head._2
+//      def procGet()( implicit tx: S#Tx ) : Proc[ S ] = groupGet().iterator.next()._2.head._2
+      def procGet()( implicit tx: S#Tx ) : Proc[ S ] = groupGet().intersect( 0L ).next()._2.head._2
       def procMeld( version: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = {
-         access.meld( version ).group.iterator.next()._2.head._2
+//         access.meld( version ).group.iterator.next()._2.head._2
+         access.meld( version ).group.intersect( 0L ).next()._2.head._2
       }
 
       cursor.step { implicit tx =>

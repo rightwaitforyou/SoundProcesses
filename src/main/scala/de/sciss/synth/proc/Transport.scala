@@ -12,7 +12,7 @@ object Transport {
       impl.TransportImpl( group, sampleRate )
 
    implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
-      impl.TransportImpl.serializer
+         impl.TransportImpl.serializer
 
    sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}
    sealed trait TimeUpdate[ S <: Sys[ S ], Elem ] extends Update[ S, Elem ] {

@@ -28,8 +28,7 @@ package de.sciss.nuages
 import impl.VisualInstantPresentationImpl
 import javax.swing.JComponent
 import de.sciss.lucre.stm.{Cursor, Sys}
-import de.sciss.lucre.expr.Chronos
-import de.sciss.synth.proc.{Proc, Transport, ProcGroup}
+import de.sciss.synth.proc.{Proc, Transport}
 
 object VisualInstantPresentation {
    def apply[ S <: Sys[ S ], A ]( transport: S#Entry[ A ])

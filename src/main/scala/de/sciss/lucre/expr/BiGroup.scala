@@ -78,16 +78,16 @@ object BiGroup {
 trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    import BiGroup.Leaf
 
-   /**
-    * Generates an iterator over all elements in the group which intersect (whose span contains)
-    * the current time as given by the implicit `chronos` argument.
-    *
-    * This methods makes no guarantees about the ordering of the returned iterator.
-    *
-    * @param chronos a reference to the current time cursor
-    * @return  a (possibly empty) iterator of the intersecting elements
-    */
-   def iterator( implicit tx: S#Tx, chronos: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+//   /**
+//    * Generates an iterator over all elements in the group which intersect (whose span contains)
+//    * the current time as given by the implicit `chronos` argument.
+//    *
+//    * This methods makes no guarantees about the ordering of the returned iterator.
+//    *
+//    * @param chronos a reference to the current time cursor
+//    * @return  a (possibly empty) iterator of the intersecting elements
+//    */
+//   def iterator( implicit tx: S#Tx, chronos: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
 
    /**
     * Queries all elements intersecting a given point in time.

@@ -30,18 +30,18 @@ object TransportImpl {
       }
    }
 
-   private final class TimeExpr[ S <: Sys[ S ]]( protected val targets: Targets[ S ], t: Impl[ S ])
-   extends Expr.Node[ S, Long ]
-   with Root[ S, Change[ Long ]] {
-      protected def writeData( out: DataOutput ) {
-         out.writeUnsignedByte( 4 )
-         t.write( out )
-      }
-
-      def value( implicit tx: S#Tx ) : Long = sys.error( "TODO" )
-
-      protected def reader : Reader[ S, Expr[ S, Long ]] = Longs.serializer[ S ]
-   }
+//   private final class TimeExpr[ S <: Sys[ S ]]( protected val targets: Targets[ S ], t: Impl[ S ])
+//   extends Expr.Node[ S, Long ]
+//   with Root[ S, Change[ Long ]] {
+//      protected def writeData( out: DataOutput ) {
+//         out.writeUnsignedByte( 4 )
+//         t.write( out )
+//      }
+//
+//      def value( implicit tx: S#Tx ) : Long = sys.error( "TODO" )
+//
+//      protected def reader : Reader[ S, Expr[ S, Long ]] = Longs.serializer[ S ]
+//   }
 
    private def flatMap[ S <: Sys[ S ], A, B ]( it: txn.Iterator[ S#Tx, IIdxSeq[ A ]])( fun: A => B )
                                              ( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, B ] = {
@@ -89,9 +89,9 @@ object TransportImpl {
    extends Transport[ S, Proc[ S ]] {
       override def toString = "Transport(" + sampleRate + ")"
 
-      private val timeExpr    = new TimeExpr( Targets[ S ]( tx0 ), this )
+//      private val timeExpr    = new TimeExpr( Targets[ S ]( tx0 ), this )
       private val playingVar  = Booleans.newVar[ S ]( Booleans.newConst( false ))( tx0 )
-      private val systemRef   = System.currentTimeMillis()
+//      private val systemRef   = System.currentTimeMillis()
 
       def write( out: DataOutput ) {
          playingVar.write( out )
@@ -101,7 +101,7 @@ object TransportImpl {
          playingVar.dispose()
       }
 
-      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Proc[ S ]] = flatMap( group.intersect( time.value ).map( _._2 ))( _._2 )
+      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Proc[ S ]] = flatMap( group.intersect( time ).map( _._2 ))( _._2 )
 
       def seek( time: Long )( implicit tx: S#Tx ) {
          sys.error( "TODO" )
@@ -117,7 +117,7 @@ object TransportImpl {
          }
       }
 
-      def time : Expr[ S, Long ] = timeExpr
+      def time( implicit tx: S#Tx ) : Long = 0L // Expr[ S, Long ] = timeExpr
 
       def changed : Event[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]] = sys.error( "TODO" )
    }

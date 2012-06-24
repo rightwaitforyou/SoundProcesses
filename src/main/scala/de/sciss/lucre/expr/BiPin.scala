@@ -67,7 +67,7 @@ object BiPin {
 sealed trait BiPin[ S <: Sys[ S ], A ] extends /* BiSource[ S#Tx, Chronos[ S ], Expr[ S, A ]] with */ Writer {
    def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
    def valueAt( time: Long )( implicit tx: S#Tx ) : A
-   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
+//   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
    def changed : Event[ S, BiPin.Update[ A ], BiPin[ S, A ]]
 
