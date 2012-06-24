@@ -4,7 +4,7 @@ import de.sciss.lucre.stm.{Cursor, Sys, InMemory}
 import de.sciss.synth.expr.{Longs, ExprImplicits}
 import de.sciss.lucre.expr.{Span, SpanLike}
 import java.awt.{BorderLayout, EventQueue}
-import javax.swing.JFrame
+import javax.swing.{WindowConstants, JFrame}
 import de.sciss.nuages.VisualInstantPresentation
 
 object VisTest {
@@ -57,9 +57,14 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
    def frame = frameVar
 
    defer {
-      frameVar = new JFrame( "Vis" )
-      val cp   = frameVar.getContentPane
+      val f    = new JFrame( "Vis" )
+      frameVar = f
+      val cp   = f.getContentPane
       val vis  = VisualInstantPresentation( system.asEntry( trans ))
       cp.add( vis.view, BorderLayout.CENTER )
+      f.pack()
+      f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
+      f.setLocationRelativeTo( null )
+      f.setVisible( true )
    }
 }

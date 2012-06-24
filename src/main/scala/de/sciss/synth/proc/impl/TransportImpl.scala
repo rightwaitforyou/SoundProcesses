@@ -87,7 +87,7 @@ object TransportImpl {
    private final class Impl[ S <: Sys[ S ]]( val id: S#ID, group: ProcGroup[ S ],
                                              val sampleRate: Double, tx0: S#Tx )
    extends Transport[ S, Proc[ S ]] {
-      override def toString = "Transport(" + sampleRate + ")"
+      override def toString = "Transport(" + sampleRate + ")" + id
 
 //      private val timeExpr    = new TimeExpr( Targets[ S ]( tx0 ), this )
       private val playingVar  = Booleans.newVar[ S ]( Booleans.newConst( false ))( tx0 )

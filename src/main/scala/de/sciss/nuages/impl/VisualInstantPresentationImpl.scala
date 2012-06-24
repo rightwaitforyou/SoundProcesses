@@ -93,14 +93,15 @@ object VisualInstantPresentationImpl {
             }
          }
 
-         t.changed.reactTx { implicit tx => {
-            case Transport.Seek(    _, time, added, removed ) => addRemove( added, removed )
-            case Transport.Advance( _, time, added, removed ) => addRemove( added, removed )
-            case Transport.Play( _ ) => playStop( b = true  )
-            case Transport.Stop( _ ) => playStop( b = false )
-         }}
+//         t.changed.reactTx { implicit tx => {
+//            case Transport.Seek(    _, time, added, removed ) => addRemove( added, removed )
+//            case Transport.Advance( _, time, added, removed ) => addRemove( added, removed )
+//            case Transport.Play( _ ) => playStop( b = true  )
+//            case Transport.Stop( _ ) => playStop( b = false )
+//         }}
       }
 
+      vis.init()
       vis
    }
 
