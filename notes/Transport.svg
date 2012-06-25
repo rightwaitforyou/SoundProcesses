@@ -26,7 +26,7 @@
      inkscape:pageshadow="2"
      inkscape:zoom="0.98994949"
      inkscape:cx="542.34704"
-     inkscape:cy="196.75118"
+     inkscape:cy="439.18779"
      inkscape:document-units="px"
      inkscape:current-layer="layer1"
      showgrid="false"
@@ -582,7 +582,7 @@
          id="tspan3999"
          x="890.99524"
          y="778.61078"
-         style="font-size:12px">i.e. chebychev metric with</tspan><tspan
+         style="font-size:12px">i.e. vehcybehc metric with</tspan><tspan
          sodipodi:role="line"
          x="890.99524"
          y="793.61078"
@@ -671,5 +671,40 @@
          y="1045.814"
          id="tspan4077"
          style="font-size:12px;font-style:italic;font-variant:normal;font-weight:normal;font-stretch:normal;font-family:Bitstream Vera Serif;-inkscape-font-specification:Bitstream Vera Serif Italic">the same minimum distance...</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-size:18px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Gulim;-inkscape-font-specification:Gulim"
+       x="281.83258"
+       y="512.94073"
+       id="text3095"
+       sodipodi:linespacing="125%"><tspan
+         sodipodi:role="line"
+         id="tspan3097"
+         x="281.83258"
+         y="512.94073"
+         style="font-size:12px">(add &amp;&amp; begin &lt;= LRP when using the full tree instead of CAG)</tspan></text>
+    <path
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linejoin:bevel;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:1, 1;stroke-dashoffset:0"
+       d="m 191.92898,535.16408 c 14.65469,-9.48552 30.99853,-15.97152 45.7235,-25.33683 11.70708,-5.1149 24.89743,-6.1314 37.45058,-4.28113 1.87181,0.5638 3.73226,1.33682 5.71935,1.33368"
+       id="path3099"
+       inkscape:connector-curvature="0" />
+    <text
+       sodipodi:linespacing="125%"
+       id="text3138"
+       y="666.94073"
+       x="281.83258"
+       style="font-size:18px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;line-height:125%;letter-spacing:0px;word-spacing:0px;fill:#000000;fill-opacity:1;stroke:none;font-family:Gulim;-inkscape-font-specification:Gulim"
+       xml:space="preserve"><tspan
+         style="font-size:12px"
+         y="666.94073"
+         x="281.83258"
+         id="tspan3140"
+         sodipodi:role="line">(add &amp;&amp; end &gt; LRP when using the full tree instead of CAG)</tspan></text>
+    <path
+       inkscape:connector-curvature="0"
+       id="path3142"
+       d="m 179.80715,623.55609 c 14.65469,9.48552 -23.41417,33.76543 57.84533,38.46881 12.75433,0.73823 24.89743,6.1314 37.45058,4.28113 1.87181,-0.5638 3.73226,-1.33682 5.71935,-1.33368"
+       style="fill:none;stroke:#000000;stroke-width:1;stroke-linejoin:bevel;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:1, 1;stroke-dashoffset:0"
+       sodipodi:nodetypes="cscc" />
   </g>
 </svg>

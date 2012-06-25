@@ -126,10 +126,10 @@ object BiGroupImpl {
    }
 
       // ... accepted are points with x > LRP || y > LRP ...
-      private val advanceNNMetric   = LongDistanceMeasure2D.chebyshev.exceptOrthant( 1 )
+      private val advanceNNMetric   = LongDistanceMeasure2D.nextSpanEvent( MAX_SQUARE )
 //   private val advanceNNMetric   = LongDistanceMeasure2D.vehsybehc.exceptOrthant( 1 )
 
-   private val regressNNMetric   = LongDistanceMeasure2D.chebyshev.exceptOrthant( 3 )
+   private val regressNNMetric   = LongDistanceMeasure2D.prevSpanEvent( MAX_SQUARE )
 
    private sealed trait Impl[ S <: Sys[ S ], Elem, U ]
    extends Var[ S, Elem, U ]
@@ -426,13 +426,13 @@ object BiGroupImpl {
          val point   = LongPoint2D( time, time ) // + 1
          val span    = tree.nearestNeighborOption( point, advanceNNMetric ).map( _._1 ).getOrElse( Span.Void )
          span match {
-            case sp @ Span.From( start ) => if( start >= time ) Some( start ) else None
-            case sp @ Span.Until( stop ) => if( stop  >= time ) Some( stop  ) else None
+            case sp @ Span.From( start ) => assert( start >= time, sp ); Some( start ) // else None
+            case sp @ Span.Until( stop ) => assert( stop  >= time, sp ); Some( stop  ) // else None
             case sp @ Span( start, stop ) =>
                if( start >= time ) {
                   Some( start )
                } else {
-                  assert( stop >= time, sp.toString ); Some( stop )
+                  assert( stop >= time, sp ); Some( stop )
                }
             case _ => None // All or Void
          }
@@ -442,13 +442,13 @@ object BiGroupImpl {
          val point   = LongPoint2D( time, time )
          val span    = tree.nearestNeighborOption( point, regressNNMetric ).map( _._1 ).getOrElse( Span.Void )
          span match {
-            case Span.From( start ) => if( start <= time ) Some( start ) else None
-            case Span.Until( stop ) => if( stop  <= time ) Some( stop  ) else None
-            case Span( start, stop )=>
+            case sp @ Span.From( start ) => assert( start <= time, sp ); Some( start ) // else None
+            case sp @ Span.Until( stop ) => assert( stop  <= time, sp ); Some( stop  ) // else None
+            case sp @ Span( start, stop ) =>
                if( stop <= time ) {
                   Some( stop )
                } else {
-                  assert( start <= time ); Some( start )
+                  assert( start <= time, sp ); Some( start )
                }
             case _ => None // All or Void
          }
