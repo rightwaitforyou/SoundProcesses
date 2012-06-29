@@ -89,3 +89,47 @@ actor {
 
 - first idea: use a 2D octree with one axis for start time, one for stop time; values must be able to accomodate multiple procs!
   ; possible disadvantage: half of the space will be unused (since start <= stop); must be possible to represented open intervals
+
+:::::::::::::::
+
+step: TxnLocal[ Long ]
+ -1 --> transport stopped
+ 0 <= t --> next event time
+
+interr: Ref[ Int ]
+
+touchTxnAfterHook: TxnLocal[ Unit ]( initialize = { tx =>
+   Txn.beforeCommit { _ =>
+      val st = step()
+      val expected =interr()
+      Txn.afterCommit { _ =>
+         if( st >= 0 ) { 
+            val fut = pool.schedule {
+               t { implicit tx =>
+                  if( interr() == expected ) {
+                     ...
+                  
+               }
+            }
+            // ??? how to store the future ???
+         } else {
+            fut.cancel()
+         }
+      }
+   }
+})
+
+
+def play() {
+   if( aleadyPlaying ) return
+   step.set( calcStep )
+   touchTxnAfterHook()
+}
+
+def stop() {
+   if( !alreadyPlaying ) return
+//   fut.cancel()
+   step() = -1
+   expected += 1
+   touchTxnAfterHook()
+}
