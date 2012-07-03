@@ -1,26 +1,34 @@
 package de.sciss.synth.proc
 
 import java.util.concurrent.{TimeUnit, Executors}
-import concurrent.stm.{TxnLocal, Txn, TxnExecutor, InTxn}
+import concurrent.stm.{TxnLocal, Txn, TxnExecutor, InTxn, Ref => STMRef}
 
 object SchedulerTest extends App {
    val pool    = Executors.newScheduledThreadPool( 1 )
    val txnTime = TxnLocal( System.currentTimeMillis() )
+   val valid   = STMRef( 0 )
 
    def t[ A ]( fun: InTxn => A ) = TxnExecutor.defaultAtomic( fun )
 
    def schedule( delay: Long )( code: InTxn => Unit )( implicit tx: InTxn ) {
+      val v          = valid()
       val logical    = txnTime()
       val jitter     = System.currentTimeMillis() - logical
       val effective  = math.max( 0L, delay - jitter)
       Txn.afterCommit { _ =>
          pool.schedule( new Runnable {
             def run() { t { implicit tx =>
-               txnTime() = logical + delay
-               code( tx )
+               if( v == valid() ) {
+                  txnTime() = logical + delay
+                  code( tx )
+               }
             }}
          }, effective, TimeUnit.MILLISECONDS )
       }
+   }
+
+   def stop()( implicit tx: InTxn ) {
+      valid += 1
    }
 
    def io( code: => Unit )( implicit tx: InTxn ) {
@@ -36,8 +44,8 @@ object SchedulerTest extends App {
             io( println( "1.5\"" ))
             schedule( 1500 ) { implicit tx =>
                io {
-                  println( "3.0\"" )
-                  pool.shutdown()
+                  println( "3.0\" -- woop. should have been stopped" )
+//                  pool.shutdown()
                }
             }
          }
@@ -46,6 +54,8 @@ object SchedulerTest extends App {
    t { implicit tx =>
       schedule( 2000 ) { implicit tx =>
          io( println( "(independant)" ))
+         stop()
+         schedule( 1000 ) { _ => pool.shutdown() }
       }
    }
 }
