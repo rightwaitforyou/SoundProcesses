@@ -98,4 +98,18 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
          f.setVisible( true )
       }
    }
+
+//   private var auralVar: AuralPresentation[ S ] = null
+//
+//   def aural() {
+//      if( auralVar == null ) t { implicit tx =>
+////         auralVar = AuralPresentation.run( group )
+//      }
+//   }
+
+   implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )
+
+   final class RichDouble private[VisTest]( d: Double ) {
+      def sec : Long = (d * 44100).toLong
+   }
 }

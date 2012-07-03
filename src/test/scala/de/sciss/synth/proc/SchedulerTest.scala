@@ -14,7 +14,7 @@ object SchedulerTest extends App {
       val v          = valid()
       val logical    = txnTime()
       val jitter     = System.currentTimeMillis() - logical
-      val effective  = math.max( 0L, delay - jitter)
+      val effective  = math.max( 0L, delay - jitter )
       Txn.afterCommit { _ =>
          pool.schedule( new Runnable {
             def run() { t { implicit tx =>

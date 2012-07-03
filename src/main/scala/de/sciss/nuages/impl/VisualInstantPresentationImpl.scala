@@ -28,7 +28,7 @@ package impl
 
 import de.sciss.lucre.stm.{Sys, Cursor}
 import de.sciss.synth.proc.{Proc, Transport}
-import java.awt.{RenderingHints, Graphics2D, Graphics, Color, EventQueue}
+import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
 import javax.swing.JComponent
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.Txn
@@ -44,7 +44,7 @@ import de.sciss.lucre.expr.SpanLike
 import prefuse.action.assignment.ColorAction
 import prefuse.util.ColorLib
 import prefuse.render.{LabelRenderer, DefaultRendererFactory}
-import prefuse.util.force.{AbstractForce, ForceItem, CircularWallForce}
+import prefuse.util.force.{AbstractForce, ForceItem}
 
 object VisualInstantPresentationImpl {
    def apply[ S <: Sys[ S ], A ]( transport: S#Entry[ A ])
@@ -115,8 +115,7 @@ object VisualInstantPresentationImpl {
          }
 
          t.changed.reactTx { implicit tx => {
-            case Transport.Seek(    _, time, added, removed ) => addRemove( added, removed )
-            case Transport.Advance( _, time, added, removed ) => addRemove( added, removed )
+            case Transport.Advance( _, _, time, added, removed ) => addRemove( added, removed )
             case Transport.Play( _ ) => playStop( b = true  )
             case Transport.Stop( _ ) => playStop( b = false )
          }}
@@ -132,7 +131,7 @@ object VisualInstantPresentationImpl {
    private val ACTION_LAYOUT  = "layout"
    private val GROUP_GRAPH    = "graph"
    private val GROUP_NODES    = "graph.nodes"
-   private val GROUP_EDGES    = "graph.edges"
+//   private val GROUP_EDGES    = "graph.edges"
    private val LAYOUT_TIME    = 50
    private val colrPlay       = new Color( 0, 0x80, 0 )
    private val colrStop       = Color.black

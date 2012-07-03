@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.expr.{SpanLike, BiGroup, Expr, Chronos}
-import de.sciss.lucre.stm.{TxnSerializer, Writer, Disposable, Sys}
+import de.sciss.lucre.stm.{Cursor, TxnSerializer, Writer, Disposable, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.event.Event
 import de.sciss.collection.txn
@@ -9,34 +9,24 @@ import de.sciss.lucre.{event => evt}
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
-                            ( implicit tx: S#Tx /*, longs: BiType[ Long ]*/) : Transport[ S, Proc[ S ]] =
+                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] =
       impl.TransportImpl( group, sampleRate )
 
-   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
+   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]) : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
          impl.TransportImpl.serializer
 
    sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}
-   sealed trait TimeUpdate[ S <: Sys[ S ], Elem ] extends Update[ S, Elem ] {
-      def time: Long
-      def added:   IIdxSeq[ (SpanLike, Elem) ]
-      def removed: IIdxSeq[ (SpanLike, Elem) ]
 
-      protected def name: String
-
-      override def toString =
-         name + "(" + transport + (if( added.nonEmpty ) added.mkString( ", added = ", ",", "" ) else "") +
-                                  (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", ")" ) else ")")
-   }
-
-   final case class Seek[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], time: Long,
-                                                 added:   IIdxSeq[ (SpanLike, Elem) ],
-                                                 removed: IIdxSeq[ (SpanLike, Elem) ])
-   extends TimeUpdate[ S, Elem ] { def name = "Seek" }
-
-   final case class Advance[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], time: Long,
+   final case class Advance[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], playing: Boolean,
+                                                    time: Long,
                                                     added:   IIdxSeq[ (SpanLike, Elem) ],
                                                     removed: IIdxSeq[ (SpanLike, Elem) ])
-   extends TimeUpdate[ S, Elem ] { def name = "Advance" }
+   extends Update[ S, Elem ] {
+      override def toString =
+         (if( playing ) "Advance" else "Seek") +
+            "(" + transport + (if( added.nonEmpty ) added.mkString( ", added = ", ",", "" ) else "") +
+                              (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", ")" ) else ")")
+   }
 
    final case class Play[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
    final case class Stop[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
