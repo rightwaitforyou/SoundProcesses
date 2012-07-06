@@ -159,8 +159,8 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
    private var auralVar: AuralPresentation[ S ] = null
 
    def aural() {
-      if( auralVar == null ) t { implicit tx =>
-         auralVar = AuralPresentation.run( access )
+      if( auralVar == null ) auralVar = t { implicit tx =>
+         AuralPresentation.run( access )
       }
    }
 
