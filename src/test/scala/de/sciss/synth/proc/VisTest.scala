@@ -7,37 +7,58 @@ import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
 import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
+import de.sciss.confluent.Confluent
+import de.sciss.lucre.stm.impl.BerkeleyDB
+import java.io.File
 
 object VisTest {
    def apply() : VisTest[ InMemory ] = {
       implicit val system = InMemory()
       new VisTest( system )
    }
+
+   def conf() : VisTest[ Confluent ] = {
+      val dir              = new File( sys.props( "user.home" ), "sound_processes_db" )
+      dir.mkdirs()
+      val store            = BerkeleyDB.factory( dir )
+      implicit val system  = Confluent( store )
+      new VisTest( system )
+   }
+
+   def main( args: Array[ String ]) {
+      val vis = VisTest.conf()
+      import vis._
+      add(Span(3.sec,6.sec))
+   }
 }
 final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) extends ExprImplicits[ S ] {
    def t[ A ]( fun: S#Tx => A ) : A = cursor.step( fun )
 
+   type Acc = (ProcGroupX.Var[ S ], Transport[ S, Proc[ S ]])
+
    object Implicits {
       implicit val procVarSer       = ProcGroupX.varSerializer[ S ]
-      implicit val transportSer     = Transport.serializer[ S ]
-      implicit val accessTransport  = (tup: (ProcGroupX.Var[ S ], Transport[ S, Proc[ S ]])) => tup._2
+      implicit val accessTransport  = (tup: Acc) => tup._2
+      implicit val transportSer     = Transport.serializer[ S, Acc ]( access ) // ( cursor, _._2 )
    }
 
    import Implicits._
 
-   val access = system.root { implicit tx =>
+   lazy val access: S#Entry[ Acc ] = system.root { implicit tx =>
       implicit def longType = Longs
       val g = ProcGroupX.newVar[ S ]
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
-      val tr   = Transport( g )
+      val tr = Transport( g, self = access )
       tr.changed.react { upd =>
          println( "Transport observed: " + upd )
       }
 //      val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
       (g, tr)
    }
+
+   access // initialize !
 
    def group( implicit tx: S#Tx ) : ProcGroupX.Var[ S ]        = access.get._1
    def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]   = access.get._2
@@ -74,7 +95,10 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
    }}
 
    def add( span: SpanLike = Span( 33, 44 ), name: String = "Proc" ) {
-      t { implicit tx => group.add( span, proc( name ))}
+      t { implicit tx =>
+         val p = proc( name )
+         group.add( span, p )
+      }
    }
 
    def play() {

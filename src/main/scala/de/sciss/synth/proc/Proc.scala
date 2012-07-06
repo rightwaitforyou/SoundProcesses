@@ -46,13 +46,13 @@ object Proc {
    }
    final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends Update[ S ]
    final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends Update[ S ]
-   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Update[ Boolean ]) extends Update[ S ]
-   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.Update[ Double ])  extends Update[ S ]
+   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Update[ Boolean ])  extends Update[ S ]
+   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.Update[ Double ])   extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
 
-   def id: S#ID
+//   def id: S#ID
 
    // ---- "fields" ----
 

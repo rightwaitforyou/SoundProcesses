@@ -8,12 +8,14 @@ import de.sciss.collection.txn
 import de.sciss.lucre.{event => evt}
 
 object Transport {
-   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
-                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] =
-      impl.TransportImpl( group, sampleRate )
+   def apply[ S <: Sys[ S ], A ]( group: ProcGroup[ S ], sampleRate: Double = 44100, self: => S#Entry[ A ])
+                                ( implicit tx: S#Tx, cursor: Cursor[ S ],
+                                  selfView: A => Transport[ S, Proc[ S ]]) : Transport[ S, Proc[ S ]] =
+      impl.TransportImpl( group, sampleRate, self )
 
-   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]) : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
-         impl.TransportImpl.serializer
+   implicit def serializer[ S <: Sys[ S ], A ]( self: => S#Entry[ A ])( implicit cursor: Cursor[ S ],
+                                                                        selfView: A => Transport[ S, Proc[ S ]]) : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
+         impl.TransportImpl.serializer( self )
 
    sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}
 
@@ -43,6 +45,9 @@ trait Transport[ S <: Sys[ S ], Elem ] extends evt.Node[ S ] with Chronos[ S ] {
    def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem) ]
 
    def changed: Event[ S, Transport.Update[ S, Elem ], Transport[ S, Elem ]]
+
+   // unfortunately this needs to go in the API because of the self-access problem
+   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long )( implicit tx: S#Tx ) : Unit
 
 //   def play()( implicit time: Chronos[ S ]) : Unit
 //   def stop()( implicit time: Chronos[ S ]) : Unit
