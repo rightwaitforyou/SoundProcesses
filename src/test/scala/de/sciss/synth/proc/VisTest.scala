@@ -7,9 +7,10 @@ import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
 import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
-import de.sciss.confluent.Confluent
+import de.sciss.confluent.{TemporalObjects, Confluent}
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
+import concurrent.stm.{Txn => STMTxn}
 
 object VisTest {
    def apply() : VisTest[ InMemory ] = {
@@ -18,7 +19,7 @@ object VisTest {
    }
 
    def conf() : VisTest[ Confluent ] = {
-      val dir              = new File( sys.props( "user.home" ), "sound_processes_db" )
+      val dir              = new File( new File( sys.props( "user.home" ), "sound_processes" ), "db" )
       dir.mkdirs()
       val store            = BerkeleyDB.factory( dir )
       implicit val system  = Confluent( store )
@@ -26,13 +27,21 @@ object VisTest {
    }
 
    def main( args: Array[ String ]) {
+//      TemporalObjects.showConfluentLog = true
       val vis = VisTest.conf()
       import vis._
-      add(Span(3.sec,6.sec))
+      add()
+      aural()
+      Thread.sleep(8000L)
+      play()
    }
 }
 final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) extends ExprImplicits[ S ] {
-   def t[ A ]( fun: S#Tx => A ) : A = cursor.step( fun )
+   def t[ A ]( fun: S#Tx => A ) : A = {
+      val peer = STMTxn.findCurrent
+      require( peer.isEmpty, peer )
+      cursor.step( fun )
+   }
 
    type Acc = (ProcGroupX.Var[ S ], Transport[ S, Proc[ S ]])
 
@@ -63,7 +72,7 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
    def group( implicit tx: S#Tx ) : ProcGroupX.Var[ S ]        = access.get._1
    def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]   = access.get._2
 
-   def proc( name: String ) : Proc[ S ] = t { implicit tx =>
+   def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)
       val p    = Proc[ S ]()
       p.name   = name
@@ -94,7 +103,7 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       group.clear()
    }}
 
-   def add( span: SpanLike = Span( 33, 44 ), name: String = "Proc" ) {
+   def add( span: SpanLike = Span( 3*44100, 6*44100 ), name: String = "Proc" ) {
       t { implicit tx =>
          val p = proc( name )
          group.add( span, p )

@@ -165,7 +165,10 @@ object AuralPresentationImpl {
 
    private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         val aural = AuralProc( server, p.name.value, p.graph, p.freq.value )
+         val name    = p.name.value
+         val graph   = p.graph
+         val freq    = p.freq.value
+         val aural   = AuralProc( server, name, graph, freq )
          viewMap.put( p.id, aural )
          val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )

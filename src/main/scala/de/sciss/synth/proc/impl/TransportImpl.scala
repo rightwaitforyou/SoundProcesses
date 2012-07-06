@@ -62,7 +62,7 @@ object TransportImpl {
       val res = Executors.newScheduledThreadPool( 1 )
       sys.addShutdownHook {
 println( "Shutting down scheduler thread pool" )
-         res.shutdownNow()
+         res.shutdown() // res.shutdownNow()
       }
       res
    }
