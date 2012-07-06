@@ -39,9 +39,9 @@ import SoundProcesses.logConfig
 object AuralPresentationImpl {
    var dumpOSC = true
 
-   def run[ S <: Sys[ S ], A ]( group: S#Entry[ A ], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ], chr: Chronos[ S ], groupView: A => ProcGroup[ S ]) : AuralPresentation[ S ] = {
-      val boot = new Boot( group, config, cursor, groupView )
+   def run[ S <: Sys[ S ], A ]( transport: S#Entry[ A ], config: Server.Config = Server.Config() )
+                          ( implicit cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]]) : AuralPresentation[ S ] = {
+      val boot = new Boot( transport, config, cursor, transportView )
       Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
          def run() { boot.shutDown() }
       }))
@@ -79,9 +79,8 @@ object AuralPresentationImpl {
 //      }
 //   }
 
-   private final class Boot[ S <: Sys[ S ], A ]( groupA: S#Entry[ A ], config: Server.Config,
-                                                 cursor: Cursor[ S ], groupView: A => ProcGroup[ S ])
-                                               ( implicit chr: Chronos[ S ])
+   private final class Boot[ S <: Sys[ S ], A ]( transportA: S#Entry[ A ], config: Server.Config,
+                                                 cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]])
    extends AuralPresentation[ S ] {
 
 //      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
@@ -133,14 +132,18 @@ object AuralPresentationImpl {
             val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-            val group   = groupView( groupA.get )
-            group.changed.react { x => println( "Aural observation: " + x )}
-//            group.iterator.foreach( booted.procAdded( _ ))
-//            group.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => e match {
-//               case ProcGroup.Added( _, procs ) =>
-//                  procs.foreach( booted.procAdded( _ ))
-//               case ProcGroup.Removed( _, procs ) =>
-//                  procs.foreach( booted.procRemoved( _ ))
+            val transport = transportView( transportA.get )
+            transport.changed.react { x => println( "Aural observation: " + x )}
+            if( transport.playing.value ) {
+               implicit val chr: Chronos[ S ] = transport
+               transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
+            }
+            transport.changed.reactTx { implicit tx => {
+               case Transport.Advance( tr, true, time, added, removed ) =>
+                  implicit val chr: Chronos[ S ] = tr
+//println( "AQUI: added = " + added + "; removed = " + removed )
+                  added.foreach   { case (_, p) => booted.procAdded(   p )}
+                  removed.foreach { case (_, p) => booted.procRemoved( p )}
 //               case ProcGroup.Element( _, changes ) =>
 //                  changes.foreach {
 //                     case Proc.Renamed( proc, Change( _, newName )) =>
@@ -154,15 +157,14 @@ object AuralPresentationImpl {
 //case _ =>
 //                  }
 //                  println( changes.mkString( "aural changes: ", ",", "" ))
-//               case _ =>
-//            }}
+               case _ =>
+            }}
          }
       }
    }
 
-   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ])
-                                             ( implicit chr: Chronos[ S ]) {
-      def procAdded( p: Proc[ S ])( implicit tx: S#Tx ) {
+   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
+      def procAdded( p: Proc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
          val aural = AuralProc( server, p.name.value, p.graph, p.freq.value )
          viewMap.put( p.id, aural )
          val playing = p.playing.value

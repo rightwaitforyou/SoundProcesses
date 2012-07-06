@@ -2,10 +2,11 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Cursor, Sys, InMemory}
 import de.sciss.synth.expr.{Longs, ExprImplicits}
-import de.sciss.lucre.expr.{Span, SpanLike}
+import de.sciss.lucre.expr.{Chronos, Span, SpanLike}
 import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
 import de.sciss.nuages.VisualInstantPresentation
+import de.sciss.synth
 
 object VisTest {
    def apply() : VisTest[ InMemory ] = {
@@ -16,7 +17,15 @@ object VisTest {
 final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) extends ExprImplicits[ S ] {
    def t[ A ]( fun: S#Tx => A ) : A = cursor.step( fun )
 
-   val (group, trans) = t { implicit tx =>
+   object Implicits {
+      implicit val procVarSer       = ProcGroupX.varSerializer[ S ]
+      implicit val transportSer     = Transport.serializer[ S ]
+      implicit val accessTransport  = (tup: (ProcGroupX.Var[ S ], Transport[ S, Proc[ S ]])) => tup._2
+   }
+
+   import Implicits._
+
+   val access = system.root { implicit tx =>
       implicit def longType = Longs
       val g = ProcGroupX.newVar[ S ]
       g.changed.react { upd =>
@@ -26,14 +35,30 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       tr.changed.react { upd =>
          println( "Transport observed: " + upd )
       }
-      val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
-      (g, trv)
+//      val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
+      (g, tr)
    }
 
+   def group( implicit tx: S#Tx ) : ProcGroupX.Var[ S ]        = access.get._1
+   def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]   = access.get._2
+
    def proc( name: String ) : Proc[ S ] = t { implicit tx =>
-      val res = Proc[ S ]()
-      res.name = name
-      res
+      implicit val chr: Chronos[ S ] = Chronos(0L)
+      val p    = Proc[ S ]()
+      p.name   = name
+      p.graph     = {
+         import synth._
+         import ugen._
+         val f = "freq".kr       // fundamental frequency
+         val p = 20              // number of partials per channel
+         val m = Mix.tabulate(p) { i =>
+            FSinOsc.ar(f * (i+1)) *
+               (LFNoise1.kr(Seq(Rand(2, 10), Rand(2, 10))) * 0.02).max(0)
+         }
+         Out.ar( 0, m )
+      }
+      p.playing = true
+      p
    }
 
    def next( time: Long ) : Option[ Long ] = t { implicit tx =>
@@ -53,19 +78,18 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
    }
 
    def play() {
-      t { implicit tx => trans.get.playing = true }
+      t { implicit tx => trans.playing = true }
    }
 
    def stop() {
-      t { implicit tx => trans.get.playing = false }
+      t { implicit tx => trans.playing = false }
    }
 
    def rewind() { seek( 0L )}
 
    def seek( pos: Long ) { t { implicit tx =>
-      val tr = trans.get
-      tr.playing = false
-      tr.seek( pos )
+      trans.playing = false
+      trans.seek( pos )
    }}
 
    def within( span: SpanLike ) = t { implicit tx =>
@@ -88,7 +112,7 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
          val f    = new JFrame( "Vis" )
          frameVar = f
          val cp   = f.getContentPane
-         val vis  = VisualInstantPresentation( system.asEntry( trans ))
+         val vis  = VisualInstantPresentation( access )
          cp.add( vis.view, BorderLayout.CENTER )
          f.pack()
          f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
@@ -99,13 +123,13 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
       }
    }
 
-//   private var auralVar: AuralPresentation[ S ] = null
-//
-//   def aural() {
-//      if( auralVar == null ) t { implicit tx =>
-////         auralVar = AuralPresentation.run( group )
-//      }
-//   }
+   private var auralVar: AuralPresentation[ S ] = null
+
+   def aural() {
+      if( auralVar == null ) t { implicit tx =>
+         auralVar = AuralPresentation.run( access )
+      }
+   }
 
    implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )
 
