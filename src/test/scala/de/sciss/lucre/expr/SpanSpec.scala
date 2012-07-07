@@ -48,6 +48,19 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       true,  true,  false, true,  true,  true,  false, true,  true,  true,    // span5
       true,  false, false, false, true,  true,  false, true,  true,  true     // span6
    )
+   val mtouch  = IIdxSeq(
+   // span1  span2  span3  sfrom  suntl  salle  svoid  span4  span5  span6
+      true,  true,  true,  true,  true,  true,  false, true,  true,  true,    // span1
+      true,  true,  true,  true,  true,  true,  false, true,  true,  false,   // span2
+      true,  true,  true,  true,  true,  true,  false, true,  true,  false,   // span3
+      true,  true,  true,  true,  true,  true,  false, true,  true,  false,   // sfrom
+      true,  true,  true,  true,  true,  true,  false, true,  true,  true,    // suntl
+      true,  true,  true,  true,  true,  true,  false, true,  true,  true,    // salle
+      false, false, false, false, false, false, false, false, false, false,   // svoid
+      true,  true,  true,  true,  true,  true,  false, true,  true,  true,    // span4
+      true,  true,  true,  true,  true,  true,  false, true,  true,  true,    // span5
+      true,  false, false, false, true,  true,  false, true,  true,  true     // span6
+   )
 
    "A SpanLike" should "be consistently test for equality" in {
       sseqi.foreach { case (s1, idx1) =>
@@ -86,7 +99,7 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       }
    }
 
-   it should "correctly respond to clip and contains for given points" in {
+   it should "correctly respond to `clip` and `contains` for given points" in {
       spans.foreach { sp =>
          pos.foreach { p =>
             val cl = sp.clip( p )
@@ -126,7 +139,7 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       }
    }
 
-   it should "correctly handle shift for given deltas" in {
+   it should "correctly handle `shift` for given deltas" in {
       shifts.foreach { d =>
          spans.foreach { sp =>
             sp.shift( d ) should equal (Span( sp.start + d, sp.stop + d ))
@@ -138,7 +151,7 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       }
    }
 
-   it should "correctly answer contains with respect to other spans" in {
+   it should "correctly answer `contains` with respect to other spans" in {
       mcont.zipWithIndex.foreach { case (res, idx) =>
          val row = idx / sseq2.size
          val col = idx % sseq2.size
@@ -147,20 +160,33 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       }
    }
 
-   it should "correctly answer overlaps with respect to other spans" in {
+   it should "correctly answer `overlaps` with respect to other spans" in {
       mover.zipWithIndex.foreach { case (res, idx) =>
          val row = idx / sseq2.size
          val col = idx % sseq2.size
          val res1 = sseq2( row ).overlaps( sseq2( col ))
          val res2 = sseq2( col ).overlaps( sseq2( row ))
          res1 should equal (res)
-         res1 should equal (res2)
+         res1 should equal (res2)                  // commutative
       }
    }
 
-   // touches ; union, intersect, subtract
+   it should "correctly answer `touches` with respect to other spans" in {
+      mtouch.zipWithIndex.foreach { case (res, idx) =>
+         val row = idx / sseq2.size
+         val col = idx % sseq2.size
+         val res1 = sseq2( row ).touches( sseq2( col ))
+         val res2 = sseq2( col ).touches( sseq2( row ))
+         val res3 = sseq2( row ).overlaps( sseq2( col ))
+         res1 should equal (res)
+         res1 should equal (res2)                  // commutative
+         if( res3 ) res1 should equal (true)       // overlap is stronger condition
+      }
+   }
 
-   "A Span.Open" should "produce a correct inversion" in {
+   //  ; union, intersect, subtract
+
+   "A Span.Open" should "produce a correct `invert`" in {
       sfrom.invert should equal (suntl)
       suntl.invert should equal (sfrom)
       salle.invert should equal (svoid)
