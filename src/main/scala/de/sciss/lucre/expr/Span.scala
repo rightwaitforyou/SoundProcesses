@@ -65,9 +65,13 @@ object Span {
       def invert : Void.type = Void
    
       def contains( pos: Long )        = true
-      def contains( that: SpanLike )   = true
-      def overlaps( that: SpanLike )   = true
-      def touches( that: SpanLike )    = true
+      def contains( that: SpanLike )   = that != Void
+      def overlaps( that: SpanLike )   = that match {
+         case sp: Span  => sp.nonEmpty
+         case Void      => false
+         case _         => true
+      }
+      def touches( that: SpanLike )    = that != Void
 
       def subtract( that: Span.Open ) : SpanLike = that.invert
       def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ] = IIdxSeq.empty
@@ -312,7 +316,7 @@ object Span {
             val minStop    = math.min( stop, thatStop )
             maxStart < minStop
          case Span.Void  => false
-         case Span.All   => true
+         case Span.All   => nonEmpty
       }
 
       def touches( that: SpanLike ) : Boolean = that match {

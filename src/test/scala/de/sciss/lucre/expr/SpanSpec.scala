@@ -29,13 +29,25 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       false, false, true,  false, false, false, false, false, false, false,   // span3
       false, true,  true,  true,  false, false, false, false, false, false,   // sfrom
       true,  false, true,  false, true,  false, false, false, false, true,    // suntl
-      true,  true,  true,  true,  true,  true,  true,  true,  true,  true,    // salle
+      true,  true,  true,  true,  true,  true,  false, true,  true,  true,    // salle
       false, false, false, false, false, false, false, false, false, false,   // svoid
       true,  true,  true,  false, false, false, false, true,  true,  true,    // span4
       false, false, true,  false, false, false, false, false, true,  false,   // span5
-      false, false, false, false, false, false, false, false, false, true
+      false, false, false, false, false, false, false, false, false, true     // span6
    )
-
+   val mover   = IIdxSeq(
+   // span1  span2  span3  sfrom  suntl  salle  svoid  span4  span5  span6
+      true,  false, false, false, true,  true,  false, true,  true,  true,    // span1
+      false, true,  false, true,  false, true,  false, true,  true,  false,   // span2
+      false, false, false, false, false, false, false, false, false, false,   // span3
+      false, true,  false, true,  false, true,  false, true,  true,  false,   // sfrom
+      true,  false, false, false, true,  true,  false, true,  true,  true,    // suntl
+      true,  true,  false, true,  true,  true,  false, true,  true,  true,    // salle
+      false, false, false, false, false, false, false, false, false, false,   // svoid
+      true,  true,  false, true,  true,  true,  false, true,  true,  true,    // span4
+      true,  true,  false, true,  true,  true,  false, true,  true,  true,    // span5
+      true,  false, false, false, true,  true,  false, true,  true,  true     // span6
+   )
 
    "A SpanLike" should "be consistently test for equality" in {
       sseqi.foreach { case (s1, idx1) =>
@@ -135,7 +147,18 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       }
    }
 
-   // contains, overlaps, touches ; union, intersect, subtract
+   it should "correctly answer overlaps with respect to other spans" in {
+      mover.zipWithIndex.foreach { case (res, idx) =>
+         val row = idx / sseq2.size
+         val col = idx % sseq2.size
+         val res1 = sseq2( row ).overlaps( sseq2( col ))
+         val res2 = sseq2( col ).overlaps( sseq2( row ))
+         res1 should equal (res)
+         res1 should equal (res2)
+      }
+   }
+
+   // touches ; union, intersect, subtract
 
    "A Span.Open" should "produce a correct inversion" in {
       sfrom.invert should equal (suntl)
