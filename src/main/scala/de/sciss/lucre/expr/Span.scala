@@ -28,6 +28,7 @@ package expr
 
 import stm.{Writer, Serializer}
 import annotation.switch
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Span {
    def from( start: Long ) : From                     = From( start )
@@ -53,17 +54,22 @@ object Span {
    
       def shift( delta: Long ) : Open
       def union( that: SpanLike ) : Open
+      def invert : SpanLike
    }
    case object All extends Open {
-      def shift( delta: Long ) : Open = this
-      def union( that: SpanLike ) : Open = this
+      def shift( delta: Long ) : All.type = this
+      def union( that: SpanLike ) : All.type = this
       def intersect( that: SpanLike ) : SpanLike = that
       def clip( pos: Long ) : Long = pos
+      def invert : Void.type = Void
    
       def contains( pos: Long )        = true
       def contains( that: SpanLike )   = true
       def overlaps( that: SpanLike )   = true
       def touches( that: SpanLike )    = true
+
+      def subtract( that: Span.Open ) : SpanLike = that.invert
+      def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ] = IIdxSeq.empty
 
       def write( out: DataOutput ) {
          out.writeUnsignedByte( 3 )
@@ -71,7 +77,8 @@ object Span {
    }
    final case class From( start: Long ) extends Open {
       def clip( pos: Long ) : Long = math.max( start, pos )
-      def shift( delta: Long ) : Open = From( start + delta )
+      def shift( delta: Long ) : From = From( start + delta )
+      def invert : Until = Until( start )
    
       def contains( pos: Long ) : Boolean = pos >= start
    
@@ -114,6 +121,28 @@ object Span {
          case All   => this
       }
 
+      def subtract( that: Span.Open ) : SpanLike = that match {
+         case Span.From( thatStart ) =>
+            if( thatStart > start ) Span( start, thatStart ) else Span.Void
+         case Span.Until( thatStop ) if thatStop > start => From( thatStop )
+         case Span.All   => Span.Void
+         case _          => this
+      }
+
+      def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ] = that match {
+         case Span.From( thatStart ) =>
+            if( thatStart > start ) IIdxSeq( Span( start, thatStart )) else IIdxSeq.empty
+         case Span.Until( thatStop ) if thatStop > start => IIdxSeq( From( thatStop ))
+         case Span( thatStart, thatStop ) if thatStop > start =>
+            if( thatStart <= start ) {
+               IIdxSeq( From( thatStop ))
+            } else {
+               IIdxSeq( Span( start, thatStart ), From( thatStop ))
+            }
+         case Span.All   => IIdxSeq.empty
+         case _          => IIdxSeq( this )
+      }
+
       def write( out: DataOutput ) {
          out.writeUnsignedByte( 1 )
          out.writeLong( start )
@@ -121,7 +150,8 @@ object Span {
    }
    final case class Until( stop: Long ) extends Open {
       def clip( pos: Long ) : Long = math.min( stop, pos )
-      def shift( delta: Long ) : Open = Until( stop + delta )
+      def shift( delta: Long ) : Until = Until( stop + delta )
+      def invert : From = From( stop )
    
       def contains( pos: Long ) : Boolean = pos < stop
    
@@ -164,6 +194,28 @@ object Span {
          case All   => this
       }
 
+      def subtract( that: Span.Open ) : SpanLike = that match {
+         case Span.From( thatStart ) if thatStart < stop => Until( thatStart )
+         case Span.Until( thatStop ) =>
+            if( thatStop < stop ) Span( thatStop, stop ) else Span.Void
+         case Span.All   => Span.Void
+         case _          => this
+      }
+
+      def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ] = that match {
+         case Span.From( thatStart ) if thatStart < stop => IIdxSeq( Until( thatStart ))
+         case Span.Until( thatStop ) =>
+            if( thatStop < stop ) IIdxSeq( Span( thatStop, stop )) else IIdxSeq.empty
+         case Span( thatStart, thatStop ) if thatStart < stop =>
+            if( thatStop >= stop ) {
+               IIdxSeq( Until( thatStart ))
+            } else {
+               IIdxSeq( Until( thatStart ), Span( thatStop, stop ))
+            }
+         case Span.All   => IIdxSeq.empty
+         case _          => IIdxSeq( this )
+      }
+
       def write( out: DataOutput ) {
          out.writeUnsignedByte( 2 )
          out.writeLong( stop )
@@ -174,13 +226,19 @@ object Span {
    
       def shift( delta: Long ) : Closed
       def intersect( that: SpanLike ) : Closed
+      def subtract( that: Span.Open ) : Closed
+      def subtract( that: SpanLike ) : IIdxSeq[ Closed ]
    }
    case object Void extends Closed {
       val length = 0L
    
-      def shift( delta: Long ) : Closed = this
+      def shift( delta: Long ) : Void.type = this
       def union( that: SpanLike ) : SpanLike = that
-      def intersect( that: SpanLike ) : Closed = this
+      def invert : All.type = All
+
+      def intersect( that: SpanLike ) : Void.type = this
+      def subtract( that: Span.Open ) : Void.type = this
+      def subtract( that: SpanLike ) : IIdxSeq[ Closed ] = IIdxSeq.empty
       def clip( pos: Long ) : Long = pos
    
       def contains( pos: Long )        = false
@@ -271,6 +329,32 @@ object Span {
          case Span.All   => true
       }
 
+      def subtract( that: Span.Open ) : Span.Closed = that match {
+         case Span.From( thatStart ) if thatStart < stop =>
+            if( thatStart > start ) Span( start, thatStart ) else Span.Void
+         case Span.Until( thatStop ) if( thatStop > start ) =>
+            if( thatStop < stop ) Span( thatStop, stop ) else Span.Void
+         case Span.All   => Span.Void
+         case _          => this
+      }
+
+      def subtract( that: SpanLike ) : IIdxSeq[ Span.Closed ] = that match {
+         case Span.From( thatStart ) if thatStart < stop =>
+            if( thatStart > start ) IIdxSeq( Span( start, thatStart )) else IIdxSeq.empty
+         case Span.Until( thatStop ) if( thatStop > start ) =>
+            if( thatStop < stop ) IIdxSeq( Span( thatStop, stop )) else IIdxSeq.empty
+         case Span( thatStart, thatStop ) if thatStart < stop && thatStop > start =>
+            if( thatStart <= start ) {
+               if( thatStop < stop ) IIdxSeq( Span( thatStop, stop )) else IIdxSeq.empty
+            } else if( thatStop >= stop ) {
+               IIdxSeq( Span( start, thatStart ))
+            } else {
+               IIdxSeq( Span( start, thatStart ), Span( thatStop, stop ))
+            }
+         case Span.All   => IIdxSeq.empty
+         case _          => IIdxSeq( this )
+      }
+
    //   // where overlapping results in negative spacing
    //   def spacing( b: Span ) : Long = {
    //      val bStart = b.start
@@ -351,6 +435,9 @@ sealed trait SpanLike extends Writer {
 
    def union( that: SpanLike ) : SpanLike
    def intersect( that: SpanLike ) : SpanLike
+
+   def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ]
+   def subtract( that: Span.Open ) : SpanLike
 }
 sealed trait Span extends Span.Closed {
    def start: Long

@@ -23,17 +23,19 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package expr
 
 import impl.BiPinImpl
 import de.sciss.lucre.{event => evt, DataInput}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
-import de.sciss.collection.txn
 import evt.{Event, EventLike}
 
 object BiPin {
-   type ExprUpdate[ S <: Sys[ S ], A ] = Update[ S, Expr[ S, A ], evt.Change[ A ]]
+   import expr.{Expr => Ex}
+
+   type ExprUpdate[ S <: Sys[ S ], A ] = Update[ S, Ex[ S, A ], evt.Change[ A ]]
 
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
       def pin: BiPin[ S, Elem, U ]
@@ -43,10 +45,11 @@ object BiPin {
 
    type Region[ Elem ] = (SpanLike, Elem)
 
-   type TimedElem[ S <: Sys[ S ], Elem ] = (Expr[ S, Long ], Elem)
+   type TimedElem[ S <: Sys[ S ], Elem ] = (Ex[ S, Long ], Elem)
    type Leaf[      S <: Sys[ S ], Elem ] = /* (Long, */ IIdxSeq[ TimedElem[ S, Elem ]] /* ) */
 
-   type ExprVar[ S <: Sys[ S ], A ] = Var[ S, Expr[ S, A ], evt.Change[ A ]]
+   type Expr[ S <: Sys[ S ], A ]    = BiPin[ S, Ex[ S, A ], evt.Change[ A ]]
+   type ExprVar[ S <: Sys[ S ], A ] = Var[   S, Ex[ S, A ], evt.Change[ A ]]
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiPin[ S, Elem, U ] {
 //      def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
@@ -57,8 +60,8 @@ object BiPin {
 //      def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]]
 //      def removeAll( span: SpanLike )( implicit tx: S#Tx ) : Unit
 
-      def add(    time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Unit
-      def remove( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Boolean
+      def add(    time: Ex[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Unit
+      def remove( time: Ex[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Boolean
       def clear()( implicit tx: S#Tx ) : Unit
    }
 
@@ -77,16 +80,16 @@ object BiPin {
 //                                 ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
 //      BiPinImpl.newVar( init )
 
-   def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
-      BiPinImpl.newGenericVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+   def newExprVar[ S <: Sys[ S ], A ]( default: Ex[ S, A ])( implicit tx: S#Tx, elemType: BiType[ A ]) : ExprVar[ S, A ] =
+      BiPinImpl.newGenericVar[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
 
-      def newConfluentVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])
-                                          ( implicit tx: S#Tx,
-                                            peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+   def newConfluentVar[ S <: Sys[ S ], A ]( init: Ex[ S, A ])
+                                       ( implicit tx: S#Tx,
+                                         peerType: BiType[ A ]) : ExprVar[ S, A ] =
       sys.error( "TODO" ) // BiPinImpl.newConfluentVar( init )
 
-   def readVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+   def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
+                                      ( implicit tx: S#Tx, peerType: BiType[ A ]) : ExprVar[ S, A ] =
       BiPinImpl.readVar( in, access )
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
@@ -94,10 +97,22 @@ object BiPin {
                                              timeType: Type[ Long ]) : TxnSerializer[ S#Tx, S#Acc, BiPin[ S, Elem, U ]] =
       BiPinImpl.serializer[ S, Elem, U ]( eventView )
 
+   def exprSerializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, Expr[ S, A ]] = {
+      import elemType.serializer
+      implicit val timeType = elemType.longType
+      BiPinImpl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )
+   }
+
    def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                               ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                                 timeType: Type[ Long ]) : TxnSerializer[ S#Tx, S#Acc, BiPin.Var[ S, Elem, U ]] =
       BiPinImpl.varSerializer[ S, Elem, U ]( eventView )
+
+   def exprVarSerializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, BiPin.ExprVar[ S, A ]] = {
+      import elemType.serializer
+      implicit val timeType = elemType.longType
+      BiPinImpl.varSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )
+   }
 
 //   implicit def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
 //      evt.Reader[ S, BiPin[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiPin[ S, A ]] = BiPinImpl.serializer[ S, A ]
@@ -110,7 +125,7 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
 
 //   def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
    def at( time: Long )( implicit tx: S#Tx ) : Elem
-   def intersect( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+   def intersect( time: Long )( implicit tx: S#Tx ) : Leaf[ S, Elem ]
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
    def collectionChanged:  Event[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]

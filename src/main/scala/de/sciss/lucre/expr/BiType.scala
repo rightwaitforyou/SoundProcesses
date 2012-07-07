@@ -55,13 +55,13 @@ trait BiType[ A ] extends Type[ A ] {
                                                ( implicit tx: S#Tx ) : Ex[ S ] = {
 //      val bi   =
       val cache   = tx.readPartialVar[ A ]( targets.id, in )
-      val bi      = BiPin.readVar[ S, A ]( in, access )( tx, this )
+      val bi      = BiPin.readExprVar[ S, A ]( in, access )( tx, this )
       val time    = longType.readExpr( in, access )
       new Projection[ S ]( targets, cache, bi, time )
    }
 
    private final class Projection[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
-                                                   bi: BiPin[ S, Expr[ S, A ], Change[ A ]], ts: Expr[ S, Long ])
+                                                   bi: BiPin[ S, Expr[ S, A ], event.Change[ A ]], ts: Expr[ S, Long ])
       extends Expr.Node[ S, A ] {
       def reader: event.Reader[ S, Ex[ S ]] = serializer[ S ]
 
@@ -91,53 +91,54 @@ trait BiType[ A ] extends Type[ A ] {
       }
 
       private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ): Option[ Change[ S ]] = {
-         val biChanged     = bi.changed
-//         val timeChanged   = ts.time.changed
-         val timeChanged   = ts.changed
-
-         val biChange = if( biChanged.isSource( pull )) {
-            biChanged.pullUpdate( pull )
-         } else {
-            None
-         }
-         val timeChange = if( timeChanged.isSource( pull )) {
-            timeChanged.pullUpdate( pull )
-         } else {
-            None
-         }
-
-         // there are three cases
-         // - if the time value changes, we need to read the bi at the new
-         //   value (independent of biChanged)
-         // - if the time value didn't change, we see if biChange affects the
-         //   current time position
-         // - all other cases are dropped
-         val res = (biChange, timeChange) match {
-            case (Some( bch ), None) =>
-//               val timeVal = ts.time.value
-               val timeVal = ts.value
-               bch.find( _.span.contains( timeVal )).flatMap { region =>
-                  val before  = cache.get
-                  val now     = region.value
-                  cache.set( now )
-                  change( before, now )
-               }
-            case (_, Some( tch )) =>
-               val before  = cache.get
-//               val before  = bi.value( tch.before )
-               val now     = bi.at( tch.now )
-//println( "CACHE WAS " + before + " NOW (AT " + tch.now + ") IS " + now )
-               cache.set( now )
-               change( before, now )
-//            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
+sys.error( "TODO" )
+//         val biChanged     = bi.changed
+////         val timeChanged   = ts.time.changed
+//         val timeChanged   = ts.changed
+//
+//         val biChange = if( biChanged.isSource( pull )) {
+//            biChanged.pullUpdate( pull )
+//         } else {
+//            None
+//         }
+//         val timeChange = if( timeChanged.isSource( pull )) {
+//            timeChanged.pullUpdate( pull )
+//         } else {
+//            None
+//         }
+//
+//         // there are three cases
+//         // - if the time value changes, we need to read the bi at the new
+//         //   value (independent of biChanged)
+//         // - if the time value didn't change, we see if biChange affects the
+//         //   current time position
+//         // - all other cases are dropped
+//         val res = (biChange, timeChange) match {
+//            case (Some( bch ), None) =>
+////               val timeVal = ts.time.value
+//               val timeVal = ts.value
+//               bch.find( _.span.contains( timeVal )).flatMap { region =>
+//                  val before  = cache.get
+//                  val now     = region.value
+//                  cache.set( now )
+//                  change( before, now )
+//               }
+//            case (_, Some( tch )) =>
 //               val before  = cache.get
-//               val now     = bi.value( tch.now )
+////               val before  = bi.value( tch.before )
+//               val now     = bi.at( tch.now )
+////println( "CACHE WAS " + before + " NOW (AT " + tch.now + ") IS " + now )
 //               cache.set( now )
 //               change( before, now )
-            case _ => None
-         }
-//println( "CURSOR UPDATE. TIME = " + timeChange + ", BI = " + biChange + ", RES = " + res )
-         res
+////            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
+////               val before  = cache.get
+////               val now     = bi.value( tch.now )
+////               cache.set( now )
+////               change( before, now )
+//            case _ => None
+//         }
+////println( "CURSOR UPDATE. TIME = " + timeChange + ", BI = " + biChange + ", RES = " + res )
+//         res
       }
    }
 }

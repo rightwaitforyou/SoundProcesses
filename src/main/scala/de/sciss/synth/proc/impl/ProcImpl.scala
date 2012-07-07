@@ -201,8 +201,8 @@ object ProcImpl {
       protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
 //      protected val playing_# = Booleans.readVar[ S ]( in, access )( tx0 )
 //      protected val freq_#    = Doubles.readVar[ S ]( in, access )( tx0 )
-      protected val playing_# = BiPin.readVar[ S, Boolean ]( in, access )( tx0, Booleans )
-      protected val freq_#    = BiPin.readVar[ S, Double  ]( in, access )( tx0, Doubles  )
+      protected val playing_# = BiPin.readExprVar[ S, Boolean ]( in, access )( tx0, Booleans )
+      protected val freq_#    = BiPin.readExprVar[ S, Double  ]( in, access )( tx0, Doubles  )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
    }
 }
