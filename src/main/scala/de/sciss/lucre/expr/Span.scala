@@ -256,7 +256,7 @@ object Span {
    }
 
    private final case class Apply( start: Long, stop: Long ) extends Span {
-      require( start <= stop, "A span's start (" + start + ") must be <= its stop (" + stop + ")" )
+      if( start > stop ) throw new IllegalArgumentException( "A span's start (" + start + ") must be <= its stop (" + stop + ")" )
 
       override def toString = "Span(" + start + "," + stop + ")"
 
