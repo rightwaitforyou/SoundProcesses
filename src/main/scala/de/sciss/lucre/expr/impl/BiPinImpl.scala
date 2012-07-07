@@ -109,7 +109,7 @@ object BiPinImpl {
 //   with evt.StandaloneLike[ S, BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]]
 //   with evt.Node[ S ]
    {
-      group =>
+      pin =>
 
       protected def tree: Tree[ S, Elem ]
       protected def eventView: Elem => EventLike[ S, U, Elem ]
@@ -128,7 +128,7 @@ object BiPinImpl {
       {
          protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 1
-         def node: evt.Node[ S ] = group
+         def node: evt.Node[ S ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -165,7 +165,7 @@ object BiPinImpl {
                      }
                   })
                })( breakOut )
-               if( changes.isEmpty ) None else Some( BiPin.Moved( group, changes ))
+               if( changes.isEmpty ) None else Some( BiPin.Collection( pin, changes ))
             }
          }
       }
@@ -175,7 +175,7 @@ object BiPinImpl {
       with evt.InvariantEvent[ S, BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]] {
          protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 2
-         def node: evt.Node[ S ] = group
+         def node: evt.Node[ S ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -196,7 +196,7 @@ object BiPinImpl {
                eventView( elem ).pullUpdate( pull ).map( u => (elem, u) )
             })( breakOut )
 
-            if( changes.isEmpty ) None else Some( BiPin.Element( group, changes ))
+            if( changes.isEmpty ) None else Some( BiPin.Element( pin, changes ))
          }
       }
 
@@ -205,7 +205,7 @@ object BiPinImpl {
       with evt.InvariantSelector[ S ] {
          protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = opNotSupported
-         def node: evt.Node[ S ] = group
+         def node: evt.Node[ S ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -280,11 +280,12 @@ object BiPinImpl {
 
       final def clear()( implicit tx: S#Tx ) {
          if( isConnected ) {
-            val changes = tree.iterator.toIndexedSeq.flatMap { case (spanVal, seq) =>
-               seq.map { case (_, elem) => BiPin.Removed( this, spanVal, elem )}
-            }
-            tree.clear()
-            changes.foreach( CollChanged.apply )
+//            val changes = tree.iterator.toIndexedSeq.flatMap { case (spanVal, seq) =>
+//               seq.map { case (_, elem) => BiPin.Removed( this, spanVal, elem )}
+//            }
+//            tree.clear()
+//            changes.foreach( CollChanged.apply )
+            sys.error( "TODO" )
 
          } else {
             tree.clear()
@@ -293,22 +294,41 @@ object BiPinImpl {
 
       final def add( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) {
          val timeVal = time.value
-         addNoFire( timeVal, time, elem )
+         val span    = addNoFire( timeVal, time, elem )
          if( isConnected ) {
             CollChanged += time
 // TODO XXX
 //            ElemChanged += elem
-            CollChanged( BiPin.Added( this, timeVal, elem ))
+            CollChanged( BiPin.Collection( pin, IIdxSeq( span -> elem )))
          }
       }
 
-      private def addNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) {
-         val point   = timeVal // spanToPoint( spanVal )
-//if( VERBOSE ) println( "add at point " + point )
-         val entry   = (time, elem)
-         tree.transformAt( point ) {
-            case None               => Some( timeVal -> IIdxSeq( entry ))
-            case Some( (_, seq) )   => Some( timeVal -> (seq :+ entry) )
+      private def addNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : SpanLike = {
+         (tree.floor( timeVal ), tree.ceil( timeVal + 1 )) match {
+            case (Some( (start, startLeaf) ), Some( (stop, stopLeaf) )) =>
+               if( start == timeVal ) {
+                  tree += timeVal -> ((time -> elem) +: startLeaf)
+               } else {
+                  tree += timeVal -> IIdxSeq( time -> elem )
+               }
+               Span( timeVal, stop )
+
+            case (Some( (start, startLeaf) ), None) =>
+               if( start == timeVal ) {
+                  tree += timeVal -> ((time -> elem) +: startLeaf)
+                  Span.from( timeVal )
+               } else {
+                  tree += timeVal -> IIdxSeq( time -> elem )
+                  Span( start, timeVal )
+               }
+
+            case (None, Some( (stop, stopLeaf) )) =>
+               tree += timeVal -> IIdxSeq( time -> elem )
+               Span( timeVal, stop )
+
+            case (None, None) =>
+               tree += timeVal -> IIdxSeq( time -> elem )
+               Span.from( timeVal )
          }
       }
 

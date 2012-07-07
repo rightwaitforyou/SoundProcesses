@@ -101,8 +101,9 @@ object ProcImpl {
          playing_#.at( chr.time )
       }
       final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         sys.error( "TODO" )
+//         sys.error( "TODO" )
 //         playing_#.set( b )
+         playing_#.add( chr.time, b )
       }
       final def graph( implicit tx: S#Tx ) : SynthGraph = {
          graphVar.get
@@ -116,12 +117,10 @@ object ProcImpl {
       }
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
       final def play()( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         sys.error( "TODO" )
-//         playing_#.set( true  )
+         playing = true
       }
       final def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         sys.error( "TODO" )
-//         playing_#.set( false )
+         playing = false
       }
 
 //      protected def freqVar : S#Var[ Expr[ S, Double ]]
@@ -142,8 +141,9 @@ object ProcImpl {
 //            }
 //         }
 
-         sys.error( "TODO" )
+//         sys.error( "TODO" )
 //         freq_#.set( f )
+         freq_#.add( chr.time, f )
       }
 
       final def renamed             = name_#.changed.map( Renamed( this, _ ))

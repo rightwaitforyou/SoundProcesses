@@ -38,10 +38,10 @@ object BiPin {
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
       def pin: BiPin[ S, Elem, U ]
    }
-   sealed trait Collection[ S <: Sys[ S ], Elem, U ] extends Update[ S, Elem, U ]
+   final case class Collection[ S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ Region[ Elem ]]) extends Update[ S, Elem, U ]
    final case class Element[ S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ]) extends Update[ S, Elem, U ]
 
-   final case class Region[ Elem ]( span: SpanLike, value: Elem )
+   type Region[ Elem ] = (SpanLike, Elem)
 
    type TimedElem[ S <: Sys[ S ], Elem ] = (Expr[ S, Long ], Elem)
    type Leaf[      S <: Sys[ S ], Elem ] = /* (Long, */ IIdxSeq[ TimedElem[ S, Elem ]] /* ) */
