@@ -18,12 +18,20 @@ object VisTest {
       new VisTest( system )
    }
 
+   def dataDir = new File( new File( sys.props( "user.home" ), "sound_processes" ), "db" )
+
    def conf() : VisTest[ Confluent ] = {
-      val dir              = new File( new File( sys.props( "user.home" ), "sound_processes" ), "db" )
+      val dir              = dataDir
       dir.mkdirs()
       val store            = BerkeleyDB.factory( dir )
       implicit val system  = Confluent( store )
       new VisTest( system )
+   }
+
+   def wipe( sure: Boolean = false ) {
+      if( !sure ) return
+      dataDir.listFiles().foreach( _.delete() )
+      dataDir.delete()
    }
 
    def main( args: Array[ String ]) {
