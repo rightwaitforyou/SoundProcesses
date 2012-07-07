@@ -26,373 +26,427 @@
 package de.sciss.lucre.expr
 package impl
 
-import de.sciss.lucre.{DataOutput, event => evt, DataInput}
-import de.sciss.lucre.stm.{Writer, Serializer, TxnSerializer, Sys}
-import de.sciss.collection.txn.{SkipList, HASkipList}
+import de.sciss.lucre.{event => evt, DataInput, DataOutput}
+import evt.{Change, Event, EventLike}
+import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import de.sciss.collection.txn
+import txn.SkipList
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.breakOut
+import annotation.switch
 
-/**
- * TODO: Entry.Dynamic should not require its own targets. It would be much better to realise a group event
- * in the var itself.
- */
 object BiPinImpl {
-   private val MIN_TIME = Long.MinValue
+   import BiPin.{Leaf, TimedElem, Var}
 
-   import BiPin.{Region, Update, Var}
+   private type Tree[ S <: Sys[ S ], Elem ] = SkipList.Map[ S, Long, Leaf[ S, Elem ]]
 
-   def newVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
-                                                        peerType: BiType[ A ]) : Var[ S, A ] = {
-      val targets = evt.Targets.partial[ S ]
-      newVar( targets, init )
-   }
+   private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   def newConfluentVar[ S <: Sys[ S ], A ]( init: Expr[ S, A ])( implicit tx: S#Tx,
-                                                                 peerType: BiType[ A ]) : Var[ S, A ] = {
-      val targets = evt.Targets[ S ]
-      newVar( targets, init )
+   def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      timeType: Type[ Long ]) : Var[ S, Elem, U ] = {
+
+//      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+//      implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
+      implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, Long ]] = timeType.serializer[ S ]
+      val tree: Tree[ S, Elem ] = SkipList.Map.empty[ S, Long, Leaf[ S, Elem ]]()
+      new ImplNew( evt.Targets[ S ], tree, eventView )
    }
 
    def readVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, A ] = {
+                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+      sys.error( "TODO" )
+
+   def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      timeType: Type[ Long ]) : evt.NodeSerializer[ S , BiPin[ S, Elem, U ]] = new Ser( eventView )
+
+   def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      timeType: Type[ Long ]) : evt.NodeSerializer[ S , BiPin.Var[ S, Elem, U ]] = new VarSer( eventView )
+
+   def readGenericVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+         ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+           timeType: Type[ Long ]) : BiPin.Var[ S, Elem, U ] = {
+
       val targets = evt.Targets.read[ S ]( in, access )
-      val ordered = {
-         implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
-         implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.Map.read[ S, Long, Entry[ S, A ]]( in, access )
-      }
-      new Impl[ S, A ]( targets, ordered )
+      read( in, access, targets, eventView )
    }
 
-   implicit def serializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
-      evt.Reader[ S, BiPin[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiPin[ S, A ]] = new Ser[ S, A ]
-
-   implicit def varSerializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
-      evt.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] = new VarSer[ S, A ]
-
-   private def newVar[ S <: Sys[ S ], A ]( targets: evt.Targets[ S ], init: Expr[ S, A ])( implicit tx: S#Tx,
-                                                        peerType: BiType[ A ]) : Var[ S, A ] = {
-      val ordered = {
-         implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
-         implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-         HASkipList.Map.empty[ S, Long, Entry[ S, A ]]
-      }
-      ordered.add( MIN_TIME -> Entry( MIN_TIME, peerType.longType.newConst( MIN_TIME ), init ))
-      new Impl[ S, A ]( targets, ordered )
+   private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
+                                             ( implicit tx: S#Tx,
+                                               elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                               timeType: Type[ Long ]) : Impl[ S, Elem, U ] = {
+//      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+//      implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
+      implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, Long ]] = timeType.serializer[ S ]
+      val tree: Tree[ S, Elem ] = SkipList.Map.read[ S, Long, Leaf[ S, Elem ]]( in, access )
+      new ImplNew( targets, tree, eventView )
    }
 
-   private final class Ser[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
-   extends evt.Reader[ S, BiPin[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiPin[ S, A ]] {
-      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : BiPin[ S, A ] = {
-         read( in, access, evt.Targets.read[ S ]( in, access ))
-      }
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin[ S, A ] = {
-         val ordered = {
-            implicit val ser     = Entry.serializer[ S, A ] // peerType.serializer[ S ]
-            implicit val ord     = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-            HASkipList.Map.read[ S, Long, Entry[ S, A ]]( in, access )
-         }
-         new Impl[ S, A ]( targets, ordered )
-      }
-      def write( v: BiPin[ S, A ], out: DataOutput ) { v.write( out )}
-   }
-
-   private final class VarSer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
-   extends evt.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] {
-      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Var[ S, A ] = {
-         read( in, access, evt.Targets.read[ S ]( in, access ))
-      }
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Var[ S, A ] = {
-         val ordered = {
-            implicit val ser        = Entry.serializer[ S, A ] // peerType.serializer[ S ]
-            implicit val ord        = Ordering.by[ (Long, Expr[ S, A ]), Long ]( _._1 )
-            HASkipList.Map.read[ S, Long, Entry[ S, A ]]( in, access )
-         }
-         new Impl[ S, A ]( targets, ordered )
-      }
-      def write( v: Var[ S, A ], out: DataOutput ) { v.write( out )}
-   }
-
-   private object Entry {
-      def serializer[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, Entry[ S, A ]] =
-         new Ser[ S, A ]
-
-      private def readFull[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])
-                                              ( implicit tx: S#Tx, peer: BiType[ A ]) : Dynamic[ S, A ] = {
-         implicit val cacheSer   = TxnSerializer.tuple2[ S#Tx, S#Acc, Long, A ]( Serializer.Long, peer.ValueSer )
-         val cacheVar            = tx.readVar[ (Long, A) ]( targets.id, in )
-         val time                = peer.longType.readExpr[ S ]( in, access )
-         val value               = peer.readExpr[ S ]( in, access )
-         new Dynamic[ S, A ]( targets, cacheVar, time, value )
-      }
-
-      private final class Ser[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ])
-      extends evt.EventLikeSerializer[ S, Entry[ S, A ]] {
-         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Entry[ S, A ] = {
-            readFull( in, access, targets )
-         }
-
-         def readConstant( in: DataInput )( implicit tx: S#Tx ) : Entry[ S, A ] = {
-            val valueVal = peer.readValue( in )
-            new Static[ S, A ]( valueVal )
-         }
-      }
-
-      def nodeReader[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ]) : evt.Reader[ S, evt.Node[ S ]] =
-         new NodeReader[ S, A ]
-
-      private final class NodeReader[ S <: Sys[ S ], A ]( implicit peer: BiType[ A ])
-      extends evt.Reader[ S, evt.Node[ S ]] {
-         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : evt.Node[ S ] = {
-            readFull( in, access, targets )
-         }
-      }
-
-      def apply[ S <: Sys[ S ], A ]( timeVal: Long, time: Expr[ S, Long ], value: Expr[ S, A ])
-                                   ( implicit tx: S#Tx, peerType: BiType[ A ]) : Entry[ S, A ] = {
-         val valueVal = value.value
-         if( time.isInstanceOf[ Expr.Const[ _, _ ]] && value.isInstanceOf[ Expr.Const[ _, _ ]]) {
-            new Static[ S, A ]( valueVal )
-         } else {
-            val targets             = evt.Targets[ S ]
-            implicit val cacheSer   = TxnSerializer.tuple2[ S#Tx, S#Acc, Long, A ]( Serializer.Long, peerType.ValueSer )
-            val cacheVar            = tx.newVar( targets.id, (timeVal, valueVal) )
-            new Dynamic[ S, A ]( targets, cacheVar, time, value )
-         }
-      }
-
-      final private[BiPinImpl] case class Static[ S <: Sys[ S ], A ]( valueVal: A )( implicit peerType: BiType[ A ])
-      extends Entry[ S, A ] with evt.Dummy[ S, evt.Change[ (Long, A) ], Entry[ S, A ]] with evt.Constant[ S ] {
-         protected def writeData( out: DataOutput ) {
-            peerType.writeValue( valueVal, out )
-         }
-
-         def valueCache( implicit tx: S#Tx ) : A = valueVal
-         def value : Expr[ S, A ]      = peerType.newConst[ S ]( valueVal )
-      }
-
-      final private[BiPinImpl] case class Dynamic[ S <: Sys[ S ], A ]( targets: evt.Targets[ S ], cacheVar: S#Var[ (Long, A) ],
-                                                                  time: Expr[ S, Long ], value: Expr[ S, A ])
-      extends Entry[ S, A ] with evt.StandaloneLike[ S, evt.Change[ (Long, A) ], Entry[ S, A ]] {
-         private def timeCache(  implicit tx: S#Tx ) : Long = cacheVar.get._1
-         def valueCache( implicit tx: S#Tx ) : A    = cacheVar.get._2
-
-         // LucreSTM issue #7 !!!
-         override def toString() = "Entry(time = " + time + ", value =" + value + ")"
-
-         protected def writeData( out: DataOutput ) {
-            cacheVar.write( out )
-            time.write( out )
-            value.write( out )
-         }
-
-         protected def disposeData()( implicit tx: S#Tx ) {
-            cacheVar.dispose()
-         }
-
-         private[lucre] def connect()( implicit tx: S#Tx ) {
-            time.changed  ---> this
-            value.changed ---> this
-         }
-
-         private[lucre] def disconnect()( implicit tx: S#Tx ) {
-            time.changed  -/-> this
-            value.changed -/-> this
-         }
-
-         protected def reader : evt.Reader[ S, Entry[ S, A ]] = {
-            sys.error( "TODO" )
-         }
-
-         @inline private def change[ B ]( before: B, now: B ) : Option[ evt.Change[ B ]] =
-            evt.Change( before, now ).toOption
-
-         private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ evt.Change[ (Long, A) ]] = {
-            val timeChanged   = time.changed
-            val valueChanged  = value.changed
-
-            val timeChange = if( timeChanged.isSource( pull )) {
-               timeChanged.pullUpdate( pull )
-            } else {
-               None
-            }
-            val valueChange = if( valueChanged.isSource( pull )) {
-               valueChanged.pullUpdate( pull )
-            } else {
-               None
-            }
-
-            (timeChange, valueChange) match {
-               case (Some( tch ), None) =>
-                  val vv   = value.value
-                  change( (tch.before, vv), (tch.now, vv) )
-               case (None, Some( vch )) =>
-                  val tv = timeCache
-                  change( (tv, vch.before), (tv, vch.now) )
-               case (Some( tch ), Some( vch )) =>
-                  change( (tch.before, vch.before), (tch.now, vch.now) )
-               case _ => None
-            }
-         }
-
-         def updateCache()( implicit tx: S#Tx ) : Long = {
-            val newTime = time.value
-            cacheVar.set( (newTime, value.value) )
-            newTime
-         }
+   private class Ser[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+                                              ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                timeType: Type[ Long ])
+   extends evt.NodeSerializer[ S, BiPin[ S, Elem, U ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin[ S, Elem, U ] = {
+         BiPinImpl.read( in, access, targets, eventView )
       }
    }
-   private sealed trait Entry[ S <: Sys[ S ], A ]
-   extends evt.EventLike[ S, evt.Change[ (Long, A) ], Entry[ S, A ]] with Writer {
-      def valueCache( implicit tx: S#Tx ) : A
-      def value: Expr[ S, A ]
+
+   private class VarSer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+                                                 ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                   timeType: Type[ Long ])
+   extends evt.NodeSerializer[ S, BiPin.Var[ S, Elem, U ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin.Var[ S, Elem, U ] = {
+         BiPinImpl.read( in, access, targets, eventView )
+      }
    }
 
-   /*
-    * XXX dangerous stuff: http://stackoverflow.com/questions/11172062/messed-up-trait-linearisation
-    *
-    * It works when StandaloneLike comes before Trigger.Impl, but not vice versa
-    */
-   private final class Impl[ S <: Sys[ S ], A ]( protected val targets: evt.Targets[ S ],
-                                                 ordered: SkipList.Map[ S, Long, Entry[ S, A ]])
-                                               ( implicit peerType: BiType[ A ])
-   extends Var[ S, A ]
-   with evt.StandaloneLike[ S, Update[ A ], BiPin[ S, A ]]
-   with evt.Trigger.Impl[ S, Update[ A ], Update[ A ], BiPin[ S, A ]] {
-      protected def reader = serializer[ S, A ]
+   private sealed trait Impl[ S <: Sys[ S ], Elem, U ]
+   extends Var[ S, Elem, U ]
+//   with evt.Compound[ S, Impl[ S, Elem, U ], Impl.type ]
+//   with evt.Trigger.Impl[ S, BiPin.Update[ S, Elem, U ], BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]]
+//   with evt.StandaloneLike[ S, BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]]
+//   with evt.Node[ S ]
+   {
+      group =>
 
-      override def toString() = "BiPin" + id
+      protected def tree: Tree[ S, Elem ]
+      protected def eventView: Elem => EventLike[ S, U, Elem ]
+      implicit protected def elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]
+      implicit protected def timeType: Type[ Long ]
 
-      private[lucre] def connect()( implicit tx: S#Tx ) {
-         var dirty   = IIdxSeq.empty[ (Long, Entry.Dynamic[ S, A ])]
+      override def toString() = "BiPin" + tree.id
 
-         ordered.iterator.foreach {
-            case (timeCache, e @ Entry.Dynamic( _, _, timeVar, _ )) =>
-               val tNow = timeVar.value
-               if( timeCache != tNow ) {
-                  dirty :+= (timeCache, e)
-               } else {
-                  e ---> this
-               }
+      // ---- event behaviour ----
 
-            case _ =>
+      private object CollChanged
+      extends evt.Trigger.Impl[ S, BiPin.Collection[ S, Elem, U ], BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      with evt.EventImpl[ S, BiPin.Collection[ S, Elem, U ], BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      with evt.InvariantEvent[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
+//      with evt.Root[ S, BiPin.Collection[ S, Elem, U ]]
+      {
+         protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
+         def slot: Int = 1
+         def node: evt.Node[ S ] = group
+
+         def connect()( implicit tx: S#Tx ) {}
+         def disconnect()( implicit tx: S#Tx ) {}
+
+         def +=( elem: Expr[ S, Long ])( implicit tx: S#Tx ) {
+            elem.changed ---> this
          }
 
-         dirty.foreach { case (timeCache, e) =>
-            ordered -= timeCache
-            val newTime = e.updateCache()
-            ordered += newTime -> e
-            e ---> this
+         def -=( elem: Expr[ S, Long ])( implicit tx: S#Tx ) {
+            elem.changed -/-> this
          }
-      }
-      private[lucre] def disconnect()( implicit tx: S#Tx ) {
-         ordered.valuesIterator.foreach( _ -/-> this )
-      }
 
-      private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Update[ A ]] = {
-         val p = pull.parents( this )
-         if( p.isEmpty ) {
-            pull.resolve[ Update[ A ]]
-         } else {
-            val reader  = Entry.nodeReader[ S, A ]
-            var regions = IIdxSeq.empty[ Region[ A ]]
-            p.foreach { sel =>
-// need to change package private modifier from `event` to `lucre`
-//               n.devirtualize()
-               val e = sel.devirtualize( reader ).asInstanceOf[ Entry.Dynamic[ S, A ]]
-               e.pullUpdate( pull ).foreach {
-                  case evt.Change( (tOld, vOld), (tNew, vNew) ) =>
-                     if( tOld == tNew ) { // time didn't change -- only one region changed
-                        val span = ordered.ceil( tOld + 1 ) match {
-                           case Some( (tSucc, _) ) => Span( tOld, tSucc )
-                           case None               => Span.from( tOld )
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Collection[ S, Elem, U ]] = {
+            val par = pull.parents( this )
+            if( par.isEmpty ) {  // add or remove
+               pull.resolve[ BiPin.Collection[ S, Elem, U ]]
+            } else {             // span key changed
+               val changes: IIdxSeq[ (Change[ Long ], Elem) ] = par.flatMap( sel => {
+                  val time = sel.devirtualize( timeType.serializer[ S ].asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+                     .node.asInstanceOf[ Expr[ S, Long ]]
+                  val changeOption = time.changed.pullUpdate( pull )
+                  // somehow the flatMap is shadowed in Option, so the implicit conversion
+                  // to Iterable doesn't kick in...
+                  (changeOption: Iterable[ Change[ Long ]]).flatMap({ case change @ Change( timeValOld, timeValNew ) =>
+                     val pointOld = timeValOld // spanToPoint( spanValOld )
+                     (tree.get( pointOld ): Iterable[ Leaf[ S, Elem ]]).flatMap { seq =>
+                        val moved: IIdxSeq[ Elem ] = seq.collect { case (time2, elem) if time2 == time => elem }
+                        // update in spatial structure
+                        moved.foreach { elem =>
+                           removeNoFire( timeValOld, time, elem )
+                           addNoFire(    timeValNew, time, elem )
                         }
-                        regions :+= Region( span, vNew )
-                     } else {             // time did change -- two changed regions, and need to re-insert entries
-                        val span1 = ordered.ceil( tOld + 1 ) match {
-                           case Some( (tSucc, _) ) => Span( tOld, tSucc )
-                           case None               => Span.from( tOld )
-                        }
-                        val r1      = Region( span1, valueCache( tOld ))
-                        regions :+= r1
-                        val span2 = ordered.ceil( tNew + 1 ) match {
-                           case Some( (tSucc, _) ) => Span( tNew, tSucc )
-                           case None               => Span.from( tNew )
-                        }
-                        val r2      = Region( span2, vNew )
-                        regions :+= r2
-
-                        ordered -= tOld
-                        val tNew2 = e.updateCache()
-                        assert( tNew2 == tNew )
-                        ordered += tNew -> e
+                        moved.map( elem => (change, elem) )
                      }
-               }
+                  })
+               })( breakOut )
+               if( changes.isEmpty ) None else Some( BiPin.Moved( group, changes ))
             }
-            Some( regions )
          }
       }
 
-      def debugList()( implicit tx: S#Tx ) : List[ (Long, A)] =
-         ordered.iterator.map( tup => (tup._1, tup._2.value.value) ).toList
+      private object ElemChanged
+      extends evt.EventImpl[ S, BiPin.Element[ S, Elem, U ], BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      with evt.InvariantEvent[ S, BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]] {
+         protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
+         def slot: Int = 2
+         def node: evt.Node[ S ] = group
 
-      def getAt( time: Long )( implicit tx: S#Tx )   : Expr[ S, A ] = ordered.floor( time ).get._2.value
-//      def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time.value )
-      def get( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, A ] = getAt( chr.time )
+         def connect()( implicit tx: S#Tx ) {}
+         def disconnect()( implicit tx: S#Tx ) {}
 
-      def valueAt( time: Long )( implicit tx: S#Tx )   : A  = getAt( time ).value
-//      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time.value )
-      def value( implicit tx: S#Tx, chr: Chronos[ S ]) : A  = valueAt( chr.time )
-
-      private def isConnected( implicit tx: S#Tx ) : Boolean = targets.nonEmpty
-
-      def add( time: Expr[ S, Long ], value: Expr[ S, A ])( implicit tx: S#Tx ) : Option[ Expr[ S, A ]] = {
-         val start         = time.value
-         val newEntry      = Entry( start, time, value )
-         val con           = isConnected
-         val succ          = ordered.ceil( start + 1 )
-
-         val oldOption = ordered.add( start -> newEntry )
-         if( con ) {
-            oldOption.foreach( _ -/-> this )
-            newEntry ---> this
-            val span = succ match {
-               case Some( (tSucc, _) ) => Span( start, tSucc )
-               case None               => Span.from( start )
-            }
-            fire( IIdxSeq( Region( span, value.value )))
+         def +=( elem: Elem )( implicit tx: S#Tx ) {
+            eventView( elem ) ---> this
          }
-         oldOption.map( _.value )
+
+         def -=( elem: Elem )( implicit tx: S#Tx ) {
+            eventView( elem ) -/-> this
+         }
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Element[ S, Elem, U ]] = {
+            val changes: IIdxSeq[ (Elem, U) ] = pull.parents( this ).flatMap( sel => {
+//               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
+               val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
+                  asInstanceOf[ Elem ]
+               eventView( elem ).pullUpdate( pull ).map( u => (elem, u) )
+            })( breakOut )
+
+            if( changes.isEmpty ) None else Some( BiPin.Element( group, changes ))
+         }
       }
-      def set( value: Expr[ S, A ])( implicit tx: S#Tx ) {
-         ordered.clear()
-         ordered.add( MIN_TIME -> Entry( MIN_TIME, peerType.longType.newConst( MIN_TIME ), value ))
+
+      private object Changed
+      extends evt.Event[ S, BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      with evt.InvariantSelector[ S ] {
+         protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
+         def slot: Int = opNotSupported
+         def node: evt.Node[ S ] = group
+
+         def connect()( implicit tx: S#Tx ) {}
+         def disconnect()( implicit tx: S#Tx ) {}
+
+         private[lucre] def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+            CollChanged ---> r
+// TODO XXX
+//            ElemChanged ---> r
+         }
+         private[lucre] def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+            CollChanged -/-> r
+// TODO XXX
+//            ElemChanged -/-> r
+         }
+
+         private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Update[ S, Elem, U ]] = {
+            if( CollChanged.isSource( pull )) CollChanged.pullUpdate( pull )
+            else if( ElemChanged.isSource( pull )) ElemChanged.pullUpdate( pull )
+            else None
+         }
+
+         def react( fun: BiPin.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]] =
+            reactTx( _ => fun )
+
+         def reactTx( fun: S#Tx => BiPin.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]] = {
+            val obs = evt.Observer( serializer( eventView ), fun )
+            obs.add( CollChanged )
+// TODO XXX
+//            obs.add( ElemChanged )
+            obs
+         }
+
+         private[lucre] def isSource( pull: evt.Pull[ S ]) : Boolean = opNotSupported
+      }
+
+      final protected def disposeData()( implicit tx: S#Tx ) {
+         tree.dispose()
+      }
+
+      final protected def writeData( out: DataOutput ) {
+         tree.write( out )
+      }
+
+      private def foreach( fun: TimedElem[ S, Elem ] => Unit )( implicit tx: S#Tx ) {
+         tree.iterator.foreach { case (_, seq) => seq.foreach( fun )}
+      }
+
+      final def connect()( implicit tx: S#Tx ) {
+         foreach { case (time, elem) =>
+            CollChanged += time
+// TODO XXX
+//            ElemChanged += elem
+         }
+      }
+
+      final def disconnect()( implicit tx: S#Tx ) {
+         foreach { case (time, elem) =>
+            CollChanged -= time
+// TODO XXX
+//            ElemChanged -= elem
+         }
+      }
+
+      final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
+         case 1 => CollChanged
+         case 2 => ElemChanged
+      }
+
+      // ---- collection behaviour ----
+
+      @inline private def isConnected( implicit tx: S#Tx ) : Boolean = targets.nonEmpty
+
+      final def clear()( implicit tx: S#Tx ) {
          if( isConnected ) {
-            fire( IIdxSeq( Region( Span.All, value.value )))
+            val changes = tree.iterator.toIndexedSeq.flatMap { case (spanVal, seq) =>
+               seq.map { case (_, elem) => BiPin.Removed( this, spanVal, elem )}
+            }
+            tree.clear()
+            changes.foreach( CollChanged.apply )
+
+         } else {
+            tree.clear()
          }
       }
-      def removeAll( span: SpanLike )( implicit tx: S#Tx ) {
-         sys.error( "TODO" )
-      }
-      def remove( time: Expr[ S, Long ])( implicit tx: S#Tx ) : Boolean = {
-         sys.error( "TODO" )
-      }
-      def removeAt( time: Long )( implicit tx: S#Tx ) : Option[ Expr[ S, Long ]] = {
-         sys.error( "TODO" )
-      }
 
-      private def valueCache( time: Long )( implicit tx: S#Tx ) : A = ordered.floor( time ).get._2.valueCache
-
-      protected def writeData( out: DataOutput ) {
-         ordered.write( out )
+      final def add( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) {
+         val timeVal = time.value
+         addNoFire( timeVal, time, elem )
+         if( isConnected ) {
+            CollChanged += time
+// TODO XXX
+//            ElemChanged += elem
+            CollChanged( BiPin.Added( this, timeVal, elem ))
+         }
       }
 
-      protected def disposeData()( implicit tx: S#Tx ) {
-         ordered.dispose()
+      private def addNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) {
+         val point   = timeVal // spanToPoint( spanVal )
+//if( VERBOSE ) println( "add at point " + point )
+         val entry   = (time, elem)
+         tree.transformAt( point ) {
+            case None               => Some( timeVal -> IIdxSeq( entry ))
+            case Some( (_, seq) )   => Some( timeVal -> (seq :+ entry) )
+         }
       }
 
-//      def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ] =
-//         peerType.newProjection[ S ]( this )
+      final def remove( time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Boolean = {
+         val timeVal = time.value
+         val res     = removeNoFire( timeVal, time, elem )
+         if( res && isConnected ) {
+            CollChanged -= time
+// TODO XXX
+//            ElemChanged -= elem
+            CollChanged( BiPin.Removed( this, timeVal, elem ))
+         }
+         res
+      }
 
-      def changed : evt.Event[ S, Update[ A ], BiPin[ S, A ]] = this
+      private def removeNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Boolean = {
+         val point   = timeVal
+         val entry   = (time, elem)
+         tree.get( point ) match {
+            case Some( IIdxSeq( single )) =>
+               if( single == entry ) {
+                  tree -= point // .removeAt( point )
+                  true
+               } else {
+                  false
+               }
+            case Some( seq ) =>
+               val seqNew = seq.filterNot( _ == entry )
+               if( seqNew.size != seq.size ) {
+                  tree.add( (timeVal, seqNew) )
+                  true
+               } else {
+                  false
+               }
+            case None => false
+         }
+      }
+
+      final def debugList()( implicit tx: S#Tx ) : List[ (Long, Elem) ] =
+         tree.toList.flatMap { case (time, seq) => seq.map { case (_, elem) => time -> elem }}
+
+//      final def iterator( implicit tx: S#Tx, chr: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]  =
+//         intersect( chr.time.value )
+
+//      final def intersect( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+//         val start   = time
+//         val stop    = time + 1
+////         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
+//         // horizontally: until query_stop; vertically: from query_start
+//         // start < query.stop && stop > query.start
+//         val shape = LongRectangle( MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start )
+//         rangeSearch( shape )
+//      }
+
+//      final def intersect( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+//         // horizontally: until query_stop; vertically: from query_start
+//         span match {
+//            case Span( start, stop ) =>
+//               val shape = LongRectangle( MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start )
+//               rangeSearch( shape )
+//
+//            case Span.From( start ) =>
+//               val shape = LongRectangle( MIN_COORD, start + 1, MAX_SIDE, MAX_COORD - start )
+//               rangeSearch( shape )
+//
+//            case Span.Until( stop ) =>
+//               val shape = LongRectangle( MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_SIDE )
+//               rangeSearch( shape )
+//
+//            case Span.All  => tree.iterator
+//            case Span.Void => txn.Iterator.empty
+//         }
+//      }
+
+//      final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+//         if( start == Span.Void || stop == Span.Void ) return txn.Iterator.empty
+//
+//         val startP  = searchSpanToPoint( start )
+//         val stopP   = searchSpanToPoint( stop  )
+//         val shape   = LongRectangle( startP.x, stopP.x, startP.y - startP.x /* + 1 */, stopP.y - stopP.x /* + 1 */)
+////println( "RANGE " + shape )
+//         rangeSearch( shape )
+//      }
+
+//      // this can be easily implemented with two rectangular range searches
+//      final def eventsAt( time: Long )( implicit tx: S#Tx ) : (txn.Iterator[ S#Tx, Leaf[ S, Elem ]], txn.Iterator[ S#Tx, Leaf[ S, Elem ]]) = {
+//         val startShape = LongRectangle( time, MIN_COORD, 1, MAX_SIDE )
+//         val stopShape  = LongRectangle( MIN_COORD, time, MAX_SIDE, 1 )
+//         (rangeSearch( startShape ), rangeSearch( stopShape ))
+//      }
+
+//      final def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
+//         val point   = LongPoint2D( time, time ) // + 1
+//         val span    = tree.nearestNeighborOption( point, advanceNNMetric ).map( _._1 ).getOrElse( Span.Void )
+//         span match {
+//            case sp @ Span.From( start ) => assert( start >= time, sp ); Some( start ) // else None
+//            case sp @ Span.Until( stop ) => assert( stop  >= time, sp ); Some( stop  ) // else None
+//            case sp @ Span( start, stop ) =>
+//               if( start >= time ) {
+//                  Some( start )
+//               } else {
+//                  assert( stop >= time, sp ); Some( stop )
+//               }
+//            case _ => None // All or Void
+//         }
+//      }
+
+//      final def nearestEventBefore( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = {
+//         val point   = LongPoint2D( time, time )
+//         val span    = tree.nearestNeighborOption( point, regressNNMetric ).map( _._1 ).getOrElse( Span.Void )
+//         span match {
+//            case sp @ Span.From( start ) => assert( start <= time, sp ); Some( start ) // else None
+//            case sp @ Span.Until( stop ) => assert( stop  <= time, sp ); Some( stop  ) // else None
+//            case sp @ Span( start, stop ) =>
+//               if( stop <= time ) {
+//                  Some( stop )
+//               } else {
+//                  assert( start <= time, sp ); Some( start )
+//               }
+//            case _ => None // All or Void
+//         }
+//      }
+
+//      private def rangeSearch( shape: LongRectangle )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+//         val res = tree.rangeQuery( shape ) // .flatMap ....
+////if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
+//         res
+//      }
+
+      final def collectionChanged : Event[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]] = CollChanged
+      final def elementChanged    : Event[ S, BiPin.Element[    S, Elem, U ], BiPin[ S, Elem, U ]] = ElemChanged
+      final def changed           : Event[ S, BiPin.Update[     S, Elem, U ], BiPin[ S, Elem, U ]] = Changed
    }
+
+   private final class ImplNew[ S <: Sys[ S ], Elem, U ]( protected val targets: evt.Targets[ S ],
+                                                          protected val tree: Tree[ S, Elem ],
+                                                          protected val eventView: Elem => EventLike[ S, U, Elem ])
+                                                        ( implicit protected val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                          protected val timeType: Type[ Long ])
+   extends Impl[ S, Elem, U ]
 }

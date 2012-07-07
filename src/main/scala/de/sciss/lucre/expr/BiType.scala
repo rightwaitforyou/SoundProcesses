@@ -61,7 +61,7 @@ trait BiType[ A ] extends Type[ A ] {
    }
 
    private final class Projection[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
-                                                   bi: BiPin[ S, A ], ts: Expr[ S, Long ])
+                                                   bi: BiPin[ S, Expr[ S, A ], Change[ A ]], ts: Expr[ S, Long ])
       extends Expr.Node[ S, A ] {
       def reader: event.Reader[ S, Ex[ S ]] = serializer[ S ]
 
@@ -74,7 +74,7 @@ trait BiType[ A ] extends Type[ A ] {
       }
 
 //      def value( implicit tx: S#Tx ): A = bi.value( tx, ts )
-      def value( implicit tx: S#Tx ): A = bi.valueAt( ts.value )
+      def value( implicit tx: S#Tx ): A = bi.at( ts.value ).value
 
       private[lucre] def connect()( implicit tx: S#Tx ) {
 //println( "CONNECT CURSOR" )
@@ -125,7 +125,7 @@ trait BiType[ A ] extends Type[ A ] {
             case (_, Some( tch )) =>
                val before  = cache.get
 //               val before  = bi.value( tch.before )
-               val now     = bi.valueAt( tch.now )
+               val now     = bi.at( tch.now )
 //println( "CACHE WAS " + before + " NOW (AT " + tch.now + ") IS " + now )
                cache.set( now )
                change( before, now )

@@ -86,10 +86,10 @@ object ProcImpl {
 
       protected def graphVar : S#Var[ SynthGraph ]
 //      protected def playing_# : Expr.Var[ S, Boolean ]
-      protected def playing_# : BiPin.Var[ S, Boolean ]
+      protected def playing_# : BiPin.ExprVar[ S, Boolean ]
       protected def name_# : Expr.Var[ S, String ]
 //      protected def freq_# : Expr.Var[ S, Double ]
-      protected def freq_# : BiPin.Var[ S, Double ]
+      protected def freq_# : BiPin.ExprVar[ S, Double ]
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
          name_#.get

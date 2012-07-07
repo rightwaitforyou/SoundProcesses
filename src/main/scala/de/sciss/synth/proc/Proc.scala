@@ -44,10 +44,10 @@ object Proc {
    sealed trait Update[ S <: Sys[ S ]] {
       def proc: Proc[ S ]
    }
-   final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends Update[ S ]
-   final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends Update[ S ]
-   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Update[ Boolean ])  extends Update[ S ]
-   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.Update[ Double ])   extends Update[ S ]
+   final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends Update[ S ]
+   final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends Update[ S ]
+   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Boolean ])   extends Update[ S ]
+   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._

@@ -136,7 +136,7 @@ object BiGroupImpl {
 //   with evt.Compound[ S, Impl[ S, Elem, U ], Impl.type ]
 //   with evt.Trigger.Impl[ S, BiGroup.Update[ S, Elem, U ], BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
 //   with evt.StandaloneLike[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-   with evt.Node[ S ]
+//   with evt.Node[ S ]
    {
       group =>
 
