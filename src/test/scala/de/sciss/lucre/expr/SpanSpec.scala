@@ -17,6 +17,7 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
    val svoid   = Span.void
    val sseq    = IIdxSeq[ SpanLike ]( span1, span2, span3, sfrom, suntl, salle, svoid )
    val spans   = IIdxSeq( span1, span2, span3 )
+   val open    = IIdxSeq( sfrom, suntl, salle )
    val sseqi   = sseq.zipWithIndex
    val sseq2   = sseq ++ IIdxSeq( span4, span5, span6 )
    val pos     = IIdxSeq( 25, 30, 35, 40, 45, 50, 55 )
@@ -86,12 +87,6 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       span1,  span11, span8,  from31, suntl,  salle, span6, span4,  span10, span6      // span6
    )
 
-   //   val span1   = Span( 30, 40 )
-   //   val span2   = Span( 40, 50 )
-   //   val span3   = Span( 40, 40 )
-   //   val span4   = Span( 30, 50 )
-   //   val span5   = Span( 35, 45 )
-   //   val span6   = Span( 31, 39 )
    val span12 = Span(35,40)
    val span13 = Span(40,45)
    val span14 = Span(35,39)
@@ -107,6 +102,26 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       span1,  span2,  span3,  span2,  span1,  span4, svoid, span4,  span5,  span6,     // span4
       span12, span13, span3,  span13, span12, span5, svoid, span5,  span5,  span14,    // span5
       span6,  svoid,  svoid,  svoid,  span6,  span6, svoid, span6,  span14, span6      // span6
+   )
+
+   //   val span1   = Span( 30, 40 )
+   //   val span2   = Span( 40, 50 )
+   //   val span3   = Span( 40, 40 )
+   //   val span4   = Span( 30, 50 )
+   //   val span5   = Span( 35, 45 )
+   //   val span6   = Span( 31, 39 )
+   val msub1 = IIdxSeq(
+   // sfrom   suntl   salle
+      span1,  span3,  svoid,  // span1
+      span3,  span2,  svoid,  // span2
+      span3,  span3,  svoid,  // span3
+      span3,  sfrom,  svoid,  // sfrom
+      suntl,  span3,  svoid,  // suntl
+      suntl,  sfrom,  svoid,  // salle
+      svoid,  svoid,  svoid,  // svoid
+      span1,  span2,  svoid,  // span4
+      span12, span13, svoid,  // span5
+      span6,  svoid,  svoid   // span6
    )
 
    "A SpanLike" should "be consistently test for equality" in {
@@ -263,7 +278,18 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       }
    }
 
-   // intersect, subtract
+   it should "correctly answer `subtract` with respect to other spans" in {
+      msub1.zipWithIndex.foreach { case (res, idx) =>
+         val row     = idx / open.size
+         val col     = idx % open.size
+         val res1    = sseq2( row ).subtract( open( col ))
+         val touches = sseq2( row ).touches( open( col ))
+//         val contains = open( col ).contains( sseq2( row ))
+//println( "" + row + " - " + col + " -> " + sseq2( row ) + ".subtract(" + open( col ) + ") = " + res1 )
+         res1 should equal (res)
+         if( !touches ) res1 should equal (sseq2( row ))
+      }
+   }
 
    "A Span.Open" should "produce a correct `invert`" in {
       sfrom.invert should equal (suntl)

@@ -128,7 +128,7 @@ object Span {
 
       def subtract( that: Span.Open ) : SpanLike = that match {
          case Span.From( thatStart ) =>
-            if( thatStart > start ) Span( start, thatStart ) else Span.Void
+            if( thatStart >= start ) Span( start, thatStart ) else Span.Void
          case Span.Until( thatStop ) if thatStop > start => From( thatStop )
          case Span.All   => Span.Void
          case _          => this
@@ -202,7 +202,7 @@ object Span {
       def subtract( that: Span.Open ) : SpanLike = that match {
          case Span.From( thatStart ) if thatStart < stop => Until( thatStart )
          case Span.Until( thatStop ) =>
-            if( thatStop < stop ) Span( thatStop, stop ) else Span.Void
+            if( thatStop <= stop ) Span( thatStop, stop ) else Span.Void
          case Span.All   => Span.Void
          case _          => this
       }
@@ -227,6 +227,10 @@ object Span {
       }
    }
    sealed trait Closed extends SpanLike {
+      /**
+       * The span's length. For a void span, this is zero, otherwise it is
+       * `stop - start`.
+       */
       def length: Long
    
       def shift( delta: Long ) : Closed
@@ -336,9 +340,9 @@ object Span {
 
       def subtract( that: Span.Open ) : Span.Closed = that match {
          case Span.From( thatStart ) if thatStart < stop =>
-            if( thatStart > start ) Span( start, thatStart ) else Span.Void
+            if( thatStart >= start ) Span( start, thatStart ) else Span.Void
          case Span.Until( thatStop ) if( thatStop > start ) =>
-            if( thatStop < stop ) Span( thatStop, stop ) else Span.Void
+            if( thatStop <= stop ) Span( thatStop, stop ) else Span.Void
          case Span.All   => Span.Void
          case _          => this
       }
@@ -357,7 +361,7 @@ object Span {
                IIdxSeq( Span( start, thatStart ), Span( thatStop, stop ))
             }
          case Span.All   => IIdxSeq.empty
-         case _          => IIdxSeq( this )
+         case _          => if( isEmpty ) IIdxSeq.empty else IIdxSeq( this )
       }
 
    //   // where overlapping results in negative spacing
@@ -393,27 +397,56 @@ object SpanLike {
    }
 }
 sealed trait SpanLike extends Writer {
+   /**
+    * Clips a position to this span's boundary. Note that
+    * the span's stop position is included. Thus the result
+    * is greater than or equal the start, and less than or equal (!)
+    * the stop.
+    *
+    * For the special cases of `Span.All` and `Span.Void`, this
+    * method returns the argument unchanged.
+    *
+    * @param pos  the point to clip
+    * @return     the clipped point
+    */
    def clip( pos: Long ) : Long
+
+   /**
+    * Shifts the span, that is applies an offset to its start and stop.
+    * For single sided open spans (`Span.From` and `Span.Until`) this
+    * alters the only bounded value. For `Span.All` and `Span.Void`
+    * this returns the object unchanged.
+    *
+    * @param delta   the shift amount (the amount to be added to the span's positions)
+    * @return  the shifted span
+    */
    def shift( delta: Long ) : SpanLike
 
    /**
-    *  Checks if the span is empty.
+    *  Checks if the span is empty. A span is empty if it is
+    *  a `Span` with `start == stop` or if it is void.
     *
     *  @return		<code>true</code>, if <code>start == stop</code>
     */
    def isEmpty : Boolean
 
+   /**
+    * Checks if the span is non empty. This is exactly the opposite
+    * value of `isEmpty`.
+    */
    def nonEmpty : Boolean
 
    /**
-    *  Checks if a position lies within the span.
+    *  Checks if a position lies within the span. Note that this returns
+    *  `false` if `this.stop == pos`.
     *
     *  @return		<code>true</code>, if <code>start <= pos < stop</code>
     */
    def contains( pos: Long ) : Boolean
 
    /**
-    *  Checks if another span lies within the span.
+    *  Checks if another span lies within the span. The result is `false`
+    *  if either of the two spans is void.
     *
     *	@param	that	second span, may be <code>null</code> (in this case returns <code>false</code>)
     *  @return		`true`, if `that.start >= this.span && that.stop <= this.stop`
@@ -421,7 +454,11 @@ sealed trait SpanLike extends Writer {
    def contains( that: SpanLike ) : Boolean
 
    /**
-    *  Checks if a two spans overlap each other.
+    *  Checks if a two spans overlap each other. Two spans overlap if the overlapping area
+    *  is greater than or equal to 1. This implies that if either span is empty, the result
+    *  will be `false`.
+    *
+    *  This method is commutative (`a overlaps b == b overlaps a`).
     *
     *	@param	that	second span
     *  @return		<code>true</code>, if the spans
@@ -430,22 +467,70 @@ sealed trait SpanLike extends Writer {
    def overlaps( that: SpanLike ) : Boolean
 
    /**
-    *  Checks if a two spans overlap or touch each other.
+    *  Checks if a two spans overlap or touch each other. Two spans touch each other if
+    *  they either overlap or they share a common point with each other (this span's start or stop
+    *  is that span's start or stop).
+    *
+    *  This method is commutative (`a touches b == b touches a`).
     *
     *	@param	that	second span
-    *  @return		<code>true</code>, if the spans
-    *				overlap each other
+    * @return	`true`, if the spans touch each other
     */
    def touches( that: SpanLike ) : Boolean
 
+   /**
+    * Constructs a single span which contains both `this` and `that` span. If the two spans
+    * are disjoint, the result will be a span with `start = min(this.start, that.start)` and
+    * `stop = max(this.stop, that.stop)`. If either span is void, the other span is returned.
+    * If either span is `Span.All`, `Span.All` will be returned.
+    *
+    *  This method is commutative (`a union b == b union a`).
+    *
+    * @param that the span to form the union with
+    * @return  the encompassing span
+    */
    def union( that: SpanLike ) : SpanLike
+
+   /**
+    * Construct the intersection between this and another span. If the two spans are
+    * disjoint, the result will be empty. An empty result may be a `Span` if the two spans
+    * touched each other, or `Span.Void` if they did not touch each other. If either span is
+    * `Span.All`, the other span is returned. If either span is void, `Span.Void` will be
+    * returned.
+    *
+    *  This method is commutative (`a intersect b == b intersect a`).
+    *
+    * @param that the span to form the intersection with
+    * @return  the intersection span (possibly empty)
+    */
    def intersect( that: SpanLike ) : SpanLike
 
+   /**
+    * Subtracts a given span from this span.
+    *
+    * @param that the span to subtract
+    * @return  a collection of spans after the argument was subtracted. Unlike `intersect`, this method
+    *          filters out empty spans, thus a span subtracted from itself produces an empty collection.
+    *          if `that` is a `Span`, the result might be two disjoint spans.
+    */
    def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ]
+
+   /**
+    * Substracts a given open span from this span.
+    *
+    * @param that the span to subtract
+    * @return the reduced span, possibly empty or void
+    */
    def subtract( that: Span.Open ) : SpanLike
 }
 sealed trait Span extends Span.Closed {
+   /**
+    * @return  the start position of the span. this is considered included in the interval
+    */
    def start: Long
+   /**
+    * @return  the stop position of the span. this is considered excluded in the interval
+    */
    def stop: Long
    def shift( delta: Long ) : Span
 }
