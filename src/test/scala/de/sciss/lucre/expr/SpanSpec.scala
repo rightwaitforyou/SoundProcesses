@@ -75,7 +75,7 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
    val munion = IIdxSeq(
    // span1   span2   span3   sfrom   suntl   salle  svoid  span4   span5   span6
       span1,  span4,  span1,  from30, suntl,  salle, span1, span4,  span7,  span1,     // span1
-      span4,  span2,  span2,  sfrom,  untl50, salle, span2, span4 , span9,  span11,    // span2
+      span4,  span2,  span2,  sfrom,  untl50, salle, span2, span4,  span9,  span11,    // span2
       span1,  span2,  span3,  sfrom,  suntl,  salle, span3, span4,  span5,  span8,     // span3
       from30, sfrom,  sfrom,  sfrom,  salle,  salle, sfrom, from30, from35, from31,    // sfrom
       suntl,  untl50, suntl,  salle,  suntl,  salle, suntl, untl50, untl45, suntl,     // suntl
@@ -92,6 +92,22 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
    //   val span4   = Span( 30, 50 )
    //   val span5   = Span( 35, 45 )
    //   val span6   = Span( 31, 39 )
+   val span12 = Span(35,40)
+   val span13 = Span(40,45)
+   val span14 = Span(35,39)
+   val msect = IIdxSeq(
+   // span1   span2   span3   sfrom   suntl   salle  svoid  span4   span5   span6
+      span1,  span3,  span3,  span3,  span1,  span1, svoid, span1,  span12, span6,     // span1
+      span3,  span2,  span3,  span2,  span3,  span2, svoid, span2,  span13, svoid,     // span2
+      span3,  span3,  span3,  span3,  span3,  span3, svoid, span3,  span3,  svoid,     // span3
+      span3,  span2,  span3,  sfrom,  span3,  sfrom, svoid, span2,  span13, svoid,     // sfrom
+      span1,  span3,  span3,  span3,  suntl,  suntl, svoid, span1,  span12, span6,     // suntl
+      span1,  span2,  span3,  sfrom,  suntl,  salle, svoid, span4,  span5,  span6,     // salle
+      svoid,  svoid,  svoid,  svoid,  svoid,  svoid, svoid, svoid,  svoid,  svoid,     // svoid
+      span1,  span2,  span3,  span2,  span1,  span4, svoid, span4,  span5,  span6,     // span4
+      span12, span13, span3,  span13, span12, span5, svoid, span5,  span5,  span14,    // span5
+      span6,  svoid,  svoid,  svoid,  span6,  span6, svoid, span6,  span14, span6      // span6
+   )
 
    "A SpanLike" should "be consistently test for equality" in {
       sseqi.foreach { case (s1, idx1) =>
@@ -228,6 +244,22 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
          res1 should equal (commut)                // commutative
 //         if( !touches ) res1 should equal (svoid)
          if( contains ) res1 should equal (sseq2( row ))
+      }
+   }
+
+   it should "correctly answer `intersect` with respect to other spans" in {
+      msect.zipWithIndex.foreach { case (res, idx) =>
+         val row     = idx / sseq2.size
+         val col     = idx % sseq2.size
+         val res1    = sseq2( row ).intersect( sseq2( col ))
+         val commut  = sseq2( col ).intersect( sseq2( row ))
+         val touches = sseq2( row ).touches( sseq2( col ))
+         val contains = sseq2( row ).contains( sseq2( col ))
+//println( "" + row + " - " + col )
+         res1 should equal (res)
+         res1 should equal (commut)                // commutative
+         if( !touches ) res1 should equal (svoid)
+         if( contains ) res1 should equal (sseq2( col ))
       }
    }
 
