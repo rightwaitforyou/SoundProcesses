@@ -104,12 +104,6 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       span6,  svoid,  svoid,  svoid,  span6,  span6, svoid, span6,  span14, span6      // span6
    )
 
-   //   val span1   = Span( 30, 40 )
-   //   val span2   = Span( 40, 50 )
-   //   val span3   = Span( 40, 40 )
-   //   val span4   = Span( 30, 50 )
-   //   val span5   = Span( 35, 45 )
-   //   val span6   = Span( 31, 39 )
    val msub1 = IIdxSeq(
    // sfrom   suntl   salle
       span1,  span3,  svoid,  // span1
@@ -122,6 +116,33 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
       span1,  span2,  svoid,  // span4
       span12, span13, svoid,  // span5
       span6,  svoid,  svoid   // span6
+   )
+
+   val span15 = Span(30,35)
+   val span16 = Span(30,31)
+   val span17 = Span(39,40)
+   val span18 = Span(45,50)
+   val span19 = Span(39,50)
+   val span20 = Span(39,45)
+   val span21 = Span(31,35)
+   val from39 = Span.from(39)
+   val from45 = Span.from(45)
+   val from50 = Span.from(50)
+   val untl30 = Span.until(30)
+   val untl31 = Span.until(31)
+   val untl35 = Span.until(35)
+   val msub2 = IIdxSeq(
+   // span1              span2              span3               sfrom        suntl        salle  svoid       span4               span5               span6
+      Nil,               Seq(span1),        Seq(span1),         Seq(span1),  Nil,         Nil,   Seq(span1), Nil,                Seq(span15),        Seq(span16,span17), // span1
+      Seq(span2),        Nil,               Seq(span2),         Nil,         Seq(span2),  Nil,   Seq(span2), Nil,                Seq(span18),        Seq(span2),         // span2
+      Nil,               Nil,               Nil,                Nil,         Nil,         Nil,   Nil,        Nil,                Nil,                Nil,                // span3
+      Seq(sfrom),        Seq(from50),       Seq(sfrom),         Nil,         Seq(sfrom),  Nil,   Seq(sfrom), Seq(from50),        Seq(from45),        Seq(sfrom),         // sfrom
+      Seq(untl30),       Seq(suntl),        Seq(suntl),         Seq(suntl),  Nil,         Nil,   Seq(suntl), Seq(untl30),        Seq(untl35),        Seq(untl31,span17), // suntl
+      Seq(untl30,sfrom), Seq(suntl,from50), Seq(suntl,sfrom),   Seq(suntl),  Seq(sfrom),  Nil,   Seq(salle), Seq(untl30,from50), Seq(untl35,from45), Seq(untl31,from39), // salle
+      Nil,               Nil,               Nil,                Nil,         Nil,         Nil,   Nil,        Nil,                Nil,                Nil,                // svoid
+      Seq(span2),        Seq(span1),        Seq(span1,span2),   Seq(span1),  Seq(span2),  Nil,   Seq(span4), Nil,                Seq(span15,span18), Seq(span16,span19), // span4
+      Seq(span13),       Seq(span12),       Seq(span12,span13), Seq(span12), Seq(span13), Nil,   Seq(span5), Nil,                Nil,                Seq(span20),        // span5
+      Nil,               Seq(span6),        Seq(span6),         Seq(span6),  Nil,         Nil,   Seq(span6), Nil,                Seq(span21),        Nil
    )
 
    "A SpanLike" should "be consistently test for equality" in {
@@ -288,6 +309,14 @@ class SpanSpec extends FlatSpec with ShouldMatchers {
 //println( "" + row + " - " + col + " -> " + sseq2( row ) + ".subtract(" + open( col ) + ") = " + res1 )
          res1 should equal (res)
          if( !touches ) res1 should equal (sseq2( row ))
+      }
+
+      msub2.zipWithIndex.foreach { case (res, idx) =>
+         val row     = idx / sseq2.size
+         val col     = idx % sseq2.size
+         val res1    = sseq2( row ).subtract( sseq2( col ))
+//println( "" + row + " - " + col + " -> " + sseq2( row ) + ".subtract(" + sseq2( col ) + ") = " + res1 )
+         res1 should equal (res)
       }
    }
 

@@ -74,7 +74,13 @@ object Span {
       def touches( that: SpanLike )    = that != Void
 
       def subtract( that: Span.Open ) : SpanLike = that.invert
-      def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ] = IIdxSeq.empty
+      def subtract( that: SpanLike ) : IIdxSeq[ SpanLike ] = that match {
+         case Span( start, stop )   => IIdxSeq( Until( start ), From( stop ))
+         case From( start )         => IIdxSeq( Until( start ))
+         case Until( stop )         => IIdxSeq( From( stop ))
+         case All                   => IIdxSeq.empty
+         case Void                  => IIdxSeq( this )
+      }
 
       def write( out: DataOutput ) {
          out.writeUnsignedByte( 3 )
@@ -506,7 +512,8 @@ sealed trait SpanLike extends Writer {
    def intersect( that: SpanLike ) : SpanLike
 
    /**
-    * Subtracts a given span from this span.
+    * Subtracts a given span from this span. Note that an empty span argument "cuts" this span,
+    * e.g. `Span.all subtract Span(30,30) == Seq(Span.until(30),Span.from(30))`
     *
     * @param that the span to subtract
     * @return  a collection of spans after the argument was subtracted. Unlike `intersect`, this method
