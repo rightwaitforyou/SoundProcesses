@@ -28,6 +28,7 @@ package impl
 
 import concurrent.stm.{Ref => ScalaRef}
 import de.sciss.synth.{addToHead, ControlSetMap, Server, SynthGraph}
+import collection.breakOut
 
 object AuralProc {
 //   implicit object Serializer extends stm.Serializer[ AuralProc ] {
@@ -38,11 +39,11 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( server: Server, initName: String, initGraph: SynthGraph, initFreq: Double ) : AuralProc = {
-      new Impl( server, initName, initGraph, initFreq )
+   def apply( server: Server, initName: String, initGraph: SynthGraph, entries: Map[ String, Param ]) : AuralProc = {
+      new Impl( server, initName, initGraph, entries )
    }
 
-   private final class Impl( val server: Server, name0: String, graph0: SynthGraph, freq0: Double )
+   private final class Impl( val server: Server, name0: String, graph0: SynthGraph, entries0: Map[ String, Param ])
    extends AuralProc {
 
       private val groupRef    = ScalaRef( Option.empty[ RichGroup ])
@@ -51,7 +52,8 @@ object AuralProc {
       private val graphRef    = ScalaRef( graph0 )
 //      private val synthDefRef = ScalaRef( Option.empty[ RichSynthDef ])
 
-      private val freqRef     = ScalaRef( freq0 )
+//      private val freqRef     = ScalaRef( freq0 )
+      private val entriesRef  = ScalaRef( entries0 )
 
       def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
       def graph( implicit tx: ProcTxn ) : SynthGraph          = graphRef.get( tx.peer )
@@ -70,14 +72,15 @@ object AuralProc {
          val gr         = graph
          val df         = ProcDemiurg.getSynthDef( server, gr )
 
+         implicit val itx = tx.peer
          val target     = RichGroup.default( server )
          val addAction  = addToHead
-         val args: Seq[ ControlSetMap ] = Seq( "freq" -> freq.toFloat )
+         val args: Seq[ ControlSetMap ] = entriesRef.get.map( tup => tup: ControlSetMap )( breakOut )
          val bufs       = Seq.empty[ RichBuffer ]
 
          val synth      = df.play( target, args, addAction, bufs )
 
-         val old        = synthRef.swap( Some( synth ))( tx.peer )
+         val old        = synthRef.swap( Some( synth ))
          old.foreach( _.free() )
       }
 
@@ -91,14 +94,14 @@ object AuralProc {
          if( p ) play() else stop()
       }
 
-      def freq( implicit tx: ProcTxn ) : Double = freqRef.get( tx.peer )
-      def freq_=( f: Double )( implicit tx: ProcTxn ) {
-         implicit val itx = tx.peer
-         val old = freqRef.swap( f )
-         if( f != old ) {
-            synthRef.get.foreach( _.set( true, "freq" -> f ))
-         }
-      }
+//      def freq( implicit tx: ProcTxn ) : Double = freqRef.get( tx.peer )
+//      def freq_=( f: Double )( implicit tx: ProcTxn ) {
+//         implicit val itx = tx.peer
+//         val old = freqRef.swap( f )
+//         if( f != old ) {
+//            synthRef.get.foreach( _.set( true, "freq" -> f ))
+//         }
+//      }
    }
 }
 sealed trait AuralProc /* extends Writer */ {
@@ -114,6 +117,6 @@ sealed trait AuralProc /* extends Writer */ {
    def graph( implicit tx: ProcTxn ) : SynthGraph
    def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) : Unit
 
-   def freq( implicit tx: ProcTxn ) : Double
-   def freq_=( f: Double )( implicit tx: ProcTxn ) : Unit
+//   def freq( implicit tx: ProcTxn ) : Double
+//   def freq_=( f: Double )( implicit tx: ProcTxn ) : Unit
 }

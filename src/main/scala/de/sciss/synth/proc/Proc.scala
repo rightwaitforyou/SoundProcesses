@@ -47,9 +47,8 @@ object Proc {
    final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends Update[ S ]
    final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends Update[ S ]
    final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Boolean ])   extends Update[ S ]
-   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
-
-//   final case class ParamChanged
+//   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
+   final case class ParamChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Param ])     extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
@@ -75,8 +74,8 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    // ---- controls preview demo ----
 
 //   def freq_# : Expr.Var[ S, Double ]
-   def freq( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Double ]
-   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
+//   def freq( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Double ]
+//   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
    def par: ParamMap[ S ]
 
@@ -94,8 +93,8 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def renamed:         evt.Event[ S, Rename[ S ],         Proc[ S ]]
    def graphChanged:    evt.Event[ S, GraphChange[ S ],    Proc[ S ]]
    def playingChanged:  evt.Event[ S, PlayingChange[ S ],  Proc[ S ]]
-
-   def freqChanged:     evt.Event[ S, FreqChange[ S ],     Proc[ S ]]
+   def paramChanged:    evt.Event[ S, ParamChange[ S ],    Proc[ S ]]
+//   def freqChanged:     evt.Event[ S, FreqChange[ S ],     Proc[ S ]]
 
    def changed:         evt.Event[ S, Update[ S ],         Proc[ S ]]
 }

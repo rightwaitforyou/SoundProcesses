@@ -167,8 +167,8 @@ object AuralPresentationImpl {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
          val name    = p.name.value
          val graph   = p.graph
-         val freq    = p.freq.value
-         val aural   = AuralProc( server, name, graph, freq )
+         val entries = p.par.entriesAt( chr.time )
+         val aural   = AuralProc( server, name, graph, entries )
          viewMap.put( p.id, aural )
          val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )
@@ -226,15 +226,15 @@ object AuralPresentationImpl {
          }
       }
 
-      def procFreqChanged( p: Proc[ S ], newFreq: Double )( implicit tx: S#Tx ) {
-         viewMap.get( p.id ) match {
-            case Some( aural ) =>
-               implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural freq changed " + p )
-               aural.freq = newFreq
-            case _ =>
-               println( "WARNING: could not find view for proc " + p )
-         }
-      }
+//      def procFreqChanged( p: Proc[ S ], newFreq: Double )( implicit tx: S#Tx ) {
+//         viewMap.get( p.id ) match {
+//            case Some( aural ) =>
+//               implicit val ptx = ProcTxn()( tx.peer )
+//               logConfig( "aural freq changed " + p )
+//               aural.freq = newFreq
+//            case _ =>
+//               println( "WARNING: could not find view for proc " + p )
+//         }
+//      }
    }
 }

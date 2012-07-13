@@ -81,7 +81,8 @@ object ProcImpl {
       declare[ Rename[        S ]]( _.renamed        )
       declare[ GraphChange[   S ]]( _.graphChanged   )
       declare[ PlayingChange[ S ]]( _.playingChanged )
-      declare[ FreqChange[    S ]]( _.freqChanged    )
+//      declare[ FreqChange[    S ]]( _.freqChanged    )
+      declare[ ParamChange[    S ]]( _.paramChanged )
    }
 
    private sealed trait Impl[ S <: Sys[ S ]]
@@ -141,9 +142,13 @@ object ProcImpl {
 
       final def apply( key: String )( implicit tx: S#Tx ) : BiPin.Expr[ S, Param ] = get( key ).get
 
-      final def keys( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, String ] = txn.Iterator.wrap(
-         graphKeys( graph ).iterator
-      )
+      final def keys( implicit tx: S#Tx ) : Set[ String ] = graphKeys( graph )
+
+      final def entriesAt( time: Long )( implicit tx: S#Tx ) : Map[ String, Param ] = {
+         keys.flatMap( key => {
+            parMap.get( key ).map( bi => key -> bi.at( time ).value )
+         })( breakOut )
+      }
 
       private def graphKeys( g: SynthGraph ) : Set[ String ] = g.controlProxies.flatMap( _.name )
 
@@ -183,8 +188,9 @@ object ProcImpl {
       final def renamed             = name_#.changed.map( Rename( this, _ ))
       final def graphChanged        = event[ GraphChange[ S ]]
       final def playingChanged      = playing_#.changed.map( PlayingChange( this, _ ))
-      final def freqChanged         = freq_#.changed.map( FreqChange( this, _ ))
-      final def changed             = renamed | graphChanged | playingChanged | freqChanged
+//      final def freqChanged         = freq_#.changed.map( FreqChange( this, _ ))
+      final def paramChanged        = event[ ParamChange[ S ]]
+      final def changed             = renamed | graphChanged | playingChanged | paramChanged
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )

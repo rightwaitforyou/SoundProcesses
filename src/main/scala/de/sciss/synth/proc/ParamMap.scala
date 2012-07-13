@@ -13,5 +13,6 @@ object ParamMap {
 trait ParamMap[ S <: Sys[ S ]] {
    def apply( key: String )( implicit tx: S#Tx ) : BiPin.Expr[ S, Param ]
    def get( key: String )( implicit tx: S#Tx ) : Option[ BiPin.Expr[ S, Param ]]
-   def keys( implicit tx: S#Tx ): txn.Iterator[ S#Tx, String ]
+   def keys( implicit tx: S#Tx ): Set[ String ] // txn.Iterator[ S#Tx, String ]
+   def entriesAt( time: Long )( implicit tx: S#Tx ) : Map[ String, Param ]
 }
