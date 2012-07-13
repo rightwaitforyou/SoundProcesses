@@ -34,6 +34,8 @@ import de.sciss.lucre.stm.{InMemory, Sys}
 import ExprImplicits._
 import de.sciss.lucre.expr.{Chronos, BiPin, Expr}
 import de.sciss.collection.txn
+import collection.breakOut
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object ProcImpl {
    private val SER_VERSION = 1
@@ -112,14 +114,15 @@ object ProcImpl {
 //         playing_#.set( b )
          playing_#.add( chr.time, b )
       }
-      final def graph( implicit tx: S#Tx ) : SynthGraph = {
-         graphVar.get
-      }
+
+      final def graph( implicit tx: S#Tx ) : SynthGraph = graphVar.get
+
       final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) {
          val old = graphVar.get
          if( old != g ) {
             graphVar.set( g )
             graphChanged( GraphChange( this, evt.Change( old, g )))
+            updatePars( old, g )
          }
       }
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
@@ -138,7 +141,21 @@ object ProcImpl {
 
       final def apply( key: String )( implicit tx: S#Tx ) : BiPin.Expr[ S, Param ] = get( key ).get
 
-      final def keys( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, String ] = sys.error( "TODO" )
+      final def keys( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, String ] = txn.Iterator.wrap(
+         graphKeys( graph ).iterator
+      )
+
+      private def graphKeys( g: SynthGraph ) : Set[ String ] = g.controlProxies.flatMap( _.name )
+
+      private def updatePars( oldGraph: SynthGraph, newGraph: SynthGraph )( implicit tx: S#Tx ) {
+         val oldNames   = graphKeys( oldGraph )
+         val newNames   = graphKeys( newGraph )
+         val removed    = oldNames -- newNames
+         val added      = newNames -- oldNames
+         if( removed.nonEmpty || added.nonEmpty ) {
+
+         }
+      }
 
 //      protected def freqVar : S#Var[ Expr[ S, Double ]]
 
@@ -196,12 +213,12 @@ object ProcImpl {
       protected val targets   = evt.Targets[ S ]( tx0 )
 
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
-      protected val playing_# = BiPin.newConfluentVar[ S, Boolean ]( true )( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
+      protected val playing_# = BiPin.newConfluentExprVar[ S, Boolean ]( true )( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
 //      protected val freqVar   = {
 //         implicit val peerSer = Doubles.serializer[ S ]
 //         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
 //      }
-      protected val freq_#    = BiPin.newConfluentVar[ S, Double ]( 441 )( tx0, Doubles ) // Doubles.newConfluentVar[ S ]( 441 )( tx0 )
+      protected val freq_#    = BiPin.newConfluentExprVar[ S, Double ]( 441 )( tx0, Doubles ) // Doubles.newConfluentVar[ S ]( 441 )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
 
       protected val parMap    = {

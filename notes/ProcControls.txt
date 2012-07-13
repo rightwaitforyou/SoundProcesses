@@ -14,3 +14,5 @@ control
 txn.Map[String,A]
 
 could use skiplist with String#hashCode as key
+
+val names = t { implicit tx => val p = proc( "Hallo" ); val keys = p.par.keys; group.add( Span( 3.sec, 6.sec ), p ); keys.toList }

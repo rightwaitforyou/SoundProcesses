@@ -48,12 +48,20 @@ object BiPinImpl {
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       timeType: Type[ Long ]) : Var[ S, Elem, U ] = {
 
-//      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
-//      implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
       implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, Long ]] = timeType.serializer[ S ]
       val tree: Tree[ S, Elem ] = SkipList.Map.empty[ S, Long, Leaf[ S, Elem ]]()
       tree += MIN_TIME -> IIdxSeq( timeType.newConst( MIN_TIME ) -> default )
       new ImplNew( evt.Targets[ S ], tree, eventView )
+   }
+
+   def newConfluentGenericVar[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      timeType: Type[ Long ]) : Var[ S, Elem, U ] = {
+
+      implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, Long ]] = timeType.serializer[ S ]
+      val tree: Tree[ S, Elem ] = SkipList.Map.empty[ S, Long, Leaf[ S, Elem ]]()
+      tree += MIN_TIME -> IIdxSeq( timeType.newConst( MIN_TIME ) -> default )
+      new ImplNew( evt.Targets.partial[ S ], tree, eventView )
    }
 
    def readVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )

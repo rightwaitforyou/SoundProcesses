@@ -83,10 +83,10 @@ object BiPin {
    def newExprVar[ S <: Sys[ S ], A ]( default: Ex[ S, A ])( implicit tx: S#Tx, elemType: BiType[ A ]) : ExprVar[ S, A ] =
       BiPinImpl.newGenericVar[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
 
-   def newConfluentVar[ S <: Sys[ S ], A ]( init: Ex[ S, A ])
-                                       ( implicit tx: S#Tx,
-                                         peerType: BiType[ A ]) : ExprVar[ S, A ] =
-      sys.error( "TODO" ) // BiPinImpl.newConfluentVar( init )
+   def newConfluentExprVar[ S <: Sys[ S ], A ]( default: Ex[ S, A ])
+                                              ( implicit tx: S#Tx,
+                                                elemType: BiType[ A ]) : ExprVar[ S, A ] =
+      BiPinImpl.newConfluentGenericVar[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
 
    def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
                                       ( implicit tx: S#Tx, peerType: BiType[ A ]) : ExprVar[ S, A ] =
