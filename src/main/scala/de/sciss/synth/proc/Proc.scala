@@ -44,10 +44,12 @@ object Proc {
    sealed trait Update[ S <: Sys[ S ]] {
       def proc: Proc[ S ]
    }
-   final case class Renamed[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends Update[ S ]
-   final case class GraphChanged[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends Update[ S ]
-   final case class PlayingChanged[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Boolean ])   extends Update[ S ]
-   final case class FreqChanged[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
+   final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends Update[ S ]
+   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends Update[ S ]
+   final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Boolean ])   extends Update[ S ]
+   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
+
+//   final case class ParamChanged
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
@@ -76,6 +78,8 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def freq( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Double ]
    def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
+   def par: ParamMap[ S ]
+
    /**
     * Same as `playing = true`
     */
@@ -87,11 +91,11 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- events ----
 
-   def renamed:         evt.Event[ S, Renamed[ S ],         Proc[ S ]]
-   def graphChanged:    evt.Event[ S, GraphChanged[ S ],    Proc[ S ]]
-   def playingChanged:  evt.Event[ S, PlayingChanged[ S ],  Proc[ S ]]
+   def renamed:         evt.Event[ S, Rename[ S ],         Proc[ S ]]
+   def graphChanged:    evt.Event[ S, GraphChange[ S ],    Proc[ S ]]
+   def playingChanged:  evt.Event[ S, PlayingChange[ S ],  Proc[ S ]]
 
-   def freqChanged:     evt.Event[ S, FreqChanged[ S ],     Proc[ S ]]
+   def freqChanged:     evt.Event[ S, FreqChange[ S ],     Proc[ S ]]
 
-   def changed:         evt.Event[ S, Update[ S ],          Proc[ S ]]
+   def changed:         evt.Event[ S, Update[ S ],         Proc[ S ]]
 }

@@ -33,6 +33,7 @@ import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.{InMemory, Sys}
 import ExprImplicits._
 import de.sciss.lucre.expr.{Chronos, BiPin, Expr}
+import de.sciss.collection.txn
 
 object ProcImpl {
    private val SER_VERSION = 1
@@ -75,13 +76,17 @@ object ProcImpl {
 
       import Proc._
 
-      declare[ Renamed[        S ]]( _.renamed        )
-      declare[ GraphChanged[   S ]]( _.graphChanged   )
-      declare[ PlayingChanged[ S ]]( _.playingChanged )
-      declare[ FreqChanged[    S ]]( _.freqChanged    )
+      declare[ Rename[        S ]]( _.renamed        )
+      declare[ GraphChange[   S ]]( _.graphChanged   )
+      declare[ PlayingChange[ S ]]( _.playingChanged )
+      declare[ FreqChange[    S ]]( _.freqChanged    )
    }
 
-   private sealed trait Impl[ S <: Sys[ S ]] extends Proc[ S ] with evt.Compound[ S, Proc[ S ], Decl[ S ]] {
+   private sealed trait Impl[ S <: Sys[ S ]]
+   extends Proc[ S ]
+   with evt.Compound[ S, Proc[ S ], Decl[ S ]]
+   with ParamMap[ S ]
+   {
       import Proc._
 
       protected def graphVar : S#Var[ SynthGraph ]
@@ -90,6 +95,8 @@ object ProcImpl {
       protected def name_# : Expr.Var[ S, String ]
 //      protected def freq_# : Expr.Var[ S, Double ]
       protected def freq_# : BiPin.ExprVar[ S, Double ]
+
+      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
          name_#.get
@@ -112,16 +119,26 @@ object ProcImpl {
          val old = graphVar.get
          if( old != g ) {
             graphVar.set( g )
-            graphChanged( GraphChanged( this, evt.Change( old, g )))
+            graphChanged( GraphChange( this, evt.Change( old, g )))
          }
       }
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
       final def play()( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         playing = true
+         playing_=( true )
       }
       final def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         playing = false
+         playing_=( false )
       }
+
+      // ---- ParamMap ----
+
+      final def par: ParamMap[ S ] = this
+
+      final def get( key: String )( implicit tx: S#Tx ) : Option[ BiPin.Expr[ S, Param ]] = sys.error( "TODO" )
+
+      final def apply( key: String )( implicit tx: S#Tx ) : BiPin.Expr[ S, Param ] = get( key ).get
+
+      final def keys( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, String ] = sys.error( "TODO" )
 
 //      protected def freqVar : S#Var[ Expr[ S, Double ]]
 
@@ -146,10 +163,10 @@ object ProcImpl {
          freq_#.add( chr.time, f )
       }
 
-      final def renamed             = name_#.changed.map( Renamed( this, _ ))
-      final def graphChanged        = event[ GraphChanged[ S ]]
-      final def playingChanged      = playing_#.changed.map( PlayingChanged( this, _ ))
-      final def freqChanged         = freq_#.changed.map( FreqChanged( this, _ ))
+      final def renamed             = name_#.changed.map( Rename( this, _ ))
+      final def graphChanged        = event[ GraphChange[ S ]]
+      final def playingChanged      = playing_#.changed.map( PlayingChange( this, _ ))
+      final def freqChanged         = freq_#.changed.map( FreqChange( this, _ ))
       final def changed             = renamed | graphChanged | playingChanged | freqChanged
 
       final protected def writeData( out: DataOutput ) {
@@ -186,12 +203,19 @@ object ProcImpl {
 //      }
       protected val freq_#    = BiPin.newConfluentVar[ S, Double ]( 441 )( tx0, Doubles ) // Doubles.newConfluentVar[ S ]( 441 )( tx0 )
       protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
+
+      protected val parMap    = {
+         implicit val tx      = tx0
+         implicit val parType = Doubles // .serializer[ S ]
+         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
+         txn.SkipList.Map.empty[ S, String, BiPin.Expr[ S, Param ]]
+      }
    }
 
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
                                              tx0: S#Tx )
    extends Impl[ S ] {
-      protected val decl      = getDecl[ S ]( tx0 );
+      protected val decl      = getDecl[ S ]( tx0 )
 
       {
          val serVer = in.readUnsignedByte()
@@ -204,5 +228,12 @@ object ProcImpl {
       protected val playing_# = BiPin.readExprVar[ S, Boolean ]( in, access )( tx0, Booleans )
       protected val freq_#    = BiPin.readExprVar[ S, Double  ]( in, access )( tx0, Doubles  )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
+
+      protected val parMap    = {
+         implicit val tx      = tx0
+         implicit val parType = Doubles // .serializer[ S ]
+         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
+         txn.SkipList.Map.read[ S, String, BiPin.Expr[ S, Param ]]( in, access )
+      }
    }
 }
