@@ -29,6 +29,7 @@ import de.sciss.synth.SynthGraph
 import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{event => evt, DataInput}
 import de.sciss.lucre.expr.{BiPin, Chronos, Expr}
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Proc {
    // ---- implementation forwards ----
@@ -44,11 +45,12 @@ object Proc {
    sealed trait Update[ S <: Sys[ S ]] {
       def proc: Proc[ S ]
    }
-   final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends Update[ S ]
-   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends Update[ S ]
-   final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Boolean ])   extends Update[ S ]
+   sealed trait StateChange[ S <: Sys[ S ]] extends Update[ S ]
+   final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends StateChange[ S ]
+   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends StateChange[ S ]
+   final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Boolean ])   extends StateChange[ S ]
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
-   final case class ParamChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Param ])     extends Update[ S ]
+   final case class ParamChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ BiPin.ExprUpdate[ S, Param ]]]) extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
@@ -90,9 +92,9 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- events ----
 
-   def renamed:         evt.Event[ S, Rename[ S ],         Proc[ S ]]
-   def graphChanged:    evt.Event[ S, GraphChange[ S ],    Proc[ S ]]
-   def playingChanged:  evt.Event[ S, PlayingChange[ S ],  Proc[ S ]]
+   def stateChanged:    evt.Event[ S, StateChange[ S ],  Proc[ S ]]
+//   def graphChanged:    evt.Event[ S, GraphChange[ S ],    Proc[ S ]]
+//   def playingChanged:  evt.Event[ S, PlayingChange[ S ],  Proc[ S ]]
    def paramChanged:    evt.Event[ S, ParamChange[ S ],    Proc[ S ]]
 //   def freqChanged:     evt.Event[ S, FreqChange[ S ],     Proc[ S ]]
 

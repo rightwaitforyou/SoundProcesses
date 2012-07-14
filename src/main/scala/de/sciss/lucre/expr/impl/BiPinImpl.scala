@@ -64,8 +64,12 @@ object BiPinImpl {
       new ImplNew( evt.Targets.partial[ S ], tree, eventView )
    }
 
+   def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
+                                      ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+      sys.error( "TODO" )
+
    def readVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : BiPin[ S, Expr[ S, A ], evt.Change[ A ]] =
       sys.error( "TODO" )
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(

@@ -90,6 +90,10 @@ object BiPin {
 
    def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
                                       ( implicit tx: S#Tx, peerType: BiType[ A ]) : ExprVar[ S, A ] =
+      BiPinImpl.readExprVar( in, access )
+
+   def readExpr[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
+                                   ( implicit tx: S#Tx, peerType: BiType[ A ]) : Expr[ S, A ] =
       BiPinImpl.readVar( in, access )
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])

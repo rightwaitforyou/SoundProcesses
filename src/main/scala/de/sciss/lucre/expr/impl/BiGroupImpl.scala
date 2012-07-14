@@ -241,13 +241,11 @@ object BiGroupImpl {
 
          private[lucre] def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             CollChanged ---> r
-// TODO XXX
-//            ElemChanged ---> r
+            ElemChanged ---> r
          }
          private[lucre] def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             CollChanged -/-> r
-// TODO XXX
-//            ElemChanged -/-> r
+            ElemChanged -/-> r
          }
 
          private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Update[ S, Elem, U ]] = {
@@ -262,8 +260,7 @@ object BiGroupImpl {
          def reactTx( fun: S#Tx => BiGroup.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] = {
             val obs = evt.Observer( serializer( eventView ), fun )
             obs.add( CollChanged )
-// TODO XXX
-//            obs.add( ElemChanged )
+            obs.add( ElemChanged )
             obs
          }
 
@@ -285,16 +282,14 @@ object BiGroupImpl {
       final def connect()( implicit tx: S#Tx ) {
          foreach { case (span, elem) =>
             CollChanged += span
-// TODO XXX
-//            ElemChanged += elem
+            ElemChanged += elem
          }
       }
 
       final def disconnect()( implicit tx: S#Tx ) {
          foreach { case (span, elem) =>
             CollChanged -= span
-// TODO XXX
-//            ElemChanged -= elem
+            ElemChanged -= elem
          }
       }
 
@@ -325,8 +320,7 @@ object BiGroupImpl {
          addNoFire( spanVal, span, elem )
          if( isConnected ) {
             CollChanged += span
-// TODO XXX
-//            ElemChanged += elem
+            ElemChanged += elem
             CollChanged( BiGroup.Added( this, spanVal, elem ))
          }
       }
@@ -346,8 +340,7 @@ object BiGroupImpl {
          val res     = removeNoFire( spanVal, span, elem )
          if( res && isConnected ) {
             CollChanged -= span
-// TODO XXX
-//            ElemChanged -= elem
+            ElemChanged -= elem
             CollChanged( BiGroup.Removed( this, spanVal, elem ))
          }
          res

@@ -28,14 +28,15 @@ package impl
 
 import de.sciss.lucre.{event => evt}
 import de.sciss.synth.SynthGraph
-import de.sciss.synth.expr._
+import de.sciss.synth.expr.{Booleans, Strings, Doubles, ExprImplicits}
 import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.stm.{InMemory, Sys}
+import de.sciss.lucre.stm.{TxnSerializer, InMemory, Sys}
 import ExprImplicits._
-import de.sciss.lucre.expr.{Chronos, BiPin, Expr}
+import de.sciss.lucre.expr.{BiType, Chronos, BiPin, Expr}
 import de.sciss.collection.txn
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import annotation.switch
 
 object ProcImpl {
    private val SER_VERSION = 1
@@ -57,40 +58,84 @@ object ProcImpl {
          new Read( in, access, targets, tx )
    }
 
-   @volatile private var declMap = Map.empty[ Class[ _ ], Decl[ _ ]]
+   private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   private def getDecl[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Decl[ S ] = {
-      val clz = tx.system.manifest.erasure
-      declMap.getOrElse( clz, {
-         val declNew = new Decl[ S ]
-         declMap += clz -> declNew
-         declNew
-      }).asInstanceOf[ Decl[ S ]]
-   }
+//   @volatile private var declMap = Map.empty[ Class[ _ ], Decl[ _ ]]
+//
+//   private def getDecl[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Decl[ S ] = {
+//      val clz = tx.system.manifest.erasure
+//      declMap.getOrElse( clz, {
+//         val declNew = new Decl[ S ]
+//         declMap += clz -> declNew
+//         declNew
+//      }).asInstanceOf[ Decl[ S ]]
+//   }
+//
+//   private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, Proc[ S ]] {
+//      val serializer: evt.Reader[ S, Impl[ S ]] = new evt.Reader[ S, Impl[ S ]] {
+//         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Impl[ S ] =
+//            new Read( in, access, targets, tx )
+//      }
+//
+//      type Update = Proc.Update[ S ]
+//
+//      import Proc._
+//
+//      declare[ Rename[        S ]]( _.renamed        )
+//      declare[ GraphChange[   S ]]( _.graphChanged   )
+//      declare[ PlayingChange[ S ]]( _.playingChanged )
+////      declare[ FreqChange[    S ]]( _.freqChanged    )
+//      declare[ ParamChange[    S ]]( _.paramChanged )
+//   }
 
-   private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, Proc[ S ]] {
-      val serializer: evt.Reader[ S, Impl[ S ]] = new evt.Reader[ S, Impl[ S ]] {
-         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Impl[ S ] =
-            new Read( in, access, targets, tx )
+   private def entrySerializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, EntryNode[ S ]] = new EntrySer
+
+   private final class EntryNode[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val key: String,
+                                                  val value: BiPin.Expr[ S, Param ])
+   extends evt.StandaloneLike[ S, (String, BiPin.ExprUpdate[ S, Param ]), EntryNode[ S ]] {
+      protected def reader: evt.Reader[ S, EntryNode[ S ]] = entrySerializer[ S ]
+
+      /* private[lucre] */ def connect()( implicit tx: S#Tx ) {
+         evt.Intruder.--->( value.changed, this )
       }
 
-      type Update = Proc.Update[ S ]
+      /* private[lucre] */ def disconnect()( implicit tx: S#Tx ) {
+         evt.Intruder.-/->( value.changed, this )
+      }
 
-      import Proc._
+      protected def writeData( out: DataOutput ) {
+         out.writeString( key )
+         value.write( out )
+      }
 
-      declare[ Rename[        S ]]( _.renamed        )
-      declare[ GraphChange[   S ]]( _.graphChanged   )
-      declare[ PlayingChange[ S ]]( _.playingChanged )
-//      declare[ FreqChange[    S ]]( _.freqChanged    )
-      declare[ ParamChange[    S ]]( _.paramChanged )
+      protected def disposeData()( implicit tx: S#Tx ) {
+         value.dispose()
+      }
+
+      /* private[lucre] */ def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, BiPin.ExprUpdate[ S, Param ])] =
+         evt.Intruder.pullUpdate( value.changed, pull ).map( key -> _ )
+   }
+
+   implicit val paramType : BiType[ Param ] = Doubles
+
+   private final class EntrySer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, EntryNode[ S ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : EntryNode[ S ] = {
+         val key     = in.readString()
+         val value   = BiPin.readExprVar( in, access )
+         new EntryNode( targets, key, value )
+      }
    }
 
    private sealed trait Impl[ S <: Sys[ S ]]
    extends Proc[ S ]
-   with evt.Compound[ S, Proc[ S ], Decl[ S ]]
+//   with evt.Compound[ S, Proc[ S ], Decl[ S ]]
    with ParamMap[ S ]
    {
+      proc =>
+
       import Proc._
+
+//      private type ParamEx = BiPin.Expr[ S, Param ]
 
       protected def graphVar : S#Var[ SynthGraph ]
 //      protected def playing_# : Expr.Var[ S, Boolean ]
@@ -99,7 +144,8 @@ object ProcImpl {
 //      protected def freq_# : Expr.Var[ S, Double ]
 //      protected def freq_# : BiPin.ExprVar[ S, Double ]
 
-      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
+//      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
+      protected def parMap : txn.SkipList.Map[ S, String, EntryNode[ S ]]
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
          name_#.get
@@ -122,7 +168,7 @@ object ProcImpl {
          val old = graphVar.get
          if( old != g ) {
             graphVar.set( g )
-            graphChanged( GraphChange( this, evt.Change( old, g )))
+            StateEvent( GraphChange( this, evt.Change( old, g )))
             updatePars( old, g )
          }
       }
@@ -136,16 +182,106 @@ object ProcImpl {
 
       // ---- ParamMap ----
 
+      private object StateEvent
+      extends evt.Trigger.Impl[ S, Proc.StateChange[ S ], Proc.StateChange[ S ], Proc[ S ]]
+      with evt.EventImpl[ S, Proc.StateChange[ S ], Proc.StateChange[ S ], Proc[ S ]]
+      with evt.InvariantEvent[ S, Proc.StateChange[ S ], Proc[ S ]]
+      with evt.Root[ S, Proc.StateChange[ S ]]
+      {
+         protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
+         def slot: Int = 1
+         def node: evt.Node[ S ] = proc
+      }
+
+      private object ParamEvent
+      extends evt.EventImpl[ S, Proc.ParamChange[ S ], Proc.ParamChange[ S ], Proc[ S ]]
+      with evt.InvariantEvent[ S, Proc.ParamChange[ S ], Proc[ S ]] {
+         protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
+         def slot: Int = 2
+         def node: evt.Node[ S ] = proc
+
+         def connect()( implicit tx: S#Tx ) {}
+         def disconnect()( implicit tx: S#Tx ) {}
+
+         def +=( entry: EntryNode[ S ])( implicit tx: S#Tx ) {
+            evt.Intruder.--->( entry, this )
+         }
+
+         def -=( entry: EntryNode[ S ])( implicit tx: S#Tx ) {
+            evt.Intruder.-/->( entry, this )
+         }
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ParamChange[ S ]] = {
+            val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ BiPin.ExprUpdate[ S, Param ]]]) { case (map, sel) =>
+//               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
+               val node = evt.Intruder.devirtualizeNode( sel, entrySerializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+                  .asInstanceOf[ EntryNode[ S ]]
+               evt.Intruder.pullUpdate( node, pull ) match {
+                  case Some( (name, upd) ) => map + (name -> (map.getOrElse( name, IIdxSeq.empty ) :+ upd))
+                  case None => map
+               }
+            }
+
+            if( changes.isEmpty ) None else Some( Proc.ParamChange( proc, changes ))
+         }
+      }
+
+      private object ChangeEvent
+      extends evt.Event[ S, Proc.Update[ S ], Proc[ S ]]
+      with evt.InvariantSelector[ S ] {
+         protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
+         def slot: Int = opNotSupported
+         def node: evt.Node[ S ] = proc
+
+         def connect()( implicit tx: S#Tx ) {}
+         def disconnect()( implicit tx: S#Tx ) {}
+
+         /* private[lucre] */ def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+            evt.Intruder.--->( StateEvent, r )
+            evt.Intruder.--->( ParamEvent, r )
+         }
+         /* private[lucre] */ def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+            evt.Intruder.-/->( StateEvent, r )
+            evt.Intruder.-/->( ParamEvent, r )
+         }
+
+         /* private[lucre] */ def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
+            if( evt.Intruder.isSource( ParamEvent, pull )) evt.Intruder.pullUpdate( ParamEvent, pull )
+            else if( evt.Intruder.isSource( StateEvent, pull )) evt.Intruder.pullUpdate( StateEvent, pull )
+            else None
+         }
+
+         def react( fun: Proc.Update[ S ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, Proc.Update[ S ], Proc[ S ]] =
+            reactTx( _ => fun )
+
+         def reactTx( fun: S#Tx => Proc.Update[ S ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, Proc.Update[ S ], Proc[ S ]] = {
+            val obs = evt.Observer( ProcImpl.serializer[ S ], fun )
+            obs.add( StateEvent )
+            obs.add( ParamEvent )
+            obs
+         }
+
+         /* private[lucre] */ def isSource( pull: evt.Pull[ S ]) : Boolean = opNotSupported
+      }
+
+      final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
+         case 1 => StateEvent
+         case 2 => ParamEvent
+      }
+
       final def par: ParamMap[ S ] = this
 
-      final def get( key: String )( implicit tx: S#Tx ) : Option[ BiPin.Expr[ S, Param ]] = parMap.get( key )
+      final def get( key: String )( implicit tx: S#Tx ) : Option[ BiPin.Expr[ S, Param ]] =
+         parMap.get( key ).map( _.value )
 
       final def apply( key: String )( implicit tx: S#Tx ) : BiPin.Expr[ S, Param ] = {
          get( key ).getOrElse {
             if( keys.contains( key )) {
                implicit val doubles = Doubles
                val expr = BiPin.newExprVar[ S, Param ]( 0d )   // XXX retrieve default value
-               parMap += key -> expr
+               val tgt  = evt.Targets[ S ]   // XXX partial?
+               val node = new EntryNode[ S ]( tgt, key, expr )
+               parMap += key -> node
                expr
             } else {
                throw new NoSuchElementException( key )
@@ -157,7 +293,7 @@ object ProcImpl {
 
       final def entriesAt( time: Long )( implicit tx: S#Tx ) : Map[ String, Param ] = {
          keys.flatMap( key => {
-            parMap.get( key ).map( bi => key -> bi.at( time ).value )
+            parMap.get( key ).map( bi => key -> bi.value.at( time ).value )
          })( breakOut )
       }
 
@@ -196,12 +332,13 @@ object ProcImpl {
 //         freq_#.add( chr.time, f )
 //      }
 
-      final def renamed             = name_#.changed.map( Rename( this, _ ))
-      final def graphChanged        = event[ GraphChange[ S ]]
-      final def playingChanged      = playing_#.changed.map( PlayingChange( this, _ ))
+//      final def renamed             = name_#.changed.map( Rename( this, _ ))
+//      final def graphChanged        = event[ GraphChange[ S ]]
+//      final def playingChanged      = playing_#.changed.map( PlayingChange( this, _ ))
 //      final def freqChanged         = freq_#.changed.map( FreqChange( this, _ ))
-      final def paramChanged        = event[ ParamChange[ S ]]
-      final def changed             = renamed | graphChanged | playingChanged | paramChanged
+      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
+      final def paramChanged : evt.Event[ S, ParamChange[ S ], Proc[ S ]] = ParamEvent
+      final def changed : evt.Event[ S, Update[ S ], Proc[ S ]] = ChangeEvent // = renamed | graphChanged | playingChanged | paramChanged
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
@@ -228,7 +365,7 @@ object ProcImpl {
    }
 
    private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
-      protected val decl      = getDecl[ S ]( tx0 )
+//      protected val decl      = getDecl[ S ]( tx0 )
       protected val targets   = evt.Targets[ S ]( tx0 )
 
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
@@ -242,16 +379,17 @@ object ProcImpl {
 
       protected val parMap    = {
          implicit val tx      = tx0
-         implicit val parType = Doubles // .serializer[ S ]
-         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
-         txn.SkipList.Map.empty[ S, String, BiPin.Expr[ S, Param ]]
+//         implicit val parType = Doubles // .serializer[ S ]
+//         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
+         implicit val entrySer = entrySerializer[ S ]
+         txn.SkipList.Map.empty[ S, String, EntryNode[ S ]]
       }
    }
 
    private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
                                              tx0: S#Tx )
    extends Impl[ S ] {
-      protected val decl      = getDecl[ S ]( tx0 )
+//      protected val decl      = getDecl[ S ]( tx0 )
 
       {
          val serVer = in.readUnsignedByte()
@@ -267,9 +405,10 @@ object ProcImpl {
 
       protected val parMap    = {
          implicit val tx      = tx0
-         implicit val parType = Doubles // .serializer[ S ]
-         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
-         txn.SkipList.Map.read[ S, String, BiPin.Expr[ S, Param ]]( in, access )
+//         implicit val parType = Doubles // .serializer[ S ]
+//         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
+         implicit val entrySer = entrySerializer[ S ]
+         txn.SkipList.Map.read[ S, String, EntryNode[ S ]]( in, access )
       }
    }
 }
