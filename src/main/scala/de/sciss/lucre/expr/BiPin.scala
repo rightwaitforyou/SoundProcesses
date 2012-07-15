@@ -51,6 +51,12 @@ object BiPin {
    type Expr[ S <: Sys[ S ], A ]    = BiPin[ S, Ex[ S, A ], evt.Change[ A ]]
    type ExprVar[ S <: Sys[ S ], A ] = Var[   S, Ex[ S, A ], evt.Change[ A ]]
 
+   object isVar {
+      def unapply[ S <: Sys[ S ], Elem, U ]( v: BiPin[ S, Elem, U ]) : Option[ Var[ S, Elem, U ]] = {
+         if( v.isInstanceOf[ Var[ _, _, _ ]]) Some( v.asInstanceOf[ Var[ S, Elem, U ]]) else None
+      }
+   }
+
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiPin[ S, Elem, U ] {
 //      def get( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 //      def getAt( time: Long )( implicit tx: S#Tx ) : Expr[ S, A ]
@@ -81,20 +87,26 @@ object BiPin {
 //      BiPinImpl.newVar( init )
 
    def newExprVar[ S <: Sys[ S ], A ]( default: Ex[ S, A ])( implicit tx: S#Tx, elemType: BiType[ A ]) : ExprVar[ S, A ] =
-      BiPinImpl.newGenericVar[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+      BiPinImpl.newVar[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
 
    def newConfluentExprVar[ S <: Sys[ S ], A ]( default: Ex[ S, A ])
                                               ( implicit tx: S#Tx,
                                                 elemType: BiType[ A ]) : ExprVar[ S, A ] =
-      BiPinImpl.newConfluentGenericVar[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+      BiPinImpl.newConfluentVar[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
 
    def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                      ( implicit tx: S#Tx, peerType: BiType[ A ]) : ExprVar[ S, A ] =
-      BiPinImpl.readExprVar( in, access )
+                                      ( implicit tx: S#Tx, elemType: BiType[ A ]) : ExprVar[ S, A ] = {
+
+//      BiPinImpl.readExprVar( in, access )
+      BiPinImpl.readVar[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+   }
 
    def readExpr[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                   ( implicit tx: S#Tx, peerType: BiType[ A ]) : Expr[ S, A ] =
-      BiPinImpl.readVar( in, access )
+                                   ( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr[ S, A ] = {
+
+//      BiPinImpl.readExpr( in, access )
+      BiPinImpl.read[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+   }
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                            ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],

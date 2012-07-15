@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Cursor, Sys, InMemory}
 import de.sciss.synth.expr.{Longs, ExprImplicits}
-import de.sciss.lucre.expr.{Chronos, Span, SpanLike}
+import de.sciss.lucre.expr.{BiPin, Chronos, Span, SpanLike}
 import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
 import de.sciss.nuages.VisualInstantPresentation
@@ -45,6 +45,8 @@ object VisTest {
    }
 }
 final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) extends ExprImplicits[ S ] {
+   type Tx = S#Tx
+
    def t[ A ]( fun: S#Tx => A ) : A = {
       val peer = STMTxn.findCurrent
       require( peer.isEmpty, peer )
@@ -169,6 +171,17 @@ final class VisTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ]) 
    def aural() {
       if( auralVar == null ) auralVar = t { implicit tx =>
          AuralPresentation.run( access )
+      }
+   }
+
+   def pr( time: Long = 4 * 44100 )( implicit tx: S#Tx ) = group.intersect( time ).next._2.head._2
+
+   def addFreq( time: Long = 0, freq: Double ) {
+      t { implicit tx =>
+         pr().par( "freq" ) match {
+            case BiPin.isVar( v ) => v.add( time, freq )
+            case _ =>
+         }
       }
    }
 

@@ -44,7 +44,7 @@ object BiPinImpl {
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   def newGenericVar[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
+   def newVar[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       timeType: Type[ Long ]) : Var[ S, Elem, U ] = {
 
@@ -54,7 +54,7 @@ object BiPinImpl {
       new ImplNew( evt.Targets[ S ], tree, eventView )
    }
 
-   def newConfluentGenericVar[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
+   def newConfluentVar[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       timeType: Type[ Long ]) : Var[ S, Elem, U ] = {
 
@@ -64,13 +64,13 @@ object BiPinImpl {
       new ImplNew( evt.Targets.partial[ S ], tree, eventView )
    }
 
-   def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                      ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
-      sys.error( "TODO" )
-
-   def readVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : BiPin[ S, Expr[ S, A ], evt.Change[ A ]] =
-      sys.error( "TODO" )
+//   def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
+//                                      ( implicit tx: S#Tx, peerType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+//      sys.error( "TODO" )
+//
+//   def readExpr[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
+//                                  ( implicit tx: S#Tx, peerType: BiType[ A ]) : BiPin[ S, Expr[ S, A ], evt.Change[ A ]] =
+//      read[ S, Expr[ S, A ], evt.Change[ A ]]( in, access, _.changed )
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
@@ -80,15 +80,20 @@ object BiPinImpl {
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       timeType: Type[ Long ]) : evt.NodeSerializer[ S , BiPin.Var[ S, Elem, U ]] = new VarSer( eventView )
 
-   def readGenericVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+   def readVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
          ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
            timeType: Type[ Long ]) : BiPin.Var[ S, Elem, U ] = {
 
       val targets = evt.Targets.read[ S ]( in, access )
-      read( in, access, targets, eventView )
+      readImpl( in, access, targets, eventView )
    }
 
-   private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
+   def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+                                     ( implicit tx: S#Tx,
+                                       elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                       timeType: Type[ Long ]) : BiPin[ S, Elem, U ] = readVar( in, access, eventView )
+
+   private def readImpl[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
                                              ( implicit tx: S#Tx,
                                                elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                                timeType: Type[ Long ]) : Impl[ S, Elem, U ] = {
@@ -104,7 +109,7 @@ object BiPinImpl {
                                                 timeType: Type[ Long ])
    extends evt.NodeSerializer[ S, BiPin[ S, Elem, U ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin[ S, Elem, U ] = {
-         BiPinImpl.read( in, access, targets, eventView )
+         BiPinImpl.readImpl( in, access, targets, eventView )
       }
    }
 
@@ -113,7 +118,7 @@ object BiPinImpl {
                                                    timeType: Type[ Long ])
    extends evt.NodeSerializer[ S, BiPin.Var[ S, Elem, U ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin.Var[ S, Elem, U ] = {
-         BiPinImpl.read( in, access, targets, eventView )
+         BiPinImpl.readImpl( in, access, targets, eventView )
       }
    }
 
