@@ -22,7 +22,8 @@ object Transport {
    final case class Advance[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], playing: Boolean,
                                                     time: Long,
                                                     added:   IIdxSeq[ (SpanLike, Elem) ],
-                                                    removed: IIdxSeq[ (SpanLike, Elem) ])
+                                                    removed: IIdxSeq[ (SpanLike, Elem) ],
+                                                    params:  IIdxSeq[ (SpanLike, Elem, Map[ String, Param ])])
    extends Update[ S, Elem ] {
       override def toString =
          (if( playing ) "Advance" else "Seek") +
@@ -47,7 +48,8 @@ trait Transport[ S <: Sys[ S ], Elem ] extends evt.Node[ S ] with Chronos[ S ] {
    def changed: Event[ S, Transport.Update[ S, Elem ], Transport[ S, Elem ]]
 
    // unfortunately this needs to go in the API because of the self-access problem
-   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long )( implicit tx: S#Tx ) : Unit
+   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
+                                   hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) : Unit
 
 //   def play()( implicit time: Chronos[ S ]) : Unit
 //   def stop()( implicit time: Chronos[ S ]) : Unit

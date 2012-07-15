@@ -27,7 +27,7 @@ package de.sciss.nuages
 package impl
 
 import de.sciss.lucre.stm.{Sys, Cursor}
-import de.sciss.synth.proc.{Proc, Transport}
+import de.sciss.synth.proc.{Proc, Transport, Param}
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
 import javax.swing.JComponent
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -59,7 +59,7 @@ object VisualInstantPresentationImpl {
          val t       = transportView( transport.get )
          val all     = t.iterator.toIndexedSeq
 
-         addRemove( t.time, all, IIdxSeq.empty )
+         advance( t.time, all, IIdxSeq.empty, IIdxSeq.empty )
 //         t.changed.react {
 //            case BiGroup.Added(   group, span, elem ) =>
 //            case BiGroup.Removed( group, span, elem ) =>
@@ -78,8 +78,9 @@ object VisualInstantPresentationImpl {
             onEDT( vis.playing = b )
          }
 
-         def addRemove( time: Long, added: IIdxSeq[ (SpanLike, Proc[ S ])],
-                                    removed: IIdxSeq[ (SpanLike, Proc[ S ])])( implicit tx: S#Tx ) {
+         def advance( time: Long, added: IIdxSeq[ (SpanLike, Proc[ S ])],
+                                removed: IIdxSeq[ (SpanLike, Proc[ S ])],
+                                params: IIdxSeq[ (SpanLike, Proc[ S ], Map[ String, Param ])])( implicit tx: S#Tx ) {
             val vpRem = removed.flatMap { case (span, proc) =>
                map.get( proc.id ).flatMap { vpm =>
                   map.remove( proc.id )
@@ -116,7 +117,7 @@ object VisualInstantPresentationImpl {
          }
 
          t.changed.reactTx { implicit tx => {
-            case Transport.Advance( _, _, time, added, removed ) => addRemove( time, added, removed )
+            case Transport.Advance( _, _, time, added, removed, params ) => advance( time, added, removed, params )
             case Transport.Play( _ ) => playStop( b = true  )
             case Transport.Stop( _ ) => playStop( b = false )
          }}

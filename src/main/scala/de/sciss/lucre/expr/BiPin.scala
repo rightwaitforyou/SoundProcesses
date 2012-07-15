@@ -148,5 +148,7 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    def elementChanged:     Event[ S, BiPin.Element[    S, Elem, U ], BiPin[ S, Elem, U ]]
    def changed :           Event[ S, BiPin.Update[     S, Elem, U ], BiPin[ S, Elem, U ]]
 
+   def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
+
    def debugList()( implicit tx: S#Tx ) : List[ (Long, Elem) ]
 }

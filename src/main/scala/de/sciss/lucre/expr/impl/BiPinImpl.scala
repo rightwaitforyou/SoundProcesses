@@ -344,6 +344,8 @@ object BiPinImpl {
             case None => IIdxSeq.empty
          }
 
+      final def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = tree.ceil( time ).map( _._1 )
+
       final def at( time: Long )( implicit tx: S#Tx ) : Elem = intersect( time ).head._2
 //         tree.floor( time ).getOrElse( throw new NoSuchElementException( time.toString ))._2.head._2
 //      }

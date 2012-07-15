@@ -139,11 +139,12 @@ object AuralPresentationImpl {
                transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
             }
             transport.changed.reactTx { implicit tx => {
-               case Transport.Advance( tr, true, time, added, removed ) =>
+               case Transport.Advance( tr, true, time, added, removed, params ) =>
                   implicit val chr: Chronos[ S ] = tr
 //println( "AQUI: added = " + added + "; removed = " + removed )
-                  added.foreach   { case (_, p) => booted.procAdded(   p )}
                   removed.foreach { case (_, p) => booted.procRemoved( p )}
+                  params.foreach  { case (_, p, m) => /* XXX TODO */ }
+                  added.foreach   { case (_, p) => booted.procAdded(   p )}
 //               case ProcGroup.Element( _, changes ) =>
 //                  changes.foreach {
 //                     case Proc.Renamed( proc, Change( _, newName )) =>

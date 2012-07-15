@@ -108,29 +108,55 @@ println( "Shutting down scheduler thread pool" )
          group.intersect( time ).flatMap( flatSpans )
 
       def seek( time: Long )( implicit tx: S#Tx ) {
-         advance( playing = false, lastTime.get, time )
+         advance( playing = false, lastTime.get, time, true, true )
       }
 
-      private def advance( playing: Boolean, oldFrame: Long, newFrame: Long )
-                         ( implicit tx: S#Tx ) {
+      private def advance( playing: Boolean, oldFrame: Long, newFrame: Long,
+                           hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) {
 if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFrame + ")" )
          if( newFrame == oldFrame ) return
          lastTime.set( newFrame )
-         val (remStart, remStop, addStart, addStop) = if( newFrame > oldFrame ) {
-            // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
-            // ... those which begin in the interval (LRP, t] && end > t must be added ...
-            val skipInt = Span( oldFrame + 1, newFrame + 1 )
-            (Span.until( oldFrame + 1 ), skipInt, skipInt, Span.from( newFrame + 1 ))
-         } else {
-            // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
-            // ... those which end in the interval (t, LRP] && begin <=t must be added ...
-            val skipInt = Span( newFrame + 1, oldFrame + 1 )
-            (skipInt, Span.from( oldFrame + 1 ), Span.until( newFrame + 1 ), skipInt)
-         }
-         val removed = group.rangeSearch( remStart, remStop ).flatMap( flatSpans )
-         val added   = group.rangeSearch( addStart, addStop ).flatMap( flatSpans )
-         if( removed.nonEmpty || added.nonEmpty ) {
-            fire( Transport.Advance( this, playing, newFrame, added.toIndexedSeq, removed.toIndexedSeq ))
+
+         val (removed, added) = if( hasProcEvent ) {
+            val (remStart, remStop, addStart, addStop) = if( newFrame > oldFrame ) {
+               // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
+               // ... those which begin in the interval (LRP, t] && end > t must be added ...
+               val skipInt = Span( oldFrame + 1, newFrame + 1 )
+               (Span.until( oldFrame + 1 ), skipInt, skipInt, Span.from( newFrame + 1 ))
+            } else {
+               // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
+               // ... those which end in the interval (t, LRP] && begin <=t must be added ...
+               val skipInt = Span( newFrame + 1, oldFrame + 1 )
+               (skipInt, Span.from( oldFrame + 1 ), Span.until( newFrame + 1 ), skipInt)
+            }
+
+            (group.rangeSearch( remStart, remStop ).flatMap( flatSpans ).toIndexedSeq,
+             group.rangeSearch( addStart, addStop ).flatMap( flatSpans ).toIndexedSeq)
+         } else (IIdxSeq.empty, IIdxSeq.empty)
+
+         val params = if( hasParEvent  ) {
+            var res = IIdxSeq.empty[ (SpanLike, Proc[ S ], Map[ String, Param ])]
+            group.intersect( newFrame ).foreach { case (span, entries) =>
+               entries.foreach { case (_, proc) =>
+                  val par = proc.par
+                  var map = Map.empty[ String, Param ]
+                  par.keys.foreach { key =>
+                     par.get( key ).foreach { bi =>
+                        val oldEx = bi.at( oldFrame )
+                        val newEx = bi.at( newFrame )
+                        if( oldEx != newEx ) {
+                           map += key -> newEx.value
+                        }
+                     }
+                  }
+                  if( map.nonEmpty ) res :+= (span, proc, map)
+               }
+            }
+            res
+         } else IIdxSeq.empty
+
+         if( removed.nonEmpty || added.nonEmpty || params.nonEmpty ) {
+            fire( Transport.Advance( this, playing, newFrame, added, removed, params ))
          }
       }
 
@@ -156,8 +182,34 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
       }
 
       private def scheduleNext()( implicit tx: S#Tx ) {
-         val oldFrame   = lastTime.get
-         group.nearestEventAfter( oldFrame + 1 ).foreach { newFrame =>
+         val oldFrame      = lastTime.get
+         val searchStart   = oldFrame + 1
+         val procMin       = group.nearestEventAfter( searchStart ).getOrElse( Long.MaxValue )
+         val hasProcEvent  = procMin != Long.MaxValue
+         val innerSpan     = if( hasProcEvent ) {
+            Span( searchStart, procMin )
+         } else {
+            Span.from( searchStart )
+         }
+         var parMin = Long.MaxValue
+         group.intersect( innerSpan ).foreach { case (span, entries) =>
+            entries.foreach { case (_, proc) =>
+               val par = proc.par
+               par.keys.foreach { key =>
+                  par.get( key ).foreach { bi =>
+                     bi.nearestEventAfter( searchStart ) match {
+                        // XXX TODO : also span.start should be < time, to avoid events from newly started procs
+                        case Some( time ) if time < parMin && span.contains( time ) => parMin = time
+                        case _ =>
+                     }
+                  }
+               }
+            }
+         }
+         val hasParEvent = parMin != Long.MaxValue
+
+         if( hasProcEvent || hasParEvent ) {
+            val newFrame   = math.min( procMin, parMin )
             val delay      = ((newFrame - oldFrame) * microsPerSample).toLong
             val v          = validVar.get
             val logical    = cpuTime.get( tx.peer )
@@ -167,20 +219,21 @@ if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + ef
             STMTxn.afterCommit( _ => {
                pool.schedule( new Runnable {
                   def run() { cursor.step { implicit tx =>
-                     selfView( self.get ).eventReached( v, logical + delay, oldFrame, newFrame )
+                     selfView( self.get ).eventReached( v, logical + delay, oldFrame, newFrame, hasProcEvent, hasParEvent )
                   }}
                }, effective, TimeUnit.MICROSECONDS )
             })( tx.peer )
          }
       }
 
-      def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long )( implicit tx: S#Tx ) {
+      def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
+                        hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) {
          // if the transport had been stopped between scheduling and actual
          // execution of the scheduled Runnable, then we will find a
          // discrepancy in validVar. In that case, just don't do anything.
          if( valid == validVar.get ) {
             cpuTime.set( newLogical )( tx.peer )
-            advance( playing = true, oldFrame = oldFrame, newFrame = newFrame )
+            advance( playing = true, oldFrame = oldFrame, newFrame = newFrame, hasProcEvent, hasParEvent )
             scheduleNext()
          }
       }
