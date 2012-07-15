@@ -26,8 +26,8 @@ object Transport {
    extends Update[ S, Elem ] {
       override def toString =
          (if( playing ) "Advance" else "Seek") +
-            "(" + transport + (if( added.nonEmpty ) added.mkString( ", added = ", ",", "" ) else "") +
-                              (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", ")" ) else ")")
+            "(" + transport + (if( added.nonEmpty )   added.mkString(   ", added = ",   ",", "" ) else "") +
+                              (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", "" ) else "") + ")"
    }
 
    final case class Play[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]

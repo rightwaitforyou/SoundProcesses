@@ -69,7 +69,7 @@ object BiGroupImpl {
       case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
    }
 
-   def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+   def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = {
 
@@ -88,7 +88,7 @@ object BiGroupImpl {
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S , BiGroup.Var[ S, Elem, U ]] = new VarSer( eventView )
 
-   def readGenericVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+   def readVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
          ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
            spanType: Type[ SpanLike ]) : BiGroup.Var[ S, Elem, U ] = {
 

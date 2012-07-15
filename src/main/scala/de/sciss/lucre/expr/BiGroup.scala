@@ -49,15 +49,15 @@ object BiGroup {
    type Leaf[      S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem ]])
 
    def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
-      BiGroupImpl.newGenericVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
+      BiGroupImpl.newVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
 
    def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
       ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-        spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.newGenericVar( eventView )
+        spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.newVar( eventView )
 
    def readGenericVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
          ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-           spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.readGenericVar( in, access, eventView )
+           spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.readVar( in, access, eventView )
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
       def add(    span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Unit
