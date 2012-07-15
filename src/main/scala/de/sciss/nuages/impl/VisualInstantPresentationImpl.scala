@@ -59,7 +59,7 @@ object VisualInstantPresentationImpl {
          val t       = transportView( transport.get )
          val all     = t.iterator.toIndexedSeq
 
-         addRemove( all, IIdxSeq.empty )
+         addRemove( t.time, all, IIdxSeq.empty )
 //         t.changed.react {
 //            case BiGroup.Added(   group, span, elem ) =>
 //            case BiGroup.Removed( group, span, elem ) =>
@@ -78,8 +78,8 @@ object VisualInstantPresentationImpl {
             onEDT( vis.playing = b )
          }
 
-         def addRemove( added:   IIdxSeq[ (SpanLike, Proc[ S ])],
-                        removed: IIdxSeq[ (SpanLike, Proc[ S ])])( implicit tx: S#Tx ) {
+         def addRemove( time: Long, added: IIdxSeq[ (SpanLike, Proc[ S ])],
+                                    removed: IIdxSeq[ (SpanLike, Proc[ S ])])( implicit tx: S#Tx ) {
             val vpRem = removed.flatMap { case (span, proc) =>
                map.get( proc.id ).flatMap { vpm =>
                   map.remove( proc.id )
@@ -97,7 +97,8 @@ object VisualInstantPresentationImpl {
             val hasRem = vpRem.nonEmpty
             val vpAdd = added.map { case (span, proc) =>
                val n    = proc.name.value
-               val vp   = new VisualProc( n )
+               val par  = proc.par.entriesAt( time )
+               val vp   = new VisualProc( n, par )
                map.get( proc.id ) match {
                   case Some( vpm ) =>
                      map.remove( proc.id )
@@ -115,7 +116,7 @@ object VisualInstantPresentationImpl {
          }
 
          t.changed.reactTx { implicit tx => {
-            case Transport.Advance( _, _, time, added, removed ) => addRemove( added, removed )
+            case Transport.Advance( _, _, time, added, removed ) => addRemove( time, added, removed )
             case Transport.Play( _ ) => playStop( b = true  )
             case Transport.Stop( _ ) => playStop( b = false )
          }}
@@ -125,7 +126,7 @@ object VisualInstantPresentationImpl {
       vis
    }
 
-   private final class VisualProc( val name: String )
+//   private final class VisualProc( val name: String )
 
    private val ACTION_COLOR   = "color"
    private val ACTION_LAYOUT  = "layout"
@@ -135,6 +136,7 @@ object VisualInstantPresentationImpl {
    private val LAYOUT_TIME    = 50
    private val colrPlay       = new Color( 0, 0x80, 0 )
    private val colrStop       = Color.black
+   private val COLUMN_DATA    = "nuages.data"
 
    private final class Impl[ S <: Sys[ S ], A ]( transport: S#Entry[ A ], cursor: Cursor[ S ],
                                                  transportView: A => Transport[ S, Proc[ S ]])
@@ -145,12 +147,14 @@ object VisualInstantPresentationImpl {
 
       private val g        = {
          val res = new data.Graph
-         res.addColumn( VisualItem.LABEL, classOf[ String ])
+//         res.addColumn( VisualItem.LABEL, classOf[ String ])
+         res.addColumn( COLUMN_DATA, classOf[ VisualProc ])
          res
       }
-      private val pVis     = {
+      private val pVis = {
          val res = new Visualization()
-         res.addGraph( GROUP_GRAPH, g )
+         /* val gVis = */ res.addGraph( GROUP_GRAPH, g )
+//         gVis.addColumn( COLUMN_DATA, classOf[ VisualProc ])
          res
       }
       private val display  = new Display( pVis ) {
@@ -197,7 +201,7 @@ object VisualInstantPresentationImpl {
          })
 
 //         val lbRend = new LabelRenderer( VisualItem.LABEL )
-         val lbRend = new NodeRenderer( VisualItem.LABEL )
+         val lbRend = new NodeRenderer( COLUMN_DATA )
          val rf = new DefaultRendererFactory( lbRend )
          pVis.setRendererFactory( rf )
 
@@ -267,7 +271,10 @@ object VisualInstantPresentationImpl {
          val pNode   = g.addNode()
 //         val vi      = pVis.getVisualItem( GROUP_GRAPH, pNode )
 //         vi.setString( VisualItem.LABEL, vp.name )
-         pNode.setString( VisualItem.LABEL, vp.name )
+//         pNode.setString( VisualItem.LABEL, vp.name )
+//         val vi = pVis.getVisualItem( GROUP_NODES, pNode )
+//         if( vi != null ) vi.set( COLUMN_DATA, vp )
+         pNode.set( COLUMN_DATA, vp )
          nodeMap    += vp -> pNode
       }
 
