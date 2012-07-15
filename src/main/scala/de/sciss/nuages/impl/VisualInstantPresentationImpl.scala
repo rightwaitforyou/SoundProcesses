@@ -196,7 +196,8 @@ object VisualInstantPresentationImpl {
             }
          })
 
-         val lbRend = new LabelRenderer( VisualItem.LABEL )
+//         val lbRend = new LabelRenderer( VisualItem.LABEL )
+         val lbRend = new NodeRenderer( VisualItem.LABEL )
          val rf = new DefaultRendererFactory( lbRend )
          pVis.setRendererFactory( rf )
 
