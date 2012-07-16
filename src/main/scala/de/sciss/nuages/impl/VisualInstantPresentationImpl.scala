@@ -40,7 +40,7 @@ import prefuse.controls.{DragControl, ZoomToFitControl, PanControl, WheelZoomCon
 import javax.swing.event.{AncestorEvent, AncestorListener}
 import prefuse.data
 import prefuse.visual.VisualItem
-import de.sciss.lucre.expr.SpanLike
+import de.sciss.lucre.expr.{BiGroup, SpanLike}
 import prefuse.action.assignment.ColorAction
 import prefuse.util.ColorLib
 import prefuse.render.DefaultRendererFactory
@@ -78,9 +78,9 @@ object VisualInstantPresentationImpl {
             onEDT( vis.playing = b )
          }
 
-         def advance( time: Long, added: IIdxSeq[ (SpanLike, Proc[ S ])],
-                                removed: IIdxSeq[ (SpanLike, Proc[ S ])],
-                                 params: IIdxSeq[ (SpanLike, Proc[ S ], Map[ String, Param ])])( implicit tx: S#Tx ) {
+         def advance( time: Long, added: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
+                                removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
+                                 params: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])])( implicit tx: S#Tx ) {
             val vpRem = removed.flatMap { case (span, proc) =>
                map.get( proc.id ).flatMap { vpm =>
                   map.remove( proc.id )
@@ -96,16 +96,18 @@ object VisualInstantPresentationImpl {
                }
             }
             val hasRem = vpRem.nonEmpty
-            val vpAdd = added.map { case (span, proc) =>
+            val vpAdd = added.map { case (span, timed) =>
+               val id   = timed.id
+               val proc = timed.value
                val n    = proc.name.value
                val par  = proc.par.entriesAt( time )
                val vp   = new VisualProc( n, par )
-               map.get( proc.id ) match {
+               map.get( id ) match {
                   case Some( vpm ) =>
-                     map.remove( proc.id )
-                     map.put( proc.id, vpm + (span -> (vp :: vpm.getOrElse( span, Nil ))))
+                     map.remove( id )
+                     map.put( id, vpm + (span -> (vp :: vpm.getOrElse( span, Nil ))))
                   case _ =>
-                     map.put( proc.id, Map( span -> (vp :: Nil) ))
+                     map.put( id, Map( span -> (vp :: Nil) ))
                }
                vp
             }

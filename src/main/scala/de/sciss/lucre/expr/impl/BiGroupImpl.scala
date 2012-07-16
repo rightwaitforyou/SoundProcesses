@@ -27,7 +27,7 @@ package de.sciss.lucre.expr
 package impl
 
 import de.sciss.lucre.{event => evt, DataInput, DataOutput}
-import evt.{Change, Event, EventLike}
+import evt.{Event, EventLike}
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.collection.txn
 import txn.{SpaceSerializers, SkipOctree}
@@ -49,8 +49,8 @@ object BiGroupImpl {
 
 //   private final case class Entry[ Elem ]( )
 
-   private type LeafImpl[ S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElemImpl[ S, Elem ]])
-   private type Tree[ S <: Sys[ S ], Elem ] = SkipOctree[ S, TwoDim, LeafImpl[ S, Elem ]]
+   private type LeafImpl[ S <: Sys[ S ], Elem, U ] = (SpanLike, IIdxSeq[ TimedElemImpl[ S, Elem, U ]])
+   private type Tree[ S <: Sys[ S ], Elem, U ] = SkipOctree[ S, TwoDim, LeafImpl[ S, Elem, U ]]
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
@@ -77,7 +77,7 @@ object BiGroupImpl {
       implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
       implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
       implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
-      val tree: Tree[ S, Elem ] = SkipOctree.empty[ S, TwoDim, LeafImpl[ S, Elem ]]( MAX_SQUARE )
+      val tree: Tree[ S, Elem, U ] = SkipOctree.empty[ S, TwoDim, LeafImpl[ S, Elem, U ]]( MAX_SQUARE )
       new ImplNew( evt.Targets[ S ], tree, eventView )
    }
 
@@ -104,7 +104,7 @@ object BiGroupImpl {
       implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
       implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
       implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
-      val tree: Tree[ S, Elem ] = SkipOctree.read[ S, TwoDim, LeafImpl[ S, Elem ]]( in, access )
+      val tree: Tree[ S, Elem, U ] = SkipOctree.read[ S, TwoDim, LeafImpl[ S, Elem, U ]]( in, access )
       new ImplNew( targets, tree, eventView )
    }
 
@@ -132,18 +132,76 @@ object BiGroupImpl {
 
    private val regressNNMetric   = LongDistanceMeasure2D.prevSpanEvent( MAX_SQUARE )
 
-   private final class TimedElemImpl[ S <: Sys[ S ], Elem ]( val span: Expr[ S, SpanLike ], val value: Elem )
-   extends TimedElem[ S, Elem ] with evt.Node[ S ] {
-//      def pullUpdate( pull: evt.Pull ) : Option[ ]
+   private final class TimedElemImpl[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ],
+      protected val targets: evt.Targets[ S ], val span: Expr[ S, SpanLike ], val value: Elem )(
+      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ])
+   extends TimedElem[ S, Elem ] with evt.StandaloneLike[ S, BiGroup.Element[ S, Elem, U, _ ], TimedElemImpl[ S, Elem, U ]] {
+
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Element[ S, Elem, U, _ ]] = {
+         val spanEvt = span.changed
+         val spanCh  = if( spanEvt.isSource( pull )) {
+            spanEvt.pullUpdate( pull )
+         } else {
+            None
+         }
+         val valueEvt = eventView( value )
+         val valueCh = if( valueEvt.isSource( pull )) {
+            valueEvt.pullUpdate( pull )
+         } else {
+            None
+         }
+
+         sys.error( "TODO" )
+//         val changes: IIdxSeq[ (evt.Change[ SpanLike ], TimedElem[ S, Elem ]) ] = par.flatMap( sel => {
+//            val span = sel.devirtualize( spanType.serializer[ S ].asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+//               .node.asInstanceOf[ Expr[ S, SpanLike ]]
+//            val changeOption = span.changed.pullUpdate( pull )
+//            // somehow the flatMap is shadowed in Option, so the implicit conversion
+//            // to Iterable doesn't kick in...
+//            (changeOption: Iterable[ evt.Change[ SpanLike ]]).flatMap({ case change @ evt.Change( spanValOld, spanValNew ) =>
+//               val pointOld = spanToPoint( spanValOld )
+//               (tree.get( pointOld ): Iterable[ LeafImpl[ S, Elem, U ]]).flatMap({ case (_, seq) =>
+////                        val moved: IIdxSeq[ Elem ] = seq.collect { case timed if timed.span == span => timed.value }
+//                  val moved /*: IIdxSeq[ TimedElem[ S, Elem ]] */ = seq.filter( _.span == span ) // collect { case timed if timed.span == span => timed.value }
+//                  // update in spatial structure
+//                  moved.foreach { timed =>
+//                     removeNoFire( spanValOld, timed )
+//                     addNoFire(    spanValNew, timed )
+//                  }
+//                  moved.map( timed => (change, timed) )
+//               })
+//            })
+//         })( breakOut )
+//         if( changes.isEmpty ) None else Some( BiGroup.Moved( group, changes ))
+      }
+
+      protected def writeData( out: DataOutput ) {
+         span.write( out )
+         elemSerializer.write( value, out )
+      }
+
+      protected def disposeData()( implicit tx: S#Tx ) {}
+
+      /* private[lucre] */ def connect()( implicit tx: S#Tx ) {
+         span.changed ---> this
+         eventView( value ) ---> this
+      }
+
+      /* private[lucre] */ def disconnect()( implicit tx: S#Tx ) {
+         span.changed -/-> this
+         eventView( value ) -/-> this
+      }
+
+      protected def reader: evt.Reader[ S, TimedElemImpl[ S, Elem, U ]] = sys.error( "TODO" )
    }
 
-   private implicit def leafSerializer[ S <: Sys[ S ], Elem ](
-      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, LeafImpl[ S, Elem ]] = sys.error( "TODO" )
+//   private implicit def leafSerializer[ S <: Sys[ S ], Elem ](
+//      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+//      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, LeafImpl[ S, Elem ]] = sys.error( "TODO" )
 
-   private implicit def timedSerializer[ S <: Sys[ S ], Elem ](
+   private implicit def timedSerializer[ S <: Sys[ S ], Elem, U ](
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, TimedElemImpl[ S, Elem ]] = sys.error( "TODO" )
+      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, TimedElemImpl[ S, Elem, U ]] = sys.error( "TODO" )
 
    private sealed trait Impl[ S <: Sys[ S ], Elem, U ]
    extends Var[ S, Elem, U ]
@@ -154,7 +212,7 @@ object BiGroupImpl {
    {
       group =>
 
-      protected def tree: Tree[ S, Elem ]
+      protected def tree: Tree[ S, Elem, U ]
       protected def eventView: Elem => EventLike[ S, U, Elem ]
       implicit protected def elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]
       implicit protected def spanType: Type[ SpanLike ]
@@ -163,7 +221,7 @@ object BiGroupImpl {
 
       // ---- event behaviour ----
 
-      private object CollChanged
+      private object CollChange
       extends evt.Trigger.Impl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
@@ -189,34 +247,35 @@ object BiGroupImpl {
             if( par.isEmpty ) {  // add or remove
                pull.resolve[ BiGroup.Collection[ S, Elem, U ]]
             } else {             // span key changed
-               val changes: IIdxSeq[ (Change[ SpanLike ], TimedElem[ S, Elem ]) ] = par.flatMap( sel => {
-                  val span = sel.devirtualize( spanType.serializer[ S ].asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
-                     .node.asInstanceOf[ Expr[ S, SpanLike ]]
-                  val changeOption = span.changed.pullUpdate( pull )
-                  // somehow the flatMap is shadowed in Option, so the implicit conversion
-                  // to Iterable doesn't kick in...
-                  (changeOption: Iterable[ Change[ SpanLike ]]).flatMap({ case change @ Change( spanValOld, spanValNew ) =>
-                     val pointOld = spanToPoint( spanValOld )
-                     (tree.get( pointOld ): Iterable[ LeafImpl[ S, Elem ]]).flatMap({ case (_, seq) =>
-//                        val moved: IIdxSeq[ Elem ] = seq.collect { case timed if timed.span == span => timed.value }
-                        val moved /*: IIdxSeq[ TimedElem[ S, Elem ]] */ = seq.filter( _.span == span ) // collect { case timed if timed.span == span => timed.value }
-                        // update in spatial structure
-                        moved.foreach { timed =>
-                           removeNoFire( spanValOld, timed )
-                           addNoFire(    spanValNew, timed )
-                        }
-                        moved.map( timed => (change, timed) )
-                     })
-                  })
-               })( breakOut )
-               if( changes.isEmpty ) None else Some( BiGroup.Moved( group, changes ))
+//               val changes: IIdxSeq[ (evt.Change[ SpanLike ], TimedElem[ S, Elem ]) ] = par.flatMap( sel => {
+//                  val span = sel.devirtualize( spanType.serializer[ S ].asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+//                     .node.asInstanceOf[ Expr[ S, SpanLike ]]
+//                  val changeOption = span.changed.pullUpdate( pull )
+//                  // somehow the flatMap is shadowed in Option, so the implicit conversion
+//                  // to Iterable doesn't kick in...
+//                  (changeOption: Iterable[ evt.Change[ SpanLike ]]).flatMap({ case change @ evt.Change( spanValOld, spanValNew ) =>
+//                     val pointOld = spanToPoint( spanValOld )
+//                     (tree.get( pointOld ): Iterable[ LeafImpl[ S, Elem, U ]]).flatMap({ case (_, seq) =>
+////                        val moved: IIdxSeq[ Elem ] = seq.collect { case timed if timed.span == span => timed.value }
+//                        val moved /*: IIdxSeq[ TimedElem[ S, Elem ]] */ = seq.filter( _.span == span ) // collect { case timed if timed.span == span => timed.value }
+//                        // update in spatial structure
+//                        moved.foreach { timed =>
+//                           removeNoFire( spanValOld, timed )
+//                           addNoFire(    spanValNew, timed )
+//                        }
+//                        moved.map( timed => (change, timed) )
+//                     })
+//                  })
+//               })( breakOut )
+//               if( changes.isEmpty ) None else Some( BiGroup.Moved( group, changes ))
+               None
             }
          }
       }
 
-      private object ElemChanged
-      extends evt.EventImpl[ S, BiGroup.Element[ S, Elem, U ], BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-      with evt.InvariantEvent[ S, BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]] {
+      private object ElemChange
+      extends evt.EventImpl[ S, BiGroup.Element[ S, Elem, U, _ ], BiGroup.Element[ S, Elem, U, _ ], BiGroup[ S, Elem, U ]]
+      with evt.InvariantEvent[ S, BiGroup.Element[ S, Elem, U, _ ], BiGroup[ S, Elem, U ]] {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 2
          def node: evt.Node[ S ] = group
@@ -232,21 +291,21 @@ object BiGroupImpl {
             eventView( elem ) -/-> this
          }
 
-         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Element[ S, Elem, U ]] = {
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Element[ S, Elem, U, _ ]] = {
             val changes: IIdxSeq[ (TimedElem[ S, Elem ], U) ] = pull.parents( this ).flatMap( sel => {
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
 //val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
 //   asInstanceOf[ Elem ]
-               val timed = sel.devirtualize( timedSerializer[ S, Elem ]).node.asInstanceOf[ TimedElemImpl[ S, Elem ]]
+               val timed = sel.devirtualize( timedSerializer[ S, Elem, U ]).node.asInstanceOf[ TimedElemImpl[ S, Elem, U ]]
                eventView( timed.value ).pullUpdate( pull ).map( u => (timed, u) )
 //               eventView( elem ).pullUpdate( pull ).map( u => (elem, u) )
             })( breakOut )
 
-            if( changes.isEmpty ) None else Some( BiGroup.Element( group, changes ))
+            if( changes.isEmpty ) None else Some( BiGroup.ElementChanged( group, changes ))
          }
       }
 
-      private object Changed
+      private object Change
       extends evt.Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.InvariantSelector[ S ] {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
@@ -257,17 +316,17 @@ object BiGroupImpl {
          def disconnect()( implicit tx: S#Tx ) {}
 
          private[lucre] def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
-            CollChanged ---> r
-            ElemChanged ---> r
+            CollChange ---> r
+            ElemChange ---> r
          }
          private[lucre] def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
-            CollChanged -/-> r
-            ElemChanged -/-> r
+            CollChange -/-> r
+            ElemChange -/-> r
          }
 
          private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Update[ S, Elem, U ]] = {
-            if( CollChanged.isSource( pull )) CollChanged.pullUpdate( pull )
-            else if( ElemChanged.isSource( pull )) ElemChanged.pullUpdate( pull )
+            if( CollChange.isSource( pull )) CollChange.pullUpdate( pull )
+            else if( ElemChange.isSource( pull )) ElemChange.pullUpdate( pull )
             else None
          }
 
@@ -276,8 +335,8 @@ object BiGroupImpl {
 
          def reactTx( fun: S#Tx => BiGroup.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] = {
             val obs = evt.Observer( serializer( eventView ), fun )
-            obs.add( CollChanged )
-            obs.add( ElemChanged )
+            obs.add( CollChange )
+            obs.add( ElemChange )
             obs
          }
 
@@ -292,7 +351,7 @@ object BiGroupImpl {
          tree.write( out )
       }
 
-      private def foreach( fun: TimedElemImpl[ S, Elem ] => Unit )( implicit tx: S#Tx ) {
+      private def foreach( fun: TimedElemImpl[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) {
          tree.iterator.foreach { case (_, seq) => seq.foreach( fun )}
       }
 
@@ -313,8 +372,8 @@ object BiGroupImpl {
       }
 
       final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
-         case 1 => CollChanged
-         case 2 => ElemChanged
+         case 1 => CollChange
+         case 2 => ElemChange
       }
 
       // ---- collection behaviour ----
@@ -327,7 +386,7 @@ object BiGroupImpl {
                seq.map { timed => BiGroup.Removed( this, spanVal, timed )}
             }
             tree.clear()
-            changes.foreach( CollChanged.apply )
+            changes.foreach( CollChange.apply )
 
          } else {
             tree.clear()
@@ -336,17 +395,18 @@ object BiGroupImpl {
 
       final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
          val spanVal = span.value
-         val timed   = new TimedElemImpl( span, elem )
+         val tgt     = evt.Targets[ S ]   // XXX partial?
+         val timed   = new TimedElemImpl[ S, Elem, U ]( eventView, tgt, span, elem )
          addNoFire( spanVal, timed )
          if( isConnected ) {
             sys.error( "TODO" )
 //            CollChanged += span
 //            ElemChanged += elem
-            CollChanged( BiGroup.Added( this, spanVal, timed ))
+            CollChange( BiGroup.Added( this, spanVal, timed ))
          }
       }
 
-      private def addNoFire( spanVal: SpanLike, timed: TimedElemImpl[ S, Elem ])( implicit tx: S#Tx ) {
+      private def addNoFire( spanVal: SpanLike, timed: TimedElemImpl[ S, Elem, U ])( implicit tx: S#Tx ) {
          val point   = spanToPoint( spanVal )
 //if( VERBOSE ) println( "add at point " + point )
 //         val entry   = (span, elem)
@@ -381,13 +441,13 @@ object BiGroupImpl {
             sys.error( "TODO" )
 //            CollChanged -= span
 //            ElemChanged -= elem
-            CollChanged( BiGroup.Removed( this, spanVal, timed ))
+            CollChange( BiGroup.Removed( this, spanVal, timed ))
          }
 
          timedO.isDefined
       }
 
-      private def removeNoFire( spanVal: SpanLike, timed: TimedElemImpl[ S, Elem ])( implicit tx: S#Tx ) : Boolean = {
+      private def removeNoFire( spanVal: SpanLike, timed: TimedElemImpl[ S, Elem, U ])( implicit tx: S#Tx ) : Boolean = {
          val point   = spanToPoint( spanVal )
 //         val entry   = (span, elem)
          tree.get( point ) match {
@@ -501,13 +561,13 @@ object BiGroupImpl {
          res
       }
 
-      final def collectionChanged : Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]] = CollChanged
-      final def elementChanged    : Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]] = ElemChanged
-      final def changed           : Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]] = Changed
+      final def collectionChanged : Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]] = CollChange
+      final def elementChanged    : Event[ S, BiGroup.Element[ S, Elem, U, _ ], BiGroup[ S, Elem, U ]] = ElemChange
+      final def changed           : Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]] = Change
    }
 
    private final class ImplNew[ S <: Sys[ S ], Elem, U ]( protected val targets: evt.Targets[ S ],
-                                                          protected val tree: Tree[ S, Elem ],
+                                                          protected val tree: Tree[ S, Elem, U ],
                                                           protected val eventView: Elem => EventLike[ S, U, Elem ])
                                                         ( implicit protected val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                                           protected val spanType: Type[ SpanLike ])

@@ -30,7 +30,7 @@ import de.sciss.lucre.stm.{IdentifierMap, Sys, InMemory, Cursor}
 import de.sciss.osc.Dump
 import de.sciss.lucre.event.Change
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
-import de.sciss.lucre.expr.Chronos
+import de.sciss.lucre.expr.{BiGroup, Chronos}
 
 //import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
@@ -105,12 +105,13 @@ object AuralPresentationImpl {
    }
 
    private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
-      def procAdded( p: Proc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+      def procAdded( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
 //         val name    = p.name.value
+         val p       = timed.value
          val graph   = p.graph
          val entries = p.par.entriesAt( chr.time )
          val aural   = AuralProc( server, /* name, */ graph, entries )
-         viewMap.put( p.id, aural )
+         viewMap.put( timed.id, aural )
          val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )
          if( playing ) {
@@ -120,17 +121,18 @@ object AuralPresentationImpl {
          }
       }
 
-      def procRemoved( p: Proc[ S ])( implicit tx: S#Tx ) {
-         viewMap.get( p.id ) match {
+      def procRemoved( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx ) {
+         val id = timed.id
+         viewMap.get( id ) match {
             case Some( aural ) =>
-               viewMap.remove( p.id )
+               viewMap.remove( id )
                implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural removed " + p + " -- playing? " + aural.playing )
+               logConfig( "aural removed " + timed.value + " -- playing? " + aural.playing )
                if( aural.playing ) {
                   aural.stop()
                }
             case _ =>
-               println( "WARNING: could not find view for proc " + p )
+               println( "WARNING: could not find view for proc " + timed.value )
          }
       }
 
@@ -167,14 +169,14 @@ object AuralPresentationImpl {
          }
       }
 
-      def procParamsChanged( p: Proc[ S ], changes: Map[ String, Param ])( implicit tx: S#Tx ) {
-         viewMap.get( p.id ) match {
+      def procParamsChanged( timed: BiGroup.TimedElem[ S, Proc[ S ]], changes: Map[ String, Param ])( implicit tx: S#Tx ) {
+         viewMap.get( timed.id ) match {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural freq changed " + p )
+               logConfig( "aural freq changed " + timed.value )
                aural.addParams( changes )
             case _ =>
-               println( "WARNING: could not find view for proc " + p )
+               println( "WARNING: could not find view for proc " + timed.value )
          }
       }
    }
