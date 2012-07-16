@@ -39,5 +39,6 @@ def shortresults[T](t: => T) = {
 import de.sciss.synth._; import ugen._; import proc._
 import de.sciss.lucre.stm.InMemory
 import de.sciss.lucre.expr.Span
+import expr.{Longs, Doubles, Spans}
 println( "To disable result types:\n :power\n :wrap shortresults\n: silent" )
 """
