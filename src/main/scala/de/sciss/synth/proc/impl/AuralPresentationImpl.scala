@@ -26,14 +26,11 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{IdentifierMap, Sys, InMemory, Cursor}
+import de.sciss.lucre.stm.{IdentifierMap, Sys, Cursor}
 import de.sciss.osc.Dump
-import de.sciss.lucre.event.Change
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
 import de.sciss.lucre.expr.{BiGroup, Chronos}
 
-//import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{Txn => ScalaTxn, TxnLocal}
 import SoundProcesses.logConfig
 
 object AuralPresentationImpl {
@@ -147,25 +144,25 @@ object AuralPresentationImpl {
 //         }
 //      }
 
-      def procPlayingChanged( p: Proc[ S ], newPlaying: Boolean )( implicit tx: S#Tx ) {
-         viewMap.get( p.id ) match {
+      def procPlayingChanged( timed: BiGroup.TimedElem[ S, Proc[ S ]], newPlaying: Boolean )( implicit tx: S#Tx ) {
+         viewMap.get( timed.id ) match {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural playing " + p + " -- " + newPlaying )
+               logConfig( "aural playing " + timed.value + " -- " + newPlaying )
                aural.playing = newPlaying
             case _ =>
-               println( "WARNING: could not find view for proc " + p )
+               println( "WARNING: could not find view for proc " + timed.value )
          }
       }
 
-      def procGraphChanged( p: Proc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ) {
-         viewMap.get( p.id ) match {
+      def procGraphChanged( timed: BiGroup.TimedElem[ S, Proc[ S ]], newGraph: SynthGraph )( implicit tx: S#Tx ) {
+         viewMap.get( timed.id ) match {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural graph changed " + p )
+               logConfig( "aural graph changed " + timed.value )
                aural.graph = newGraph
             case _ =>
-               println( "WARNING: could not find view for proc " + p )
+               println( "WARNING: could not find view for proc " + timed.value )
          }
       }
 

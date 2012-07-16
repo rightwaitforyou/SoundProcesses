@@ -81,13 +81,13 @@ object VisualInstantPresentationImpl {
          def advance( time: Long, added: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
                                 removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
                                  params: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])])( implicit tx: S#Tx ) {
-            val vpRem = removed.flatMap { case (span, proc) =>
-               map.get( proc.id ).flatMap { vpm =>
-                  map.remove( proc.id )
+            val vpRem = removed.flatMap { case (span, timed) =>
+               map.get( timed.id ).flatMap { vpm =>
+                  map.remove( timed.id )
                   vpm.get( span ).flatMap {
                      case vp :: tail =>
                         if( tail.nonEmpty ) {
-                           map.put( proc.id, vpm + (span -> tail) )
+                           map.put( timed.id, vpm + (span -> tail) )
                         }
                         Some( vp )
                      case _ =>
@@ -113,8 +113,8 @@ object VisualInstantPresentationImpl {
             }
             val hasAdd = vpAdd.nonEmpty
 
-            val vpMod = params.flatMap { case (span, proc, ch) =>
-               map.get( proc.id ).flatMap( _.getOrElse( span, Nil ).headOption ).map( _ -> ch )
+            val vpMod = params.flatMap { case (span, timed, ch) =>
+               map.get( timed.id ).flatMap( _.getOrElse( span, Nil ).headOption ).map( _ -> ch )
             }
             val hasMod = vpMod.nonEmpty
 
