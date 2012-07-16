@@ -33,7 +33,7 @@ object LinkedList {
    }
 
    def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
-                                       ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ]) : Var[ S, Elem, U ] =
+                                       ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : Var[ S, Elem, U ] =
       LinkedListImpl.newVar( eventView )
 }
 trait LinkedList[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
