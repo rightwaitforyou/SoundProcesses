@@ -45,19 +45,6 @@ object TransportImpl {
       }
    }
 
-//   private final class TimeExpr[ S <: Sys[ S ]]( protected val targets: Targets[ S ], t: Impl[ S ])
-//   extends Expr.Node[ S, Long ]
-//   with Root[ S, Change[ Long ]] {
-//      protected def writeData( out: DataOutput ) {
-//         out.writeUnsignedByte( 4 )
-//         t.write( out )
-//      }
-//
-//      def value( implicit tx: S#Tx ) : Long = sys.error( "TODO" )
-//
-//      protected def reader : Reader[ S, Expr[ S, Long ]] = Longs.serializer[ S ]
-//   }
-
    private lazy val pool : ScheduledExecutorService = {        // system wide scheduler
       val res = Executors.newScheduledThreadPool( 1 )
       sys.addShutdownHook {
@@ -245,19 +232,6 @@ if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + ef
       def time( implicit tx: S#Tx ) : Long = lastTime.get   // XXX // Expr[ S, Long ] = timeExpr
 
       // ---- event stuff ----
-
-
-//      def connect()( implicit tx: S#Tx ) {
-//
-//      }
-//
-//      def disconnect()( implicit tx: S#Tx ) {
-//
-//      }
-//
-//      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Transport.Update[ S, Proc[ S ]]] = {
-//         sys.error( "TODO" )
-//      }
 
       def changed : Event[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]] = this
 

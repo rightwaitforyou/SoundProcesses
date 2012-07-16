@@ -70,17 +70,6 @@ object BiGroupImpl {
       case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
    }
 
-   def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
-      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-      spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = {
-
-      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
-      implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
-      implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
-      val tree: Tree[ S, Elem, U ] = SkipOctree.empty[ S, TwoDim, LeafImpl[ S, Elem, U ]]( MAX_SQUARE )
-      new Impl( evt.Targets[ S ], tree, eventView )
-   }
-
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, BiGroup[ S, Elem, U ]] = new Ser( eventView )
@@ -97,15 +86,32 @@ object BiGroupImpl {
       read( in, access, targets, eventView )
    }
 
+   def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = {
+
+      new Impl( evt.Targets[ S ], eventView ) {
+         val tree: Tree[ S, Elem, U ] = {
+//            implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
+            implicit val timeSer    = TimedSer        // XXX why is TimedSer not found, while it is in read?
+            implicit val hyperSer   = this.hyperSer   // XXX why is hyperSer not found, while it is in read?
+            SkipOctree.empty[ S, TwoDim, LeafImpl[ S, Elem, U ]]( MAX_SQUARE )
+         }
+      }
+   }
+
    private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
                                              ( implicit tx: S#Tx,
                                                elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                                spanType: Type[ SpanLike ]) : Impl[ S, Elem, U ] = {
-      implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
-      implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
-      implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
-      val tree: Tree[ S, Elem, U ] = SkipOctree.read[ S, TwoDim, LeafImpl[ S, Elem, U ]]( in, access )
-      new Impl( targets, tree, eventView )
+      new Impl( targets, eventView ) {
+         val tree: Tree[ S, Elem, U ] = {
+//            implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+//            implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
+//            implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
+            SkipOctree.read[ S, TwoDim, LeafImpl[ S, Elem, U ]]( in, access )
+         }
+      }
    }
 
    private class Ser[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
@@ -168,22 +174,18 @@ object BiGroupImpl {
          eventView( value ) -/-> this
       }
 
-      protected def reader: evt.Reader[ S, TimedElemImpl[ S, Elem, U ]] = timedSerializer[ S, Elem, U ]
+      protected def reader: evt.Reader[ S, TimedElemImpl[ S, Elem, U ]] = group.TimedSer // timedSerializer[ S, Elem, U ]
    }
 
-//   private implicit def leafSerializer[ S <: Sys[ S ], Elem ](
+//   private implicit def timedSerializer[ S <: Sys[ S ], Elem, U ](
 //      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-//      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, LeafImpl[ S, Elem ]] = sys.error( "TODO" )
+//      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, TimedElemImpl[ S, Elem, U ]] = new TimedSer
+//
 
-   private implicit def timedSerializer[ S <: Sys[ S ], Elem, U ](
-      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, TimedElemImpl[ S, Elem, U ]] = sys.error( "TODO" )
-
-   private final class Impl[ S <: Sys[ S ], Elem, U ]( protected val targets: evt.Targets[ S ],
-                                                       protected val tree: Tree[ S, Elem, U ],
-                                                       val eventView: Elem => EventLike[ S, U, Elem ])
-                                                     ( implicit val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-                                                       val spanType: Type[ SpanLike ])
+   private abstract class Impl[ S <: Sys[ S ], Elem, U ](
+      protected val targets: evt.Targets[ S ], val eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      val spanType: Type[ SpanLike ])
    extends Var[ S, Elem, U ]
 //   with evt.Compound[ S, Impl[ S, Elem, U ], Impl.type ]
 //   with evt.Trigger.Impl[ S, BiGroup.Update[ S, Elem, U ], BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
@@ -192,12 +194,23 @@ object BiGroupImpl {
    {
       group =>
 
-//      protected def tree: Tree[ S, Elem, U ]
+      implicit def pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+      implicit def hyperSer   = SpaceSerializers.LongSquareSerializer
+
+      protected def tree: Tree[ S, Elem, U ]
 //      def eventView: Elem => EventLike[ S, U, Elem ]
 //      implicit def elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]
 //      implicit def spanType: Type[ SpanLike ]
 
       override def toString() = "BiGroup" + tree.id
+
+      implicit object TimedSer extends evt.NodeSerializer[ S, TimedElemImpl[ S, Elem, U ]] {
+         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : TimedElemImpl[ S, Elem, U ] = {
+            val span    = spanType.readExpr( in, access )
+            val value   = elemSerializer.read( in, access )
+            new TimedElemImpl( group, targets, span, value )
+         }
+      }
 
       // ---- event behaviour ----
 
@@ -255,7 +268,7 @@ object BiGroupImpl {
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
 //val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
 //   asInstanceOf[ Elem ]
-               val timed = sel.devirtualize( timedSerializer[ S, Elem, U ]).node.asInstanceOf[ TimedElemImpl[ S, Elem, U ]]
+               val timed = sel.devirtualize( TimedSer /* timedSerializer[ S, Elem, U ]*/).node.asInstanceOf[ TimedElemImpl[ S, Elem, U ]]
                val ch0 = timed.pullUpdate( pull ).getOrElse( IIdxSeq.empty )
                ch0.map {
                   case ch @ BiGroup.Moved( evt.Change( spanValOld, spanValNew )) =>
