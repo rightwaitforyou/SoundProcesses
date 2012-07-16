@@ -183,7 +183,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
 
    def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
    def elementChanged:     Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]]
-   def changed :           Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]]
+   def changed:            Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ]
 }
