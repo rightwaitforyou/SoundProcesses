@@ -144,7 +144,7 @@ object AuralPresentationImpl {
 //println( "AQUI: added = " + added + "; removed = " + removed )
                   removed.foreach { case (_, p)    => booted.procRemoved( p )}
                   params.foreach  { case (_, p, m) => booted.procParamsChanged( p, m )}
-                  added.foreach   { case (_, p)    => booted.procAdded(   p )}
+                  added.foreach   { case (_, p)    => booted.procAdded( p )}
                case _ =>
             }}
          }

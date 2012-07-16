@@ -43,7 +43,7 @@ import prefuse.visual.VisualItem
 import de.sciss.lucre.expr.SpanLike
 import prefuse.action.assignment.ColorAction
 import prefuse.util.ColorLib
-import prefuse.render.{LabelRenderer, DefaultRendererFactory}
+import prefuse.render.DefaultRendererFactory
 import prefuse.util.force.{AbstractForce, ForceItem}
 
 object VisualInstantPresentationImpl {
@@ -80,7 +80,7 @@ object VisualInstantPresentationImpl {
 
          def advance( time: Long, added: IIdxSeq[ (SpanLike, Proc[ S ])],
                                 removed: IIdxSeq[ (SpanLike, Proc[ S ])],
-                                params: IIdxSeq[ (SpanLike, Proc[ S ], Map[ String, Param ])])( implicit tx: S#Tx ) {
+                                 params: IIdxSeq[ (SpanLike, Proc[ S ], Map[ String, Param ])])( implicit tx: S#Tx ) {
             val vpRem = removed.flatMap { case (span, proc) =>
                map.get( proc.id ).flatMap { vpm =>
                   map.remove( proc.id )
@@ -110,9 +110,16 @@ object VisualInstantPresentationImpl {
                vp
             }
             val hasAdd = vpAdd.nonEmpty
-            if( hasAdd || hasRem ) onEDT {
-               if( hasAdd ) vis.add(    vpAdd: _* )
+
+            val vpMod = params.flatMap { case (span, proc, ch) =>
+               map.get( proc.id ).flatMap( _.getOrElse( span, Nil ).headOption ).map( _ -> ch )
+            }
+            val hasMod = vpMod.nonEmpty
+
+            if( hasAdd || hasRem || hasMod ) onEDT {
+               if( hasAdd ) vis.add( vpAdd: _* )
                if( hasRem ) vis.remove( vpRem: _* )
+               if( hasMod ) vis.updated( vpMod: _* )
             }
          }
 
@@ -265,6 +272,14 @@ object VisualInstantPresentationImpl {
 //         vps --= procs
          visDo {
             vps.foreach( rem1 )
+         }
+      }
+
+      def updated( pairs: (VisualProc, Map[ String, Param ])* ) {
+         visDo {
+            pairs.foreach { case (vp, map) =>
+               vp.par ++= map
+            }
          }
       }
 
