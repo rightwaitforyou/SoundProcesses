@@ -39,16 +39,16 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( server: Server, initName: String, initGraph: SynthGraph, entries: Map[ String, Param ]) : AuralProc = {
-      new Impl( server, initName, initGraph, entries )
+   def apply( server: Server, /* initName: String, */ initGraph: SynthGraph, entries: Map[ String, Param ]) : AuralProc = {
+      new Impl( server, /* initName, */ initGraph, entries )
    }
 
-   private final class Impl( val server: Server, name0: String, graph0: SynthGraph, entries0: Map[ String, Param ])
+   private final class Impl( val server: Server, /* name0: String, */ graph0: SynthGraph, entries0: Map[ String, Param ])
    extends AuralProc {
 
       private val groupRef    = ScalaRef( Option.empty[ RichGroup ])
       private val synthRef    = ScalaRef( Option.empty[ RichSynth ])
-      private val nameRef     = ScalaRef( name0 )
+//      private val nameRef     = ScalaRef( name0 )
       private val graphRef    = ScalaRef( graph0 )
 //      private val synthDefRef = ScalaRef( Option.empty[ RichSynthDef ])
 
@@ -65,8 +65,8 @@ object AuralProc {
          }
       }
 
-      def name( implicit tx: ProcTxn ) : String = nameRef.get( tx.peer )
-      def name_=( n: String )( implicit tx: ProcTxn ) { nameRef.set( n )( tx.peer )}
+//      def name( implicit tx: ProcTxn ) : String = nameRef.get( tx.peer )
+//      def name_=( n: String )( implicit tx: ProcTxn ) { nameRef.set( n )( tx.peer )}
 
       def play()( implicit tx: ProcTxn ) {
          val gr         = graph
@@ -94,25 +94,26 @@ object AuralProc {
          if( p ) play() else stop()
       }
 
-//      def freq( implicit tx: ProcTxn ) : Double = freqRef.get( tx.peer )
-//      def freq_=( f: Double )( implicit tx: ProcTxn ) {
-//         implicit val itx = tx.peer
-//         val old = freqRef.swap( f )
-//         if( f != old ) {
-//            synthRef.get.foreach( _.set( true, "freq" -> f ))
-//         }
-//      }
+      def addParams( map: Map[ String, Param ])( implicit tx: ProcTxn ) {
+         if( map.nonEmpty ) {
+            implicit val itx = tx.peer
+            entriesRef.transform( _ ++ map )
+            synthRef.get.foreach( _.set( true, map.map( tup => tup: ControlSetMap )( breakOut ): _* ))
+         }
+      }
    }
 }
 sealed trait AuralProc /* extends Writer */ {
    def server : Server
-   def name( implicit tx: ProcTxn ) : String
-   def name_=( n: String )( implicit tx: ProcTxn ) : Unit
+//   def name( implicit tx: ProcTxn ) : String
+//   def name_=( n: String )( implicit tx: ProcTxn ) : Unit
    def group( implicit tx: ProcTxn ) : Option[ RichGroup ]
    def play()( implicit tx: ProcTxn ) : Unit
    def playing( implicit tx: ProcTxn ) : Boolean
    def playing_=( p: Boolean )( implicit tx: ProcTxn ) : Unit
    def stop()( implicit tx: ProcTxn ) : Unit
+
+   def addParams( map: Map[ String, Param ])( implicit tx: ProcTxn ) : Unit
 
    def graph( implicit tx: ProcTxn ) : SynthGraph
    def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) : Unit

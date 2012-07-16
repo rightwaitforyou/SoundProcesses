@@ -63,7 +63,9 @@ object Span {
       def intersect( that: SpanLike ) : SpanLike = that
       def clip( pos: Long ) : Long = pos
       def invert : Void.type = Void
-   
+
+      def compareStart( pos: Long )    = -1
+      def compareStop(  pos: Long )    = 1
       def contains( pos: Long )        = true
       def contains( that: SpanLike )   = that != Void
       def overlaps( that: SpanLike )   = that match {
@@ -91,6 +93,8 @@ object Span {
       def shift( delta: Long ) : From = From( start + delta )
       def invert : Until = Until( start )
    
+      def compareStart( pos: Long )    = if( start < pos ) -1 else if( start > pos ) 1 else 0
+      def compareStop(  pos: Long )    = 1
       def contains( pos: Long ) : Boolean = pos >= start
    
       def contains( that: SpanLike ) : Boolean = that match {
@@ -164,6 +168,8 @@ object Span {
       def shift( delta: Long ) : Until = Until( stop + delta )
       def invert : From = From( stop )
    
+      def compareStart( pos: Long )    = -1
+      def compareStop(  pos: Long )    = if( stop < pos ) -1 else if( stop > pos ) 1 else 0
       def contains( pos: Long ) : Boolean = pos < stop
    
       def contains( that: SpanLike ) : Boolean = that match {
@@ -256,6 +262,8 @@ object Span {
       def subtract( that: SpanLike ) : IIdxSeq[ Closed ] = IIdxSeq.empty
       def clip( pos: Long ) : Long = pos
    
+      def compareStart( pos: Long )    = 1
+      def compareStop(  pos: Long )    = -1
       def contains( pos: Long )        = false
       def contains( that: SpanLike )   = false
       def overlaps( that: SpanLike )   = false
@@ -276,7 +284,9 @@ object Span {
 
       def length: Long = stop - start
 
-      def contains( pos: Long ) : Boolean = pos >= start && pos < stop
+      def compareStart( pos: Long ) = if( start < pos ) -1 else if( start > pos ) 1 else 0
+      def compareStop(  pos: Long ) = if( stop  < pos ) -1 else if( stop  > pos ) 1 else 0
+      def contains( pos: Long )     = pos >= start && pos < stop
 
       def shift( delta: Long ) : Span = Span( start + delta, stop + delta )
 
@@ -449,6 +459,24 @@ sealed trait SpanLike extends Writer {
     *  @return		<code>true</code>, if <code>start <= pos < stop</code>
     */
    def contains( pos: Long ) : Boolean
+
+   /**
+    * Compares the span's start to a given position
+    *
+    *  @return		<code>-1</code>, if the span start lies before the query position,
+    *             <code>1</code>, if it lies after that position, or
+    *             <code>0</code>, if both are the same
+    */
+   def compareStart( pos: Long ) : Int
+
+   /**
+    * Compares the span's stop to a given position
+    *
+    *  @return		<code>-1</code>, if the span stop lies before the query position,
+    *             <code>1</code>, if it lies after that position, or
+    *             <code>0</code>, if both are the same
+    */
+   def compareStop( pos: Long ) : Int
 
    /**
     *  Checks if another span lies within the span. The result is `false`

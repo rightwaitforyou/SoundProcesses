@@ -142,22 +142,9 @@ object AuralPresentationImpl {
                case Transport.Advance( tr, true, time, added, removed, params ) =>
                   implicit val chr: Chronos[ S ] = tr
 //println( "AQUI: added = " + added + "; removed = " + removed )
-                  removed.foreach { case (_, p) => booted.procRemoved( p )}
-                  params.foreach  { case (_, p, m) => /* XXX TODO */ }
-                  added.foreach   { case (_, p) => booted.procAdded(   p )}
-//               case ProcGroup.Element( _, changes ) =>
-//                  changes.foreach {
-//                     case Proc.Renamed( proc, Change( _, newName )) =>
-//                        booted.procRenamed( proc, newName )
-//                     case Proc.GraphChanged( proc, Change( _, newGraph )) =>
-//                        booted.procGraphChanged( proc, newGraph )
-////                     case Proc.PlayingChanged( proc, Change( _, newPlaying )) =>
-////                        booted.procPlayingChanged( proc, newPlaying )
-////                     case Proc.FreqChanged( proc, Change( _, newFreq )) =>
-////                        booted.procFreqChanged( proc, newFreq )
-//case _ =>
-//                  }
-//                  println( changes.mkString( "aural changes: ", ",", "" ))
+                  removed.foreach { case (_, p)    => booted.procRemoved( p )}
+                  params.foreach  { case (_, p, m) => booted.procParamsChanged( p, m )}
+                  added.foreach   { case (_, p)    => booted.procAdded(   p )}
                case _ =>
             }}
          }
@@ -166,10 +153,10 @@ object AuralPresentationImpl {
 
    private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
       def procAdded( p: Proc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         val name    = p.name.value
+//         val name    = p.name.value
          val graph   = p.graph
          val entries = p.par.entriesAt( chr.time )
-         val aural   = AuralProc( server, name, graph, entries )
+         val aural   = AuralProc( server, /* name, */ graph, entries )
          viewMap.put( p.id, aural )
          val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )
@@ -194,16 +181,16 @@ object AuralPresentationImpl {
          }
       }
 
-      def procRenamed( p: Proc[ S ], newName: String )( implicit tx: S#Tx ) {
-         viewMap.get( p.id ) match {
-            case Some( aural ) =>
-               implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural renamed " + p + " -- " + newName )
-               aural.name = newName
-            case _ =>
-               println( "WARNING: could not find view for proc " + p )
-         }
-      }
+//      def procRenamed( p: Proc[ S ], newName: String )( implicit tx: S#Tx ) {
+//         viewMap.get( p.id ) match {
+//            case Some( aural ) =>
+//               implicit val ptx = ProcTxn()( tx.peer )
+//               logConfig( "aural renamed " + p + " -- " + newName )
+//               aural.name = newName
+//            case _ =>
+//               println( "WARNING: could not find view for proc " + p )
+//         }
+//      }
 
       def procPlayingChanged( p: Proc[ S ], newPlaying: Boolean )( implicit tx: S#Tx ) {
          viewMap.get( p.id ) match {
@@ -227,15 +214,15 @@ object AuralPresentationImpl {
          }
       }
 
-//      def procFreqChanged( p: Proc[ S ], newFreq: Double )( implicit tx: S#Tx ) {
-//         viewMap.get( p.id ) match {
-//            case Some( aural ) =>
-//               implicit val ptx = ProcTxn()( tx.peer )
-//               logConfig( "aural freq changed " + p )
-//               aural.freq = newFreq
-//            case _ =>
-//               println( "WARNING: could not find view for proc " + p )
-//         }
-//      }
+      def procParamsChanged( p: Proc[ S ], changes: Map[ String, Param ])( implicit tx: S#Tx ) {
+         viewMap.get( p.id ) match {
+            case Some( aural ) =>
+               implicit val ptx = ProcTxn()( tx.peer )
+               logConfig( "aural freq changed " + p )
+               aural.addParams( changes )
+            case _ =>
+               println( "WARNING: could not find view for proc " + p )
+         }
+      }
    }
 }

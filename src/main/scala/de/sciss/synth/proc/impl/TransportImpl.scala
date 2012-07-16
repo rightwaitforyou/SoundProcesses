@@ -198,8 +198,7 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
                par.keys.foreach { key =>
                   par.get( key ).foreach { bi =>
                      bi.nearestEventAfter( searchStart ) match {
-                        // XXX TODO : also span.start should be < time, to avoid events from newly started procs
-                        case Some( time ) if time < parMin && span.contains( time ) => parMin = time
+                        case Some( time ) if (time < parMin) && (span.compareStart( time ) < 0) && (span.compareStop( time ) > 0) => parMin = time
                         case _ =>
                      }
                   }

@@ -26,9 +26,10 @@ object Transport {
                                                     params:  IIdxSeq[ (SpanLike, Elem, Map[ String, Param ])])
    extends Update[ S, Elem ] {
       override def toString =
-         (if( playing ) "Advance" else "Seek") +
-            "(" + transport + (if( added.nonEmpty )   added.mkString(   ", added = ",   ",", "" ) else "") +
-                              (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", "" ) else "") + ")"
+         (if( playing ) "Advance" else "Seek") + "(" + transport + ", " + time +
+            (if( added.nonEmpty )   added.mkString(   ", added = ",   ",", "" ) else "") +
+            (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", "" ) else "") +
+            (if( params.nonEmpty )  params.mkString(  ", params = ",  ",", "" ) else "") + ")"
    }
 
    final case class Play[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
