@@ -46,17 +46,16 @@ object BiGroup {
    final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem ])
    extends Collection[ S, Elem, U ]
 
-   sealed trait Element[ S <: Sys[ S ], Elem, U, V ] extends Update[ S, Elem, U ] {
-      def changes: IIdxSeq[ (TimedElem[ S, Elem ], V) ]
-   }
+   final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ],
+                                                       changes: IIdxSeq[ (TimedElem[ S, Elem ], ElementUpdate[ U ])])
+   extends Update[ S, Elem, U ]
+//   {
+//      def changes: IIdxSeq[ (TimedElem[ S, Elem ], V) ]
+//   }
 
-   final case class ElementMoved[ S <: Sys[ S ], Elem, U ](
-      group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (TimedElem[ S, Elem ], evt.Change[ SpanLike ])])
-   extends Element[ S, Elem, U, evt.Change[ SpanLike ]]
-
-   final case class ElementChanged[ S <: Sys[ S ], Elem, U ](
-      group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (TimedElem[ S, Elem ], U) ])
-   extends Element[ S, Elem, U, U ]
+   sealed trait ElementUpdate[ +U ]
+   final case class Moved( change: evt.Change[ SpanLike ]) extends ElementUpdate[ Nothing ]
+   final case class Mutated[ U ]( change: U ) extends ElementUpdate[ U ]
 
 //   type TimedElem[ S <: Sys[ S ], Elem ] = (Expr[ S, SpanLike ], Elem)
    type Leaf[ S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem ]])
@@ -183,7 +182,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
    def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-   def elementChanged:     Event[ S, BiGroup.Element[ S, Elem, U, _ ], BiGroup[ S, Elem, U ]]
+   def elementChanged:     Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]]
    def changed :           Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ]
