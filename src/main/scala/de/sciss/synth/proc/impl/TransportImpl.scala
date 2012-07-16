@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm.{Cursor, Sys}
-import de.sciss.lucre.expr.{SpanLike, Span, Expr}
+import de.sciss.lucre.expr.{BiGroup, SpanLike, Span, Expr}
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.{event => evt}
 import evt.Event
@@ -68,9 +68,14 @@ println( "Shutting down scheduler thread pool" )
    }
    private val cpuTime = STMTxnLocal( System.nanoTime()/1000 ) // system wide wall clock in microseconds
 
-   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Proc[ S ])])) : IIdxSeq[ (SpanLike, Proc[ S ])] = {
+//   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Proc[ S ])])) : IIdxSeq[ (SpanLike, Proc[ S ])] = {
+//      val span = in._1
+//      in._2.map { case (_, proc) => (span, proc) }
+//   }
+
+   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ BiGroup.TimedElem[ S, Proc[ S ]]])) : IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])] = {
       val span = in._1
-      in._2.map { case (_, proc) => (span, proc) }
+      in._2.map { span -> _ }
    }
 
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: evt.Targets[ S ],
@@ -104,7 +109,7 @@ println( "Shutting down scheduler thread pool" )
          lastTime.dispose()
       }
 
-      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, Elem)] =
+      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])] =
          group.intersect( time ).flatMap( flatSpans )
 
       def seek( time: Long )( implicit tx: S#Tx ) {
@@ -135,10 +140,10 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
          } else (IIdxSeq.empty, IIdxSeq.empty)
 
          val params = if( hasParEvent  ) {
-            var res = IIdxSeq.empty[ (SpanLike, Proc[ S ], Map[ String, Param ])]
+            var res = IIdxSeq.empty[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])]
             group.intersect( newFrame ).foreach { case (span, entries) =>
-               entries.foreach { case (_, proc) =>
-                  val par = proc.par
+               entries.foreach { case timed =>
+                  val par = timed.value.par
                   var map = Map.empty[ String, Param ]
                   par.keys.foreach { key =>
                      par.get( key ).foreach { bi =>
@@ -149,7 +154,7 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
                         }
                      }
                   }
-                  if( map.nonEmpty ) res :+= (span, proc, map)
+                  if( map.nonEmpty ) res :+= (span, timed, map)
                }
             }
             res
@@ -193,8 +198,8 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
          }
          var parMin = Long.MaxValue
          group.intersect( innerSpan ).foreach { case (span, entries) =>
-            entries.foreach { case (_, proc) =>
-               val par = proc.par
+            entries.foreach { case timed =>
+               val par = timed.value.par
                par.keys.foreach { key =>
                   par.get( key ).foreach { bi =>
                      bi.nearestEventAfter( searchStart ) match {
