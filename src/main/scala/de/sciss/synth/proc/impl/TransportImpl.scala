@@ -47,13 +47,15 @@ object TransportImpl {
 
    private lazy val pool : ScheduledExecutorService = {        // system wide scheduler
       val res = Executors.newScheduledThreadPool( 1 )
-      sys.addShutdownHook {
-println( "Shutting down scheduler thread pool" )
-         res.shutdown() // res.shutdownNow()
-      }
+      sys.addShutdownHook( shutdownScheduler() )
       res
    }
    private val cpuTime = STMTxnLocal( System.nanoTime()/1000 ) // system wide wall clock in microseconds
+
+   def shutdownScheduler() {
+     println( "Shutting down scheduler thread pool" )
+     pool.shutdown()
+   }
 
 //   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Proc[ S ])])) : IIdxSeq[ (SpanLike, Proc[ S ])] = {
 //      val span = in._1

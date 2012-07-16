@@ -24,6 +24,8 @@ retrieveManaged := true
 
 scalacOptions ++= Seq( "-deprecation", "-unchecked", "-no-specialization" )   // "-Xelide-below", "INFO"
 
+fork in run := true  // required for shutdown hook, and also the scheduled thread pool, it seems
+
 initialCommands in console := """// thanks to Rex Kerr for this trick (http://www.scala-lang.org/node/11813)
 def shortresults[T](t: => T) = {
    val s = t.toString
