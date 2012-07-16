@@ -140,7 +140,29 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    import BiPin.Leaf
 
 //   def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
+
+   /**
+    * Queries the element valid for the given point in time.
+    * Unlike, `intersect`, if there are multiple elements sharing
+    * the same point in time, this returns the most recently added element.
+    *
+    * We propose that this should be the unambiguous way to evaluate
+    * the `BiPin` for a given moment in time.
+    *
+    * @param time the query time point
+    * @return  an element for the given time point
+    */
    def at( time: Long )( implicit tx: S#Tx ) : Elem
+
+   /**
+    * Queries all elements which are found at a given point in time.
+    * There may be multiple time expressions which are not equal but
+    * evaluate to the same moment in time. It is thus possible that
+    * for a given point, multiple elements are found.
+    *
+    * @param time the query point
+    * @return  the sequence of elements found along with their time expressions
+    */
    def intersect( time: Long )( implicit tx: S#Tx ) : Leaf[ S, Elem ]
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
