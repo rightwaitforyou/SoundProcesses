@@ -49,56 +49,9 @@ object AuralPresentationImpl {
       boot
    }
 
-//   private sealed trait Action // [ S <: Sys[ S ]]
-//   private final case class ActionPlay() extends Action
-//   private final case class ActionStop() extends Action
-//
-//   private object Actions {
-//      def empty[ S <: Sys[ S ]] : Actions[ S ] = // anyEmpty.asInstanceOf[ Actions[ S ]]
-//         sys.error( "TODO" )
-//
-////      private val anyEmpty = Actions[ InMemory ]( Map.empty )
-//   }
-//   private case class Actions[ S <: Sys[ S ]]( map: Map[ AuralProc, Action ]) {
-//      def nonEmpty : Boolean = map.nonEmpty
-//
-//      def addPlay( p: Proc[ S ]) : Actions[ S ] = {
-//         map.get( p ) match {
-//            case Some( ActionStop() )  => this.copy( map = map - p )
-//            case None                  => this.copy( map = map + (p -> ActionPlay()) )
-//            case _                     => this
-//         }
-//      }
-//
-//      def addStop( p: Proc[ S ]) : Actions[ S ] = {
-//         map.get( p ) match {
-//            case Some( ActionPlay() )  => this.copy( map = map - p )
-//            case None                  => this.copy( map = map + (p -> ActionStop()) )
-//            case _                     => this
-//         }
-//      }
-//   }
-
    private final class Boot[ S <: Sys[ S ], A ]( transportA: S#Entry[ A ], config: Server.Config,
                                                  cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]])
    extends AuralPresentation[ S ] {
-
-//      private val actions: TxnLocal[ Actions[ S ]] = TxnLocal( initialValue = { implicit itx =>
-//         ScalaTxn.beforeCommit { implicit itx =>
-//            val m = actions().map
-//            if( m.nonEmpty ) ScalaTxn.afterCommit { _ =>
-//               processActions( m )
-//            }
-//         }
-//         Actions.empty[ S ]
-//      })
-
-//      private def processActions( m: Map[ Proc[ S ], Action ]) {
-//         m.foreach {
-//            case (p, ActionPlay()) =>
-//            case (p, ActionStop()) =>
-//         }
-//      }
 
       private val sync        = new AnyRef
       private var connection  = Option.empty[ Either[ ServerConnection, Server ]]

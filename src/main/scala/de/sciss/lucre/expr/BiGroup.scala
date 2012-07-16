@@ -40,13 +40,28 @@ object BiGroup {
 //      def elem: Elem
 //      def span: SpanLike
    }
-   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: Elem ) extends Collection[ S, Elem, U ]
-   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: Elem ) extends Collection[ S, Elem, U ]
-   final case class Moved[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (evt.Change[ SpanLike ], Elem) ]) extends Collection[ S, Elem, U ]
-   final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ]) extends Update[ S, Elem, U ]
+   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem ])
+   extends Collection[ S, Elem, U ]
 
-   type TimedElem[ S <: Sys[ S ], Elem ] = (Expr[ S, SpanLike ], Elem)
-   type Leaf[      S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem ]])
+   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem ])
+   extends Collection[ S, Elem, U ]
+
+   final case class Moved[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ],
+                                                     changes: IIdxSeq[ (evt.Change[ SpanLike ], TimedElem[ S, Elem ])])
+   extends Collection[ S, Elem, U ]
+
+   final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ],
+                                                       changes: IIdxSeq[ (TimedElem[ S, Elem ], U) ])
+   extends Update[ S, Elem, U ]
+
+//   type TimedElem[ S <: Sys[ S ], Elem ] = (Expr[ S, SpanLike ], Elem)
+   type Leaf[ S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem ]])
+
+   trait TimedElem[ S <: Sys[ S ], Elem ] {
+      def id: S#ID
+      def span: Expr[ S, SpanLike ]
+      def value: Elem
+   }
 
    def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
       BiGroupImpl.newVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
