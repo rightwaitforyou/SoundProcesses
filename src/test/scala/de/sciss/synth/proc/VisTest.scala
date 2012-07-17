@@ -57,7 +57,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    type Acc = (ProcGroupX.Var[ S ], Transport[ S, Proc[ S ]])
 
    object Implicits {
-      implicit val procVarSer       = ProcGroupX.varSerializer[ S ]
+      implicit val procVarSer       = ProcGroupX.Modifiable.serializer[ S ]
       implicit val accessTransport  = (tup: Acc) => tup._2
       implicit val transportSer     = Transport.serializer[ S, Acc ]( access ) // ( cursor, _._2 )
    }
@@ -66,7 +66,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    lazy val access: S#Entry[ Acc ] = system.root { implicit tx =>
       implicit def longType = Longs
-      val g = ProcGroupX.newVar[ S ]
+      val g = ProcGroupX.Modifiable[ S ]
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
