@@ -54,7 +54,7 @@ object BiPinImpl {
       new ImplNew( evt.Targets[ S ], tree, eventView )
    }
 
-   def newConfluentModifiable[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
+   def newPartialModifiable[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] = {
 

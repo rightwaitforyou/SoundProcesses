@@ -121,7 +121,7 @@ object ProcImpl {
    private final class EntrySer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, EntryNode[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : EntryNode[ S ] = {
          val key     = in.readString()
-         val value   = BiPin.readExprModifiable( in, access )
+         val value   = BiPin.Expr.Modifiable.read( in, access )
          new EntryNode( targets, key, value )
       }
    }
@@ -278,7 +278,7 @@ object ProcImpl {
          get( key ).getOrElse {
             if( keys.contains( key )) {
                implicit val doubles = Doubles
-               val expr = BiPin.newExprModifiable[ S, Param ]( 0d )   // XXX retrieve default value
+               val expr = BiPin.Expr.Modifiable[ S, Param ]( 0d )   // XXX retrieve default value
                val tgt  = evt.Targets[ S ]   // XXX partial?
                val node = new EntryNode[ S ]( tgt, key, expr )
                parMap += key -> node
@@ -369,7 +369,7 @@ object ProcImpl {
       protected val targets   = evt.Targets[ S ]( tx0 )
 
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
-      protected val playing_# = BiPin.newConfluentExprModifiable[ S, Boolean ]( true )( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
+      protected val playing_# = BiPin.Expr.Modifiable.partial[ S, Boolean ]( true )( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
 //      protected val freqVar   = {
 //         implicit val peerSer = Doubles.serializer[ S ]
 //         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
@@ -399,7 +399,7 @@ object ProcImpl {
       protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
 //      protected val playing_# = Booleans.readVar[ S ]( in, access )( tx0 )
 //      protected val freq_#    = Doubles.readVar[ S ]( in, access )( tx0 )
-      protected val playing_# = BiPin.readExprModifiable[ S, Boolean ]( in, access )( tx0, Booleans )
+      protected val playing_# = BiPin.Expr.Modifiable.read[ S, Boolean ]( in, access )( tx0, Booleans )
 //      protected val freq_#    = BiPin.readExprVar[ S, Double  ]( in, access )( tx0, Doubles  )
       protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
 
