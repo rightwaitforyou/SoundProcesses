@@ -71,15 +71,15 @@ object BiGroupImpl {
    }
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
-      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
       spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, BiGroup[ S, Elem, U ]] = new Ser( eventView )
 
    def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
-      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
       spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, BiGroup.Var[ S, Elem, U ]] = new VarSer( eventView )
 
    def readVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
-         ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+         ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
            spanType: Type[ SpanLike ]) : BiGroup.Var[ S, Elem, U ] = {
 
       val targets = evt.Targets.read[ S ]( in, access )
@@ -87,7 +87,7 @@ object BiGroupImpl {
    }
 
    def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
-      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
       spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = {
 
       new Impl( evt.Targets[ S ], eventView ) {
@@ -102,7 +102,7 @@ object BiGroupImpl {
 
    private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
                                              ( implicit tx: S#Tx,
-                                               elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                               elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
                                                spanType: Type[ SpanLike ]) : Impl[ S, Elem, U ] = {
       new Impl( targets, eventView ) {
          val tree: Tree[ S, Elem, U ] = {
@@ -115,7 +115,7 @@ object BiGroupImpl {
    }
 
    private class Ser[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
-                                              ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                              ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
                                                 spanType: Type[ SpanLike ])
    extends evt.NodeSerializer[ S, BiGroup[ S, Elem, U ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiGroup[ S, Elem, U ] = {
@@ -124,7 +124,7 @@ object BiGroupImpl {
    }
 
    private class VarSer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
-                                                 ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                 ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
                                                    spanType: Type[ SpanLike ])
    extends evt.NodeSerializer[ S, BiGroup.Var[ S, Elem, U ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiGroup.Var[ S, Elem, U ] = {
@@ -184,7 +184,7 @@ object BiGroupImpl {
 
    private abstract class Impl[ S <: Sys[ S ], Elem, U ](
       protected val targets: evt.Targets[ S ], val eventView: Elem => EventLike[ S, U, Elem ])(
-      implicit val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+      implicit val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
       val spanType: Type[ SpanLike ])
    extends Var[ S, Elem, U ]
 //   with evt.Compound[ S, Impl[ S, Elem, U ], Impl.type ]
