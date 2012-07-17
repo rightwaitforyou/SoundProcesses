@@ -5,6 +5,7 @@ import evt.{Event, EventLike}
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
 import de.sciss.collection.txn
 import impl.LinkedListImpl
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object LinkedList {
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
@@ -20,7 +21,7 @@ object LinkedList {
    final case class Removed[ S <: Sys[ S ], Elem, U ]( list: LinkedList[ S, Elem, U ], index: Int, elem: Elem )
    extends Collection[ S, Elem, U ]
 
-   final case class Element[ S <: Sys[ S ], Elem, U ]( list: LinkedList[ S, Elem, U ], elem: Elem, update: U )
+   final case class Element[ S <: Sys[ S ], Elem, U ]( list: LinkedList[ S, Elem, U ], updates: IIdxSeq[ (Elem, U) ])
    extends Update[ S, Elem, U ]
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends LinkedList[ S, Elem, U ] {
@@ -32,9 +33,14 @@ object LinkedList {
       def clear()( implicit tx: S#Tx ) : Unit
    }
 
+   type ExprVar[ S <: Sys[ S ], A ] = Var[ S, Expr[ S, A ], evt.Change[ A ]]
+
    def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                        ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : Var[ S, Elem, U ] =
       LinkedListImpl.newVar( eventView )
+
+   def newExprVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, peerType: Type[ A ]) : ExprVar[ S, A ] =
+      newVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, peerType.serializer[ S ])
 }
 trait LinkedList[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    def isEmpty( implicit tx: S#Tx ) : Boolean

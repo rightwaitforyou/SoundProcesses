@@ -7,6 +7,7 @@ object ExprImplicits {
    implicit def stringConst[   S <: Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )
    implicit def booleanConst[  S <: Sys[ S ]]( b: Boolean )  : Expr[ S, Boolean  ] = Booleans.newConst(  b )
    implicit def doubleConst[   S <: Sys[ S ]]( d: Double )   : Expr[ S, Double   ] = Doubles.newConst(   d )
+   implicit def intConst[      S <: Sys[ S ]]( i: Int )      : Expr[ S, Int      ] = Ints.newConst(      i )
    implicit def longConst[     S <: Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
    implicit def spanConst[     S <: Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
    implicit def spanLikeConst[ S <: Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
@@ -38,6 +39,11 @@ class ExprImplicits[ S <: Sys[ S ]] /* extends ExprImplicits.LowPriority[ S ] */
    implicit def doubleOps1[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, Double ]) : Doubles.RichOps[ S ] =
       new Doubles.RichOps( ex )
    implicit def doubleOps2( ex: Expr[ S, Double ])( implicit tx: S#Tx ) : Doubles.Ops[ S ] = new Doubles.Ops( ex )
+
+   implicit def intConst( i: Int ) : Expr[ S, Int ] = Ints.newConst( i )
+   implicit def intOps1[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, Int ]) : Ints.RichOps[ S ] =
+      new Ints.RichOps( ex )
+   implicit def intOps2( ex: Expr[ S, Int ])( implicit tx: S#Tx ) : Ints.Ops[ S ] = new Ints.Ops( ex )
 
    implicit def longConst( n: Long ) : Expr[ S, Long ] = Longs.newConst( n )
    implicit def longOps1[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, Long ]) : Longs.RichOps[ S ] =
