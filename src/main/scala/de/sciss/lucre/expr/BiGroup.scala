@@ -29,7 +29,7 @@ import de.sciss.lucre.{event => evt, DataInput}
 import evt.{Event, EventLike}
 import de.sciss.collection.txn
 import de.sciss.lucre.stm.{TxnSerializer, Sys}
-import impl.BiGroupImpl
+import impl.{BiGroupImpl => Impl}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object BiGroup {
@@ -49,15 +49,11 @@ object BiGroup {
    final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ],
                                                        changes: IIdxSeq[ (TimedElem[ S, Elem ], ElementUpdate[ U ])])
    extends Update[ S, Elem, U ]
-//   {
-//      def changes: IIdxSeq[ (TimedElem[ S, Elem ], V) ]
-//   }
 
    sealed trait ElementUpdate[ +U ]
    final case class Moved( change: evt.Change[ SpanLike ]) extends ElementUpdate[ Nothing ]
    final case class Mutated[ U ]( change: U ) extends ElementUpdate[ U ]
 
-//   type TimedElem[ S <: Sys[ S ], Elem ] = (Expr[ S, SpanLike ], Elem)
    type Leaf[ S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem ]])
 
    trait TimedElem[ S <: Sys[ S ], Elem ] {
@@ -66,16 +62,20 @@ object BiGroup {
       def value: Elem
    }
 
-   def newVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
-      BiGroupImpl.newVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
+   def newExprVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+      Impl.newVar[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
 
-   def newGenericVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+   def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
       ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-        spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.newVar( eventView )
+        spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = Impl.newVar( eventView )
 
-   def readGenericVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+   def readExprVar[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
+         ( implicit tx: S#Tx, elemType: BiType[ A ]) : Var[ S, Expr[ S, A ], evt.Change[ A ]] =
+      Impl.readVar[ S, Expr[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.spanLikeType )
+
+   def readVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
          ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-           spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = BiGroupImpl.readVar( in, access, eventView )
+           spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = Impl.readVar( in, access, eventView )
 
    trait Var[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
       def add(    span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Unit
@@ -83,15 +83,21 @@ object BiGroup {
       def clear()( implicit tx: S#Tx ) : Unit
    }
 
+   def exprSerializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, BiGroup[ S, Expr[ S, A ], evt.Change[ A ]]] =
+      Impl.serializer[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer[ S ], elemType.spanLikeType )
+
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                            ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                              spanType: Type[ SpanLike ]) : TxnSerializer[ S#Tx, S#Acc, BiGroup[ S, Elem, U ]] =
-      BiGroupImpl.serializer[ S, Elem, U ]( eventView )
+      Impl.serializer[ S, Elem, U ]( eventView )
+
+   def exprVarSerializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, BiGroup.Var[ S, Expr[ S, A ], evt.Change[ A ]]] =
+      Impl.varSerializer[ S, Expr[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer[ S ], elemType.spanLikeType )
 
    def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                               ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                                 spanType: Type[ SpanLike ]) : TxnSerializer[ S#Tx, S#Acc, BiGroup.Var[ S, Elem, U ]] =
-      BiGroupImpl.varSerializer[ S, Elem, U ]( eventView )
+      Impl.varSerializer[ S, Elem, U ]( eventView )
 }
 trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    import BiGroup.Leaf
