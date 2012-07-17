@@ -94,6 +94,11 @@ trait LinkedList[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    def head( implicit tx: S#Tx ) : Elem
    def last( implicit tx: S#Tx ) : Elem
    def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Elem ]
+
+   /**
+    * Note: this is an O(n) operation.
+    */
+   def indexOf( elem: Elem )( implicit tx: S#Tx ) : Int
    
    def collectionChanged:  Event[ S, LinkedList.Collection[ S, Elem, U ], LinkedList[ S, Elem, U ]]
    def elementChanged:     Event[ S, LinkedList.Element[    S, Elem, U ], LinkedList[ S, Elem, U ]]

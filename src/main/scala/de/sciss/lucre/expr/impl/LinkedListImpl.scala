@@ -232,6 +232,17 @@ object LinkedListImpl {
          case 2 => ElementEvent
       }
 
+      def indexOf( elem: Elem )( implicit tx: S#Tx ) : Int = {
+         var idx  = 0
+         var rec  = headRef.get
+         while( rec != null ) {
+            if( rec.elem == elem ) return idx
+            idx += 1
+            rec = rec.succ.get
+         }
+         -1
+      }
+
       def addLast( elem: Elem )( implicit tx: S#Tx ) {
          val pred       = lastRef.get
          val recPred    = tx.newVar[ C ]( id, pred )
