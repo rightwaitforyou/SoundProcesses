@@ -33,18 +33,18 @@
 //object ProcGroupImpl {
 //   private val SER_VERSION = 11
 //
-//   def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup[ S ] = new New[ S ]( tx )
+//   def empty[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroupX$[ S ] = new New[ S ]( tx )
 //
-//   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup[ S ] =
+//   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroupX$[ S ] =
 //      serializer[ S ].read( in, access )
 //
-//   def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroup[ S ]] =
-//      anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, ProcGroup[ S ]]]
+//   def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroupX$[ S ]] =
+//      anySer.asInstanceOf[ TxnSerializer[ S#Tx, S#Acc, ProcGroupX$[ S ]]]
 //
 //   private val anySer = new Serializer[ InMemory ]
 //
-//   private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, ProcGroup[ S ]] {
-//      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ProcGroup[ S ] = {
+//   private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, ProcGroupX$[ S ]] {
+//      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ProcGroupX$[ S ] = {
 //         new Read( in, access, targets, tx )
 //      }
 //   }
@@ -60,24 +60,24 @@
 //      }).asInstanceOf[ Decl[ S ]]
 //   }
 //
-//   private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, ProcGroup[ S ]] {
+//   private class Decl[ S <: Sys[ S ]] extends evt.Decl[ S, ProcGroupX$[ S ]] {
 //      val serializer: evt.Reader[ S, Impl[ S ]] = new evt.Reader[ S, Impl[ S ]] {
 //         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Impl[ S ] =
 //            new Read( in, access, targets, tx )
 //      }
 //
-//      type Update = ProcGroup.Update[ S ]
+//      type Update = ProcGroupX$.Update[ S ]
 //
-//      import ProcGroup._
+//      import ProcGroupX$._
 //
 //      declare[ Collection[ S ]]( _.collectionChanged )
 //      declare[ Element[    S ]]( _.elementChanged    )
 //   }
 //
-//   private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroup[ S ] with evt.Compound[ S, ProcGroup[ S ], Decl[ S ]] {
+//   private sealed trait Impl[ S <: Sys[ S ]] extends ProcGroupX$[ S ] with evt.Compound[ S, ProcGroupX$[ S ], Decl[ S ]] {
 //      protected def seq: SkipList.Set[ S, Proc[ S ]]
 //
-//      import ProcGroup._
+//      import ProcGroupX$._
 //
 //      final def add( procs: Proc[ S ]* )( implicit tx: S#Tx ) {
 //         procs.foreach { p =>
@@ -106,7 +106,7 @@
 //         seq.dispose()
 //      }
 //
-//      final lazy val collectionChanged : evt.Trigger[ S, Collection[ S ], ProcGroup[ S ]] = event[ Collection[ S ]]
+//      final lazy val collectionChanged : evt.Trigger[ S, Collection[ S ], ProcGroupX$[ S ]] = event[ Collection[ S ]]
 //// OOO
 ////      final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.changed ).map( Element( this, _ ))
 //final lazy val elementChanged    = collection( (p: Proc[ S ]) => p.freqChanged ).map( Element( this, _ ))

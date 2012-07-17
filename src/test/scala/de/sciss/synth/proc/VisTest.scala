@@ -1,8 +1,7 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Cursor, Sys, InMemory}
-import de.sciss.synth.expr.{Longs, ExprImplicits}
-import de.sciss.lucre.expr.{Expr, BiPin, Chronos, Span, SpanLike}
+import de.sciss.lucre.stm.{TxnSerializer, Cursor, Sys, InMemory}
+import de.sciss.lucre.expr.{BiType, BiGroup, Expr, BiPin, Chronos, Span, SpanLike}
 import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
 import de.sciss.nuages.VisualInstantPresentation
@@ -11,6 +10,7 @@ import de.sciss.confluent.{TemporalObjects, Confluent}
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 import concurrent.stm.{Txn => STMTxn}
+import synth.expr.{SpanLikes, Longs, ExprImplicits}
 
 object VisTest {
    def apply() : VisTest[ InMemory ] = {
@@ -54,12 +54,16 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       cursor.step( fun )
    }
 
-   type Acc = (ProcGroupX.Var[ S ], Transport[ S, Proc[ S ]])
+//   private type PG = ProcGroupX$.Modifiable[ S ]
+   private type PG = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
+   type Acc = (PG, Transport[ S, Proc[ S ]])
 
    object Implicits {
-      implicit val procVarSer       = ProcGroupX.Modifiable.serializer[ S ]
-      implicit val accessTransport  = (tup: Acc) => tup._2
-      implicit val transportSer     = Transport.serializer[ S, Acc ]( access ) // ( cursor, _._2 )
+//      implicit def procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = ProcGroupX$.Modifiable.serializer[ S ]
+      implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
+      implicit def procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
+      implicit def accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
+      implicit def transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S, Acc ]( access ) // ( cursor, _._2 )
    }
 
    import Implicits._
@@ -80,7 +84,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    access // initialize !
 
-   def group( implicit tx: S#Tx ) : ProcGroupX.Var[ S ]        = access.get._1
+   def group( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ]  = access.get._1
    def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]   = access.get._2
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {

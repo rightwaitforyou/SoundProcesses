@@ -14,13 +14,13 @@
 //   }
 //
 //   def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
-//      implicit val whyOhWhy = ProcGroupX.varSerializer[ S ]
+//      implicit val whyOhWhy = ProcGroupX$$.varSerializer[ S ]
 //      val imp = new ExprImplicits[ S ]
 //      import imp._
 //
 //      implicit val ts = Chronos[ S ]( 0L )
 //
-//      def group()( implicit tx: S#Tx ) : ProcGroupX.Var[ S ] = ProcGroupX.newVar
+//      def group()( implicit tx: S#Tx ) : ProcGroupX$$.Var[ S ] = ProcGroupX$$.newVar
 //      def proc()(  implicit tx: S#Tx ) : Proc[ S ]          = Proc()
 //
 //      val access = system.root { implicit tx => group() }

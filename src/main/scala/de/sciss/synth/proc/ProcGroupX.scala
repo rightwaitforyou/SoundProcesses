@@ -31,25 +31,25 @@ import de.sciss.synth.expr.SpanLikes
 import de.sciss.lucre.event.EventLike
 import de.sciss.lucre.DataInput
 
-// scalac crashes if we name this ProcGroup :-(
+// scalac crashes if we name this ProcGroupX$ :-(
 object ProcGroupX {
    type Update[ S <: Sys[ S ]] = BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]]
 
-   type Var[ S <: Sys[ S ]] = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
+   type Modifiable[ S <: Sys[ S ]] = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
 
    private implicit val spanType : Type[ SpanLike ] = SpanLikes
 
    private def eventView[ S <: Sys[ S ]]( proc: Proc[ S ]) : EventLike[ S, Proc.Update[ S ], Proc[ S ]] = proc.changed
 
    object Modifiable {
-      def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroupX.Var[ S ]] = {
+      def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroupX.Modifiable[ S ]] = {
          BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
       }
 
-      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroupX.Var[ S ] =
+      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ] =
          BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
 
-      def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroupX.Var[ S ] =
+      def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ] =
          BiGroup.Modifiable.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
    }
 

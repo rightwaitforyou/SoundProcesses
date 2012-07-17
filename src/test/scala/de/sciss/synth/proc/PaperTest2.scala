@@ -43,14 +43,14 @@
 ////
 ////   }
 ////   trait Access[ S <: Sys[ S ]] {
-////      def group : S#Var[ ProcGroup[ S ]]
+////      def group : S#Var[ ProcGroupX$[ S ]]
 ////      def freq  : Expr.Var[ S, Double ]
 ////   }
 //
 //   class Helper[ S <: Sys[ S ]]( imp: ExprImplicits[ S ]) {
 //      import imp._
 //
-//      implicit val whyOhWhy   = ProcGroupX.varSerializer[ S ]
+//      implicit val whyOhWhy   = ProcGroupX$$.varSerializer[ S ]
 //      implicit val whyOhWhy2  = Proc.serializer[ S ]
 //
 //      implicit object doubleVarSerializer extends TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Double ]] {
@@ -59,7 +59,7 @@
 //            Doubles.readVar[ S ]( in, access )
 //      }
 //
-//      def newGroup()(  implicit tx: S#Tx ) : ProcGroupX.Var[ S ]   = ProcGroupX.newVar
+//      def newGroup()(  implicit tx: S#Tx ) : ProcGroupX$$.Var[ S ]   = ProcGroupX$$.newVar
 //      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]            = Proc()
 //
 //      def newAccess[ A ]( block: => A )( implicit tx: S#Tx, ser: TxnSerializer[ S#Tx, S#Acc, A ]) : S#Entry[ A ] = {
@@ -94,7 +94,7 @@
 //
 //   implicit val ts = Chronos[ S ]( 0L )
 //  val group = s.root(newGroup()(_))
-//  AuralPresentation.run[S, ProcGroupX.Var[S]](group)
+//  AuralPresentation.run[S, ProcGroupX$$.Var[S]](group)
 //
 //  val freq = c.step { implicit tx =>
 //    exprVar(50.0).asAccess
