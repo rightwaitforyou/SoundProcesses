@@ -51,7 +51,17 @@ object LinkedList {
    final case class Element[ S <: Sys[ S ], Elem, U ]( list: LinkedList[ S, Elem, U ], updates: IIdxSeq[ (Elem, U) ])
    extends Update[ S, Elem, U ]
 
-   trait Var[ S <: Sys[ S ], Elem, U ] extends LinkedList[ S, Elem, U ] {
+   object Modifiable {
+      def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+         implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : TxnSerializer[ S#Tx, S#Acc, Modifiable[ S, Elem, U ]] =
+         Impl.modifiableSerializer[ S, Elem, U ]( eventView )
+
+      def apply[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+                                         ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : Modifiable[ S, Elem, U ] =
+         Impl.newModifiable( eventView )
+   }
+
+   trait Modifiable[ S <: Sys[ S ], Elem, U ] extends LinkedList[ S, Elem, U ] {
       def addLast( elem: Elem )( implicit tx: S#Tx ) : Unit
       def addHead( elem: Elem )( implicit tx: S#Tx ) : Unit
       def remove( elem: Elem )( implicit tx: S#Tx ) : Boolean
@@ -60,29 +70,25 @@ object LinkedList {
       def clear()( implicit tx: S#Tx ) : Unit
    }
 
-   type Expr[    S <: Sys[ S ], A ] = LinkedList[ S, Ex[ S, A ], evt.Change[ A ]]
-   type ExprVar[ S <: Sys[ S ], A ] = Var[        S, Ex[ S, A ], evt.Change[ A ]]
+   object Expr {
+      type Modifiable[ S <: Sys[ S ], A ] = LinkedList.Modifiable[ S, Ex[ S, A ], evt.Change[ A ]]
 
-   def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
-                                       ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : Var[ S, Elem, U ] =
-      Impl.newVar( eventView )
+      def serializer[ S <: Sys[ S ], A ]( implicit elemType: Type[ A ]) : TxnSerializer[ S#Tx, S#Acc, Expr[ S, A ]] =
+         Impl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer[ S ])
 
-   def newExprVar[ S <: Sys[ S ], A ]( implicit tx: S#Tx, peerType: Type[ A ]) : ExprVar[ S, A ] =
-      newVar[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( tx, peerType.serializer[ S ])
+      object Modifiable {
+         def serializer[ S <: Sys[ S ], A ]( implicit elemType: Type[ A ]) : TxnSerializer[ S#Tx, S#Acc, Expr.Modifiable[ S, A ]] =
+            Impl.modifiableSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer[ S ])
 
-   def exprSerializer[ S <: Sys[ S ], A ]( implicit elemType: Type[ A ]) : TxnSerializer[ S#Tx, S#Acc, Expr[ S, A ]] =
-      Impl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer[ S ])
+         def apply[ S <: Sys[ S ], A ]( implicit tx: S#Tx, peerType: Type[ A ]) : Expr.Modifiable[ S, A ] =
+            LinkedList.Modifiable[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( tx, peerType.serializer[ S ])
+      }
+   }
+   type Expr[ S <: Sys[ S ], A ] = LinkedList[ S, Ex[ S, A ], evt.Change[ A ]]
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : TxnSerializer[ S#Tx, S#Acc, LinkedList[ S, Elem, U ]] =
       Impl.serializer[ S, Elem, U ]( eventView )
-
-   def exprVarSerializer[ S <: Sys[ S ], A ]( implicit elemType: Type[ A ]) : TxnSerializer[ S#Tx, S#Acc, ExprVar[ S, A ]] =
-      Impl.varSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer[ S ])
-
-   def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
-      implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : TxnSerializer[ S#Tx, S#Acc, Var[ S, Elem, U ]] =
-      Impl.varSerializer[ S, Elem, U ]( eventView )
 }
 trait LinkedList[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    def isEmpty( implicit tx: S#Tx ) : Boolean

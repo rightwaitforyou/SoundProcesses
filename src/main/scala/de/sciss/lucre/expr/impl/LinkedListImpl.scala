@@ -35,21 +35,16 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 
 object LinkedListImpl {
-   import LinkedList.Var
+   import LinkedList.Modifiable
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-//   implicit def cellSerializer[ S <: Sys[ S ], Elem ]( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ]) :
-//      TxnSerializer[ S#Tx, S#Acc, Cell[ S, Elem ]] = new CellSer
-
-   def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])( implicit tx: S#Tx,
-      elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : Var[ S, Elem, U ] = {
+   def newModifiable[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])( implicit tx: S#Tx,
+      elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) : Modifiable[ S, Elem, U ] = {
 
       val tgt  = evt.Targets[ S ]
       val id   = tgt.id
       val sz   = tx.newIntVar( id, 0 )
-//      val head = tx.newVar[ Cell[ S, Elem ]]( id, null )
-//      val last = tx.newVar[ Cell[ S, Elem ]]( id, null )
       new Impl( tgt, sz, eventView ) {
          protected val headRef = tx.newVar[ C ]( id, null )( CellSer )
          protected val lastRef = tx.newVar[ C ]( id, null )( CellSer )
@@ -61,10 +56,10 @@ object LinkedListImpl {
          evt.NodeSerializer[ S, LinkedList[ S, Elem, U ]] with evt.Reader[ S, LinkedList[ S, Elem, U ]] =
       new Ser[ S, Elem, U ]( eventView )
 
-   def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+   def modifiableSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]) :
-         evt.NodeSerializer[ S, Var[ S, Elem, U ]] with evt.Reader[ S, Var[ S, Elem, U ]] =
-      new VarSer[ S, Elem, U ]( eventView )
+         evt.NodeSerializer[ S, Modifiable[ S, Elem, U ]] with evt.Reader[ S, Modifiable[ S, Elem, U ]] =
+      new ModSer[ S, Elem, U ]( eventView )
 
    private class Ser[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                               ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ])
@@ -74,10 +69,10 @@ object LinkedListImpl {
       }
    }
 
-   private class VarSer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+   private class ModSer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                               ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ])
-   extends evt.NodeSerializer[ S, Var[ S, Elem, U ]] with evt.Reader[ S, Var[ S, Elem, U ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Var[ S, Elem, U ] = {
+   extends evt.NodeSerializer[ S, Modifiable[ S, Elem, U ]] with evt.Reader[ S, Modifiable[ S, Elem, U ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Modifiable[ S, Elem, U ] = {
          LinkedListImpl.read( in, access, targets, eventView )
       }
    }
@@ -110,7 +105,7 @@ object LinkedListImpl {
                                                           sizeRef: S#Var[ Int ],
                                                           eventView: Elem => EventLike[ S, U, Elem ])
                                                         ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ])
-   extends Var[ S, Elem, U ] {
+   extends Modifiable[ S, Elem, U ] {
       list =>
 
       protected type C = Cell[ S, Elem ]
