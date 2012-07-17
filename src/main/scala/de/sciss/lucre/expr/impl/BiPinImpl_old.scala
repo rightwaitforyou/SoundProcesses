@@ -67,7 +67,7 @@
 //      evt.Reader[ S, BiPin[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, BiPin[ S, A ]] = new Ser[ S, A ]
 //
 //   implicit def varSerializer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ]) :
-//      evt.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] = new VarSer[ S, A ]
+//      evt.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] = new ModSer[ S, A ]
 //
 //   private def newVar[ S <: Sys[ S ], A ]( targets: evt.Targets[ S ], init: Expr[ S, A ])( implicit tx: S#Tx,
 //                                                        peerType: BiType[ A ]) : Var[ S, A ] = {
@@ -96,7 +96,7 @@
 //      def write( v: BiPin[ S, A ], out: DataOutput ) { v.write( out )}
 //   }
 //
-//   private final class VarSer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
+//   private final class ModSer[ S <: Sys[ S ], A ]( implicit peerType: BiType[ A ])
 //   extends evt.Reader[ S, Var[ S, A ]] with TxnSerializer[ S#Tx, S#Acc, Var[ S, A ]] {
 //      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Var[ S, A ] = {
 //         read( in, access, evt.Targets.read[ S ]( in, access ))

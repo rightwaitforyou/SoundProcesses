@@ -12,7 +12,7 @@ class BiGroupTest[ S <: Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S
 
    val bi = t { implicit tx =>
       implicit def longType = Longs
-      val res = BiGroup.newExprVar[ S, Long ]
+      val res = BiGroup.Expr.Modifiable[ S, Long ]
       res.changed.react { upd =>
          println( "Observed: " + upd )
       }

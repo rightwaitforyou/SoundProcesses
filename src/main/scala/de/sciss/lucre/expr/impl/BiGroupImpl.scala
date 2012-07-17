@@ -38,7 +38,7 @@ import de.sciss.collection.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint
 import de.sciss.collection.geom.LongSpace.TwoDim
 
 object BiGroupImpl {
-   import BiGroup.{Leaf, TimedElem, Var}
+   import BiGroup.{Leaf, TimedElem, Modifiable}
 
 //   var VERBOSE = true
 
@@ -74,21 +74,21 @@ object BiGroupImpl {
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
       spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, BiGroup[ S, Elem, U ]] = new Ser( eventView )
 
-   def varSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+   def modifiableSerializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
-      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, BiGroup.Var[ S, Elem, U ]] = new VarSer( eventView )
+      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, BiGroup.Modifiable[ S, Elem, U ]] = new ModSer( eventView )
 
-   def readVar[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
+   def readModifiable[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, eventView: Elem => EventLike[ S, U, Elem ])
          ( implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
-           spanType: Type[ SpanLike ]) : BiGroup.Var[ S, Elem, U ] = {
+           spanType: Type[ SpanLike ]) : BiGroup.Modifiable[ S, Elem, U ] = {
 
       val targets = evt.Targets.read[ S ]( in, access )
       read( in, access, targets, eventView )
    }
 
-   def newVar[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+   def newModifiable[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
-      spanType: Type[ SpanLike ]) : Var[ S, Elem, U ] = {
+      spanType: Type[ SpanLike ]) : Modifiable[ S, Elem, U ] = {
 
       new Impl( evt.Targets[ S ], eventView ) {
          val tree: Tree[ S, Elem, U ] = {
@@ -123,11 +123,11 @@ object BiGroupImpl {
       }
    }
 
-   private class VarSer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
+   private class ModSer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                                  ( implicit elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
                                                    spanType: Type[ SpanLike ])
-   extends evt.NodeSerializer[ S, BiGroup.Var[ S, Elem, U ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiGroup.Var[ S, Elem, U ] = {
+   extends evt.NodeSerializer[ S, BiGroup.Modifiable[ S, Elem, U ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiGroup.Modifiable[ S, Elem, U ] = {
          BiGroupImpl.read( in, access, targets, eventView )
       }
    }
@@ -186,7 +186,7 @@ object BiGroupImpl {
       protected val targets: evt.Targets[ S ], val eventView: Elem => EventLike[ S, U, Elem ])(
       implicit val elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
       val spanType: Type[ SpanLike ])
-   extends Var[ S, Elem, U ]
+   extends Modifiable[ S, Elem, U ]
 //   with evt.Compound[ S, Impl[ S, Elem, U ], Impl.type ]
 //   with evt.Trigger.Impl[ S, BiGroup.Update[ S, Elem, U ], BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
 //   with evt.StandaloneLike[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
