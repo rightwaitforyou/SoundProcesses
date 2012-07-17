@@ -22,7 +22,7 @@ object BiTempTest extends App {
       val exprImp = new ExprImplicits[ S ]
       import exprImp._
 
-      implicit def biSer[ A ]( implicit peer: BiType[ A ]) = BiPin.exprVarSerializer[ S, A ]
+      implicit def biSer[ A ]( implicit peer: BiType[ A ]) = BiPin.exprModifiableSerializer[ S, A ]
       implicit val doubles       = Doubles
       implicit val longVarSer    = Longs.varSerializer[ S ]
       implicit val doubleVarSer  = Doubles.varSerializer[ S ]
@@ -31,7 +31,7 @@ object BiTempTest extends App {
 
       println( "__STEP__ root" )
       val access = system.root { implicit tx =>
-         val bi = BiPin.newExprVar( 0.0 )
+         val bi = BiPin.newExprModifiable( 0.0 )
          (bi, IIdxSeq.empty[ Expr.Var[ S, Long ]], IIdxSeq.empty[ Expr.Var[ S, Double ]])
       }
 

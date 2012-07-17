@@ -180,7 +180,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    def addFreq( time: Expr[ S, Long ] = 0, freq: Expr[ S, Param ]) {
       t { implicit tx =>
          pr().par( "freq" ) match {
-            case BiPin.isVar( v ) => v.add( time, freq )
+            case BiPin.isEdit( v ) => v.add( time, freq )
             case _ =>
          }
       }

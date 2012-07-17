@@ -55,7 +55,7 @@ trait BiType[ A ] extends Type[ A ] {
                                                ( implicit tx: S#Tx ) : Ex[ S ] = {
 //      val bi   =
       val cache   = tx.readPartialVar[ A ]( targets.id, in )
-      val bi      = BiPin.readExprVar[ S, A ]( in, access )( tx, this )
+      val bi      = BiPin.readExprModifiable[ S, A ]( in, access )( tx, this )
       val time    = longType.readExpr( in, access )
       new Projection[ S ]( targets, cache, bi, time )
    }
