@@ -65,8 +65,9 @@ object LinkedList {
       def addLast( elem: Elem )( implicit tx: S#Tx ) : Unit
       def addHead( elem: Elem )( implicit tx: S#Tx ) : Unit
       def remove( elem: Elem )( implicit tx: S#Tx ) : Boolean
-      def removeLast()( implicit tx: S#Tx ) : Unit
-      def removeHead()( implicit tx: S#Tx ) : Unit
+      def removeLast()( implicit tx: S#Tx ) : Elem
+      def removeHead()( implicit tx: S#Tx ) : Elem
+      def removeAt( index : Int )( implicit tx: S#Tx ) : Elem
       def clear()( implicit tx: S#Tx ) : Unit
    }
 

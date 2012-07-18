@@ -288,6 +288,23 @@ object LinkedListImpl {
          false
       }
 
+      def removeAt( index: Int )( implicit tx: S#Tx ) : Elem = {
+         if( index < 0 ) throw new IndexOutOfBoundsException( index.toString )
+         var rec = headRef.get
+         if( rec == null ) throw new IndexOutOfBoundsException( index.toString )
+         var idx = 0
+         while( idx < index ) {
+            rec = rec.succ.get
+            if( rec == null ) throw new IndexOutOfBoundsException( index.toString )
+            idx += 1
+         }
+
+         val e = rec.elem
+         removeCell( rec )
+         fireRemoved( idx, e )
+         e
+      }
+
       // unlinks a cell and disposes it. does not fire. decrements sizeRef
       private def removeCell( cell: C )( implicit tx: S#Tx ) {
          val pred = cell.pred.get
@@ -306,7 +323,7 @@ object LinkedListImpl {
          disposeCell( cell )
       }
 
-      def removeLast()( implicit tx: S#Tx ) {
+      def removeLast()( implicit tx: S#Tx ) : Elem = {
          val rec = lastRef.get
          if( rec == null ) throw new NoSuchElementException( "last of empty list" )
 
@@ -322,9 +339,10 @@ object LinkedListImpl {
             pred.succ.set( null )
          }
          fireRemoved( idx, e )
+         e
       }
 
-      def removeHead()( implicit tx: S#Tx ) {
+      def removeHead()( implicit tx: S#Tx ) : Elem = {
          val rec = headRef.get
          if( rec == null ) throw new NoSuchElementException( "head of empty list" )
 
@@ -339,6 +357,7 @@ object LinkedListImpl {
             succ.pred.set( null )
          }
          fireRemoved( 0, e )
+         e
       }
 
       def clear()( implicit tx: S#Tx ) {
