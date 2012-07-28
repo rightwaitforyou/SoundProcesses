@@ -31,9 +31,8 @@ import de.sciss.lucre.stm.{Source, Cursor, Sys}
 import de.sciss.synth.proc.{Proc, Transport}
 
 object VisualInstantPresentation {
-   def apply[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ])
-                                ( implicit cursor: Cursor[ S ],
-                                  transportView: A => Transport[ S, Proc[ S ]]) : VisualInstantPresentation[ S ] =
+   def apply[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]])
+                            ( implicit cursor: Cursor[ S ]) : VisualInstantPresentation[ S ] =
       VisualInstantPresentationImpl( transport )
 }
 trait VisualInstantPresentation[ S <: Sys[ S ]] {

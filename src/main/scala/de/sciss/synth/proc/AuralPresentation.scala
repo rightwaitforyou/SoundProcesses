@@ -33,8 +33,8 @@ import de.sciss.lucre.expr.Chronos
 object AuralPresentation {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]]) : AuralPresentation[ S ] =
+   def run[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]], config: Server.Config = Server.Config() )
+                          ( implicit cursor: Cursor[ S ]) : AuralPresentation[ S ] =
       AuralPresentationImpl.run( transport, config )
 }
 trait AuralPresentation[ S <: Sys[ S ]]

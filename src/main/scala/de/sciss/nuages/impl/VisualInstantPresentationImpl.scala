@@ -47,16 +47,15 @@ import prefuse.render.DefaultRendererFactory
 import prefuse.util.force.{AbstractForce, ForceItem}
 
 object VisualInstantPresentationImpl {
-   def apply[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ])
-                                ( implicit cursor: Cursor[ S ],
-                                  transportView: A => Transport[ S, Proc[ S ]]) : VisualInstantPresentation[ S ] = {
+   def apply[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]])
+                            ( implicit cursor: Cursor[ S ]) : VisualInstantPresentation[ S ] = {
 
       require( EventQueue.isDispatchThread, "Must be called on EDT" )
 
-      val vis = new Impl( transport, cursor, transportView )
+      val vis = new Impl( transport, cursor )
       cursor.step { implicit tx =>
          val map     = tx.newInMemoryIDMap[ Map[ SpanLike, List[ VisualProc ]]]
-         val t       = transportView( transport.get )
+         val t       = transport.get
          val all     = t.iterator.toIndexedSeq
 
          advance( t.time, all, IIdxSeq.empty, IIdxSeq.empty )
@@ -148,8 +147,7 @@ object VisualInstantPresentationImpl {
    private val colrStop       = Color.black
    private val COLUMN_DATA    = "nuages.data"
 
-   private final class Impl[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ], cursor: Cursor[ S ],
-                                                 transportView: A => Transport[ S, Proc[ S ]])
+   private final class Impl[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]], cursor: Cursor[ S ])
    extends VisualInstantPresentation[ S ] {
       private var playingVar = false
 //      private var vps      = Set.empty[ VisualProc ]

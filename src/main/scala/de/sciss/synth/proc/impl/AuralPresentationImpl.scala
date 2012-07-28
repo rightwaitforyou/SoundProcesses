@@ -36,9 +36,9 @@ import SoundProcesses.logConfig
 object AuralPresentationImpl {
    var dumpOSC = true
 
-   def run[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]]) : AuralPresentation[ S ] = {
-      val boot = new Boot( transport, config, cursor, transportView )
+   def run[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]], config: Server.Config = Server.Config() )
+                          ( implicit cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
+      val boot = new Boot( transport, config, cursor )
       Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
          def run() { boot.shutDown() }
       }))
@@ -46,8 +46,8 @@ object AuralPresentationImpl {
       boot
    }
 
-   private final class Boot[ S <: Sys[ S ], A ]( transportA: Source[ S#Tx, A ], config: Server.Config,
-                                                 cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]])
+   private final class Boot[ S <: Sys[ S ]]( transportA: Source[ S#Tx, Transport[ S, Proc[ S ]]], config: Server.Config,
+                                             cursor: Cursor[ S ])
    extends AuralPresentation[ S ] {
 
       private val sync        = new AnyRef
@@ -82,7 +82,7 @@ object AuralPresentationImpl {
             val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-            val transport = transportView( transportA.get )
+            val transport = transportA.get
             transport.changed.react { x => println( "Aural observation: " + x )}
             if( transport.playing.value ) {
                implicit val chr: Chronos[ S ] = transport

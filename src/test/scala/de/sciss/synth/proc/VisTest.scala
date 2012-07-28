@@ -62,7 +62,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 //      implicit def procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = ProcGroupX$.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
       implicit val procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
-      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
+//      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
       implicit val transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S ]( cursor )( transportAccess )
    }
 
@@ -163,7 +163,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
          val f    = new JFrame( "Vis" )
          frameVar = f
          val cp   = f.getContentPane
-         val vis  = VisualInstantPresentation( access )
+         val vis  = VisualInstantPresentation( transportAccess )
          cp.add( vis.view, BorderLayout.CENTER )
          f.pack()
          f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
@@ -178,7 +178,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    def aural() {
       if( auralVar == null ) auralVar = t { implicit tx =>
-         AuralPresentation.run( access )
+         AuralPresentation.run( transportAccess )
       }
    }
 
