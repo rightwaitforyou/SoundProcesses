@@ -44,16 +44,16 @@ object BiPin {
       }
 
       def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, Expr[ S, A ]] = {
-         import elemType.serializer
-         implicit val timeType = elemType.longType
-         BiPinImpl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )
+//         import elemType.{serializer => elemSer}
+//         implicit val timeType = elemType.longType
+         BiPinImpl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
       }
 
       object Modifiable {
          def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : TxnSerializer[ S#Tx, S#Acc, BiPin.Expr.Modifiable[ S, A ]] = {
-            import elemType.serializer
-            implicit val timeType = elemType.longType
-            BiPinImpl.modifiableSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )
+//            import elemType.{serializer => elemSer}
+//            implicit val timeType = elemType.longType
+            BiPinImpl.modifiableSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
          }
 
          def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr.Modifiable[ S, A ] = {

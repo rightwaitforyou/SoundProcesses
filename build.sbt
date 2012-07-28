@@ -12,13 +12,22 @@ licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
 scalaVersion := "2.9.2"
 
+crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
+
 libraryDependencies ++= Seq(
    "de.sciss" %% "scalacollider" % "0.34",
    "de.sciss" %% "temporalobjects" % "0.34-SNAPSHOT",
-   "de.sciss" %% "lucreexpr" % "0.33",
-   "de.sciss" % "prefuse-core" % "0.21",
-   "org.scalatest" %% "scalatest" % "1.7.2" % "test"
+   "de.sciss" %% "lucreexpr" % "0.34-SNAPSHOT",
+   "de.sciss" % "prefuse-core" % "0.21"
 )
+
+libraryDependencies in ThisBuild <+= scalaVersion { sv =>
+   val v = sv match {
+      case "2.10.0-M6" => "1.9-2.10.0-M6-B2"
+      case _ => "1.8"
+   }
+   "org.scalatest" %% "scalatest" % v % "test"
+}
 
 retrieveManaged := true
 

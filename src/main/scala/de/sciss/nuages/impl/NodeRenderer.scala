@@ -87,7 +87,6 @@ final class NodeRenderer( val dataColumn: String ) extends AbstractShapeRenderer
             ty += 5
             par.foreach { case (parName, parVal) =>
                ty += 15f
-               4f
                g.drawString( parName, tx, ty )
                g.drawString( parValFmt.format( parVal ), tx + 44f, ty )
             }

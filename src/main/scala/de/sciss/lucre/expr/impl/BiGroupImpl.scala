@@ -28,7 +28,7 @@ package impl
 
 import de.sciss.lucre.{event => evt, DataInput, DataOutput}
 import evt.{Event, EventLike}
-import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import de.sciss.lucre.stm.{TxnSerializer, Sys, Serializer}
 import de.sciss.collection.txn
 import txn.{SpaceSerializers, SkipOctree}
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -84,34 +84,6 @@ object BiGroupImpl {
 
       val targets = evt.Targets.read[ S ]( in, access )
       read( in, access, targets, eventView )
-   }
-
-   def newModifiable[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
-      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
-      spanType: Type[ SpanLike ]) : Modifiable[ S, Elem, U ] = {
-
-      new Impl( evt.Targets[ S ], eventView ) {
-         val tree: Tree[ S, Elem, U ] = {
-//            implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
-            implicit val timeSer    = TimedSer        // XXX why is TimedSer not found, while it is in read?
-            implicit val hyperSer   = this.hyperSer   // XXX why is hyperSer not found, while it is in read?
-            SkipOctree.empty[ S, TwoDim, LeafImpl[ S, Elem, U ]]( MAX_SQUARE )
-         }
-      }
-   }
-
-   private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
-                                             ( implicit tx: S#Tx,
-                                               elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
-                                               spanType: Type[ SpanLike ]) : Impl[ S, Elem, U ] = {
-      new Impl( targets, eventView ) {
-         val tree: Tree[ S, Elem, U ] = {
-//            implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
-//            implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
-//            implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
-            SkipOctree.read[ S, TwoDim, LeafImpl[ S, Elem, U ]]( in, access )
-         }
-      }
    }
 
    private class Ser[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
@@ -195,7 +167,7 @@ object BiGroupImpl {
       group =>
 
       implicit def pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
-      implicit def hyperSer   = SpaceSerializers.LongSquareSerializer
+      implicit def hyperSer: Serializer[ LongSquare ] = SpaceSerializers.LongSquareSerializer
 
       protected def tree: Tree[ S, Elem, U ]
 //      def eventView: Elem => EventLike[ S, U, Elem ]
@@ -531,6 +503,38 @@ object BiGroupImpl {
       final def collectionChanged : Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]] = CollectionEvent
       final def elementChanged    : Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]] = ElementEvent
       final def changed           : Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]] = ChangeEvent
+   }
+
+   def newModifiable[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
+      implicit tx: S#Tx, elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
+      spanType: Type[ SpanLike ]) : Modifiable[ S, Elem, U ] = {
+
+      new Impl( evt.Targets[ S ], eventView ) {
+         group =>
+
+         val tree: Tree[ S, Elem, U ] = {
+//            implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
+//            implicit val TimedSer   = group.TimedSer   // XXX why is TimedSer not found, while it is in read?
+//            implicit val hyperSer   = group.hyperSer   // XXX why is hyperSer not found, while it is in read?
+//            implicit val elemSerializer = group.elemSerializer // XXX fucking shit. a new problem with 2.10.0-M6
+//            import group.{TimedSer,hyperSer,elemSerializer}
+            SkipOctree.empty[ S, TwoDim, LeafImpl[ S, Elem, U ]]( MAX_SQUARE ) // ( tx, view, space, )
+         }
+      }
+   }
+
+   private def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc, targets: evt.Targets[ S ], eventView: Elem => EventLike[ S, U, Elem ])
+                                             ( implicit tx: S#Tx,
+                                               elemSerializer: TxnSerializer[ S#Tx, S#Acc, Elem ],
+                                               spanType: Type[ SpanLike ]) : Impl[ S, Elem, U ] = {
+      new Impl( targets, eventView ) {
+         val tree: Tree[ S, Elem, U ] = {
+//            implicit val pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+//            implicit val hyperSer   = SpaceSerializers.LongSquareSerializer
+//            implicit val exprSer: TxnSerializer[ S#Tx, S#Acc, Expr[ S, SpanLike ]] = spanType.serializer[ S ]
+            SkipOctree.read[ S, TwoDim, LeafImpl[ S, Elem, U ]]( in, access )
+         }
+      }
    }
 
 //   private final class ImplNew[ S <: Sys[ S ], Elem, U ]( protected val targets: evt.Targets[ S ],
