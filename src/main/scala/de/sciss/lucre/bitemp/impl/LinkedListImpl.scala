@@ -23,16 +23,18 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package bitemp
 package impl
 
-import de.sciss.lucre.stm.{TxnSerializer, Sys}
-import de.sciss.lucre.{event => evt, DataInput, DataOutput}
+import de.sciss.lucre.{event => evt}
+import stm.{TxnSerializer, Sys}
 import evt.{Event, EventLike}
-import de.sciss.collection.txn
+import expr.LinkedList
 import annotation.switch
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
+import data.Iterator
 
 object LinkedListImpl {
    import LinkedList.Modifiable
@@ -88,7 +90,7 @@ object LinkedListImpl {
 
    private final class Cell[ S <: Sys[ S ], Elem ]( val elem: Elem, val pred: S#Var[ Cell[ S, Elem ]], val succ: S#Var[ Cell[ S, Elem ]])
 
-   private final class Iter[ S <: Sys[ S ], Elem ]( private var cell: Cell[ S, Elem ]) extends txn.Iterator[ S#Tx, Elem ] {
+   private final class Iter[ S <: Sys[ S ], Elem ]( private var cell: Cell[ S, Elem ]) extends Iterator[ S#Tx, Elem ] {
       override def toString = if( cell == null ) "empty iterator" else "non-empty iterator"
 
       def hasNext( implicit tx: S#Tx ) = cell != null
@@ -426,7 +428,7 @@ object LinkedListImpl {
          if( rec != null ) rec.elem else throw new NoSuchElementException( "last of empty list" )
       }
 
-      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Elem ] = new Iter( headRef.get )
+      def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, Elem ] = new Iter( headRef.get )
 
       def collectionChanged : Event[ S, LinkedList.Collection[ S, Elem, U ], LinkedList[ S, Elem, U ]] = CollectionEvent
       def elementChanged    : Event[ S, LinkedList.Element[    S, Elem, U ], LinkedList[ S, Elem, U ]] = ElementEvent

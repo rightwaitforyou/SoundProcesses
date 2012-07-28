@@ -26,14 +26,14 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.{event => evt, stm, expr, data, bitemp, DataInput, DataOutput}
 import de.sciss.synth.SynthGraph
 import de.sciss.synth.expr.{Booleans, Strings, Doubles, ExprImplicits}
-import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.stm.{TxnSerializer, InMemory, Sys}
+import stm.{TxnSerializer, InMemory, Sys}
+import bitemp.{BiType, Chronos, BiPin}
+import expr.Expr
+import data.SkipList
 import ExprImplicits._
-import de.sciss.lucre.expr.{BiType, Chronos, BiPin, Expr}
-import de.sciss.collection.txn
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import annotation.switch
@@ -145,7 +145,7 @@ object ProcImpl {
 //      protected def freq_# : BiPin.ExprVar[ S, Double ]
 
 //      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
-      protected def parMap : txn.SkipList.Map[ S, String, EntryNode[ S ]]
+      protected def parMap : SkipList.Map[ S, String, EntryNode[ S ]]
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
          name_#.get
@@ -382,7 +382,7 @@ object ProcImpl {
 //         implicit val parType = Doubles // .serializer[ S ]
 //         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
          implicit val entrySer = entrySerializer[ S ]
-         txn.SkipList.Map.empty[ S, String, EntryNode[ S ]]
+         SkipList.Map.empty[ S, String, EntryNode[ S ]]
       }
    }
 
@@ -408,7 +408,7 @@ object ProcImpl {
 //         implicit val parType = Doubles // .serializer[ S ]
 //         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
          implicit val entrySer = entrySerializer[ S ]
-         txn.SkipList.Map.read[ S, String, EntryNode[ S ]]( in, access )
+         SkipList.Map.read[ S, String, EntryNode[ S ]]( in, access )
       }
    }
 }

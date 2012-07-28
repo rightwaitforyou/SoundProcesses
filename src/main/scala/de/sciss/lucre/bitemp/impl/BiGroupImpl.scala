@@ -23,19 +23,20 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package bitemp
 package impl
 
-import de.sciss.lucre.{event => evt, DataInput, DataOutput}
+import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike}
-import de.sciss.lucre.stm.{TxnSerializer, Sys, Serializer}
-import de.sciss.collection.txn
-import txn.{SpaceSerializers, SkipOctree}
+import stm.{TxnSerializer, Sys, Serializer}
+import data.{SpaceSerializers, SkipOctree, Iterator}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 import annotation.switch
-import de.sciss.collection.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare}
-import de.sciss.collection.geom.LongSpace.TwoDim
+import geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare, LongSpace}
+import LongSpace.TwoDim
+import expr.{Expr, Type}
 
 object BiGroupImpl {
    import BiGroup.{Leaf, TimedElem, Modifiable}
@@ -415,7 +416,7 @@ object BiGroupImpl {
 //      final def iterator( implicit tx: S#Tx, chr: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]  =
 //         intersect( chr.time.value )
 
-      final def intersect( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+      final def intersect( time: Long )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          val start   = time
          val stop    = time + 1
 //         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
@@ -425,7 +426,7 @@ object BiGroupImpl {
          rangeSearch( shape )
       }
 
-      final def intersect( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+      final def intersect( span: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          // horizontally: until query_stop; vertically: from query_start
          span match {
             case Span( start, stop ) =>
@@ -441,12 +442,12 @@ object BiGroupImpl {
                rangeSearch( shape )
 
             case Span.All  => tree.iterator
-            case Span.Void => txn.Iterator.empty
+            case Span.Void => Iterator.empty
          }
       }
 
-      final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
-         if( start == Span.Void || stop == Span.Void ) return txn.Iterator.empty
+      final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+         if( start == Span.Void || stop == Span.Void ) return Iterator.empty
 
          val startP  = searchSpanToPoint( start )
          val stopP   = searchSpanToPoint( stop  )
@@ -456,7 +457,7 @@ object BiGroupImpl {
       }
 
       // this can be easily implemented with two rectangular range searches
-      final def eventsAt( time: Long )( implicit tx: S#Tx ) : (txn.Iterator[ S#Tx, Leaf[ S, Elem ]], txn.Iterator[ S#Tx, Leaf[ S, Elem ]]) = {
+      final def eventsAt( time: Long )( implicit tx: S#Tx ) : (Iterator[ S#Tx, Leaf[ S, Elem ]], Iterator[ S#Tx, Leaf[ S, Elem ]]) = {
          val startShape = LongRectangle( time, MIN_COORD, 1, MAX_SIDE )
          val stopShape  = LongRectangle( MIN_COORD, time, MAX_SIDE, 1 )
          (rangeSearch( startShape ), rangeSearch( stopShape ))
@@ -494,7 +495,7 @@ object BiGroupImpl {
          }
       }
 
-      private def rangeSearch( shape: LongRectangle )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]] = {
+      private def rangeSearch( shape: LongRectangle )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          val res = tree.rangeQuery( shape ) // .flatMap ....
 //if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
          res

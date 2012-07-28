@@ -23,17 +23,18 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package bitemp
 package impl
 
-import de.sciss.lucre.{event => evt, DataInput, DataOutput}
+import de.sciss.lucre.{event => evt}
 import evt.{Change, Event, EventLike}
-import de.sciss.lucre.stm.{TxnSerializer, Sys}
-import de.sciss.collection.txn
-import txn.SkipList
+import stm.{TxnSerializer, Sys}
+import data.SkipList
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 import annotation.switch
+import expr.{Expr, Type}
 
 object BiPinImpl {
    import BiPin.{Leaf, TimedElem, Modifiable, Region}

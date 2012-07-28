@@ -1,13 +1,14 @@
 package de.sciss.synth.proc
 
 import de.sciss.confluent.Confluent
-import de.sciss.lucre.stm.impl.BerkeleyDB
+import de.sciss.lucre.{stm, bitemp, expr}
+import stm.{Cursor, Sys}
+import stm.impl.BerkeleyDB
+import bitemp.{BiType, BiPin}
+import expr.Expr
 import java.io.File
-import de.sciss.lucre.event.Change
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
-import de.sciss.lucre.stm.{Cursor, Sys}
-import de.sciss.lucre.expr.{Chronos, Expr, BiType, BiPin}
 
 object BiTempTest extends App {
    {

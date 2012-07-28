@@ -25,11 +25,12 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.{Type, SpanLike, BiGroup}
-import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import de.sciss.lucre.{stm, bitemp, expr, event => evt, DataInput}
+import bitemp.{SpanLike, BiGroup}
+import expr.Type
+import stm.{TxnSerializer, Sys}
 import de.sciss.synth.expr.SpanLikes
-import de.sciss.lucre.event.EventLike
-import de.sciss.lucre.DataInput
+import evt.EventLike
 
 // scalac crashes if we name this ProcGroupX$ :-(
 object ProcGroupX {

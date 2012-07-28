@@ -1,11 +1,12 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.{SpanLike, BiGroup, Expr, Chronos}
-import de.sciss.lucre.stm.{Source, Cursor, TxnSerializer, Sys}
+import de.sciss.lucre.{bitemp, expr, stm, event => evt, data}
+import bitemp.{SpanLike, BiGroup, Chronos}
+import expr.Expr
+import stm.{Source, Cursor, TxnSerializer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.lucre.event.Event
-import de.sciss.collection.txn
-import de.sciss.lucre.{event => evt}
+import evt.Event
+import data.Iterator
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100, self: => Source[ S#Tx, Transport[ S, Proc[ S ]]])
@@ -44,7 +45,7 @@ trait Transport[ S <: Sys[ S ], Elem ] extends evt.Node[ S ] with Chronos[ S ] {
 
    def sampleRate: Double
 
-   def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])]
+   def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])]
 
    def changed: Event[ S, Transport.Update[ S, Elem ], Transport[ S, Elem ]]
 

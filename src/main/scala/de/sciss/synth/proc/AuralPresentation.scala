@@ -28,7 +28,7 @@ package de.sciss.synth.proc
 import de.sciss.synth.Server
 import impl.AuralPresentationImpl
 import de.sciss.lucre.stm.{Source, Cursor, Sys}
-import de.sciss.lucre.expr.Chronos
+import de.sciss.lucre.bitemp.Chronos
 
 object AuralPresentation {
    // ---- implementation forwards ----

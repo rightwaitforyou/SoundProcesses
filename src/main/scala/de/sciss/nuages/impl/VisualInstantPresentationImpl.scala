@@ -28,6 +28,7 @@ package impl
 
 import de.sciss.lucre.stm.{Source, Sys, Cursor}
 import de.sciss.synth.proc.{Proc, Transport, Param}
+import de.sciss.lucre.bitemp.{BiGroup, SpanLike}
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
 import javax.swing.JComponent
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -40,7 +41,6 @@ import prefuse.controls.{DragControl, ZoomToFitControl, PanControl, WheelZoomCon
 import javax.swing.event.{AncestorEvent, AncestorListener}
 import prefuse.data
 import prefuse.visual.VisualItem
-import de.sciss.lucre.expr.{BiGroup, SpanLike}
 import prefuse.action.assignment.ColorAction
 import prefuse.util.ColorLib
 import prefuse.render.DefaultRendererFactory

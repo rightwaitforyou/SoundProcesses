@@ -1,13 +1,15 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Source, TxnSerializer, Cursor, Sys, InMemory}
-import de.sciss.lucre.expr.{BiType, BiGroup, Expr, BiPin, Chronos, Span, SpanLike}
+import de.sciss.lucre.{stm, bitemp, expr}
+import stm.{Source, TxnSerializer, Cursor, Sys, InMemory}
+import stm.impl.BerkeleyDB
+import bitemp.{BiType, BiGroup, BiPin, Chronos, Span, SpanLike}
+import expr.Expr
 import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
 import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
-import de.sciss.confluent.{TemporalObjects, Confluent}
-import de.sciss.lucre.stm.impl.BerkeleyDB
+import de.sciss.confluent.Confluent
 import java.io.File
 import concurrent.stm.{Txn => STMTxn}
 import synth.expr.{SpanLikes, Longs, ExprImplicits}

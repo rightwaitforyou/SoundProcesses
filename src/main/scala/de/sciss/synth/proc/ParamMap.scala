@@ -1,8 +1,7 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.BiPin
+import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.stm.Sys
-import de.sciss.collection.txn
 
 object ParamMap {
 //   trait Var[ S <: Sys[ S ]] extends ParamMap[ S ] {

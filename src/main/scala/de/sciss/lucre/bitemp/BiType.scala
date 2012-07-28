@@ -23,11 +23,13 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package bitemp
 
-import de.sciss.lucre.stm.{Serializer, Sys}
-import de.sciss.lucre.{DataInput, event, DataOutput}
-import event.{Pull, Targets}
+import stm.{Serializer, Sys}
+import de.sciss.lucre.{event => evt}
+import evt.{Pull, Targets}
+import expr.{Expr, Type}
 
 /**
  * Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object.

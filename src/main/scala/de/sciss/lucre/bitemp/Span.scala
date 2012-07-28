@@ -24,7 +24,7 @@
  */
 
 package de.sciss.lucre
-package expr
+package bitemp
 
 import stm.{Writer, Serializer}
 import annotation.switch

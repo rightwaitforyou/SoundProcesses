@@ -1,4 +1,5 @@
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package bitemp
 
 import org.scalatest.matchers.ShouldMatchers
 import org.scalatest.FlatSpec

@@ -25,10 +25,11 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.event.Targets
-import de.sciss.lucre.expr.{Expr, Span}
+import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt, expr, bitemp}
+import stm.Sys
+import evt.Targets
+import expr.Expr
+import bitemp.Span
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string, 9 = spanlike, 10 = span

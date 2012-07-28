@@ -23,14 +23,16 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package bitemp
 
-import de.sciss.lucre.{event => evt, DataInput}
+import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike}
-import de.sciss.collection.txn
-import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import stm.{TxnSerializer, Sys}
 import impl.{BiGroupImpl => Impl}
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import expr.{Expr, Type}
+import data.Iterator
 
 object BiGroup {
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
@@ -129,7 +131,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * @param time the point in time to search at
     * @return  a (possibly empty) iterator of the intersecting elements
     */
-   def intersect( time: Long )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+   def intersect( time: Long )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]]
 
    /**
     * Queries all elements intersecting a given time span.
@@ -141,7 +143,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * @param span the the span to search within (this may be a half-bounded interval or even `Span.All`)
     * @return  a (possibly empty) iterator of the intersecting elements
     */
-   def intersect( span: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+   def intersect( span: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]]
 
    /**
     * Performs a range query according to separate intervals for the allowed start and stop positions
@@ -161,7 +163,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * @param stop    the constraint for the stop position of the spans of the elements filtered.
     * @return  a (possibly empty) iterator of the intersecting elements
     */
-   def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
+   def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]]
 
    /**
     * Queries the closest event (an element's span starting or stopping) later than the given time
@@ -189,7 +191,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     *          start at the query time, the second iterator (_2) contains the event which
     *          stop at the query time
     */
-   def eventsAt( time: Long )( implicit tx: S#Tx ) : (txn.Iterator[ S#Tx, Leaf[ S, Elem ]], txn.Iterator[ S#Tx, Leaf[ S, Elem ]])
+   def eventsAt( time: Long )( implicit tx: S#Tx ) : (Iterator[ S#Tx, Leaf[ S, Elem ]], Iterator[ S#Tx, Leaf[ S, Elem ]])
 
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 

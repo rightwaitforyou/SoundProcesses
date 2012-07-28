@@ -26,10 +26,11 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{Source, IdentifierMap, Sys, Cursor}
+import de.sciss.lucre.{stm, bitemp}
+import stm.{Source, IdentifierMap, Sys, Cursor}
 import de.sciss.osc.Dump
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
-import de.sciss.lucre.expr.{BiGroup, Chronos}
+import bitemp.{BiGroup, Chronos}
 
 import SoundProcesses.logConfig
 

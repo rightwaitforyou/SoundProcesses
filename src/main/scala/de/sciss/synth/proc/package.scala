@@ -1,7 +1,7 @@
 package de.sciss.synth
 
 import de.sciss.lucre.stm.{Sys, InMemory}
-import de.sciss.lucre.expr.BiGroup
+import de.sciss.lucre.bitemp.BiGroup
 
 package object proc {
    private[proc] type I = InMemory

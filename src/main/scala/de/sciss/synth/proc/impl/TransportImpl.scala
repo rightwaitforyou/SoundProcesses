@@ -1,13 +1,13 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{Source, Cursor, Sys}
-import de.sciss.lucre.expr.{BiGroup, SpanLike, Span, Expr}
-import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.{stm, expr, data, bitemp, event => evt, DataInput, DataOutput}
+import stm.{Source, Cursor, Sys}
+import bitemp.{BiGroup, SpanLike, Span}
+import expr.Expr
 import evt.Event
+import data.Iterator
 import de.sciss.synth.expr.Booleans
-import de.sciss.collection.txn
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import java.util.concurrent.{TimeUnit, ScheduledExecutorService, Executors}
 import concurrent.stm.{Txn => STMTxn, TxnLocal => STMTxnLocal}
@@ -96,7 +96,7 @@ object TransportImpl {
          lastTime.dispose()
       }
 
-      def iterator( implicit tx: S#Tx ) : txn.Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])] =
+      def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])] =
          group.intersect( time ).flatMap( flatSpans )
 
       def seek( time: Long )( implicit tx: S#Tx ) {

@@ -1,7 +1,9 @@
 package de.sciss.synth.expr
 
-import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.expr.{SpanLike, Span, Expr}
+import de.sciss.lucre.{stm, expr, bitemp}
+import stm.Sys
+import bitemp.{SpanLike, Span}
+import expr.Expr
 
 object ExprImplicits {
    implicit def stringConst[   S <: Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )

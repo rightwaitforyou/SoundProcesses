@@ -1,6 +1,7 @@
-package de.sciss.lucre.expr
+package de.sciss.lucre
+package bitemp
 
-import de.sciss.lucre.stm.Sys
+import stm.Sys
 
 object Chronos {
 //   def apply[ S <: Sys[ S ]]( t: Expr[ S, Long ]) : Chronos[ S ] = new Wrap( t )

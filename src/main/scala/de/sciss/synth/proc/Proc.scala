@@ -26,9 +26,10 @@
 package de.sciss.synth.proc
 
 import de.sciss.synth.SynthGraph
-import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.{event => evt, DataInput}
-import de.sciss.lucre.expr.{BiPin, Chronos, Expr}
+import de.sciss.lucre.{stm, event => evt, bitemp, expr, DataInput}
+import stm.Sys
+import bitemp.{BiPin, Chronos}
+import expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Proc {

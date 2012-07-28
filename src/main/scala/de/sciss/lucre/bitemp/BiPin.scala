@@ -24,13 +24,14 @@
  */
 
 package de.sciss.lucre
-package expr
+package bitemp
 
 import impl.BiPinImpl
-import de.sciss.lucre.{event => evt, DataInput}
+import de.sciss.lucre.{event => evt}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.lucre.stm.{TxnSerializer, Sys}
+import stm.{TxnSerializer, Sys}
 import evt.{Event, EventLike}
+import expr.Type
 
 object BiPin {
    import expr.{Expr => Ex}
