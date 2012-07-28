@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{TxnSerializer, Cursor, Sys, InMemory}
+import de.sciss.lucre.stm.{Source, TxnSerializer, Cursor, Sys, InMemory}
 import de.sciss.lucre.expr.{BiType, BiGroup, Expr, BiPin, Chronos, Span, SpanLike}
 import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
@@ -61,9 +61,9 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    object Implicits {
 //      implicit def procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = ProcGroupX$.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
-      implicit def procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
-      implicit def accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-      implicit def transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S, Acc ]( access ) // ( cursor, _._2 )
+      implicit val procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
+      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
+      implicit val transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S ]( cursor )( transportAccess )
    }
 
    import Implicits._
@@ -74,7 +74,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
-      val tr = Transport( g, self = access )
+      val tr = Transport( g, self = transportAccess )
       tr.changed.react { upd =>
          println( "Transport observed: " + upd )
       }
@@ -84,8 +84,11 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    access // initialize !
 
-   def group( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ]  = access.get._1
-   def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]   = access.get._2
+   val groupAccess:     Source[ S#Tx, ProcGroupX.Modifiable[ S ]] = Source.map( access )( _._1 )
+   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
+
+   def group( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ]    = access.get._1
+   def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]      = access.get._2
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)

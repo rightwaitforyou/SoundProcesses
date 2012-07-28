@@ -8,14 +8,13 @@ import de.sciss.collection.txn
 import de.sciss.lucre.{event => evt}
 
 object Transport {
-   def apply[ S <: Sys[ S ], A ]( group: ProcGroup[ S ], sampleRate: Double = 44100, self: => Source[ S#Tx, A ])
-                                ( implicit tx: S#Tx, cursor: Cursor[ S ],
-                                  selfView: A => Transport[ S, Proc[ S ]]) : Transport[ S, Proc[ S ]] =
+   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100, self: => Source[ S#Tx, Transport[ S, Proc[ S ]]])
+                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] =
       impl.TransportImpl( group, sampleRate, self )
 
-   def serializer[ S <: Sys[ S ], A ]( self: => Source[ S#Tx, A ])(
-      implicit cursor: Cursor[ S ], selfView: A => Transport[ S, Proc[ S ]]) : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
-         impl.TransportImpl.serializer( self )
+   def serializer[ S <: Sys[ S ]]( cursor: Cursor[ S ])
+                                 ( self: => Source[ S#Tx, Transport[ S, Proc[ S ]]]): TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
+         impl.TransportImpl.serializer( self )( cursor )
 
    sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}
 
