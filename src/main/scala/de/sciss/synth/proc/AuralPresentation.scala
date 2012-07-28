@@ -27,13 +27,13 @@ package de.sciss.synth.proc
 
 import de.sciss.synth.Server
 import impl.AuralPresentationImpl
-import de.sciss.lucre.stm.{Cursor, Sys}
+import de.sciss.lucre.stm.{Source, Cursor, Sys}
 import de.sciss.lucre.expr.Chronos
 
 object AuralPresentation {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ], A ]( transport: S#Entry[ A ], config: Server.Config = Server.Config() )
+   def run[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ], config: Server.Config = Server.Config() )
                           ( implicit cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]]) : AuralPresentation[ S ] =
       AuralPresentationImpl.run( transport, config )
 }

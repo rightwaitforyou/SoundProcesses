@@ -1,19 +1,19 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.expr.{SpanLike, BiGroup, Expr, Chronos}
-import de.sciss.lucre.stm.{Cursor, TxnSerializer, Sys}
+import de.sciss.lucre.stm.{Source, Cursor, TxnSerializer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.event.Event
 import de.sciss.collection.txn
 import de.sciss.lucre.{event => evt}
 
 object Transport {
-   def apply[ S <: Sys[ S ], A ]( group: ProcGroup[ S ], sampleRate: Double = 44100, self: => S#Entry[ A ])
+   def apply[ S <: Sys[ S ], A ]( group: ProcGroup[ S ], sampleRate: Double = 44100, self: => Source[ S#Tx, A ])
                                 ( implicit tx: S#Tx, cursor: Cursor[ S ],
                                   selfView: A => Transport[ S, Proc[ S ]]) : Transport[ S, Proc[ S ]] =
       impl.TransportImpl( group, sampleRate, self )
 
-   implicit def serializer[ S <: Sys[ S ], A ]( self: => S#Entry[ A ])(
+   def serializer[ S <: Sys[ S ], A ]( self: => Source[ S#Tx, A ])(
       implicit cursor: Cursor[ S ], selfView: A => Transport[ S, Proc[ S ]]) : TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
          impl.TransportImpl.serializer( self )
 

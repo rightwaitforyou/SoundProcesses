@@ -26,7 +26,7 @@
 package de.sciss.nuages
 package impl
 
-import de.sciss.lucre.stm.{Sys, Cursor}
+import de.sciss.lucre.stm.{Source, Sys, Cursor}
 import de.sciss.synth.proc.{Proc, Transport, Param}
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
 import javax.swing.JComponent
@@ -47,7 +47,7 @@ import prefuse.render.DefaultRendererFactory
 import prefuse.util.force.{AbstractForce, ForceItem}
 
 object VisualInstantPresentationImpl {
-   def apply[ S <: Sys[ S ], A ]( transport: S#Entry[ A ])
+   def apply[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ])
                                 ( implicit cursor: Cursor[ S ],
                                   transportView: A => Transport[ S, Proc[ S ]]) : VisualInstantPresentation[ S ] = {
 
@@ -148,7 +148,7 @@ object VisualInstantPresentationImpl {
    private val colrStop       = Color.black
    private val COLUMN_DATA    = "nuages.data"
 
-   private final class Impl[ S <: Sys[ S ], A ]( transport: S#Entry[ A ], cursor: Cursor[ S ],
+   private final class Impl[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ], cursor: Cursor[ S ],
                                                  transportView: A => Transport[ S, Proc[ S ]])
    extends VisualInstantPresentation[ S ] {
       private var playingVar = false

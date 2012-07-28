@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{Cursor, Sys}
+import de.sciss.lucre.stm.{Source, Cursor, Sys}
 import de.sciss.lucre.expr.{BiGroup, SpanLike, Span, Expr}
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.{event => evt}
@@ -15,7 +15,7 @@ import concurrent.stm.{Txn => STMTxn, TxnLocal => STMTxnLocal}
 object TransportImpl {
    private val VERBOSE = false
 
-   def apply[ S <: Sys[ S ], A ]( group: ProcGroup[ S ], sampleRate: Double, self: => S#Entry[ A ])
+   def apply[ S <: Sys[ S ], A ]( group: ProcGroup[ S ], sampleRate: Double, self: => Source[ S#Tx, A ])
                                 ( implicit tx: S#Tx, cursor: Cursor[ S ],
                                   selfView: A => Transport[ S, Proc[ S ]]) : Transport[ S, Proc[ S ]] = {
       val targets    = evt.Targets[ S ]
@@ -26,13 +26,13 @@ object TransportImpl {
       new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, self )
    }
 
-   implicit def serializer[ S <: Sys[ S ], A ]( self: => S#Entry[ A ])
-                                              ( implicit cursor: Cursor[ S ],
-                                                selfView: A => Transport[ S, Proc[ S ]]) : evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] =
+   def serializer[ S <: Sys[ S ], A ]( self: => Source[ S#Tx, A ])
+                                     ( implicit cursor: Cursor[ S ],
+                                       selfView: A => Transport[ S, Proc[ S ]]) : evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] =
       new Ser[ S, A ]( self )
 
-   private final class Ser[ S <: Sys[ S ], A ]( self: => S#Entry[ A ] )( implicit cursor: Cursor[ S ],
-                                                                         selfView: A => Transport[ S, Proc[ S ]])
+   private final class Ser[ S <: Sys[ S ], A ]( self: => Source[ S#Tx, A ])( implicit cursor: Cursor[ S ],
+                                                                             selfView: A => Transport[ S, Proc[ S ]])
    extends evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]] = {
          val id         = targets.id
@@ -71,7 +71,7 @@ object TransportImpl {
                                                  group: ProcGroup[ S ],
                                                  val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ],
                                                  validVar: S#Var[ Int ], lastTime: S#Var[ Long ],
-                                                 self: => S#Entry[ A ])
+                                                 self: => Source[ S#Tx, A ])
                                                ( implicit cursor: Cursor[ S ], selfView: A => Transport[ S, Proc[ S ]])
    extends Transport[ S, Proc[ S ]]
    with evt.Trigger.Impl[ S, Transport.Update[ S, Proc[ S ]], Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]

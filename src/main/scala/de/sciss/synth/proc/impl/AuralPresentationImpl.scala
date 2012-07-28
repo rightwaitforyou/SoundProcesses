@@ -26,7 +26,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{IdentifierMap, Sys, Cursor}
+import de.sciss.lucre.stm.{Source, IdentifierMap, Sys, Cursor}
 import de.sciss.osc.Dump
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
 import de.sciss.lucre.expr.{BiGroup, Chronos}
@@ -36,7 +36,7 @@ import SoundProcesses.logConfig
 object AuralPresentationImpl {
    var dumpOSC = true
 
-   def run[ S <: Sys[ S ], A ]( transport: S#Entry[ A ], config: Server.Config = Server.Config() )
+   def run[ S <: Sys[ S ], A ]( transport: Source[ S#Tx, A ], config: Server.Config = Server.Config() )
                           ( implicit cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]]) : AuralPresentation[ S ] = {
       val boot = new Boot( transport, config, cursor, transportView )
       Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
@@ -46,7 +46,7 @@ object AuralPresentationImpl {
       boot
    }
 
-   private final class Boot[ S <: Sys[ S ], A ]( transportA: S#Entry[ A ], config: Server.Config,
+   private final class Boot[ S <: Sys[ S ], A ]( transportA: Source[ S#Tx, A ], config: Server.Config,
                                                  cursor: Cursor[ S ], transportView: A => Transport[ S, Proc[ S ]])
    extends AuralPresentation[ S ] {
 
