@@ -1,15 +1,31 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{InMemory, Cursor, Mutable, Sys, Writer, TxnSerializer}
+import de.sciss.lucre.stm.{Durable, InMemory, Cursor, Mutable, Sys, Writer, TxnSerializer}
 import de.sciss.lucre.{DataInput, DataOutput}
 import java.util.concurrent.{TimeUnit, Executors, ScheduledExecutorService}
 import concurrent.stm.Txn
+import de.sciss.lucre.stm.impl.BerkeleyDB
+import java.io.File
 
 object SelfAccessTest extends App {
-   inMem()
+//   inMem()
+   dur()
 
    def inMem() {
       implicit val sys = InMemory()
+      new SelfAccessTest( sys )
+   }
+
+   private def tmpDir() : File = {
+      val f = File.createTempFile( "database", "db" )
+      f.delete()
+      f.mkdir()
+      f
+   }
+
+   def dur() {
+      val fact = BerkeleyDB.factory( tmpDir(), createIfNecessary = true )
+      implicit val sys = Durable( fact )
       new SelfAccessTest( sys )
    }
 }
@@ -58,11 +74,13 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
          protected def writeData( out: DataOutput ) {
             cnt.write( out )
             play.write( out )
+            self.write( out )
          }
 
          protected def disposeData()( implicit tx: S#Tx ) {
             cnt.dispose()
             play.dispose()
+            self.dispose()
          }
 
          def run() {
