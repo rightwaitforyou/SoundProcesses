@@ -133,3 +133,13 @@ def stop() {
    expected += 1
    touchTxnAfterHook()
 }
+
+::::::::::::::::
+
+Self-Access
+
+why the tests have failed
+
+- S#Var --> uses its own path
+- tx.access( ) --> not implemented in Confluent (Exception is stupidly eaten)
+- IDMap --> works only correctly with up-to-date ID
