@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Durable, InMemory, Cursor, Mutable, Sys, Writer, TxnSerializer}
+import de.sciss.lucre.stm.{Disposable, Durable, InMemory, Cursor, Mutable, Sys, Writer, TxnSerializer}
 import de.sciss.lucre.{DataInput, DataOutput}
 import java.util.concurrent.{TimeUnit, Executors, ScheduledExecutorService}
 import concurrent.stm.Txn
@@ -39,7 +39,8 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
             val cnt  = tx.newIntVar( id, 0 )
             val play = tx.newBooleanVar( id, init = false )
             val csr  = cursor
-            val self = tx.newVar[ Counter ]( id, this )
+            val self = tx.newVar[ Counter ]( id, null )
+            self.set( this )
          }
       }
 
@@ -48,8 +49,15 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
       private final class Ser( cursor: Cursor[ S ]) extends TxnSerializer[ S#Tx, S#Acc, Counter ] {
          ser =>
 
-         def write( c: Counter, out: DataOutput ) { c.write( out )}
+         def write( c: Counter, out: DataOutput ) {
+            if( c == null ) {
+               out.writeUnsignedByte( 0 )
+            } else {
+               c.write( out )
+            }
+         }
          def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Counter = {
+            if( in.readUnsignedByte() == 0 ) return null
             new Impl {
                val id      = tx.readID( in, access )
                val cnt     = tx.readIntVar( id, in )
@@ -61,9 +69,10 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
       }
 
       private abstract class Impl
-      extends Counter with Mutable[ S ] with Runnable {
+      extends Counter with Runnable {
          me =>
 
+         def id: S#ID
          protected def csr: Cursor[ S ]
          protected def cnt: S#Var[ Int ]
          protected def play: S#Var[ Boolean ]
@@ -71,25 +80,28 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
 
          override def toString = "Counter" + id
 
-         protected def writeData( out: DataOutput ) {
+         final def write( out: DataOutput ) {
+            out.writeUnsignedByte( 1 )
+            id.write( out )
             cnt.write( out )
             play.write( out )
             self.write( out )
          }
 
-         protected def disposeData()( implicit tx: S#Tx ) {
+         final def dispose()( implicit tx: S#Tx ) {
+            id.dispose()
             cnt.dispose()
             play.dispose()
             self.dispose()
          }
 
-         def run() {
+         final def run() {
             csr.step { implicit tx =>
                self.get.step()
             }
          }
 
-         def step()( implicit tx: S#Tx ) {
+         final def step()( implicit tx: S#Tx ) {
             if( play.get ) {
                cnt.transform( _ + 1 )
                implicit val itx = tx.peer
@@ -103,7 +115,7 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
             }
          }
 
-         def start()( implicit tx: S#Tx ) {
+         final def start()( implicit tx: S#Tx ) {
             val wasPlaying = play.get
             if( !wasPlaying ) {
                play.set( true )
@@ -111,7 +123,7 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
             }
          }
 
-         def stop()( implicit tx: S#Tx ) {
+         final def stop()( implicit tx: S#Tx ) {
             val wasPlaying = play.get
             if( wasPlaying ) {
                play.set( false )
@@ -125,10 +137,10 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
             }
          }
 
-         def value()( implicit tx: S#Tx ) : Int = cnt.get
+         final def value()( implicit tx: S#Tx ) : Int = cnt.get
       }
    }
-   sealed trait Counter extends Writer {
+   sealed trait Counter extends Writer with Disposable[ S#Tx ] {
       def start()( implicit tx: S#Tx ) : Unit
       def stop()( implicit tx: S#Tx ) : Unit
       def value()( implicit tx: S#Tx ) : Int
