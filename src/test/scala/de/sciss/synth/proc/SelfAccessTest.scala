@@ -6,7 +6,7 @@ import java.util.concurrent.{TimeUnit, Executors, ScheduledExecutorService}
 import concurrent.stm.Txn
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
-import de.sciss.confluent.Confluent
+import de.sciss.confluent.{TemporalObjects, Confluent}
 
 object SelfAccessTest extends App {
 //   inMem()
@@ -34,6 +34,7 @@ object SelfAccessTest extends App {
 
    def conf() {
       implicit val sys = Confluent( durFact() )
+      TemporalObjects.showConfluentLog = true
       new SelfAccessTest( sys )
    }
 }
