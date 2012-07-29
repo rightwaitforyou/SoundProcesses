@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Disposable, Durable, InMemory, Cursor, Sys, Writer, TxnSerializer}
+import de.sciss.lucre.stm.{IdentifierMap, Disposable, Durable, InMemory, Cursor, Sys, Writer, TxnSerializer}
 import de.sciss.lucre.{DataInput, DataOutput}
 import java.util.concurrent.{TimeUnit, Executors, ScheduledExecutorService}
 import concurrent.stm.Txn
@@ -34,7 +34,7 @@ object SelfAccessTest extends App {
 
    def conf() {
       implicit val sys = Confluent( durFact() )
-      TemporalObjects.showConfluentLog = true
+//      TemporalObjects.showConfluentLog = true
       new SelfAccessTest( sys )
    }
 }
@@ -43,17 +43,22 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
 
    object Counter {
       def apply()( implicit tx: S#Tx, cursor: Cursor[ S ]) : Counter = {
-         new Impl {
+         val res = new Impl {
             val id   = tx.newID()
             val cnt  = tx.newIntVar( id, 0 )
             val play = tx.newBooleanVar( id, init = false )
             val csr  = cursor
-            val self = tx.newVar[ Counter ]( id, null )
-            self.set( this )
+//            val self = tx.newVar[ Counter ]( id, null )
+//            self.set( this )
          }
+if( map == null ) map = tx.newDurableIDMap[ Counter ]
+map.put( res.id, res )
+         res
       }
 
       implicit def serializer( implicit cursor: Cursor[ S ]) : TxnSerializer[ S#Tx, S#Acc, Counter ] = new Ser( cursor )
+
+private var map: IdentifierMap[ S#Tx, S#ID, Counter ] = null
 
       private final class Ser( cursor: Cursor[ S ]) extends TxnSerializer[ S#Tx, S#Acc, Counter ] {
          ser =>
@@ -72,7 +77,7 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
                val cnt     = tx.readIntVar( id, in )
                val play    = tx.readBooleanVar( id, in )
                val csr     = cursor
-               val self    = tx.readVar[ Counter ]( id, in )( ser )
+//               val self    = tx.readVar[ Counter ]( id, in )( ser )
             }
          }
       }
@@ -85,7 +90,7 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
          protected def csr: Cursor[ S ]
          protected def cnt: S#Var[ Int ]
          protected def play: S#Var[ Boolean ]
-         protected def self: S#Var[ Counter ]
+//         protected def self: S#Var[ Counter ]
 
          override def toString = "Counter" + id
 
@@ -94,20 +99,23 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
             id.write( out )
             cnt.write( out )
             play.write( out )
-            self.write( out )
+//            self.write( out )
          }
 
          final def dispose()( implicit tx: S#Tx ) {
             id.dispose()
             cnt.dispose()
             play.dispose()
-            self.dispose()
+//            self.dispose()
          }
 
          final def run() {
             csr.step { implicit tx =>
-               val icke = self.get
-               println( "...run " + tx + " -> " + icke )
+//               val icke = self.get
+               val ickeO = map.get( id )
+//               val icke = tx.access( self )
+               println( "...run " + tx + " -> " + ickeO )
+               val icke = ickeO.get
                icke.step()
             }
          }
