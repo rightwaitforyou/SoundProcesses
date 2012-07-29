@@ -1,15 +1,17 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Disposable, Durable, InMemory, Cursor, Mutable, Sys, Writer, TxnSerializer}
+import de.sciss.lucre.stm.{Disposable, Durable, InMemory, Cursor, Sys, Writer, TxnSerializer}
 import de.sciss.lucre.{DataInput, DataOutput}
 import java.util.concurrent.{TimeUnit, Executors, ScheduledExecutorService}
 import concurrent.stm.Txn
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
+import de.sciss.confluent.Confluent
 
 object SelfAccessTest extends App {
 //   inMem()
-   dur()
+//   dur()
+   conf()
 
    def inMem() {
       implicit val sys = InMemory()
@@ -23,9 +25,15 @@ object SelfAccessTest extends App {
       f
    }
 
+   private def durFact() = BerkeleyDB.factory( tmpDir(), createIfNecessary = true )
+
    def dur() {
-      val fact = BerkeleyDB.factory( tmpDir(), createIfNecessary = true )
-      implicit val sys = Durable( fact )
+      implicit val sys = Durable( durFact() )
+      new SelfAccessTest( sys )
+   }
+
+   def conf() {
+      implicit val sys = Confluent( durFact() )
       new SelfAccessTest( sys )
    }
 }
@@ -97,12 +105,16 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
 
          final def run() {
             csr.step { implicit tx =>
-               self.get.step()
+               val icke = self.get
+               println( "...run " + tx + " -> " + icke )
+               icke.step()
             }
          }
 
          final def step()( implicit tx: S#Tx ) {
-            if( play.get ) {
+            val p = play.get
+            println( "Step in " + tx + " found " + p )
+            if( p ) {
                cnt.transform( _ + 1 )
                implicit val itx = tx.peer
                Txn.beforeCommit { implicit itx =>
@@ -118,6 +130,7 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
          final def start()( implicit tx: S#Tx ) {
             val wasPlaying = play.get
             if( !wasPlaying ) {
+               println( "Setting in " + tx + " play = true " )
                play.set( true )
                spawn()
             }
@@ -160,12 +173,14 @@ class SelfAccessTest[ S <: Sys[ S ]]( system: S )( implicit cursor: Cursor[ S ])
       def run() {
          cursor.step { implicit tx =>
             implicit val itx = tx.peer
+            val c = access.get
+            val v = c.value()
             Txn.afterCommit { _ =>
-               println( "Stop" )
+               println( "Stop. Last value was " + v )
                pool.shutdown()
                sys.exit( 0 )
             }
-            access.get.stop()
+            c.stop()
          }
       }
    }, 10, TimeUnit.SECONDS )
