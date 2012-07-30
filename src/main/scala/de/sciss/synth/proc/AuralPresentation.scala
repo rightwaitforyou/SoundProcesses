@@ -27,14 +27,15 @@ package de.sciss.synth.proc
 
 import de.sciss.synth.Server
 import impl.AuralPresentationImpl
-import de.sciss.lucre.stm.{Source, Cursor, Sys}
+import de.sciss.lucre.stm.{TxnSerializer, Source, Cursor, Sys}
 import de.sciss.lucre.bitemp.Chronos
 
 object AuralPresentation {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ]) : AuralPresentation[ S ] =
+   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], config: Server.Config = Server.Config() )
+                          ( implicit tx: S#Tx, cursor: Cursor[ S ],
+                            transportSerializer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]]) : AuralPresentation[ S ] =
       AuralPresentationImpl.run( transport, config )
 }
 trait AuralPresentation[ S <: Sys[ S ]]

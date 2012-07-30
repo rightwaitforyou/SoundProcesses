@@ -27,28 +27,33 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.{stm, bitemp}
-import stm.{Source, IdentifierMap, Sys, Cursor}
+import stm.{TxnSerializer, Source, IdentifierMap, Sys, Cursor}
 import de.sciss.osc.Dump
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
 import bitemp.{BiGroup, Chronos}
 
 import SoundProcesses.logConfig
+import concurrent.stm.Txn
 
 object AuralPresentationImpl {
    var dumpOSC = true
 
-   def run[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]], config: Server.Config = Server.Config() )
-                          ( implicit cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
-      val boot = new Boot( transport, config, cursor )
-      Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
-         def run() { boot.shutDown() }
-      }))
-      boot.start()
+   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], config: Server.Config = Server.Config() )
+                          ( implicit tx: S#Tx, cursor: Cursor[ S ],
+                            transportSerializer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]]) : AuralPresentation[ S ] = {
+      val boot = new Boot( transport, config, cursor.position )
+      implicit val itx = tx.peer
+      Txn.afterCommit { _ =>
+         Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
+            def run() { boot.shutDown() }
+         }))
+         boot.start()
+      }
       boot
    }
 
-   private final class Boot[ S <: Sys[ S ]]( transportA: Source[ S#Tx, Transport[ S, Proc[ S ]]], config: Server.Config,
-                                             cursor: Cursor[ S ])
+   private final class Boot[ S <: Sys[ S ]]( transportStale: Transport[ S, Proc[ S ]], config: Server.Config, csrPos: S#Acc )
+                                           ( implicit cursor: Cursor[ S ], transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]])
    extends AuralPresentation[ S ] {
 
       private val sync        = new AnyRef
@@ -83,7 +88,7 @@ object AuralPresentationImpl {
             val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-            val transport = transportA.get
+            val transport = tx.refresh( csrPos, transportStale )
             transport.changed.react { x => println( "Aural observation: " + x )}
             if( transport.playing.value ) {
                implicit val chr: Chronos[ S ] = transport

@@ -11,7 +11,7 @@ import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
 import de.sciss.confluent.Confluent
 import java.io.File
-import concurrent.stm.{Txn => STMTxn}
+import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.expr.{SpanLikes, Longs, ExprImplicits}
 
 object VisTest {
@@ -176,13 +176,14 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       }
    }
 
-   private var auralVar: AuralPresentation[ S ] = null
+   private val auralVar = STMRef( Option.empty[ AuralPresentation[ S ]])
 
-   def aural() {
-      if( auralVar == null ) auralVar = t { implicit tx =>
-         AuralPresentation.run( transportAccess )
+   def aural() { t { implicit tx =>
+      implicit val itx = tx.peer
+      if( auralVar().isEmpty ) {
+         auralVar.set( Some( AuralPresentation.run( transportAccess.get )))
       }
-   }
+   }}
 
    def pr( time: Long = 4 * 44100 )( implicit tx: S#Tx ) = group.intersect( time ).next._2.head.value
 
