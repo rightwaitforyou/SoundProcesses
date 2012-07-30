@@ -65,7 +65,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
       implicit val procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-      implicit val transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S ]( cursor )( transportAccess )
+      implicit val transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S ]( cursor )
    }
 
    import Implicits._
@@ -76,7 +76,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
-      val tr = Transport( g, self = transportAccess )
+      val tr = Transport( g )
       tr.changed.react { upd =>
          println( "Transport observed: " + upd )
       }

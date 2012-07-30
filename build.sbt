@@ -47,7 +47,8 @@ def shortresults[T](t: => T) = {
 }
 import de.sciss.synth._; import ugen._; import proc._
 import de.sciss.lucre.stm.InMemory
-import de.sciss.lucre.expr.{Expr, Span, LinkedList}
+import de.sciss.lucre.expr.{Expr, LinkedList}
+import de.sciss.lucre.bitemp.Span
 import de.sciss.lucre.{event => evt}
 import expr.{Ints, Longs, Doubles, Spans}
 println( "To disable result types:\n :power\n :wrap shortresults\n: silent" )

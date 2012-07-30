@@ -9,13 +9,12 @@ import evt.Event
 import data.Iterator
 
 object Transport {
-   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100, self: => Source[ S#Tx, Transport[ S, Proc[ S ]]])
+   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
                             ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] =
-      impl.TransportImpl( group, sampleRate, self )
+      impl.TransportImpl( group, sampleRate )
 
-   def serializer[ S <: Sys[ S ]]( cursor: Cursor[ S ])
-                                 ( self: => Source[ S#Tx, Transport[ S, Proc[ S ]]]): TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
-         impl.TransportImpl.serializer( self )( cursor )
+   def serializer[ S <: Sys[ S ]]( cursor: Cursor[ S ]): TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
+         impl.TransportImpl.serializer( cursor )
 
    sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}
 

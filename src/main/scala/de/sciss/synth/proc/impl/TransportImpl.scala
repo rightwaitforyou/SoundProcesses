@@ -15,22 +15,21 @@ import concurrent.stm.{Txn => STMTxn, TxnLocal => STMTxnLocal}
 object TransportImpl {
    private val VERBOSE = false
 
-   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double, self: => Source[ S#Tx, Transport[ S, Proc[ S ]]])
+   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )
                             ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] = {
       val targets    = evt.Targets[ S ]
       val id         = targets.id
       val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
       val validVar   = tx.newIntVar( id, 0 )
       val lastTime   = tx.newLongVar( id, 0L )
-      new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, self )
+      val csrPos     = cursor.position
+      new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, csrPos )
    }
 
-   def serializer[ S <: Sys[ S ]]( self: => Source[ S#Tx, Transport[ S, Proc[ S ]]])
-                                 ( implicit cursor: Cursor[ S ]) : evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] =
-      new Ser[ S ]( self )
+   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]) : evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] =
+      new Ser[ S ]
 
-   private final class Ser[ S <: Sys[ S ]]( self: => Source[ S#Tx, Transport[ S, Proc[ S ]]])
-                                          ( implicit cursor: Cursor[ S ])
+   private final class Ser[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ])
    extends evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]] = {
          val id         = targets.id
@@ -39,7 +38,8 @@ object TransportImpl {
          val playingVar = Booleans.readVar( in, access )
          val validVar   = tx.readIntVar( id, in )
          val lastTime   = tx.readLongVar( id, in )
-         new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, self )
+         val csrPos     = cursor.position
+         new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, csrPos )
       }
    }
 
@@ -69,13 +69,15 @@ object TransportImpl {
                                              group: ProcGroup[ S ],
                                              val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ],
                                              validVar: S#Var[ Int ], lastTime: S#Var[ Long ],
-                                             self: => Source[ S#Tx, Transport[ S, Proc[ S ]]])
+                                             csrPos: S#Acc )
                                            ( implicit cursor: Cursor[ S ])
    extends Transport[ S, Proc[ S ]]
    with evt.Trigger.Impl[ S, Transport.Update[ S, Proc[ S ]], Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
    with evt.StandaloneLike[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
    with evt.Root[ S, Transport.Update[ S, Proc[ S ]]]
    {
+      me =>
+
       private val microsPerSample = 1000000 / sampleRate
 
       private type Elem = Proc[ S ]
@@ -210,7 +212,8 @@ if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + ef
             STMTxn.afterCommit( _ => {
                pool.schedule( new Runnable {
                   def run() { cursor.step { implicit tx =>
-                     self.get.eventReached( v, logical + delay, oldFrame, newFrame, hasProcEvent, hasParEvent )
+                     val self = tx.refresh[ Transport[ S, Proc[ S ]]]( csrPos, me )
+                     self.eventReached( v, logical + delay, oldFrame, newFrame, hasProcEvent, hasParEvent )
                   }}
                }, effective, TimeUnit.MICROSECONDS )
             })( tx.peer )
@@ -235,6 +238,6 @@ if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + ef
 
       def changed : Event[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]] = this
 
-      protected def reader: evt.Reader[ S, Transport[ S, Proc[ S ]]] = serializer[ S ]( self )
+      protected def reader: evt.Reader[ S, Transport[ S, Proc[ S ]]] = serializer[ S ]
    }
 }
