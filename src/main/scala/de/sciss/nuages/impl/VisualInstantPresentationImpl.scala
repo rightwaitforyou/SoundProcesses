@@ -26,7 +26,7 @@
 package de.sciss.nuages
 package impl
 
-import de.sciss.lucre.stm.{Source, Sys, Cursor}
+import de.sciss.lucre.stm.{TxnSerializer, Source, Sys, Cursor}
 import de.sciss.synth.proc.{Proc, Transport, Param}
 import de.sciss.lucre.bitemp.{BiGroup, SpanLike}
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
@@ -47,18 +47,17 @@ import prefuse.render.DefaultRendererFactory
 import prefuse.util.force.{AbstractForce, ForceItem}
 
 object VisualInstantPresentationImpl {
-   def apply[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]])
-                            ( implicit cursor: Cursor[ S ]) : VisualInstantPresentation[ S ] = {
+   def apply[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]])
+                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : VisualInstantPresentation[ S ] = {
 
-      require( EventQueue.isDispatchThread, "Must be called on EDT" )
+//      require( EventQueue.isDispatchThread, "VisualInstantPresentation.apply must be called on EDT" )
+//      require( Txn.findCurrent.isEmpty, "VisualInstantPresentation.apply must be called outside transaction" )
 
-      val vis = new Impl( transport, cursor )
-      cursor.step { implicit tx =>
-         val map     = tx.newInMemoryIDMap[ Map[ SpanLike, List[ VisualProc ]]]
-         val t       = transport.get
-         val all     = t.iterator.toIndexedSeq
+      val vis     = new Impl( transport, cursor )
+      val map     = tx.newInMemoryIDMap[ Map[ SpanLike, List[ VisualProc ]]]
+      val all     = transport.iterator.toIndexedSeq
 
-         advance( t.time, all, IIdxSeq.empty, IIdxSeq.empty )
+      advance( transport.time, all, IIdxSeq.empty, IIdxSeq.empty )
 //         t.changed.react {
 //            case BiGroup.Added(   group, span, elem ) =>
 //            case BiGroup.Removed( group, span, elem ) =>
@@ -66,72 +65,71 @@ object VisualInstantPresentationImpl {
 //            case BiGroup.Element( group, changes ) =>
 //         }
 
-         def onEDT( thunk: => Unit )( implicit tx: S#Tx ) {
-            Txn.afterCommit( _ => EventQueue.invokeLater( new Runnable {
-               def run() {
-                  thunk
-               }
-            }))( tx.peer )
-         }
-         def playStop( b: Boolean )( implicit tx: S#Tx ) {
-            onEDT( vis.playing = b )
-         }
-
-         def advance( time: Long, added: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
-                                removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
-                                 params: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])])( implicit tx: S#Tx ) {
-            val vpRem = removed.flatMap { case (span, timed) =>
-               map.get( timed.id ).flatMap { vpm =>
-                  map.remove( timed.id )
-                  vpm.get( span ).flatMap {
-                     case vp :: tail =>
-                        if( tail.nonEmpty ) {
-                           map.put( timed.id, vpm + (span -> tail) )
-                        }
-                        Some( vp )
-                     case _ =>
-                        None
-                  }
-               }
+      def onEDT( thunk: => Unit )( implicit tx: S#Tx ) {
+         Txn.afterCommit( _ => EventQueue.invokeLater( new Runnable {
+            def run() {
+               thunk
             }
-            val hasRem = vpRem.nonEmpty
-            val vpAdd = added.map { case (span, timed) =>
-               val id   = timed.id
-               val proc = timed.value
-               val n    = proc.name.value
-               val par  = proc.par.entriesAt( time )
-               val vp   = new VisualProc( n, par )
-               map.get( id ) match {
-                  case Some( vpm ) =>
-                     map.remove( id )
-                     map.put( id, vpm + (span -> (vp :: vpm.getOrElse( span, Nil ))))
-                  case _ =>
-                     map.put( id, Map( span -> (vp :: Nil) ))
-               }
-               vp
-            }
-            val hasAdd = vpAdd.nonEmpty
-
-            val vpMod = params.flatMap { case (span, timed, ch) =>
-               map.get( timed.id ).flatMap( _.getOrElse( span, Nil ).headOption ).map( _ -> ch )
-            }
-            val hasMod = vpMod.nonEmpty
-
-            if( hasAdd || hasRem || hasMod ) onEDT {
-               if( hasAdd ) vis.add( vpAdd: _* )
-               if( hasRem ) vis.remove( vpRem: _* )
-               if( hasMod ) vis.updated( vpMod: _* )
-            }
-         }
-
-         t.changed.reactTx { implicit tx => {
-            case Transport.Advance( _, _, time, added, removed, params ) => advance( time, added, removed, params )
-            case Transport.Play( _ ) => playStop( b = true  )
-            case Transport.Stop( _ ) => playStop( b = false )
-         }}
+         }))( tx.peer )
+      }
+      def playStop( b: Boolean )( implicit tx: S#Tx ) {
+         onEDT( vis.playing = b )
       }
 
-      vis.init()
+      def advance( time: Long, added: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
+                             removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
+                              params: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])])( implicit tx: S#Tx ) {
+         val vpRem = removed.flatMap { case (span, timed) =>
+            map.get( timed.id ).flatMap { vpm =>
+               map.remove( timed.id )
+               vpm.get( span ).flatMap {
+                  case vp :: tail =>
+                     if( tail.nonEmpty ) {
+                        map.put( timed.id, vpm + (span -> tail) )
+                     }
+                     Some( vp )
+                  case _ =>
+                     None
+               }
+            }
+         }
+         val hasRem = vpRem.nonEmpty
+         val vpAdd = added.map { case (span, timed) =>
+            val id   = timed.id
+            val proc = timed.value
+            val n    = proc.name.value
+            val par  = proc.par.entriesAt( time )
+            val vp   = new VisualProc( n, par )
+            map.get( id ) match {
+               case Some( vpm ) =>
+                  map.remove( id )
+                  map.put( id, vpm + (span -> (vp :: vpm.getOrElse( span, Nil ))))
+               case _ =>
+                  map.put( id, Map( span -> (vp :: Nil) ))
+            }
+            vp
+         }
+         val hasAdd = vpAdd.nonEmpty
+
+         val vpMod = params.flatMap { case (span, timed, ch) =>
+            map.get( timed.id ).flatMap( _.getOrElse( span, Nil ).headOption ).map( _ -> ch )
+         }
+         val hasMod = vpMod.nonEmpty
+
+         if( hasAdd || hasRem || hasMod ) onEDT {
+            if( hasAdd ) vis.add( vpAdd: _* )
+            if( hasRem ) vis.remove( vpRem: _* )
+            if( hasMod ) vis.updated( vpMod: _* )
+         }
+      }
+
+      transport.changed.reactTx { implicit tx => {
+         case Transport.Advance( _, _, time, added, removed, params ) => advance( time, added, removed, params )
+         case Transport.Play( _ ) => playStop( b = true  )
+         case Transport.Stop( _ ) => playStop( b = false )
+      }}
+
+      onEDT( vis.init() )
       vis
    }
 
@@ -147,7 +145,7 @@ object VisualInstantPresentationImpl {
    private val colrStop       = Color.black
    private val COLUMN_DATA    = "nuages.data"
 
-   private final class Impl[ S <: Sys[ S ]]( transport: Source[ S#Tx, Transport[ S, Proc[ S ]]], cursor: Cursor[ S ])
+   private final class Impl[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], cursor: Cursor[ S ])
    extends VisualInstantPresentation[ S ] {
       private var playingVar = false
 //      private var vps      = Set.empty[ VisualProc ]
@@ -159,25 +157,25 @@ object VisualInstantPresentationImpl {
          res.addColumn( COLUMN_DATA, classOf[ VisualProc ])
          res
       }
-      private val pVis = {
-         val res = new Visualization()
-         /* val gVis = */ res.addGraph( GROUP_GRAPH, g )
-//         gVis.addColumn( COLUMN_DATA, classOf[ VisualProc ])
-         res
-      }
-      private val display  = new Display( pVis ) {
-         override protected def setRenderingHints( g: Graphics2D ) {
-            g.setRenderingHint( RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON )
-            g.setRenderingHint( RenderingHints.KEY_RENDERING,         RenderingHints.VALUE_RENDER_QUALITY )
-            // XXX somehow this has now effect:
-            g.setRenderingHint( RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON )
-            g.setRenderingHint( RenderingHints.KEY_STROKE_CONTROL,    RenderingHints.VALUE_STROKE_PURE )
-         }
-      }
+      private var pVis: Visualization = _
+      private var display: Display = _
 
       def view : JComponent = display
 
       def init() {
+         pVis = new Visualization()
+         pVis.addGraph( GROUP_GRAPH, g )
+
+         display = new Display( pVis ) {
+            override protected def setRenderingHints( g: Graphics2D ) {
+               g.setRenderingHint( RenderingHints.KEY_ANTIALIASING,      RenderingHints.VALUE_ANTIALIAS_ON )
+               g.setRenderingHint( RenderingHints.KEY_RENDERING,         RenderingHints.VALUE_RENDER_QUALITY )
+               // XXX somehow this has now effect:
+               g.setRenderingHint( RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON )
+               g.setRenderingHint( RenderingHints.KEY_STROKE_CONTROL,    RenderingHints.VALUE_STROKE_PURE )
+            }
+         }
+
          val lay = new ForceDirectedLayout( GROUP_GRAPH )
          val fs = lay.getForceSimulator
 

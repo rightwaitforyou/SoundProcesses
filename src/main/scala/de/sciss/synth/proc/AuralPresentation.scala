@@ -34,8 +34,7 @@ object AuralPresentation {
    // ---- implementation forwards ----
 
    def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], config: Server.Config = Server.Config() )
-                          ( implicit tx: S#Tx, cursor: Cursor[ S ],
-                            transportSerializer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]]) : AuralPresentation[ S ] =
+                          ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] =
       AuralPresentationImpl.run( transport, config )
 }
 trait AuralPresentation[ S <: Sys[ S ]]

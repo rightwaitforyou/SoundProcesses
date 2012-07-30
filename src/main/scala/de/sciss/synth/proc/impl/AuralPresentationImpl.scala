@@ -39,21 +39,20 @@ object AuralPresentationImpl {
    var dumpOSC = true
 
    def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], config: Server.Config = Server.Config() )
-                          ( implicit tx: S#Tx, cursor: Cursor[ S ],
-                            transportSerializer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]]) : AuralPresentation[ S ] = {
-      val boot = new Boot( transport, config, cursor.position )
-      implicit val itx = tx.peer
-      Txn.afterCommit { _ =>
+                          ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
+//      require( Txn.findCurrent.isEmpty, "AuralPresentation.run must be called outide of transaction" )
+      val boot = new Boot( cursor.position, transport, config )
+      Txn.afterCommit( _ => {
          Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
             def run() { boot.shutDown() }
          }))
          boot.start()
-      }
+      })( tx.peer )
       boot
    }
 
-   private final class Boot[ S <: Sys[ S ]]( transportStale: Transport[ S, Proc[ S ]], config: Server.Config, csrPos: S#Acc )
-                                           ( implicit cursor: Cursor[ S ], transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]])
+   private final class Boot[ S <: Sys[ S ]]( csrPos: S#Acc, transportStale: Transport[ S, Proc[ S ]], config: Server.Config )
+                                           ( implicit cursor: Cursor[ S ])
    extends AuralPresentation[ S ] {
 
       private val sync        = new AnyRef

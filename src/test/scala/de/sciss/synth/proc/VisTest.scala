@@ -86,8 +86,8 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    access // initialize !
 
-   val groupAccess:     Source[ S#Tx, ProcGroupX.Modifiable[ S ]] = Source.map( access )( _._1 )
-   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
+//   val groupAccess:     Source[ S#Tx, ProcGroupX.Modifiable[ S ]] = Source.map( access )( _._1 )
+//   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
 
    def group( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ]    = access.get._1
    def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]      = access.get._2
@@ -160,28 +160,34 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    private var frameVar: JFrame = null
    def frame = frameVar
 
-   def gui() {
-      if( frame == null ) defer {
-         val f    = new JFrame( "Vis" )
-         frameVar = f
-         val cp   = f.getContentPane
-         val vis  = VisualInstantPresentation( transportAccess )
-         cp.add( vis.view, BorderLayout.CENTER )
-         f.pack()
-         f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
-         f.setLocationRelativeTo( null )
-         f.setLocation( f.getX, 0 )
-         f.setAlwaysOnTop( true )
-         f.setVisible( true )
+   private val visVar = STMRef( Option.empty[ VisualInstantPresentation[ S ]])
+
+   def gui() { t { implicit tx =>
+      implicit val itx = tx.peer
+      if( visVar().isEmpty ) {
+         val vis = VisualInstantPresentation( trans )
+         visVar.set( Some( vis ))
+         STMTxn.afterCommit( _ => defer {
+            val f    = new JFrame( "Vis" )
+            frameVar = f
+            val cp   = f.getContentPane
+            cp.add( vis.view, BorderLayout.CENTER )
+            f.pack()
+            f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
+            f.setLocationRelativeTo( null )
+            f.setLocation( f.getX, 0 )
+            f.setAlwaysOnTop( true )
+            f.setVisible( true )
+         })
       }
-   }
+   }}
 
    private val auralVar = STMRef( Option.empty[ AuralPresentation[ S ]])
 
    def aural() { t { implicit tx =>
       implicit val itx = tx.peer
       if( auralVar().isEmpty ) {
-         auralVar.set( Some( AuralPresentation.run( transportAccess.get )))
+         auralVar.set( Some( AuralPresentation.run( trans )))
       }
    }}
 
