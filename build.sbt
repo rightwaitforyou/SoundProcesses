@@ -16,8 +16,8 @@ crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
 
 libraryDependencies ++= Seq(
    "de.sciss" %% "scalacollider" % "0.34",
-   "de.sciss" %% "temporalobjects" % "0.34-SNAPSHOT",
-   "de.sciss" %% "lucreexpr" % "0.34-SNAPSHOT",
+   "de.sciss" %% "temporalobjects" % "0.34",
+   "de.sciss" %% "lucreexpr" % "0.34",
    "de.sciss" % "prefuse-core" % "0.21"
 )
 
