@@ -131,6 +131,8 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
 
 //   def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
 
+   def modifiableOption : Option[ BiPin.Modifiable[ S, Elem, U ]]
+
    /**
     * Queries the element valid for the given point in time.
     * Unlike, `intersect`, if there are multiple elements sharing

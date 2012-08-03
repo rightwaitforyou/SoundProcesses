@@ -110,6 +110,8 @@ object BiGroup {
 trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    import BiGroup.Leaf
 
+   def modifiableOption : Option[ BiGroup.Modifiable[ S, Elem, U ]]
+
 //   /**
 //    * Generates an iterator over all elements in the group which intersect (whose span contains)
 //    * the current time as given by the implicit `chronos` argument.

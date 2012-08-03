@@ -84,7 +84,7 @@ object AuralPresentationImpl {
       private def booted( server: Server ) {
          if( dumpOSC ) server.dumpOSC( Dump.Text )
          cursor.step { implicit tx =>
-            val viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
+            val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new Booted( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val transport = tx.refresh( csrPos, transportStale )
@@ -106,7 +106,7 @@ object AuralPresentationImpl {
       }
    }
 
-   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#Tx, S#ID, AuralProc ]) {
+   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]) {
       def procAdded( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
 //         val name    = p.name.value
          val p       = timed.value

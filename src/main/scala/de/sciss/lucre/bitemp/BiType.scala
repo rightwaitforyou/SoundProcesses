@@ -26,7 +26,7 @@
 package de.sciss.lucre
 package bitemp
 
-import stm.{Serializer, Sys}
+import stm.{ImmutableSerializer, Sys}
 import de.sciss.lucre.{event => evt}
 import evt.{Pull, Targets}
 import expr.{Expr, Type}
@@ -35,7 +35,7 @@ import expr.{Expr, Type}
  * Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object.
  */
 trait BiType[ A ] extends Type[ A ] {
-   implicit object ValueSer extends Serializer[ A ] {
+   implicit object ValueSer extends ImmutableSerializer[ A ] {
       def write( v: A, out: DataOutput ) { writeValue( v, out )}
       def read( in: DataInput ) : A = readValue( in )
    }

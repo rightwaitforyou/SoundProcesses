@@ -26,9 +26,9 @@
 package de.sciss.lucre
 package bitemp
 
-import stm.{Writer, Serializer}
 import annotation.switch
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import stm.ImmutableSerializer
 
 object Span {
    def from( start: Long ) : From                     = From( start )
@@ -38,7 +38,7 @@ object Span {
    def all : All.type                                 = All
    def void : Void.type                               = Void
 
-   implicit object serializer extends Serializer[ Span ] {
+   implicit object serializer extends ImmutableSerializer[ Span ] {
       def write( v: Span, out: DataOutput ) { v.write( out )}
       def read( in: DataInput ) : Span = Span.read( in )
    }
@@ -398,7 +398,7 @@ object Span {
    }
 }
 object SpanLike {
-   implicit object serializer extends Serializer[ SpanLike ] {
+   implicit object serializer extends ImmutableSerializer[ SpanLike ] {
       def write( v: SpanLike, out: DataOutput ) { v.write( out )}
       def read( in: DataInput ) : SpanLike = SpanLike.read( in )
    }
@@ -412,7 +412,7 @@ object SpanLike {
       case cookie => sys.error( "Unrecognized cookie " + cookie )
    }
 }
-sealed trait SpanLike extends Writer {
+sealed trait SpanLike extends Writable {
    /**
     * Clips a position to this span's boundary. Note that
     * the span's stop position is included. Thus the result

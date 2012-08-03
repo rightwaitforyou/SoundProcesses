@@ -29,7 +29,7 @@ package impl
 
 import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike}
-import stm.{TxnSerializer, Sys, Serializer}
+import stm.{ImmutableSerializer, TxnSerializer, Sys}
 import data.{SpaceSerializers, SkipOctree, Iterator}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
@@ -168,7 +168,7 @@ object BiGroupImpl {
       group =>
 
       implicit def pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
-      implicit def hyperSer: Serializer[ LongSquare ] = SpaceSerializers.LongSquareSerializer
+      implicit def hyperSer: ImmutableSerializer[ LongSquare ] = SpaceSerializers.LongSquareSerializer
 
       protected def tree: Tree[ S, Elem, U ]
 //      def eventView: Elem => EventLike[ S, U, Elem ]
@@ -176,6 +176,8 @@ object BiGroupImpl {
 //      implicit def spanType: Type[ SpanLike ]
 
       override def toString() = "BiGroup" + tree.id
+
+      final def modifiableOption : Option[ BiGroup.Modifiable[ S, Elem, U ]] = Some( this )
 
       implicit object TimedSer extends evt.NodeSerializer[ S, TimedElemImpl[ S, Elem, U ]] {
          def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : TimedElemImpl[ S, Elem, U ] = {

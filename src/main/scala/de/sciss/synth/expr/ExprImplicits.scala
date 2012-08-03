@@ -1,7 +1,7 @@
 package de.sciss.synth.expr
 
 import de.sciss.lucre.{stm, expr, bitemp}
-import stm.Sys
+import stm.{InMemory, Sys}
 import bitemp.{SpanLike, Span}
 import expr.Expr
 
@@ -19,6 +19,10 @@ object ExprImplicits {
 ////      implicit def lowSpanLikeOps( ex: Expr[ S, Span ])( implicit tx: S#Tx ) : SpanLikes.Ops[ S ] = new SpanLikes.Ops( ex )
 ////      implicit def lowDoubleConst( d: Float ) : Expr[ S, Double ] = Doubles.newConst( d )
 //   }
+
+   def apply[ S <: Sys[ S ]] : ExprImplicits[ S ] = Imp.asInstanceOf[ ExprImplicits[ S ]]
+
+   private object Imp extends ExprImplicits[ InMemory ]
 }
 
 /**

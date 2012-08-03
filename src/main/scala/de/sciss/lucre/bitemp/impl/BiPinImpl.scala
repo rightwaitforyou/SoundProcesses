@@ -139,6 +139,8 @@ object BiPinImpl {
 
       override def toString() = "BiPin" + tree.id
 
+      final def modifiableOption : Option[ BiPin.Modifiable[ S, Elem, U ]] = Some( this )
+
       // ---- event behaviour ----
 
       private object CollChanged
