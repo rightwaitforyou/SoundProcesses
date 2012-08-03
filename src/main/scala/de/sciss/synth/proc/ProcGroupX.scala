@@ -28,7 +28,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.{stm, bitemp, expr, event => evt, DataInput}
 import bitemp.{SpanLike, BiGroup}
 import expr.Type
-import stm.{TxnSerializer, Sys}
+import stm.{Serializer, Sys}
 import de.sciss.synth.expr.SpanLikes
 import evt.EventLike
 
@@ -43,7 +43,7 @@ object ProcGroupX {
    private def eventView[ S <: Sys[ S ]]( proc: Proc[ S ]) : EventLike[ S, Proc.Update[ S ], Proc[ S ]] = proc.changed
 
    object Modifiable {
-      def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroupX.Modifiable[ S ]] = {
+      def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, ProcGroupX.Modifiable[ S ]] = {
          BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
       }
 
@@ -57,7 +57,7 @@ object ProcGroupX {
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup[ S ] =
       BiGroup.Modifiable.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
 
-   implicit def serializer[ S <: Sys[ S ]] : TxnSerializer[ S#Tx, S#Acc, ProcGroup[ S ]] = {
+   implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, ProcGroup[ S ]] = {
       BiGroup.serializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
    }
 }

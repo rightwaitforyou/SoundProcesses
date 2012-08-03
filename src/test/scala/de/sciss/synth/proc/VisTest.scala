@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.{stm, bitemp, expr}
-import stm.{Source, TxnSerializer, Cursor, Sys, InMemory}
+import stm.{Serializer, Cursor, Sys, InMemory}
 import stm.impl.BerkeleyDB
 import bitemp.{BiType, BiGroup, BiPin, Chronos, Span, SpanLike}
 import expr.Expr
@@ -61,11 +61,11 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    type Acc = (PG, Transport[ S, Proc[ S ]])
 
    object Implicits {
-//      implicit def procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = ProcGroupX$.Modifiable.serializer[ S ]
+//      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroupX$.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
-      implicit val procVarSer: TxnSerializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
+      implicit val procVarSer: Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-      implicit val transportSer: TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S ]( cursor )
+      implicit val transportSer: Serializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S ]( cursor )
    }
 
    import Implicits._

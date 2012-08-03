@@ -29,7 +29,7 @@ package impl
 import de.sciss.lucre.{event => evt, stm, expr, data, bitemp, DataInput, DataOutput}
 import de.sciss.synth.SynthGraph
 import de.sciss.synth.expr.{Booleans, Strings, Doubles, ExprImplicits}
-import stm.{TxnSerializer, InMemory, Sys}
+import stm.{InMemory, Sys}
 import bitemp.{BiType, Chronos, BiPin}
 import expr.Expr
 import data.SkipList

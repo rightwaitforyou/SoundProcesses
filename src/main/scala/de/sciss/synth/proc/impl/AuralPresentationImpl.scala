@@ -27,7 +27,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.{stm, bitemp}
-import stm.{TxnSerializer, Source, IdentifierMap, Sys, Cursor}
+import stm.{IdentifierMap, Sys, Cursor}
 import de.sciss.osc.Dump
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
 import bitemp.{BiGroup, Chronos}

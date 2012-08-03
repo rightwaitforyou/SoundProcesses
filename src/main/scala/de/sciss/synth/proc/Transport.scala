@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.{bitemp, expr, stm, event => evt, data}
 import bitemp.{SpanLike, BiGroup, Chronos}
 import expr.Expr
-import stm.{Source, Cursor, TxnSerializer, Sys}
+import stm.{Cursor, Serializer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.Event
 import data.Iterator
@@ -13,7 +13,7 @@ object Transport {
                             ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] =
       impl.TransportImpl( group, sampleRate )
 
-   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): TxnSerializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
+   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
          impl.TransportImpl.serializer( cursor )
 
    sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}

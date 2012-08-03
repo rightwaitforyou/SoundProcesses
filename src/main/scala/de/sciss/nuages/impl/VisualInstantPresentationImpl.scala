@@ -26,7 +26,7 @@
 package de.sciss.nuages
 package impl
 
-import de.sciss.lucre.stm.{TxnSerializer, Source, Sys, Cursor}
+import de.sciss.lucre.stm.{Sys, Cursor}
 import de.sciss.synth.proc.{Proc, Transport, Param}
 import de.sciss.lucre.bitemp.{BiGroup, SpanLike}
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
