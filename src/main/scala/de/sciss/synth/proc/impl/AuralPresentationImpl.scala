@@ -112,7 +112,7 @@ object AuralPresentationImpl {
          val p       = timed.value
          val graph   = p.graph
          val entries = p.par.entriesAt( chr.time )
-         val aural   = AuralProc( server, /* name, */ graph, entries )
+         val aural   = AuralProc( server, /* name, */ graph.synthGraph, entries )
          viewMap.put( timed.id, aural )
          val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )

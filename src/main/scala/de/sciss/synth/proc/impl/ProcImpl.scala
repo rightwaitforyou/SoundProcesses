@@ -137,12 +137,10 @@ object ProcImpl {
 
 //      private type ParamEx = BiPin.Expr[ S, Param ]
 
-      protected def graphVar : S#Var[ SynthGraph ]
+      protected def graphVar : S#Var[ ProcGraph ]
 //      protected def playing_# : Expr.Var[ S, Boolean ]
       protected def playing_# : BiPin.Expr.Modifiable[ S, Boolean ]
       protected def name_# : Expr.Var[ S, String ]
-//      protected def freq_# : Expr.Var[ S, Double ]
-//      protected def freq_# : BiPin.ExprVar[ S, Double ]
 
 //      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
       protected def parMap : SkipList.Map[ S, String, EntryNode[ S ]]
@@ -162,14 +160,14 @@ object ProcImpl {
          playing_#.add( chr.time, b )
       }
 
-      final def graph( implicit tx: S#Tx ) : SynthGraph = graphVar.get
+      final def graph( implicit tx: S#Tx ) : ProcGraph = graphVar.get
 
-      final def graph_=( g: SynthGraph )( implicit tx: S#Tx ) {
+      final def graph_=( g: ProcGraph )( implicit tx: S#Tx ) {
          val old = graphVar.get
          if( old != g ) {
             graphVar.set( g )
             StateEvent( GraphChange( this, evt.Change( old, g )))
-            updatePars( old, g )
+            updatePars( old.synthGraph, g.synthGraph )
          }
       }
       final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
@@ -289,7 +287,7 @@ object ProcImpl {
          }
       }
 
-      final def keys( implicit tx: S#Tx ) : Set[ String ] = graphKeys( graph )
+      final def keys( implicit tx: S#Tx ) : Set[ String ] = graphKeys( graph.synthGraph )
 
       final def entriesAt( time: Long )( implicit tx: S#Tx ) : Map[ String, Param ] = {
          keys.flatMap( key => {
@@ -375,7 +373,7 @@ object ProcImpl {
 //         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
 //      }
 //      protected val freq_#    = BiPin.newConfluentExprVar[ S, Double ]( 441 )( tx0, Doubles ) // Doubles.newConfluentVar[ S ]( 441 )( tx0 )
-      protected val graphVar  = tx0.newVar[ SynthGraph ]( id, emptyGraph )( SynthGraphSerializer )
+      protected val graphVar  = tx0.newVar[ ProcGraph ]( id, emptyGraph ) // ( SynthGraphSerializer )
 
       protected val parMap    = {
          implicit val tx      = tx0
@@ -401,7 +399,7 @@ object ProcImpl {
 //      protected val freq_#    = Doubles.readVar[ S ]( in, access )( tx0 )
       protected val playing_# = BiPin.Expr.Modifiable.read[ S, Boolean ]( in, access )( tx0, Booleans )
 //      protected val freq_#    = BiPin.readExprVar[ S, Double  ]( in, access )( tx0, Doubles  )
-      protected val graphVar  = tx0.readVar[ SynthGraph ]( id, in )( SynthGraphSerializer )
+      protected val graphVar  = tx0.readVar[ ProcGraph ]( id, in ) // ( SynthGraphSerializer )
 
       protected val parMap    = {
          implicit val tx      = tx0
