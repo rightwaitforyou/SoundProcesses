@@ -170,7 +170,7 @@ object ProcImpl {
             updatePars( old.synthGraph, g.synthGraph )
          }
       }
-      final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph( block ))}
+      final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( ProcGraph.withoutSource( SynthGraph( block )))}
       final def play()( implicit tx: S#Tx, chr: Chronos[ S ]) {
          playing_=( true )
       }
