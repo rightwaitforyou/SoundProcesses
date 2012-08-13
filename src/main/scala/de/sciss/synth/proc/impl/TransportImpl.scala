@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.{stm, expr, data, bitemp, event => evt, DataInput, DataOutput}
-import stm.{Source, Cursor, Sys}
+import stm.{Cursor, Sys}
 import bitemp.{BiGroup, SpanLike, Span}
 import expr.Expr
 import evt.Event
@@ -149,9 +149,9 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
             res
          } else IIdxSeq.empty
 
-         if( removed.nonEmpty || added.nonEmpty || params.nonEmpty ) {
+//         if( removed.nonEmpty || added.nonEmpty || params.nonEmpty ) {
             fire( Transport.Advance( this, playing, newFrame, added, removed, params ))
-         }
+//         }
       }
 
       def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
