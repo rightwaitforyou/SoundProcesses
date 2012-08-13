@@ -259,7 +259,11 @@ object ProcImpl {
             obs
          }
 
-         /* private[lucre] */ def isSource( pull: evt.Pull[ S ]) : Boolean = opNotSupported
+         /* private[lucre] */ def isSource( pull: evt.Pull[ S ]) : Boolean = {
+            // I don't know why this method is actually called? But it _is_, so we need to correctly handle the case
+//            opNotSupported
+            evt.Intruder.isSource( StateEvent, pull ) || evt.Intruder.isSource( ParamEvent, pull )
+         }
       }
 
       final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
