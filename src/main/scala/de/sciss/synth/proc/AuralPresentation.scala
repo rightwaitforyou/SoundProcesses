@@ -25,15 +25,14 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.synth.Server
 import impl.AuralPresentationImpl
-import de.sciss.lucre.stm.{Cursor, Sys}
+import de.sciss.lucre.stm.{Disposable, Cursor, Sys}
 
 object AuralPresentation {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], config: Server.Config = Server.Config() )
+   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], aural: AuralSystem )
                           ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] =
-      AuralPresentationImpl.run( transport, config )
+      AuralPresentationImpl.run( transport, aural )
 }
-trait AuralPresentation[ S <: Sys[ S ]]
+trait AuralPresentation[ S <: Sys[ S ]] extends Disposable[ S#Tx ]

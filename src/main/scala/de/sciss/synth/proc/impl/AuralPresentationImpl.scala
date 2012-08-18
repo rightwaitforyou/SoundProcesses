@@ -36,56 +36,41 @@ import SoundProcesses.logConfig
 import concurrent.stm.Txn
 
 object AuralPresentationImpl {
-   var dumpOSC = true
-
-   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], config: Server.Config = Server.Config() )
+   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], aural: AuralSystem )
                           ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
-//      require( Txn.findCurrent.isEmpty, "AuralPresentation.run must be called outide of transaction" )
-      val boot = new Boot( cursor.position, transport, config )
-      Txn.afterCommit( _ => {
-         Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
-            def run() { boot.shutDown() }
-         }))
-         boot.start()
-      })( tx.peer )
-      boot
+
+      val c = new Client( cursor.position, transport, aural )
+      Txn.afterCommit( _ => aural.addClient( c ))( tx.peer )
+      c
    }
 
-   private final class Boot[ S <: Sys[ S ]]( csrPos: S#Acc, transportStale: Transport[ S, Proc[ S ]], config: Server.Config )
-                                           ( implicit cursor: Cursor[ S ])
-   extends AuralPresentation[ S ] {
+   private final class Client[ S <: Sys[ S ]]( csrPos: S#Acc, transportStale: Transport[ S, Proc[ S ]],
+                                               aural: AuralSystem )( implicit cursor: Cursor[ S ])
+   extends AuralPresentation[ S ] with AuralSystem.Client {
 
-      private val sync        = new AnyRef
-      private var connection  = Option.empty[ Either[ ServerConnection, Server ]]
+      override def toString = "AuralPresentation@" + hashCode.toHexString
 
-      def start() {
+      private val sync     = new AnyRef
+      private var running  = Option.empty[ Impl[ S ]]
+
+      def dispose()( implicit tx: S#Tx ) {
+         // XXX TODO dispose running
+      }
+
+      def stopped() {
+         aural.removeClient( this )
          sync.synchronized {
-            val c = Server.boot( "SoundProcesses", config ) {
-               case ServerConnection.Aborted =>
-                  sync.synchronized { connection = None }
-               case ServerConnection.Running( s ) =>
-                  sync.synchronized { connection = Some( Right( s ))}
-                  booted( s )
+            running.foreach { impl =>
+               // XXX TODO dispose
             }
-            connection = Some( Left( c ))
+            running = None
          }
       }
 
-      def shutDown() {
-         sync.synchronized {
-            connection.foreach {
-               case Left( c )    => c.abort
-               case Right( s )   => s.quit
-            }
-            connection = None
-         }
-      }
-
-      private def booted( server: Server ) {
-         if( dumpOSC ) server.dumpOSC( Dump.Text )
-         cursor.step { implicit tx =>
+      def started( server: Server ) {
+         val impl = cursor.step { implicit tx =>
             val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
-            val booted  = new Booted( server, viewMap )
+            val booted  = new Impl( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val transport = tx.refresh( csrPos, transportStale )
             transport.changed.react { x => println( "Aural observation: " + x )}
@@ -102,11 +87,17 @@ object AuralPresentationImpl {
                   added.foreach   { case (_, p)    => booted.procAdded( p )}
                case _ =>
             }}
+            booted
          }
+         sync.synchronized( running = Some( impl ))
       }
    }
 
-   private final class Booted[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]) {
+   private final class Impl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]) {
+      def dispose()( implicit tx: S#Tx ) {
+         viewMap.dispose()
+      }
+
       def procAdded( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
 //         val name    = p.name.value
          val p       = timed.value

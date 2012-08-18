@@ -187,7 +187,9 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    def aural() { t { implicit tx =>
       implicit val itx = tx.peer
       if( auralVar().isEmpty ) {
-         auralVar.set( Some( AuralPresentation.run( trans )))
+         val as = AuralSystem()
+         as.start()  // XXX TODO non-transactional
+         auralVar.set( Some( AuralPresentation.run( trans, as )))
       }
    }}
 

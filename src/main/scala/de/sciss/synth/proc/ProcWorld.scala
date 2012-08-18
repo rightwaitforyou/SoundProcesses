@@ -119,7 +119,13 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       implicit val itx = tx.peer
       if( servers.contains( server )) return
       servers += server
-      worlds += server -> new ProcWorld
+      worlds  += server -> new ProcWorld
+   }
+
+   def removeServer( server: Server )( implicit tx: ProcTxn ) {
+      implicit val itx = tx.peer
+      servers -= server
+      worlds  -= server
    }
 
    // commented out for debugging inspection
