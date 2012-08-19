@@ -1,3 +1,28 @@
+/*
+ *  TransportImpl.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either
+ *  version 2, june 1991 of the License, or (at your option) any later version.
+ *
+ *  This software is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public
+ *  License (gpl.txt) along with this software; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth.proc
 package impl
 
@@ -74,7 +99,7 @@ object TransportImpl {
    extends Transport[ S, Proc[ S ]]
    with evt.Trigger.Impl[ S, Transport.Update[ S, Proc[ S ]], Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
    with evt.StandaloneLike[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
-   with evt.Root[ S, Transport.Update[ S, Proc[ S ]]]
+//   with evt.Root[ S, Transport.Update[ S, Proc[ S ]]]
    {
       me =>
 
@@ -96,6 +121,62 @@ object TransportImpl {
          playingVar.dispose()
          validVar.dispose()
          lastTime.dispose()
+      }
+
+      // ---- event ----
+
+//      private object TransportEvent
+//      extends evt.Trigger.Impl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+//      with evt.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+//      with evt.InvariantEvent[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+//      with evt.Root[ S, BiGroup.Collection[ S, Elem, U ]]
+//      {
+//         protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
+//         def slot: Int = 1
+//         def node: evt.Node[ S ] = group
+//      }
+
+      def connect()( implicit tx: S#Tx ) {
+         evt.Intruder.--->( group.changed, this )
+      }
+
+      def disconnect()( implicit tx: S#Tx ) {
+         evt.Intruder.-/->( group.changed, this )
+      }
+
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Transport.Update[ S, Proc[ S ]]] = {
+         if( pull.parents( this ).isEmpty ) {
+            pull.resolve[ Transport.Update[ S, Proc[ S ]]]
+         } else {
+            /*
+               XXX TODO: if the transport is running
+               - cancel the future
+               - calculate interpolated current time t_now
+               - if added/removed and span ends before t_now: ignore
+               - if t_now contains span: fire
+               - recalculate next event time _if necessary_
+               - create new future
+             */
+            evt.Intruder.pullUpdate( group.changed, pull ).flatMap { gu =>
+               val tim = time // XXX TODO
+               gu match {
+                  case BiGroup.Added( gr, span, elem ) =>
+                     if( span.contains( tim )) {
+
+                        None
+                     } else if( span.overlaps( Span.from( tim ))) {
+
+                        None
+                     } else {
+                        None
+                     }
+                  case BiGroup.Removed( gr, span, elem ) =>
+                     None
+                  case BiGroup.Element( gr, changes ) =>
+                     None
+               }
+            }
+         }
       }
 
       def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])] =
