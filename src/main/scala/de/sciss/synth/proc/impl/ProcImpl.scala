@@ -41,7 +41,7 @@ import annotation.switch
 object ProcImpl {
    private val SER_VERSION = 1
 
-   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
+   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = sys.error( "TODO" ) // new New[ S ]( tx )
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] =
       serializer[ S ].read( in, access )
@@ -55,7 +55,7 @@ object ProcImpl {
 
    private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Proc[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Proc[ S ] =
-         new Read( in, access, targets, tx )
+         sys.error( "TODO" ) // new Read( in, access, targets, tx )
    }
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
@@ -366,7 +366,7 @@ object ProcImpl {
          (that.asInstanceOf[ Proc[ _ ]].id == id)
    }
 
-   private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
+   private abstract /* final */ class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
 //      protected val decl      = getDecl[ S ]( tx0 )
       protected val targets   = evt.Targets[ S ]( tx0 )
 
@@ -388,7 +388,7 @@ object ProcImpl {
       }
    }
 
-   private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
+   private abstract /* final */ class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
                                              tx0: S#Tx )
    extends Impl[ S ] {
 //      protected val decl      = getDecl[ S ]( tx0 )

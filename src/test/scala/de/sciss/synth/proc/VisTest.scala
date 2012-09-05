@@ -94,9 +94,9 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)
-      val p    = Proc[ S ]()
-      p.name   = name
-      p.graph     = {
+      val p = Proc[ S ]()
+      p.name_=( name )
+      p.graph_=({
          import synth._
          import ugen._
          val f = "freq".kr       // fundamental frequency
@@ -105,9 +105,18 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
             FSinOsc.ar(f * (i+1)) *
                (LFNoise1.kr(Seq(Rand(2, 10), Rand(2, 10))) * 0.02).max(0)
          }
+//         Out_~( "sig", WhiteNoise.ar )
+//         SinOsc.ar( In_~( "freq", 441 ))
+//         Out_!( "trig", Dust.kr( 1 ))
+//         Decay.ar( In_!( "trig2" ))
+//         Trigger( "silence", DetectSilence.ar( m ))
+
          Out.ar( 0, m )
-      }
-      p.playing = true
+      })
+
+//      p.trigger( "silence" )
+
+      p.playing_=( true )
       p
    }
 

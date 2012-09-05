@@ -1,0 +1,177 @@
+proc.attr[String]("name")
+proc.step[Boolean]("mute")
+proc.step[Unit]("trig")
+proc.integral("freq")
+proc.continous("freq")
+proc.control("freq")
+proc.signal("freq")
+proc.motile("freq")
+proc.motion("freq")
+proc.ctl("freq")
+proc.roll("freq")
+! proc.shape("freq")
+proc.dynamic("freq")
+proc.contour("freq")
+
+proc.io("freq")
+! proc.scan("freq")
+
+attr - plain single attribute
+step - temporal sequence of attributes
+scan - integral or continous temporal envelope or signal
+
+`attr` can be lifted into a `step`
+`step` can be lifted into a `scan` iff type is Boolean or Float?
+
+e.g. 
+
+trait Step[T] {
+   def ar( implicit ev: T <:< Boolean ) : GE
+   def ar( implicit ev: T <:< Float ) : GE
+}
+
+(with the problem of the overloading arguments erasing to the same type)
+
+trait Scan { def ar: GE }
+
+trait Step[T] {
+   def ar( implicit source: ScanSource: Step[T] => Scan ) : GE = source( this ).ar
+}
+
+:::::::::::::::
+
+proc.attrs += "name" -> "Hallo"
+proc.steps += "muted" -> false  // default value
+
+vs
+
+proc.step.add[Boolean]( "muted" )  // ?
+
+proc.scans.add( "freq" )
+proc.scans.keys
+proc.scans.entriesAt( time: Long )
+
+Code[T] {
+   def value: T
+   def source: Option[String]
+}
+
+:::::::::::::::
+
+example graph usage. read:
+
+   WhiteNoise.ar * (1 - Step[Boolean]("muted", true).kr)
+
+   SinOsc.ar(Scan("freq", 441))
+
+( where Scan should fall back to checking against Step[Float] if no scan found? ; perhaps not, because Step[Float] doesn't make much sense anyway ?)
+
+example writing:
+
+   val sil = DetectSilence.ar( ... )
+   sil.once ~> Step[Boolean]("muted") // ?  where x.once == Latch(x,x)
+
+   sil.once ~> Step[Unit]("muted")
+
+   sil.once ~> Trigger("muted") // i.e. not bitemporal
+
+--- or put the responsibility on the consumer?
+
+p1:
+   val in  = LiveIn( ... )  // ?
+   val pch = Pitch.kr( in )
+   pch ~> Scan("pitch") --> merely adds a 'server signal' tag, instead of writing the data
+
+p2:
+   val pch = Scan("pitch", 441)
+
+p1.scan("pitch") ~> p2.scan("pitch") ??
+
+... so the case of Scan is rather clear : do _not_ write an audio file, unless explicitly with a GE such as LiveIn
+
+LiveIn could function based on an external ephemeral (global?) switch, such as "Record"
+
+what needs clarification is the triggers (Step)
+
+:::::::::::::::::::::
+
+also unclear is whether we need explicit distinction between 'input' and 'output' scans, i.e. whether the graph will "just read" or "just write" the slot?
+
+e.g. what will happen with
+
+    OutScan("test").ar(InScan("test").ar(0))
+
+-- probably it will be "fine", resulting in an InFeedback.ar
+
+:::::::::::::::::::::
+
+    out("test").ar(in("test").ar(0))
+
+    out("trig").tr( DetectSilence.ar( ... ))
+
+    in("muted").tr  // should that be control or audio rate?
+
+so the advantage of the following would be explicit rate:
+
+    scin
+    scout
+    trin
+    trout
+
+no...
+
+    StepIn
+    StepOut
+    ScanIn
+    ScanOut
+
+or apply/update:
+
+    BufCue( Attr[String]("name")() + ".aif" )
+
+    SinOsc.ar( Scan("freq")() )
+
+    val f = Scan( "freq" )()
+    SinOsc.ar( f.ar )
+
+??? defaults missing
+
+better lower case anyway, so no confusion with regular GEs
+
+    BufCue( attr[String]("name")( "default" ) + ".aif" )
+
+    SinOsc.ar( scan("freq").ar( 441 ))
+
+    scan("freq")() = Pitch.kr( ... )
+
+vs.
+
+    scan("freq") := Pitch.kr( ... )
+
+Could avoid the type parameter for attr:
+
+    BufCue( attr("name", "default") + ".aif" )
+
+well...
+
+    BufCueOrSilence( attr[AudioFileResource]("file") /*.get */ )
+
+:::::::::::::::::::::
+
+back to detect silence + free self stuff
+
+    trig("done") := DetectSilence.ar( ... )
+
+is this going to write onto a bitemporal plane or not? i think _not_, because it fits with the existing event system which _is_ ephemeral
+
+it may be possible to even forbid assignment of step from the graph function? is there a case where this writing would be useful?
+
+:::::::::::::::::::::
+
+thus a Scan will ultimately be a BiPin[ S, Scan.Elem, _ ] with
+
+object Scan {
+   sealed trait Elem[S <: Sys[S]] // { def shape: Env.Shape }
+   case class Expr[S <: Sys[S]]( value: Expr[S, Double], shape: Env.Shape ) extends Elem[S]
+   case class 
+}
