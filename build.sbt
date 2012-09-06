@@ -10,9 +10,9 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
-scalaVersion := "2.10.0-M7" // "2.9.2"
+scalaVersion := "2.9.2" // "2.10.0-M7"
 
-scalaBinaryVersion := "2.10.0-M7"
+// scalaBinaryVersion := "2.10.0-M7"
 
 // crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
 
