@@ -152,7 +152,7 @@ object ProcImpl {
          name_#.set( s )
       }
       final def playing( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Boolean ] = {
-         playing_#.at( chr.time )
+         playing_#.at( chr.time ).getOrElse( true )   // true?
       }
       final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
 //         sys.error( "TODO" )
@@ -280,7 +280,7 @@ object ProcImpl {
          get( key ).getOrElse {
             if( keys.contains( key )) {
                implicit val doubles = Doubles
-               val expr = BiPin.Expr.Modifiable[ S, Param ]( 0d )   // XXX retrieve default value
+               val expr = BiPin.Expr.Modifiable[ S, Param ] // ( 0d )   // XXX retrieve default value
                val tgt  = evt.Targets[ S ]   // XXX partial?
                val node = new EntryNode[ S ]( tgt, key, expr )
                parMap += key -> node
@@ -295,7 +295,9 @@ object ProcImpl {
 
       final def entriesAt( time: Long )( implicit tx: S#Tx ) : Map[ String, Param ] = {
          keys.flatMap( key => {
-            parMap.get( key ).map( bi => key -> bi.value.at( time ).value )
+            parMap.get( key ).flatMap { bi =>
+               bi.value.at( time ).map( ex => key -> ex.value )
+            }
          })( breakOut )
       }
 
@@ -371,7 +373,7 @@ object ProcImpl {
       protected val targets   = evt.Targets[ S ]( tx0 )
 
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
-      protected val playing_# = BiPin.Expr.Modifiable.partial[ S, Boolean ]( true )( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
+      protected val playing_# = BiPin.Expr.Modifiable.partial[ S, Boolean ]/*( true )*/( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
 //      protected val freqVar   = {
 //         implicit val peerSer = Doubles.serializer[ S ]
 //         tx0.newVar[ Expr[ S, Double ]]( id, 441 )

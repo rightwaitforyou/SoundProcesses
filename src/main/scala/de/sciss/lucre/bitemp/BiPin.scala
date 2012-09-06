@@ -61,12 +61,12 @@ object BiPin {
             BiPinImpl.readModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
          }
 
-         def apply[ S <: Sys[ S ], A ]( default: Ex[ S, A ])( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr.Modifiable[ S, A ] =
-            BiPinImpl.newModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+         def apply[ S <: Sys[ S ], A ]/*( default: Ex[ S, A ])*/( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr.Modifiable[ S, A ] =
+            BiPinImpl.newModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( /* default, */ _.changed )( tx, elemType.serializer[ S ], elemType.longType )
 
-         def partial[ S <: Sys[ S ], A ]( default: Ex[ S, A ])
+         def partial[ S <: Sys[ S ], A ]/*( default: Ex[ S, A ])*/
                                         ( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr.Modifiable[ S, A ] =
-            BiPinImpl.newPartialModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( default, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+            BiPinImpl.newPartialModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( /* default, */ _.changed )( tx, elemType.serializer[ S ], elemType.longType )
       }
    }
    type Expr[ S <: Sys[ S ], A ]    = BiPin[ S, Ex[ S, A ], evt.Change[ A ]]
@@ -97,11 +97,11 @@ object BiPin {
          BiPinImpl.readModifiable[ S, Elem, U ]( in, access, eventView )
       }
 
-      def apply[ S <: Sys[ S ], Elem, U ]( default: Elem )( eventView: Elem => EventLike[ S, U, Elem ])
+      def apply[ S <: Sys[ S ], Elem, U ]/*( default: Elem )*/( eventView: Elem => EventLike[ S, U, Elem ])
                                          ( implicit tx: S#Tx,
                                            elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                            timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] =
-         BiPinImpl.newModifiable[ S, Elem, U ]( default, eventView )
+         BiPinImpl.newModifiable[ S, Elem, U ]( /* default, */ eventView )
 
       def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                               ( implicit elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
@@ -142,9 +142,9 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * the `BiPin` for a given moment in time.
     *
     * @param time the query time point
-    * @return  an element for the given time point
+    * @return  an element for the given time point, if it exists, otherwise `None`
     */
-   def at( time: Long )( implicit tx: S#Tx ) : Elem
+   def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem ]
 
    /**
     * Queries all elements which are found at a given point in time.

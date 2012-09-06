@@ -52,95 +52,95 @@ trait BiType[ A ] extends Type[ A ] {
 
 //   def readLongExpr[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Expr[ S, Long ]
 
-   // assumes it was identified (cookie 3 read)
-   protected def readProjection[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                               ( implicit tx: S#Tx ) : Ex[ S ] = {
-//      val bi   =
-      val cache   = tx.readPartialVar[ A ]( targets.id, in )
-      val bi      = BiPin.Expr.Modifiable.read[ S, A ]( in, access )( tx, this )
-      val time    = longType.readExpr( in, access )
-      new Projection[ S ]( targets, cache, bi, time )
-   }
+//   // assumes it was identified (cookie 3 read)
+//   protected def readProjection[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
+//                                               ( implicit tx: S#Tx ) : Ex[ S ] = {
+////      val bi   =
+//      val cache   = tx.readPartialVar[ A ]( targets.id, in )
+//      val bi      = BiPin.Expr.Modifiable.read[ S, A ]( in, access )( tx, this )
+//      val time    = longType.readExpr( in, access )
+//      new Projection[ S ]( targets, cache, bi, time )
+//   }
 
-   private final class Projection[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
-                                                   bi: BiPin[ S, Expr[ S, A ], event.Change[ A ]], ts: Expr[ S, Long ])
-      extends Expr.Node[ S, A ] {
-      def reader: event.Reader[ S, Ex[ S ]] = serializer[ S ]
-
-      protected def writeData( out: DataOutput ) {
-         out.writeUnsignedByte( 3 )
-         cache.write( out )
-         bi.write( out )
-//         ts.time.write( out )
-         ts.write( out )
-      }
-
-//      def value( implicit tx: S#Tx ): A = bi.value( tx, ts )
-      def value( implicit tx: S#Tx ): A = bi.at( ts.value ).value
-
-      private[lucre] def connect()( implicit tx: S#Tx ) {
-//println( "CONNECT CURSOR" )
-         bi.changed   ---> this
-//         ts.time.changed ---> this
-         ts.changed ---> this
-      }
-
-      private[lucre] def disconnect()( implicit tx: S#Tx ) {
-//println( "DISCONNECT CURSOR" )
-         bi.changed   -/-> this
-//         ts.time.changed -/-> this
-         ts.changed -/-> this
-      }
-
-      private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ): Option[ Change[ S ]] = {
-sys.error( "TODO" )
-//         val biChanged     = bi.changed
-////         val timeChanged   = ts.time.changed
-//         val timeChanged   = ts.changed
+//   private final class Projection[ S <: Sys[ S ]]( protected val targets: Targets[ S ], cache: S#Var[ A ],
+//                                                   bi: BiPin[ S, Expr[ S, A ], event.Change[ A ]], ts: Expr[ S, Long ])
+//      extends Expr.Node[ S, A ] {
+//      def reader: event.Reader[ S, Ex[ S ]] = serializer[ S ]
 //
-//         val biChange = if( biChanged.isSource( pull )) {
-//            biChanged.pullUpdate( pull )
-//         } else {
-//            None
-//         }
-//         val timeChange = if( timeChanged.isSource( pull )) {
-//            timeChanged.pullUpdate( pull )
-//         } else {
-//            None
-//         }
+//      protected def writeData( out: DataOutput ) {
+//         out.writeUnsignedByte( 3 )
+//         cache.write( out )
+//         bi.write( out )
+////         ts.time.write( out )
+//         ts.write( out )
+//      }
 //
-//         // there are three cases
-//         // - if the time value changes, we need to read the bi at the new
-//         //   value (independent of biChanged)
-//         // - if the time value didn't change, we see if biChange affects the
-//         //   current time position
-//         // - all other cases are dropped
-//         val res = (biChange, timeChange) match {
-//            case (Some( bch ), None) =>
-////               val timeVal = ts.time.value
-//               val timeVal = ts.value
-//               bch.find( _.span.contains( timeVal )).flatMap { region =>
-//                  val before  = cache.get
-//                  val now     = region.value
-//                  cache.set( now )
-//                  change( before, now )
-//               }
-//            case (_, Some( tch )) =>
-//               val before  = cache.get
-////               val before  = bi.value( tch.before )
-//               val now     = bi.at( tch.now )
-////println( "CACHE WAS " + before + " NOW (AT " + tch.now + ") IS " + now )
-//               cache.set( now )
-//               change( before, now )
-////            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
+////      def value( implicit tx: S#Tx ): A = bi.value( tx, ts )
+//      def value( implicit tx: S#Tx ): A = bi.at( ts.value ).value
+//
+//      private[lucre] def connect()( implicit tx: S#Tx ) {
+////println( "CONNECT CURSOR" )
+//         bi.changed   ---> this
+////         ts.time.changed ---> this
+//         ts.changed ---> this
+//      }
+//
+//      private[lucre] def disconnect()( implicit tx: S#Tx ) {
+////println( "DISCONNECT CURSOR" )
+//         bi.changed   -/-> this
+////         ts.time.changed -/-> this
+//         ts.changed -/-> this
+//      }
+//
+//      private[lucre] def pullUpdate( pull: Pull[ S ])( implicit tx: S#Tx ): Option[ Change[ S ]] = {
+//sys.error( "TODO" )
+////         val biChanged     = bi.changed
+//////         val timeChanged   = ts.time.changed
+////         val timeChanged   = ts.changed
+////
+////         val biChange = if( biChanged.isSource( pull )) {
+////            biChanged.pullUpdate( pull )
+////         } else {
+////            None
+////         }
+////         val timeChange = if( timeChanged.isSource( pull )) {
+////            timeChanged.pullUpdate( pull )
+////         } else {
+////            None
+////         }
+////
+////         // there are three cases
+////         // - if the time value changes, we need to read the bi at the new
+////         //   value (independent of biChanged)
+////         // - if the time value didn't change, we see if biChange affects the
+////         //   current time position
+////         // - all other cases are dropped
+////         val res = (biChange, timeChange) match {
+////            case (Some( bch ), None) =>
+//////               val timeVal = ts.time.value
+////               val timeVal = ts.value
+////               bch.find( _.span.contains( timeVal )).flatMap { region =>
+////                  val before  = cache.get
+////                  val now     = region.value
+////                  cache.set( now )
+////                  change( before, now )
+////               }
+////            case (_, Some( tch )) =>
 ////               val before  = cache.get
-////               val now     = bi.value( tch.now )
+//////               val before  = bi.value( tch.before )
+////               val now     = bi.at( tch.now )
+//////println( "CACHE WAS " + before + " NOW (AT " + tch.now + ") IS " + now )
 ////               cache.set( now )
 ////               change( before, now )
-//            case _ => None
-//         }
-////println( "CURSOR UPDATE. TIME = " + timeChange + ", BI = " + biChange + ", RES = " + res )
-//         res
-      }
-   }
+//////            case (Some( bch ), Some( tch )) /* if bch._1.contains( tch.now ) */ =>
+//////               val before  = cache.get
+//////               val now     = bi.value( tch.now )
+//////               cache.set( now )
+//////               change( before, now )
+////            case _ => None
+////         }
+//////println( "CURSOR UPDATE. TIME = " + timeChange + ", BI = " + biChange + ", RES = " + res )
+////         res
+//      }
+//   }
 }

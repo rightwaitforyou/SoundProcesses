@@ -107,8 +107,8 @@ object Longs extends BiTypeImpl[ Long ] {
             val _2 = readExpr( in, access )
             new Tuple2( typeID, op, targets, _1, _2 )
 
-         case 3 =>
-            readProjection[ S ]( in, access, targets )
+//         case 3 =>
+//            readProjection[ S ]( in, access, targets )
 
          case _ => sys.error( "Invalid cookie " + cookie )
       }

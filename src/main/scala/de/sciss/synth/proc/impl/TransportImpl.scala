@@ -217,10 +217,12 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
                   var map = Map.empty[ String, Param ]
                   par.keys.foreach { key =>
                      par.get( key ).foreach { bi =>
-                        val oldEx = bi.at( oldFrame )
-                        val newEx = bi.at( newFrame )
-                        if( oldEx != newEx ) {
-                           map += key -> newEx.value
+                        val oldExO = bi.at( oldFrame )
+                        val newExO = bi.at( newFrame )
+                        newExO.foreach { newEx =>
+                           if( oldExO != newExO ) {
+                              map += key -> newEx.value
+                           }
                         }
                      }
                   }

@@ -39,29 +39,29 @@ import expr.{Expr, Type}
 object BiPinImpl {
    import BiPin.{Leaf, TimedElem, Modifiable, Region}
 
-   private val MIN_TIME = Long.MinValue
+//   private val MIN_TIME = Long.MinValue
 
    private type Tree[ S <: Sys[ S ], Elem ] = SkipList.Map[ S, Long, Leaf[ S, Elem ]]
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   def newModifiable[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
+   def newModifiable[ S <: Sys[ S ], Elem, U ]( /* default: Elem, */ eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] = {
 
       implicit val exprSer: Serializer[ S#Tx, S#Acc, Expr[ S, Long ]] = timeType.serializer[ S ]
       val tree: Tree[ S, Elem ] = SkipList.Map.empty[ S, Long, Leaf[ S, Elem ]]()
-      tree += MIN_TIME -> IIdxSeq( timeType.newConst( MIN_TIME ) -> default )
+//      tree += MIN_TIME -> IIdxSeq( timeType.newConst( MIN_TIME ) -> default )
       new ImplNew( evt.Targets[ S ], tree, eventView )
    }
 
-   def newPartialModifiable[ S <: Sys[ S ], Elem, U ]( default: Elem, eventView: Elem => EventLike[ S, U, Elem ])(
+   def newPartialModifiable[ S <: Sys[ S ], Elem, U ]( /* default: Elem, */ eventView: Elem => EventLike[ S, U, Elem ])(
       implicit tx: S#Tx, elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
       timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] = {
 
       implicit val exprSer: Serializer[ S#Tx, S#Acc, Expr[ S, Long ]] = timeType.serializer[ S ]
       val tree: Tree[ S, Elem ] = SkipList.Map.empty[ S, Long, Leaf[ S, Elem ]]()
-      tree += MIN_TIME -> IIdxSeq( timeType.newConst( MIN_TIME ) -> default )
+//      tree += MIN_TIME -> IIdxSeq( timeType.newConst( MIN_TIME ) -> default )
       new ImplNew( evt.Targets.partial[ S ], tree, eventView )
    }
 
@@ -349,7 +349,7 @@ object BiPinImpl {
 
       final def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = tree.ceil( time ).map( _._1 )
 
-      final def at( time: Long )( implicit tx: S#Tx ) : Elem = intersect( time ).head._2
+      final def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem ] = intersect( time ).headOption.map( _._2 )
 //         tree.floor( time ).getOrElse( throw new NoSuchElementException( time.toString ))._2.head._2
 //      }
 

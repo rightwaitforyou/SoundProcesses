@@ -167,8 +167,8 @@ object SpanLikes extends BiTypeImpl[ SpanLike ] {
             }
             op.read( in, access, targets )
 
-         case 3 =>
-            readProjection[ S ]( in, access, targets )
+//         case 3 =>
+//            readProjection[ S ]( in, access, targets )
 
          case _ => sys.error( "Invalid cookie " + cookie )
       }

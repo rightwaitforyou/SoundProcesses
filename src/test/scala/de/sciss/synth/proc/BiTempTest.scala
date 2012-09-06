@@ -32,7 +32,7 @@ object BiTempTest extends App {
 
       println( "__STEP__ root" )
       val access = system.root { implicit tx =>
-         val bi = BiPin.Expr.Modifiable( 0.0 )
+         val bi = BiPin.Expr.Modifiable[ S, Double ] // ( 0.0 )
          (bi, IIdxSeq.empty[ Expr.Var[ S, Long ]], IIdxSeq.empty[ Expr.Var[ S, Double ]])
       }
 
