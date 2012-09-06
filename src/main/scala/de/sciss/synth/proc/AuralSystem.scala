@@ -12,9 +12,11 @@ object AuralSystem {
    }
 }
 trait AuralSystem {
-   def start( config: Server.Config = Server.Config() ) : Unit
-   def stop() : Unit
+   def start( config: Server.Config = Server.Config() ) : AuralSystem
+   def stop() : AuralSystem
 
-   def addClient(    c: AuralSystem.Client ) : Unit
-   def removeClient( c: AuralSystem.Client ) : Unit
+   def addClient(    c: AuralSystem.Client ) : AuralSystem
+   def removeClient( c: AuralSystem.Client ) : AuralSystem
+
+   def whenStarted( fun: Server => Unit ) : AuralSystem
 }

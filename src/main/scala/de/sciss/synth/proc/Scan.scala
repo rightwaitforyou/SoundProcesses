@@ -9,6 +9,9 @@ import de.sciss.lucre.{DataOutput, DataInput}
 import de.sciss.lucre.event.Targets
 
 object Scan_ {
+//   object Elem {
+//      sealed trait Update[ S <: Sys[ S ]]
+//   }
    sealed trait Elem[ S <: Sys[ S ]]
    final case class Mono[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.Shape ) extends Elem[ S ]
 //   final case class AudioFile[ S <: Sys[ S ]]( f: File, offset: Expr[ S, Long ]) extends Elem[ S ]
@@ -20,10 +23,12 @@ object Scan_ {
    type Modifiable[ S <: Sys[ S ]] = BiPin.Modifiable[ S, Elem[ S ], Unit ]
 
    object Modifiable {
+      def apply[ S <: Sys[ S ]] : Modifiable[ S ] = sys.error( "TODO" ) // BiPin.Modifiable.apply()
+
       /**
        * Extractor to check if a `Scan` is actually a `Scan.Modifiable`
        */
-      def unapply[ S <: Sys[ S ], Elem, U ]( v: Scan[ S ]) : Option[ Modifiable[ S ]] = {
+      def unapply[ S <: Sys[ S ]]( v: Scan[ S ]) : Option[ Modifiable[ S ]] = {
 //         if( v.isInstanceOf[ Modifiable[ _ ]]) Some( v.asInstanceOf[ Modifiable[ S ]]) else None
          if( v.isInstanceOf[ BiPin.Modifiable[ _ , _ , _ ]]) Some( v.asInstanceOf[ Modifiable[ S ]]) else None
       }

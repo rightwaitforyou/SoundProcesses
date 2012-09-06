@@ -18,17 +18,19 @@ object AuralSystemImpl {
    }
 
    private final class Impl extends AuralSystem {
+      import AuralSystem.Client
+
       override def toString = "AuralSystem@" + hashCode.toHexString
 
       private val sync        = new AnyRef
       private var connection  = Option.empty[ ServerLike ]
-      private var clients     = IIdxSeq.empty[ AuralSystem.Client ]
+      private var clients     = IIdxSeq.empty[ Client ]
 
       private def atomic[ A ]( fun: InTxn => A ) : A = TxnExecutor.defaultAtomic( fun )
 
-      def start( config: Server.Config ) {
+      def start( config: Server.Config ) : AuralSystem = {
          sync.synchronized {
-            if( connection.isDefined ) return
+            if( connection.isDefined ) return this
 
             val c = Server.boot( "SoundProcesses", config ) {
                case ServerConnection.Aborted =>
@@ -45,9 +47,10 @@ object AuralSystemImpl {
             }
             connection = Some( c )
          }
+         this
       }
 
-      def stop() {
+      def stop() : AuralSystem = {
          sync.synchronized {
             connection.foreach {
                case c: ServerConnection => c.abort
@@ -59,9 +62,10 @@ object AuralSystemImpl {
             }
             connection = None
          }
+         this
       }
 
-      def addClient( c: AuralSystem.Client ) {
+      def addClient( c: Client ) : AuralSystem = {
          sync.synchronized {
             clients :+= c
             connection match {
@@ -69,12 +73,22 @@ object AuralSystemImpl {
                case _ =>
             }
          }
+         this
       }
 
-      def removeClient( c: AuralSystem.Client ) {
+      def removeClient( c: Client ) : AuralSystem = {
          sync.synchronized {
             clients = clients.filterNot( _ == c )
          }
+         this
       }
+
+      def whenStarted( fun: ( Server ) => Unit) : AuralSystem = addClient( new Client {
+         def started( s: Server ) {
+            fun( s )
+         }
+
+         def stopped() {}
+      })
    }
 }
