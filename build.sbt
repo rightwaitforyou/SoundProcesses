@@ -10,20 +10,22 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.0-M7" // "2.9.2"
 
-crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
+scalaBinaryVersion := "2.10.0-M7"
+
+// crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "0.34",
-   "de.sciss" %% "temporalobjects" % "0.34",
-   "de.sciss" %% "lucreexpr" % "0.34",
+   "de.sciss" %% "scalacollider" % "1.0.+", // "0.34",
+   "de.sciss" %% "temporalobjects" % "1.0.+",
+   "de.sciss" %% "lucreexpr" % "1.0.+",
    "de.sciss" % "prefuse-core" % "0.21"
 )
 
 libraryDependencies in ThisBuild <+= scalaVersion { sv =>
    val v = sv match {
-      case "2.10.0-M6" => "1.9-2.10.0-M6-B2"
+      case "2.10.0-M7" => "1.9-2.10.0-M7-B1"
       case _ => "1.8"
    }
    "org.scalatest" %% "scalatest" % v % "test"
