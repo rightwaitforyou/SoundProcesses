@@ -82,7 +82,7 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    def par: ParamMap[ S ]
 
-   def scans: Scans[ S ]
+   def scans: Scans.Modifiable[ S ]
 
    /**
     * Same as `playing = true`
