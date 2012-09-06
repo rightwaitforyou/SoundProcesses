@@ -32,8 +32,8 @@ import stm.{Serializer, Sys}
 import de.sciss.synth.expr.SpanLikes
 import evt.EventLike
 
-// scalac crashes if we name this ProcGroupX$ :-(
-object ProcGroupX {
+// scalac 2.9.2 crashes if we name this ProcGroup$ :-(
+object ProcGroup {
    type Update[ S <: Sys[ S ]] = BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]]
 
    type Modifiable[ S <: Sys[ S ]] = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
@@ -43,14 +43,14 @@ object ProcGroupX {
    private def eventView[ S <: Sys[ S ]]( proc: Proc[ S ]) : EventLike[ S, Proc.Update[ S ], Proc[ S ]] = proc.changed
 
    object Modifiable {
-      def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, ProcGroupX.Modifiable[ S ]] = {
+      def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, ProcGroup.Modifiable[ S ]] = {
          BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
       }
 
-      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ] =
+      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : ProcGroup.Modifiable[ S ] =
          BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
 
-      def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ] =
+      def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup.Modifiable[ S ] =
          BiGroup.Modifiable.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
    }
 

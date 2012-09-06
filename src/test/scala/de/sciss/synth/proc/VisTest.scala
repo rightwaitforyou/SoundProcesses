@@ -56,12 +56,12 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       cursor.step( fun )
    }
 
-//   private type PG = ProcGroupX$.Modifiable[ S ]
+//   private type PG = ProcGroup.Modifiable[ S ]
    private type PG = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
    type Acc = (PG, Transport[ S, Proc[ S ]])
 
    object Implicits {
-//      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroupX$.Modifiable.serializer[ S ]
+//      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
       implicit val procVarSer: Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
@@ -72,7 +72,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    lazy val access: S#Entry[ Acc ] = system.root { implicit tx =>
       implicit def longType = Longs
-      val g = ProcGroupX.Modifiable[ S ]
+      val g = ProcGroup.Modifiable[ S ]
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
@@ -86,10 +86,10 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    access // initialize !
 
-//   val groupAccess:     Source[ S#Tx, ProcGroupX.Modifiable[ S ]] = Source.map( access )( _._1 )
+//   val groupAccess:     Source[ S#Tx, ProcGroup.Modifiable[ S ]] = Source.map( access )( _._1 )
 //   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
 
-   def group( implicit tx: S#Tx ) : ProcGroupX.Modifiable[ S ]    = access.get._1
+   def group( implicit tx: S#Tx ) : ProcGroup.Modifiable[ S ]    = access.get._1
    def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]      = access.get._2
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {

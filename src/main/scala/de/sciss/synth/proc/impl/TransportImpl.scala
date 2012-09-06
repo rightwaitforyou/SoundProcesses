@@ -58,7 +58,7 @@ object TransportImpl {
    extends evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]] = {
          val id         = targets.id
-         val group      = ProcGroupX.read( in, access )
+         val group      = ProcGroup.read( in, access )
          val sampleRate = in.readDouble()
          val playingVar = Booleans.readVar( in, access )
          val validVar   = tx.readIntVar( id, in )

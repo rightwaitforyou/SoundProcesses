@@ -29,7 +29,7 @@
 //   }
 //
 //   def run[ S <: KSys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
-//      implicit val whyOhWhy   = ProcGroupX$$.serializer[ S ]
+//      implicit val whyOhWhy   = ProcGroup.serializer[ S ]
 //      implicit val whyOhWhy2  = Proc.serializer[ S ]
 //      val imp = new ExprImplicits[ S ]
 //      import imp._
@@ -42,7 +42,7 @@
 //            Doubles.readVar[ S ]( in, access )
 //      }
 //
-//      def newGroup()(  implicit tx: S#Tx ) : ProcGroupX$$.Var[ S ]   = ProcGroupX$$.newVar
+//      def newGroup()(  implicit tx: S#Tx ) : ProcGroup.Var[ S ]   = ProcGroup.newVar
 //      def newProc()(   implicit tx: S#Tx ) : Proc[ S ]            = Proc()
 //
 //      def log( what: => String ) {
@@ -50,9 +50,9 @@
 //      }
 //
 //      object Access {
-//         def apply( g: ProcGroupX$$.Var[ S ]) : Access = new Impl( g, IIdxSeq.empty )
+//         def apply( g: ProcGroup.Var[ S ]) : Access = new Impl( g, IIdxSeq.empty )
 //
-//         implicit def group( a: Access ) : ProcGroupX$$.Var[ S ] = a.group
+//         implicit def group( a: Access ) : ProcGroup.Var[ S ] = a.group
 //
 //         private val varsSer = TxnSerializer.indexedSeq[ S#Tx, S#Acc, Expr.Var[ S, Double ]]
 //
@@ -63,7 +63,7 @@
 //            }
 //
 //            def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Access = {
-//               val g       = ProcGroupX$$.readVar[ S ]( in, access )
+//               val g       = ProcGroup.readVar[ S ]( in, access )
 //               val vars    = varsSer.read( in, access )
 //               new Impl( g, vars )
 //            }
@@ -73,14 +73,14 @@
 ////            def get( implicit tx: S#Tx ) : Expr.Var[ S, Double ]
 ////         }
 //
-//         private final class Impl( val group: ProcGroupX$$.Var[ S ], val vars: IIdxSeq[ Expr.Var[ S, Double ]])
+//         private final class Impl( val group: ProcGroup.Var[ S ], val vars: IIdxSeq[ Expr.Var[ S, Double ]])
 //         extends Access {
 //            override def toString = "Access"
 //            def addVar( v: Expr.Var[ S, Double ]) : Access = new Impl( group, vars :+ v )
 //         }
 //      }
 //      trait Access {
-//         def group : ProcGroupX$$.Var[ S ]
+//         def group : ProcGroup.Var[ S ]
 //         def vars  : IIdxSeq[ Expr.Var[ S, Double ]]
 //         def addVar( v: Expr.Var[ S, Double ]) : Access
 //      }
@@ -91,7 +91,7 @@
 //         val g = newGroup()
 //         if( DRY ) {
 //            log( "react to new group" )
-//            g.changed.reactTx { implicit tx => (e: ProcGroupX$$.Update[ S ]) => println( "____OBSERVE____ " + e )}
+//            g.changed.reactTx { implicit tx => (e: ProcGroup.Update[ S ]) => println( "____OBSERVE____ " + e )}
 //         }
 //         Access( g )
 //      }
@@ -114,7 +114,7 @@
 //         access.transform( _.addVar( freq ))
 //      }
 //
-//      def groupGet()( implicit tx: S#Tx ) : ProcGroupX$$.Var[ S ] = access.get.group
+//      def groupGet()( implicit tx: S#Tx ) : ProcGroup.Var[ S ] = access.get.group
 //      def freqVar()( implicit tx: S#Tx ) : Expr.Var[ S, Double ] = access.get.vars.head
 ////      def procGet()( implicit tx: S#Tx ) : Proc[ S ] = groupGet().iterator.next()._2.head._2
 //      def procGet()( implicit tx: S#Tx ) : Proc[ S ] = groupGet().intersect( 0L ).next()._2.head._2
