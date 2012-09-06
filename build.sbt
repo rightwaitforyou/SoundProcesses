@@ -16,6 +16,9 @@ scalaBinaryVersion := "2.10.0-M7"
 
 // crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
 
+// to get the dependencies before they appear in maven central
+resolvers += ("sonoreleases" at "http://oss.sonatype.org/content/repositories/releases")
+
 libraryDependencies ++= Seq(
    "de.sciss" %% "scalacollider" % "1.0.+", // "0.34",
    "de.sciss" %% "temporalobjects" % "1.0.+",
