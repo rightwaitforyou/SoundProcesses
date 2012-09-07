@@ -218,7 +218,7 @@ object Scan_ {
 
          def disconnect()( implicit tx: S#Tx ) {
             evt.Intruder.-/->( ref.changed, this )
-            evt.Intruder.--->( offset.changed, this )
+            evt.Intruder.-/->( offset.changed, this )
          }
 
          protected def disposeData()( implicit tx: S#Tx ) {}
