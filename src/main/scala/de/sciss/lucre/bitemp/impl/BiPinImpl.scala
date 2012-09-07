@@ -279,7 +279,10 @@ object BiPinImpl {
             obs
          }
 
-         private[lucre] def isSource( pull: evt.Pull[ S ]) : Boolean = opNotSupported
+         private[lucre] def isSource( pull: evt.Pull[ S ]) : Boolean = {
+//            opNotSupported
+            CollChanged.isSource( pull ) || ElemChanged.isSource( pull )
+         }
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {

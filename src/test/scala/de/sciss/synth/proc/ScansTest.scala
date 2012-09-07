@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Durable, InMemory, Sys}
-import de.sciss.synth.expr.{Doubles, ExprImplicits}
+import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
 import de.sciss.lucre.bitemp.Span
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
@@ -53,6 +53,16 @@ object ScansTest extends App {
          scan.add( 15000L, Scan_.Mono( v ))
          v.set( 777 )
       }
+
+      println( "\n---step2---\n" )
+
+      sys.step { implicit tx =>
+         val sc2 = Scan_.Modifiable[ S ]
+         val v2 = Longs.newVar[ S ]( 20000L )
+         scan.add( 20000L, Scan_.Embedded( sc2, v2 ))
+         sc2.add( 0L, Scan_.Mono( 888 ))
+         v2.set( 30000L )
+      }
    }
 
    def test /* [ S <: Sys[ S ]] */( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
@@ -61,8 +71,6 @@ object ScansTest extends App {
 
       group.add( Span.from( 0L ), p1 )
       group.add( Span.from( 0L ), p2 )
-
-//      def ??? : Nothing = sys.error( "TODO" )
 
       val fScan1: Scan[ S ] = Scan_.Modifiable[ S ]
       p1.scans.add( "freq", fScan1 )
