@@ -19,8 +19,12 @@ object Scan_ {
 //   private final val sqrShapeID     = sqrShape.id
 //   private final val cubShapeID     = cubShape.id
 
+   type Update[ S <: Sys[ S ]] = BiPin.Update[ S, Elem[ S ], Elem.Update[ S ]]
+
    object Elem {
-      sealed trait Update[ S <: Sys[ S ]]
+      sealed trait Update[ S <: Sys[ S ]] { def elem: Elem[ S ]}
+      final case class MonoChanged[ S <: Sys[ S ]]( elem: Mono[ S ], change: evt.Change[ Double ]) extends Update[ S ]
+      final case class EmbeddedChanged[ S <: Sys[ S ]]( elem: Embedded[ S ], refChange: Option[ Scan_.Update[ S ]], offset: Long ) extends Update[ S ]
 
       implicit def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Elem[ S ]] = anySer.asInstanceOf[ Ser[ S ]]
 
@@ -39,35 +43,50 @@ object Scan_ {
                case curveShape.id   => curveShape( in.readFloat() )
                case sqrShape.id     => sqrShape
                case cubShape.id     => cubShape
+               case other           => sys.error( "Unexpected shape ID " + other )
             }
          }
 
          def readConstant( in: DataInput )( implicit tx: S#Tx ) : Elem[ S ] = {
             (in.readUnsignedByte(): @switch) match {
-               case 0 =>
-                  require( in.readUnsignedByte() == 3, "Expected constant Expr" )   // XXX bad...
+               case Mono.cookie =>
+                  require( in.readUnsignedByte() == 3, "Expected constant Expr" )   // XXX TODO bad... should have Expr.Const.cookie
                   val targetLevel   = Doubles.serializer[ S ].readConstant( in )
                   val shape         = readShape( in )
-                  Mono( targetLevel, shape )
+                  Mono.Const( targetLevel, shape )
 
-               case 1 =>
+               case Synthesis.cookie =>
                   synthesis[ S ]
 
-               case 2 =>
-                  sys.error( "TODO" )
+//               case Embedded.cookie =>
+
+               case other => sys.error( "Unexpected cookie " + other )
             }
-            sys.error( "TODO" )
          }
 
          def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Elem[ S ] = {
-            sys.error( "TODO" )
+            (in.readUnsignedByte(): @switch) match {
+               case Mono.cookie =>
+                  val targetLevel   = Doubles.readExpr( in, access )
+                  val shape         = readShape( in )
+                  new Mono.Mut( targets, targetLevel, shape )
+
+               case Embedded.cookie =>
+                  val ref           = Scan_.read( in, access )
+                  val offset        = Longs.readExpr( in, access )
+                  new Embedded.Impl( targets, ref, offset )
+
+               case other => sys.error( "Unexpected cookie " + other )
+            }
          }
       }
    }
    sealed trait Elem[ S <: Sys[ S ]] extends Writable {
-      def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = sys.error( "TODO" )
+      def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]]
    }
    object Mono {
+      private[Scan_] final val cookie = 0
+
       def apply[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )( implicit tx: S#Tx ) : Mono[ S ] = {
          if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
             Const( targetLevel, shape )
@@ -84,15 +103,19 @@ object Scan_ {
          } else None
       }
 
-      private final case class Const[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )
+      private[Scan_] final case class Const[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )
       extends Mono[ S ] with evt.Constant[ S ] {
          override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+
+         def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = evt.Dummy.apply
       }
 
-      private final class Mut[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+      private[Scan_] final class Mut[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
                                                val targetLevel: Expr[ S, Double ], val shape: Env.ConstShape )
       extends Mono[ S ] with evt.StandaloneLike[ S, Elem.Update[ S ], Elem[ S ]] {
          override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+
+         def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = this
 
          def reader: evt.Reader[ S, Elem[ S ]] = Elem.serializer[ S ]
 
@@ -108,7 +131,10 @@ object Scan_ {
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
             // XXX TODO ugly. Should have object Event { def unapply( ... )}
-            evt.Intruder.pullUpdate( targetLevel.changed.asInstanceOf[ evt.NodeSelector[ S, evt.Change[ Double ]]], pull ).map( u => sys.error( "TODO" ))
+            evt.Intruder.pullUpdate(
+               targetLevel.changed.asInstanceOf[ evt.NodeSelector[ S, evt.Change[ Double ]]], pull ).map( u =>
+                  Elem.MonoChanged( this, u )
+               )
          }
       }
    }
@@ -117,12 +143,12 @@ object Scan_ {
       def shape: Env.ConstShape
 
       final protected def writeData( out: DataOutput ) {
-         out.writeUnsignedByte( 0 )
+         out.writeUnsignedByte( Mono.cookie )
          targetLevel.write( out )
          out.writeInt( shape.id )
          shape match {
             case cs: curveShape => out.writeFloat( cs.curvature )
-            case _ =>
+            case _ => // only curveShape has an extra curvature argument
          }
       }
    }
@@ -133,15 +159,74 @@ object Scan_ {
 
    private def synthesis[ S <: Sys[ S ]] : Synthesis[ S ] = anySynthesis.asInstanceOf[ Synthesis[ S ]]
 
+   object Synthesis {
+      private[Scan_] final val cookie = 1
+   }
    final case class Synthesis[ S <: Sys[ S ]]() extends Elem[ S ] with evt.Constant[ S ] {
+      def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = evt.Dummy.apply
+
       protected def writeData( out: DataOutput ) {
-         out.writeUnsignedByte( 1 )
+         out.writeUnsignedByte( Synthesis.cookie )
       }
    }
-   final case class Embedded[ S <: Sys[ S ]]( ref: Scan[ S ], offset: Expr[ S, Long ]) extends Elem[ S ] {
-      def write( out: DataOutput ) {
-         out.writeUnsignedByte( 2 )
+   object Embedded {
+      private[Scan_] final val cookie = 2
+
+      def apply[ S <: Sys[ S ]]( ref: Scan[ S ], offset: Expr[ S, Long ])( implicit tx: S#Tx ) : Embedded[ S ] = {
+         val tgt = evt.Targets[ S ] // XXX TODO partial? should reflect ref.targets I guess?
+         new Impl( tgt, ref, offset )
+      }
+
+      def unapply[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ (Scan[ S ], Expr[ S, Long ]) ] = {
+         if( elem.isInstanceOf[ Embedded[ _ ]]) {
+            val embedded = elem.asInstanceOf[ Embedded[ S ]]
+            Some( embedded.ref -> embedded.offset )
+         } else None
+      }
+
+      private[Scan_] final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+                                                       val ref: Scan[ S ], val offset: Expr[ S, Long ])
+      extends Embedded[ S ] with evt.StandaloneLike[ S, Elem.Update[ S ], Elem[ S ]] {
+         override def toString = "Embedded(" + ref + ", " + offset + ")"
+
+         def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = this
+
+         def reader: evt.Reader[ S, Elem[ S ]] = Elem.serializer[ S ]
+
+         def connect()( implicit tx: S#Tx ) {
+            evt.Intruder.--->( ref.changed, this )
+            evt.Intruder.--->( offset.changed, this )
+         }
+
+         def disconnect()( implicit tx: S#Tx ) {
+            evt.Intruder.-/->( ref.changed, this )
+            evt.Intruder.--->( offset.changed, this )
+         }
+
+         protected def disposeData()( implicit tx: S#Tx ) {}
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
+            val refEvt  = ref.changed
+            val refUpd  = if( evt.Intruder.isSource( refEvt, pull )) evt.Intruder.pullUpdate( refEvt, pull ) else None
+            val offEvtL = offset.changed
+            val offUpd  = if( offEvtL.isInstanceOf[ evt.NodeSelector[ _, _ ]]) {   // XXX TODO ugly
+               val offEvt = offEvtL.asInstanceOf[ Event[ S, evt.Change[ Long ], Expr[ S, Long ]]]
+               if( evt.Intruder.isSource( offEvt, pull )) evt.Intruder.pullUpdate( offEvt, pull ) else None
+            } else None
+            val offVal  = offUpd.map( _.now ).getOrElse( offset.value )
+
+            Some( Elem.EmbeddedChanged( this, refUpd, offVal ))
+         }
+      }
+   }
+   sealed trait Embedded[ S <: Sys[ S ]] extends Elem[ S ] {
+      def ref: Scan[ S ]
+      def offset: Expr[ S, Long ]
+
+      final protected def writeData( out: DataOutput ) {
+         out.writeUnsignedByte( Embedded.cookie )
          ref.write( out )
+         offset.write( out )
       }
    }
 
@@ -161,6 +246,11 @@ object Scan_ {
 //         if( v.isInstanceOf[ Modifiable[ _ ]]) Some( v.asInstanceOf[ Modifiable[ S ]]) else None
          if( v.isInstanceOf[ BiPin.Modifiable[ _ , _ , _ ]]) Some( v.asInstanceOf[ Modifiable[ S ]]) else None
       }
+   }
+
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Scan[ S ] = {
+      implicit val time = Longs
+      BiPin.read[ S, Elem[ S ], Elem.Update[ S ]]( _.changed )( in, access )
    }
 
 //   def Elems[ S <: Sys[ S ]] : BiType[ Elem[ S ]] = anyElems.asInstanceOf[ BiType[ Elem[ S ]]]
