@@ -482,7 +482,7 @@ sealed trait SpanLike extends Writable {
     *  Checks if another span lies within the span. The result is `false`
     *  if either of the two spans is void.
     *
-    *	@param	that	second span, may be <code>null</code> (in this case returns <code>false</code>)
+    *	@param	that	second span
     *  @return		`true`, if `that.start >= this.span && that.stop <= this.stop`
     */
    def contains( that: SpanLike ) : Boolean
