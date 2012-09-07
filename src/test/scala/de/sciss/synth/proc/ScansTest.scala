@@ -1,16 +1,29 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{InMemory, Sys}
-import de.sciss.synth.expr.ExprImplicits
+import de.sciss.lucre.stm.{Durable, InMemory, Sys}
+import de.sciss.synth.expr.{Doubles, ExprImplicits}
 import de.sciss.lucre.bitemp.Span
+import de.sciss.lucre.stm.impl.BerkeleyDB
+import java.io.File
 
-object ScansTest {
-   type S = InMemory
+object ScansTest extends App {
+   type S = Durable
    val imp  = new ExprImplicits[ S ]
    import imp._
 
+   args.headOption match {
+      case Some( "--prelim" ) => preliminaryTest()
+      case _ => run()
+   }
+
+   def makeSys() : Durable = {
+      val dir = File.createTempFile( "scans", "db" )
+      dir.delete()
+      Durable( BerkeleyDB.factory( dir ))
+   }
+
    def run() {
-      implicit val sys = InMemory()
+      implicit val sys = makeSys()
       lazy val server: AuralSystem = AuralSystem().start().whenStarted { _ =>
          sys.step { implicit tx =>
             val group   = ProcGroup_.Modifiable[ S ]
@@ -19,6 +32,26 @@ object ScansTest {
             test( group )
             transp.playing_=( true )
          }
+      }
+   }
+
+   def preliminaryTest() {
+      val sys  = makeSys()
+      val scan = sys.step { implicit tx =>
+         val _scan = Scan_.Modifiable[ S ]
+         _scan.changed.react { upd =>
+            println( "OBSERVED: " + upd )
+         }
+         _scan
+      }
+
+      sys.step { implicit tx =>
+         scan.add(     0L, Scan_.Mono( 441 ))
+         scan.add( 10000L, Scan_.Mono( 333 ))
+         scan.add(  5000L, Scan_.Synthesis() )
+         val v = Doubles.newVar[ S ]( 666 )
+         scan.add( 15000L, Scan_.Mono( v ))
+         v.set( 777 )
       }
    }
 

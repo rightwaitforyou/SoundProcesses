@@ -1,6 +1,31 @@
+/*
+ *  Scan.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either
+ *  version 2, june 1991 of the License, or (at your option) any later version.
+ *
+ *  This software is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public
+ *  License (gpl.txt) along with this software; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Serializer, Sys}
+import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.{cubShape, sqrShape, welchShape, sinShape, expShape, linShape, stepShape, curveShape, Env}
 import de.sciss.lucre.bitemp.BiPin
@@ -10,21 +35,14 @@ import evt.{EventLikeSerializer, Event, EventLike}
 import annotation.switch
 
 object Scan_ {
-//   private final val stepShapeID    = stepShape.id
-//   private final val linShapeID     = linShape.id
-//   private final val expShapeID     = expShape.id
-//   private final val sinShapeID     = sinShape.id
-//   private final val welchShapeID   = welchShape.id
-//   private final val curveShapeID   = curveShape( 0f ).id  // grmpfff...
-//   private final val sqrShapeID     = sqrShape.id
-//   private final val cubShapeID     = cubShape.id
-
    type Update[ S <: Sys[ S ]] = BiPin.Update[ S, Elem[ S ], Elem.Update[ S ]]
 
    object Elem {
-      sealed trait Update[ S <: Sys[ S ]] { def elem: Elem[ S ]}
-      final case class MonoChanged[ S <: Sys[ S ]]( elem: Mono[ S ], change: evt.Change[ Double ]) extends Update[ S ]
-      final case class EmbeddedChanged[ S <: Sys[ S ]]( elem: Embedded[ S ], refChange: Option[ Scan_.Update[ S ]], offset: Long ) extends Update[ S ]
+      // Note: we do not need to carry along `elem` because the outer collection
+      // (`BiPin`) already does that for us.
+      sealed trait Update[ S <: Sys[ S ]] // { def elem: Elem[ S ]}
+      final case class MonoChanged[ S <: Sys[ S ]]( /* elem: Mono[ S ], */ change: evt.Change[ Double ]) extends Update[ S ]
+      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChange: Option[ Scan_.Update[ S ]], offset: Long ) extends Update[ S ]
 
       implicit def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Elem[ S ]] = anySer.asInstanceOf[ Ser[ S ]]
 
@@ -87,7 +105,7 @@ object Scan_ {
    object Mono {
       private[Scan_] final val cookie = 0
 
-      def apply[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )( implicit tx: S#Tx ) : Mono[ S ] = {
+      def apply[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape = linShape )( implicit tx: S#Tx ) : Mono[ S ] = {
          if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
             Const( targetLevel, shape )
          } else {
@@ -133,7 +151,7 @@ object Scan_ {
             // XXX TODO ugly. Should have object Event { def unapply( ... )}
             evt.Intruder.pullUpdate(
                targetLevel.changed.asInstanceOf[ evt.NodeSelector[ S, evt.Change[ Double ]]], pull ).map( u =>
-                  Elem.MonoChanged( this, u )
+                  Elem.MonoChanged( /* this, */ u )
                )
          }
       }
@@ -215,7 +233,7 @@ object Scan_ {
             } else None
             val offVal  = offUpd.map( _.now ).getOrElse( offset.value )
 
-            Some( Elem.EmbeddedChanged( this, refUpd, offVal ))
+            Some( Elem.EmbeddedChanged( /* this, */ refUpd, offVal ))
          }
       }
    }
