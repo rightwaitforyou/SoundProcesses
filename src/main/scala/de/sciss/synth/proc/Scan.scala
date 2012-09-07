@@ -6,7 +6,7 @@ import de.sciss.synth.{cubShape, sqrShape, welchShape, sinShape, expShape, linSh
 import de.sciss.lucre.bitemp.BiPin
 import de.sciss.synth.expr.{Longs, Doubles}
 import de.sciss.lucre.{Writable, DataOutput, DataInput, event => evt}
-import evt.{Targets, EventLikeSerializer, EventLike}
+import evt.{EventLikeSerializer, Event, EventLike}
 import annotation.switch
 
 object Scan_ {
@@ -59,7 +59,7 @@ object Scan_ {
             sys.error( "TODO" )
          }
 
-         def read( in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Elem[ S ] = {
+         def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Elem[ S ] = {
             sys.error( "TODO" )
          }
       }
@@ -68,16 +68,49 @@ object Scan_ {
       def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = sys.error( "TODO" )
    }
    object Mono {
-      def apply[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape ) : Mono[ S ] = {
+      def apply[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )( implicit tx: S#Tx ) : Mono[ S ] = {
          if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
             Const( targetLevel, shape )
          } else {
-            sys.error( "TODO" )
+            val tgt = evt.Targets.partial[ S ]
+            new Mut( tgt, targetLevel, shape )
          }
       }
 
+      def unapply[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ (Expr[ S, Double ], Env.ConstShape) ] = {
+         if( elem.isInstanceOf[ Mono[ _ ]]) {
+            val mono = elem.asInstanceOf[ Mono[ S ]]
+            Some( mono.targetLevel -> mono.shape )
+         } else None
+      }
+
       private final case class Const[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )
-      extends Mono[ S ] with evt.Constant[ S ]
+      extends Mono[ S ] with evt.Constant[ S ] {
+         override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+      }
+
+      private final class Mut[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+                                               val targetLevel: Expr[ S, Double ], val shape: Env.ConstShape )
+      extends Mono[ S ] with evt.StandaloneLike[ S, Elem.Update[ S ], Elem[ S ]] {
+         override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+
+         def reader: evt.Reader[ S, Elem[ S ]] = Elem.serializer[ S ]
+
+         def connect()( implicit tx: S#Tx ) {
+            evt.Intruder.--->( targetLevel.changed, this )
+         }
+
+         def disconnect()( implicit tx: S#Tx ) {
+            evt.Intruder.-/->( targetLevel.changed, this )
+         }
+
+         protected def disposeData()( implicit tx: S#Tx ) {}
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
+            // XXX TODO ugly. Should have object Event { def unapply( ... )}
+            evt.Intruder.pullUpdate( targetLevel.changed.asInstanceOf[ evt.NodeSelector[ S, evt.Change[ Double ]]], pull ).map( u => sys.error( "TODO" ))
+         }
+      }
    }
    sealed trait Mono[ S <: Sys[ S ]] extends Elem[ S ] {
       def targetLevel: Expr[ S, Double ]
@@ -140,7 +173,7 @@ object Scan_ {
 //      /* protected */ def readValue( in: DataInput ) : Elem[ S ] = ??? // SpanLike.read( in )
 //      /* protected */ def writeValue( value: Elem[ S ], out: DataOutput ) { ??? } // value.write( out )}
 //
-//      def readTuple[ S1 <: Sys[ S1 ]]( cookie: Int, in: DataInput, access: S1#Acc, targets: Targets[ S1 ])( implicit tx: S1#Tx ) : Ex[ S1 ] =
+//      def readTuple[ S1 <: Sys[ S1 ]]( cookie: Int, in: DataInput, access: S1#Acc, targets: evt.Targets[ S1 ])( implicit tx: S1#Tx ) : Ex[ S1 ] =
 //         (cookie /*: @switch */) match {
 //            case _ => sys.error( "Invalid cookie " + cookie )
 //         }
