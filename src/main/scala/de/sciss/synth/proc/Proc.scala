@@ -65,9 +65,9 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def name( implicit tx: S#Tx ) : Expr[ S, String ]
    def name_=( expr: Expr[ S, String ])( implicit tx: S#Tx ) : Unit
 
-   def graph( implicit tx: S#Tx ) : ProcGraph
-   def graph_=( g: ProcGraph )( implicit tx: S#Tx ) : Unit
-   def graph_=( block: => Any )( implicit tx: S#Tx ) : Unit
+   def graph( implicit tx: S#Tx ) : Code[ ProcGraph ]
+   def graph_=( g: Code[ ProcGraph ])( implicit tx: S#Tx ) : Unit
+//   def graph_=( block: => Any )( implicit tx: S#Tx ) : Unit
 
 // OOO
 //   def playing_# : Expr.Var[ S, Boolean ]
@@ -80,7 +80,7 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 //   def freq( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Double ]
 //   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
-   def par: ParamMap[ S ]
+//   def par: ParamMap[ S ]
 
    def scans: Scans.Modifiable[ S ]
 

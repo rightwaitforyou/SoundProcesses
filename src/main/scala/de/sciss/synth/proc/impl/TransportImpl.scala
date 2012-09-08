@@ -213,19 +213,20 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
             var res = IIdxSeq.empty[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])]
             group.intersect( newFrame ).foreach { case (span, entries) =>
                entries.foreach { case timed =>
-                  val par = timed.value.par
+// XXX TODO
+//                  val par = timed.value.par
                   var map = Map.empty[ String, Param ]
-                  par.keys.foreach { key =>
-                     par.get( key ).foreach { bi =>
-                        val oldExO = bi.at( oldFrame )
-                        val newExO = bi.at( newFrame )
-                        newExO.foreach { newEx =>
-                           if( oldExO != newExO ) {
-                              map += key -> newEx.value
-                           }
-                        }
-                     }
-                  }
+//                  par.keys.foreach { key =>
+//                     par.get( key ).foreach { bi =>
+//                        val oldExO = bi.at( oldFrame )
+//                        val newExO = bi.at( newFrame )
+//                        newExO.foreach { newEx =>
+//                           if( oldExO != newExO ) {
+//                              map += key -> newEx.value
+//                           }
+//                        }
+//                     }
+//                  }
                   if( map.nonEmpty ) res :+= (span, timed, map)
                }
             }
@@ -269,19 +270,20 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
             Span.from( searchStart )
          }
          var parMin = Long.MaxValue
-         group.intersect( innerSpan ).foreach { case (span, entries) =>
-            entries.foreach { case timed =>
-               val par = timed.value.par
-               par.keys.foreach { key =>
-                  par.get( key ).foreach { bi =>
-                     bi.nearestEventAfter( searchStart ) match {
-                        case Some( time ) if (time < parMin) && (span.compareStart( time ) < 0) && (span.compareStop( time ) > 0) => parMin = time
-                        case _ =>
-                     }
-                  }
-               }
-            }
-         }
+// XXX TODO
+//         group.intersect( innerSpan ).foreach { case (span, entries) =>
+//            entries.foreach { case timed =>
+//               val par = timed.value.par
+//               par.keys.foreach { key =>
+//                  par.get( key ).foreach { bi =>
+//                     bi.nearestEventAfter( searchStart ) match {
+//                        case Some( time ) if (time < parMin) && (span.compareStart( time ) < 0) && (span.compareStop( time ) > 0) => parMin = time
+//                        case _ =>
+//                     }
+//                  }
+//               }
+//            }
+//         }
          val hasParEvent = parMin != Long.MaxValue
 
          if( hasProcEvent || hasParEvent ) {

@@ -98,7 +98,7 @@ object VisualInstantPresentationImpl {
             val id   = timed.id
             val proc = timed.value
             val n    = proc.name.value
-            val par  = proc.par.entriesAt( time )
+            val par  = Map.empty[ String, Double ] // XXX TODO proc.par.entriesAt( time )
             val vp   = new VisualProc( n, par )
             map.get( id ) match {
                case Some( vpm ) =>

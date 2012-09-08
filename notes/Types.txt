@@ -175,3 +175,6 @@ object Scan {
    case class Expr[S <: Sys[S]]( value: Expr[S, Double], shape: Env.Shape ) extends Elem[S]
    case class 
 }
+
+:::::::::::::::::::::
+

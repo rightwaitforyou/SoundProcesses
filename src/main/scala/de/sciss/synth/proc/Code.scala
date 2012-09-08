@@ -8,6 +8,8 @@ object Code {
    implicit def serializer[ S <: Sys[ S ], A ]( implicit peerSer: Serializer[ S#Tx, S#Acc, A ]) : Serializer[ S#Tx, S#Acc, Code[ A ]] =
       new Ser[ S, A ]( peerSer )
 
+   implicit def withoutSource[ A ]( value: A ) : Code[ A ] = Code( value, None )
+
    private final class Ser[ S <: Sys[ S ], A ]( peerSer: Serializer[ S#Tx, S#Acc, A ])
    extends Serializer[ S#Tx, S#Acc, Code[ A ]] {
       def write( code: Code[ A ], out: DataOutput ) {
