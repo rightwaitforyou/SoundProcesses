@@ -55,7 +55,7 @@ object ProcImpl {
 
    private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Proc[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Proc[ S ] =
-         sys.error( "TODO" ) // new Read( in, access, targets, tx )
+         new Read( in, access, targets, tx )
    }
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
@@ -372,7 +372,7 @@ object ProcImpl {
       }
    }
 
-   private abstract /* final */ class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
+   private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
                                              tx0: S#Tx )
    extends Impl[ S ] {
 
@@ -384,6 +384,11 @@ object ProcImpl {
       protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
       protected val playing_# = BiPin.Expr.Modifiable.read[ S, Boolean ]( in, access )( tx0, Booleans )
       protected val graphVar  = tx0.readVar[ Code[ ProcGraph ]]( id, in ) // ( SynthGraphSerializer )
+
+      protected val scanMap    = {
+         implicit val tx      = tx0
+         SkipList.Map.read[ S, String, ScanNode[ S ]]( in, access )
+      }
 
 //      protected val parMap    = {
 //         implicit val tx      = tx0

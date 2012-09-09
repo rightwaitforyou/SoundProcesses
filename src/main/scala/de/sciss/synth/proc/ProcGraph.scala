@@ -17,7 +17,7 @@ object ProcGraph {
             out.writeUnsignedByte( dir.id )
             out.writeString( key )
          }
-         out.writeUnsignedByte( -1 )
+         out.writeUnsignedByte( 255 )
       }
 
       def read( in: DataInput ) : ProcGraph = {
@@ -26,7 +26,7 @@ object ProcGraph {
          val synthGraph = SynthGraphSerializer.read( in )
          var scans = Map.empty[ String, Direction ]
          var id = in.readUnsignedByte()
-         while( id >= 0 ) {
+         while( id < 255 ) {
             val key = in.readString()
             scans += key -> Direction( id )
             id = in.readUnsignedByte()
@@ -69,10 +69,10 @@ object ProcGraph {
 
    object Direction {
       def apply( id: Int ) : Direction = (id: @switch) match {
-         case In.id => In
-         case Out.id => Out
+         case In.id   => In
+         case Out.id  => Out
          case Bidi.id => Bidi
-         case _ => sys.error( "Invalid Direction id " + id )
+         case _       => sys.error( "Invalid Direction id " + id )
       }
    }
    sealed trait Direction {

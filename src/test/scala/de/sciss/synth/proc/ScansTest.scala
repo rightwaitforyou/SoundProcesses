@@ -64,6 +64,8 @@ object ScansTest extends App {
             transp.playing_=( true )
          }
       }
+      server
+//      Thread.sleep( 1000 )
    }
 
    def test /* [ S <: Sys[ S ]] */( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
@@ -85,7 +87,7 @@ object ScansTest extends App {
       }
 
       for( Scan_.Modifiable( s1 ) <- p1.scans.get( "out" )) {
-         s1.add( 0L, Scan_.Mono( 333 ))
+         s1.add( 0L, Scan_.Mono( 441 ))
       }
 
       p1.graph_=( ProcGraph {
@@ -95,7 +97,7 @@ object ScansTest extends App {
 
       p2.graph_=( ProcGraph {
          import ugen._
-         val freq = graph.scan( "freq" ).ar( 441 )
+         val freq = graph.scan( "freq" ).ar( 333 )
          Out.ar( 0, SinOsc.ar( freq ))
       })
 
