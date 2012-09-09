@@ -146,6 +146,9 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     */
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem ]
 
+   def floor( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ]
+   def ceil(  time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ]
+
    /**
     * Queries all elements which are found at a given point in time.
     * There may be multiple time expressions which are not equal but

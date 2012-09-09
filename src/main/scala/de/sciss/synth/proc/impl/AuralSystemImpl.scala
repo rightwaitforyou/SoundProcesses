@@ -58,7 +58,7 @@ object AuralSystemImpl {
                   atomic { implicit itx =>
                      ProcDemiurg.removeServer( s )( ProcTxn() )
                   }
-                  s.quit
+                  s.quit()
             }
             connection = None
          }

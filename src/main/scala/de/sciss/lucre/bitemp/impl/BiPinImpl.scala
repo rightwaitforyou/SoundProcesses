@@ -356,6 +356,14 @@ object BiPinImpl {
 //         tree.floor( time ).getOrElse( throw new NoSuchElementException( time.toString ))._2.head._2
 //      }
 
+      final def floor( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ] = tree.floor( time ).flatMap {
+         case (time2, leaf) => leaf.headOption.map { case (_, elem) => time2 -> elem }
+      }
+
+      final def ceil( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ] = tree.ceil( time ).flatMap {
+         case (time2, leaf) => leaf.headOption.map { case (_, elem) => time2 -> elem }
+      }
+
       private def addNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : SpanLike = {
          val entry = (time, elem)
          (tree.floor( timeVal ), tree.ceil( timeVal + 1 )) match {

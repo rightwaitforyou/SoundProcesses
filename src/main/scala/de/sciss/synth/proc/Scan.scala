@@ -43,6 +43,13 @@ object Scan_ {
       BiPin.serializer[ S, Elem[ S ], Elem.Update[ S ]]( _.changed )
    }
 
+   object Value {
+      final case class MonoConst[ S <: Sys[ S ]]( value: Float /*, stop: Long */) extends Value[ S ]
+      final case class MonoSegment[ S <: Sys[ S ]]( start: Float, stop: Float, dur: Float, shape: Env.ConstShape ) extends Value[ S ]
+      final case class Synthesis[ S <: Sys[ S ]]( proc: Proc[ S ] /*, stop: Long, direction: ProcGraph.Direction */) extends Value[ S ]
+   }
+   sealed trait Value[ S <: Sys[ S ]] // { def stop: Long }
+
    object Elem {
       // Note: we do not need to carry along `elem` because the outer collection
       // (`BiPin`) already does that for us.

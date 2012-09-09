@@ -99,11 +99,26 @@ object AuralPresentationImpl {
       }
 
       def procAdded( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-//         val name    = p.name.value
+//         val time    = chr.time
          val p       = timed.value
-         val graph   = p.graph
+         val pg      = p.graph.value
+//         val scanMap = pg.scans
+//         if( scanMap.nonEmpty ) {
+//            val scans   = p.scans
+//            scanMap.map { case (key, dir) =>
+//               scans.get( key ).map { scan =>
+//                  scan.intersect( time ).headOption.map { case (startEx, elem) =>
+//                     elem match {
+//                        case Scan_.Mono( levelExpr, shape ) =>
+//                          val level = levelExpr.value
+//                     }
+//                  }
+//               }
+//            }
+//         }
+
          val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
-         val aural   = AuralProc( server, /* name, */ graph.value.synthGraph, entries )
+         val aural   = AuralProc( server, /* name, */ pg.synthGraph, entries )
          viewMap.put( timed.id, aural )
          val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )
@@ -145,7 +160,7 @@ object AuralPresentationImpl {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
                logConfig( "aural playing " + timed.value + " -- " + newPlaying )
-               aural.playing = newPlaying
+               aural.playing_=( newPlaying )
             case _ =>
                println( "WARNING: could not find view for proc " + timed.value )
          }
@@ -156,7 +171,7 @@ object AuralPresentationImpl {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
                logConfig( "aural graph changed " + timed.value )
-               aural.graph = newGraph
+               aural.graph_=( newGraph )
             case _ =>
                println( "WARNING: could not find view for proc " + timed.value )
          }

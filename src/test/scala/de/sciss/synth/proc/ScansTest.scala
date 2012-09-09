@@ -90,13 +90,13 @@ object ScansTest extends App {
          s1.add( 0L, Scan_.Mono( 441 ))
       }
 
+      import ugen._
+
       p1.graph_=( ProcGraph {
-         import ugen._
          graph.scan( "out" ) := SinOsc.ar( 100 ).linexp( -1, 1, 30, 3000 )
       })
 
       p2.graph_=( ProcGraph {
-         import ugen._
          val freq = graph.scan( "freq" ).ar( 333 )
          Out.ar( 0, SinOsc.ar( freq ))
       })
