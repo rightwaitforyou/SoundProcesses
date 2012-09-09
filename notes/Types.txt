@@ -178,3 +178,16 @@ object Scan {
 
 :::::::::::::::::::::
 
+proc1.scan("out") -> proc2.scan("freq")
+
+proc1.graph {
+  scan("out") := SinOsc.ar(100).linexp(-1,1,20,10000)
+}
+
+proc2.graph {
+  Out.ar(0, SinOsc.ar( scan("freq").ar(441) ))
+}
+
+proc2.play
+proc1.play
+

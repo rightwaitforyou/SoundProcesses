@@ -130,7 +130,7 @@ object ProcImpl {
             val isConnected = targets.nonEmpty
             val tgt  = evt.Targets[ S ]   // XXX TODO : partial?
             val sn   = new ScanNode( tgt, key, scan )
-            val setRemove = scanMap.add( key -> sn ) match {
+            val setRemoved = scanMap.add( key -> sn ) match {
                case Some( oldScan ) =>
                   if( isConnected ) ScanEvent -= oldScan
                   Set( key )
@@ -138,7 +138,7 @@ object ProcImpl {
             }
             if( isConnected ) {
                ScanEvent += sn
-               StateEvent( Proc.ScansCollectionChange( proc, Set( key ), setRemove ))
+               StateEvent( Proc.ScansCollectionChange( proc, Set( key ), setRemoved ))
             }
          }
 

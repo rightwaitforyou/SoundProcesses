@@ -1,8 +1,9 @@
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
 import de.sciss.lucre.stm.{Durable, InMemory, Sys}
-import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
-import de.sciss.lucre.bitemp.Span
+import expr.{Longs, Doubles, ExprImplicits}
+import de.sciss.lucre.bitemp.{Chronos, Span}
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 
@@ -20,19 +21,6 @@ object ScansTest extends App {
       val dir = File.createTempFile( "scans", "db" )
       dir.delete()
       Durable( BerkeleyDB.factory( dir ))
-   }
-
-   def run() {
-      implicit val sys = makeSys()
-      lazy val server: AuralSystem = AuralSystem().start().whenStarted { _ =>
-         sys.step { implicit tx =>
-            val group   = ProcGroup_.Modifiable[ S ]
-            val transp  = Transport( group )
-            /* val view = */ AuralPresentation.run( transp, server )
-            test( group )
-            transp.playing_=( true )
-         }
-      }
    }
 
    def preliminaryTest() {
@@ -65,19 +53,60 @@ object ScansTest extends App {
       }
    }
 
+   def run() {
+      implicit val sys = makeSys()
+      lazy val server: AuralSystem = AuralSystem().start().whenStarted { _ =>
+         sys.step { implicit tx =>
+            val group   = ProcGroup_.Modifiable[ S ]
+            val transp  = Transport( group )
+            /* val view = */ AuralPresentation.run( transp, server )
+            test( group )
+            transp.playing_=( true )
+         }
+      }
+   }
+
    def test /* [ S <: Sys[ S ]] */( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
       val p1 = Proc[ S ]()
       val p2 = Proc[ S ]()
 
-      group.add( Span.from( 0L ), p1 )
-      group.add( Span.from( 0L ), p2 )
+      val t1 = 4 * 44100L
+      val t2 = 0L
+
+      group.add( Span.from( t1 ), p1 )
+      group.add( Span.from( t2 ), p2 )
 
       val fScan1: Scan[ S ] = Scan_.Modifiable[ S ]
-      p1.scans.add( "freq", fScan1 )
+      p1.scans.add( "out", fScan1 )
       val fScan2: Scan[ S ] = Scan_.Modifiable[ S ]
       p2.scans.add( "freq", fScan2 )
-      for( s1 <- p1.scans.get( "freq" ); Scan_.Modifiable( s2 ) <- p2.scans.get( "freq" )) {
+      for( s1 <- p1.scans.get( "out" ); Scan_.Modifiable( s2 ) <- p2.scans.get( "freq" )) {
          s2.add( 0L, Scan_.Embedded( s1, 0L ))
       }
+
+      for( Scan_.Modifiable( s1 ) <- p1.scans.get( "out" )) {
+         s1.add( 0L, Scan_.Mono( 333 ))
+      }
+
+      p1.graph_=( ProcGraph {
+         import ugen._
+         graph.scan( "out" ) := SinOsc.ar( 100 ).linexp( -1, 1, 30, 3000 )
+      })
+
+      p2.graph_=( ProcGraph {
+         import ugen._
+         val freq = graph.scan( "freq" ).ar( 441 )
+         Out.ar( 0, SinOsc.ar( freq ))
+      })
+
+//      {
+//         implicit val chr = Chronos[ S ]( t1 )
+//         p1.playing_=( true )
+//      }
+//
+//      {
+//         implicit val chr = Chronos[ S ]( t2 )
+//         p2.playing_=( true )
+//      }
    }
 }
