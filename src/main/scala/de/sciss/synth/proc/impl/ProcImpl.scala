@@ -60,12 +60,13 @@ object ProcImpl {
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   private def entrySerializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, EntryNode[ S ]] = new EntrySer
-
-   private final class EntryNode[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val key: String,
-                                                  val value: BiPin.Expr[ S, Param ])
-   extends evt.StandaloneLike[ S, (String, BiPin.Expr.Update[ S, Param ]), EntryNode[ S ]] {
-      protected def reader: evt.Reader[ S, EntryNode[ S ]] = entrySerializer[ S ]
+   private object ScanNode {
+      implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, ScanNode[ S ]] = anyScanNodeSer.asInstanceOf[ ScanNodeSer[ S ]]
+   }
+   private final class ScanNode[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val key: String,
+                                                  val value: Scan[ S ])
+   extends evt.StandaloneLike[ S, (String, Scan_.Update[ S ]), ScanNode[ S ]] {
+      protected def reader: evt.Reader[ S, ScanNode[ S ]] = ScanNode.serializer[ S ]
 
       /* private[lucre] */ def connect()( implicit tx: S#Tx ) {
          evt.Intruder.--->( value.changed, this )
@@ -84,17 +85,19 @@ object ProcImpl {
          value.dispose()
       }
 
-      /* private[lucre] */ def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, BiPin.Expr.Update[ S, Param ])] =
+      /* private[lucre] */ def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, Scan_.Update[ S ])] =
          evt.Intruder.pullUpdate( value.changed, pull ).map( key -> _ )
    }
 
    implicit val paramType : BiType[ Param ] = Doubles
 
-   private final class EntrySer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, EntryNode[ S ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : EntryNode[ S ] = {
+   private val anyScanNodeSer = new ScanNodeSer[ I ]
+
+   private final class ScanNodeSer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, ScanNode[ S ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ScanNode[ S ] = {
          val key     = in.readString()
-         val value   = BiPin.Expr.Modifiable.read( in, access )
-         new EntryNode( targets, key, value )
+         val value   = Scan_.read( in, access ) // BiPin.Expr.Modifiable.read( in, access )
+         new ScanNode( targets, key, value )
       }
    }
 
@@ -115,24 +118,42 @@ object ProcImpl {
       protected def name_# : Expr.Var[ S, String ]
 
 //      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
-//      protected def parMap : SkipList.Map[ S, String, EntryNode[ S ]]
+//      protected def parMap : SkipList.Map[ S, String, ScanNode[ S ]]
 
-      protected def scanMap : SkipList.Map[ S, String, Scan[ S ]]
+      protected def scanMap : SkipList.Map[ S, String, ScanNode[ S ]]
 
       object scans extends Scans.Modifiable[ S ] {
-         def get( key: String )( implicit tx: S#Tx ) : Option[ Scan[ S ]] = scanMap.get( key )
+         def get( key: String )( implicit tx: S#Tx ) : Option[ Scan[ S ]] = scanMap.get( key ).map( _.value )
          def keys( implicit tx: S#Tx ) : Set[ String ] = scanMap.keysIterator.toSet
 
          def add( key: String, scan: Scan[ S ])( implicit tx: S#Tx ) {
-            scanMap.add( key -> scan ).foreach { oldScan =>
-               // XXX TODO fire removal
+            val isConnected = targets.nonEmpty
+            val tgt  = evt.Targets[ S ]   // XXX TODO : partial?
+            val sn   = new ScanNode( tgt, key, scan )
+            val setRemove = scanMap.add( key -> sn ) match {
+               case Some( oldScan ) =>
+                  if( isConnected ) ScanEvent -= oldScan
+                  Set( key )
+               case _ => Set.empty[ String ]
+            }
+            if( isConnected ) {
+               ScanEvent += sn
+               StateEvent( Proc.ScansCollectionChange( proc, Set( key ), setRemove ))
             }
          }
 
          def remove( key: String )( implicit tx: S#Tx ) : Boolean = {
-            val oldScan = scanMap.remove( key )
-            // XXX TODO fire removal
-            oldScan.isDefined
+            scanMap.remove( key ) match {
+               case Some( oldScan ) =>
+                  val isConnected = targets.nonEmpty
+                  if( isConnected ) {
+                     ScanEvent -= oldScan
+                     Proc.ScansCollectionChange( proc, Set.empty, Set( key ))
+                  }
+                  true
+
+               case _ => false
+            }
          }
       }
 
@@ -181,9 +202,9 @@ object ProcImpl {
          def node: evt.Node[ S ] = proc
       }
 
-      private object ParamEvent
-      extends evt.EventImpl[ S, Proc.ParamChange[ S ], Proc.ParamChange[ S ], Proc[ S ]]
-      with evt.InvariantEvent[ S, Proc.ParamChange[ S ], Proc[ S ]] {
+      private object ScanEvent
+      extends evt.EventImpl[ S, Proc.ScansElementChange[ S ], Proc.ScansElementChange[ S ], Proc[ S ]]
+      with evt.InvariantEvent[ S, Proc.ScansElementChange[ S ], Proc[ S ]] {
          protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
          def slot: Int = 2
          def node: evt.Node[ S ] = proc
@@ -191,26 +212,26 @@ object ProcImpl {
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
 
-         def +=( entry: EntryNode[ S ])( implicit tx: S#Tx ) {
+         def +=( entry: ScanNode[ S ])( implicit tx: S#Tx ) {
             evt.Intruder.--->( entry, this )
          }
 
-         def -=( entry: EntryNode[ S ])( implicit tx: S#Tx ) {
+         def -=( entry: ScanNode[ S ])( implicit tx: S#Tx ) {
             evt.Intruder.-/->( entry, this )
          }
 
-         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ParamChange[ S ]] = {
-            val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ BiPin.Expr.Update[ S, Param ]]]) { case (map, sel) =>
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ScansElementChange[ S ]] = {
+            val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ Scan_.Update[ S ]]]) { case (map, sel) =>
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
-               val node = evt.Intruder.devirtualizeNode( sel, entrySerializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
-                  .asInstanceOf[ EntryNode[ S ]]
+               val node = evt.Intruder.devirtualizeNode( sel, ScanNode.serializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+                  .asInstanceOf[ ScanNode[ S ]]
                evt.Intruder.pullUpdate( node, pull ) match {
                   case Some( (name, upd) ) => map + (name -> (map.getOrElse( name, IIdxSeq.empty ) :+ upd))
                   case None => map
                }
             }
 
-            if( changes.isEmpty ) None else Some( Proc.ParamChange( proc, changes ))
+            if( changes.isEmpty ) None else Some( Proc.ScansElementChange( proc, changes ))
          }
       }
 
@@ -226,15 +247,15 @@ object ProcImpl {
 
          /* private[lucre] */ def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             evt.Intruder.--->( StateEvent, r )
-            evt.Intruder.--->( ParamEvent, r )
+            evt.Intruder.--->( ScanEvent, r )
          }
          /* private[lucre] */ def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             evt.Intruder.-/->( StateEvent, r )
-            evt.Intruder.-/->( ParamEvent, r )
+            evt.Intruder.-/->( ScanEvent, r )
          }
 
          /* private[lucre] */ def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
-            if( evt.Intruder.isSource( ParamEvent, pull )) evt.Intruder.pullUpdate( ParamEvent, pull )
+            if(      evt.Intruder.isSource( ScanEvent,  pull )) evt.Intruder.pullUpdate( ScanEvent,  pull )
             else if( evt.Intruder.isSource( StateEvent, pull )) evt.Intruder.pullUpdate( StateEvent, pull )
             else None
          }
@@ -245,20 +266,20 @@ object ProcImpl {
          def reactTx( fun: S#Tx => Proc.Update[ S ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, Proc.Update[ S ], Proc[ S ]] = {
             val obs = evt.Observer( ProcImpl.serializer[ S ], fun )
             obs.add( StateEvent )
-            obs.add( ParamEvent )
+            obs.add( ScanEvent )
             obs
          }
 
          /* private[lucre] */ def isSource( pull: evt.Pull[ S ]) : Boolean = {
             // I don't know why this method is actually called? But it _is_, so we need to correctly handle the case
 //            opNotSupported
-            evt.Intruder.isSource( StateEvent, pull ) || evt.Intruder.isSource( ParamEvent, pull )
+            evt.Intruder.isSource( StateEvent, pull ) || evt.Intruder.isSource( ScanEvent, pull )
          }
       }
 
       final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
          case 1 => StateEvent
-         case 2 => ParamEvent
+         case 2 => ScanEvent
       }
 
 //      final def par: ParamMap[ S ] = this
@@ -272,7 +293,7 @@ object ProcImpl {
 //               implicit val doubles = Doubles
 //               val expr = BiPin.Expr.Modifiable[ S, Param ] // ( 0d )   // XXX retrieve default value
 //               val tgt  = evt.Targets[ S ]   // XXX partial?
-//               val node = new EntryNode[ S ]( tgt, key, expr )
+//               val node = new ScanNode[ S ]( tgt, key, expr )
 //               parMap += key -> node
 //               expr
 //            } else {
@@ -304,7 +325,7 @@ object ProcImpl {
 //      }
 
       final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
-      final def paramChanged : evt.Event[ S, ParamChange[ S ], Proc[ S ]] = ParamEvent
+//      final def paramChanged : evt.Event[ S, ParamChange[ S ], Proc[ S ]] = ParamEvent
       final def changed : evt.Event[ S, Update[ S ], Proc[ S ]] = ChangeEvent // = renamed | graphChanged | playingChanged | paramChanged
 
       final protected def writeData( out: DataOutput ) {
@@ -347,7 +368,7 @@ object ProcImpl {
 //         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
 //         implicit val entrySer = entrySerializer[ S ]
 //         implicit val scanSer = Scan_.serializer[ S ]
-         SkipList.Map.empty[ S, String, Scan[ S ]]
+         SkipList.Map.empty[ S, String, ScanNode[ S ]]
       }
    }
 
@@ -369,7 +390,7 @@ object ProcImpl {
 ////         implicit val parType = Doubles // .serializer[ S ]
 ////         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
 //         implicit val entrySer = entrySerializer[ S ]
-//         SkipList.Map.read[ S, String, EntryNode[ S ]]( in, access )
+//         SkipList.Map.read[ S, String, ScanNode[ S ]]( in, access )
 //      }
    }
 }
