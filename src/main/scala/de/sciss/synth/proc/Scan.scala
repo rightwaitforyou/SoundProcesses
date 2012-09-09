@@ -25,7 +25,7 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.stm.{Serializer, Sys}
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.{cubShape, sqrShape, welchShape, sinShape, expShape, linShape, stepShape, curveShape, Env}
 import de.sciss.lucre.bitemp.BiPin
@@ -36,6 +36,12 @@ import annotation.switch
 
 object Scan_ {
    type Update[ S <: Sys[ S ]] = BiPin.Update[ S, Elem[ S ], Elem.Update[ S ]]
+
+   implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Scan[ S ]] = {
+      implicit val elemSer = Elem.serializer[ S ]
+      implicit val time    = Longs
+      BiPin.serializer[ S, Elem[ S ], Elem.Update[ S ]]( _.changed )
+   }
 
    object Elem {
       // Note: we do not need to carry along `elem` because the outer collection

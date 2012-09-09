@@ -96,7 +96,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       implicit val chr: Chronos[ S ] = Chronos(0L)
       val p = Proc[ S ]()
       p.name_=( name )
-      p.graph_=({
+      p.graph_=( ProcGraph {
          import synth._
          import ugen._
          val f = "freq".kr       // fundamental frequency
@@ -206,8 +206,8 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    def addFreq( time: Expr[ S, Long ] = 0, freq: Expr[ S, Param ]) {
       t { implicit tx =>
-         pr().par( "freq" ) match {
-            case BiPin.Modifiable( v ) => v.add( time, freq )
+         pr().scans.get( "freq" ) match {
+            case Some( BiPin.Modifiable( v )) => v.add( time, Scan_.Mono( freq ))
             case _ =>
          }
       }

@@ -56,8 +56,6 @@ object Proc {
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
 
-//   def id: S#ID
-
    // ---- "fields" ----
 
 // OOO
@@ -75,10 +73,6 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
    // ---- controls preview demo ----
-
-//   def freq_# : Expr.Var[ S, Double ]
-//   def freq( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Double ]
-//   def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
 //   def par: ParamMap[ S ]
 

@@ -41,7 +41,7 @@ import annotation.switch
 object ProcImpl {
    private final val SER_VERSION = 2
 
-   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = sys.error( "TODO" ) // new New[ S ]( tx )
+   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] =
       serializer[ S ].read( in, access )
@@ -115,7 +115,26 @@ object ProcImpl {
       protected def name_# : Expr.Var[ S, String ]
 
 //      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
-      protected def parMap : SkipList.Map[ S, String, EntryNode[ S ]]
+//      protected def parMap : SkipList.Map[ S, String, EntryNode[ S ]]
+
+      protected def scanMap : SkipList.Map[ S, String, Scan[ S ]]
+
+      object scans extends Scans.Modifiable[ S ] {
+         def get( key: String )( implicit tx: S#Tx ) : Option[ Scan[ S ]] = scanMap.get( key )
+         def keys( implicit tx: S#Tx ) : Set[ String ] = scanMap.keysIterator.toSet
+
+         def add( key: String, scan: Scan[ S ])( implicit tx: S#Tx ) {
+            scanMap.add( key -> scan ).foreach { oldScan =>
+               // XXX TODO fire removal
+            }
+         }
+
+         def remove( key: String )( implicit tx: S#Tx ) : Boolean = {
+            val oldScan = scanMap.remove( key )
+            // XXX TODO fire removal
+            oldScan.isDefined
+         }
+      }
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
          name_#.get
@@ -127,7 +146,6 @@ object ProcImpl {
          playing_#.at( chr.time ).getOrElse( true )   // true?
       }
       final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-//         sys.error( "TODO" )
 //         playing_#.set( b )
          playing_#.add( chr.time, b )
       }
@@ -285,33 +303,6 @@ object ProcImpl {
 //         }
 //      }
 
-//      protected def freqVar : S#Var[ Expr[ S, Double ]]
-
-//      final def freq( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Double ] = freq_#.at( chr.time )
-//      final def freq_=( f: Expr[ S, Double ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-////         val before = freq_#.get
-////         if( before != f ) {
-////            val con = targets.nonEmpty
-//////            logEvent( this.toString + " set " + expr + " (con = " + con + ")" )
-////            if( con ) evt.Intruder.-/->( before.changed, freqChanged )
-////            freq_#.set( f )
-////            if( con ) {
-////               evt.Intruder.--->( f.changed, freqChanged )
-////               val beforeV = before.value
-////               val exprV   = f.value
-////               freqChanged( FreqChanged( this, evt.Change( beforeV, exprV )))
-////            }
-////         }
-//
-////         sys.error( "TODO" )
-////         freq_#.set( f )
-//         freq_#.add( chr.time, f )
-//      }
-
-//      final def renamed             = name_#.changed.map( Rename( this, _ ))
-//      final def graphChanged        = event[ GraphChange[ S ]]
-//      final def playingChanged      = playing_#.changed.map( PlayingChange( this, _ ))
-//      final def freqChanged         = freq_#.changed.map( FreqChange( this, _ ))
       final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
       final def paramChanged : evt.Event[ S, ParamChange[ S ], Proc[ S ]] = ParamEvent
       final def changed : evt.Event[ S, Update[ S ], Proc[ S ]] = ChangeEvent // = renamed | graphChanged | playingChanged | paramChanged
@@ -320,55 +311,49 @@ object ProcImpl {
          out.writeUnsignedByte( SER_VERSION )
          name_#.write( out )
          playing_#.write( out )
-//         freq_#.write( out )
          graphVar.write( out )
-         parMap.write( out )
+//         parMap.write( out )
+         scanMap.write( out )
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {
          name_#.dispose()
          playing_#.dispose()
-//         freq_#.dispose()
          graphVar.dispose()
-         parMap.dispose()
+//         parMap.dispose()
+         scanMap.dispose()
       }
 
       override def toString() = "Proc" + id
 
-      override def hashCode() : Int = id.##
-      override def equals( that: Any ) = that.isInstanceOf[ Proc[ _ ]] &&
-         (that.asInstanceOf[ Proc[ _ ]].id == id)
+//      override def hashCode() : Int = id.##
+//      override def equals( that: Any ) = that.isInstanceOf[ Proc[ _ ]] &&
+//         (that.asInstanceOf[ Proc[ _ ]].id == id)
    }
 
-   private abstract /* final */ class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
-//      protected val decl      = getDecl[ S ]( tx0 )
+   private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
       protected val targets   = evt.Targets[ S ]( tx0 )
 
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
       protected val playing_# = BiPin.Expr.Modifiable.partial[ S, Boolean ]/*( true )*/( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
-//      protected val freqVar   = {
-//         implicit val peerSer = Doubles.serializer[ S ]
-//         tx0.newVar[ Expr[ S, Double ]]( id, 441 )
-//      }
-//      protected val freq_#    = BiPin.newConfluentExprVar[ S, Double ]( 441 )( tx0, Doubles ) // Doubles.newConfluentVar[ S ]( 441 )( tx0 )
       protected val graphVar  = {
          implicit val ser = Code.serializer[ S, ProcGraph ]
          tx0.newVar[ Code[ ProcGraph ]]( id, emptyGraph )
       }
 
-      protected val parMap    = {
+      protected val scanMap    = {
          implicit val tx      = tx0
 //         implicit val parType = Doubles // .serializer[ S ]
 //         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
-         implicit val entrySer = entrySerializer[ S ]
-         SkipList.Map.empty[ S, String, EntryNode[ S ]]
+//         implicit val entrySer = entrySerializer[ S ]
+//         implicit val scanSer = Scan_.serializer[ S ]
+         SkipList.Map.empty[ S, String, Scan[ S ]]
       }
    }
 
    private abstract /* final */ class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
                                              tx0: S#Tx )
    extends Impl[ S ] {
-//      protected val decl      = getDecl[ S ]( tx0 )
 
       {
          val serVer = in.readUnsignedByte()
@@ -376,18 +361,15 @@ object ProcImpl {
       }
 
       protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
-//      protected val playing_# = Booleans.readVar[ S ]( in, access )( tx0 )
-//      protected val freq_#    = Doubles.readVar[ S ]( in, access )( tx0 )
       protected val playing_# = BiPin.Expr.Modifiable.read[ S, Boolean ]( in, access )( tx0, Booleans )
-//      protected val freq_#    = BiPin.readExprVar[ S, Double  ]( in, access )( tx0, Doubles  )
       protected val graphVar  = tx0.readVar[ Code[ ProcGraph ]]( id, in ) // ( SynthGraphSerializer )
 
-      protected val parMap    = {
-         implicit val tx      = tx0
-//         implicit val parType = Doubles // .serializer[ S ]
-//         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
-         implicit val entrySer = entrySerializer[ S ]
-         SkipList.Map.read[ S, String, EntryNode[ S ]]( in, access )
-      }
+//      protected val parMap    = {
+//         implicit val tx      = tx0
+////         implicit val parType = Doubles // .serializer[ S ]
+////         implicit val exprSer = BiPin.exprSerializer[ S, Param ]
+//         implicit val entrySer = entrySerializer[ S ]
+//         SkipList.Map.read[ S, String, EntryNode[ S ]]( in, access )
+//      }
    }
 }
