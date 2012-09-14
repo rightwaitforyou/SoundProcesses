@@ -365,7 +365,14 @@ new approach (sketch):
          }
       }
 
+:::::::::::::
 
+alternative: the UGenGraphBuilder can match the sources, and avoid putting logic into them that requires reaction (looking up the Proc as a thread-local, throwing a control exception, ...); so that their `force` can be reduced to providing a `In`/control or `Out`.
+
+      // graph elements / lazies
+
+      
+      
 
 
 
