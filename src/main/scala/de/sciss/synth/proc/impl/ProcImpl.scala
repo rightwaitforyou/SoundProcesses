@@ -49,7 +49,7 @@ object ProcImpl {
    def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] =
       anySer.asInstanceOf[ evt.NodeSerializer[ S, Proc[ S ]]]
 
-   final val emptyGraph: ProcGraph = ProcGraph {}
+   final val emptyGraph: SynthGraph = SynthGraph {}
 
    private val anySer = new Serializer[ InMemory ]
 
@@ -112,7 +112,7 @@ object ProcImpl {
 
 //      private type ParamEx = BiPin.Expr[ S, Param ]
 
-      protected def graphVar : S#Var[ Code[ ProcGraph ]]
+      protected def graphVar : S#Var[ Code[ SynthGraph ]]
 //      protected def playing_# : Expr.Var[ S, Boolean ]
       protected def playing_# : BiPin.Expr.Modifiable[ S, Boolean ]
       protected def name_# : Expr.Var[ S, String ]
@@ -201,9 +201,9 @@ object ProcImpl {
          playing_#.add( chr.time, b )
       }
 
-      final def graph( implicit tx: S#Tx ) : Code[ ProcGraph ] = graphVar.get
+      final def graph( implicit tx: S#Tx ) : Code[ SynthGraph ] = graphVar.get
 
-      final def graph_=( g: Code[ ProcGraph ])( implicit tx: S#Tx ) {
+      final def graph_=( g: Code[ SynthGraph ])( implicit tx: S#Tx ) {
          val old = graphVar.get
          if( old != g ) {
             graphVar.set( g )
@@ -211,7 +211,7 @@ object ProcImpl {
 //            updatePars( old.value.synthGraph, g.value.synthGraph )
          }
       }
-//      final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( ProcGraph.withoutSource( SynthGraph( block )))}
+//      final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph.withoutSource( SynthGraph( block )))}
       final def play()( implicit tx: S#Tx, chr: Chronos[ S ]) {
          playing_=( true )
       }
@@ -388,8 +388,9 @@ object ProcImpl {
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
       protected val playing_# = BiPin.Expr.Modifiable.partial[ S, Boolean ]/*( true )*/( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
       protected val graphVar  = {
-         implicit val ser = Code.serializer[ S, ProcGraph ]
-         tx0.newVar[ Code[ ProcGraph ]]( id, emptyGraph )
+         implicit val peerSer = SynthGraphSerializer
+//         implicit val ser     = Code.serializer[ S, SynthGraph ]
+         tx0.newVar[ Code[ SynthGraph ]]( id, emptyGraph )
       }
 
       protected val scanMap    = {
@@ -413,7 +414,10 @@ object ProcImpl {
 
       protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
       protected val playing_# = BiPin.Expr.Modifiable.read[ S, Boolean ]( in, access )( tx0, Booleans )
-      protected val graphVar  = tx0.readVar[ Code[ ProcGraph ]]( id, in ) // ( SynthGraphSerializer )
+      protected val graphVar  = {
+         implicit val peerSer = SynthGraphSerializer
+         tx0.readVar[ Code[ SynthGraph ]]( id, in )
+      } // ( SynthGraphSerializer )
 
       protected val scanMap    = {
          implicit val tx      = tx0

@@ -64,7 +64,7 @@ object DynamicBusUser {
 //      new ControlReaderWriterImpl( bus )
 
    private abstract class AbstractAudioImpl extends DynamicAudioBusUser with RichAudioBus.User {
-      val added = ScalaRef( false )
+      val added = ScalaRef( initialValue = false )
       def busChanged( bus: AudioBus )( implicit tx: ProcTxn ) {}
 
       def migrateTo( newBus: RichAudioBus )( implicit tx: ProcTxn ) : DynamicAudioBusUser = {
@@ -91,7 +91,7 @@ object DynamicBusUser {
    }
 
    private abstract class AbstractControlImpl extends DynamicControlBusUser with RichControlBus.User {
-      val added = ScalaRef( false )
+      val added = ScalaRef( initialValue = false )
       def busChanged( bus: ControlBus )( implicit tx: ProcTxn ) {}
 
       def migrateTo( newBus: RichControlBus )( implicit tx: ProcTxn ) : DynamicControlBusUser = {

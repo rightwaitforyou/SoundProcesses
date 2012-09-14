@@ -67,7 +67,7 @@ object BusNodeSetter {
       new ControlMapperImpl( controlName, bus, node )
 
    private trait ImplLike extends BusNodeSetter {
-      val added = ScalaRef( false )
+      val added = ScalaRef( initialValue = false )
    }
 
    private trait AudioSetterLike extends ImplLike {

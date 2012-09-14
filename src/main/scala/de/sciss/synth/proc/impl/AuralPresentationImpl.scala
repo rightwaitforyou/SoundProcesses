@@ -51,7 +51,7 @@ object AuralPresentationImpl {
       override def toString = "AuralPresentation@" + hashCode.toHexString
 
       private val sync     = new AnyRef
-      private var running  = Option.empty[ Running[ S ]]
+      private var running  = Option.empty[ RunningImpl[ S ]]
 
       def dispose()( implicit tx: S#Tx ) {
          // XXX TODO dispose running
@@ -70,7 +70,7 @@ object AuralPresentationImpl {
       def started( server: Server ) {
          val impl = cursor.step { implicit tx =>
             val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
-            val booted  = new Running( server, viewMap )
+            val booted  = new RunningImpl( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val transport = tx.refresh( csrPos, transportStale )
             transport.changed.react { x => println( "Aural observation: " + x )}
@@ -102,7 +102,24 @@ object AuralPresentationImpl {
       }
    }
 
-   private[impl] final class Running[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]) {
+   sealed trait Running[ S <: Sys[ S ]] {
+      def addScanIn(  proc: Proc[ S ], key: String )( implicit tx: S#Tx ) : Int
+      def addScanOut( proc: Proc[ S ], key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
+   }
+
+   private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
+   extends Running[ S ] {
+      def addScanIn( proc: Proc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
+//         val p: Proc[ S ] = null
+//         p.scans.valueAt( key, time ).get.
+
+         throw new MissingInfo
+      }
+
+      def addScanOut( proc: Proc[ S ], key: String, numChannels: Int )( implicit tx: S#Tx ) {
+         sys.error( "TODO" )
+      }
+
       def dispose()( implicit tx: S#Tx ) {
          viewMap.dispose()
       }
@@ -111,7 +128,7 @@ object AuralPresentationImpl {
          timed.foreach { pt =>
 //         val time    = chr.time
             val p       = pt.value
-            val pg      = p.graph.value
+            val graph   = p.graph.value
    //         val scanMap = pg.scans
    //         if( scanMap.nonEmpty ) {
    //            val scans   = p.scans
@@ -128,7 +145,7 @@ object AuralPresentationImpl {
    //         }
 
             val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
-            val aural   = AuralProc( server, /* name, */ pg.synthGraph, entries )
+            val aural   = AuralProc( server, /* name, */ graph, entries )
             viewMap.put( pt.id, aural )
             val playing = p.playing.value
             logConfig( "aural added " + p + " -- playing? " + playing )

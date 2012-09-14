@@ -23,9 +23,9 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
-import de.sciss.synth.SynthGraph
 import de.sciss.lucre.{stm, event => evt, bitemp, expr, DataInput}
 import stm.Sys
 import bitemp.{BiPin, Chronos}
@@ -48,7 +48,7 @@ object Proc {
    }
    sealed trait StateChange[ S <: Sys[ S ]] extends Update[ S ]
    final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends StateChange[ S ]
-   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ ProcGraph ])          extends StateChange[ S ]
+   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])          extends StateChange[ S ]
    final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
    final case class ScansCollectionChange[ S <: Sys[ S ]]( proc: Proc[ S ], added: Set[ String ], removed: Set[ String ]) extends StateChange[ S ]
@@ -66,8 +66,8 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def name( implicit tx: S#Tx ) : Expr[ S, String ]
    def name_=( expr: Expr[ S, String ])( implicit tx: S#Tx ) : Unit
 
-   def graph( implicit tx: S#Tx ) : Code[ ProcGraph ]
-   def graph_=( g: Code[ ProcGraph ])( implicit tx: S#Tx ) : Unit
+   def graph( implicit tx: S#Tx ) : Code[ SynthGraph ]
+   def graph_=( g: Code[ SynthGraph ])( implicit tx: S#Tx ) : Unit
 //   def graph_=( block: => Any )( implicit tx: S#Tx ) : Unit
 
 // OOO

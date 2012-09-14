@@ -53,7 +53,7 @@ object scan {
          }
       }
 
-      def dir: ProcGraph.Direction = ProcGraph.In
+//      def dir: ProcGraph.Direction = ProcGraph.In
    }
 
 //   private final case class Out( key: String, signal: GE )
@@ -96,7 +96,7 @@ object scan {
          new UGen.ZeroOut( name, audio, argsAr, isIndividual = true )
       }
 
-      def dir: ProcGraph.Direction = ProcGraph.Out
+//      def dir: ProcGraph.Direction = ProcGraph.Out
    }
 }
 final case class scan( key: String ) {
