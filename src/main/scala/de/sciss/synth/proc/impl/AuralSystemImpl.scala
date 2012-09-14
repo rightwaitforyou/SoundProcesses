@@ -7,7 +7,7 @@ import concurrent.stm.{InTxn, TxnExecutor}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object AuralSystemImpl {
-   var dumpOSC = false
+   var dumpOSC = true
 
    def apply() : AuralSystem = {
       val impl = new Impl

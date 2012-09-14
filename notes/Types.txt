@@ -193,3 +193,189 @@ proc1.play
 
 :::::::::::::::::::::
 
+Interconnections:
+
+- identify buses as tuple (proc, scan-key)
+- ProcGraph has map (scan-key, direction) ; is embedded with a proc
+- AuralPresentation - play proc :
+  - a proc might appear in different AuralPresentations ; in that case there would be independent AuralProc views
+  - hence bus sharing information must remain with AuralPresentation, not AuralSystem
+  - probably the best (with respect to minimising re-creating stuff due to channel-num change) is a two phase assembly
+  - phase 1: traverse list of procs to start. for each encountered bus:
+    - is input?
+      - is found in AuralPres. map?
+        - done. (GE.expand will find the information through some sort of ThreadLocal)
+      - not in AuralPres. map?
+        - current resolved Scan.Elem is bus driven?
+          - defer proc
+        - current resolved Scan.Elem is plain control value?
+          - done. (add appropriate n_set(n) message)
+    - is output?
+
+- idea: allow two iterations (one round of adjustments to each proc, to accomodate negotiation of channel numbers, without the huge effort of a constraints system)
+
+- furthermore it is important to remember that a newly started proc might write to a bus, thus possibly writing a new value into the Scan, on which other procs
+  which embed that scan might depend. --> see iteration (1) in next paragraph
+
+:::::::::::::::::::::
+
+(1)
+procs.foreach { p =>
+   p.graph.scanMap.foreach {
+      case (key, Out) => if value at current time in corresponding scan is _not_ Synthesis() : insert that value
+      case _ =>
+   }
+}
+
+(2)
+var remaining = Set.empty[ Proc ]
+var tried     = Map.empty[ (Proc, String), Set[ Int ]]
+
+remaining ++= allProcsToPlay
+var stasis = false
+while( remaining.nonEmpty && !stasis ) {
+   var unsatisfied = false
+   var inChans = Map.empty[ String, Int ]
+   var actions = IIdxSeq.empty[ () => Unit ]
+   remaining.foreach { p =>
+      p.graph.scanMap.foreach { case (key, dir) =>
+         if( dir == In ) {
+            p.scans.valueAt( key ) match {
+               case Some( Scan.Value.MonoConst( v )) =>
+                  inChans += key -> 1
+                  actions :+= { => /* ...n_set(n)... */ }
+               
+               case Some( Scan.Value.MonoSegment( start, stop, dur, shape )) =>
+                  inChans += key -> 1
+                  actions :+= { => /* ...new segment synth... */ }
+               
+               case Some( Scan.Synthesis( sourceProc )) => // dir == In implies that sourceProc != p
+                  busMap.get( sourceProc -> key ) match {
+                     case Some( richBus /*???*/ ) =>
+                        inChans += key -> richBus.numChannels
+                        actions :+= { => /* ...n_mapa... */ }
+                     case _ =>
+                        unsatisfied = true
+                  }
+
+               case _ => // satisfied, control with use default
+                  inChans += key -> -1  // special indicator
+            }
+
+         } else if( dir == Out ) { // implies after (1) that p.scans.valueAt( key ) == Some( Scan.Value.Synthesis( `p` )) !
+            // ideally we'd find out if the number of channels can be determined
+            
+            
+         } else if( dir == Bidi ) { // should we completely forbid Bidi (i.e. enforce separate scan keys for in/out) ?
+            
+         }
+   }
+
+   if( unsatisfied ) {
+   
+   } else {
+      p.graph.synthGraph.expand // ???
+   }
+}
+
+:::::::::::::::::::::
+
+- Bidi implies the number of channels cannot change, thus depends on the input in the first place
+
+- this whole iteration (2) should be incorporated into the UGenGraphBuilder ?
+
+- how about we construct a UGenGraphBuilder which can catch special control exceptions thrown by Lazy's expand
+- and thus not iterate over (maybe not even build explicitly) scanMap; scanMap could be build dynamically as
+  the ugen graph is created.
+- the ThreadLocal builder would still collect all the ugens that have been expanded until the exception is
+  thrown (this would be automatically found in the cache in a new iteration).
+
+'standard' build process in ScalaCollider:
+
+      def build : UGenGraph = {
+         var g                = graph
+         var controlProxies   = MBuffer.empty[ ControlProxyLike[ _ ]]
+         while( g.nonEmpty ) {
+            controlProxies ++= g.controlProxies
+            g = SynthGraph( g.sources.foreach { src =>
+               src.force( builder )
+            })  // allow for further graphs being created
+         }
+         val ctrlProxyMap        = buildControls( controlProxies )
+         val (igens, constants)  = indexUGens( ctrlProxyMap )
+         val indexedUGens        = sortUGens( igens )
+         val richUGens : IIdxSeq[ RichUGen ] =
+            indexedUGens.map( iu => RichUGen( iu.ugen, iu.richInputs.map( _.create )))( breakOut )
+         UGenGraph( constants, controlValues, controlNames, richUGens )
+      }
+
+new approach (sketch):
+
+      procs.foreach { p =>
+         ub = new CustomBuilder( p.graph.synthGraph ) // initiates builder with all sources (not yet forced)
+         UGenGraphBuilder.use( ub ) { // need to add that method in ScalaCollider
+            ub.tryBuild() match {
+               case Some( ug ) => ...
+               case _ =>
+                  
+         }
+      }
+
+      trait CustomBuilder {
+         // tries to build the graph. if there is a problem due to missing
+         // scan input channel information, stops at that point and returns
+         // `None`. In that case, when more information is available, this
+         // method can be called again (it thus incrementally builds the graph).
+         def tryBuild() : Option[ UGenGraph ]
+         
+         // common API
+         def visit[ U ]( ref: AnyRef, init: => U ) : U
+         def addUGen( ugen: UGen )
+         def addControl( values: IIdxSeq[ Float ], name: Option[ String ])
+      }
+
+      // roughly like this
+      class CustomBuilderImpl( g: Graph ) {
+         builder =>
+
+         private var remaining       = g.sources
+         private var controlProxies  = MBuffer[ ControlProxyLike[ _ ]]( g.controlProxies )
+         private var missing         = IIdxSeq.empty[ Lazy ]
+
+         def build : UGenGraph = {
+            var missingInfo = false
+            while( !missingInfo && remaining.nonEmpty ) {
+               val g = SynthGraph {
+                  remaining.foreach { src =>
+                     try {
+                        src.force( builder )
+                     } catch {
+                        catch e: MissingChannelInfo =>
+                        missing :+= src
+                     }
+                  }
+                  missingInfo |= remaining.nonEmpty
+               }
+               if( g.nonEmpty ) {
+                  remaining ++= g.sources
+                  controlProxies ++= g.controlProxies
+               }
+            }
+            if( missingInfo ) None else Some( standardBuildStuff() )
+         }
+      }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
