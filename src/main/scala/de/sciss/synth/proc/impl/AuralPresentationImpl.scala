@@ -31,7 +31,7 @@ import stm.{IdentifierMap, Sys, Cursor}
 import de.sciss.osc.Dump
 import de.sciss.synth.{SynthGraph, ServerConnection, Server}
 import bitemp.{BiGroup, Chronos}
-
+import collection.immutable.{IndexedSeq => IIdxSeq}
 import SoundProcesses.logConfig
 import concurrent.stm.Txn
 
@@ -51,7 +51,7 @@ object AuralPresentationImpl {
       override def toString = "AuralPresentation@" + hashCode.toHexString
 
       private val sync     = new AnyRef
-      private var running  = Option.empty[ Impl[ S ]]
+      private var running  = Option.empty[ Running[ S ]]
 
       def dispose()( implicit tx: S#Tx ) {
          // XXX TODO dispose running
@@ -70,13 +70,18 @@ object AuralPresentationImpl {
       def started( server: Server ) {
          val impl = cursor.step { implicit tx =>
             val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
-            val booted  = new Impl( server, viewMap )
+            val booted  = new Running( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val transport = tx.refresh( csrPos, transportStale )
             transport.changed.react { x => println( "Aural observation: " + x )}
             if( transport.playing.value ) {
                implicit val chr: Chronos[ S ] = transport
-               transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
+//               transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
+               val it = transport.iterator
+               if( it.nonEmpty ) {
+                  val timed = it.collect({ case (_, pt) if pt.value.playing.value => pt })
+                  booted.procsAdded( timed.toIndexedSeq )
+               }
             }
             transport.changed.reactTx { implicit tx => {
                case Transport.Advance( tr, true, time, added, removed, params ) =>
@@ -84,7 +89,11 @@ object AuralPresentationImpl {
 //println( "AQUI: added = " + added + "; removed = " + removed )
                   removed.foreach { case (_, p)    => booted.procRemoved( p )}
                   params.foreach  { case (_, p, m) => booted.procParamsChanged( p, m )}
-                  added.foreach   { case (_, p)    => booted.procAdded( p )}
+                  // added.foreach   { case (_, p)    => booted.procAdded( p )}
+                  if( added.nonEmpty ) {
+                     val timed = added.collect { case (_, pt) if pt.value.playing.value => pt }
+                     booted.procsAdded( timed )
+                  }
                case _ =>
             }}
             booted
@@ -93,39 +102,41 @@ object AuralPresentationImpl {
       }
    }
 
-   private final class Impl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]) {
+   private[impl] final class Running[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]) {
       def dispose()( implicit tx: S#Tx ) {
          viewMap.dispose()
       }
 
-      def procAdded( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+      def procsAdded( timed: IIdxSeq[ BiGroup.TimedElem[ S, Proc[ S ]]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+         timed.foreach { pt =>
 //         val time    = chr.time
-         val p       = timed.value
-         val pg      = p.graph.value
-//         val scanMap = pg.scans
-//         if( scanMap.nonEmpty ) {
-//            val scans   = p.scans
-//            scanMap.map { case (key, dir) =>
-//               scans.get( key ).map { scan =>
-//                  scan.intersect( time ).headOption.map { case (startEx, elem) =>
-//                     elem match {
-//                        case Scan_.Mono( levelExpr, shape ) =>
-//                          val level = levelExpr.value
-//                     }
-//                  }
-//               }
-//            }
-//         }
+            val p       = pt.value
+            val pg      = p.graph.value
+   //         val scanMap = pg.scans
+   //         if( scanMap.nonEmpty ) {
+   //            val scans   = p.scans
+   //            scanMap.map { case (key, dir) =>
+   //               scans.get( key ).map { scan =>
+   //                  scan.intersect( time ).headOption.map { case (startEx, elem) =>
+   //                     elem match {
+   //                        case Scan_.Mono( levelExpr, shape ) =>
+   //                          val level = levelExpr.value
+   //                     }
+   //                  }
+   //               }
+   //            }
+   //         }
 
-         val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
-         val aural   = AuralProc( server, /* name, */ pg.synthGraph, entries )
-         viewMap.put( timed.id, aural )
-         val playing = p.playing.value
-         logConfig( "aural added " + p + " -- playing? " + playing )
-         if( playing ) {
-            implicit val ptx = ProcTxn()( tx.peer )
-            aural.play()
-//            actions.transform( _.addPlay( p ))
+            val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
+            val aural   = AuralProc( server, /* name, */ pg.synthGraph, entries )
+            viewMap.put( pt.id, aural )
+            val playing = p.playing.value
+            logConfig( "aural added " + p + " -- playing? " + playing )
+            if( playing ) {
+               implicit val ptx = ProcTxn()( tx.peer )
+               aural.play()
+   //            actions.transform( _.addPlay( p ))
+            }
          }
       }
 

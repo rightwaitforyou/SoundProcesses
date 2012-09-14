@@ -342,7 +342,7 @@ new approach (sketch):
          private var controlProxies  = MBuffer[ ControlProxyLike[ _ ]]( g.controlProxies )
          private var missing         = IIdxSeq.empty[ Lazy ]
 
-         def build : UGenGraph = {
+         def tryBuild() : Option[ UGenGraph ] = {
             var missingInfo = false
             while( !missingInfo && remaining.nonEmpty ) {
                val g = SynthGraph {
@@ -371,9 +371,9 @@ alternative: the UGenGraphBuilder can match the sources, and avoid putting logic
 
       // graph elements / lazies
 
-      
-      
+kann nicht funktionieren, weil force auch von dependent GE aufgerufen wird (e.g. SinOsc.ar( scan.In( key ))), u.U. vor dem graph builder
 
+- it might be that we need to handle some more details of the ugen graph builder differently; e.g. make visitation map immutable, so that upon catching MissingInfo it can be safely restored (because otherwise depending ugens will be dropped in the next try)
 
 
 
