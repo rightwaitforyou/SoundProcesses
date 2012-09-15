@@ -23,9 +23,9 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
-import de.sciss.synth.{addToHead, AddAction, ControlSetMap, Node, Synth}
 import collection.breakOut
 import ProcTxn.RequiresChange
 
@@ -33,13 +33,15 @@ final case class RichSynth( synth: Synth, synthDef: RichSynthDef ) extends RichN
    def node: Node = synth
 
    def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil, addAction: AddAction = addToHead,
-             bufs: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) {
+             buffers: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) {
 
       require( target.server == server )
-      bufs.foreach( b => require( b.server == server ))
+      buffers.foreach( b => require( b.server == server ))
 
-      val deps: Map[ RichState, Boolean ] = bufs.map( _.hasContent -> true )( breakOut )
-      tx.add( synth.newMsg( synthDef.name, target.node, args, addAction ), Some( (RequiresChange, isOnline, true) ),
-              true, deps ++ Map( target.isOnline -> true, synthDef.isOnline -> true ))
+      val dependencies: Map[ RichState, Boolean ] = buffers.map( _.hasContent -> true )( breakOut )
+      tx.add( synth.newMsg( synthDef.name, target.node, args, addAction ),
+              change = Some( (RequiresChange, isOnline, true) ),
+              audible = true,
+              dependencies = dependencies + (target.isOnline -> true) + (synthDef.isOnline -> true) )
    }
 }

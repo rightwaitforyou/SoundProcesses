@@ -23,17 +23,16 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 package impl
 
 import de.sciss.lucre.{stm, bitemp}
 import stm.{IdentifierMap, Sys, Cursor}
-import de.sciss.osc.Dump
-import de.sciss.synth.{SynthGraph, ServerConnection, Server}
 import bitemp.{BiGroup, Chronos}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import SoundProcesses.logConfig
-import concurrent.stm.Txn
+import concurrent.stm.{Ref, Txn}
 
 object AuralPresentationImpl {
    def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], aural: AuralSystem )
@@ -103,21 +102,132 @@ object AuralPresentationImpl {
    }
 
    sealed trait Running[ S <: Sys[ S ]] {
-      def addScanIn(  proc: Proc[ S ], key: String )( implicit tx: S#Tx ) : Int
-      def addScanOut( proc: Proc[ S ], key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
+      def addScanIn(  proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int
+      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
+   }
+
+   private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment[ _ ], val bus: RichAudioBus, aural: AuralProc )
+   extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
+      private val synthRef: Ref[ Option[ RichSynth ]] = ???
+
+      protected def synth( implicit tx: ProcTxn ) : Option[ RichSynth ] = synthRef.get( tx.peer )
+      protected def synth_=( rso: Option[ RichSynth ])( implicit tx: ProcTxn ) {
+         val oldSynth = synthRef.swap( rso )( tx.peer )
+         rso.foreach( addMapBusConsumer )
+         oldSynth.foreach( _.free( audible = true ))
+      }
+
+      protected def addMapBusConsumer( rs: RichSynth )( implicit tx: ProcTxn ) {
+//         val rb = mapBus
+//         rs.write( rb -> "$out" )
+         rs.write( bus -> "$out" )
+      }
+
+      protected def graph = SynthGraph {
+         import ugen._
+
+         val start   = "$start".ir
+         val stop    = "$stop".ir
+         val dur     = "$dur".ir
+         val sig = seg.shape match {
+            case `linShape` =>
+               Line.ar( start, stop, dur, doneAction = freeSelf )
+            case `expShape` =>
+               if( seg.start != 0f && seg.stop != 0f && seg.start * seg.stop > 0f ) {
+                  XLine.ar( start, stop, dur, doneAction = freeSelf )
+               } else {
+                  Line.ar( 0, 0, dur, doneAction = freeSelf )
+               }
+            case _ =>
+               val env = Env( start, Env.Seg( dur = dur, targetLevel = stop,
+                                              shape = varShape( "$shape".ir, "$curve".ir( 0 ))) :: Nil )
+               EnvGen.ar( env, doneAction = freeSelf )
+
+         }
+         Out.ar( "$out".kr, sig )
+      }
+
+      // ---- TxnPlayer ----
+
+      def play( implicit tx: ProcTxn ) {
+         type Ctl = List[ ControlSetMap ]
+
+         val g          = graph
+         val rsd        = RichSynthDef( aural.server, g )
+         val ctl0: Ctl  = List( "$start" -> seg.start, "$stop" -> seg.stop, "$dur" -> seg.dur )
+         val shp        = seg.shape
+         val ctl1: Ctl  = if( shp != linShape && shp != expShape ) ("$shape" -> seg.shape.id) :: ctl0 else ctl0
+         val ctl: Ctl   = if( shp.curvature != 0f ) ("$curve" -> shp.curvature) :: ctl1 else ctl1
+         val rs         = rsd.play( aural.preGroup, ctl )
+
+         synth_=( Some( rs ))
+
+//         rs.onEndTxn { implicit tx =>
+//            synth.foreach( rs2 => if( rs == rs2 ) {
+//               ctrl.glidingDone
+//            })
+//         }
+      }
+
+      def stop( implicit tx: ProcTxn ) {
+         synthRef.swap( None )( tx.peer ).foreach( _.free( audible = true ))
+      }
+
+      def isPlaying( implicit tx: ProcTxn ) : Boolean = synth.map( _.isOnline.get ).getOrElse( false )
+
+      // ---- RichAudioBus.User ----
+
+      def busChanged( bus: AudioBus )( implicit tx: ProcTxn ) {
+         ???
+      }
+
+      // ---- DynamicAudioBusUser ----
+
+      def add( implicit tx: ProcTxn ) {
+         bus.addWriter( this )
+      }
+
+      def remove( implicit tx: ProcTxn ) {
+         bus.removeWriter( this )
+      }
+
+      def migrateTo( newBus: RichAudioBus )( implicit tx: ProcTxn ) : DynamicAudioBusUser = {
+         ???
+      }
    }
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends Running[ S ] {
-      def addScanIn( proc: Proc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
-//         val p: Proc[ S ] = null
-//         p.scans.valueAt( key, time ).get.
+      def addScanIn( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
+         proc.scans.valueAt( key, time ) match {
+            case Some( value ) =>
+               value match {
+                  case Scan_.Value.MonoConst( _ ) => 1
+                  case seg @ Scan_.Value.MonoSegment( _, _, _, _ ) =>
+                     val aural = viewMap.getOrElse( proc.id, sys.error( "Missing aural view of process " + proc ))
+                     implicit val procTxn = ProcTxn()( tx.peer )
+                     val bus   = aural.getBus( key ).getOrElse {
+                        val _bus = RichBus.audio( server, 1 )
+                        aural.setBus( key, Some( _bus ))
+                        _bus
+                     }
+                     val user: RichAudioBus.User = ???
+                     bus.addReader( user )
+                     1
 
-         throw new MissingInfo
+                  case Scan_.Value.Synthesis( sourceProc ) =>
+                     val sourceAural = viewMap.getOrElse( sourceProc.id, sys.error( "Missing aural view of process " + sourceProc ))
+
+                     ???
+               }
+            case _ => -1   // special result: no value found, use default
+         }
+//         throw new MissingInfo
       }
 
-      def addScanOut( proc: Proc[ S ], key: String, numChannels: Int )( implicit tx: S#Tx ) {
-         sys.error( "TODO" )
+      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) {
+
+         ???
       }
 
       def dispose()( implicit tx: S#Tx ) {

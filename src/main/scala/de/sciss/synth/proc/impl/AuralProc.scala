@@ -23,11 +23,11 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 package impl
 
-import concurrent.stm.{Ref => ScalaRef}
-import de.sciss.synth.{addToHead, ControlSetMap, Server, SynthGraph}
+import concurrent.stm.Ref
 import collection.breakOut
 
 object AuralProc {
@@ -43,19 +43,32 @@ object AuralProc {
       new Impl( server, /* initName, */ initGraph, entries )
    }
 
+   /*
+    * The possible differentiation of groups for an aural process. The minimum configuration is one main
+    * group. If synths need to play before the main process, a pre group will be established, if they need
+    * to play after the main process, a post group will be established. If multiple synths participate in
+    * the main process, a core group may be established. A back group will hold 'forgotten' synths, once
+    * they have been marked to fade out and be removed by themselves.
+    */
+   private final case class AllGroups( main: RichGroup, pre: Option[ RichGroup ] = None,
+                                       core: Option[ RichGroup ] = None,
+                                       post: Option[ RichGroup ] = None, back: Option[ RichGroup ] = None )
+
    private final class Impl( val server: Server, /* name0: String, */ graph0: SynthGraph, entries0: Map[ String, Param ])
    extends AuralProc {
 
-      private val groupRef    = ScalaRef( Option.empty[ RichGroup ])
-      private val synthRef    = ScalaRef( Option.empty[ RichSynth ])
-//      private val nameRef     = ScalaRef( name0 )
-      private val graphRef    = ScalaRef( graph0 )
-//      private val synthDefRef = ScalaRef( Option.empty[ RichSynthDef ])
+      private val groupsRef   = Ref[ Option[ AllGroups ]]( None )
+      
+//      private val groupRef    = Ref( Option.empty[ RichGroup ])
+      private val synthRef    = Ref( Option.empty[ RichSynth ])
+//      private val nameRef     = Ref( name0 )
+      private val graphRef    = Ref( graph0 )
+//      private val synthDefRef = Ref( Option.empty[ RichSynthDef ])
 
-//      private val freqRef     = ScalaRef( freq0 )
-      private val entriesRef  = ScalaRef( entries0 )
+//      private val freqRef     = Ref( freq0 )
+      private val entriesRef  = Ref( entries0 )
 
-      def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
+//      def group( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupRef.get( tx.peer )
       def graph( implicit tx: ProcTxn ) : SynthGraph          = graphRef.get( tx.peer )
       def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) {
          graphRef.set( g )( tx.peer )
@@ -63,6 +76,91 @@ object AuralProc {
             stop()
             play()
          }
+      }
+
+      private def runningTarget()( implicit tx: ProcTxn ) : (RichNode, AddAction) = {
+         groupsRef.get( tx.peer ) map { all =>
+            all.core map { core =>
+               core -> addToHead
+            } getOrElse { all.pre map { pre =>
+               pre -> addAfter
+            } getOrElse { all.post map { post =>
+               post -> addBefore
+            } getOrElse {
+               all.main -> addToTail
+            }}}
+         } getOrElse {
+            RichGroup.default( server ) -> addToHead
+         }
+      }
+
+      def groupOption( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupsRef.get( tx.peer ).map( _.main )
+
+      def group()( implicit tx: ProcTxn ) : RichGroup = {
+         groupOption getOrElse {
+            val g    = Group( server )
+            val res  = RichGroup( g )
+            res.play( RichGroup.default( server ))
+            group_=( res )
+            res
+         }
+      }
+
+      private def group_=( newGroup: RichGroup )( implicit tx: ProcTxn ) {
+         implicit val itx = tx.peer
+         groupsRef.transform( _ map { all =>
+            moveAllTo( all, newGroup )
+            all.main.free( audible = true ) // que se puede...?
+            all.copy( main = newGroup )
+         } orElse {
+            val all = AllGroups( main = newGroup )
+//            runningRef().foreach( _.setGroup( newGroup ))
+            synthRef().foreach( _.moveToHead( audible = true, group = newGroup ))
+            Some( all )
+         })
+      }
+
+      @inline private def preGroupOption( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupsRef.get( tx.peer ).flatMap( _.pre )
+
+      def preGroup()( implicit tx: ProcTxn ) : RichGroup = {
+         implicit val itx = tx.peer
+         preGroupOption getOrElse {
+            val g       = Group( server )
+            val res     = RichGroup( g )
+            val main    = group       // creates group if necessary
+            val all     = groupsRef().get
+            val (target, addAction) = anchorNodeOption map { core =>
+               core -> addBefore
+            } getOrElse { all.post map { post =>
+               post -> addBefore
+            } getOrElse {
+               main -> addToTail
+            }}
+            res.play( target, addAction )
+            groupsRef.set( Some( all.copy( pre = Some( res ))))
+            res
+         }
+      }
+
+      private def anchorNodeOption( implicit tx: ProcTxn ) : Option[ RichNode ] = {
+         implicit val itx = tx.peer
+         groupsRef().flatMap( _.core ) orElse synthRef() // runningRef().map( _.anchorNode )
+      }
+
+      private def moveAllTo( all: AllGroups, newGroup: RichGroup )( implicit tx: ProcTxn ) {
+         anchorNodeOption map { core =>
+            core.moveToTail( audible = true, group = newGroup )
+            all.pre.foreach(  _.moveBefore( audible = true, target = core ))
+            all.post.foreach( _.moveAfter(  audible = true, target = core ))
+         } getOrElse {
+            all.post.map { post =>
+               post.moveToTail( audible = true, group = newGroup )
+               all.pre.foreach( _.moveBefore( audible = true, target = post ))
+            } getOrElse {
+               all.pre.foreach( _.moveToTail( audible = true, group = newGroup ))
+            }
+         }
+         all.back.foreach( _.moveToHeadIfOnline( newGroup )) // ifOnline !
       }
 
 //      def name( implicit tx: ProcTxn ) : String = nameRef.get( tx.peer )
@@ -73,8 +171,7 @@ object AuralProc {
          val df         = ProcDemiurg.getSynthDef( server, gr )
 
          implicit val itx = tx.peer
-         val target     = RichGroup.default( server )
-         val addAction  = addToHead
+         val (target, addAction) = runningTarget()
          val args: Seq[ ControlSetMap ] = entriesRef.get.map( tup => tup: ControlSetMap )( breakOut )
          val bufs       = Seq.empty[ RichBuffer ]
 
@@ -94,6 +191,9 @@ object AuralProc {
          if( p ) play() else stop()
       }
 
+      def getBus( key: String )( implicit tx: ProcTxn ) : Option[ RichAudioBus ] = ???
+      def setBus( key: String, bus: Option[ RichAudioBus ]) { ??? }
+
       def addParams( map: Map[ String, Param ])( implicit tx: ProcTxn ) {
          if( map.nonEmpty ) {
             implicit val itx = tx.peer
@@ -107,7 +207,20 @@ sealed trait AuralProc /* extends Writer */ {
    def server : Server
 //   def name( implicit tx: ProcTxn ) : String
 //   def name_=( n: String )( implicit tx: ProcTxn ) : Unit
-   def group( implicit tx: ProcTxn ) : Option[ RichGroup ]
+
+   /**
+    *    Retrieves the main group of the Proc, or
+    *    returns None if a group has not yet been assigned.
+    */
+   def groupOption( implicit tx: ProcTxn ) : Option[ RichGroup ]
+   /**
+    *    Retrieves the main group of the Proc. If this
+    *    group has not been assigned yet, this method will
+    *    create a new group.
+    */
+   def group()( implicit tx: ProcTxn ) : RichGroup
+   def preGroup()( implicit tx: ProcTxn ) : RichGroup
+
    def play()( implicit tx: ProcTxn ) : Unit
    def playing( implicit tx: ProcTxn ) : Boolean
    def playing_=( p: Boolean )( implicit tx: ProcTxn ) : Unit
@@ -117,6 +230,9 @@ sealed trait AuralProc /* extends Writer */ {
 
    def graph( implicit tx: ProcTxn ) : SynthGraph
    def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) : Unit
+
+   def getBus( key: String )( implicit tx: ProcTxn ) : Option[ RichAudioBus ]
+   def setBus( key: String, bus: Option[ RichAudioBus ])
 
 //   def freq( implicit tx: ProcTxn ) : Double
 //   def freq_=( f: Double )( implicit tx: ProcTxn ) : Unit

@@ -204,12 +204,12 @@ object RichBus {
 //      def busChanged( bus: AudioBus )( implicit tx: ProcTxn ) : Unit
 //   }
 
-   private var verbose = false
+   var verbose = false
 
    private sealed trait BusHolder[ T <: Bus ] {
       def bus: T
 
-      private val useCount = Ref.withCheck( 0 ) { case 0 => bus.free }
+      private val useCount = Ref.withCheck( 0 ) { case 0 => bus.free() }
 
       final def alloc()( implicit tx: ProcTxn ) {
          implicit val itx = tx.peer

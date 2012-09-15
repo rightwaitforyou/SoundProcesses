@@ -11,10 +11,11 @@ import de.sciss.lucre.stm.Sys
 private[proc] class MissingInfo extends ControlThrowable
 
 private[proc] object UGenGraphBuilderImpl {
-   def apply[ S <: Sys[ S ]]( aural: AuralPresentationImpl.Running[ S ], proc: Proc[ S ])( implicit tx: S#Tx ) : UGenGraphBuilder =
-      new Impl( aural, proc, proc.graph.value, tx )
+   def apply[ S <: Sys[ S ]]( aural: AuralPresentationImpl.Running[ S ], proc: Proc[ S ], time: Long )( implicit tx: S#Tx ) : UGenGraphBuilder =
+      new Impl( aural, proc, time, proc.graph.value, tx )
 
-   private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentationImpl.Running[ S ], proc: Proc[ S ], g: SynthGraph, tx: S#Tx )
+   private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentationImpl.Running[ S ], proc: Proc[ S ], time: Long,
+                                             g: SynthGraph, tx: S#Tx )
    extends BasicUGenGraphBuilder with UGenGraphBuilder {
       builder =>
 
@@ -28,11 +29,11 @@ private[proc] object UGenGraphBuilderImpl {
 //      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
 
       def addScanIn( key: String ) : Int = {
-         aural.addScanIn( proc, key )( tx )
+         aural.addScanIn( proc, time, key )( tx )
       }
 
       def addScanOut( key: String, numChannels: Int ) {
-         aural.addScanOut( proc, key, numChannels )( tx )
+         aural.addScanOut( proc, time, key, numChannels )( tx )
       }
 
       def tryBuild() : BuildResult = {

@@ -43,7 +43,7 @@ final case class RichSynthDef( server: Server, synthDef: SynthDef ) /* extends R
     *    will be queued.
     */
    def recv()( implicit tx: ProcTxn ) {
-      tx.add( synthDef.recvMsg, Some( (IfChanges, isOnline, true) ), false )
+      tx.add( synthDef.recvMsg, change = Some( (IfChanges, isOnline, true) ), audible = false )
    }
 
    def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil,
