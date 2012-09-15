@@ -42,15 +42,15 @@ object ScansTest extends App {
          v.set( 777 )
       }
 
-      println( "\n---step2---\n" )
-
-      sys.step { implicit tx =>
-         val sc2 = Scan_.Modifiable[ S ]
-         val v2 = Longs.newVar[ S ]( 20000L )
-         scan.add( 20000L, Scan_.Embedded( sc2, v2 ))
-         sc2.add( 0L, Scan_.Mono( 888 ))
-         v2.set( 30000L )
-      }
+//      println( "\n---step2---\n" )
+//
+//      sys.step { implicit tx =>
+//         val sc2 = Scan_.Modifiable[ S ]
+//         val v2 = Longs.newVar[ S ]( 20000L )
+//         scan.add( 20000L, Scan_.Embedded( sc2, v2 ))
+//         sc2.add( 0L, Scan_.Mono( 888 ))
+//         v2.set( 30000L )
+//      }
    }
 
    def run() {
@@ -75,15 +75,18 @@ object ScansTest extends App {
       val t1 = 4 * 44100L
       val t2 = 0L
 
-      group.add( Span.from( t1 ), p1 )
+      val tp1 = group.add( Span.from( t1 ), p1 )
       group.add( Span.from( t2 ), p2 )
 
       val fScan1: Scan[ S ] = Scan_.Modifiable[ S ]
       p1.scans.add( "out", fScan1 )
       val fScan2: Scan[ S ] = Scan_.Modifiable[ S ]
       p2.scans.add( "freq", fScan2 )
-      for( s1 <- p1.scans.get( "out" ); Scan_.Modifiable( s2 ) <- p2.scans.get( "freq" )) {
-         s2.add( 0L, Scan_.Embedded( s1, 0L ))
+//      for( s1 <- p1.scans.get( "out" ); Scan_.Modifiable( s2 ) <- p2.scans.get( "freq" )) {
+//         s2.add( 0L, Scan_.Embedded( s1, 0L ))
+//      }
+      for( Scan_.Modifiable( s2 ) <- p2.scans.get( "freq" )) {
+         s2.add( 0L, Scan_.Embedded( tp1, "out", 0L ))
       }
 
       for( Scan_.Modifiable( s1 ) <- p1.scans.get( "out" )) {
@@ -92,11 +95,11 @@ object ScansTest extends App {
 
       import ugen._
 
-      p1.graph_=( ProcGraph {
+      p1.graph_=( SynthGraph {
          graph.scan( "out" ) := SinOsc.ar( 100 ).linexp( -1, 1, 30, 3000 )
       })
 
-      p2.graph_=( ProcGraph {
+      p2.graph_=( SynthGraph {
          val freq = graph.scan( "freq" ).ar( 333 )
          Out.ar( 0, SinOsc.ar( freq ))
       })

@@ -343,7 +343,7 @@ object BiGroupImpl {
          }
       }
 
-      final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) {
+      final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : TimedElem[ S, Elem, U ] = {
          val spanVal = span.value
          val tgt     = evt.Targets[ S ]   // XXX partial?
          val timed   = new TimedElemImpl[ S, Elem, U ]( group, tgt, span, elem )
@@ -352,6 +352,7 @@ object BiGroupImpl {
             ElementEvent += timed
             CollectionEvent( BiGroup.Added( group, spanVal, timed ))
          }
+         timed
       }
 
       private def addNoFire( spanVal: SpanLike, timed: TimedElemImpl[ S, Elem, U ])( implicit tx: S#Tx ) {

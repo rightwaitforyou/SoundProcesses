@@ -13,6 +13,7 @@ import de.sciss.confluent.Confluent
 import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.expr.{SpanLikes, Longs, ExprImplicits}
+import synth.SynthGraph
 
 object VisTest {
    def apply() : VisTest[ InMemory ] = {
@@ -58,14 +59,14 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
 //   private type PG = ProcGroup.Modifiable[ S ]
    private type PG = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
-   type Acc = (PG, Transport[ S, Proc[ S ]])
+   type Acc = (PG, ProcTransport[ S ])
 
    object Implicits {
 //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
       implicit val procVarSer: Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-      implicit val transportSer: Serializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] = Transport.serializer[ S ]( cursor )
+      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = Transport.serializer[ S ]( cursor )
    }
 
    import Implicits._
@@ -89,14 +90,14 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 //   val groupAccess:     Source[ S#Tx, ProcGroup.Modifiable[ S ]] = Source.map( access )( _._1 )
 //   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
 
-   def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ]    = access.get._1
-   def trans( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]]      = access.get._2
+   def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ] = access.get._1
+   def trans( implicit tx: S#Tx ) : ProcTransport[ S ]         = access.get._2
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)
       val p = Proc[ S ]()
       p.name_=( name )
-      p.graph_=( ProcGraph {
+      p.graph_=( SynthGraph {
          import synth._
          import ugen._
          val f = "freq".kr       // fundamental frequency

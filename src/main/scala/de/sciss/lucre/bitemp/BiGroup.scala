@@ -105,7 +105,7 @@ object BiGroup {
    }
 
    trait Modifiable[ S <: Sys[ S ], Elem, U ] extends BiGroup[ S, Elem, U ] {
-      def add(    span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Unit
+      def add(    span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : TimedElem[ S, Elem, U ]
       def remove( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean
       def clear()( implicit tx: S#Tx ) : Unit
    }

@@ -48,7 +48,7 @@ private[proc] object UGenGraphBuilderImpl {
          }
       }
 
-      def tryBuild() : Boolean = {
+      def tryBuild() : Boolean = UGenGraph.use( this ) {
          var missingElems  = IIdxSeq.empty[ Lazy ]
 //         var missingIns    = Set.empty[ MissingIn[ S ]]
          missingIns = Set.empty
