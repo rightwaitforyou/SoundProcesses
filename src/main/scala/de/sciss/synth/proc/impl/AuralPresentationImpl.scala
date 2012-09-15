@@ -201,18 +201,24 @@ object AuralPresentationImpl {
 */
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
-      private def getNumChannels( timed: TimedProc[ S ], key: String ) : Int = {
-         ???
+      private val ongoingBuild : TxnLocal[ AnyRef ] = ???
+
+      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
+         viewMap.get( timed.id ).flatMap({ aural =>
+            implicit val ptx = ProcTxn()( tx.peer )
+            aural.getBus( key ).map( _.numChannels )
+         }).getOrElse( throw UGenGraphBuilder.MissingIn( timed, key ))
       }
 
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
          timed.value.scans.valueAt( key, time ) match {
             case Some( value ) =>
+               import Scan_.Value._
                value match {
-                  case Scan_.Value.MonoConst( _ ) => 1
-                  case Scan_.Value.MonoSegment( _, _, _, _ ) => 1
-                  case Scan_.Value.Source => getNumChannels( timed, key )
-                  case Scan_.Value.Sink( sourceTimed, sourceKey ) => getNumChannels( sourceTimed, sourceKey )
+                  case MonoConst( _ )                 => 1
+                  case MonoSegment( _, _, _, _ )      => 1
+                  case Source                         => getNumChannels( timed, key )
+                  case Sink( sourceTimed, sourceKey ) => getNumChannels( sourceTimed, sourceKey )
                }
             case _ => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
          }
@@ -289,8 +295,6 @@ object AuralPresentationImpl {
             playProc( timed, aural, time )
          }
       }
-
-      private val ongoingBuild : TxnLocal[ AnyRef ] = ???
 
       private def playProc( timed: TimedProc[ S ], aural: AuralProc, time: Long )( implicit tx: S#Tx ) {
          val ugb = UGenGraphBuilder( this, timed, time )
