@@ -39,8 +39,8 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( server: Server, synth: RichSynth /*, initName: String, initGraph: SynthGraph, entries: Map[ String, Param ] */) : AuralProc = {
-      new Impl( server, synth /*, initName, initGraph, entries */ )
+   def apply( /* server: Server, */ synth: RichSynth /*, initName: String, initGraph: SynthGraph, entries: Map[ String, Param ] */) : AuralProc = {
+      new Impl( /* server, */ synth /*, initName, initGraph, entries */ )
    }
 
    /*
@@ -54,7 +54,7 @@ object AuralProc {
                                        core: Option[ RichGroup ] = None,
                                        post: Option[ RichGroup ] = None, back: Option[ RichGroup ] = None )
 
-   private final class Impl( val server: Server, synth: RichSynth  /*, name0: String, graph0: SynthGraph, entries0: Map[ String, Param ] */)
+   private final class Impl( /* val server: Server, */ synth: RichSynth  /*, name0: String, graph0: SynthGraph, entries0: Map[ String, Param ] */)
    extends AuralProc {
 
       private val groupsRef   = Ref[ Option[ AllGroups ]]( None )
@@ -79,21 +79,23 @@ object AuralProc {
 //         }
 //      }
 
-      private def runningTarget()( implicit tx: ProcTxn ) : (RichNode, AddAction) = {
-         groupsRef.get( tx.peer ) map { all =>
-            all.core map { core =>
-               core -> addToHead
-            } getOrElse { all.pre map { pre =>
-               pre -> addAfter
-            } getOrElse { all.post map { post =>
-               post -> addBefore
-            } getOrElse {
-               all.main -> addToTail
-            }}}
-         } getOrElse {
-            RichGroup.default( server ) -> addToHead
-         }
-      }
+//      private def runningTarget()( implicit tx: ProcTxn ) : (RichNode, AddAction) = {
+//         groupsRef.get( tx.peer ) map { all =>
+//            all.core map { core =>
+//               core -> addToHead
+//            } getOrElse { all.pre map { pre =>
+//               pre -> addAfter
+//            } getOrElse { all.post map { post =>
+//               post -> addBefore
+//            } getOrElse {
+//               all.main -> addToTail
+//            }}}
+//         } getOrElse {
+//            RichGroup.default( server ) -> addToHead
+//         }
+//      }
+
+      def server = synth.server
 
       def groupOption( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupsRef.get( tx.peer ).map( _.main )
 

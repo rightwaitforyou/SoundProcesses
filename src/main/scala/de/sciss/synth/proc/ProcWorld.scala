@@ -230,6 +230,10 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //   }}
 
    def getSynthDef( server: Server, graph: SynthGraph )( implicit tx: ProcTxn ) : RichSynthDef = {
+      getSynthDef( server, graph.expand )
+   }
+
+   def getSynthDef( server: Server, graph: UGenGraph )( implicit tx: ProcTxn ) : RichSynthDef = {
       implicit val itx = tx.peer
       val w = worlds.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
 
@@ -237,12 +241,12 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       // includeParam for ProcAudioOutput ... And anyways, we might allow for
       // indeterminate GE.Lazies, thus we need to check for UGenGraph equality,
       // not SynthGraph equality
-      val u = graph.expand
+//      val u = graph.expand
 
-      w.ugenGraphs.get.get( u ).getOrElse {
+      w.ugenGraphs.get.get( graph ).getOrElse {
          val name = "proc" + nextDefID()
-         val rd   = RichSynthDef( server, SynthDef( name, u ))
-         w.ugenGraphs.transform( _ + (u -> rd) )
+         val rd   = RichSynthDef( server, SynthDef( name, graph ))
+         w.ugenGraphs.transform( _ + (graph -> rd) )
          rd
       }
    }

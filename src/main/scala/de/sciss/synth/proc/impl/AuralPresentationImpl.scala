@@ -207,6 +207,8 @@ object AuralPresentationImpl {
 //         val ug = ugen.finish
 //         AuralProc()
 //      }
+
+      def id: S#ID = ugen.timed.id
    }
 
    private final case class OngoingBuild[ S <: Sys[ S ]]( missing: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
@@ -232,8 +234,13 @@ object AuralPresentationImpl {
             val ugen          = builder.ugen
             val ug            = ugen.finish
             implicit val tx   = ugen.tx
-
-
+            implicit val itx  = tx.peer
+            implicit val ptx  = ProcTxn()
+            val df            = ProcDemiurg.getSynthDef( server, ug ) // RichSynthDef()
+//            val rdf           = RichSynthDef( server, df )
+            val synth         = df.play( target = RichGroup.default( server ), addAction = addToHead )
+            val aural         = AuralProc( synth )
+            viewMap.put( builder.id, aural )
          }
       }
 
