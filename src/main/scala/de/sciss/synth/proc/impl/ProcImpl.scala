@@ -34,7 +34,6 @@ import bitemp.{BiType, Chronos, BiPin}
 import expr.Expr
 import data.SkipList
 import ExprImplicits._
-import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import annotation.{tailrec, switch}
 
@@ -157,9 +156,9 @@ object ProcImpl {
          }
 
          def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] =
-            flatValueAt( proc, key, time )
+            flatValueAt( None, key, time )
 
-         @tailrec private def flatValueAt( proc: Proc[ S ], key: String, time: Long )
+         @tailrec private def flatValueAt( sourceOption: Option[ TimedProc[ S ]], key: String, time: Long )
                                          ( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
             scanMap.get( key ) match {
                case Some( entry ) =>
@@ -175,23 +174,28 @@ object ProcImpl {
                                     if( ceilShape == stepShape ) {
                                        Some( Scan_.Value.MonoConst( ceilValue ))
                                     } else {
-                                       val start: Float = ???
-                                       val dur:   Float = ???
+                                       val ceilDur = ceilTime - floorTime
+                                       val dur     = ceilTime - time
+                                       val w       = 1.0 - (ceilDur.toDouble / dur)
+                                       val start   = ceilShape.levelAt( w.toFloat, floorValue, ceilValue )
                                        Some( Scan_.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
                                     }
                                  case _ => Some( Scan_.Value.MonoConst( floorValue ))
                               }
 
-                           case Scan_.Synthesis() => Some( Scan_.Value.Source )
+                           case Scan_.Synthesis() =>
+                              sourceOption match {
+                                 case Some( source )  => Some( Scan_.Value.Sink( source, key ))
+                                 case _               => Some( Scan_.Value.Source )
+                              }
                            case Scan_.Embedded( sourceTimed, sourceKey, offsetEx ) =>
                               val offset = offsetEx.value
-                              flatValueAt( sourceTimed.value, sourceKey, time + offset )
+                              flatValueAt( Some( sourceTimed ), sourceKey, time + offset )  // tail-rec
                         }
 
-                     case None => None
+                     case _ => None
                   }
-
-               case None => None
+               case _ => None
             }
          }
       }

@@ -107,7 +107,8 @@ object AuralPresentationImpl {
 //      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
 //   }
 
-   private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment, val bus: RichAudioBus, aural: AuralProc )
+/*
+   private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment, val bus: RichAudioBus, aural: AuralProc, sampleRate: Double )
    extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
       private val synthRef: Ref[ Option[ RichSynth ]] = ???
 
@@ -155,7 +156,8 @@ object AuralPresentationImpl {
 
          val g          = graph
          val rsd        = RichSynthDef( aural.server, g )
-         val ctl0: Ctl  = List( "$start" -> seg.start, "$stop" -> seg.stop, "$dur" -> seg.dur )
+         val durSecs    = seg.dur * sampleRate
+         val ctl0: Ctl  = List( "$start" -> seg.start, "$stop" -> seg.stop, "$dur" -> durSecs )
          val shp        = seg.shape
          val ctl1: Ctl  = if( shp != linShape && shp != expShape ) ("$shape" -> seg.shape.id) :: ctl0 else ctl0
          val ctl: Ctl   = if( shp.curvature != 0f ) ("$curve" -> shp.curvature) :: ctl1 else ctl1
@@ -196,14 +198,27 @@ object AuralPresentationImpl {
          ???
       }
    }
-
+*/
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
-      def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
-         val aural = viewMap.getOrElse( timed.id, sys.error( "Missing aural view of process " + timed.value ))
-         val source: TimedProc[ S ] = ???
-         throw UGenGraphBuilder.MissingIn( source, key )
+      private def getNumChannels( timed: TimedProc[ S ], key: String ) : Int = {
          ???
+      }
+
+      def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
+         timed.value.scans.valueAt( key, time ) match {
+            case Some( value ) =>
+               value match {
+                  case Scan_.Value.MonoConst( _ ) => 1
+                  case Scan_.Value.MonoSegment( _, _, _, _ ) => 1
+                  case Scan_.Value.Source => getNumChannels( timed, key )
+                  case Scan_.Value.Sink( sourceTimed, sourceKey ) => getNumChannels( sourceTimed, sourceKey )
+               }
+            case _ => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
+         }
+
+//         val aural = viewMap.getOrElse( timed.id, sys.error( "Missing aural view of process " + timed.value ))
+//         throw UGenGraphBuilder.MissingIn( source, key )
       }
 
 //      def addScanIn( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {

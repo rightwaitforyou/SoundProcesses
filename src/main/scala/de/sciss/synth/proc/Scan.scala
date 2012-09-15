@@ -45,17 +45,44 @@ object Scan_ {
    }
 
    object Value {
+
+      /**
+       * A monophonic constant value
+       */
       final case class MonoConst( value: Float /*, stop: Long */)
       extends Value[ Nothing ] // { def numChannels = 1 }
 
-      final case class MonoSegment( start: Float, stop: Float, dur: Float, shape: Env.ConstShape )
+      /**
+       * A monophonic envelope segment
+       *
+       * @param start   value at start of segment
+       * @param stop    target value of segment
+       * @param dur     duration of segment in frames
+       * @param shape   shape of segment
+       */
+      final case class MonoSegment( start: Float, stop: Float, dur: Long, shape: Env.ConstShape )
       extends Value[ Nothing ] // { def numChannels = 1 }
 
+      /**
+       * A real-time signal produced by another process
+       *
+       * @param timed   the source process of the signal
+       * @param key     the scan key in the source process
+       */
       final case class Sink[ S <: Sys[ S ]]( timed: TimedProc[ S ], key: String )
       extends Value[ S ]
 
+      /**
+       * The real-time signal produced (output) by this process
+       */
       case object Source extends Value[ Nothing ]
    }
+
+   /**
+    * An evaluated and flattened scan element. This is either an immutable value such as a constant or
+    * envelope segment, or a real-time signal, coming either from the same process (`Source`) or being
+    * fed by another embedded process (`Sink`).
+    */
    sealed trait Value[ +S ] {
 //      def stop: Long
 //      def numChannels: Int
