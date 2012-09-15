@@ -102,8 +102,9 @@ object AuralPresentationImpl {
    }
 
    sealed trait Running[ S <: Sys[ S ]] {
-      def addScanIn(  proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int
-      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
+//      def addScanIn(  proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int
+//      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
+      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
    }
 
    private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment[ _ ], val bus: RichAudioBus, aural: AuralProc )
@@ -198,37 +199,41 @@ object AuralPresentationImpl {
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends Running[ S ] {
-      def addScanIn( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
-         proc.scans.valueAt( key, time ) match {
-            case Some( value ) =>
-               value match {
-                  case Scan_.Value.MonoConst( _ ) => 1
-                  case seg @ Scan_.Value.MonoSegment( _, _, _, _ ) =>
-                     val aural = viewMap.getOrElse( proc.id, sys.error( "Missing aural view of process " + proc ))
-                     implicit val procTxn = ProcTxn()( tx.peer )
-                     val bus = aural.getBus( key ).getOrElse {
-                        val _bus = RichBus.audio( server, 1 )
-                        aural.setBus( key, Some( _bus ))
-                        _bus
-                     }
-                     val user: RichAudioBus.User = ???
-                     bus.addReader( user )
-                     1
-
-                  case Scan_.Value.Synthesis( sourceProc ) =>
-                     val sourceAural = viewMap.getOrElse( sourceProc.id, sys.error( "Missing aural view of process " + sourceProc ))
-
-                     ???
-               }
-            case _ => -1   // special result: no value found, use default
-         }
-//         throw new MissingInfo
-      }
-
-      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) {
-
+      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
          ???
       }
+
+//      def addScanIn( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
+//         proc.scans.valueAt( key, time ) match {
+//            case Some( value ) =>
+//               value match {
+//                  case Scan_.Value.MonoConst( _ ) => 1
+//                  case seg @ Scan_.Value.MonoSegment( _, _, _, _ ) =>
+//                     val aural = viewMap.getOrElse( proc.id, sys.error( "Missing aural view of process " + proc ))
+//                     implicit val procTxn = ProcTxn()( tx.peer )
+//                     val bus = aural.getBus( key ).getOrElse {
+//                        val _bus = RichBus.audio( server, 1 )
+//                        aural.setBus( key, Some( _bus ))
+//                        _bus
+//                     }
+//                     val user: RichAudioBus.User = ???
+//                     bus.addReader( user )
+//                     1
+//
+//                  case Scan_.Value.Synthesis( sourceProc ) =>
+//                     val sourceAural = viewMap.getOrElse( sourceProc.id, sys.error( "Missing aural view of process " + sourceProc ))
+//
+//                     ???
+//               }
+//            case _ => -1   // special result: no value found, use default
+//         }
+////         throw new MissingInfo
+//      }
+
+//      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) {
+//
+//         ???
+//      }
 
       def dispose()( implicit tx: S#Tx ) {
          viewMap.dispose()

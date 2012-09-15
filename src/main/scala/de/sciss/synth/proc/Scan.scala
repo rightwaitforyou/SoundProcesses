@@ -44,11 +44,18 @@ object Scan_ {
    }
 
    object Value {
-      final case class MonoConst[ S <: Sys[ S ]]( value: Float /*, stop: Long */) extends Value[ S ]
-      final case class MonoSegment[ S <: Sys[ S ]]( start: Float, stop: Float, dur: Float, shape: Env.ConstShape ) extends Value[ S ]
-      final case class Synthesis[ S <: Sys[ S ]]( proc: Proc[ S ] /*, stop: Long, direction: ProcGraph.Direction */) extends Value[ S ]
+      final case class MonoConst[ S <: Sys[ S ]]( value: Float /*, stop: Long */)
+      extends Value[ S ] { def numChannels = 1 }
+
+      final case class MonoSegment[ S <: Sys[ S ]]( start: Float, stop: Float, dur: Float, shape: Env.ConstShape )
+      extends Value[ S ] { def numChannels = 1 }
+
+      final case class Synthesis[ S <: Sys[ S ]]( proc: Proc[ S ], numChannels: Int ) extends Value[ S ]
    }
-   sealed trait Value[ S <: Sys[ S ]] // { def stop: Long }
+   sealed trait Value[ S <: Sys[ S ]] {
+//      def stop: Long
+      def numChannels: Int
+   }
 
    object Elem {
       // Note: we do not need to carry along `elem` because the outer collection

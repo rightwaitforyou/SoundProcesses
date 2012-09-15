@@ -157,33 +157,33 @@ object ProcImpl {
          }
 
          def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
-            scanMap.get( key ).flatMap { entry =>
-               val scan = entry.value
-               scan.floor( time ) match {
-                  case Some( (floorTime, floorElem) ) =>
-                     floorElem match {
-                        case Scan_.Synthesis() => Some( Scan_.Value.Synthesis( proc ))
-                        case Scan_.Mono( floorValueEx, _ ) =>
-                           val floorValue = floorValueEx.value.toFloat
-                           scan.ceil( time ) match {
-                              case Some( (ceilTime, Scan_.Mono( ceilValueEx, ceilShape )) ) =>
-                                 val ceilValue = ceilValueEx.value.toFloat
-                                 if( ceilShape == stepShape ) {
-                                    Some( Scan_.Value.MonoConst( ceilValue ))
-                                 } else {
-                                    val start: Float = sys.error( "TODO" )
-                                    val dur:   Float = sys.error( "TODO" )
-                                    Some( Scan_.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
-                                 }
-                              case _ => Some( Scan_.Value.MonoConst( floorValue ))
-                           }
-                     }
+//            scanMap.get( key ).flatMap { entry =>
+//               val scan = entry.value
+//               scan.floor( time ) match {
+//                  case Some( (floorTime, floorElem) ) =>
+//                     floorElem match {
+//                        case Scan_.Synthesis() => Some( Scan_.Value.Synthesis( proc ))
+//                        case Scan_.Mono( floorValueEx, _ ) =>
+//                           val floorValue = floorValueEx.value.toFloat
+//                           scan.ceil( time ) match {
+//                              case Some( (ceilTime, Scan_.Mono( ceilValueEx, ceilShape )) ) =>
+//                                 val ceilValue = ceilValueEx.value.toFloat
+//                                 if( ceilShape == stepShape ) {
+//                                    Some( Scan_.Value.MonoConst( ceilValue ))
+//                                 } else {
+//                                    val start: Float = ???
+//                                    val dur:   Float = ???
+//                                    Some( Scan_.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
+//                                 }
+//                              case _ => Some( Scan_.Value.MonoConst( floorValue ))
+//                           }
+//                     }
+//
+//                  case None => None
+//               }
+//            }
 
-                  case None => None
-               }
-            }
-
-            sys.error( "TODO" )
+            ???
          }
       }
 

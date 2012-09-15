@@ -8,7 +8,7 @@ import util.control.ControlThrowable
 import concurrent.stm.{InTxn, Txn}
 import de.sciss.lucre.stm.Sys
 
-private[proc] class MissingInfo extends ControlThrowable
+private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 
 private[proc] object UGenGraphBuilderImpl {
    def apply[ S <: Sys[ S ]]( aural: AuralPresentationImpl.Running[ S ], proc: Proc[ S ], time: Long )( implicit tx: S#Tx ) : UGenGraphBuilder =
@@ -25,38 +25,61 @@ private[proc] object UGenGraphBuilderImpl {
 
       private var remaining: IIdxSeq[ Lazy ]                   = g.sources
       private var controlProxies: ISet[ ControlProxyLike[ _ ]] = g.controlProxies
+      private var scanOuts                                     = Map.empty[ String, Int ]
+      private var scanIns                                      = Set.empty[ String ] // , Scan_.Value[ S ]]
+//      private var missingScanIns                               = Set.empty[ String ]
 
 //      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
 
       def addScanIn( key: String ) : Int = {
-         aural.addScanIn( proc, time, key )( tx )
+         aural.scanInValue( proc, time, key )( tx ) match {
+            case Some( value ) =>
+               scanIns += key // -> value
+               value.numChannels
+            case _ =>
+//               missingScanIns += key
+               throw MissingInfo( key )
+         }
       }
 
       def addScanOut( key: String, numChannels: Int ) {
-         aural.addScanOut( proc, time, key, numChannels )( tx )
+//         aural.addScanOut( proc, time, key, numChannels )( tx )
+         scanOuts.get( key ) match {
+            case Some( prevChans ) =>
+               require( numChannels == prevChans, "Cannot write multiple times to the same scan (" + key +
+                  ") using different number of channels (" + prevChans + ", " + numChannels + ")" )
+            case _ =>
+               scanOuts += key -> numChannels
+         }
       }
 
       def tryBuild() : BuildResult = {
-         var missing       = IIdxSeq.empty[ Lazy ]
+         var missingElems  = IIdxSeq.empty[ Lazy ]
+         var missingKeys   = Set.empty[ String ]
          var someSucceeded = false
          while( remaining.nonEmpty ) {
             val g = SynthGraph {
                remaining.foreach { elem =>
-                  // save rollback information -- not very elegant :-(
+                  // save rollback information -- not very elegant; should figure out how scala-stm nesting works
                   val savedSourceMap      = sourceMap
                   val savedControlNames   = controlNames
                   val savedControlValues  = controlValues
                   val savedUGens          = ugens
+                  val savedScanOuts       = scanOuts
+                  val savedScanIns        = scanIns
                   try {
                      elem.force( builder )
                      someSucceeded        = true
                   } catch {
-                     case e: MissingInfo =>
+                     case MissingInfo( key ) =>
                         sourceMap         = savedSourceMap
                         controlNames      = savedControlNames
                         controlValues     = savedControlValues
                         ugens             = savedUGens
-                        missing         :+= elem
+                        scanOuts          = savedScanOuts
+                        scanIns           = savedScanIns
+                        missingElems     :+= elem
+                        missingKeys       += key
                   }
                }
             }
@@ -68,11 +91,11 @@ private[proc] object UGenGraphBuilderImpl {
             }
          }
 
-         if( missing.isEmpty ) {
-            Finished( build( controlProxies ))
+         if( missingElems.isEmpty ) {
+            Finished( build( controlProxies ), scanIns, scanOuts )
          } else {
-            remaining = missing
-            if( someSucceeded ) Advanced else Halted
+            remaining = missingElems
+            Partial( missingKeys, advanced = someSucceeded )
          }
       }
    }
