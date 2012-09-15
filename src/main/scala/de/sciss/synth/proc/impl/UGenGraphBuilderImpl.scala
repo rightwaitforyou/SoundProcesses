@@ -14,7 +14,7 @@ private[proc] object UGenGraphBuilderImpl {
       new Impl( aural, timed, time, timed.value.graph.value, tx )
 
    private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ],
-                                             val timed: TimedProc[ S ], time: Long, g: SynthGraph, tx: S#Tx )
+                                             val timed: TimedProc[ S ], time: Long, g: SynthGraph, val tx: S#Tx )
    extends BasicUGenGraphBuilder with UGenGraphBuilder[ S ] {
       builder =>
 

@@ -32,7 +32,7 @@ import stm.{IdentifierMap, Sys, Cursor}
 import bitemp.Chronos
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{TxnLocal, Ref, Txn}
+import concurrent.stm.{InTxn, TxnLocal, Ref, Txn}
 import SoundProcesses.logConfig
 import UGenGraphBuilder.MissingIn
 
@@ -203,18 +203,22 @@ object AuralPresentationImpl {
 */
    private final class AuralProcBuilder[ S <: Sys[ S ]]( val ugen: UGenGraphBuilder[ S ],
                                                          var outBuses: Map[ String, RichAudioBus ]) {
-      def finish( ug: UGenGraph ) : AuralProc = ???
+//      def finish : AuralProc = {
+//         val ug = ugen.finish
+//         AuralProc()
+//      }
    }
 
    private final case class OngoingBuild[ S <: Sys[ S ]]( missing: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
                                                             Map.empty[  MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
                                                           incomplete: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
-                                                            None )
+                                                            None,
+                                                          complete: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
       private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
-         TxnLocal( init = OngoingBuild() ) //  Map.empty[ MissingIn[ S ], UGenGraphBuilder[ S ]]))
+         TxnLocal( init = OngoingBuild(), beforeCommit = beforeCommit ) //  Map.empty[ MissingIn[ S ], UGenGraphBuilder[ S ]]))
 
 //      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
 //         viewMap.get( timed.id ).flatMap({ aural =>
@@ -222,6 +226,16 @@ object AuralPresentationImpl {
 //            aural.getBus( key ).map( _.numChannels )
 //         }).getOrElse( throw MissingIn( timed, key ))
 //      }
+
+      private def beforeCommit( itx: InTxn ) {
+         ongoingBuild.get( itx ).complete.foreach { builder =>
+            val ugen          = builder.ugen
+            val ug            = ugen.finish
+            implicit val tx   = ugen.tx
+
+
+         }
+      }
 
       private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
          val busOpt = viewMap.get( timed.id ) match {
@@ -278,12 +292,11 @@ object AuralPresentationImpl {
 
       private def buildAuralProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
          val ugb = UGenGraphBuilder( this, timed, time )
-         ugb.tryBuild()
-         afterIncr( new AuralProcBuilder( ugb, Map.empty ))
+         incrementalBuild( new AuralProcBuilder( ugb, Map.empty ))
       }
 
       // note: builder.outBuses will be updated by this method
-      private def afterIncr( builder: AuralProcBuilder[ S ])( implicit tx: S#Tx ) {
+      private def incrementalBuild( builder: AuralProcBuilder[ S ])( implicit tx: S#Tx ) {
          // simpler algorithm (does not allow for circular relationships):
          // - just store with the missing keys, and wait for other finished ugs to show up within the txn
 
@@ -295,23 +308,31 @@ object AuralPresentationImpl {
          // - if found, continue building
 
          val ugen       = builder.ugen
+         ugen.tryBuild()
 
          // detect which new scan outputs have been determined in the last iteration
          val newOuts    = builder.ugen.scanOuts.filterNot { case (key, _) => builder.outBuses.contains( key )}
-         // if there were any, create rich audio buses for them, and store them in the builder's bus map
+         // if there were any, create rich audio buses for them, and store them in the builder's bus map.
+         //    note that these buses initially do not have any real resources allocated, so it's safe to
+         //    forget about them and have them gc'ed if the process does not complete by the end of the txn.
          if( newOuts.nonEmpty ) {
             val newBuses = newOuts.mapValues( numCh => RichBus.audio( server, numCh ))
             builder.outBuses ++= newBuses
          }
 
          implicit val itx     = tx.peer
-         val ongoing          = ongoingBuild()
+         val oldOngoing       = ongoingBuild()
+         // if the ugen build completed, add it to the complete set
+         val newOngoing0 = if( ugen.isComplete ) {
+            oldOngoing.copy( complete = oldOngoing.complete :+ builder )
+         } else oldOngoing
+
          // initialise the id-to-builder map if necessary
-         val (newOngoing1, builderMap) = ongoing.incomplete match {
-            case Some( m ) => ongoing -> m
+         val (newOngoing1, builderMap) = newOngoing0.incomplete match {
+            case Some( m ) => newOngoing0 -> m
             case _ =>
                val m = tx.newInMemoryIDMap[ AuralProcBuilder[ S ]]
-               ongoing.copy( incomplete = Some( m )) -> m
+               newOngoing0.copy( incomplete = Some( m )) -> m
          }
          // add the (possibly new) builder to it. redundant overwrites do not cause problems
          builderMap.put( ugen.timed.id, builder )
@@ -347,10 +368,7 @@ object AuralPresentationImpl {
          ongoingBuild.set( newOngoing3 )
 
          // advance the ugen graph builder for all processes which have been selected for retry
-         retry.foreach { retBuilder =>
-            retBuilder.ugen.tryBuild()
-            afterIncr( retBuilder ) // deal with the updated build process recursively
-         }
+         retry.foreach( incrementalBuild )
       }
 
       def procRemoved( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
@@ -359,10 +377,10 @@ object AuralPresentationImpl {
             case Some( aural ) =>
                viewMap.remove( id )
                implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural removed " + timed.value + " -- playing? " + aural.playing )
-               if( aural.playing ) {
+               logConfig( "aural removed " + timed.value ) // + " -- playing? " + aural.playing )
+//               if( aural.playing ) {
                   aural.stop()
-               }
+//               }
             case _ =>
                println( "WARNING: could not find view for proc " + timed.value )
          }
@@ -379,37 +397,37 @@ object AuralPresentationImpl {
 //         }
 //      }
 
-      def procPlayingChanged( timed: TimedProc[ S ], newPlaying: Boolean )( implicit tx: S#Tx ) {
-         viewMap.get( timed.id ) match {
-            case Some( aural ) =>
-               implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural playing " + timed.value + " -- " + newPlaying )
-               aural.playing_=( newPlaying )
-            case _ =>
-               println( "WARNING: could not find view for proc " + timed.value )
-         }
-      }
+//      def procPlayingChanged( timed: TimedProc[ S ], newPlaying: Boolean )( implicit tx: S#Tx ) {
+//         viewMap.get( timed.id ) match {
+//            case Some( aural ) =>
+//               implicit val ptx = ProcTxn()( tx.peer )
+//               logConfig( "aural playing " + timed.value + " -- " + newPlaying )
+//               aural.playing_=( newPlaying )
+//            case _ =>
+//               println( "WARNING: could not find view for proc " + timed.value )
+//         }
+//      }
 
-      def procGraphChanged( timed: TimedProc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ) {
-         viewMap.get( timed.id ) match {
-            case Some( aural ) =>
-               implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural graph changed " + timed.value )
-               aural.graph_=( newGraph )
-            case _ =>
-               println( "WARNING: could not find view for proc " + timed.value )
-         }
-      }
+//      def procGraphChanged( timed: TimedProc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ) {
+//         viewMap.get( timed.id ) match {
+//            case Some( aural ) =>
+//               implicit val ptx = ProcTxn()( tx.peer )
+//               logConfig( "aural graph changed " + timed.value )
+//               aural.graph_=( newGraph )
+//            case _ =>
+//               println( "WARNING: could not find view for proc " + timed.value )
+//         }
+//      }
 
       def procParamsChanged( timed: TimedProc[ S ], changes: Map[ String, Param ])( implicit tx: S#Tx ) {
-         viewMap.get( timed.id ) match {
-            case Some( aural ) =>
-               implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural freq changed " + timed.value )
-               aural.addParams( changes )
-            case _ =>
-               println( "WARNING: could not find view for proc " + timed.value )
-         }
+//         viewMap.get( timed.id ) match {
+//            case Some( aural ) =>
+//               implicit val ptx = ProcTxn()( tx.peer )
+//               logConfig( "aural freq changed " + timed.value )
+//               aural.addParams( changes )
+//            case _ =>
+//               println( "WARNING: could not find view for proc " + timed.value )
+//         }
       }
    }
 }
