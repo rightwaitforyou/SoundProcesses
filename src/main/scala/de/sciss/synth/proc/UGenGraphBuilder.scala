@@ -27,10 +27,26 @@ private[proc] object UGenGraphBuilder {
       Impl( aural, timed, time )
 }
 private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
+   /**
+    * This method should only be invoked by the `graph.scan.Elem` instances. It requests a scan input, and
+    * the method returns the corresponding number of channels, or throws a `MissingIn` exception which
+    * is then caught by the main builder body.
+    */
    def addScanIn( key: String ) : Int
+
+   /**
+    * This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along
+    * with the number of channels written to it.
+    */
    def addScanOut( key: String, numChannels: Int ) : Unit
 
+   /**
+    * Current set of used inputs. This is guaranteed to only grow during incremental building, never shrink.
+    */
    def scanIns : Set[ String ]
+   /**
+    * Current set of used outputs. This is guaranteed to only grow during incremental building, never shrink.
+    */
    def scanOuts : Map[ String, Int ]
 
    /**

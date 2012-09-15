@@ -30,9 +30,11 @@ package impl
 import de.sciss.lucre.{stm, bitemp}
 import stm.{IdentifierMap, Sys, Cursor}
 import bitemp.Chronos
+import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import SoundProcesses.logConfig
 import concurrent.stm.{TxnLocal, Ref, Txn}
+import SoundProcesses.logConfig
+import UGenGraphBuilder.MissingIn
 
 object AuralPresentationImpl {
    def run[ S <: Sys[ S ]]( transport: ProcTransport[ S ], aural: AuralSystem )
@@ -199,15 +201,40 @@ object AuralPresentationImpl {
       }
    }
 */
+   private final case class AuralProcBuilder[ S <: Sys[ S ]]( builder: UGenGraphBuilder[ S ],
+                                                              outBuses: Map[ String, RichAudioBus ]) {
+      def finish( ug: UGenGraph ) : AuralProc = ???
+   }
+
+   private final case class OngoingBuild[ S <: Sys[ S ]]( missing: Map[ MissingIn[ S ], AuralProcBuilder[ S ]] =
+                                                            Map.empty[  MissingIn[ S ], AuralProcBuilder[ S ]],
+                                                          incomplete: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
+                                                            None )
+
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
-      private val ongoingBuild : TxnLocal[ AnyRef ] = ???
+      private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
+         TxnLocal( init = OngoingBuild() ) //  Map.empty[ MissingIn[ S ], UGenGraphBuilder[ S ]]))
+
+//      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
+//         viewMap.get( timed.id ).flatMap({ aural =>
+//            implicit val ptx = ProcTxn()( tx.peer )
+//            aural.getBus( key ).map( _.numChannels )
+//         }).getOrElse( throw MissingIn( timed, key ))
+//      }
 
       private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
-         viewMap.get( timed.id ).flatMap({ aural =>
-            implicit val ptx = ProcTxn()( tx.peer )
-            aural.getBus( key ).map( _.numChannels )
-         }).getOrElse( throw UGenGraphBuilder.MissingIn( timed, key ))
+         val busOpt = viewMap.get( timed.id ) match {
+            case Some( aural ) =>
+               implicit val ptx = ProcTxn()( tx.peer )
+               aural.getBus( key )
+            case _ =>
+               ongoingBuild.get( tx.peer ).incomplete.flatMap { map =>
+                  map.get( timed.id ).flatMap( _.outBuses.get( key ))
+               }
+         }
+
+         busOpt.map( _.numChannels ).getOrElse( throw MissingIn( timed, key ))
       }
 
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
@@ -238,49 +265,52 @@ object AuralPresentationImpl {
          if( !playing ) return
 
          val time    = chr.time
-         val graph   = p.graph.value
-//         val scanMap = pg.scans
-//         if( scanMap.nonEmpty ) {
-//            val scans   = p.scans
-//            scanMap.map { case (key, dir) =>
-//               scans.get( key ).map { scan =>
-//                  scan.intersect( time ).headOption.map { case (startEx, elem) =>
-//                     elem match {
-//                        case Scan_.Mono( levelExpr, shape ) =>
-//                          val level = levelExpr.value
-//                     }
-//                  }
-//               }
-//            }
-//         }
-
-         val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
-         val aural   = AuralProc( server, /* name, */ graph, entries )
-         viewMap.put( timed.id, aural )
+//         val graph   = p.graph.value
+//
+//         val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
+//         val aural   = AuralProc( server, /* name, */ graph, entries )
+//         viewMap.put( timed.id, aural )
          logConfig( "aural added " + p ) // + " -- playing? " + playing )
 //         if( playing ) {
-            playProc( timed, aural, time )
+            playProc( timed, time )
 //         }
       }
 
-      private def playProc( timed: TimedProc[ S ], aural: AuralProc, time: Long )( implicit tx: S#Tx ) {
+      private def playProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
          val ugb = UGenGraphBuilder( this, timed, time )
          ugb.tryBuild() match {
             case UGenGraphBuilder.Finished( ug ) =>
                ???
 
-            case UGenGraphBuilder.Partial( missingScanIns, advanced ) =>
+            case UGenGraphBuilder.Partial( incrMissing, advanced ) =>
+               // simpler algorithm (does not allow for circular relationships):
+               // - just store with the missing keys, and wait for other finished ugs to show up within the txn
+
+               // more inquisitive algorithm:
                // - register scanIns
                // - register scanOuts
                // - register missingScanIns
                // - look up (one, arbitrary) missingScanIn for any of the scanOuts
                // - if found, continue building
 
+               implicit val itx     = tx.peer
+               val ongoing          = ongoingBuild()
+               val oldMiss          = ongoing.missing
+               val (retryE, keep)   = oldMiss.partition { case (miss, _) => incrMissing.contains( miss )}
+               val retry: Set[ UGenGraphBuilder[ S ]] = retryE.map( _._2 )( breakOut )
+
+               val newMiss    = keep ++ incrMissing.map( _ -> ugb )
+               val newOngoing = ongoing.copy( missing = newMiss )
+
+               retry.foreach { ugbRet =>
+
+               }
+
                ???
          }
 
-         implicit val ptx = ProcTxn()( tx.peer )
-         aural.play()
+//         implicit val ptx = ProcTxn()( tx.peer )
+//         aural.play()
 //            actions.transform( _.addPlay( p ))
       }
 
