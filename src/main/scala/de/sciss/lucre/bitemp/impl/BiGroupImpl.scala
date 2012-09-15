@@ -159,6 +159,22 @@ object BiGroupImpl {
 //      spanType: Type[ SpanLike ]) : evt.NodeSerializer[ S, TimedElemImpl[ S, Elem, U ]] = new TimedSer
 //
 
+
+//   def readTimedElem[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc )
+//                                              ( implicit tx: S#Tx,
+//                                                elemSerializer: Serializer[ S#Tx, S#Acc, Elem ],
+//                                                spanType: Type[ SpanLike ]) : TimedElem[ S, Elem, U ] =
+//      readTimedElemImpl( in, access )
+//
+//   private def readTimedElemImpl[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc )
+//                                                          ( implicit tx: S#Tx,
+//                                                            elemSerializer: Serializer[ S#Tx, S#Acc, Elem ],
+//                                                            spanType: Type[ SpanLike ]) : TimedElemImpl[ S, Elem, U ] = {
+//      val span    = spanType.readExpr( in, access )
+//      val value   = elemSerializer.read( in, access )
+//      new TimedElemImpl( group, targets, span, value )
+//   }
+
    private abstract class Impl[ S <: Sys[ S ], Elem, U ](
       protected val targets: evt.Targets[ S ], val eventView: Elem => EventLike[ S, U, Elem ])(
       implicit val elemSerializer: Serializer[ S#Tx, S#Acc, Elem ],
@@ -185,6 +201,7 @@ object BiGroupImpl {
 
       implicit object TimedSer extends evt.NodeSerializer[ S, TimedElemImpl[ S, Elem, U ]] {
          def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : TimedElemImpl[ S, Elem, U ] = {
+//            readTimedElemImpl( in, access )
             val span    = spanType.readExpr( in, access )
             val value   = elemSerializer.read( in, access )
             new TimedElemImpl( group, targets, span, value )

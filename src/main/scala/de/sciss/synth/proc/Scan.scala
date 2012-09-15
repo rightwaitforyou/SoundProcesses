@@ -29,7 +29,7 @@ import de.sciss.lucre.stm.{Serializer, Sys}
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.{cubShape, sqrShape, welchShape, sinShape, expShape, linShape, stepShape, curveShape, Env}
 import de.sciss.lucre.bitemp.{BiGroup, BiPin}
-import de.sciss.synth.expr.{Longs, Doubles}
+import de.sciss.synth.expr.{SpanLikes, Spans, Longs, Doubles}
 import de.sciss.lucre.{Writable, DataOutput, DataInput, event => evt}
 import evt.{EventLikeSerializer, Event, EventLike}
 import annotation.switch
@@ -143,7 +143,13 @@ object Scan_ {
 
                case Embedded.cookie =>
 //                  val ref           = Scan_.read( in, access )
-                  val ref           = BiGroup.TimedElem.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access )
+
+//                  val ref           = BiGroup.TimedElem.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access )
+                  val refID         = tx.readID( in, access )
+                  val refSpan       = SpanLikes.readExpr( in, access )
+                  val refVal        = Proc.read( in, access )
+                  val ref           = BiGroup.TimedElem[ S, Proc[ S ], Proc.Update[ S ]]( refID, refSpan, refVal )
+
                   val key           = in.readString()
                   val offset        = Longs.readExpr( in, access )
                   new Embedded.Impl( targets, ref, key, offset )
@@ -268,28 +274,30 @@ object Scan_ {
          def reader: evt.Reader[ S, Elem[ S ]] = Elem.serializer[ S ]
 
          def connect()( implicit tx: S#Tx ) {
-            evt.Intruder.--->( ref.changed, this )
+//            evt.Intruder.--->( ref.changed, this )
             evt.Intruder.--->( offset.changed, this )
          }
 
          def disconnect()( implicit tx: S#Tx ) {
-            evt.Intruder.-/->( ref.changed, this )
+//            evt.Intruder.-/->( ref.changed, this )
             evt.Intruder.-/->( offset.changed, this )
          }
 
          protected def disposeData()( implicit tx: S#Tx ) {}
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
-            val refEvt  = ref.changed
-            val refUpd  = if( evt.Intruder.isSource( refEvt, pull )) evt.Intruder.pullUpdate( refEvt, pull ) else None
-            val offEvtL = offset.changed
-            val offUpd  = if( offEvtL.isInstanceOf[ evt.NodeSelector[ _, _ ]]) {   // XXX TODO ugly
-               val offEvt = offEvtL.asInstanceOf[ Event[ S, evt.Change[ Long ], Expr[ S, Long ]]]
-               if( evt.Intruder.isSource( offEvt, pull )) evt.Intruder.pullUpdate( offEvt, pull ) else None
-            } else None
-            val offVal  = offUpd.map( _.now ).getOrElse( offset.value )
-
-            Some( Elem.EmbeddedChanged( /* this, */ refUpd.getOrElse( IIdxSeq.empty ), offVal ))
+println( "WARNING: Span.Embedded pullUpdate not yet implemented" )
+None
+//            val refEvt  = ref.changed
+//            val refUpd  = if( evt.Intruder.isSource( refEvt, pull )) evt.Intruder.pullUpdate( refEvt, pull ) else None
+//            val offEvtL = offset.changed
+//            val offUpd  = if( offEvtL.isInstanceOf[ evt.NodeSelector[ _, _ ]]) {   // XXX TODO ugly
+//               val offEvt = offEvtL.asInstanceOf[ Event[ S, evt.Change[ Long ], Expr[ S, Long ]]]
+//               if( evt.Intruder.isSource( offEvt, pull )) evt.Intruder.pullUpdate( offEvt, pull ) else None
+//            } else None
+//            val offVal  = offUpd.map( _.now ).getOrElse( offset.value )
+//
+//            Some( Elem.EmbeddedChanged( /* this, */ refUpd.getOrElse( IIdxSeq.empty ), offVal ))
          }
       }
    }
@@ -300,7 +308,12 @@ object Scan_ {
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( Embedded.cookie )
-         ref.write( out )
+//         ref.write( out )
+
+         ref.id.write( out )
+         ref.span.write( out )
+         ref.value.write( out )
+
          out.writeString( key )
          offset.write( out )
       }

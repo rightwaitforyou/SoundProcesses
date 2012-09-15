@@ -58,18 +58,28 @@ object BiGroup {
 
    type Leaf[ S <: Sys[ S ], Elem, U ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem, U ]])
 
+//   object TimedElem {
+//      def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc )
+//                                        ( implicit tx: S#Tx,
+//                                          elemSerializer: Serializer[ S#Tx, S#Acc, Elem ],
+//                                          spanType: Type[ SpanLike ]) : TimedElem[ S, Elem, U ] =
+//         Impl.readTimedElem( in, access )
+//   }
    object TimedElem {
-      def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc )
-                                        ( implicit tx: S#Tx,
-                                          elemSerializer: Serializer[ S#Tx, S#Acc, Elem ]) : TimedElem[ S, Elem, U ] =
-         sys.error( "TODO" )
+      def apply[ S <: Sys[ S ], Elem, U ]( id: S#ID, span: Expr[ S, SpanLike ], value: Elem ) : TimedElem[ S, Elem, U ] =
+         Wrapper( id, span, value )
+
+      private final case class Wrapper[ S <: Sys[ S ], Elem, U ]( id: S#ID, span: Expr[ S, SpanLike ], value: Elem )
+      extends TimedElem[ S, Elem, U ] {
+         override def toString = "TimedElem(" + id + ", " + span + ", " + value + ")"
+      }
    }
-   trait TimedElem[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
+   trait TimedElem[ S <: Sys[ S ], Elem, U ] /* extends evt.Node[ S ] */ {
       def id: S#ID
       def span: Expr[ S, SpanLike ]
       def value: Elem
 
-      def changed: Event[ S, IIdxSeq[ ElementUpdate[ U ]], TimedElem[ S, Elem, U ]]
+//      def changed: Event[ S, IIdxSeq[ ElementUpdate[ U ]], TimedElem[ S, Elem, U ]]
    }
 
    object Expr {
