@@ -277,37 +277,36 @@ object AuralPresentationImpl {
       }
 
       private def playProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
-         val ugb = UGenGraphBuilder( this, timed, time )
-         ugb.tryBuild() match {
-            case UGenGraphBuilder.Finished( ug ) =>
-               ???
+         val ugb        = UGenGraphBuilder( this, timed, time )
+         val isComplete = ugb.tryBuild()
 
-            case UGenGraphBuilder.Partial( incrMissing, advanced ) =>
-               // simpler algorithm (does not allow for circular relationships):
-               // - just store with the missing keys, and wait for other finished ugs to show up within the txn
+         // simpler algorithm (does not allow for circular relationships):
+         // - just store with the missing keys, and wait for other finished ugs to show up within the txn
 
-               // more inquisitive algorithm:
-               // - register scanIns
-               // - register scanOuts
-               // - register missingScanIns
-               // - look up (one, arbitrary) missingScanIn for any of the scanOuts
-               // - if found, continue building
+         // more inquisitive algorithm:
+         // - register scanIns
+         // - register scanOuts
+         // - register missingScanIns
+         // - look up (one, arbitrary) missingScanIn for any of the scanOuts
+         // - if found, continue building
 
-               implicit val itx     = tx.peer
-               val ongoing          = ongoingBuild()
-               val oldMiss          = ongoing.missing
-               val (retryE, keep)   = oldMiss.partition { case (miss, _) => incrMissing.contains( miss )}
-               val retry: Set[ UGenGraphBuilder[ S ]] = retryE.map( _._2 )( breakOut )
+         implicit val itx     = tx.peer
+         val incrMissing      = ugb.missingIns
+         val ongoing          = ongoingBuild()
+         val oldMiss          = ongoing.missing
+         val (retryE, keep)   = oldMiss.partition { case (miss, _) => incrMissing.contains( miss )}
+         val retry: Set[ AuralProcBuilder[ S ]] = retryE.map( _._2 )( breakOut )
 
-               val newMiss    = keep ++ incrMissing.map( _ -> ugb )
-               val newOngoing = ongoing.copy( missing = newMiss )
+         val apb = AuralProcBuilder( ugb, Map.empty )
 
-               retry.foreach { ugbRet =>
+         val newMiss    = keep ++ incrMissing.map( _ -> apb )
+         val newOngoing = ongoing.copy( missing = newMiss )
 
-               }
+         retry.foreach { ugbRet =>
 
-               ???
          }
+
+         ???
 
 //         implicit val ptx = ProcTxn()( tx.peer )
 //         aural.play()

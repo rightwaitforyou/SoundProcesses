@@ -27,6 +27,7 @@ private[proc] object UGenGraphBuilderImpl {
       var scanOuts                                             = Map.empty[ String, Int ]
       var scanIns                                              = Set.empty[ String ] // , Scan_.Value[ S ]]
 //      private var missingScanIns                               = Set.empty[ String ]
+      var missingIns                                           = Set.empty[ MissingIn[ S ]]
 
 //      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
 
@@ -47,9 +48,10 @@ private[proc] object UGenGraphBuilderImpl {
          }
       }
 
-      def tryBuild() : BuildResult[ S ] = {
+      def tryBuild() : Boolean = {
          var missingElems  = IIdxSeq.empty[ Lazy ]
-         var missingIns    = Set.empty[ MissingIn[ S ]]
+//         var missingIns    = Set.empty[ MissingIn[ S ]]
+         missingIns = Set.empty
          var someSucceeded = false
          while( remaining.nonEmpty ) {
             val g = SynthGraph {
@@ -86,11 +88,18 @@ private[proc] object UGenGraphBuilderImpl {
          }
 
          if( missingElems.isEmpty ) {
-            Finished( build( controlProxies ))
+            true // Finished // ( build( controlProxies ))
          } else {
             remaining = missingElems
-            Partial( missingIns, advanced = someSucceeded )
+            false // Partial // ( missingIns, advanced = someSucceeded )
          }
+      }
+
+      def isComplete = remaining.isEmpty
+
+      def finish : UGenGraph = {
+         require( isComplete )
+         build( controlProxies )
       }
    }
 }

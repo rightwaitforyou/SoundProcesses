@@ -6,14 +6,18 @@ import impl.{UGenGraphBuilderImpl => Impl}
 import util.control.ControlThrowable
 
 private[proc] object UGenGraphBuilder {
-   sealed trait BuildResult[ S <: Sys[ S ]]
-//   case object Halted extends BuildResult
-//   case object Advanced extends BuildResult
-   final case class Finished[ S <: Sys[ S ]]( graph: UGenGraph /*, scanIns: Set[ String ], scanOuts: Map[ String, Int ]*/)
-   extends BuildResult[ S ]
-
-   final case class Partial[ S <: Sys[ S ]]( missingScanIns: Set[ MissingIn[ S ]], advanced: Boolean )
-   extends BuildResult[ S ]
+//   sealed trait BuildResult // [ S <: Sys[ S ]]
+////   case object Halted extends BuildResult
+////   case object Advanced extends BuildResult
+//
+////   final case class Finished[ S <: Sys[ S ]]( graph: UGenGraph /*, scanIns: Set[ String ], scanOuts: Map[ String, Int ]*/)
+////   extends BuildResult[ S ]
+//
+//   final case class Finished( graph: UGenGraph /*, scanIns: Set[ String ], scanOuts: Map[ String, Int ]*/)
+//   extends BuildResult
+//
+//   final case class Partial[ S <: Sys[ S ]]( missingScanIns: Set[ MissingIn[ S ]], advanced: Boolean )
+//   extends BuildResult[ S ]
 
    final case class MissingIn[ S <: Sys[ S ]]( timed: TimedProc[ S ], key: String ) extends ControlThrowable
 
@@ -27,6 +31,8 @@ private[proc] object UGenGraphBuilder {
       Impl( aural, timed, time )
 }
 private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
+   import UGenGraphBuilder._
+
    /**
     * This method should only be invoked by the `graph.scan.Elem` instances. It requests a scan input, and
     * the method returns the corresponding number of channels, or throws a `MissingIn` exception which
@@ -50,9 +56,21 @@ private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
    def scanOuts : Map[ String, Int ]
 
    /**
-    * Builds or continuous to build the ugen graph. Since the builder is mutable, `tryBuild` should be called
-    * repeatably on the same object as long as a `Partial` result is obtained, until either the transaction is aborted,
-    * or a `Finished` result is obtained.
+    * Current set of missing scan inputs.
     */
-   def tryBuild() : UGenGraphBuilder.BuildResult[ S ]
+   def missingIns: Set[ MissingIn[ S ]]
+
+   def isComplete : Boolean
+
+   /**
+    * Builds or continuous to build the ugen graph. Since the builder is mutable, `tryBuild` should be called
+    * repeatably on the same object as long as a `false` result is obtained, until either the transaction is aborted,
+    * or a `true` result is obtained.
+    *
+    * @return  the status of completion after the iteration, i.e. `true` if the graph has no more missing elements
+    *          and can be completed by calling `finish`, otherwise `false`
+    */
+   def tryBuild() : Boolean // UGenGraphBuilder.BuildResult[ S ]
+
+   def finish: UGenGraph
 }
