@@ -7,15 +7,17 @@ import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
 import util.control.ControlThrowable
 import concurrent.stm.{InTxn, Txn}
 import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.bitemp.BiGroup
 
 private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 
 private[proc] object UGenGraphBuilderImpl {
-   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], proc: Proc[ S ], time: Long )( implicit tx: S#Tx ) : UGenGraphBuilder =
-      new Impl( aural, proc, time, proc.graph.value, tx )
+   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long )
+                            ( implicit tx: S#Tx ) : UGenGraphBuilder =
+      new Impl( aural, timed, time, timed.value.graph.value, tx )
 
-   private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], proc: Proc[ S ], time: Long,
-                                             g: SynthGraph, tx: S#Tx )
+   private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ],
+                                             timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long, g: SynthGraph, tx: S#Tx )
    extends BasicUGenGraphBuilder with UGenGraphBuilder {
       builder =>
 
@@ -32,7 +34,7 @@ private[proc] object UGenGraphBuilderImpl {
 //      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
 
       def addScanIn( key: String ) : Int = {
-         aural.scanInValue( proc, time, key )( tx ) match {
+         aural.scanInValue( timed, time, key )( tx ) match {
             case Some( value ) =>
                scanIns += key // -> value
                value.numChannels

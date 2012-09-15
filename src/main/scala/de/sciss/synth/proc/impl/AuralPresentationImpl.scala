@@ -199,7 +199,7 @@ object AuralPresentationImpl {
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
-      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
+      def scanInValue( timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
          ???
       }
 
@@ -240,35 +240,37 @@ object AuralPresentationImpl {
       }
 
       def procsAdded( timed: IIdxSeq[ BiGroup.TimedElem[ S, Proc[ S ]]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         timed.foreach { pt =>
-//         val time    = chr.time
-            val p       = pt.value
-            val graph   = p.graph.value
-   //         val scanMap = pg.scans
-   //         if( scanMap.nonEmpty ) {
-   //            val scans   = p.scans
-   //            scanMap.map { case (key, dir) =>
-   //               scans.get( key ).map { scan =>
-   //                  scan.intersect( time ).headOption.map { case (startEx, elem) =>
-   //                     elem match {
-   //                        case Scan_.Mono( levelExpr, shape ) =>
-   //                          val level = levelExpr.value
-   //                     }
-   //                  }
-   //               }
-   //            }
-   //         }
+         timed.foreach( procAdded )
+      }
 
-            val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
-            val aural   = AuralProc( server, /* name, */ graph, entries )
-            viewMap.put( pt.id, aural )
-            val playing = p.playing.value
-            logConfig( "aural added " + p + " -- playing? " + playing )
-            if( playing ) {
-               implicit val ptx = ProcTxn()( tx.peer )
-               aural.play()
-   //            actions.transform( _.addPlay( p ))
-            }
+      private def procAdded( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+//         val time    = chr.time
+         val p       = timed.value
+         val graph   = p.graph.value
+//         val scanMap = pg.scans
+//         if( scanMap.nonEmpty ) {
+//            val scans   = p.scans
+//            scanMap.map { case (key, dir) =>
+//               scans.get( key ).map { scan =>
+//                  scan.intersect( time ).headOption.map { case (startEx, elem) =>
+//                     elem match {
+//                        case Scan_.Mono( levelExpr, shape ) =>
+//                          val level = levelExpr.value
+//                     }
+//                  }
+//               }
+//            }
+//         }
+
+         val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
+         val aural   = AuralProc( server, /* name, */ graph, entries )
+         viewMap.put( timed.id, aural )
+         val playing = p.playing.value
+         logConfig( "aural added " + p + " -- playing? " + playing )
+         if( playing ) {
+            implicit val ptx = ProcTxn()( tx.peer )
+            aural.play()
+//            actions.transform( _.addPlay( p ))
          }
       }
 

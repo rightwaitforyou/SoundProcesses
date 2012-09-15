@@ -27,6 +27,7 @@ package de.sciss.synth.proc
 
 import impl.AuralPresentationImpl
 import de.sciss.lucre.stm.{Disposable, Cursor, Sys}
+import de.sciss.lucre.bitemp.BiGroup
 
 object AuralPresentation {
    // ---- implementation forwards ----
@@ -36,7 +37,7 @@ object AuralPresentation {
       AuralPresentationImpl.run( transport, aural )
 
    private[proc] trait Running[ S <: Sys[ S ]] {
-      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
+      def scanInValue( timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
    }
 }
 trait AuralPresentation[ S <: Sys[ S ]] extends Disposable[ S#Tx ]

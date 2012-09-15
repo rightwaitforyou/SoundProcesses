@@ -3,6 +3,7 @@ package proc
 
 import de.sciss.lucre.stm.Sys
 import impl.{UGenGraphBuilderImpl => Impl}
+import de.sciss.lucre.bitemp.BiGroup
 
 private[proc] object UGenGraphBuilder {
    sealed trait BuildResult
@@ -16,8 +17,9 @@ private[proc] object UGenGraphBuilder {
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], proc: Proc[ S ], time: Long )( implicit tx: S#Tx ) : UGenGraphBuilder =
-      Impl( aural, proc, time )
+   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long )
+                            ( implicit tx: S#Tx ) : UGenGraphBuilder =
+      Impl( aural, timed, time )
 }
 private[proc] trait UGenGraphBuilder extends UGenGraph.Builder {
    def addScanIn( key: String ) : Int
