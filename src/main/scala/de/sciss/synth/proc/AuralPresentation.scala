@@ -37,7 +37,9 @@ object AuralPresentation {
       AuralPresentationImpl.run( transport, aural )
 
    private[proc] trait Running[ S <: Sys[ S ]] {
-      def scanInValue( timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
+      def scanInValue( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
+
+      final case class MissingInfo( source: TimedProc[ S ], key: String ) extends Throwable
    }
 }
 trait AuralPresentation[ S <: Sys[ S ]] extends Disposable[ S#Tx ]

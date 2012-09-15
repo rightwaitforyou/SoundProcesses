@@ -29,10 +29,10 @@ package impl
 
 import de.sciss.lucre.{stm, bitemp}
 import stm.{IdentifierMap, Sys, Cursor}
-import bitemp.{BiGroup, Chronos}
+import bitemp.Chronos
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import SoundProcesses.logConfig
-import concurrent.stm.{Ref, Txn}
+import concurrent.stm.{TxnLocal, Ref, Txn}
 
 object AuralPresentationImpl {
    def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], aural: AuralSystem )
@@ -199,7 +199,8 @@ object AuralPresentationImpl {
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
-      def scanInValue( timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
+      def scanInValue( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
+         val aural = viewMap.getOrElse( timed.id, sys.error( "Missing aural view of process " + timed.value ))
          ???
       }
 
@@ -239,12 +240,12 @@ object AuralPresentationImpl {
          viewMap.dispose()
       }
 
-      def procsAdded( timed: IIdxSeq[ BiGroup.TimedElem[ S, Proc[ S ]]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+      def procsAdded( timed: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
          timed.foreach( procAdded )
       }
 
-      private def procAdded( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-//         val time    = chr.time
+      private def procAdded( timed: TimedProc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+         val time    = chr.time
          val p       = timed.value
          val graph   = p.graph.value
 //         val scanMap = pg.scans
@@ -268,13 +269,27 @@ object AuralPresentationImpl {
          val playing = p.playing.value
          logConfig( "aural added " + p + " -- playing? " + playing )
          if( playing ) {
-            implicit val ptx = ProcTxn()( tx.peer )
-            aural.play()
-//            actions.transform( _.addPlay( p ))
+            playProc( timed, aural, time )
          }
       }
 
-      def procRemoved( timed: BiGroup.TimedElem[ S, Proc[ S ]])( implicit tx: S#Tx ) {
+      private val ongoingBuild : TxnLocal[ AnyRef ] = ???
+
+      private def playProc( timed: TimedProc[ S ], aural: AuralProc, time: Long )( implicit tx: S#Tx ) {
+         val ugb = UGenGraphBuilder( this, timed, time )
+         ugb.tryBuild() match {
+            case UGenGraphBuilder.Finished( ug, scanIns, scanOuts ) =>
+
+            case UGenGraphBuilder.Partial( missingScanIns, advanced ) =>
+
+         }
+
+         implicit val ptx = ProcTxn()( tx.peer )
+         aural.play()
+//            actions.transform( _.addPlay( p ))
+      }
+
+      def procRemoved( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
          val id = timed.id
          viewMap.get( id ) match {
             case Some( aural ) =>
@@ -300,7 +315,7 @@ object AuralPresentationImpl {
 //         }
 //      }
 
-      def procPlayingChanged( timed: BiGroup.TimedElem[ S, Proc[ S ]], newPlaying: Boolean )( implicit tx: S#Tx ) {
+      def procPlayingChanged( timed: TimedProc[ S ], newPlaying: Boolean )( implicit tx: S#Tx ) {
          viewMap.get( timed.id ) match {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
@@ -311,7 +326,7 @@ object AuralPresentationImpl {
          }
       }
 
-      def procGraphChanged( timed: BiGroup.TimedElem[ S, Proc[ S ]], newGraph: SynthGraph )( implicit tx: S#Tx ) {
+      def procGraphChanged( timed: TimedProc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ) {
          viewMap.get( timed.id ) match {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
@@ -322,7 +337,7 @@ object AuralPresentationImpl {
          }
       }
 
-      def procParamsChanged( timed: BiGroup.TimedElem[ S, Proc[ S ]], changes: Map[ String, Param ])( implicit tx: S#Tx ) {
+      def procParamsChanged( timed: TimedProc[ S ], changes: Map[ String, Param ])( implicit tx: S#Tx ) {
          viewMap.get( timed.id ) match {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )

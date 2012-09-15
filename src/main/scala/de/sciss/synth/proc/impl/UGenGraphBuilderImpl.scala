@@ -5,19 +5,17 @@ package impl
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
 import util.control.ControlThrowable
-import concurrent.stm.{InTxn, Txn}
 import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.bitemp.BiGroup
 
 private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 
 private[proc] object UGenGraphBuilderImpl {
-   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long )
+   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: TimedProc[ S ], time: Long )
                             ( implicit tx: S#Tx ) : UGenGraphBuilder =
       new Impl( aural, timed, time, timed.value.graph.value, tx )
 
    private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ],
-                                             timed: BiGroup.TimedElem[ S, Proc[ S ]], time: Long, g: SynthGraph, tx: S#Tx )
+                                             timed: TimedProc[ S ], time: Long, g: SynthGraph, tx: S#Tx )
    extends BasicUGenGraphBuilder with UGenGraphBuilder {
       builder =>
 
