@@ -199,8 +199,10 @@ object AuralPresentationImpl {
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
-      def scanInValue( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
+      def scanInValue( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Scan_.Value[ S ] = {
          val aural = viewMap.getOrElse( timed.id, sys.error( "Missing aural view of process " + timed.value ))
+         val source: TimedProc[ S ] = ???
+         throw UGenGraphBuilder.MissingIn( source, key )
          ???
       }
 
@@ -279,9 +281,10 @@ object AuralPresentationImpl {
          val ugb = UGenGraphBuilder( this, timed, time )
          ugb.tryBuild() match {
             case UGenGraphBuilder.Finished( ug, scanIns, scanOuts ) =>
+               ???
 
             case UGenGraphBuilder.Partial( missingScanIns, advanced ) =>
-
+               ???
          }
 
          implicit val ptx = ProcTxn()( tx.peer )

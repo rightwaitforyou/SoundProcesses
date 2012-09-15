@@ -4,19 +4,18 @@ package impl
 
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
-import util.control.ControlThrowable
 import de.sciss.lucre.stm.Sys
 
-private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
+//private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 
 private[proc] object UGenGraphBuilderImpl {
    def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: TimedProc[ S ], time: Long )
-                            ( implicit tx: S#Tx ) : UGenGraphBuilder =
+                            ( implicit tx: S#Tx ) : UGenGraphBuilder[ S ] =
       new Impl( aural, timed, time, timed.value.graph.value, tx )
 
    private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ],
                                              timed: TimedProc[ S ], time: Long, g: SynthGraph, tx: S#Tx )
-   extends BasicUGenGraphBuilder with UGenGraphBuilder {
+   extends BasicUGenGraphBuilder with UGenGraphBuilder[ S ] {
       builder =>
 
       import UGenGraphBuilder._
@@ -32,14 +31,9 @@ private[proc] object UGenGraphBuilderImpl {
 //      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
 
       def addScanIn( key: String ) : Int = {
-         aural.scanInValue( timed, time, key )( tx ) match {
-            case Some( value ) =>
-               scanIns += key // -> value
-               value.numChannels
-            case _ =>
-//               missingScanIns += key
-               throw MissingInfo( key )
-         }
+         val value = aural.scanInValue( timed, time, key )( tx )
+         scanIns += key // -> value
+         value.numChannels
       }
 
       def addScanOut( key: String, numChannels: Int ) {
@@ -53,9 +47,9 @@ private[proc] object UGenGraphBuilderImpl {
          }
       }
 
-      def tryBuild() : BuildResult = {
+      def tryBuild() : BuildResult[ S ] = {
          var missingElems  = IIdxSeq.empty[ Lazy ]
-         var missingKeys   = Set.empty[ String ]
+         var missingIns    = Set.empty[ MissingIn[ S ]]
          var someSucceeded = false
          while( remaining.nonEmpty ) {
             val g = SynthGraph {
@@ -71,7 +65,7 @@ private[proc] object UGenGraphBuilderImpl {
                      elem.force( builder )
                      someSucceeded        = true
                   } catch {
-                     case MissingInfo( key ) =>
+                     case miss @ MissingIn( _, _ ) =>
                         sourceMap         = savedSourceMap
                         controlNames      = savedControlNames
                         controlValues     = savedControlValues
@@ -79,7 +73,7 @@ private[proc] object UGenGraphBuilderImpl {
                         scanOuts          = savedScanOuts
                         scanIns           = savedScanIns
                         missingElems     :+= elem
-                        missingKeys       += key
+                        missingIns        += miss.asInstanceOf[ MissingIn[ S ]]  // XXX TODO yukk
                   }
                }
             }
@@ -95,7 +89,7 @@ private[proc] object UGenGraphBuilderImpl {
             Finished( build( controlProxies ), scanIns, scanOuts )
          } else {
             remaining = missingElems
-            Partial( missingKeys, advanced = someSucceeded )
+            Partial( missingIns, advanced = someSucceeded )
          }
       }
    }

@@ -45,7 +45,7 @@ object scan {
 
       def makeUGens: UGenInLike = {
          UGenGraph.builder match {
-            case b: UGenGraphBuilder =>
+            case b: UGenGraphBuilder[ _ ] =>
                val numChannels = b.addScanIn( key )
                val ctlName = "$in_" + key
                if( numChannels == 1 ) {
@@ -93,7 +93,7 @@ object scan {
 
       protected def makeUGen( _args: IIdxSeq[ UGenIn ]) {
          UGenGraph.builder match {
-            case b: UGenGraphBuilder =>
+            case b: UGenGraphBuilder[ _ ] =>
                b.addScanOut( key, _args.size )
             case other => outsideOfContext()
          }
