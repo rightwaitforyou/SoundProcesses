@@ -34,5 +34,9 @@ object AuralPresentation {
    def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], aural: AuralSystem )
                           ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] =
       AuralPresentationImpl.run( transport, aural )
+
+   private[proc] trait Running[ S <: Sys[ S ]] {
+      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
+   }
 }
 trait AuralPresentation[ S <: Sys[ S ]] extends Disposable[ S#Tx ]

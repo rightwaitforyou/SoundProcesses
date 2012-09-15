@@ -101,11 +101,11 @@ object AuralPresentationImpl {
       }
    }
 
-   sealed trait Running[ S <: Sys[ S ]] {
-//      def addScanIn(  proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int
-//      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
-      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
-   }
+//   sealed trait Running[ S <: Sys[ S ]] {
+////      def addScanIn(  proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int
+////      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
+//      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
+//   }
 
    private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment[ _ ], val bus: RichAudioBus, aural: AuralProc )
    extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
@@ -198,7 +198,7 @@ object AuralPresentationImpl {
    }
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
-   extends Running[ S ] {
+   extends AuralPresentation.Running[ S ] {
       def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
          ???
       }

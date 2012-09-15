@@ -11,10 +11,10 @@ import de.sciss.lucre.stm.Sys
 private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 
 private[proc] object UGenGraphBuilderImpl {
-   def apply[ S <: Sys[ S ]]( aural: AuralPresentationImpl.Running[ S ], proc: Proc[ S ], time: Long )( implicit tx: S#Tx ) : UGenGraphBuilder =
+   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], proc: Proc[ S ], time: Long )( implicit tx: S#Tx ) : UGenGraphBuilder =
       new Impl( aural, proc, time, proc.graph.value, tx )
 
-   private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentationImpl.Running[ S ], proc: Proc[ S ], time: Long,
+   private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], proc: Proc[ S ], time: Long,
                                              g: SynthGraph, tx: S#Tx )
    extends BasicUGenGraphBuilder with UGenGraphBuilder {
       builder =>
