@@ -45,17 +45,20 @@ object Scan_ {
    }
 
    object Value {
-      final case class MonoConst[ S <: Sys[ S ]]( value: Float /*, stop: Long */)
-      extends Value[ S ] { def numChannels = 1 }
+      final case class MonoConst( value: Float /*, stop: Long */)
+      extends Value[ Nothing ] // { def numChannels = 1 }
 
-      final case class MonoSegment[ S <: Sys[ S ]]( start: Float, stop: Float, dur: Float, shape: Env.ConstShape )
-      extends Value[ S ] { def numChannels = 1 }
+      final case class MonoSegment( start: Float, stop: Float, dur: Float, shape: Env.ConstShape )
+      extends Value[ Nothing ] // { def numChannels = 1 }
 
-      final case class Synthesis[ S <: Sys[ S ]]( proc: Proc[ S ], numChannels: Int ) extends Value[ S ]
+      final case class Sink[ S <: Sys[ S ]]( timed: TimedProc[ S ], key: String )
+      extends Value[ S ]
+
+      case object Source extends Value[ Nothing ]
    }
-   sealed trait Value[ S <: Sys[ S ]] {
+   sealed trait Value[ +S ] {
 //      def stop: Long
-      def numChannels: Int
+//      def numChannels: Int
    }
 
    object Elem {

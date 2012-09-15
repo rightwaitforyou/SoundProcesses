@@ -36,7 +36,7 @@ import data.SkipList
 import ExprImplicits._
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import annotation.switch
+import annotation.{tailrec, switch}
 
 object ProcImpl {
    private final val SER_VERSION = 2
@@ -156,34 +156,43 @@ object ProcImpl {
             }
          }
 
-         def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
-            scanMap.get( key ).flatMap { entry =>
-               val scan = entry.value
-               scan.floor( time ) match {
-                  case Some( (floorTime, floorElem) ) =>
-                     floorElem match {
-                        case Scan_.Synthesis() => Some( Scan_.Value.Synthesis( proc, ??? ))
-                        case Scan_.Mono( floorValueEx, _ ) =>
-                           val floorValue = floorValueEx.value.toFloat
-                           scan.ceil( time ) match {
-                              case Some( (ceilTime, Scan_.Mono( ceilValueEx, ceilShape )) ) =>
-                                 val ceilValue = ceilValueEx.value.toFloat
-                                 if( ceilShape == stepShape ) {
-                                    Some( Scan_.Value.MonoConst( ceilValue ))
-                                 } else {
-                                    val start: Float = ???
-                                    val dur:   Float = ???
-                                    Some( Scan_.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
-                                 }
-                              case _ => Some( Scan_.Value.MonoConst( floorValue ))
-                           }
-                     }
+         def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] =
+            flatValueAt( proc, key, time )
 
-                  case None => None
-               }
+         @tailrec private def flatValueAt( proc: Proc[ S ], key: String, time: Long )
+                                         ( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
+            scanMap.get( key ) match {
+               case Some( entry ) =>
+                  val scan = entry.value
+                  scan.floor( time ) match {
+                     case Some( (floorTime, floorElem) ) =>
+                        floorElem match {
+                           case Scan_.Mono( floorValueEx, _ ) =>
+                              val floorValue = floorValueEx.value.toFloat
+                              scan.ceil( time ) match {
+                                 case Some( (ceilTime, Scan_.Mono( ceilValueEx, ceilShape )) ) =>
+                                    val ceilValue = ceilValueEx.value.toFloat
+                                    if( ceilShape == stepShape ) {
+                                       Some( Scan_.Value.MonoConst( ceilValue ))
+                                    } else {
+                                       val start: Float = ???
+                                       val dur:   Float = ???
+                                       Some( Scan_.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
+                                    }
+                                 case _ => Some( Scan_.Value.MonoConst( floorValue ))
+                              }
+
+                           case Scan_.Synthesis() => Some( Scan_.Value.Source )
+                           case Scan_.Embedded( sourceTimed, sourceKey, offsetEx ) =>
+                              val offset = offsetEx.value
+                              flatValueAt( sourceTimed.value, sourceKey, time + offset )
+                        }
+
+                     case None => None
+                  }
+
+               case None => None
             }
-
-            ???
          }
       }
 

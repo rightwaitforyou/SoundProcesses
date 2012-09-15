@@ -27,7 +27,6 @@ package de.sciss.synth.proc
 
 import impl.AuralPresentationImpl
 import de.sciss.lucre.stm.{Disposable, Cursor, Sys}
-import de.sciss.lucre.bitemp.BiGroup
 
 object AuralPresentation {
    // ---- implementation forwards ----
@@ -37,7 +36,19 @@ object AuralPresentation {
       AuralPresentationImpl.run( transport, aural )
 
    private[proc] trait Running[ S <: Sys[ S ]] {
-      def scanInValue( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Scan_.Value[ S ]
+      /**
+       * Queries the number of channel associated with a scanned input.
+       * Throws a control throwable when no value can be determined, making
+       * the ugen graph builder mark the querying graph element as incomplete
+       * (missing information).
+       *
+       * @param timed   the process whose graph is currently built
+       * @param time    the time at which to query the scan
+       * @param key     the scan key
+       * @param tx      the current transaction
+       * @return        the number of channels for the scan input at the given time
+       */
+      def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int // Scan_.Value[ S ]
 
       final case class MissingInfo( source: TimedProc[ S ], key: String ) extends Throwable
    }

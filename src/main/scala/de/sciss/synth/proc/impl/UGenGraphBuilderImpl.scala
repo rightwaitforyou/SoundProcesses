@@ -31,9 +31,9 @@ private[proc] object UGenGraphBuilderImpl {
 //      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
 
       def addScanIn( key: String ) : Int = {
-         val value = aural.scanInValue( timed, time, key )( tx )
+         val res = aural.scanInNumChannels( timed, time, key )( tx )
          scanIns += key // -> value
-         value.numChannels
+         res
       }
 
       def addScanOut( key: String, numChannels: Int ) {

@@ -27,8 +27,8 @@ package de.sciss.nuages
 package impl
 
 import de.sciss.lucre.stm.{Sys, Cursor}
-import de.sciss.synth.proc.{Proc, Transport, Param, ProcTransport, TimedProc}
-import de.sciss.lucre.bitemp.{BiGroup, SpanLike}
+import de.sciss.synth.proc.{Transport, Param, ProcTransport, TimedProc}
+import de.sciss.lucre.bitemp.SpanLike
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
 import javax.swing.JComponent
 import collection.immutable.{IndexedSeq => IIdxSeq}

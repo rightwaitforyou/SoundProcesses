@@ -28,7 +28,7 @@ package de.sciss.nuages
 import impl.VisualInstantPresentationImpl
 import javax.swing.JComponent
 import de.sciss.lucre.stm.{Cursor, Sys}
-import de.sciss.synth.proc.{Proc, Transport, ProcTransport}
+import de.sciss.synth.proc.ProcTransport
 
 object VisualInstantPresentation {
    def apply[ S <: Sys[ S ]]( transport: ProcTransport[ S ])

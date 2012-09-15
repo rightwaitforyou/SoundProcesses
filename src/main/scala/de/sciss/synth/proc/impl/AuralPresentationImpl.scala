@@ -107,7 +107,7 @@ object AuralPresentationImpl {
 //      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
 //   }
 
-   private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment[ _ ], val bus: RichAudioBus, aural: AuralProc )
+   private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment, val bus: RichAudioBus, aural: AuralProc )
    extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
       private val synthRef: Ref[ Option[ RichSynth ]] = ???
 
@@ -199,7 +199,7 @@ object AuralPresentationImpl {
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
-      def scanInValue( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Scan_.Value[ S ] = {
+      def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
          val aural = viewMap.getOrElse( timed.id, sys.error( "Missing aural view of process " + timed.value ))
          val source: TimedProc[ S ] = ???
          throw UGenGraphBuilder.MissingIn( source, key )
