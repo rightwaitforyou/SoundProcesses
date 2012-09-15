@@ -9,7 +9,7 @@ private[proc] object UGenGraphBuilder {
    sealed trait BuildResult[ S <: Sys[ S ]]
 //   case object Halted extends BuildResult
 //   case object Advanced extends BuildResult
-   final case class Finished[ S <: Sys[ S ]]( graph: UGenGraph, scanIns: Set[ String ], scanOuts: Map[ String, Int ])
+   final case class Finished[ S <: Sys[ S ]]( graph: UGenGraph /*, scanIns: Set[ String ], scanOuts: Map[ String, Int ]*/)
    extends BuildResult[ S ]
 
    final case class Partial[ S <: Sys[ S ]]( missingScanIns: Set[ MissingIn[ S ]], advanced: Boolean )
@@ -29,6 +29,9 @@ private[proc] object UGenGraphBuilder {
 private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
    def addScanIn( key: String ) : Int
    def addScanOut( key: String, numChannels: Int ) : Unit
+
+   def scanIns : Set[ String ]
+   def scanOuts : Map[ String, Int ]
 
    /**
     * Builds or continuous to build the ugen graph. Since the builder is mutable, `tryBuild` should be called

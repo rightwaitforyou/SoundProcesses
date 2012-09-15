@@ -24,8 +24,8 @@ private[proc] object UGenGraphBuilderImpl {
 
       private var remaining: IIdxSeq[ Lazy ]                   = g.sources
       private var controlProxies: ISet[ ControlProxyLike[ _ ]] = g.controlProxies
-      private var scanOuts                                     = Map.empty[ String, Int ]
-      private var scanIns                                      = Set.empty[ String ] // , Scan_.Value[ S ]]
+      var scanOuts                                             = Map.empty[ String, Int ]
+      var scanIns                                              = Set.empty[ String ] // , Scan_.Value[ S ]]
 //      private var missingScanIns                               = Set.empty[ String ]
 
 //      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
@@ -86,7 +86,7 @@ private[proc] object UGenGraphBuilderImpl {
          }
 
          if( missingElems.isEmpty ) {
-            Finished( build( controlProxies ), scanIns, scanOuts )
+            Finished( build( controlProxies ))
          } else {
             remaining = missingElems
             Partial( missingIns, advanced = someSucceeded )

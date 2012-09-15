@@ -75,12 +75,12 @@ object AuralPresentationImpl {
             transport.changed.react { x => println( "Aural observation: " + x )}
             if( transport.playing.value ) {
                implicit val chr: Chronos[ S ] = transport
-//               transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
-               val it = transport.iterator
-               if( it.nonEmpty ) {
-                  val timed = it.collect({ case (_, pt) if pt.value.playing.value => pt })
-                  booted.procsAdded( timed.toIndexedSeq )
-               }
+               transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
+//               val it = transport.iterator
+//               if( it.nonEmpty ) {
+//                  val timed = it.collect({ case (_, pt) if pt.value.playing.value => pt })
+//                  timed.foreach( booted.procAdded )
+//               }
             }
             transport.changed.reactTx { implicit tx => {
                case Transport.Advance( tr, true, time, added, removed, params ) =>
@@ -88,11 +88,11 @@ object AuralPresentationImpl {
 //println( "AQUI: added = " + added + "; removed = " + removed )
                   removed.foreach { case (_, p)    => booted.procRemoved( p )}
                   params.foreach  { case (_, p, m) => booted.procParamsChanged( p, m )}
-                  // added.foreach   { case (_, p)    => booted.procAdded( p )}
-                  if( added.nonEmpty ) {
-                     val timed = added.collect { case (_, pt) if pt.value.playing.value => pt }
-                     booted.procsAdded( timed )
-                  }
+                  added.foreach   { case (_, p)    => booted.procAdded( p )}
+//                  if( added.nonEmpty ) {
+//                     val timed = added.collect { case (_, pt) if pt.value.playing.value => pt }
+//                     booted.procsAdded( timed )
+//                  }
                case _ =>
             }}
             booted
@@ -222,54 +222,22 @@ object AuralPresentationImpl {
                }
             case _ => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
          }
-
-//         val aural = viewMap.getOrElse( timed.id, sys.error( "Missing aural view of process " + timed.value ))
-//         throw UGenGraphBuilder.MissingIn( source, key )
       }
-
-//      def addScanIn( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
-//         proc.scans.valueAt( key, time ) match {
-//            case Some( value ) =>
-//               value match {
-//                  case Scan_.Value.MonoConst( _ ) => 1
-//                  case seg @ Scan_.Value.MonoSegment( _, _, _, _ ) =>
-//                     val aural = viewMap.getOrElse( proc.id, sys.error( "Missing aural view of process " + proc ))
-//                     implicit val procTxn = ProcTxn()( tx.peer )
-//                     val bus = aural.getBus( key ).getOrElse {
-//                        val _bus = RichBus.audio( server, 1 )
-//                        aural.setBus( key, Some( _bus ))
-//                        _bus
-//                     }
-//                     val user: RichAudioBus.User = ???
-//                     bus.addReader( user )
-//                     1
-//
-//                  case Scan_.Value.Synthesis( sourceProc ) =>
-//                     val sourceAural = viewMap.getOrElse( sourceProc.id, sys.error( "Missing aural view of process " + sourceProc ))
-//
-//                     ???
-//               }
-//            case _ => -1   // special result: no value found, use default
-//         }
-////         throw new MissingInfo
-//      }
-
-//      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) {
-//
-//         ???
-//      }
 
       def dispose()( implicit tx: S#Tx ) {
          viewMap.dispose()
       }
 
-      def procsAdded( timed: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         timed.foreach( procAdded )
-      }
+//      def procsAdded( timed: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+//         timed.foreach( procAdded )
+//      }
 
-      private def procAdded( timed: TimedProc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         val time    = chr.time
+      def procAdded( timed: TimedProc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
          val p       = timed.value
+         val playing = p.playing.value
+         if( !playing ) return
+
+         val time    = chr.time
          val graph   = p.graph.value
 //         val scanMap = pg.scans
 //         if( scanMap.nonEmpty ) {
@@ -289,20 +257,25 @@ object AuralPresentationImpl {
          val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
          val aural   = AuralProc( server, /* name, */ graph, entries )
          viewMap.put( timed.id, aural )
-         val playing = p.playing.value
-         logConfig( "aural added " + p + " -- playing? " + playing )
-         if( playing ) {
+         logConfig( "aural added " + p ) // + " -- playing? " + playing )
+//         if( playing ) {
             playProc( timed, aural, time )
-         }
+//         }
       }
 
       private def playProc( timed: TimedProc[ S ], aural: AuralProc, time: Long )( implicit tx: S#Tx ) {
          val ugb = UGenGraphBuilder( this, timed, time )
          ugb.tryBuild() match {
-            case UGenGraphBuilder.Finished( ug, scanIns, scanOuts ) =>
+            case UGenGraphBuilder.Finished( ug ) =>
                ???
 
             case UGenGraphBuilder.Partial( missingScanIns, advanced ) =>
+               // - register scanIns
+               // - register scanOuts
+               // - register missingScanIns
+               // - look up (one, arbitrary) missingScanIn for any of the scanOuts
+               // - if found, continue building
+
                ???
          }
 
