@@ -201,13 +201,13 @@ object AuralPresentationImpl {
       }
    }
 */
-   private final case class AuralProcBuilder[ S <: Sys[ S ]]( builder: UGenGraphBuilder[ S ],
-                                                              outBuses: Map[ String, RichAudioBus ]) {
+   private final class AuralProcBuilder[ S <: Sys[ S ]]( val ugen: UGenGraphBuilder[ S ],
+                                                         var outBuses: Map[ String, RichAudioBus ]) {
       def finish( ug: UGenGraph ) : AuralProc = ???
    }
 
-   private final case class OngoingBuild[ S <: Sys[ S ]]( missing: Map[ MissingIn[ S ], AuralProcBuilder[ S ]] =
-                                                            Map.empty[  MissingIn[ S ], AuralProcBuilder[ S ]],
+   private final case class OngoingBuild[ S <: Sys[ S ]]( missing: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
+                                                            Map.empty[  MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
                                                           incomplete: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
                                                             None )
 
@@ -272,14 +272,18 @@ object AuralPresentationImpl {
 //         viewMap.put( timed.id, aural )
          logConfig( "aural added " + p ) // + " -- playing? " + playing )
 //         if( playing ) {
-            playProc( timed, time )
+            buildAuralProc( timed, time )
 //         }
       }
 
-      private def playProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
-         val ugb        = UGenGraphBuilder( this, timed, time )
-         val isComplete = ugb.tryBuild()
+      private def buildAuralProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
+         val ugb = UGenGraphBuilder( this, timed, time )
+         ugb.tryBuild()
+         afterIncr( new AuralProcBuilder( ugb, Map.empty ))
+      }
 
+      // note: builder.outBuses will be updated by this method
+      private def afterIncr( builder: AuralProcBuilder[ S ])( implicit tx: S#Tx ) {
          // simpler algorithm (does not allow for circular relationships):
          // - just store with the missing keys, and wait for other finished ugs to show up within the txn
 
@@ -290,27 +294,63 @@ object AuralPresentationImpl {
          // - look up (one, arbitrary) missingScanIn for any of the scanOuts
          // - if found, continue building
 
-         implicit val itx     = tx.peer
-         val incrMissing      = ugb.missingIns
-         val ongoing          = ongoingBuild()
-         val oldMiss          = ongoing.missing
-         val (retryE, keep)   = oldMiss.partition { case (miss, _) => incrMissing.contains( miss )}
-         val retry: Set[ AuralProcBuilder[ S ]] = retryE.map( _._2 )( breakOut )
+         val ugen       = builder.ugen
 
-         val apb = AuralProcBuilder( ugb, Map.empty )
-
-         val newMiss    = keep ++ incrMissing.map( _ -> apb )
-         val newOngoing = ongoing.copy( missing = newMiss )
-
-         retry.foreach { ugbRet =>
-
+         // detect which new scan outputs have been determined in the last iteration
+         val newOuts    = builder.ugen.scanOuts.filterNot { case (key, _) => builder.outBuses.contains( key )}
+         // if there were any, create rich audio buses for them, and store them in the builder's bus map
+         if( newOuts.nonEmpty ) {
+            val newBuses = newOuts.mapValues( numCh => RichBus.audio( server, numCh ))
+            builder.outBuses ++= newBuses
          }
 
-         ???
+         implicit val itx     = tx.peer
+         val ongoing          = ongoingBuild()
+         // initialise the id-to-builder map if necessary
+         val (newOngoing1, builderMap) = ongoing.incomplete match {
+            case Some( m ) => ongoing -> m
+            case _ =>
+               val m = tx.newInMemoryIDMap[ AuralProcBuilder[ S ]]
+               ongoing.copy( incomplete = Some( m )) -> m
+         }
+         // add the (possibly new) builder to it. redundant overwrites do not cause problems
+         builderMap.put( ugen.timed.id, builder )
 
-//         implicit val ptx = ProcTxn()( tx.peer )
-//         aural.play()
-//            actions.transform( _.addPlay( p ))
+         // if the last iteration did not complete the build process, store the missing in keys
+         val newOngoing2 = if( !ugen.isComplete ) {
+            var newMissing = newOngoing1.missing
+            ugen.missingIns.foreach { miss =>
+               newMissing += miss -> (newMissing.getOrElse( miss, Set.empty ) + builder)
+            }
+            newOngoing1.copy( missing = newMissing )
+         } else newOngoing1
+
+         // if new scan outputs have been determined, find out whether other incomplete
+         // processes depend on them, so that their building might be advanced
+         val (retry, newOngoing3) = if( newOuts.nonEmpty ) {
+            // the retried entries are those whose missing scan in corresponds
+            // to any of the newly determined scan outs
+            val keys: Set[ MissingIn[ S ]] = newOuts.map({ case (key, _) => MissingIn( ugen.timed, key )})( breakOut )
+            // divide missing map according to these keys
+            val (retE, keep) = newOngoing2.missing.partition { case (key, _) => keys.contains( key )}
+            // merge all the found builder sets together
+            val ret: Set[ AuralProcBuilder[ S ]] = retE.flatMap( _._2 )( breakOut )
+            // ...and update the ongoing information by removing the builders to retry from the missing map
+            // (they will add themselves again in the recursive `afterIncr` call)
+            ret -> newOngoing2.copy( missing = keep )
+
+         } else {
+            Set.empty[ AuralProcBuilder[ S ]] -> newOngoing2
+         }
+
+         // store the most recent version of the updated ongoing build information
+         ongoingBuild.set( newOngoing3 )
+
+         // advance the ugen graph builder for all processes which have been selected for retry
+         retry.foreach { retBuilder =>
+            retBuilder.ugen.tryBuild()
+            afterIncr( retBuilder ) // deal with the updated build process recursively
+         }
       }
 
       def procRemoved( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
