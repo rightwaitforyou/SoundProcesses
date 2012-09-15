@@ -32,7 +32,7 @@ import de.sciss.lucre.bitemp.BiGroup
 object AuralPresentation {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], aural: AuralSystem )
+   def run[ S <: Sys[ S ]]( transport: ProcTransport[ S ], aural: AuralSystem )
                           ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] =
       AuralPresentationImpl.run( transport, aural )
 

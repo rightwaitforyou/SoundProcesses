@@ -35,7 +35,7 @@ import SoundProcesses.logConfig
 import concurrent.stm.{TxnLocal, Ref, Txn}
 
 object AuralPresentationImpl {
-   def run[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], aural: AuralSystem )
+   def run[ S <: Sys[ S ]]( transport: ProcTransport[ S ], aural: AuralSystem )
                           ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
 
       val c = new Client( cursor.position, transport, aural )
@@ -43,7 +43,7 @@ object AuralPresentationImpl {
       c
    }
 
-   private final class Client[ S <: Sys[ S ]]( csrPos: S#Acc, transportStale: Transport[ S, Proc[ S ]],
+   private final class Client[ S <: Sys[ S ]]( csrPos: S#Acc, transportStale: ProcTransport[ S ],
                                                aural: AuralSystem )( implicit cursor: Cursor[ S ])
    extends AuralPresentation[ S ] with AuralSystem.Client {
 

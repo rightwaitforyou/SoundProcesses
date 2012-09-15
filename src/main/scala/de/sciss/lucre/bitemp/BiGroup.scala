@@ -39,29 +39,37 @@ object BiGroup {
       def group: BiGroup[ S, Elem, U ]
    }
    sealed trait Collection[ S <: Sys[ S ], Elem, U ] extends Update[ S, Elem, U ] {
-      def elem: TimedElem[ S, Elem ]
+      def elem: TimedElem[ S, Elem, U ]
       def span: SpanLike
    }
-   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem ])
+   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem, U ])
    extends Collection[ S, Elem, U ]
 
-   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem ])
+   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem, U ])
    extends Collection[ S, Elem, U ]
 
    final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ],
-                                                       changes: IIdxSeq[ (TimedElem[ S, Elem ], ElementUpdate[ U ])])
+                                                       changes: IIdxSeq[ (TimedElem[ S, Elem, U ], ElementUpdate[ U ])])
    extends Update[ S, Elem, U ]
 
    sealed trait ElementUpdate[ +U ]
    final case class Moved( change: evt.Change[ SpanLike ]) extends ElementUpdate[ Nothing ]
    final case class Mutated[ U ]( change: U ) extends ElementUpdate[ U ]
 
-   type Leaf[ S <: Sys[ S ], Elem ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem ]])
+   type Leaf[ S <: Sys[ S ], Elem, U ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem, U ]])
 
-   trait TimedElem[ S <: Sys[ S ], Elem ] {
+   object TimedElem {
+      def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc )
+                                        ( implicit tx: S#Tx,
+                                          elemSerializer: Serializer[ S#Tx, S#Acc, Elem ]) : TimedElem[ S, Elem, U ] =
+         sys.error( "TODO" )
+   }
+   trait TimedElem[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
       def id: S#ID
       def span: Expr[ S, SpanLike ]
       def value: Elem
+
+      def changed: Event[ S, IIdxSeq[ ElementUpdate[ U ]], TimedElem[ S, Elem, U ]]
    }
 
    object Expr {
@@ -133,7 +141,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * @param time the point in time to search at
     * @return  a (possibly empty) iterator of the intersecting elements
     */
-   def intersect( time: Long )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]]
+   def intersect( time: Long )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem, U ]]
 
    /**
     * Queries all elements intersecting a given time span.
@@ -145,7 +153,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * @param span the the span to search within (this may be a half-bounded interval or even `Span.All`)
     * @return  a (possibly empty) iterator of the intersecting elements
     */
-   def intersect( span: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]]
+   def intersect( span: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem, U ]]
 
    /**
     * Performs a range query according to separate intervals for the allowed start and stop positions
@@ -165,7 +173,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * @param stop    the constraint for the stop position of the spans of the elements filtered.
     * @return  a (possibly empty) iterator of the intersecting elements
     */
-   def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]]
+   def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem, U ]]
 
    /**
     * Queries the closest event (an element's span starting or stopping) later than the given time
@@ -193,7 +201,7 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     *          start at the query time, the second iterator (_2) contains the event which
     *          stop at the query time
     */
-   def eventsAt( time: Long )( implicit tx: S#Tx ) : (Iterator[ S#Tx, Leaf[ S, Elem ]], Iterator[ S#Tx, Leaf[ S, Elem ]])
+   def eventsAt( time: Long )( implicit tx: S#Tx ) : (Iterator[ S#Tx, Leaf[ S, Elem, U ]], Iterator[ S#Tx, Leaf[ S, Elem, U ]])
 
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 

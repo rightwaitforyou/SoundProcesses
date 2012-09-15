@@ -28,10 +28,10 @@ package de.sciss.nuages
 import impl.VisualInstantPresentationImpl
 import javax.swing.JComponent
 import de.sciss.lucre.stm.{Cursor, Sys}
-import de.sciss.synth.proc.{Proc, Transport}
+import de.sciss.synth.proc.{Proc, Transport, ProcTransport}
 
 object VisualInstantPresentation {
-   def apply[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]])
+   def apply[ S <: Sys[ S ]]( transport: ProcTransport[ S ])
                             ( implicit tx: S#Tx, cursor: Cursor[ S ]) : VisualInstantPresentation[ S ] =
       VisualInstantPresentationImpl( transport )
 }

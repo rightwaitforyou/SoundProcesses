@@ -32,7 +32,8 @@ package object proc {
    private[proc] type I = InMemory
 
    type ProcGroup[ S <: Sys[ S ]] = BiGroup[ S, Proc[ S ], Proc.Update[ S ]]
-   type TimedProc[ S <: Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ]]
+   type TimedProc[ S <: Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ], Proc.Update[ S ]]
+   type ProcTransport[ S <: Sys[ S ]] = Transport[ S, Proc[ S ], Proc.Update[ S ]]
    type Param = Double
 
 //   type ScanElem[ S <: Sys[ S ]] = de.sciss.synth.proc.Scan.Elem

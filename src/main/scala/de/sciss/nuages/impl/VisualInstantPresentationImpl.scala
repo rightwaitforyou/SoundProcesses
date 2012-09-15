@@ -27,7 +27,7 @@ package de.sciss.nuages
 package impl
 
 import de.sciss.lucre.stm.{Sys, Cursor}
-import de.sciss.synth.proc.{Proc, Transport, Param}
+import de.sciss.synth.proc.{Proc, Transport, Param, ProcTransport, TimedProc}
 import de.sciss.lucre.bitemp.{BiGroup, SpanLike}
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
 import javax.swing.JComponent
@@ -47,7 +47,7 @@ import prefuse.render.DefaultRendererFactory
 import prefuse.util.force.{AbstractForce, ForceItem}
 
 object VisualInstantPresentationImpl {
-   def apply[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]])
+   def apply[ S <: Sys[ S ]]( transport: ProcTransport[ S ])
                             ( implicit tx: S#Tx, cursor: Cursor[ S ]) : VisualInstantPresentation[ S ] = {
 
 //      require( EventQueue.isDispatchThread, "VisualInstantPresentation.apply must be called on EDT" )
@@ -76,9 +76,9 @@ object VisualInstantPresentationImpl {
          onEDT( vis.playing = b )
       }
 
-      def advance( time: Long, added: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
-                             removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])],
-                              params: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])])( implicit tx: S#Tx ) {
+      def advance( time: Long, added: IIdxSeq[ (SpanLike, TimedProc[ S ])],
+                             removed: IIdxSeq[ (SpanLike, TimedProc[ S ])],
+                              params: IIdxSeq[ (SpanLike, TimedProc[ S ], Map[ String, Param ])])( implicit tx: S#Tx ) {
          val vpRem = removed.flatMap { case (span, timed) =>
             map.get( timed.id ).flatMap { vpm =>
                map.remove( timed.id )
@@ -145,7 +145,7 @@ object VisualInstantPresentationImpl {
    private val colrStop       = Color.black
    private val COLUMN_DATA    = "nuages.data"
 
-   private final class Impl[ S <: Sys[ S ]]( transport: Transport[ S, Proc[ S ]], cursor: Cursor[ S ])
+   private final class Impl[ S <: Sys[ S ]]( transport: ProcTransport[ S ], cursor: Cursor[ S ])
    extends VisualInstantPresentation[ S ] {
       private var playingVar = false
 //      private var vps      = Set.empty[ VisualProc ]

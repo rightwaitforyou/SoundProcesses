@@ -28,11 +28,12 @@ package de.sciss.synth.proc
 import de.sciss.lucre.stm.{Serializer, Sys}
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.{cubShape, sqrShape, welchShape, sinShape, expShape, linShape, stepShape, curveShape, Env}
-import de.sciss.lucre.bitemp.BiPin
+import de.sciss.lucre.bitemp.{BiGroup, BiPin}
 import de.sciss.synth.expr.{Longs, Doubles}
 import de.sciss.lucre.{Writable, DataOutput, DataInput, event => evt}
 import evt.{EventLikeSerializer, Event, EventLike}
 import annotation.switch
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Scan_ {
    type Update[ S <: Sys[ S ]] = BiPin.Update[ S, Elem[ S ], Elem.Update[ S ]]
@@ -62,7 +63,8 @@ object Scan_ {
       // (`BiPin`) already does that for us.
       sealed trait Update[ S <: Sys[ S ]] // { def elem: Elem[ S ]}
       final case class MonoChanged[ S <: Sys[ S ]]( /* elem: Mono[ S ], */ change: evt.Change[ Double ]) extends Update[ S ]
-      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChange: Option[ Scan_.Update[ S ]], offset: Long ) extends Update[ S ]
+//      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChange: Option[ Scan_.Update[ S ]], offset: Long ) extends Update[ S ]
+      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChanges: IIdxSeq[ BiGroup.ElementUpdate[ Proc.Update[ S ]]], offset: Long ) extends Update[ S ]
 
       implicit def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Elem[ S ]] = anySer.asInstanceOf[ Ser[ S ]]
 
@@ -110,9 +112,11 @@ object Scan_ {
                   new Mono.Mut( targets, targetLevel, shape )
 
                case Embedded.cookie =>
-                  val ref           = Scan_.read( in, access )
+//                  val ref           = Scan_.read( in, access )
+                  val ref           = BiGroup.TimedElem.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access )
+                  val key           = in.readString()
                   val offset        = Longs.readExpr( in, access )
-                  new Embedded.Impl( targets, ref, offset )
+                  new Embedded.Impl( targets, ref, key, offset )
 
                case other => sys.error( "Unexpected cookie " + other )
             }
@@ -210,20 +214,22 @@ object Scan_ {
    object Embedded {
       private[Scan_] final val cookie = 2
 
-      def apply[ S <: Sys[ S ]]( ref: Scan[ S ], offset: Expr[ S, Long ])( implicit tx: S#Tx ) : Embedded[ S ] = {
+//      def apply[ S <: Sys[ S ]]( ref: Scan[ S ], offset: Expr[ S, Long ])( implicit tx: S#Tx ) : Embedded[ S ]
+
+      def apply[ S <: Sys[ S ]]( ref: TimedProc[ S ], key: String, offset: Expr[ S, Long ])( implicit tx: S#Tx ) : Embedded[ S ] = {
          val tgt = evt.Targets[ S ] // XXX TODO partial? should reflect ref.targets I guess?
-         new Impl( tgt, ref, offset )
+         new Impl( tgt, ref, key, offset )
       }
 
-      def unapply[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ (Scan[ S ], Expr[ S, Long ]) ] = {
+      def unapply[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ (TimedProc[ S ], String, Expr[ S, Long ]) ] = {
          if( elem.isInstanceOf[ Embedded[ _ ]]) {
             val embedded = elem.asInstanceOf[ Embedded[ S ]]
-            Some( embedded.ref -> embedded.offset )
+            Some( (embedded.ref, embedded.key, embedded.offset) )
          } else None
       }
 
       private[Scan_] final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                                       val ref: Scan[ S ], val offset: Expr[ S, Long ])
+                                                       val ref: TimedProc[ S ], val key: String, val offset: Expr[ S, Long ])
       extends Embedded[ S ] with evt.StandaloneLike[ S, Elem.Update[ S ], Elem[ S ]] {
          override def toString = "Embedded(" + ref + ", " + offset + ")"
 
@@ -253,17 +259,19 @@ object Scan_ {
             } else None
             val offVal  = offUpd.map( _.now ).getOrElse( offset.value )
 
-            Some( Elem.EmbeddedChanged( /* this, */ refUpd, offVal ))
+            Some( Elem.EmbeddedChanged( /* this, */ refUpd.getOrElse( IIdxSeq.empty ), offVal ))
          }
       }
    }
    sealed trait Embedded[ S <: Sys[ S ]] extends Elem[ S ] {
-      def ref: Scan[ S ]
+      def ref: TimedProc[ S ]
+      def key: String
       def offset: Expr[ S, Long ]
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( Embedded.cookie )
          ref.write( out )
+         out.writeString( key )
          offset.write( out )
       }
    }

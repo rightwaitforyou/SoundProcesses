@@ -41,7 +41,7 @@ object TransportImpl {
    private val VERBOSE = false
 
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )
-                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] = {
+                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : ProcTransport[ S ] = {
       val targets    = evt.Targets[ S ]
       val id         = targets.id
       val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
@@ -51,12 +51,12 @@ object TransportImpl {
       new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, csrPos )
    }
 
-   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]) : evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] =
+   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]) : evt.NodeSerializer[ S, ProcTransport[ S ]] =
       new Ser[ S ]
 
    private final class Ser[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ])
-   extends evt.NodeSerializer[ S, Transport[ S, Proc[ S ]]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Transport[ S, Proc[ S ]] = {
+   extends evt.NodeSerializer[ S, ProcTransport[ S ]] {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ProcTransport[ S ] = {
          val id         = targets.id
          val group      = ProcGroup_.read( in, access )
          val sampleRate = in.readDouble()
@@ -85,10 +85,12 @@ object TransportImpl {
 //      in._2.map { case (_, proc) => (span, proc) }
 //   }
 
-   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ BiGroup.TimedElem[ S, Proc[ S ]]])) : IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]])] = {
+   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ TimedProc[ S ]])) : IIdxSeq[ (SpanLike, TimedProc[ S ])] = {
       val span = in._1
       in._2.map { span -> _ }
    }
+
+   private type ProcTransportUpd[ S <: Sys[ S ]] = Transport.Update[ S, Proc[ S ], Proc.Update[ S ]]
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
                                              group: ProcGroup[ S ],
@@ -96,9 +98,9 @@ object TransportImpl {
                                              validVar: S#Var[ Int ], lastTime: S#Var[ Long ],
                                              csrPos: S#Acc )
                                            ( implicit cursor: Cursor[ S ])
-   extends Transport[ S, Proc[ S ]]
-   with evt.Trigger.Impl[ S, Transport.Update[ S, Proc[ S ]], Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
-   with evt.StandaloneLike[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]]
+   extends Transport[ S, Proc[ S ], Proc.Update[ S ]]
+   with evt.Trigger.Impl[ S, ProcTransportUpd[ S ], ProcTransportUpd[ S ], ProcTransport[ S ]]
+   with evt.StandaloneLike[ S, ProcTransportUpd[ S ], ProcTransport[ S ]]
 //   with evt.Root[ S, Transport.Update[ S, Proc[ S ]]]
    {
       me =>
@@ -144,9 +146,9 @@ object TransportImpl {
          evt.Intruder.-/->( group.changed, this )
       }
 
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Transport.Update[ S, Proc[ S ]]] = {
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ProcTransportUpd[ S ]] = {
          if( pull.parents( this ).isEmpty ) {
-            pull.resolve[ Transport.Update[ S, Proc[ S ]]]
+            pull.resolve[ ProcTransportUpd[ S ]]
          } else {
             /*
                XXX TODO: if the transport is running
@@ -179,7 +181,7 @@ object TransportImpl {
          }
       }
 
-      def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])] =
+      def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
          group.intersect( time ).flatMap( flatSpans )
 
       def seek( time: Long )( implicit tx: S#Tx ) {
@@ -210,7 +212,7 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
          } else (IIdxSeq.empty, IIdxSeq.empty)
 
          val params = if( hasParEvent  ) {
-            var res = IIdxSeq.empty[ (SpanLike, BiGroup.TimedElem[ S, Proc[ S ]], Map[ String, Param ])]
+            var res = IIdxSeq.empty[ (SpanLike, TimedProc[ S ], Map[ String, Param ])]
             group.intersect( newFrame ).foreach { case (span, entries) =>
                entries.foreach { case timed =>
 // XXX TODO
@@ -297,7 +299,7 @@ if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + ef
             STMTxn.afterCommit( _ => {
                pool.schedule( new Runnable {
                   def run() { cursor.step { implicit tx =>
-                     val self = tx.refresh[ Transport[ S, Proc[ S ]]]( csrPos, me )
+                     val self = tx.refresh[ ProcTransport[ S ]]( csrPos, me )
                      self.eventReached( v, logical + delay, oldFrame, newFrame, hasProcEvent, hasParEvent )
                   }}
                }, effective, TimeUnit.MICROSECONDS )
@@ -321,8 +323,8 @@ if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + ef
 
       // ---- event stuff ----
 
-      def changed : Event[ S, Transport.Update[ S, Proc[ S ]], Transport[ S, Proc[ S ]]] = this
+      def changed : Event[ S, ProcTransportUpd[ S ], ProcTransport[ S ]] = this
 
-      protected def reader: evt.Reader[ S, Transport[ S, Proc[ S ]]] = serializer[ S ]
+      protected def reader: evt.Reader[ S, ProcTransport[ S ]] = serializer[ S ]
    }
 }

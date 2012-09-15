@@ -10,21 +10,21 @@ import data.Iterator
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
-                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ]] =
+                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ], Proc.Update[ S ]] =
       impl.TransportImpl( group, sampleRate )
 
-   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ]]] =
+   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ], Proc.Update[ S ]]] =
          impl.TransportImpl.serializer( cursor )
 
-   sealed trait Update[ S <: Sys[ S ], Elem ] { def transport: Transport[ S, Elem ]}
+   sealed trait Update[ S <: Sys[ S ], Elem, U ] { def transport: Transport[ S, Elem, U ]}
 
-   final case class Advance[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ], playing: Boolean,
+   final case class Advance[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], playing: Boolean,
                                                     time: Long,
-                                                    added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
-                                                    removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
-                                                    params:  IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ],
+                                                    added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem, U ])],
+                                                    removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem, U ])],
+                                                    params:  IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem, U ],
                                                        Map[ String, Param ])])
-   extends Update[ S, Elem ] {
+   extends Update[ S, Elem, U ] {
       override def toString =
          (if( playing ) "Advance" else "Seek") + "(" + transport + ", " + time +
             (if( added.nonEmpty )   added.mkString(   ", added = ",   ",", "" ) else "") +
@@ -32,10 +32,10 @@ object Transport {
             (if( params.nonEmpty )  params.mkString(  ", params = ",  ",", "" ) else "") + ")"
    }
 
-   final case class Play[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
-   final case class Stop[ S <: Sys[ S ], Elem ]( transport: Transport[ S, Elem ]) extends Update[ S, Elem ]
+   final case class Play[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
+   final case class Stop[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
 }
-trait Transport[ S <: Sys[ S ], Elem ] extends evt.Node[ S ] with Chronos[ S ] {
+trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S ] {
    def id: S#ID
 
    def seek( time: Long )( implicit tx: S#Tx ) : Unit
@@ -44,9 +44,9 @@ trait Transport[ S <: Sys[ S ], Elem ] extends evt.Node[ S ] with Chronos[ S ] {
 
    def sampleRate: Double
 
-   def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])]
+   def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem, U ])]
 
-   def changed: Event[ S, Transport.Update[ S, Elem ], Transport[ S, Elem ]]
+   def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
 
    // unfortunately this needs to go in the API because of the self-access problem
    private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
