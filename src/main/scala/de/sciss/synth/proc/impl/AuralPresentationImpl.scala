@@ -206,7 +206,7 @@ object AuralPresentationImpl {
                   case seg @ Scan_.Value.MonoSegment( _, _, _, _ ) =>
                      val aural = viewMap.getOrElse( proc.id, sys.error( "Missing aural view of process " + proc ))
                      implicit val procTxn = ProcTxn()( tx.peer )
-                     val bus   = aural.getBus( key ).getOrElse {
+                     val bus = aural.getBus( key ).getOrElse {
                         val _bus = RichBus.audio( server, 1 )
                         aural.setBus( key, Some( _bus ))
                         _bus

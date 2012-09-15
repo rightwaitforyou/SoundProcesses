@@ -377,9 +377,12 @@ kann nicht funktionieren, weil force auch von dependent GE aufgerufen wird (e.g.
 
 :::::::::::::::
 
-
-
-
+import concurrent.stm._
+// how does nesting work?
+val r = Ref( 11 )
+atomic { implicit tx => r() = 22; atomic.oneOf({ implicit tx => r() = 33; retry }, { implicit tx => r() = 44; sys.error( "no way jose" )})}
+// should return 22, but does return 11 :-(
+r.single.get
 
 
 
