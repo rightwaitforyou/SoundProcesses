@@ -37,6 +37,9 @@ object scan {
 //      def dir: ProcGraph.Direction
 //   }
 
+   private[proc] def outControlName( key: String ) : String = "$out_" + key
+   private[proc] def inControlName(  key: String ) : String = "$in_" + key
+
    private final case class In( key: String, default: Double )
    extends GE.Lazy /* with Elem */ with AudioRated {
       def displayName = "scan.In"
@@ -47,7 +50,7 @@ object scan {
          UGenGraph.builder match {
             case b: UGenGraphBuilder[ _ ] =>
                val numChannels = b.addScanIn( key )
-               val ctlName = "$in_" + key
+               val ctlName = inControlName( key )
                if( numChannels == 1 ) {
                   ctlName.ar( default ).expand
                } else if( numChannels > 1 ) {
@@ -87,7 +90,7 @@ object scan {
 //      }
 
       protected def makeUGens {
-         val bus = ("$out_" + key).kr
+         val bus = outControlName( key ).kr
          unwrap( IIdxSeq( bus.expand ) ++ in.expand.outputs )
       }
 

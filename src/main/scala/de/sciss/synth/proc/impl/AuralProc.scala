@@ -39,8 +39,8 @@ object AuralProc {
 //      }
 //   }
 
-   def apply( /* server: Server, */ synth: RichSynth /*, initName: String, initGraph: SynthGraph, entries: Map[ String, Param ] */) : AuralProc = {
-      new Impl( /* server, */ synth /*, initName, initGraph, entries */ )
+   def apply( synth: RichSynth, outBuses: Map[ String, RichAudioBus ], busUsers: Iterable[ DynamicBusUser ]) : AuralProc = {
+      new Impl( synth, outBuses, busUsers )
    }
 
    /*
@@ -54,7 +54,7 @@ object AuralProc {
                                        core: Option[ RichGroup ] = None,
                                        post: Option[ RichGroup ] = None, back: Option[ RichGroup ] = None )
 
-   private final class Impl( /* val server: Server, */ synth: RichSynth  /*, name0: String, graph0: SynthGraph, entries0: Map[ String, Param ] */)
+   private final class Impl( synth: RichSynth, outBuses: Map[ String, RichAudioBus ], busUsers: Iterable[ DynamicBusUser ])
    extends AuralProc {
 
       private val groupsRef   = Ref[ Option[ AllGroups ]]( None )
@@ -100,7 +100,7 @@ object AuralProc {
       def groupOption( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupsRef.get( tx.peer ).map( _.main )
 
       def group()( implicit tx: ProcTxn ) : RichGroup = {
-         groupOption getOrElse {
+         groupOption.getOrElse {
             val g    = Group( server )
             val res  = RichGroup( g )
             res.play( RichGroup.default( server ))
@@ -130,7 +130,7 @@ object AuralProc {
 
       def preGroup()( implicit tx: ProcTxn ) : RichGroup = {
          implicit val itx = tx.peer
-         preGroupOption getOrElse {
+         preGroupOption.getOrElse {
             val g       = Group( server )
             val res     = RichGroup( g )
             /* val main = */ group()      // creates group if necessary
@@ -195,6 +195,7 @@ val addAction = addBefore
 //         val synth = synthRef.swap( None )( tx.peer )
 //         synth.foreach( _.free() )
          synth.free()
+         busUsers.foreach( _.remove() )
       }
 
 //      def playing( implicit tx: ProcTxn ) : Boolean = synthRef.get( tx.peer ).map( _.isOnline.get ).getOrElse( false )
@@ -202,8 +203,9 @@ val addAction = addBefore
 //         if( p ) play() else stop()
 //      }
 
-      def getBus( key: String )( implicit tx: ProcTxn ) : Option[ RichAudioBus ] = ???
-      def setBus( key: String, bus: Option[ RichAudioBus ]) { ??? }
+      // XXX if they stay static that way, we can remove the tx argument
+      def getBus( key: String )( implicit tx: ProcTxn ) : Option[ RichAudioBus ] = outBuses.get( key )
+//      def setBus( key: String, bus: Option[ RichAudioBus ]) { ??? }
 
 //      def addParams( map: Map[ String, Param ])( implicit tx: ProcTxn ) {
 //         if( map.nonEmpty ) {
@@ -243,7 +245,7 @@ sealed trait AuralProc /* extends Writer */ {
 //   def graph_=( g: SynthGraph )( implicit tx: ProcTxn ) : Unit
 
    def getBus( key: String )( implicit tx: ProcTxn ) : Option[ RichAudioBus ]
-   def setBus( key: String, bus: Option[ RichAudioBus ])
+//   def setBus( key: String, bus: Option[ RichAudioBus ])
 
 //   def freq( implicit tx: ProcTxn ) : Double
 //   def freq_=( f: Double )( implicit tx: ProcTxn ) : Unit

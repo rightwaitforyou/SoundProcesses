@@ -32,9 +32,10 @@ import stm.{IdentifierMap, Sys, Cursor}
 import bitemp.Chronos
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{InTxn, TxnLocal, Ref, Txn}
+import concurrent.stm.{InTxn, TxnLocal, Txn}
 import SoundProcesses.logConfig
 import UGenGraphBuilder.MissingIn
+import graph.scan
 
 object AuralPresentationImpl {
    def run[ S <: Sys[ S ]]( transport: ProcTransport[ S ], aural: AuralSystem )
@@ -243,13 +244,54 @@ object AuralPresentationImpl {
                // as well as setting and mapping controls)
                val df            = ProcDemiurg.getSynthDef( server, ug ) // RichSynthDef()
                val synth         = df.play( target = RichGroup.default( server ), addAction = addToHead )
-               // wrap as AuralProc and save it in the identifier map for later lookup
-               val aural         = AuralProc( synth )
-               viewMap.put( builder.id, aural )
 
-               builder.outBuses.foreach { case (key, bus) =>
+               // ---- handle input buses ----
+               val time       = ugen.time
+               val timed      = ugen.timed
+               var setMap     = IIdxSeq.empty[ ControlSetMap ]
+               var busUsers   = IIdxSeq.empty[ DynamicBusUser ]
 
+               ugen.scanIns.foreach { case (key, numCh) =>
+                  import Scan_.Value._
+
+                  def ensureChannels( n: Int ) {
+                     require( n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")" )
+                  }
+
+                  def makeBusMapper( t: TimedProc[ S ], k: String ) {
+                     val bus = getBus( t, k ).getOrElse( // ... or could just stick with the default control value
+                        sys.error( "Bus disappeared " + t.value + " -> " + k ))
+                     ensureChannels( bus.numChannels )  // ... or could insert a channel coercing synth
+                     val bm = BusNodeSetter.mapper( scan.inControlName( key /* ! not k */ ), bus, synth )
+                     bm.add()
+                     busUsers :+= bm
+                  }
+
+                  timed.value.scans.valueAt( key, time ).foreach {   // if not found, stick with default
+                     case MonoConst( c ) =>
+                        ensureChannels( 1 )  // ... or could just adjust to the fact that they changed
+                        setMap :+= ((key -> c) : ControlSetMap)
+
+                     case MonoSegment( _, _, _, _ ) =>
+                        ensureChannels( 1 )  // ... or could just adjust to the fact that they changed
+                        ??? // MonoSegmentWriter
+
+                     case Source                         => makeBusMapper( timed,       key       )
+                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
+                  }
                }
+
+               // ---- handle output buses ----
+               val outBuses      = builder.outBuses
+               builder.outBuses.foreach { case (key, bus) =>
+                  val bw = BusNodeSetter.writer( scan.outControlName( key ), bus, synth )
+                  bw.add()
+                  busUsers :+= bw
+               }
+
+               // wrap as AuralProc and save it in the identifier map for later lookup
+               val aural = AuralProc( synth, outBuses, busUsers )
+               viewMap.put( builder.id, aural )
 
             } else {
                println( "Warning: Incomplete aural proc build for " + ugen.timed.value )
@@ -257,8 +299,8 @@ object AuralPresentationImpl {
          }
       }
 
-      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
-         val busOpt = viewMap.get( timed.id ) match {
+      private def getBus( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Option[ RichAudioBus ] = {
+         viewMap.get( timed.id ) match {
             case Some( aural ) =>
                implicit val ptx = ProcTxn()( tx.peer )
                aural.getBus( key )
@@ -267,19 +309,24 @@ object AuralPresentationImpl {
                   map.get( timed.id ).flatMap( _.outBuses.get( key ))
                }
          }
+      }
 
-         busOpt.map( _.numChannels ).getOrElse( throw MissingIn( timed, key ))
+      private def getBusNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
+         val bus = getBus( timed, key ).getOrElse( throw MissingIn( timed, key ))
+         bus.numChannels
       }
 
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
+         // XXX TODO: since we are only interested in the number of channels at this point,
+         // we might add a more efficient method to `Scans`
          timed.value.scans.valueAt( key, time ) match {
             case Some( value ) =>
                import Scan_.Value._
                value match {
                   case MonoConst( _ )                 => 1
                   case MonoSegment( _, _, _, _ )      => 1
-                  case Source                         => getNumChannels( timed, key )
-                  case Sink( sourceTimed, sourceKey ) => getNumChannels( sourceTimed, sourceKey )
+                  case Source                         => getBusNumChannels( timed, key )
+                  case Sink( sourceTimed, sourceKey ) => getBusNumChannels( sourceTimed, sourceKey )
                }
             case _ => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
          }
@@ -311,9 +358,9 @@ object AuralPresentationImpl {
       }
 
       private def buildAuralProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
-         val ugen    = UGenGraphBuilder( this, timed, time )
-         val builder = new AuralProcBuilder( ugen, Map.empty )
-         val ongoing = ongoingBuild.get( tx.peer )
+         val ugen      = UGenGraphBuilder( this, timed, time )
+         val builder   = new AuralProcBuilder( ugen, Map.empty )
+         val ongoing   = ongoingBuild.get( tx.peer )
          ongoing.seq :+= builder
          incrementalBuild( ongoing, builder )
       }

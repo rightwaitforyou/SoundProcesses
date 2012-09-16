@@ -76,7 +76,7 @@ object ScansTest extends App {
       val p1 = Proc[ S ]()
       val p2 = Proc[ S ]()
 
-      val t1 = 4 * 44100L
+      val t1 = 1 /* 4 */ * 44100L
       val t2 = 1 * 44100L // 0L -- note: currently skipped by transport
 
       val tp1 = group.add( Span.from( t1 ), p1 )

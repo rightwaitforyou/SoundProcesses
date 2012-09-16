@@ -49,7 +49,7 @@ private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
    /**
     * Current set of used inputs. This is guaranteed to only grow during incremental building, never shrink.
     */
-   def scanIns : Set[ String ]
+   def scanIns : Map[ String, Int ] // Set[ String ]
    /**
     * Current set of used outputs. This is guaranteed to only grow during incremental building, never shrink.
     */
@@ -63,6 +63,8 @@ private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
    def isComplete : Boolean
 
    def timed: TimedProc[ S ]
+
+   def time: Long
 
    def tx: S#Tx
 

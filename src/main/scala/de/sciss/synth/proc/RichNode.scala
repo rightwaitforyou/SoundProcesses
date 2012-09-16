@@ -23,12 +23,12 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Ref => ScalaRef}
-import ProcTxn.{FilterMode, IfChanges}
-import de.sciss.synth.{ControlABusMap, ControlKBusMap, ControlSetMap, Node}
+import ProcTxn.IfChanges
 
 object RichNode {
    private val EmptyOnEnd = new OnEnd( IIdxSeq.empty, IIdxSeq.empty )
@@ -36,38 +36,12 @@ object RichNode {
       def nonEmpty = direct.nonEmpty || inTxn.nonEmpty
    }
 }
-abstract class RichNode( val initOnline : Boolean ) /* extends RichObject */ {
+abstract class RichNode( val initOnline: Boolean ) /* extends RichObject */ {
    import RichNode._
 
    final val isOnline: RichState = new RichState( this, "isOnline", initOnline )
 //   private val onEndFuns   = Ref( IQueue.empty[ Function1[ ProcTxn, Unit ]])
    private val onEndFuns   = ScalaRef( EmptyOnEnd )
-
-   // ---- constructor ----
-//   node.onEnd {
-//      ProcTxn.atomic { implicit tx =>
-//         isOnline.set( false )
-//         val e = onEndFuns.swap( EmptyOnEnd )
-//         if( e.nonEmpty ) {
-//            tx.afterCommit { _ =>
-//               if( e.inTxn.nonEmpty ) ProcTxn.spawnAtomic { implicit tx =>
-//                  e.inTxn.foreach { f => try {
-//                     f( tx )
-//                  } catch {
-//                     case ex => ex.printStackTrace()
-//                  }}
-//               }
-//               if( e.direct.nonEmpty ) {
-//                  e.direct.foreach { f => try {
-//                     f()
-//                  } catch {
-//                     case ex => ex.printStackTrace()
-//                  }}
-//               }
-//            }
-//         }
-//      }
-//   }
 
    def onEndTxn( fun: ProcTxn => Unit )( implicit tx: ProcTxn ) {
       onEndFuns.transform( e => e.copy( inTxn = e.inTxn :+ fun ))( tx.peer )
@@ -76,26 +50,6 @@ abstract class RichNode( val initOnline : Boolean ) /* extends RichObject */ {
    def onEnd( code: => Unit )( implicit tx: ProcTxn ) {
       onEndFuns.transform( e => e.copy( direct = e.direct :+ (() => code) ))( tx.peer )
    }
-
-////   def onEnd( fun: ProcTxn => Unit )( implicit tx: ProcTxn )
-//   def onEnd( code: => Unit )( implicit tx: ProcTxn ) {
-//      onEndFuns.transform { queue =>
-////         if( queue.isEmpty ) node.onEnd {
-////            ProcTxn.spawnAtomic { implicit tx =>
-////// since we are now executing the txn only when there are client
-////// onEnd functions, it doesn't make sense to re-set the isOnline.
-////// i don't think it should be used anyways, as nodes are
-////// better created anew each time instead of reusing old ids.
-//////               val wasOnline  = isOnline.swap( false )
-////               val funs       = onEndFuns.swap( IQueue.empty )
-////               funs.foreach( f => try {
-////                  f( tx )
-////               } catch { case e => e.printStackTrace })
-////            }
-////         }
-//         queue.enqueue( () => code )
-//      }
-//   }
 
    def node: Node
 
@@ -158,50 +112,58 @@ abstract class RichNode( val initOnline : Boolean ) /* extends RichObject */ {
    }
 
    private def registerSetter( bns: BusNodeSetter )( implicit tx: ProcTxn ) {
-      bns.add
-      onEndTxn { tx0 => bns.remove( tx0 )}
+      bns.add()
+      onEndTxn { implicit tx => bns.remove() }
    }
 
    final def free( audible: Boolean = true )( implicit tx: ProcTxn ) {
-      tx.add( node.freeMsg, Some( (IfChanges, isOnline, false) ), audible, Map( isOnline -> true ))
+      tx.add( node.freeMsg, change = Some( (IfChanges, isOnline, false) ), audible = audible,
+              dependencies = Map( isOnline -> true ))
    }
 
    final def set( audible: Boolean, pairs: ControlSetMap* )( implicit tx: ProcTxn ) {
-      tx.add( node.setMsg( pairs: _* ), None, audible, Map( isOnline -> true ))
+      tx.add( node.setMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
    final def setIfOnline( pairs: ControlSetMap* )( implicit tx: ProcTxn ) {
       // XXX eventually this should be like set with different failure resolution
-      if( isOnline.get ) tx.add( node.setMsg( pairs: _* ), None, true, noErrors = true )
+      if( isOnline.get ) tx.add( node.setMsg( pairs: _* ), change = None, audible = true, noErrors = true )
 //      if( isOnline.get ) tx.add( OSCBundle(
 //         OSCMessage( "/error", -1 ), node.setMsg( pairs: _* ), OSCMessage( "/error", -2 )), true )
    }
 
    final def mapn( audible: Boolean, pairs: ControlKBusMap* )( implicit tx: ProcTxn ) {
-      tx.add( node.mapnMsg( pairs: _* ), None, audible, Map( isOnline -> true ))
+      tx.add( node.mapnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
    final def mapan( audible: Boolean, pairs: ControlABusMap* )( implicit tx: ProcTxn ) {
-      tx.add( node.mapanMsg( pairs: _* ), None, audible, Map( isOnline -> true ))
+      tx.add( node.mapanMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
    final def moveToHead( audible: Boolean, group: RichGroup )( implicit tx: ProcTxn ) {
-      tx.add( node.moveToHeadMsg( group.group ), None, audible, Map( isOnline -> true, group.isOnline -> true ))
+      tx.add( node.moveToHeadMsg( group.group ), change = None, audible = audible,
+              dependencies = Map( isOnline -> true, group.isOnline -> true ))
    }
 
    final def moveToHeadIfOnline( group: RichGroup )( implicit tx: ProcTxn ) {
-      if( isOnline.get ) tx.add( node.moveToHeadMsg( group.group ), None, true, Map( group.isOnline -> true ), true )
+      if( isOnline.get ) {
+         tx.add( node.moveToHeadMsg( group.group ), change = None, audible = true,
+                 dependencies = Map( group.isOnline -> true ), true )
+      }
    }
 
    final def moveToTail( audible: Boolean, group: RichGroup )( implicit tx: ProcTxn ) {
-      tx.add( node.moveToTailMsg( group.group ), None, audible, Map( isOnline -> true, group.isOnline -> true ))
+      tx.add( node.moveToTailMsg( group.group ), change = None, audible = audible,
+              dependencies = Map( isOnline -> true, group.isOnline -> true ))
    }
 
    final def moveBefore( audible: Boolean, target: RichNode )( implicit tx: ProcTxn ) {
-      tx.add( node.moveBeforeMsg( target.node ), None, audible, Map( isOnline -> true, target.isOnline -> true ))
+      tx.add( node.moveBeforeMsg( target.node ), change = None, audible = audible,
+              dependencies = Map( isOnline -> true, target.isOnline -> true ))
    }
 
    final def moveAfter( audible: Boolean, target: RichNode )( implicit tx: ProcTxn ) {
-      tx.add( node.moveAfterMsg( target.node ), None, audible, Map( isOnline -> true, target.isOnline -> true ))
+      tx.add( node.moveAfterMsg( target.node ), change = None, audible = audible,
+              dependencies = Map( isOnline -> true, target.isOnline -> true ))
    }
 }

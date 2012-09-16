@@ -14,7 +14,7 @@ private[proc] object UGenGraphBuilderImpl {
       new Impl( aural, timed, time, timed.value.graph.value, tx )
 
    private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ],
-                                             val timed: TimedProc[ S ], time: Long, g: SynthGraph, val tx: S#Tx )
+                                             val timed: TimedProc[ S ], val time: Long, g: SynthGraph, val tx: S#Tx )
    extends BasicUGenGraphBuilder with UGenGraphBuilder[ S ] {
       builder =>
 
@@ -25,7 +25,7 @@ private[proc] object UGenGraphBuilderImpl {
       private var remaining: IIdxSeq[ Lazy ]                   = g.sources
       private var controlProxies: ISet[ ControlProxyLike[ _ ]] = g.controlProxies
       var scanOuts                                             = Map.empty[ String, Int ]
-      var scanIns                                              = Set.empty[ String ] // , Scan_.Value[ S ]]
+      var scanIns                                              = Map.empty[ String, Int ]
 //      private var missingScanIns                               = Set.empty[ String ]
       var missingIns                                           = Set.empty[ MissingIn[ S ]]
 
@@ -33,7 +33,7 @@ private[proc] object UGenGraphBuilderImpl {
 
       def addScanIn( key: String ) : Int = {
          val res = aural.scanInNumChannels( timed, time, key )( tx )
-         scanIns += key // -> value
+         scanIns += key -> res
          res
       }
 
