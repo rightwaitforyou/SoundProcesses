@@ -94,13 +94,14 @@ object ScansTest extends App {
       }
 
       import ugen._
+      import graph.scan
 
       p1.graph_=( SynthGraph {
-         graph.scan( "out" ) := SinOsc.ar( 100 ).linexp( -1, 1, 30, 3000 )
+         scan( "out" ) := SinOsc.ar( 100 ).linexp( -1, 1, 30, 3000 )
       })
 
       p2.graph_=( SynthGraph {
-         val freq = graph.scan( "freq" ).ar( 333 )
+         val freq = scan( "freq" ).ar( 333 )
          Out.ar( 0, SinOsc.ar( freq ))
       })
 

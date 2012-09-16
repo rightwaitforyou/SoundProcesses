@@ -97,7 +97,7 @@ private[proc] object UGenGraphBuilderImpl {
 
       def isComplete = remaining.isEmpty
 
-      def finish : UGenGraph = {
+      def finish : UGenGraph = UGenGraph.use( this ) {
          require( isComplete )
          build( controlProxies )
       }
