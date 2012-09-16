@@ -211,11 +211,11 @@ object AuralPresentationImpl {
       def id: S#ID = ugen.timed.id
    }
 
-   private final case class OngoingBuild[ S <: Sys[ S ]]( missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
+   private final case class OngoingBuild[ S <: Sys[ S ]]( var missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
                                                             Map.empty[  MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
-                                                          idMap: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
+                                                          var idMap: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
                                                             None,
-                                                          seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
+                                                          var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
@@ -233,15 +233,24 @@ object AuralPresentationImpl {
          ongoingBuild.get( itx ).seq.foreach { builder =>
             val ugen          = builder.ugen
             if( ugen.isComplete ) {
+               // finalise the ugen graph
                val ug            = ugen.finish
                implicit val tx   = ugen.tx
                implicit val itx  = tx.peer
                implicit val ptx  = ProcTxn()
+               // get a rich synth def and synth playing just in the default group
+               // (we'll have additional messages moving the group into place if needed,
+               // as well as setting and mapping controls)
                val df            = ProcDemiurg.getSynthDef( server, ug ) // RichSynthDef()
-   //            val rdf           = RichSynthDef( server, df )
                val synth         = df.play( target = RichGroup.default( server ), addAction = addToHead )
+               // wrap as AuralProc and save it in the identifier map for later lookup
                val aural         = AuralProc( synth )
                viewMap.put( builder.id, aural )
+
+               builder.outBuses.foreach { case (key, bus) =>
+
+               }
+
             } else {
                println( "Warning: Incomplete aural proc build for " + ugen.timed.value )
             }
@@ -304,12 +313,13 @@ object AuralPresentationImpl {
       private def buildAuralProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
          val ugen    = UGenGraphBuilder( this, timed, time )
          val builder = new AuralProcBuilder( ugen, Map.empty )
-         ongoingBuild.transform( b => b.copy( seq = b.seq :+ builder ))( tx.peer )
-         incrementalBuild( builder )
+         val ongoing = ongoingBuild.get( tx.peer )
+         ongoing.seq :+= builder
+         incrementalBuild( ongoing, builder )
       }
 
       // note: builder.outBuses will be updated by this method
-      private def incrementalBuild( builder: AuralProcBuilder[ S ])( implicit tx: S#Tx ) {
+      private def incrementalBuild( ongoing: OngoingBuild[ S ], builder: AuralProcBuilder[ S ])( implicit tx: S#Tx ) {
          // simpler algorithm (does not allow for circular relationships):
          // - just store with the missing keys, and wait for other finished ugs to show up within the txn
 
@@ -334,55 +344,55 @@ object AuralPresentationImpl {
          }
 
          implicit val itx     = tx.peer
-         val oldOngoing       = ongoingBuild()
+//         val oldOngoing       = ongoingBuild()
 //         // if the ugen build completed, add it to the complete set
 //         val newOngoing0 = if( ugen.isComplete ) {
 //            oldOngoing.copy( seq = oldOngoing.seq :+ builder )
 //         } else oldOngoing
-val newOngoing0 = oldOngoing
+//val newOngoing0 = ongoingBuild()
 
          // initialise the id-to-builder map if necessary
-         val (newOngoing1, builderMap) = newOngoing0.idMap match {
-            case Some( m ) => newOngoing0 -> m
-            case _ =>
-               val m = tx.newInMemoryIDMap[ AuralProcBuilder[ S ]]
-               newOngoing0.copy( idMap = Some( m )) -> m
+         val builderMap = ongoing.idMap.getOrElse {
+            val m = tx.newInMemoryIDMap[ AuralProcBuilder[ S ]]
+            ongoing.idMap = Some( m )
+            m
          }
          // add the (possibly new) builder to it. redundant overwrites do not cause problems
          builderMap.put( ugen.timed.id, builder )
 
          // if the last iteration did not complete the build process, store the missing in keys
-         val newOngoing2 = if( !ugen.isComplete ) {
-            var newMissing = newOngoing1.missingMap
+         if( !ugen.isComplete ) {
+            var newMissing = ongoing.missingMap
             ugen.missingIns.foreach { miss =>
                newMissing += miss -> (newMissing.getOrElse( miss, Set.empty ) + builder)
             }
-            newOngoing1.copy( missingMap = newMissing )
-         } else newOngoing1
+            ongoing.missingMap = newMissing
+         }
 
          // if new scan outputs have been determined, find out whether other incomplete
          // processes depend on them, so that their building might be advanced
-         val (retry, newOngoing3) = if( newOuts.nonEmpty ) {
+         val retry = if( newOuts.nonEmpty ) {
             // the retried entries are those whose missing scan in corresponds
             // to any of the newly determined scan outs
             val keys: Set[ MissingIn[ S ]] = newOuts.map({ case (key, _) => MissingIn( ugen.timed, key )})( breakOut )
             // divide missing map according to these keys
-            val (retE, keep) = newOngoing2.missingMap.partition { case (key, _) => keys.contains( key )}
+            val (retE, keep) = ongoing.missingMap.partition { case (key, _) => keys.contains( key )}
             // merge all the found builder sets together
             val ret: Set[ AuralProcBuilder[ S ]] = retE.flatMap( _._2 )( breakOut )
             // ...and update the ongoing information by removing the builders to retry from the missing map
             // (they will add themselves again in the recursive `afterIncr` call)
-            ret -> newOngoing2.copy( missingMap = keep )
+            ongoing.missingMap = keep
+            ret
 
          } else {
-            Set.empty[ AuralProcBuilder[ S ]] -> newOngoing2
+            Set.empty[ AuralProcBuilder[ S ]]
          }
 
-         // store the most recent version of the updated ongoing build information
-         ongoingBuild.set( newOngoing3 )
+//         // store the most recent version of the updated ongoing build information
+//         ongoingBuild.set( newOngoing3 )
 
          // advance the ugen graph builder for all processes which have been selected for retry
-         retry.foreach( incrementalBuild )
+         retry.foreach( r => incrementalBuild( ongoing, r ))
       }
 
       def procRemoved( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
