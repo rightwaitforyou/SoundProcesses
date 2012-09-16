@@ -156,13 +156,14 @@ object ProcImpl {
          }
 
          def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] =
-            flatValueAt( None, key, time )
+            flatValueAt( this, None, key, time )
 
-         @tailrec private def flatValueAt( sourceOption: Option[ TimedProc[ S ]], key: String, time: Long )
+         @tailrec private def flatValueAt( scans: Scans[ S ], sourceOption: Option[ TimedProc[ S ]],
+                                           key: String, time: Long )
                                          ( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
-            scanMap.get( key ) match {
-               case Some( entry ) =>
-                  val scan = entry.value
+            scans.get( key ) match {
+               case Some( scan ) =>
+//                  val scan = entry.value
                   scan.floor( time ) match {
                      case Some( (floorTime, floorElem) ) =>
                         floorElem match {
@@ -190,7 +191,7 @@ object ProcImpl {
                               }
                            case Scan_.Embedded( sourceTimed, sourceKey, offsetEx ) =>
                               val offset = offsetEx.value
-                              flatValueAt( Some( sourceTimed ), sourceKey, time + offset )  // tail-rec
+                              flatValueAt( sourceTimed.value.scans, Some( sourceTimed ), sourceKey, time + offset )  // tail-rec
                         }
 
                      case _ => None

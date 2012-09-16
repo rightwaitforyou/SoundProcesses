@@ -94,7 +94,8 @@ object ScansTest extends App {
       }
 
       for( Scan_.Modifiable( s1 ) <- p1.scans.get( "out" )) {
-         s1.add( 0L, Scan_.Mono( 441 ))
+//         s1.add( 0L, Scan_.Mono( 441 ))
+         s1.add( 0L, Scan_.Synthesis() )
       }
 
       import ugen._
