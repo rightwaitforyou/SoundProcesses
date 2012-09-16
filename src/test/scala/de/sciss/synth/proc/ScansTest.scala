@@ -56,6 +56,7 @@ object ScansTest extends App {
    def run() {
       implicit val sys = makeSys()
       lazy val server: AuralSystem = AuralSystem().start().whenStarted { _ =>
+//         Thread.sleep( 1000 )
          sys.step { implicit tx =>
             val group   = ProcGroup_.Modifiable[ S ]
             val transp  = Transport( group )
@@ -69,11 +70,14 @@ object ScansTest extends App {
    }
 
    def test /* [ S <: Sys[ S ]] */( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
+
+      SoundProcesses.showLog = true
+
       val p1 = Proc[ S ]()
       val p2 = Proc[ S ]()
 
       val t1 = 4 * 44100L
-      val t2 = 0L
+      val t2 = 1 * 44100L // 0L -- note: currently skipped by transport
 
       val tp1 = group.add( Span.from( t1 ), p1 )
       group.add( Span.from( t2 ), p2 )
@@ -102,6 +106,7 @@ object ScansTest extends App {
 
       p2.graph_=( SynthGraph {
          val freq = scan( "freq" ).ar( 333 )
+//         freq.poll
          Out.ar( 0, SinOsc.ar( freq ))
       })
 
