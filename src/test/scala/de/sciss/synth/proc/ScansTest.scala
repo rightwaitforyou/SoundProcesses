@@ -76,8 +76,8 @@ object ScansTest extends App {
       val p1 = Proc[ S ]()
       val p2 = Proc[ S ]()
 
-      val t1 = 1 /* 4 */ * 44100L
-      val t2 = 1 * 44100L // 0L -- note: currently skipped by transport
+      val t1 = 1 /* 4 */ * 44100L   // XXX TODO eventually should appear later
+      val t2 = 1 * 44100L // XXX TODO must currently be greater than current transport position
 
       val tp1 = group.add( Span.from( t1 ), p1 )
       group.add( Span.from( t2 ), p2 )
@@ -95,7 +95,7 @@ object ScansTest extends App {
 
       for( Scan_.Modifiable( s1 ) <- p1.scans.get( "out" )) {
 //         s1.add( 0L, Scan_.Mono( 441 ))
-         s1.add( 0L, Scan_.Synthesis() )
+         s1.add( 0L, Scan_.Synthesis() )  // XXX TODO should be written by the scan.Out itself
       }
 
       import ugen._
