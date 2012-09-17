@@ -35,6 +35,7 @@ import evt.{EventLikeSerializer, EventLike}
 import annotation.switch
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import impl.{GraphemeImpl => Impl}
+import de.sciss.synth.io.AudioFileSpec
 
 object Grapheme {
    type Update[ S <: Sys[ S ]] = BiPin.Update[ S, Elem[ S ], Elem.Update[ S ]]
@@ -93,7 +94,7 @@ object Grapheme {
 
       object Curve {
          def apply[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] =
-            Impl.curve( values: _* )
+            Impl.curveElem( values: _* )
 
          def unapplySeq[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = {
             if( elem.isInstanceOf[ Curve[ _ ]]) {
@@ -150,6 +151,28 @@ object Grapheme {
 //            }
 //         }
       }
+
+      object Audio {
+         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+                                  ( implicit tx: S#Tx ) : Audio[ S ] =
+            Impl.audioElem( artifact, spec, offset, gain )
+
+         def unapply[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ]) ] = {
+            if( elem.isInstanceOf[ Audio[ _ ]]) {
+               val a = elem.asInstanceOf[ Audio[ S ]]
+               Some( (a.artifact, a.spec, a.offset, a.gain) )
+            } else None
+         }
+      }
+      trait Audio[ S <: Sys[ S ]] extends Elem[ S ] {
+         def artifact: Artifact
+         def spec: AudioFileSpec
+         def offset: Expr[ S, Long ]
+         def gain: Expr[ S, Double ]
+      }
+
+      // XXX TODO: if we get too ambitious:
+      // object Embed
    }
    sealed trait Elem[ S <: Sys[ S ]] extends Writable {
       def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]]

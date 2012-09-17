@@ -2,17 +2,16 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, DataOutput, stm, bitemp, DataInput}
+import de.sciss.lucre.{event => evt, expr, DataOutput, stm, DataInput}
 import stm.{Serializer, Sys}
-import bitemp.BiGroup
 import evt.EventLikeSerializer
 import annotation.switch
-import expr.{Longs, SpanLikes, Doubles}
-import de.sciss.lucre.expr.Expr
+import expr.Expr
+import io.AudioFileSpec
 
 object GraphemeImpl {
    import Grapheme.{Elem, Modifiable}
-   import Elem.Curve
+   import Elem.{Audio, Curve}
 
    private val anySer = new Ser[ I ]
 
@@ -46,7 +45,7 @@ object GraphemeImpl {
       }
    }
 
-   def curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] = {
+   def curveElem[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] = {
       ???
 //      if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
 //         Const( targetLevel, shape )
@@ -55,6 +54,9 @@ object GraphemeImpl {
 //         new Mut( tgt, targetLevel, shape )
 //      }
    }
+
+   def audioElem[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+                            ( implicit tx: S#Tx ) : Audio[ S ] = ???
 
    def modifiable[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = {
       ???
