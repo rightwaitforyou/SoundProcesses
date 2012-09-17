@@ -153,7 +153,7 @@ object Grapheme {
 //      }
 
       final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ] {
-         def isConstant : Boolean = values.forall { case (Expr.Const( _ ), _) => true; case _ => false }
+         def isConstant : Boolean = values.forall { tup => Expr.isConst( tup._1 )}
       }
 
 //      object Audio {
@@ -177,10 +177,7 @@ object Grapheme {
 
       final case class Audio[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
       extends Elem[ S ] {
-         def isConstant : Boolean = (offset, gain) match {
-            case (Expr.Const( _ ), Expr.Const( _ )) => true
-            case _ => false
-         }
+         def isConstant : Boolean = Expr.isConst( offset ) && Expr.isConst( gain )
       }
 
       // XXX TODO: if we get too ambitious:
