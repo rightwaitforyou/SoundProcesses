@@ -26,9 +26,11 @@
 package de.sciss.synth.proc
 
 import java.io.File
+import de.sciss.lucre.{DataInput, Writable}
 
-//object Artifact {
-//}
-trait Artifact {
+object Artifact {
+   def read( in: DataInput ) : Artifact = ???
+}
+trait Artifact extends Writable {
    def toFile: File
 }

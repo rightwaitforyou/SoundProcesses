@@ -152,7 +152,9 @@ object Grapheme {
 ////         }
 //      }
 
-      final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ]
+      final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ] {
+         def isConstant : Boolean = values.forall { case (Expr.Const( _ ), _) => true; case _ => false }
+      }
 
 //      object Audio {
 //         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
@@ -174,7 +176,12 @@ object Grapheme {
 //      }
 
       final case class Audio[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
-      extends Elem[ S ]
+      extends Elem[ S ] {
+         def isConstant : Boolean = (offset, gain) match {
+            case (Expr.Const( _ ), Expr.Const( _ )) => true
+            case _ => false
+         }
+      }
 
       // XXX TODO: if we get too ambitious:
       // trait Embed[ S <: Sys[ S ]] { def peer: Grapheme[ S ], offset: Expr[ S, Long ]}

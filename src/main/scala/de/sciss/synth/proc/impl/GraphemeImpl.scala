@@ -32,9 +32,10 @@ import stm.{Serializer, Sys}
 import evt.EventLikeSerializer
 import annotation.switch
 import expr.Expr
-import io.AudioFileSpec
 import bitemp.BiPin
-import de.sciss.synth.expr.Longs
+import de.sciss.synth.expr.{Doubles, Longs}
+import collection.immutable.{IndexedSeq => IIdxSeq}
+import io.AudioFileSpec
 
 object GraphemeImpl {
    import Grapheme.{Elem, Value, Modifiable}
@@ -68,23 +69,23 @@ object GraphemeImpl {
       def value: Elem[ S ]
    }
 
-   def curveElem[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] = {
-      val idx     = values.toIndexedSeq
-      val const   = idx.collect { case (Expr.Const( c ), shape) => c -> shape }
-      if( const.size == idx.size ) {   // all constant
-
-      } else {
-
-      }
-
-      ???
-//      if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
-//         Const( targetLevel, shape )
+//   def curveElem[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] = {
+//      val idx     = values.toIndexedSeq
+//      val const   = idx.collect { case (Expr.Const( c ), shape) => c -> shape }
+//      if( const.size == idx.size ) {   // all constant
+//
 //      } else {
-//         val tgt = evt.Targets.partial[ S ]
-//         new Mut( tgt, targetLevel, shape )
+//
 //      }
-   }
+//
+//      ???
+////      if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
+////         Const( targetLevel, shape )
+////      } else {
+////         val tgt = evt.Targets.partial[ S ]
+////         new Mut( tgt, targetLevel, shape )
+////      }
+//   }
 
 //   def audioElem[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
 //                            ( implicit tx: S#Tx ) : Audio[ S ] = ???
@@ -95,64 +96,86 @@ object GraphemeImpl {
 //      BiPin.Modifiable( _.changed ) // ( tx, Elem.serializer[ S ], Longs )
    }
 
-   private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]] {
-//         def write( elem: Elem[ S ], out: DataOutput ) { elem.write( out )}
+   private final val curveCookie = 0
+   private final val audioCookie = 1
 
-      private def readShape( in: DataInput ) : Env.ConstShape = {
-         (in.readInt(): @switch) match {
-            case stepShape.id    => stepShape
-            case linShape.id     => linShape
-            case expShape.id     => expShape
-            case sinShape.id     => sinShape
-            case welchShape.id   => welchShape
-            case curveShape.id   => curveShape( in.readFloat() )
-            case sqrShape.id     => sqrShape
-            case cubShape.id     => cubShape
-            case other           => sys.error( "Unexpected shape ID " + other )
+   private sealed trait CurveHolder[ S <: Sys[ S ]] extends ElemHolder[ S ] {
+      def value: Curve[ S ]
+
+      final protected def writeData( out: DataOutput ) {
+         out.writeUnsignedByte( curveCookie )
+         val idx = value.values.toIndexedSeq
+         out.writeInt( idx.size )
+         idx.foreach { tup =>
+            tup._1.write( out )
+            CommonSerializers.EnvConstShape.write( tup._2, out )
+         }
+      }
+   }
+
+   private sealed trait AudioHolder[ S <: Sys[ S ]] extends ElemHolder[ S ] {
+      def value: Audio[ S ]
+
+      final protected def writeData( out: DataOutput ) {
+         out.writeUnsignedByte( audioCookie )
+         value.artifact.write( out )
+         CommonSerializers.AudioFileSpec.write( value.spec, out )
+         value.offset.write( out )
+         value.gain.write( out )
+      }
+   }
+
+   private final case class ConstCurve[ S <: Sys[ S ]]( value: Curve[ S ])
+   extends CurveHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+
+   private final case class ConstAudio[ S <: Sys[ S ]]( value: Audio[ S ])
+   extends AudioHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+
+   private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]] {
+      def readConstant( in: DataInput )( implicit tx: S#Tx ) : ElemHolder[ S ] = {
+         (in.readUnsignedByte(): @switch) match {
+            case `curveCookie` =>
+               val sz      = in.readInt()
+               val values  = IIdxSeq.fill( sz ) {
+                  val value   = Doubles.readConst[ S ]( in )
+                  val shape   = CommonSerializers.EnvConstShape.read( in )
+                  value -> shape
+               }
+               ConstCurve( Curve( values: _* ))
+
+            case `audioCookie` =>
+               val artifact   = Artifact.read( in )
+               val spec       = CommonSerializers.AudioFileSpec.read( in )
+               val offset     = Longs.readConst[ S ]( in )
+               val gain       = Doubles.readConst[ S ]( in )
+               ConstAudio( Audio( artifact, spec, offset, gain ))
+
+            case other => sys.error( "Unexpected cookie " + other )
          }
       }
 
-      def readConstant( in: DataInput )( implicit tx: S#Tx ) : ElemHolder[ S ] = {
-         ???
-//         (in.readUnsignedByte(): @switch) match {
-//            case Mono.cookie =>
-//               require( in.readUnsignedByte() == 3, "Expected constant Expr" )   // XXX TODO bad... should have Expr.Const.cookie
-//               val targetLevel   = Doubles.serializer[ S ].readConstant( in )
-//               val shape         = readShape( in )
-//               Mono.Const( targetLevel, shape )
-//
-//            case Synthesis.cookie =>
-//               synthesis[ S ]
-//
-////               case Embedded.cookie =>
-//
-//            case other => sys.error( "Unexpected cookie " + other )
-//         }
-      }
-
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = {
-         ???
-//         (in.readUnsignedByte(): @switch) match {
-//            case Mono.cookie =>
-//               val targetLevel   = Doubles.readExpr( in, access )
-//               val shape         = readShape( in )
-//               new Mono.Mut( targets, targetLevel, shape )
-//
-//            case Embedded.cookie =>
-////                  val ref           = Grapheme.read( in, access )
-//
-////                  val ref           = BiGroup.TimedElem.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access )
-//               val refID         = tx.readID( in, access )
-//               val refSpan       = SpanLikes.readExpr( in, access )
-//               val refVal        = Proc.read( in, access )
-//               val ref           = BiGroup.TimedElem[ S, Proc[ S ], Proc.Update[ S ]]( refID, refSpan, refVal )
-//
-//               val key           = in.readString()
-//               val offset        = Longs.readExpr( in, access )
-//               new Embedded.Impl( targets, ref, key, offset )
-//
-//            case other => sys.error( "Unexpected cookie " + other )
-//         }
+         (in.readUnsignedByte(): @switch) match {
+            case `curveCookie` =>
+               val sz      = in.readInt()
+               val values  = IIdxSeq.fill( sz ) {
+                  val value   = Doubles.readExpr( in, access )
+                  val shape   = CommonSerializers.EnvConstShape.read( in )
+                  value -> shape
+               }
+               Curve( values: _* )
+               ??? // new MutableElem( )
+
+            case `audioCookie` =>
+               val artifact   = Artifact.read( in )
+               val spec       = CommonSerializers.AudioFileSpec.read( in )
+               val offset     = Longs.readExpr( in, access )
+               val gain       = Doubles.readExpr( in, access )
+               Audio( artifact, spec, offset, gain )
+               ??? // new ConstElem( )
+
+            case other => sys.error( "Unexpected cookie " + other )
+         }
       }
    }
 
@@ -163,7 +186,12 @@ object GraphemeImpl {
 
       def modifiableOption : Option[ Modifiable[ S ]] = Some( this )
 
-      private def wrap( elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = ???
+      private def wrap( elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = elem match {
+         case curve @ Curve( _ ) =>
+            if( curve.isConstant ) ConstCurve( curve ) else ???
+         case audio @ Audio( _, _, _, _ ) =>
+            if( audio.isConstant ) ConstAudio( audio ) else ???
+      }
 
       // ---- forwarding to pin ----
 
