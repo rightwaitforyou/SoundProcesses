@@ -1,9 +1,9 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.stm.{Durable, InMemory, Sys}
-import expr.{Longs, Doubles, ExprImplicits}
-import de.sciss.lucre.bitemp.{Chronos, Span}
+import de.sciss.lucre.stm.Durable
+import expr.{Doubles, ExprImplicits}
+import de.sciss.lucre.bitemp.Span
 import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 

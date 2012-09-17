@@ -51,10 +51,14 @@ object Proc {
    final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])          extends StateChange[ S ]
    final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
-   final case class ScansCollectionChange[ S <: Sys[ S ]]( proc: Proc[ S ], added: Set[ String ], removed: Set[ String ]) extends StateChange[ S ]
+
+   final case class AssociativeChange[ S <: Sys[ S ]]( proc: Proc[ S ], added: Set[ AssociativeKey ], removed: Set[ AssociativeKey ]) extends StateChange[ S ]
+   sealed trait AssociativeKey { def name: String }
+   final case class ScanKey( name: String ) extends AssociativeKey
+   final case class GraphemeKey( name: String ) extends AssociativeKey
 
 //   final case class ParamChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ BiPin.Expr.Update[ S, Param ]]]) extends Update[ S ]
-   final case class ScansElementChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Scan_.Update[ S ]]]) extends Update[ S ]
+   final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Grapheme.Update[ S ]]]) extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._
@@ -80,6 +84,8 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 //   def par: ParamMap[ S ]
 
    def scans: Scans.Modifiable[ S ]
+
+   def graphemes: Graphemes.Modifiable[ S ]
 
    /**
     * Same as `playing = true`

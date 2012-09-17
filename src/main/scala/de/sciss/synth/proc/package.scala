@@ -39,7 +39,8 @@ package object proc {
 //   type ScanElem[ S <: Sys[ S ]] = de.sciss.synth.proc.Scan.Elem
 
 //   type Scan[ S <: Sys[ S ]] = BiPin.Expr[ S, Scan_.Elem[ S ]]
-   type Scan[ S <: Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
+
+//   type Grapheme[ S <: Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
 
    def ??? : Nothing = sys.error( "TODO" )
 }

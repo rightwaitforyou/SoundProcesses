@@ -252,7 +252,7 @@ object AuralPresentationImpl {
                var busUsers   = IIdxSeq.empty[ DynamicBusUser ]
 
                ugen.scanIns.foreach { case (key, numCh) =>
-                  import Scan_.Value._
+                  import Grapheme.Value._
 
                   def ensureChannels( n: Int ) {
                      require( n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")" )
@@ -267,7 +267,7 @@ object AuralPresentationImpl {
                      busUsers :+= bm
                   }
 
-                  timed.value.scans.valueAt( key, time ).foreach {   // if not found, stick with default
+                  timed.value.graphemes.valueAt( key, time ).foreach {   // if not found, stick with default
                      case MonoConst( c ) =>
                         ensureChannels( 1 )  // ... or could just adjust to the fact that they changed
                         setMap :+= ((key -> c) : ControlSetMap)
@@ -319,9 +319,9 @@ object AuralPresentationImpl {
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
          // XXX TODO: since we are only interested in the number of channels at this point,
          // we might add a more efficient method to `Scans`
-         timed.value.scans.valueAt( key, time ) match {
+         timed.value.graphemes.valueAt( key, time ) match {
             case Some( value ) =>
-               import Scan_.Value._
+               import Grapheme.Value._
                value match {
                   case MonoConst( _ )                 => 1
                   case MonoSegment( _, _, _, _ )      => 1

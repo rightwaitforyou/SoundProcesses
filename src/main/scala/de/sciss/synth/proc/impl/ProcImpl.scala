@@ -155,41 +155,41 @@ object ProcImpl {
             }
          }
 
-         def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] =
+         def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value[ S ]] =
             flatValueAt( this, None, key, time )
 
          @tailrec private def flatValueAt( scans: Scans[ S ], sourceOption: Option[ TimedProc[ S ]],
                                            key: String, time: Long )
-                                         ( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]] = {
+                                         ( implicit tx: S#Tx ) : Option[ Grapheme.Value[ S ]] = {
             scans.get( key ) match {
                case Some( scan ) =>
 //                  val scan = entry.value
                   scan.floor( time ) match {
                      case Some( (floorTime, floorElem) ) =>
                         floorElem match {
-                           case Scan_.Mono( floorValueEx, _ ) =>
+                           case Grapheme.Mono( floorValueEx, _ ) =>
                               val floorValue = floorValueEx.value.toFloat
                               scan.ceil( time ) match {
-                                 case Some( (ceilTime, Scan_.Mono( ceilValueEx, ceilShape )) ) =>
+                                 case Some( (ceilTime, Grapheme.Mono( ceilValueEx, ceilShape )) ) =>
                                     val ceilValue = ceilValueEx.value.toFloat
                                     if( ceilShape == stepShape ) {
-                                       Some( Scan_.Value.MonoConst( ceilValue ))
+                                       Some( Grapheme.Value.MonoConst( ceilValue ))
                                     } else {
                                        val ceilDur = ceilTime - floorTime
                                        val dur     = ceilTime - time
                                        val w       = 1.0 - (ceilDur.toDouble / dur)
                                        val start   = ceilShape.levelAt( w.toFloat, floorValue, ceilValue )
-                                       Some( Scan_.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
+                                       Some( Grapheme.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
                                     }
-                                 case _ => Some( Scan_.Value.MonoConst( floorValue ))
+                                 case _ => Some( Grapheme.Value.MonoConst( floorValue ))
                               }
 
-                           case Scan_.Synthesis() =>
+                           case Grapheme.Synthesis() =>
                               sourceOption match {
-                                 case Some( source )  => Some( Scan_.Value.Sink( source, key ))
-                                 case _               => Some( Scan_.Value.Source )
+                                 case Some( source )  => Some( Grapheme.Value.Sink( source, key ))
+                                 case _               => Some( Grapheme.Value.Source )
                               }
-                           case Scan_.Embedded( sourceTimed, sourceKey, offsetEx ) =>
+                           case Grapheme.Embedded( sourceTimed, sourceKey, offsetEx ) =>
                               val offset = offsetEx.value
                               flatValueAt( sourceTimed.value.scans, Some( sourceTimed ), sourceKey, time + offset )  // tail-rec
                         }
@@ -265,7 +265,7 @@ object ProcImpl {
          }
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ScansElementChange[ S ]] = {
-            val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ Scan_.Update[ S ]]]) { case (map, sel) =>
+            val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ Grapheme.Update[ S ]]]) { case (map, sel) =>
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
                val node = evt.Intruder.devirtualizeNode( sel, ScanNode.serializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
                   .asInstanceOf[ ScanNode[ S ]]
