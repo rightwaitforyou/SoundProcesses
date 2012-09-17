@@ -85,100 +85,106 @@ object Grapheme {
    object Elem {
       // Note: we do not need to carry along `elem` because the outer collection
       // (`BiPin`) already does that for us.
-      sealed trait Update[ S <: Sys[ S ]] // { def elem: Elem[ S ]}
+      sealed trait Update[ S ] // { def elem: Elem[ S ]}
 //      final case class MonoChanged[ S <: Sys[ S ]]( /* elem: Mono[ S ], */ change: evt.Change[ Double ]) extends Update[ S ]
 ////      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChange: Option[ Grapheme.Update[ S ]], offset: Long ) extends Update[ S ]
 //      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChanges: IIdxSeq[ BiGroup.ElementUpdate[ Proc.Update[ S ]]], offset: Long ) extends Update[ S ]
 
-      implicit def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Elem[ S ]] = Impl.elemSerializer[ S ]
+//      implicit def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Elem[ S ]] = Impl.elemSerializer[ S ]
 
-      object Curve {
-         def apply[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] =
-            Impl.curveElem( values: _* )
-
-         def unapplySeq[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = {
-            if( elem.isInstanceOf[ Curve[ _ ]]) {
-               val c = elem.asInstanceOf[ Curve[ S ]]
-               Some( c.values )
-            } else None
-         }
-
-//         private[Grapheme] final case class Const[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )
-//         extends Mono[ S ] with evt.Constant[ S ] {
-//            override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+//      object Curve {
+//         def apply[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] =
+//            Impl.curveElem( values: _* )
 //
-//            def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = evt.Dummy.apply
+//         def unapplySeq[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = {
+//            if( elem.isInstanceOf[ Curve[ _ ]]) {
+//               val c = elem.asInstanceOf[ Curve[ S ]]
+//               Some( c.values )
+//            } else None
 //         }
 //
-//         private[Grapheme] final class Mut[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-//                                                  val targetLevel: Expr[ S, Double ], val shape: Env.ConstShape )
-//         extends Mono[ S ] with evt.StandaloneLike[ S, Elem.Update[ S ], Elem[ S ]] {
-//            override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+////         private[Grapheme] final case class Const[ S <: Sys[ S ]]( targetLevel: Expr[ S, Double ], shape: Env.ConstShape )
+////         extends Mono[ S ] with evt.Constant[ S ] {
+////            override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+////
+////            def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = evt.Dummy.apply
+////         }
+////
+////         private[Grapheme] final class Mut[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+////                                                  val targetLevel: Expr[ S, Double ], val shape: Env.ConstShape )
+////         extends Mono[ S ] with evt.StandaloneLike[ S, Elem.Update[ S ], Elem[ S ]] {
+////            override def toString = "Mono(" + targetLevel + ", " + shape + ")"
+////
+////            def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = this
+////
+////            def reader: evt.Reader[ S, Elem[ S ]] = Elem.serializer[ S ]
+////
+////            def connect()( implicit tx: S#Tx ) {
+////               evt.Intruder.--->( targetLevel.changed, this )
+////            }
+////
+////            def disconnect()( implicit tx: S#Tx ) {
+////               evt.Intruder.-/->( targetLevel.changed, this )
+////            }
+////
+////            protected def disposeData()( implicit tx: S#Tx ) {}
+////
+////            def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
+////               // XXX TODO ugly. Should have object Event { def unapply( ... )}
+////               evt.Intruder.pullUpdate(
+////                  targetLevel.changed.asInstanceOf[ evt.NodeSelector[ S, evt.Change[ Double ]]], pull ).map( u =>
+////                     Elem.MonoChanged( /* this, */ u )
+////                  )
+////            }
+////         }
+//      }
+//      trait Curve[ S <: Sys[ S ]] extends Elem[ S ] {
+//         def values: Seq[ (Expr[ S, Double ], Env.ConstShape) ]
 //
-//            def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = this
+////         final protected def writeData( out: DataOutput ) {
+////            out.writeUnsignedByte( Mono.cookie )
+////            targetLevel.write( out )
+////            out.writeInt( shape.id )
+////            shape match {
+////               case cs: curveShape => out.writeFloat( cs.curvature )
+////               case _ => // only curveShape has an extra curvature argument
+////            }
+////         }
+//      }
+
+      final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ]
+
+//      object Audio {
+//         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+//                                  ( implicit tx: S#Tx ) : Audio[ S ] =
+//            Impl.audioElem( artifact, spec, offset, gain )
 //
-//            def reader: evt.Reader[ S, Elem[ S ]] = Elem.serializer[ S ]
-//
-//            def connect()( implicit tx: S#Tx ) {
-//               evt.Intruder.--->( targetLevel.changed, this )
-//            }
-//
-//            def disconnect()( implicit tx: S#Tx ) {
-//               evt.Intruder.-/->( targetLevel.changed, this )
-//            }
-//
-//            protected def disposeData()( implicit tx: S#Tx ) {}
-//
-//            def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
-//               // XXX TODO ugly. Should have object Event { def unapply( ... )}
-//               evt.Intruder.pullUpdate(
-//                  targetLevel.changed.asInstanceOf[ evt.NodeSelector[ S, evt.Change[ Double ]]], pull ).map( u =>
-//                     Elem.MonoChanged( /* this, */ u )
-//                  )
-//            }
+//         def unapply[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ]) ] = {
+//            if( elem.isInstanceOf[ Audio[ _ ]]) {
+//               val a = elem.asInstanceOf[ Audio[ S ]]
+//               Some( (a.artifact, a.spec, a.offset, a.gain) )
+//            } else None
 //         }
-      }
-      trait Curve[ S <: Sys[ S ]] extends Elem[ S ] {
-         def values: Seq[ (Expr[ S, Double ], Env.ConstShape) ]
+//      }
+//      trait Audio[ S <: Sys[ S ]] extends Elem[ S ] {
+//         def artifact: Artifact
+//         def spec: AudioFileSpec
+//         def offset: Expr[ S, Long ]
+//         def gain: Expr[ S, Double ]
+//      }
 
-//         final protected def writeData( out: DataOutput ) {
-//            out.writeUnsignedByte( Mono.cookie )
-//            targetLevel.write( out )
-//            out.writeInt( shape.id )
-//            shape match {
-//               case cs: curveShape => out.writeFloat( cs.curvature )
-//               case _ => // only curveShape has an extra curvature argument
-//            }
-//         }
-      }
-
-      object Audio {
-         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
-                                  ( implicit tx: S#Tx ) : Audio[ S ] =
-            Impl.audioElem( artifact, spec, offset, gain )
-
-         def unapply[ S <: Sys[ S ]]( elem: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ]) ] = {
-            if( elem.isInstanceOf[ Audio[ _ ]]) {
-               val a = elem.asInstanceOf[ Audio[ S ]]
-               Some( (a.artifact, a.spec, a.offset, a.gain) )
-            } else None
-         }
-      }
-      trait Audio[ S <: Sys[ S ]] extends Elem[ S ] {
-         def artifact: Artifact
-         def spec: AudioFileSpec
-         def offset: Expr[ S, Long ]
-         def gain: Expr[ S, Double ]
-      }
+      final case class Audio[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+      extends Elem[ S ]
 
       // XXX TODO: if we get too ambitious:
       // trait Embed[ S <: Sys[ S ]] { def peer: Grapheme[ S ], offset: Expr[ S, Long ]}
       // trait Graph[ S <: Sys[ S ]] { def fun: GraphFunction }
       // trait Proc[ S <: Sys[ S ]] { def proc: proc.Proc[ S ]; def scanKey: String }
    }
-   sealed trait Elem[ S <: Sys[ S ]] extends Writable {
-      def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]]
-   }
+//   sealed trait Elem[ S <: Sys[ S ]] extends Writable {
+//      def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]]
+//   }
+   sealed trait Elem[ S ]
 
 //   object Embedded {
 //      private[Grapheme] final val cookie = 2

@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{bitemp, event => evt, expr, DataOutput, stm, DataInput}
+import de.sciss.lucre.{event => evt, Writable, bitemp, expr, DataOutput, stm, DataInput}
 import stm.{Serializer, Sys}
 import evt.EventLikeSerializer
 import annotation.switch
@@ -51,19 +51,32 @@ object GraphemeImpl {
    implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
       anySer.asInstanceOf[ Serializer[ S#Tx, S#Acc, Grapheme[ S ]]]
 
-   implicit def elemSerializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Elem[ S ]] =
-      anyElemSer.asInstanceOf[ EventLikeSerializer[ S, Elem[ S ]]]
+   private implicit def elemSerializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, ElemHolder[ S ]] =
+      anyElemSer.asInstanceOf[ EventLikeSerializer[ S, ElemHolder[ S ]]]
 
    private val anyElemSer = new Ser[ I ]
 
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme[ S ] = {
-         val pin = BiPin.Modifiable.read[ S, Elem[ S ], Elem.Update[ S ]]( _.changed )( in, access )
+         val pin = BiPin.Modifiable.read[ S, ElemHolder[ S ], Elem.Update[ S ]]( identity )( in, access )
          new Impl( targets, pin )
       }
    }
 
+   private sealed trait ElemHolder[ S <: Sys[ S ]]
+   extends evt.EventLike[ S, Elem.Update[ S ], ElemHolder[ S ]] with Writable {
+      def value: Elem[ S ]
+   }
+
    def curveElem[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] = {
+      val idx     = values.toIndexedSeq
+      val const   = idx.collect { case (Expr.Const( c ), shape) => c -> shape }
+      if( const.size == idx.size ) {   // all constant
+
+      } else {
+
+      }
+
       ???
 //      if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
 //         Const( targetLevel, shape )
@@ -73,8 +86,8 @@ object GraphemeImpl {
 //      }
    }
 
-   def audioElem[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
-                            ( implicit tx: S#Tx ) : Audio[ S ] = ???
+//   def audioElem[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+//                            ( implicit tx: S#Tx ) : Audio[ S ] = ???
 
    def modifiable[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = {
       ???
@@ -82,7 +95,7 @@ object GraphemeImpl {
 //      BiPin.Modifiable( _.changed ) // ( tx, Elem.serializer[ S ], Longs )
    }
 
-   private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, Elem[ S ]] {
+   private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]] {
 //         def write( elem: Elem[ S ], out: DataOutput ) { elem.write( out )}
 
       private def readShape( in: DataInput ) : Env.ConstShape = {
@@ -99,7 +112,7 @@ object GraphemeImpl {
          }
       }
 
-      def readConstant( in: DataInput )( implicit tx: S#Tx ) : Elem[ S ] = {
+      def readConstant( in: DataInput )( implicit tx: S#Tx ) : ElemHolder[ S ] = {
          ???
 //         (in.readUnsignedByte(): @switch) match {
 //            case Mono.cookie =>
@@ -117,7 +130,7 @@ object GraphemeImpl {
 //         }
       }
 
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Elem[ S ] = {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = {
          ???
 //         (in.readUnsignedByte(): @switch) match {
 //            case Mono.cookie =>
@@ -143,27 +156,35 @@ object GraphemeImpl {
       }
    }
 
-   private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], pin: BiPin.Modifiable[ S, Elem[ S ], Elem.Update[ S ]])
+   private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+                                             pin: BiPin.Modifiable[ S, ElemHolder[ S ], Elem.Update[ S ]])
    extends Modifiable[ S ] {
       override def toString = "Grapheme" + pin.id
 
       def modifiableOption : Option[ Modifiable[ S ]] = Some( this )
 
+      private def wrap( elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = ???
+
       // ---- forwarding to pin ----
 
       def add( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) {
-         pin.add( time, elem )
+         pin.add( time, wrap( elem ))
       }
 
       def remove( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : Boolean = {
-         pin.remove( time, elem )
+         val timeVal = time.value
+         pin.intersect( timeVal ).find({ case (time2, hold) => time2 == time && hold.value == elem }) match {
+            case Some( (time2, hold) ) => pin.remove( time2, hold )
+            case _ => false
+         }
+//         pin.remove( time, elem )
       }
 
       def clear()( implicit tx: S#Tx ) {
          pin.clear()
       }
 
-      def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem[ S ]] = pin.at( time )
+      def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem[ S ]] = pin.at( time ).map( _.value )
 
       // ---- extensions ----
 
