@@ -264,7 +264,7 @@ object BiPinImpl {
          }
 
          private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Update[ S, Elem, U ]] = {
-            if( CollChanged.isSource( pull )) CollChanged.pullUpdate( pull )
+            if(      CollChanged.isSource( pull )) CollChanged.pullUpdate( pull )
             else if( ElemChanged.isSource( pull )) ElemChanged.pullUpdate( pull )
             else None
          }

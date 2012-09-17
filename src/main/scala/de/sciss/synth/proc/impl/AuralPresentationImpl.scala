@@ -268,16 +268,16 @@ object AuralPresentationImpl {
                   }
 
                   timed.value.graphemes.valueAt( key, time ).foreach {   // if not found, stick with default
-                     case MonoConst( c ) =>
-                        ensureChannels( 1 )  // ... or could just adjust to the fact that they changed
-                        setMap :+= ((key -> c) : ControlSetMap)
+                     case const: Const =>
+                        ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
+                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
 
-                     case MonoSegment( _, _, _, _ ) =>
-                        ensureChannels( 1 )  // ... or could just adjust to the fact that they changed
+                     case segm: Segment =>
+                        ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
                         ??? // MonoSegmentWriter
 
-                     case Source                         => makeBusMapper( timed,       key       )
-                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
+//                     case Source                         => makeBusMapper( timed,       key       )
+//                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
                   }
                }
 
@@ -321,13 +321,14 @@ object AuralPresentationImpl {
          // we might add a more efficient method to `Scans`
          timed.value.graphemes.valueAt( key, time ) match {
             case Some( value ) =>
-               import Grapheme.Value._
-               value match {
-                  case MonoConst( _ )                 => 1
-                  case MonoSegment( _, _, _, _ )      => 1
-                  case Source                         => getBusNumChannels( timed, key )
-                  case Sink( sourceTimed, sourceKey ) => getBusNumChannels( sourceTimed, sourceKey )
-               }
+               value.numChannels
+//               import Grapheme.Value._
+//               value match {
+//                  case MonoConst( _ )                 => 1
+//                  case MonoSegment( _, _, _, _ )      => 1
+//                  case Source                         => getBusNumChannels( timed, key )
+//                  case Sink( sourceTimed, sourceKey ) => getBusNumChannels( sourceTimed, sourceKey )
+//               }
             case _ => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
          }
       }
