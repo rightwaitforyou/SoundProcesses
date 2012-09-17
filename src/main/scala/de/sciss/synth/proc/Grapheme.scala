@@ -86,9 +86,9 @@ object Grapheme {
       // Note: we do not need to carry along `elem` because the outer collection
       // (`BiPin`) already does that for us.
       sealed trait Update[ S <: Sys[ S ]] // { def elem: Elem[ S ]}
-      final case class MonoChanged[ S <: Sys[ S ]]( /* elem: Mono[ S ], */ change: evt.Change[ Double ]) extends Update[ S ]
-//      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChange: Option[ Grapheme.Update[ S ]], offset: Long ) extends Update[ S ]
-      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChanges: IIdxSeq[ BiGroup.ElementUpdate[ Proc.Update[ S ]]], offset: Long ) extends Update[ S ]
+//      final case class MonoChanged[ S <: Sys[ S ]]( /* elem: Mono[ S ], */ change: evt.Change[ Double ]) extends Update[ S ]
+////      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChange: Option[ Grapheme.Update[ S ]], offset: Long ) extends Update[ S ]
+//      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChanges: IIdxSeq[ BiGroup.ElementUpdate[ Proc.Update[ S ]]], offset: Long ) extends Update[ S ]
 
       implicit def serializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, Elem[ S ]] = Impl.elemSerializer[ S ]
 
@@ -172,28 +172,14 @@ object Grapheme {
       }
 
       // XXX TODO: if we get too ambitious:
-      // object Embed
+      // trait Embed[ S <: Sys[ S ]] { def peer: Grapheme[ S ], offset: Expr[ S, Long ]}
+      // trait Graph[ S <: Sys[ S ]] { def fun: GraphFunction }
+      // trait Proc[ S <: Sys[ S ]] { def proc: proc.Proc[ S ]; def scanKey: String }
    }
    sealed trait Elem[ S <: Sys[ S ]] extends Writable {
       def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]]
    }
-//   final case class AudioFile[ S <: Sys[ S ]]( f: File, offset: Expr[ S, Long ]) extends Elem[ S ]
-//   final case class Graph[ S <: Sys[ S ]]( func: Expr[ S, SynthGraph ]) extends Elem[ S ]
 
-//   private val anySynthesis = Synthesis[ I ]()
-//
-//   private def synthesis[ S <: Sys[ S ]] : Synthesis[ S ] = anySynthesis.asInstanceOf[ Synthesis[ S ]]
-//
-//   object Synthesis {
-//      private[Grapheme] final val cookie = 1
-//   }
-//   final case class Synthesis[ S <: Sys[ S ]]() extends Elem[ S ] with evt.Constant[ S ] {
-//      def changed: EventLike[ S, Elem.Update[ S ], Elem[ S ]] = evt.Dummy.apply
-//
-//      protected def writeData( out: DataOutput ) {
-//         out.writeUnsignedByte( Synthesis.cookie )
-//      }
-//   }
 //   object Embedded {
 //      private[Grapheme] final val cookie = 2
 //
@@ -266,8 +252,6 @@ object Grapheme {
 //      }
 //   }
 
-//   type Modifiable[ S <: Sys[ S ]] = BiPin.Expr.Modifiable[ S, Elem[ S ]]
-//   type Modifiable[ S <: Sys[ S ]] = BiPin.Modifiable[ S, Elem[ S ], Elem.Update[ S ]]
    trait Modifiable[ S <: Sys[ S ]] extends Grapheme[ S ] {
       def add(    time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : Unit
       def remove( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : Boolean
@@ -286,25 +270,8 @@ object Grapheme {
    }
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = Impl.read( in, access )
-
-//   def Elems[ S <: Sys[ S ]] : BiType[ Elem[ S ]] = anyElems.asInstanceOf[ BiType[ Elem[ S ]]]
-//
-//   private val anyElems = new ElemsImpl[ I ]
-//
-//   private final class ElemsImpl[ S <: Sys[ S ]] extends BiTypeImpl[ Elem[ S ]] {
-//      private val typeID = 1000
-//
-//      /* protected */ def readValue( in: DataInput ) : Elem[ S ] = ??? // SpanLike.read( in )
-//      /* protected */ def writeValue( value: Elem[ S ], out: DataOutput ) { ??? } // value.write( out )}
-//
-//      def readTuple[ S1 <: Sys[ S1 ]]( cookie: Int, in: DataInput, access: S1#Acc, targets: evt.Targets[ S1 ])( implicit tx: S1#Tx ) : Ex[ S1 ] =
-//         (cookie /*: @switch */) match {
-//            case _ => sys.error( "Invalid cookie " + cookie )
-//         }
-//   }
 }
 trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
-//   def pin: BiPin[ S, Grapheme.Elem[ S ], Grapheme.Elem.Update[ S ]]
    def modifiableOption : Option[ Grapheme.Modifiable[ S ]]
 
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Elem[ S ]]

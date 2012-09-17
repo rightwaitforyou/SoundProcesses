@@ -36,7 +36,7 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 object Proc {
    // ---- implementation forwards ----
 
-   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = ??? // impl.ProcImpl[ S ]()
+   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx /*, store: ArtifactStore[ S ] */ ) : Proc[ S ] = ??? // impl.ProcImpl[ S ]()
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ??? // impl.ProcImpl.read( in, access )
 
@@ -49,7 +49,7 @@ object Proc {
    }
    sealed trait StateChange[ S <: Sys[ S ]] extends Update[ S ]
    final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends StateChange[ S ]
-   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])          extends StateChange[ S ]
+   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends StateChange[ S ]
    final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
 
@@ -83,9 +83,7 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    // ---- controls preview demo ----
 
 //   def par: ParamMap[ S ]
-
    def scans: Scans.Modifiable[ S ]
-
    def graphemes: Graphemes.Modifiable[ S ]
 
    /**
