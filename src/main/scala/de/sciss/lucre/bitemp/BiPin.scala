@@ -69,7 +69,7 @@ object BiPin {
             BiPinImpl.newPartialModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( /* default, */ _.changed )( tx, elemType.serializer[ S ], elemType.longType )
       }
    }
-   type Expr[ S <: Sys[ S ], A ]    = BiPin[ S, Ex[ S, A ], evt.Change[ A ]]
+   type Expr[ S <: Sys[ S ], A ] = BiPin[ S, Ex[ S, A ], evt.Change[ A ]]
 
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
       def pin: BiPin[ S, Elem, U ]

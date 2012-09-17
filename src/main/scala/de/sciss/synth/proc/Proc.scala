@@ -32,14 +32,15 @@ import bitemp.{BiPin, Chronos}
 import expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
+
 object Proc {
    // ---- implementation forwards ----
 
-   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = impl.ProcImpl[ S ]()
+   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = ??? // impl.ProcImpl[ S ]()
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = impl.ProcImpl.read( in, access )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ??? // impl.ProcImpl.read( in, access )
 
-   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = impl.ProcImpl.serializer[ S ]
+   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = ??? // impl.ProcImpl.serializer[ S ]
 
    // ---- event types ----
 

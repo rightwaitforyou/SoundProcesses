@@ -384,6 +384,6 @@ None
 //         }
 //   }
 }
-sealed trait Grapheme[ S ] {
+sealed trait Grapheme[ S <: Sys[ S ]] {
    def pin: BiPin[ S, Grapheme.Elem[ S ], Grapheme.Elem.Update[ S ]]
 }

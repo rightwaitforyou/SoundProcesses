@@ -37,6 +37,7 @@ import ExprImplicits._
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import annotation.{tailrec, switch}
 
+/*
 object ProcImpl {
    private final val SER_VERSION = 2
 
@@ -447,3 +448,4 @@ object ProcImpl {
 //      }
    }
 }
+*/
