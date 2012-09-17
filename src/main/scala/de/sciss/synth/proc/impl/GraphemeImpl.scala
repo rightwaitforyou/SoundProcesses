@@ -29,13 +29,11 @@ package impl
 
 import de.sciss.lucre.{event => evt, Writable, bitemp, expr, DataOutput, stm, DataInput}
 import stm.{Serializer, Sys}
-import evt.EventLikeSerializer
 import annotation.switch
 import expr.Expr
 import bitemp.BiPin
 import de.sciss.synth.expr.{Doubles, Longs}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import io.AudioFileSpec
 
 object GraphemeImpl {
    import Grapheme.{Elem, Value, Modifiable}
@@ -67,42 +65,25 @@ object GraphemeImpl {
    private sealed trait ElemHolder[ S <: Sys[ S ]]
    extends evt.EventLike[ S, Elem.Update[ S ], ElemHolder[ S ]] with Writable {
       def value: Elem[ S ]
+      protected def headerCookie: Int
    }
 
-//   def curveElem[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Curve[ S ] = {
-//      val idx     = values.toIndexedSeq
-//      val const   = idx.collect { case (Expr.Const( c ), shape) => c -> shape }
-//      if( const.size == idx.size ) {   // all constant
-//
-//      } else {
-//
-//      }
-//
-//      ???
-////      if( targetLevel.isInstanceOf[ Expr.Const[ _, _ ]]) {
-////         Const( targetLevel, shape )
-////      } else {
-////         val tgt = evt.Targets.partial[ S ]
-////         new Mut( tgt, targetLevel, shape )
-////      }
-//   }
-
-//   def audioElem[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
-//                            ( implicit tx: S#Tx ) : Audio[ S ] = ???
-
    def modifiable[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = {
-      ???
-//      implicit val time = Longs
-//      BiPin.Modifiable( _.changed ) // ( tx, Elem.serializer[ S ], Longs )
+      val targets = evt.Targets[ S ]   // XXX TODO: partial?
+      val pin     = BiPin.Modifiable[ S, ElemHolder[ S ], Elem.Update[ S ]]( identity )
+      new Impl( targets, pin )
    }
 
    private final val curveCookie = 0
    private final val audioCookie = 1
+   private final val constCookie = 0
+   private final val mutableCookie = 1
 
    private sealed trait CurveHolder[ S <: Sys[ S ]] extends ElemHolder[ S ] {
       def value: Curve[ S ]
 
-      final protected def writeData( out: DataOutput ) {
+      final def write( out: DataOutput ) {
+         out.writeUnsignedByte( headerCookie )
          out.writeUnsignedByte( curveCookie )
          val idx = value.values.toIndexedSeq
          out.writeInt( idx.size )
@@ -116,7 +97,8 @@ object GraphemeImpl {
    private sealed trait AudioHolder[ S <: Sys[ S ]] extends ElemHolder[ S ] {
       def value: Audio[ S ]
 
-      final protected def writeData( out: DataOutput ) {
+      final def write( out: DataOutput ) {
+         out.writeUnsignedByte( headerCookie )
          out.writeUnsignedByte( audioCookie )
          value.artifact.write( out )
          CommonSerializers.AudioFileSpec.write( value.spec, out )
@@ -126,18 +108,48 @@ object GraphemeImpl {
    }
 
    private final case class ConstCurve[ S <: Sys[ S ]]( value: Curve[ S ])
-   extends CurveHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+   extends CurveHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] {
+      protected def headerCookie = constCookie
+   }
+
+   private final case class MutableCurve[ S <: Sys[ S ]]( node: evt.Node[ S ], value: Curve[ S ])
+   extends CurveHolder[ S ]
+   with evt.EventImpl[ S, Elem.Update[ S ], Elem.Update[ S ], ElemHolder[ S ]]
+   with evt.InvariantEvent[ S, Elem.Update[ S ], ElemHolder[ S ]] with evt.Reader {
+      protected def headerCookie = mutableCookie
+
+      def reader: evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
+      def slot = 0
+
+      def connect()( implicit tx: S#Tx ) {
+         value.values.foreach( tup => evt.Intruder.--->( tup._1.changed, this ))
+      }
+
+      def disconnect()( implicit tx: S#Tx ) {
+         value.values.foreach( tup => evt.Intruder.-/->( tup._1.changed, this ))
+      }
+
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
+         ???
+      }
+   }
 
    private final case class ConstAudio[ S <: Sys[ S ]]( value: Audio[ S ])
-   extends AudioHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+   extends AudioHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] { // with evt.Constant[ S ]
+      protected def headerCookie = constCookie
+   }
 
-   private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]] {
-      def readConstant( in: DataInput )( implicit tx: S#Tx ) : ElemHolder[ S ] = {
+//   private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]]
+   private final class ElemSer[ S <: Sys[ S ]] extends Serializer[ S#Tx, S#Acc, ElemHolder[ S ]] {
+      def write( elem: ElemHolder[ S ], out: DataOutput ) { elem.write( out )}
+
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ElemHolder[ S ] = {
          (in.readUnsignedByte(): @switch) match {
             case `curveCookie` =>
                val sz      = in.readInt()
                val values  = IIdxSeq.fill( sz ) {
-                  val value   = Doubles.readConst[ S ]( in )
+//                  val value   = Doubles.readConst[ S ]( in )
+                  val value   = Doubles.readExpr( in, access )
                   val shape   = CommonSerializers.EnvConstShape.read( in )
                   value -> shape
                }
@@ -146,37 +158,39 @@ object GraphemeImpl {
             case `audioCookie` =>
                val artifact   = Artifact.read( in )
                val spec       = CommonSerializers.AudioFileSpec.read( in )
-               val offset     = Longs.readConst[ S ]( in )
-               val gain       = Doubles.readConst[ S ]( in )
+//               val offset     = Longs.readConst[ S ]( in )
+               val offset     = Longs.readExpr[ S ]( in, access )
+//               val gain       = Doubles.readConst[ S ]( in )
+               val gain       = Doubles.readExpr[ S ]( in, access )
                ConstAudio( Audio( artifact, spec, offset, gain ))
 
             case other => sys.error( "Unexpected cookie " + other )
          }
       }
 
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = {
-         (in.readUnsignedByte(): @switch) match {
-            case `curveCookie` =>
-               val sz      = in.readInt()
-               val values  = IIdxSeq.fill( sz ) {
-                  val value   = Doubles.readExpr( in, access )
-                  val shape   = CommonSerializers.EnvConstShape.read( in )
-                  value -> shape
-               }
-               Curve( values: _* )
-               ??? // new MutableElem( )
-
-            case `audioCookie` =>
-               val artifact   = Artifact.read( in )
-               val spec       = CommonSerializers.AudioFileSpec.read( in )
-               val offset     = Longs.readExpr( in, access )
-               val gain       = Doubles.readExpr( in, access )
-               Audio( artifact, spec, offset, gain )
-               ??? // new ConstElem( )
-
-            case other => sys.error( "Unexpected cookie " + other )
-         }
-      }
+//      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = {
+//         (in.readUnsignedByte(): @switch) match {
+//            case `curveCookie` =>
+//               val sz      = in.readInt()
+//               val values  = IIdxSeq.fill( sz ) {
+//                  val value   = Doubles.readExpr( in, access )
+//                  val shape   = CommonSerializers.EnvConstShape.read( in )
+//                  value -> shape
+//               }
+//               Curve( values: _* )
+//               ??? // new MutableElem( )
+//
+//            case `audioCookie` =>
+//               val artifact   = Artifact.read( in )
+//               val spec       = CommonSerializers.AudioFileSpec.read( in )
+//               val offset     = Longs.readExpr( in, access )
+//               val gain       = Doubles.readExpr( in, access )
+//               Audio( artifact, spec, offset, gain )
+//               ??? // new ConstElem( )
+//
+//            case other => sys.error( "Unexpected cookie " + other )
+//         }
+//      }
    }
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
