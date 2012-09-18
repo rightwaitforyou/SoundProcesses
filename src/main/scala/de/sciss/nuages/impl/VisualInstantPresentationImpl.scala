@@ -27,7 +27,7 @@ package de.sciss.nuages
 package impl
 
 import de.sciss.lucre.stm.{Sys, Cursor}
-import de.sciss.synth.proc.{Transport, Param, ProcTransport, TimedProc}
+import de.sciss.synth.proc.{Proc, Transport, Param, ProcTransport, TimedProc}
 import de.sciss.lucre.bitemp.SpanLike
 import java.awt.{RenderingHints, Graphics2D, Color, EventQueue}
 import javax.swing.JComponent
@@ -123,7 +123,7 @@ object VisualInstantPresentationImpl {
          }
       }
 
-      transport.changed.reactTx { implicit tx => {
+      transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Proc.Update[ S ]]] { implicit tx => {
          case Transport.Advance( _, _, time, added, removed, params ) => advance( time, added, removed, params )
          case Transport.Play( _ ) => playStop( b = true  )
          case Transport.Stop( _ ) => playStop( b = false )

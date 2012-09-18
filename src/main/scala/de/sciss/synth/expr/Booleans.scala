@@ -27,7 +27,6 @@ package de.sciss.synth.expr
 
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.expr.Type
 import de.sciss.lucre.event.Targets
 
 object Booleans extends BiTypeImpl[ Boolean ] {
@@ -40,7 +39,7 @@ object Booleans extends BiTypeImpl[ Boolean ] {
 
    // ---- protected ----
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] =
+   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : ExN[ S ] =
 //   case 3 =>
 //      readCursor[ S ]( in, access, targets )
       sys.error( "Invalid cookie " + cookie )

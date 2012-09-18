@@ -34,13 +34,13 @@ import de.sciss.lucre.expr.Expr
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string, 9 = spanlike
 object Ints extends BiTypeImpl[ Int ] {
-   private val typeID = 2
+   private final val typeID = 2
 
    /* protected */ def readValue( in: DataInput ) : Int = in.readInt()
    /* protected */ def writeValue( value: Int, out: DataOutput ) { out.writeInt( value )}
 
    def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                ( implicit tx: S#Tx ) : Ex[ S ] = {
+                                ( implicit tx: S#Tx ) : ExN[ S ] = {
       (cookie: @switch) match {
          case 1 =>
             val tpe  = in.readInt()

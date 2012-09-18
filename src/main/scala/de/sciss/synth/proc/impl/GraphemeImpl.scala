@@ -122,11 +122,11 @@ object GraphemeImpl {
       protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
 
       def connect()( implicit tx: S#Tx ) {
-         value.values.foreach( tup => evt.Intruder.--->( tup._1.changed, this ))
+         value.values.foreach( tup => tup._1.changed ---> this )
       }
 
       def disconnect()( implicit tx: S#Tx ) {
-         value.values.foreach( tup => evt.Intruder.-/->( tup._1.changed, this ))
+         value.values.foreach( tup => tup._1.changed -/-> this )
       }
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate ] = {
@@ -134,11 +134,7 @@ object GraphemeImpl {
          val valueChanges: IIdxSeq[ ((Double, Env.ConstShape), (Double, Env.ConstShape))] =
             value.values.map({ case (mag, shape) =>
                val magEvt  = mag.changed
-               val magCh   = if( evt.Intruder.isSource( magEvt, pull )) {
-                  evt.Intruder.pullUpdate( magEvt, pull )
-               } else {
-                  None
-               }
+               val magCh   = if( magEvt.isSource( pull )) magEvt.pullUpdate( pull ) else None
                magCh match {
                   case Some( evt.Change( oldMag, newMag )) => (oldMag, shape) -> (newMag, shape)
                   case None =>
@@ -163,13 +159,13 @@ object GraphemeImpl {
       protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
 
       def connect()( implicit tx: S#Tx ) {
-         evt.Intruder.--->( value.offset.changed, this )
-         evt.Intruder.--->( value.gain.changed,   this )
+         value.offset.changed ---> this
+         value.gain.changed   ---> this
       }
 
       def disconnect()( implicit tx: S#Tx ) {
-         evt.Intruder.-/->( value.offset.changed, this )
-         evt.Intruder.-/->( value.gain.changed,   this )
+         value.offset.changed -/-> this
+         value.gain.changed   -/-> this
       }
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate ] = {
@@ -177,12 +173,8 @@ object GraphemeImpl {
          val gain       = value.gain
          val offsetEvt  = offset.changed
          val gainEvt    = gain.changed
-         val offsetCh   = if( evt.Intruder.isSource( offsetEvt, pull )) {
-            evt.Intruder.pullUpdate( offsetEvt, pull )
-         } else None
-         val gainCh     = if( evt.Intruder.isSource( gainEvt, pull )) {
-            evt.Intruder.pullUpdate( gainEvt, pull )
-         } else None
+         val offsetCh   = if( offsetEvt.isSource( pull )) offsetEvt.pullUpdate( pull ) else None
+         val gainCh     = if( gainEvt.isSource(   pull )) gainEvt.pullUpdate(   pull ) else None
 
          val (oldOffset, newOffset) = offsetCh match {
             case Some( evt.Change( _old, _new )) => _old -> _new
@@ -231,7 +223,7 @@ object GraphemeImpl {
          }
       }
 
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = {
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] with evt.Node[ S ] = {
          (in.readUnsignedByte(): @switch) match {
             case `curveCookie` =>
                val sz      = in.readInt()
@@ -307,11 +299,11 @@ object GraphemeImpl {
       protected def reader: evt.Reader[ S, Grapheme[ S ]] = serializer[ S ]
 
       def connect()( implicit tx: S#Tx ) {
-         evt.Intruder.--->( pin.changed, this )
+         pin.changed ---> this
       }
 
       def disconnect()( implicit tx: S#Tx ) {
-         evt.Intruder.-/->( pin.changed, this )
+         pin.changed -/-> this
       }
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Grapheme.Update[ S ]] = {

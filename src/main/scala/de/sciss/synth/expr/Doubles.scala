@@ -28,20 +28,19 @@ package de.sciss.synth.expr
 import de.sciss.lucre.{DataInput, DataOutput}
 import de.sciss.lucre.stm.Sys
 import de.sciss.synth.RichDouble
-import de.sciss.lucre.expr.Type
 import de.sciss.lucre.event.Targets
 import annotation.switch
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string, 9 = spanlike
 object Doubles extends BiTypeImpl[ Double ] {
-   private val typeID = 5
+   private final val typeID = 5
 
    /* protected */ def readValue( in: DataInput ) : Double = in.readDouble()
    /* protected */ def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}
 
    def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                ( implicit tx: S#Tx ) : Ex[ S ] = {
+                                ( implicit tx: S#Tx ) : ExN[ S ] = {
       (cookie: @switch) match {
          case 1 =>
             val tpe  = in.readInt()

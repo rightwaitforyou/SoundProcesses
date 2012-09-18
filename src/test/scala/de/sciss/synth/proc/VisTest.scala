@@ -206,12 +206,13 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    def pr( time: Long = 4 * 44100 )( implicit tx: S#Tx ) = group.intersect( time ).next._2.head.value
 
    def addFreq( time: Expr[ S, Long ] = 0, freq: Expr[ S, Param ]) {
-      t { implicit tx =>
-         pr().scans.get( "freq" ) match {
-            case Some( BiPin.Modifiable( v )) => v.add( time, Scan_.Mono( freq ))
-            case _ =>
-         }
-      }
+      ???
+//      t { implicit tx =>
+//         pr().scans.get( "freq" ) match {
+//            case Some( BiPin.Modifiable( v )) => v.add( time, Scan_.Mono( freq ))
+//            case _ =>
+//         }
+//      }
    }
 
    implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )

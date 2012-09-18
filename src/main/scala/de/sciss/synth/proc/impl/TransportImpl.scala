@@ -99,7 +99,7 @@ object TransportImpl {
                                              csrPos: S#Acc )
                                            ( implicit cursor: Cursor[ S ])
    extends Transport[ S, Proc[ S ], Proc.Update[ S ]]
-   with evt.Trigger.Impl[ S, ProcTransportUpd[ S ], ProcTransportUpd[ S ], ProcTransport[ S ]]
+   with evt.Trigger.Impl[ S, ProcTransportUpd[ S ], ProcTransport[ S ]]
    with evt.StandaloneLike[ S, ProcTransportUpd[ S ], ProcTransport[ S ]]
 //   with evt.Root[ S, Transport.Update[ S, Proc[ S ]]]
    {
@@ -139,11 +139,11 @@ object TransportImpl {
 //      }
 
       def connect()( implicit tx: S#Tx ) {
-         evt.Intruder.--->( group.changed, this )
+         group.changed ---> this
       }
 
       def disconnect()( implicit tx: S#Tx ) {
-         evt.Intruder.-/->( group.changed, this )
+         group.changed -/-> this
       }
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ProcTransportUpd[ S ]] = {
@@ -159,7 +159,7 @@ object TransportImpl {
                - recalculate next event time _if necessary_
                - create new future
              */
-            evt.Intruder.pullUpdate( group.changed, pull ).flatMap { gu: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]] =>
+            group.changed.pullUpdate( pull ).flatMap { gu: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]] =>
                val tim = time // XXX TODO
                gu match {
                   case BiGroup.Added( gr, span, elem ) =>

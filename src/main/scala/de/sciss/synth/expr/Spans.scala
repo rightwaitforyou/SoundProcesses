@@ -34,7 +34,7 @@ import bitemp.Span
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string, 9 = spanlike, 10 = span
 object Spans extends BiTypeImpl[ Span ] {
-   private val typeID = 10
+   private final val typeID = 10
 
    /* protected */ def readValue( in: DataInput ) : Span = Span.read( in )
    /* protected */ def writeValue( value: Span, out: DataOutput ) { value.write( out )}
@@ -52,7 +52,7 @@ object Spans extends BiTypeImpl[ Span ] {
 
    // ---- protected ----
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] =
+   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : ExN[ S ] =
 //   case 3 =>
 //      readCursor[ S ]( in, access, targets )
       sys.error( "Invalid cookie " + cookie )

@@ -28,14 +28,14 @@ package de.sciss.synth.expr
 import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt, expr, bitemp}
 import stm.Sys
 import evt.Targets
-import expr.{Expr, Type}
+import expr.Expr
 import bitemp.{Span, SpanLike}
 import annotation.switch
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string, 9 = spanlike, 10 = span
 object SpanLikes extends BiTypeImpl[ SpanLike ] {
-   private val typeID = 9
+   private final val typeID = 9
 
    /* protected */ def readValue( in: DataInput ) : SpanLike = SpanLike.read( in )
    /* protected */ def writeValue( value: SpanLike, out: DataOutput ) { value.write( out )}
@@ -141,7 +141,7 @@ object SpanLikes extends BiTypeImpl[ SpanLike ] {
       }
    }
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : Ex[ S ] =
+   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : ExN[ S ] =
       (cookie: @switch) match {
          case 1 =>
             val tpe  = in.readInt()

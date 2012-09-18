@@ -32,7 +32,7 @@ import de.sciss.lucre.event.Targets
 import annotation.switch
 
 object Strings extends BiTypeImpl[ String ] {
-   private val typeID = 8
+   private final val typeID = 8
 
    /* protected */ def readValue( in: DataInput ) : String = in.readString()
    /* protected */ def writeValue( value: String, out: DataOutput ) { out.writeString( value )}
@@ -68,7 +68,7 @@ object Strings extends BiTypeImpl[ String ] {
    // ---- protected ----
 
    def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                ( implicit tx: S#Tx ) : Ex[ S ] = {
+                                ( implicit tx: S#Tx ) : ExN[ S ] = {
       (cookie /* : @switch */) match {
 //         case 1 =>
 //            val tpe  = in.readInt()

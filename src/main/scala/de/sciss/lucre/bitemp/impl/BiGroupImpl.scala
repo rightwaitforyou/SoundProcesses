@@ -211,14 +211,14 @@ object BiGroupImpl {
       // ---- event behaviour ----
 
       private object CollectionEvent
-      extends evt.Trigger.Impl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-      with evt.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+      extends evt.Trigger.Impl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+      with evt.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.Root[ S, BiGroup.Collection[ S, Elem, U ]]
       {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 1
-         def node: evt.Node[ S ] = group
+         def node: BiGroup[ S, Elem, U ] = group
 
 //         def connect()( implicit tx: S#Tx ) {}
 //         def disconnect()( implicit tx: S#Tx ) {}
@@ -242,11 +242,11 @@ object BiGroupImpl {
       }
 
       private object ElementEvent
-      extends evt.EventImpl[ S, BiGroup.Element[ S, Elem, U ], BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+      extends evt.EventImpl[ S, BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]] {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 2
-         def node: evt.Node[ S ] = group
+         def node: BiGroup[ S, Elem, U ] = group
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -285,37 +285,37 @@ object BiGroupImpl {
       with evt.InvariantSelector[ S ] {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = opNotSupported
-         def node: evt.Node[ S ] = group
+         def node: BiGroup[ S, Elem, U ] = group
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
 
-         private[lucre] def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+         def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             CollectionEvent ---> r
             ElementEvent    ---> r
          }
-         private[lucre] def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+         def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             CollectionEvent -/-> r
             ElementEvent    -/-> r
          }
 
-         private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Update[ S, Elem, U ]] = {
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Update[ S, Elem, U ]] = {
             if(   CollectionEvent.isSource( pull )) CollectionEvent.pullUpdate( pull )
             else if( ElementEvent.isSource( pull )) ElementEvent.pullUpdate(    pull )
             else None
          }
 
-         def react( fun: BiGroup.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] =
-            reactTx( _ => fun )
+         def react[ A1 >: BiGroup.Update[ S, Elem, U ]]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiGroup[ S, Elem, U ]] =
+            reactTx[ A1 ]( _ => fun )
 
-         def reactTx( fun: S#Tx => BiGroup.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]] = {
+         def reactTx[ A1 >: BiGroup.Update[ S, Elem, U ]]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiGroup[ S, Elem, U ]] = {
             val obs = evt.Observer( serializer( eventView ), fun )
             obs.add( CollectionEvent )
             obs.add( ElementEvent )
             obs
          }
 
-         private[lucre] def isSource( pull: evt.Pull[ S ]) : Boolean = opNotSupported
+         def isSource( pull: evt.Pull[ S ]) : Boolean = CollectionEvent.isSource( pull ) || ElementEvent.isSource( pull )
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {
@@ -338,7 +338,7 @@ object BiGroupImpl {
          foreach( ElementEvent -= _ )
       }
 
-      final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
+      final def select( slot: Int, invariant: Boolean ) : evt.Event[ S, Any, Any ] = (slot: @switch) match {
          case 1 => CollectionEvent
          case 2 => ElementEvent
       }

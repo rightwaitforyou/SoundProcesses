@@ -144,14 +144,14 @@ object BiPinImpl {
       // ---- event behaviour ----
 
       private object CollChanged
-      extends evt.Trigger.Impl[ S, BiPin.Collection[ S, Elem, U ], BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
-      with evt.EventImpl[ S, BiPin.Collection[ S, Elem, U ], BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      extends evt.Trigger.Impl[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      with evt.EventImpl[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
 //      with evt.Root[ S, BiPin.Collection[ S, Elem, U ]]
       {
          protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 1
-         def node: evt.Node[ S ] = pin
+         def node: BiPin[ S, Elem, U ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -215,11 +215,11 @@ object BiPinImpl {
       }
 
       private object ElemChanged
-      extends evt.EventImpl[ S, BiPin.Element[ S, Elem, U ], BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      extends evt.EventImpl[ S, BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]] {
          protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 2
-         def node: evt.Node[ S ] = pin
+         def node: BiPin[ S, Elem, U ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -249,40 +249,37 @@ object BiPinImpl {
       with evt.InvariantSelector[ S ] {
          protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = opNotSupported
-         def node: evt.Node[ S ] = pin
+         def node: BiPin[ S, Elem, U ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
 
-         private[lucre] def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+         def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             CollChanged ---> r
             ElemChanged ---> r
          }
-         private[lucre] def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+         def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             CollChanged -/-> r
             ElemChanged -/-> r
          }
 
-         private[lucre] def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Update[ S, Elem, U ]] = {
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Update[ S, Elem, U ]] = {
             if(      CollChanged.isSource( pull )) CollChanged.pullUpdate( pull )
             else if( ElemChanged.isSource( pull )) ElemChanged.pullUpdate( pull )
             else None
          }
 
-         def react( fun: BiPin.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]] =
-            reactTx( _ => fun )
+         def react[ A1 >: BiPin.Update[ S, Elem, U ]]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiPin[ S, Elem, U ]] =
+            reactTx[ A1 ]( _ => fun )
 
-         def reactTx( fun: S#Tx => BiPin.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, BiPin.Update[ S, Elem, U ], BiPin[ S, Elem, U ]] = {
+         def reactTx[ A1 >: BiPin.Update[ S, Elem, U ]]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiPin[ S, Elem, U ]] = {
             val obs = evt.Observer( serializer( eventView ), fun )
             obs.add( CollChanged )
             obs.add( ElemChanged )
             obs
          }
 
-         private[lucre] def isSource( pull: evt.Pull[ S ]) : Boolean = {
-//            opNotSupported
-            CollChanged.isSource( pull ) || ElemChanged.isSource( pull )
-         }
+         def isSource( pull: evt.Pull[ S ]) : Boolean = CollChanged.isSource( pull ) || ElemChanged.isSource( pull )
       }
 
       final protected def disposeData()( implicit tx: S#Tx ) {
@@ -311,7 +308,7 @@ object BiPinImpl {
          }
       }
 
-      final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
+      final def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = (slot: @switch) match {
          case 1 => CollChanged
          case 2 => ElemChanged
       }
