@@ -41,21 +41,16 @@ object GraphemeImpl {
    import Grapheme.{Elem, Value, Modifiable}
    import Elem.{Audio, Curve}
 
-   private val anySer = new Ser[ I ]
-
    private implicit val time = Longs
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = {
       serializer[ S ].read( in, access )
    }
 
-   implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
-      anySer.asInstanceOf[ Serializer[ S#Tx, S#Acc, Grapheme[ S ]]]
+   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Grapheme[ S ]] =
+      anySer.asInstanceOf[ evt.NodeSerializer[ S, Grapheme[ S ]]]
 
-   private implicit def elemSerializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, ElemHolder[ S ]] =
-      anyElemSer.asInstanceOf[ EventLikeSerializer[ S, ElemHolder[ S ]]]
-
-   private val anyElemSer = new ElemSer[ I ]
+   private val anySer = new Ser[ I ]
 
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme[ S ] = {
@@ -69,6 +64,11 @@ object GraphemeImpl {
       val pin     = BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate ]( identity )
       new Impl( targets, pin )
    }
+
+   private implicit def elemSerializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, ElemHolder[ S ]] =
+      anyElemSer.asInstanceOf[ EventLikeSerializer[ S, ElemHolder[ S ]]]
+
+   private val anyElemSer = new ElemSer[ I ]
 
    // ---- ElemHolder ----
 
@@ -263,7 +263,7 @@ object GraphemeImpl {
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
                                              pin: BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate ])
-   extends Modifiable[ S ] {
+   extends Modifiable[ S ] with evt.StandaloneLike[ S, Grapheme.Update[ S ], Grapheme[ S ]] {
       override def toString = "Grapheme" + pin.id
 
       def modifiableOption : Option[ Modifiable[ S ]] = Some( this )
@@ -302,7 +302,21 @@ object GraphemeImpl {
          ???
       }
 
-      // ---- evt.Node ----
+      // ---- node and event ----
+
+      protected def reader: evt.Reader[ S, Grapheme[ S ]] = serializer[ S ]
+
+      def connect()( implicit tx: S#Tx ) {
+         evt.Intruder.--->( pin.changed, this )
+      }
+
+      def disconnect()( implicit tx: S#Tx ) {
+         evt.Intruder.-/->( pin.changed, this )
+      }
+
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Grapheme.Update[ S ]] = {
+         ???
+      }
 
       protected def disposeData()( implicit tx: S#Tx ) {
          pin.dispose()
@@ -311,7 +325,5 @@ object GraphemeImpl {
       protected def writeData( out: DataOutput ) {
          pin.write( out )
       }
-
-      def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = ???
    }
 }
