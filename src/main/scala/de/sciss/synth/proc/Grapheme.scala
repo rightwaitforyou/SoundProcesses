@@ -29,14 +29,17 @@ package proc
 import de.sciss.lucre.{bitemp, stm, expr, DataInput, event => evt}
 import stm.{Serializer, Sys}
 import expr.Expr
-import bitemp.{Span, SpanLike, BiPin}
+import bitemp.{Span, SpanLike}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
 
 object Grapheme {
-//   type Update[ S <: Sys[ S ]] = BiPin.Update[ S, Elem[ S ], Elem.Update[ S ]]
-   sealed trait Update[ S ]
+   // If necessary for some views, we could eventually add the Elems, too,
+   // like `changes: IIdxSeq[ (Elem[ S ], Value) ]`. Then the question would be
+   // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
+   // where `trait StoredElem[ S <: Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
+   final case class Update[ S <: Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Value ])
 
    implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
       Impl.serializer[ S ]
@@ -60,8 +63,20 @@ object Grapheme {
          def numChannels = values.size
 
          def from( start: Long ) : Segment = {
-            val newSpan = span.intersect( Span.from( start ))
-            val newValues: IIdxSeq[ (Double, Double, Env.ConstShape) ] = ???
+            if( !span.contains( start )) throw new IllegalArgumentException(
+               "Segment.from - start position " + start + " lies outside of span " + span )
+
+            val newSpan    = span.intersect( Span.from( start ))
+            val newValues  = span match {
+               case Span( oldStart, oldStop) =>
+                  val pos = (start - oldStart).toDouble / (oldStop - oldStart)
+                  values.map { case (oldStartVal, stopVal, shape) =>
+                     val newStartVal = shape.levelAt( pos.toFloat, oldStartVal.toFloat, stopVal.toFloat).toDouble
+                     (newStartVal, stopVal, shape)
+                  }
+
+               case _ => values // either of start or stop is infinite, therefore interpolation does not make sense
+            }
             Segment( newSpan, newValues: _* )
          }
       }

@@ -37,7 +37,7 @@ object BiPin {
    import expr.{Expr => Ex}
 
    object Expr {
-      type Update[ S <: Sys[ S ], A ] = BiPin.Update[ S, Ex[ S, A ], evt.Change[ A ]]
+      type Update[     S <: Sys[ S ], A ] = BiPin.Update[     S, Ex[ S, A ], evt.Change[ A ]]
       type Modifiable[ S <: Sys[ S ], A ] = BiPin.Modifiable[ S, Ex[ S, A ], evt.Change[ A ]]
 
       def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr[ S, A ] = {
@@ -75,7 +75,7 @@ object BiPin {
       def pin: BiPin[ S, Elem, U ]
    }
    final case class Collection[ S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ Region[ Elem ]]) extends Update[ S, Elem, U ]
-   final case class Element[ S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ]) extends Update[ S, Elem, U ]
+   final case class Element[    S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ])     extends Update[ S, Elem, U ]
 
    type Region[ Elem ] = (SpanLike, Elem)
 

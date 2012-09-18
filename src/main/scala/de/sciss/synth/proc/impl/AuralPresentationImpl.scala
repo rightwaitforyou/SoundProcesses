@@ -267,7 +267,7 @@ object AuralPresentationImpl {
                      busUsers :+= bm
                   }
 
-                  timed.value.graphemes.valueAt( key, time ).foreach {   // if not found, stick with default
+                  timed.value.graphemes.get( key ).flatMap( _.valueAt( time )).foreach {   // if not found, stick with default
                      case const: Const =>
                         ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
                         setMap :+= ((key -> const.numChannels) : ControlSetMap)
@@ -277,11 +277,13 @@ object AuralPresentationImpl {
                         ??? // MonoSegmentWriter
 
                      case audio: Audio =>
-                        ???
+                        ??? // AudioFileWriter
 
 //                     case Source                         => makeBusMapper( timed,       key       )
 //                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
                   }
+
+                  ??? // need to look at time.value.scans instead
                }
 
                // ---- handle output buses ----
@@ -322,7 +324,7 @@ object AuralPresentationImpl {
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
          // XXX TODO: since we are only interested in the number of channels at this point,
          // we might add a more efficient method to `Scans`
-         timed.value.graphemes.valueAt( key, time ) match {
+         timed.value.graphemes.get( key ).flatMap( _.valueAt( time )) match {
             case Some( value ) =>
                value.numChannels
 //               import Grapheme.Value._
