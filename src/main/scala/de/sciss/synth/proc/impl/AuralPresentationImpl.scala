@@ -276,6 +276,9 @@ object AuralPresentationImpl {
                         ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
                         ??? // MonoSegmentWriter
 
+                     case audio: Audio =>
+                        ???
+
 //                     case Source                         => makeBusMapper( timed,       key       )
 //                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
                   }

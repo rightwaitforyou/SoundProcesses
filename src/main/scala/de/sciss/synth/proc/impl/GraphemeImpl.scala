@@ -59,28 +59,29 @@ object GraphemeImpl {
 
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme[ S ] = {
-         val pin = BiPin.Modifiable.read[ S, ElemHolder[ S ], ElemHolderUpdate[ S ]]( identity )( in, access )
+         val pin = BiPin.Modifiable.read[ S, ElemHolder[ S ], ElemHolderUpdate ]( identity )( in, access )
          new Impl( targets, pin )
       }
    }
 
    def modifiable[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = {
       val targets = evt.Targets[ S ]   // XXX TODO: partial?
-      val pin     = BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate[ S ]]( identity )
+      val pin     = BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate ]( identity )
       new Impl( targets, pin )
    }
 
    // ---- ElemHolder ----
 
-   private sealed trait ElemHolderUpdate[ S ]
-   private final case class CurveHolderUpdate[ S ]( before: IIdxSeq[ (Double, Env.ConstShape) ],
-                                                    now:    IIdxSeq[ (Double, Env.ConstShape) ])
-   extends ElemHolderUpdate[ S ]
+   private sealed trait ElemHolderUpdate
+   private final case class CurveHolderUpdate( before: IIdxSeq[ (Double, Env.ConstShape) ],
+                                               now:    IIdxSeq[ (Double, Env.ConstShape) ])
+   extends ElemHolderUpdate
 
-   private final case class AudioHolderUpdate[ S <: Sys[ S ]]( audio: Audio[ S ]) extends ElemHolderUpdate[ S ]
+   private final case class AudioHolderUpdate( beforeOffset: Long, beforeGain: Double,
+                                               nowOffset: Long, nowGain: Double ) extends ElemHolderUpdate
 
    private sealed trait ElemHolder[ S <: Sys[ S ]]
-   extends evt.EventLike[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] with Writable {
+   extends evt.EventLike[ S, ElemHolderUpdate, ElemHolder[ S ]] with Writable {
       def value: Elem[ S ]
    }
 
@@ -114,10 +115,10 @@ object GraphemeImpl {
    }
 
    private final case class ConstCurve[ S <: Sys[ S ]]( value: Curve[ S ])
-   extends CurveHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+   extends CurveHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evt.Constant[ S ]
 
    private final class MutableCurve[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val value: Curve[ S ])
-   extends CurveHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] {
+   extends CurveHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
       protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
 
       def connect()( implicit tx: S#Tx ) {
@@ -128,7 +129,7 @@ object GraphemeImpl {
          value.values.foreach( tup => evt.Intruder.-/->( tup._1.changed, this ))
       }
 
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate[ S ]] = {
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate ] = {
          // parent is Expr[ S, Double ] coming from one or more of the curve's values
          val valueChanges: IIdxSeq[ ((Double, Env.ConstShape), (Double, Env.ConstShape))] =
             value.values.map({ case (mag, shape) =>
@@ -155,10 +156,10 @@ object GraphemeImpl {
    }
 
    private final case class ConstAudio[ S <: Sys[ S ]]( value: Audio[ S ])
-   extends AudioHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+   extends AudioHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evt.Constant[ S ]
 
    private final class MutableAudio[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val value: Audio[ S ])
-   extends AudioHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] {
+   extends AudioHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
       protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
 
       def connect()( implicit tx: S#Tx ) {
@@ -171,8 +172,35 @@ object GraphemeImpl {
          evt.Intruder.-/->( value.gain.changed,   this )
       }
 
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate[ S ]] = {
-         ???
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate ] = {
+         val offset     = value.offset
+         val gain       = value.gain
+         val offsetEvt  = offset.changed
+         val gainEvt    = gain.changed
+         val offsetCh   = if( evt.Intruder.isSource( offsetEvt, pull )) {
+            evt.Intruder.pullUpdate( offsetEvt, pull )
+         } else None
+         val gainCh     = if( evt.Intruder.isSource( gainEvt, pull )) {
+            evt.Intruder.pullUpdate( gainEvt, pull )
+         } else None
+
+         val (oldOffset, newOffset) = offsetCh match {
+            case Some( evt.Change( _old, _new )) => _old -> _new
+            case None =>
+               val offsetVal = offset.value
+               offsetVal -> offsetVal
+         }
+
+         val (oldGain, newGain) = gainCh match {
+            case Some( evt.Change( _old, _new )) => _old -> _new
+            case None =>
+               val gainVal = gain.value
+               gainVal -> gainVal
+         }
+
+         if( oldOffset != newOffset || oldGain != newGain ) {
+            Some( AudioHolderUpdate( oldOffset, oldGain, newOffset, newGain ))
+         } else None
       }
 
       protected def disposeData()( implicit tx: S#Tx ) {}
@@ -234,7 +262,7 @@ object GraphemeImpl {
    // ---- actual implementation ----
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                             pin: BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate[ S ]])
+                                             pin: BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate ])
    extends Modifiable[ S ] {
       override def toString = "Grapheme" + pin.id
 
@@ -270,7 +298,7 @@ object GraphemeImpl {
 
       // ---- extensions ----
 
-      def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value[ S ]] = {
+      def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ] = {
          ???
       }
 

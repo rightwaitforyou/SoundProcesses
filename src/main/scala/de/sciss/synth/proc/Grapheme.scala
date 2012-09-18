@@ -45,8 +45,7 @@ object Grapheme {
       /**
        * A mono- or polyphonic constant value
        */
-      final case class Const( span: SpanLike, values: Double* )
-      extends Value[ Nothing ] {
+      final case class Const( span: SpanLike, values: Double* ) extends Value {
          def numChannels = values.size
       }
 
@@ -57,8 +56,7 @@ object Grapheme {
        * @param values  a sequence of tuples, each consisting of the value at start of the segment,
        *                the target value of the segment, and the shape of the segment
        */
-      final case class Segment( span: SpanLike, values: (Double, Double, Env.ConstShape)* )
-      extends Value[ Nothing ] {
+      final case class Segment( span: SpanLike, values: (Double, Double, Env.ConstShape)* ) extends Value {
          def numChannels = values.size
 
          def from( start: Long ) : Segment = {
@@ -67,6 +65,11 @@ object Grapheme {
             Segment( newSpan, newValues: _* )
          }
       }
+
+      final case class Audio( span: SpanLike, artifact: Artifact, spec: AudioFileSpec, offset: Long, gain: Double )
+      extends Value {
+         def numChannels = spec.numChannels
+      }
    }
 
    /**
@@ -74,7 +77,7 @@ object Grapheme {
     * envelope segment, or a real-time signal, coming either from the same process (`Source`) or being
     * fed by another embedded process (`Sink`).
     */
-   sealed trait Value[ +S ] {
+   sealed trait Value {
       def numChannels: Int
       def span: SpanLike
    }
@@ -141,5 +144,5 @@ trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def modifiableOption : Option[ Grapheme.Modifiable[ S ]]
 
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Elem[ S ]]
-   def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value[ S ]]
+   def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value ]
 }
