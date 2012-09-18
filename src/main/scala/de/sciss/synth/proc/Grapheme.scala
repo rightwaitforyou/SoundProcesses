@@ -107,11 +107,13 @@ object Grapheme {
 
       final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ] {
          def isConstant : Boolean = values.forall { tup => Expr.isConst( tup._1 )}
+         def numChannels = values.size
       }
 
       final case class Audio[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
       extends Elem[ S ] {
          def isConstant : Boolean = Expr.isConst( offset ) && Expr.isConst( gain )
+         def numChannels = spec.numChannels
       }
 
       // XXX TODO: if we get too ambitious:
@@ -119,7 +121,7 @@ object Grapheme {
       // trait Graph[ S <: Sys[ S ]] { def fun: GraphFunction }
       // trait Proc[ S <: Sys[ S ]] { def proc: proc.Proc[ S ]; def scanKey: String }
    }
-   sealed trait Elem[ S ]
+   sealed trait Elem[ S ] { def numChannels: Int }
 
 //         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
 //println( "WARNING: Span.Embedded pullUpdate not yet implemented" )

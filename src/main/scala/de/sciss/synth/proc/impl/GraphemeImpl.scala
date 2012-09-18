@@ -31,7 +31,7 @@ import de.sciss.lucre.{event => evt, Writable, bitemp, expr, DataOutput, stm, Da
 import stm.{Serializer, Sys}
 import annotation.switch
 import expr.Expr
-import bitemp.BiPin
+import bitemp.{Span, BiPin}
 import de.sciss.synth.expr.{Doubles, Longs}
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -291,7 +291,36 @@ object GraphemeImpl {
       // ---- extensions ----
 
       def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ] = {
-         ???
+         pin.floor( time ).map { case (floorTime, floorHolder) =>
+            floorHolder.value match {
+               case floorCurve @ Elem.Curve( floorValues @ _* ) =>
+                  val floorValuesVal = floorValues.map( _._1.value )
+                  pin.ceil( time + 1 ) match {
+                     case Some( (ceilTime, ceilHolder) ) =>
+                        val span = Span( floorTime, ceilTime )
+                        ceilHolder.value match {
+                           case ceilCurve @ Elem.Curve( ceilValues @ _* ) if floorCurve.numChannels == ceilCurve.numChannels =>
+                              val segmValues    = (floorValuesVal zip ceilValues).map { case (startVal, (stop, shape)) =>
+                                 (startVal, stop.value, shape)
+                              }
+                              Value.Segment( span, segmValues: _* )
+                           case _ =>
+                              Value.Const( span, floorValuesVal: _* )
+                        }
+                     case _ =>
+                        Value.Const( Span.from( floorTime ), floorValuesVal: _* )
+                  }
+
+               case Elem.Audio( artifact, spec, offset, gain ) =>
+                  val offsetVal  = offset.value
+                  val gainVal    = gain.value
+                  val span       = pin.nearestEventAfter( time + 1 ) match {
+                     case Some( ceilTime )   => Span( floorTime, ceilTime )
+                     case _                  => Span.from( floorTime )
+                  }
+                  Value.Audio( span, artifact, spec, offsetVal, gainVal )
+            }
+         }
       }
 
       // ---- node and event ----
@@ -307,7 +336,10 @@ object GraphemeImpl {
       }
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Grapheme.Update[ S ]] = {
-         ???
+         pin.changed.pullUpdate( pull ).map {
+            case BiPin.Collection( _, changes ) => ???
+            case BiPin.Element(    _, changes ) => ???
+         }
       }
 
       protected def disposeData()( implicit tx: S#Tx ) {

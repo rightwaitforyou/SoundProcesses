@@ -146,7 +146,22 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     */
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem ]
 
+   /**
+    * Finds the entry at the given time, or the closest entry before the given time.
+    *
+    * @param time the query time
+    * @return     the entry nearest in time to the query time, but not later than the
+    *             query time, or `None` if there is no entry at such time
+    */
    def floor( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ]
+
+   /**
+    * Finds the entry at the given time, or the closest entry after the given time.
+    *
+    * @param time the query time
+    * @return     the entry nearest in time to the query time, but not earlier than the
+    *             query time, or `None` if there is no entry at such time
+    */
    def ceil(  time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ]
 
    /**
@@ -165,6 +180,13 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    def elementChanged:     Event[ S, BiPin.Element[    S, Elem, U ], BiPin[ S, Elem, U ]]
    def changed :           Event[ S, BiPin.Update[     S, Elem, U ], BiPin[ S, Elem, U ]]
 
+   /**
+    * Finds the entry with the smallest time which is greater than or equal to the query time.
+    *
+    * @param time the query time
+    * @return     the time corresponding to the next entry, or `None` if there is no entry
+    *             at or later than the given time
+    */
    def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
 
    def debugList()( implicit tx: S#Tx ) : List[ (Long, Elem) ]
