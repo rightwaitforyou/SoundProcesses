@@ -159,7 +159,7 @@ object TransportImpl {
                - recalculate next event time _if necessary_
                - create new future
              */
-            evt.Intruder.pullUpdate( group.changed, pull ).flatMap { gu =>
+            evt.Intruder.pullUpdate( group.changed, pull ).flatMap { gu: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]] =>
                val tim = time // XXX TODO
                gu match {
                   case BiGroup.Added( gr, span, elem ) =>
@@ -266,12 +266,12 @@ if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFr
          val searchStart   = oldFrame + 1
          val procMin       = group.nearestEventAfter( searchStart ).getOrElse( Long.MaxValue )
          val hasProcEvent  = procMin != Long.MaxValue
-         val innerSpan     = if( hasProcEvent ) {
-            Span( searchStart, procMin )
-         } else {
-            Span.from( searchStart )
-         }
-         var parMin = Long.MaxValue
+//         val innerSpan     = if( hasProcEvent ) {
+//            Span( searchStart, procMin )
+//         } else {
+//            Span.from( searchStart )
+//         }
+         val /* var */ parMin = Long.MaxValue
 // XXX TODO
 //         group.intersect( innerSpan ).foreach { case (span, entries) =>
 //            entries.foreach { case timed =>

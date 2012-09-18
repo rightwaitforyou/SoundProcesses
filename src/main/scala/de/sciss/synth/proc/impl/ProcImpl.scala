@@ -266,6 +266,7 @@ object ProcImpl {
          }
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ScansElementChange[ S ]] = {
+XXX check if casting still necessary
             val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ Grapheme.Update[ S ]]]) { case (map, sel) =>
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
                val node = evt.Intruder.devirtualizeNode( sel, ScanNode.serializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])

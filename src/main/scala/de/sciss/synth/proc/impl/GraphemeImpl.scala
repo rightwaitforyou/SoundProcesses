@@ -33,6 +33,7 @@ import annotation.switch
 import expr.Expr
 import bitemp.BiPin
 import de.sciss.synth.expr.{Doubles, Longs}
+import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.EventLikeSerializer
 
@@ -58,19 +59,28 @@ object GraphemeImpl {
 
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme[ S ] = {
-         val pin = BiPin.Modifiable.read[ S, ElemHolder[ S ], Elem.Update[ S ]]( identity )( in, access )
+         val pin = BiPin.Modifiable.read[ S, ElemHolder[ S ], ElemHolderUpdate[ S ]]( identity )( in, access )
          new Impl( targets, pin )
       }
    }
 
    def modifiable[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = {
       val targets = evt.Targets[ S ]   // XXX TODO: partial?
-      val pin     = BiPin.Modifiable[ S, ElemHolder[ S ], Elem.Update[ S ]]( identity )
+      val pin     = BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate[ S ]]( identity )
       new Impl( targets, pin )
    }
 
+   // ---- ElemHolder ----
+
+   private sealed trait ElemHolderUpdate[ S ]
+   private final case class CurveHolderUpdate[ S ]( before: IIdxSeq[ (Double, Env.ConstShape) ],
+                                                    now:    IIdxSeq[ (Double, Env.ConstShape) ])
+   extends ElemHolderUpdate[ S ]
+
+   private final case class AudioHolderUpdate[ S <: Sys[ S ]]( audio: Audio[ S ]) extends ElemHolderUpdate[ S ]
+
    private sealed trait ElemHolder[ S <: Sys[ S ]]
-   extends evt.EventLike[ S, Elem.Update[ S ], ElemHolder[ S ]] with Writable {
+   extends evt.EventLike[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] with Writable {
       def value: Elem[ S ]
    }
 
@@ -104,13 +114,10 @@ object GraphemeImpl {
    }
 
    private final case class ConstCurve[ S <: Sys[ S ]]( value: Curve[ S ])
-   extends CurveHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+   extends CurveHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
 
    private final class MutableCurve[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val value: Curve[ S ])
-   extends CurveHolder[ S ]
-//   with evt.EventImpl[ S, Elem.Update[ S ], Elem.Update[ S ], ElemHolder[ S ]]
-//   with evt.InvariantEvent[ S, Elem.Update[ S ], ElemHolder[ S ]] {
-   with evt.StandaloneLike[ S, Elem.Update[ S ], ElemHolder[ S ]] {
+   extends CurveHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] {
       protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
 
       def connect()( implicit tx: S#Tx ) {
@@ -121,15 +128,55 @@ object GraphemeImpl {
          value.values.foreach( tup => evt.Intruder.-/->( tup._1.changed, this ))
       }
 
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
-         ???
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate[ S ]] = {
+         // parent is Expr[ S, Double ] coming from one or more of the curve's values
+         val valueChanges: IIdxSeq[ ((Double, Env.ConstShape), (Double, Env.ConstShape))] =
+            value.values.map({ case (mag, shape) =>
+               val magEvt  = mag.changed
+               val magCh   = if( evt.Intruder.isSource( magEvt, pull )) {
+                  evt.Intruder.pullUpdate( magEvt, pull )
+               } else {
+                  None
+               }
+               magCh match {
+                  case Some( evt.Change( oldMag, newMag )) => (oldMag, shape) -> (newMag, shape)
+                  case None =>
+                     val flat = (mag.value, shape)
+                     flat -> flat
+               }
+            })( breakOut )
+         val (before, now) = valueChanges.unzip
+         if( before != now ) {
+            Some( CurveHolderUpdate( before, now ))
+         } else None
       }
 
       protected def disposeData()( implicit tx: S#Tx ) {}
    }
 
    private final case class ConstAudio[ S <: Sys[ S ]]( value: Audio[ S ])
-   extends AudioHolder[ S ] with evt.Dummy[ S, Elem.Update[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+   extends AudioHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] with evt.Constant[ S ]
+
+   private final class MutableAudio[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val value: Audio[ S ])
+   extends AudioHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate[ S ], ElemHolder[ S ]] {
+      protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
+
+      def connect()( implicit tx: S#Tx ) {
+         evt.Intruder.--->( value.offset.changed, this )
+         evt.Intruder.--->( value.gain.changed,   this )
+      }
+
+      def disconnect()( implicit tx: S#Tx ) {
+         evt.Intruder.-/->( value.offset.changed, this )
+         evt.Intruder.-/->( value.gain.changed,   this )
+      }
+
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate[ S ]] = {
+         ???
+      }
+
+      protected def disposeData()( implicit tx: S#Tx ) {}
+   }
 
    private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]] {
       def readConstant( in: DataInput )( implicit tx: S#Tx ) : ElemHolder[ S ] = {
@@ -167,7 +214,7 @@ object GraphemeImpl {
                   value -> shape
                }
                val curve = Curve( values: _* )
-               ??? // new MutableElem( )
+               new MutableCurve( targets, curve )
 
             case `audioCookie` =>
                val artifact   = Artifact.read( in )
@@ -177,15 +224,17 @@ object GraphemeImpl {
       //               val gain       = Doubles.readConst[ S ]( in )
                val gain       = Doubles.readExpr[ S ]( in, access )
                val audio   = Audio( artifact, spec, offset, gain )
-               ??? // new ConstElem( )
+               new MutableAudio( targets, audio )
 
             case other => sys.error( "Unexpected cookie " + other )
          }
       }
    }
 
+   // ---- actual implementation ----
+
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                             pin: BiPin.Modifiable[ S, ElemHolder[ S ], Elem.Update[ S ]])
+                                             pin: BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate[ S ]])
    extends Modifiable[ S ] {
       override def toString = "Grapheme" + pin.id
 
@@ -193,9 +242,9 @@ object GraphemeImpl {
 
       private def wrap( elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = elem match {
          case curve @ Curve( _ ) =>
-            if( curve.isConstant ) ConstCurve( curve ) else ???
+            if( curve.isConstant ) ConstCurve( curve ) else new MutableCurve( evt.Targets[ S ], curve )  // XXX TODO partial?
          case audio @ Audio( _, _, _, _ ) =>
-            if( audio.isConstant ) ConstAudio( audio ) else ???
+            if( audio.isConstant ) ConstAudio( audio ) else new MutableAudio( evt.Targets[ S ], audio )  // XXX TODO partial?
       }
 
       // ---- forwarding to pin ----
