@@ -235,13 +235,10 @@ object BiPinImpl {
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Element[ S, Elem, U ]] = {
             val changes: IIdxSeq[ (Elem, U) ] = pull.parents( this ).flatMap( sel => {
-//               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
-
-//               val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
-//                  asInstanceOf[ Elem ]
-               val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
-                  asInstanceOf[ Elem ]
-               eventView( elem ).pullUpdate( pull ).map( u => (elem, u) )
+               val evt  = sel.devirtualize( elemSerializer )
+               val elem = evt.node
+               // wow... how does this get the event update type right I'm wondering... ?
+               evt.pullUpdate( pull ).map( elem -> _ )   // eventView( elem )
             })( breakOut )
 
             if( changes.isEmpty ) None else Some( BiPin.Element( pin, changes ))

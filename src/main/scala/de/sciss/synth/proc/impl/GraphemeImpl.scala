@@ -82,6 +82,7 @@ object GraphemeImpl {
 
    private sealed trait ElemHolder[ S <: Sys[ S ]]
    extends evt.EventLike[ S, ElemHolderUpdate, ElemHolder[ S ]] with Writable {
+      def timeOption: Option[ Expr[ S, Long ]]
       def value: Elem[ S ]
    }
 
@@ -93,6 +94,7 @@ object GraphemeImpl {
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( curveCookie )
+         timeOption.foreach( _.write( out ))
          val idx = value.values.toIndexedSeq
          out.writeInt( idx.size )
          idx.foreach { tup =>
@@ -107,6 +109,7 @@ object GraphemeImpl {
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( audioCookie )
+         timeOption.foreach( _.write( out ))
          value.artifact.write( out )
          CommonSerializers.AudioFileSpec.write( value.spec, out )
          value.offset.write( out )
@@ -114,13 +117,26 @@ object GraphemeImpl {
       }
    }
 
+   private sealed trait ConstHolder[ S <: Sys[ S ]] extends ElemHolder[ S ]
+   with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evt.Constant[ S ] {
+      final def timeOption : Option[ Expr[ S, Long ]] = None
+   }
+
+   private sealed trait MutableHolder[ S <: Sys[ S ]] extends ElemHolder[ S ]
+   with evt.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
+      def time: Expr[ S, Long ]
+
+      final protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
+      final def timeOption : Option[ Expr[ S, Long ]] = Some( time )
+      final protected def disposeData()( implicit tx: S#Tx ) {}
+   }
+
    private final case class ConstCurve[ S <: Sys[ S ]]( value: Curve[ S ])
-   extends CurveHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evt.Constant[ S ]
+   extends CurveHolder[ S ] with ConstHolder[ S ]
 
-   private final class MutableCurve[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val value: Curve[ S ])
-   extends CurveHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
-      protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
-
+   private final class MutableCurve[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val time: Expr[ S, Long ],
+                                                     val value: Curve[ S ])
+   extends CurveHolder[ S ] with MutableHolder[ S ] {
       def connect()( implicit tx: S#Tx ) {
          value.values.foreach( tup => tup._1.changed ---> this )
       }
@@ -147,17 +163,14 @@ object GraphemeImpl {
             Some( CurveHolderUpdate( before, now ))
          } else None
       }
-
-      protected def disposeData()( implicit tx: S#Tx ) {}
    }
 
    private final case class ConstAudio[ S <: Sys[ S ]]( value: Audio[ S ])
-   extends AudioHolder[ S ] with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evt.Constant[ S ]
+   extends AudioHolder[ S ] with ConstHolder[ S ]
 
-   private final class MutableAudio[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val value: Audio[ S ])
-   extends AudioHolder[ S ] with evt.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
-      protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
-
+   private final class MutableAudio[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val time: Expr[ S, Long ],
+                                                     val value: Audio[ S ])
+   extends AudioHolder[ S ] with MutableHolder[ S ] {
       def connect()( implicit tx: S#Tx ) {
          value.offset.changed ---> this
          value.gain.changed   ---> this
@@ -194,8 +207,6 @@ object GraphemeImpl {
             Some( AudioHolderUpdate( oldOffset, oldGain, newOffset, newGain ))
          } else None
       }
-
-      protected def disposeData()( implicit tx: S#Tx ) {}
    }
 
    private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]] {
@@ -226,6 +237,7 @@ object GraphemeImpl {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] with evt.Node[ S ] = {
          (in.readUnsignedByte(): @switch) match {
             case `curveCookie` =>
+               val time    = Longs.readExpr( in, access )
                val sz      = in.readInt()
                val values  = IIdxSeq.fill( sz ) {
       //                  val value   = Doubles.readConst[ S ]( in )
@@ -234,9 +246,10 @@ object GraphemeImpl {
                   value -> shape
                }
                val curve = Curve( values: _* )
-               new MutableCurve( targets, curve )
+               new MutableCurve( targets, time, curve )
 
             case `audioCookie` =>
+               val time    = Longs.readExpr( in, access )
                val artifact   = Artifact.read( in )
                val spec       = CommonSerializers.AudioFileSpec.read( in )
       //               val offset     = Longs.readConst[ S ]( in )
@@ -244,7 +257,7 @@ object GraphemeImpl {
       //               val gain       = Doubles.readConst[ S ]( in )
                val gain       = Doubles.readExpr[ S ]( in, access )
                val audio   = Audio( artifact, spec, offset, gain )
-               new MutableAudio( targets, audio )
+               new MutableAudio( targets, time, audio )
 
             case other => sys.error( "Unexpected cookie " + other )
          }
@@ -262,17 +275,17 @@ object GraphemeImpl {
 
       def modifiableOption : Option[ Modifiable[ S ]] = Some( this )
 
-      private def wrap( elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = elem match {
+      private def wrap( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = elem match {
          case curve @ Curve( _ ) =>
-            if( curve.isConstant ) ConstCurve( curve ) else new MutableCurve( evt.Targets[ S ], curve )  // XXX TODO partial?
+            if( curve.isConstant ) ConstCurve( curve ) else new MutableCurve( evt.Targets[ S ], time, curve )  // XXX TODO partial?
          case audio @ Audio( _, _, _, _ ) =>
-            if( audio.isConstant ) ConstAudio( audio ) else new MutableAudio( evt.Targets[ S ], audio )  // XXX TODO partial?
+            if( audio.isConstant ) ConstAudio( audio ) else new MutableAudio( evt.Targets[ S ], time, audio )  // XXX TODO partial?
       }
 
       // ---- forwarding to pin ----
 
       def add( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) {
-         pin.add( time, wrap( elem ))
+         pin.add( time, wrap( time, elem ))
       }
 
       def remove( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : Boolean = {
