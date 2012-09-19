@@ -164,20 +164,21 @@ object BiPinImpl {
             elem.changed -/-> this
          }
 
-         private def incorporate( change: IIdxSeq[ Region[ Elem ]], span: SpanLike, elem: Elem ) : IIdxSeq[ Region[ Elem ]] = {
+         private def incorporate( change: IIdxSeq[ Region[ Elem ]], span: Span.HasStart, elem: Elem ) : IIdxSeq[ Region[ Elem ]] = {
             val entry = (span, elem)
-            span match {
-               case span1: Span =>
-                  change.flatMap({
-                     case (span2, elem2) => span2.subtract( span1 ).map( s => s -> elem2 )
-                  }) :+ entry
-               case Span.All  => IIdxSeq( entry )
-               case span1: Span.Open =>
-                  change.map({
-                     case (span2, elem2) => span2.subtract( span1 ) -> elem2
-                  }).filterNot( _._1.isEmpty ) :+ entry
-               case Span.Void => change
-            }
+            change.flatMap({
+               case (span2, elem2) => span2.subtract( span ).map( _ -> elem2 )
+            }) :+ entry
+//            span match {
+//               case span1: Span =>
+//                  change.flatMap({
+//                     case (span2, elem2) => span2.subtract( span1 ).map( s => s -> elem2 )
+//                  }) :+ entry
+//               case span1: Span.From =>
+//                  change.flatMap({
+//                     case (span2, elem2) => span2.subtract( span1 ).nonEmptyOption.map( _ -> elem2 )
+//                  }) :+ entry
+//            }
          }
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Collection[ S, Elem, U ]] = {
@@ -361,7 +362,7 @@ object BiPinImpl {
          case (time2, leaf) => leaf.headOption.map { case (_, elem) => time2 -> elem }
       }
 
-      private def addNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : SpanLike = {
+      private def addNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Span.HasStart = {
          val entry = (time, elem)
          (tree.floor( timeVal ), tree.ceil( timeVal + 1 )) match {
             case (Some( (start, startLeaf) ), Some( (stop, _) )) =>

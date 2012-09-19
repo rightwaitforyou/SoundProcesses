@@ -1,0 +1,24 @@
+digraph G {
+	NotVoid -> SpanLike
+   FromOrAll -> Open
+   HasStartOrVoid -> SpanLike
+   UntilOrAll -> Open
+   HasStopOrVoid -> SpanLike
+   SpanOrVoid -> HasStartOrVoid
+   SpanOrVoid -> HasStopOrVoid
+   HasStart -> HasStartOrVoid
+   HasStart -> NotVoid
+   HasStop -> HasStopOrVoid
+   HasStop -> NotVoid
+   Open -> NotVoid
+   All -> FromOrAll
+   All -> UntilOrAll
+   From -> FromOrAll
+   From -> HasStart
+   Until -> UntilOrAll
+   Until -> HasStop
+   Void -> SpanOrVoid
+   Span -> SpanOrVoid
+   Span -> HasStart
+   Span -> HasStop
+}

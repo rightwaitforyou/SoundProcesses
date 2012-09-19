@@ -77,7 +77,7 @@ object BiPin {
    final case class Collection[ S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ Region[ Elem ]]) extends Update[ S, Elem, U ]
    final case class Element[    S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ])     extends Update[ S, Elem, U ]
 
-   type Region[ Elem ] = (SpanLike, Elem)
+   type Region[ Elem ] = (Span.HasStart, Elem)
 
    type TimedElem[ S <: Sys[ S ], Elem ] = (Ex[ S, Long ], Elem)
    type Leaf[      S <: Sys[ S ], Elem ] = /* (Long, */ IIdxSeq[ TimedElem[ S, Elem ]] /* ) */

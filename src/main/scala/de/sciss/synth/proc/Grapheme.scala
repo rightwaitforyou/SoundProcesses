@@ -29,7 +29,7 @@ package proc
 import de.sciss.lucre.{bitemp, stm, expr, DataInput, event => evt}
 import stm.{Serializer, Sys}
 import expr.Expr
-import bitemp.{Span, SpanLike}
+import bitemp.Span
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
@@ -48,7 +48,7 @@ object Grapheme {
       /**
        * A mono- or polyphonic constant value
        */
-      final case class Const( span: SpanLike, values: Double* ) extends Value {
+      final case class Const( span: Span.HasStart, values: Double* ) extends Value {
          def numChannels = values.size
       }
 
@@ -59,14 +59,14 @@ object Grapheme {
        * @param values  a sequence of tuples, each consisting of the value at start of the segment,
        *                the target value of the segment, and the shape of the segment
        */
-      final case class Segment( span: SpanLike, values: (Double, Double, Env.ConstShape)* ) extends Value {
+      final case class Segment( span: Span.HasStart, values: (Double, Double, Env.ConstShape)* ) extends Value {
          def numChannels = values.size
 
          def from( start: Long ) : Segment = {
-            if( !span.contains( start )) throw new IllegalArgumentException(
-               "Segment.from - start position " + start + " lies outside of span " + span )
-
-            val newSpan    = span.intersect( Span.from( start ))
+            val newSpan = span.intersect( Span.from( start )).nonEmptyOption.getOrElse {
+               throw new IllegalArgumentException(
+                  "Segment.from - start position " + start + " lies outside of span " + span )
+            }
             val newValues  = span match {
                case Span( oldStart, oldStop) =>
                   val pos = (start - oldStart).toDouble / (oldStop - oldStart)
@@ -81,7 +81,7 @@ object Grapheme {
          }
       }
 
-      final case class Audio( span: SpanLike, artifact: Artifact, spec: AudioFileSpec, offset: Long, gain: Double )
+      final case class Audio( span: Span.HasStart, artifact: Artifact, spec: AudioFileSpec, offset: Long, gain: Double )
       extends Value {
          def numChannels = spec.numChannels
       }
@@ -94,7 +94,7 @@ object Grapheme {
     */
    sealed trait Value {
       def numChannels: Int
-      def span: SpanLike
+      def span: Span.HasStart
    }
 
    object Elem {
