@@ -49,7 +49,7 @@ object Span {
       Span( in.readLong(), in.readLong() )
    }
 
-   sealed trait NotVoid          extends SpanLike
+   sealed trait NonVoid          extends SpanLike
    sealed trait FromOrAll        extends Open   { def nonEmptyOption : Option[ FromOrAll ]}
    sealed trait HasStartOrVoid   extends SpanLike { def nonEmptyOption : Option[ HasStart ]}
    sealed trait UntilOrAll       extends Open { def nonEmptyOption : Option[ UntilOrAll ]}
@@ -69,7 +69,7 @@ object Span {
       def nonEmptyOption : Option[ Span ]
    }
 
-   sealed trait HasStart extends HasStartOrVoid with NotVoid {
+   sealed trait HasStart extends HasStartOrVoid with NonVoid {
       /**
        * @return  the start position of the span. this is considered included in the interval
        */
@@ -83,7 +83,7 @@ object Span {
       def subtract( that: Span.Open ) : HasStartOrVoid
       def subtract( that: SpanLike ) : IIdxSeq[ HasStart ]
    }
-   sealed trait HasStop extends HasStopOrVoid with NotVoid {
+   sealed trait HasStop extends HasStopOrVoid with NonVoid {
       /**
        * @return  the stop position of the span. this is considered excluded in the interval
        */
@@ -94,7 +94,7 @@ object Span {
       final def compareStop( pos: Long ) = if( stop < pos ) -1 else if( stop > pos ) 1 else 0
    }
 
-   sealed trait Open extends NotVoid {
+   sealed trait Open extends NonVoid {
       final def isEmpty    = false
       final def nonEmpty   = true
    
@@ -597,7 +597,7 @@ sealed trait SpanLike extends Writable {
     */
    def subtract( that: Span.Open ) : SpanLike
 
-   def nonEmptyOption : Option[ Span.NotVoid ]
+   def nonEmptyOption : Option[ Span.NonVoid ]
 }
 sealed trait Span extends Span.SpanOrVoid with Span.HasStart with Span.HasStop {
    def shift( delta: Long ) : Span

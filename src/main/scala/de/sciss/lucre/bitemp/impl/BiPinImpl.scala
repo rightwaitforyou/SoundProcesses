@@ -134,7 +134,7 @@ object BiPinImpl {
 
       protected def tree: Tree[ S, Elem ]
       protected def eventView: Elem => EventLike[ S, U, Elem ]
-      implicit protected def elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ]
+      implicit protected def elemSerializer: evt.Serializer[ S, Elem ]
       implicit protected def timeType: Type[ Long ]
 
       override def toString() = "BiPin" + tree.id
@@ -236,6 +236,9 @@ object BiPinImpl {
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Element[ S, Elem, U ]] = {
             val changes: IIdxSeq[ (Elem, U) ] = pull.parents( this ).flatMap( sel => {
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
+
+//               val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
+//                  asInstanceOf[ Elem ]
                val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
                   asInstanceOf[ Elem ]
                eventView( elem ).pullUpdate( pull ).map( u => (elem, u) )
@@ -457,7 +460,7 @@ object BiPinImpl {
    private final class ImplNew[ S <: Sys[ S ], Elem, U ]( protected val targets: evt.Targets[ S ],
                                                           protected val tree: Tree[ S, Elem ],
                                                           protected val eventView: Elem => EventLike[ S, U, Elem ])
-                                                        ( implicit protected val elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                        ( implicit protected val elemSerializer: evt.Serializer[ S, Elem ],
                                                           protected val timeType: Type[ Long ])
    extends Impl[ S, Elem, U ]
 }

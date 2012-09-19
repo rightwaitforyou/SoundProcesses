@@ -350,6 +350,19 @@ object GraphemeImpl {
 
             case BiPin.Element( _, changes ) =>
                // changes = IIdxSeq[ (ElemHolder, ElemHolderUpdate)
+               changes.map { case (elem, _) =>
+                  ???
+//                  upd match {
+//                     case CurveHolderUpdate( before, now ) =>
+//                        // before and now: : IIdxSeq[ (Double, Env.ConstShape) ]
+//
+//                        ???
+//
+//                     case AudioHolderUpdate( beforeOffset, beforeGain, nowOffset, nowGain ) =>
+//                        // before/now offset: Long, before/now gain: Double
+//                        ???
+//                  }
+               }
                ???
          }
       }
