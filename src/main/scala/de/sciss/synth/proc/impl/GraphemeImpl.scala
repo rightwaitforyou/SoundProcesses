@@ -36,6 +36,7 @@ import de.sciss.synth.expr.{Doubles, Longs}
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.EventLikeSerializer
+import io.AudioFileSpec
 
 object GraphemeImpl {
    import Grapheme.{Elem, Value, Modifiable}
@@ -72,13 +73,18 @@ object GraphemeImpl {
 
    // ---- ElemHolder ----
 
-   private sealed trait ElemHolderUpdate
-   private final case class CurveHolderUpdate( before: IIdxSeq[ (Double, Env.ConstShape) ],
+   private sealed trait ElemHolderUpdate { def time: Long }
+   private final case class CurveHolderUpdate( time: Long,
+//                                               before: IIdxSeq[ (Double, Env.ConstShape) ],
                                                now:    IIdxSeq[ (Double, Env.ConstShape) ])
    extends ElemHolderUpdate
 
-   private final case class AudioHolderUpdate( beforeOffset: Long, beforeGain: Double,
-                                               nowOffset: Long, nowGain: Double ) extends ElemHolderUpdate
+   private final case class AudioHolderUpdate( time: Long, artifact: Artifact, spec: AudioFileSpec,
+//                                               beforeOffset: Long, beforeGain: Double,
+                                               nowOffset:    Long, nowGain:    Double )
+   extends ElemHolderUpdate
+
+//   private final case class ElemHolderUpdate( time: Long )
 
    private sealed trait ElemHolder[ S <: Sys[ S ]]
    extends evt.EventLike[ S, ElemHolderUpdate, ElemHolder[ S ]] with Writable {
@@ -160,7 +166,7 @@ object GraphemeImpl {
             })( breakOut )
          val (before, now) = valueChanges.unzip
          if( before != now ) {
-            Some( CurveHolderUpdate( before, now ))
+            Some( CurveHolderUpdate( time.value, /* before, */ now ))
          } else None
       }
    }
@@ -204,7 +210,7 @@ object GraphemeImpl {
          }
 
          if( oldOffset != newOffset || oldGain != newGain ) {
-            Some( AudioHolderUpdate( oldOffset, oldGain, newOffset, newGain ))
+            Some( AudioHolderUpdate( time.value, value.artifact, value.spec, /* oldOffset, oldGain, */ newOffset, newGain ))
          } else None
       }
    }
@@ -312,22 +318,8 @@ object GraphemeImpl {
       private def valueFromFloor( floorTime: Long, floorHolder: ElemHolder[ S ])( implicit tx: S#Tx ) : Value = {
          floorHolder.value match {
             case floorCurve @ Elem.Curve( floorValues @ _* ) =>
-               val floorValuesVal = floorValues.map( _._1.value )
-               pin.ceil( floorTime + 1 ) match {
-                  case Some( (ceilTime, ceilHolder) ) =>
-                     val span = Span( floorTime, ceilTime )
-                     ceilHolder.value match {
-                        case ceilCurve @ Elem.Curve( ceilValues @ _* ) if floorCurve.numChannels == ceilCurve.numChannels =>
-                           val segmValues    = (floorValuesVal zip ceilValues).map { case (startVal, (stop, shape)) =>
-                              (startVal, stop.value, shape)
-                           }
-                           Value.Segment( span, segmValues: _* )
-                        case _ =>
-                           Value.Const( span, floorValuesVal: _* )
-                     }
-                  case _ =>
-                     Value.Const( Span.from( floorTime ), floorValuesVal: _* )
-               }
+               val floorValuesVal: IIdxSeq[ Double ] = floorValues.map( _._1.value )( breakOut )
+               curveValueFromFloor( floorTime, floorValuesVal )
 
             case Elem.Audio( artifact, spec, offset, gain ) =>
                val offsetVal  = offset.value
@@ -338,6 +330,24 @@ object GraphemeImpl {
                }
                Value.Audio( span, artifact, spec, offsetVal, gainVal )
             }
+      }
+
+      private def curveValueFromFloor( floorTime: Long, floorValues: IIdxSeq[ Double ])( implicit tx: S#Tx ) : Value = {
+         pin.ceil( floorTime + 1 ) match {
+            case Some( (ceilTime, ceilHolder) ) =>
+               val span = Span( floorTime, ceilTime )
+               ceilHolder.value match {
+                  case ceilCurve @ Elem.Curve( ceilValues @ _* ) if floorValues.size == ceilValues.size =>
+                     val segmValues = (floorValues zip ceilValues).map { case (startVal, (stop, shape)) =>
+                        (startVal, stop.value, shape)
+                     }
+                     Value.Segment( span, segmValues: _* )
+                  case _ =>
+                     Value.Const( span, floorValues: _* )
+               }
+            case _ =>
+               Value.Const( Span.from( floorTime ), floorValues: _* )
+         }
       }
 
       // ---- node and event ----
@@ -363,20 +373,34 @@ object GraphemeImpl {
 
             case BiPin.Element( _, changes ) =>
                // changes = IIdxSeq[ (ElemHolder, ElemHolderUpdate)
-               changes.map { case (elem, _) =>
-                  ???
-//                  upd match {
-//                     case CurveHolderUpdate( before, now ) =>
-//                        // before and now: : IIdxSeq[ (Double, Env.ConstShape) ]
-//
-//                        ???
-//
-//                     case AudioHolderUpdate( beforeOffset, beforeGain, nowOffset, nowGain ) =>
-//                        // before/now offset: Long, before/now gain: Double
-//                        ???
-//                  }
+               val values = changes.flatMap { case (elem, upd) =>
+                  upd match {
+                     case CurveHolderUpdate( nowTime, /* before, */ nowValues ) =>
+                        // before and now: : IIdxSeq[ (Double, Env.ConstShape) ]
+                        val right   = curveValueFromFloor( nowTime, nowValues.map( _._1 )) :: Nil
+                        pin.floor( nowTime - 1 ) match {
+                           case Some( (floorTime, floorHolder) ) =>
+                              floorHolder.value match {
+                                 case floorCurve @ Elem.Curve( floorValues @ _* ) if floorValues.size == nowValues.size =>
+                                    val segmValues = (floorValues zip nowValues).map { case (start, (stopVal, shape)) =>
+                                       (start._1.value, stopVal, shape)
+                                    }
+                                    Value.Segment( Span( floorTime, nowTime ), segmValues: _* ) :: right
+                                 case _ => right
+                              }
+                           case _ => right
+                        }
+
+                     case AudioHolderUpdate( startTime, artifact, spec, nowOffset, nowGain ) =>
+                        // before/now offset: Long, before/now gain: Double
+                        val span = pin.nearestEventAfter( startTime + 1 ) match {
+                           case Some( stopTime ) => Span( startTime, stopTime )
+                           case _                => Span.From( startTime )
+                        }
+                        Value.Audio( span, artifact, spec, nowOffset, nowGain ) :: Nil
+                  }
                }
-               ???
+               Grapheme.Update( graph, values )
          }
       }
 

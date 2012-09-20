@@ -1,0 +1,4 @@
+- curve change = change in magnitude in the segment for which time is the end point; in other words, the outer update needs to consider this segment, if its end point is a curve; as well as the span for which time is the start point (yielding either a curve if the end point is another point, or a constant otherwise)
+
+- audio change = change within the segment given by time as the start point
+
