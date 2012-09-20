@@ -117,7 +117,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
 //      p.trigger( "silence" )
 
-      p.playing_=( true )
+//      p.playing_=( true )
       p
    }
 

@@ -26,21 +26,20 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, DataInput, Writable, data, stm}
-import stm.{Identifiable, Sys}
+import de.sciss.lucre.{event => evt, DataInput, data, stm}
+import stm.Sys
 import impl.{ScanImpl => Impl}
 import evt.Event
 
 object Scan {
    object Link {
-//      implicit def none( unit: Unit ) : Output = ???
       implicit def grapheme[ S <: Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
       implicit def scan[     S <: Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan(     link )
 
-      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] // { def id = peer.id }
-      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] // { def id = peer.id }
+      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] { def id = peer.id }
+      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] { def id = peer.id }
    }
-   sealed trait Link[ S <: Sys[ S ]] // { def id: S#ID }
+   sealed trait Link[ S <: Sys[ S ]] { def id: S#ID }
 
    def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Scan[ S ] = Impl.apply
 

@@ -27,11 +27,11 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data}
-import data.SkipList
-import stm.Sys
+import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data, expr}
+import stm.{IdentifierMap, Sys}
 import evt.Event
 import annotation.switch
+import expr.LinkedList
 
 object ScanImpl {
    import Scan.Link
@@ -42,14 +42,13 @@ object ScanImpl {
       val targets    = evt.Targets[ S ]   // XXX TODO: partial?
       val id         = targets.id
       val sourceRef  = tx.newVar[ Option[ Link[ S ]]]( id, None )
-//      val sinkSet    = SkipList.Set.empty[ S, Link[ S ]]
-      val sinkSet: SkipList.Set[ S, Link[ S ]] = ???
-      new ImplNew( targets, sourceRef, sinkSet )
+      val sinkMap    = tx.newDurableIDMap[ Link[ S ]]
+      val sinkList   = LinkedList.Modifiable[ S, Link[ S ]]
+      new Impl( targets, sourceRef, sinkMap, sinkList )
    }
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Scan[ S ] = {
       serializer[ S ].read( in, access )
-//      val targets    = evt.Targets.read[ S ]( in, access )
    }
 
    implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Scan[ S ]] =
@@ -57,13 +56,13 @@ object ScanImpl {
 
    private val anySer : evt.NodeSerializer[ I, Scan[ I ]] = new Ser[ I ]
 
-//   private final class Ser[ S <: Sys[ S ]] extends evt.Reader[ S, Impl[ S ]] with stm.Serializer[ S#Tx, S#Acc, Scan[ S ]]
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Scan[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Scan[ S ] = {
          val id         = targets.id
          val sourceRef  = tx.readVar[ Option[ Link[ S ]]]( id, in )
-         val sinkSet: SkipList.Set[ S, Link[ S ]] = ???
-         new ImplNew( targets, sourceRef, sinkSet )
+         val sinkMap    = tx.readDurableIDMap[ Link[ S ]]( in )
+         val sinkList   = LinkedList.Modifiable.read[ S, Link[ S ]]( in, access )
+         new Impl( targets, sourceRef, sinkMap, sinkList )
       }
    }
 
@@ -97,34 +96,44 @@ object ScanImpl {
       }
    }
 
-   private abstract class Impl[ S <: Sys[ S ]]
+   // TODO: the crappy sinkList is only needed because the id map does not have an iterator...
+   // we should really figure out how to add iterator functionality to the id map!!!
+   private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+                                             protected val sourceRef: S#Var[ Option[ Link[ S ]]],
+                                             protected val sinkMap: IdentifierMap[ S#ID, S#Tx, Link[ S ]],
+                                             protected val sinkList: LinkedList.Modifiable[ S, Link[ S ], Unit ])
    extends Scan[ S ]
    with evt.StandaloneLike[ S, Scan.Update[ S ], Scan[ S ]]
    with evt.Generator[ S, Scan.Update[ S ], Scan[ S ]]
    with evt.Root[ S, Scan.Update[ S ]] {
       me =>
 
-      protected def sourceRef : S#Var[ Option[ Link[ S ]]]
-      protected def sinkSet : SkipList.Set[ S, Link[ S ]]
-
       override def toString = "Scan" + id
 
-      final def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkSet.iterator
+      def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkList.iterator
 
-      final def addSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean = {
-         val res = sinkSet.add( sink )
-         if( res ) fire( Scan.SinkAdded( me, sink ))
-         res
+      def addSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean = {
+         val sinkID  = sink.id
+         if( sinkMap.contains( sinkID )) return false
+
+         sinkMap.put( sinkID, sink )
+         sinkList.addHead( sink )   // faster than addLast; but perhaps we should use addLast to have a better iterator order?
+         fire( Scan.SinkAdded( me, sink ))
+         true
       }
-      final def removeSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean = {
-         val res = sinkSet.remove( sink )
-         if( res ) fire( Scan.SinkRemoved( me, sink ))
-         res
+
+      def removeSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean = {
+         val sinkID  = sink.id
+         if( !sinkMap.contains( sinkID )) return false
+         sinkMap.remove( sinkID )
+         sinkList.remove( sink )
+         fire( Scan.SinkRemoved( me, sink ))
+         true
       }
 
-      final def source( implicit tx: S#Tx ) : Option[ Link[ S ]] = sourceRef.get
+      def source( implicit tx: S#Tx ) : Option[ Link[ S ]] = sourceRef.get
 
-      final def source_=( link: Option[ Link[ S ]])( implicit tx: S#Tx ) {
+      def source_=( link: Option[ Link[ S ]])( implicit tx: S#Tx ) {
          if( setSource( link )) {
             link match {
                case Some( Link.Scan( peer )) => peer.addSink( this )
@@ -146,7 +155,7 @@ object ScanImpl {
          true
       }
 
-      final def changed: Event[ S, Scan.Update[ S ], Scan[ S ]] = this
+      def changed: Event[ S, Scan.Update[ S ], Scan[ S ]] = this
 
       // called in the implementation from addSink( Link.Scan( _ )). the difference
       // to source_= is that this method should not establish the opposite connection
@@ -156,21 +165,18 @@ object ScanImpl {
          setSource( Some( source: Link[ S ]) )
       }
 
-      final protected def writeData( out: DataOutput ) {
+      protected def writeData( out: DataOutput ) {
          sourceRef.write( out )
-         sinkSet.write( out )
+         sinkMap.write( out )
+         sinkList.write( out )
       }
 
-      final protected def disposeData()(implicit tx: S#Tx) {
+      protected def disposeData()(implicit tx: S#Tx) {
          sourceRef.dispose()
-         sinkSet.dispose()
+         sinkMap.dispose()
+         sinkList.dispose()
       }
 
-      final protected def reader: evt.Reader[ S, Scan[ S ]] = serializer
+      protected def reader: evt.Reader[ S, Scan[ S ]] = serializer
    }
-
-   private final class ImplNew[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                                protected val sourceRef: S#Var[ Option[ Link[ S ]]],
-                                                protected val sinkSet: SkipList.Set[ S, Link[ S ]])
-   extends Impl[ S ]
 }
