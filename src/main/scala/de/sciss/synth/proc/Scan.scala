@@ -26,8 +26,8 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, Writable, data, stm}
-import stm.Sys
+import de.sciss.lucre.{event => evt, DataInput, Writable, data, stm}
+import stm.{Identifiable, Sys}
 import impl.{ScanImpl => Impl}
 import evt.Event
 
@@ -37,12 +37,14 @@ object Scan {
       implicit def grapheme[ S <: Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
       implicit def scan[     S <: Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan(     link )
 
-      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ]
-      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ]
+      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] // { def id = peer.id }
+      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] // { def id = peer.id }
    }
-   sealed trait Link[ S ]
+   sealed trait Link[ S <: Sys[ S ]] // { def id: S#ID }
 
    def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Scan[ S ] = Impl.apply
+
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Scan[ S ] = Impl.read( in, access )
 
    implicit def serializer[ S <: Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
 
@@ -60,7 +62,7 @@ object Scan {
  * known as key. A scan can write to any number of targets, but may only be synchronised to one
  * source. If not synchronised to a source, the owner process' graph may feed a signal into it.
  */
-trait Scan[ S <: Sys[ S ]] extends Writable {
+trait Scan[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Scan._
 
    def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]]
@@ -69,6 +71,8 @@ trait Scan[ S <: Sys[ S ]] extends Writable {
    // more the 'procedural' approach
    def addSink(    sink: Link[ S ])( implicit tx: S#Tx ) : Boolean
    def removeSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean
+
+//   private[proc] def wasRemoved()( implicit tx: S#Tx ) : Unit
 
    def source( implicit tx: S#Tx ) : Option[ Link[ S ]]
    def source_=( link: Option[ Link[ S ]])( implicit tx: S#Tx ) : Unit
