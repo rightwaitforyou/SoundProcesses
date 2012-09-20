@@ -348,8 +348,8 @@ object AuralPresentationImpl {
 
       def procAdded( timed: TimedProc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
          val p       = timed.value
-         val playing = p.playing.value
-         if( !playing ) return
+//         val playing = p.playing.value
+//         if( !playing ) return
 
          val time    = chr.time
 //         val graph   = p.graph.value

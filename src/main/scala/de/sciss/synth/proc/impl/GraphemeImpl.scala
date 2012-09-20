@@ -28,7 +28,7 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, Writable, bitemp, expr, DataOutput, stm, DataInput}
-import stm.{Serializer, Sys}
+import stm.Sys
 import annotation.switch
 import expr.Expr
 import bitemp.{Span, BiPin}

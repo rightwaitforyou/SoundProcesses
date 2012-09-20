@@ -23,33 +23,31 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
 import de.sciss.lucre.{data, stm}
 import stm.Sys
 
 object Scan {
-//   /**
-//    * A real-time signal produced by another process
-//    *
-//    * @param timed   the source process of the signal
-//    * @param key     the scan key in the source process
-//    */
-//   final case class Sink[ S <: Sys[ S ]]( timed: TimedProc[ S ], key: String )
-//   extends Value[ S ]
-//
-//   /**
-//    * The real-time signal produced (output) by this process
-//    */
-//   case object Source extends Value[ Nothing ]
-
    object Link {
 //      implicit def none( unit: Unit ) : Output = ???
-      implicit def grapheme[ S <: Sys[ S ]]( link: Grapheme[ S ]) : Link[ S ] = ???
-      implicit def scan[     S <: Sys[ S ]]( link: Scan[     S ]) : Link[ S ] = ???
+      implicit def grapheme[ S <: Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
+      implicit def scan[     S <: Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan( link )
+
+      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ]
+      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ]
    }
    sealed trait Link[ S ]
 }
+
+/**
+ * A scan represents a real-time signal which can either function as a reader linked to another scan
+ * which functions as its source or a grapheme, or it functions as a writer sinking into a grapheme
+ * or another scan. Scans are situated with a process (`Proc`) and identified by a unique name, also
+ * known as key. A scan can write to any number of targets, but may only be synchronised to one
+ * source. If not synchronised to a source, the owner process' graph may feed a signal into it.
+ */
 trait Scan[ S <: Sys[ S ]] {
    import Scan._
 

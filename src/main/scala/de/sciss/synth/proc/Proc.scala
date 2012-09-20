@@ -74,10 +74,10 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def graph_=( g: Code[ SynthGraph ])( implicit tx: S#Tx ) : Unit
 //   def graph_=( block: => Any )( implicit tx: S#Tx ) : Unit
 
-// OOO
-//   def playing_# : Expr.Var[ S, Boolean ]
-   def playing( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Boolean ]
-   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
+//// OOO
+////   def playing_# : Expr.Var[ S, Boolean ]
+//   def playing( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Boolean ]
+//   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
    // ---- controls preview demo ----
 
@@ -85,14 +85,14 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    def scans: Scans.Modifiable[ S ]
    def graphemes: Graphemes.Modifiable[ S ]
 
-   /**
-    * Same as `playing = true`
-    */
-   def play()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
-   /**
-    * Same as `playing = false`
-    */
-   def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
+//   /**
+//    * Same as `playing = true`
+//    */
+//   def play()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
+//   /**
+//    * Same as `playing = false`
+//    */
+//   def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
 
    // ---- events ----
 
