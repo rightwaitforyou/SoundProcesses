@@ -49,12 +49,13 @@ object Proc {
    sealed trait StateChange[ S <: Sys[ S ]] extends Update[ S ]
    final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends StateChange[ S ]
    final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends StateChange[ S ]
-   final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
+//   final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
 
-   final case class AssociativeChange[ S <: Sys[ S ]]( proc: Proc[ S ], added: Set[ AssociativeKey ], removed: Set[ AssociativeKey ]) extends StateChange[ S ]
+   final case class AssociativeChange[ S <: Sys[ S ]]( proc: Proc[ S ], added:   Set[ AssociativeKey ],
+                                                                        removed: Set[ AssociativeKey ]) extends StateChange[ S ]
    sealed trait AssociativeKey { def name: String }
-   final case class ScanKey( name: String ) extends AssociativeKey
+   final case class ScanKey(     name: String ) extends AssociativeKey
    final case class GraphemeKey( name: String ) extends AssociativeKey
 
 //   final case class ParamChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ BiPin.Expr.Update[ S, Param ]]]) extends Update[ S ]

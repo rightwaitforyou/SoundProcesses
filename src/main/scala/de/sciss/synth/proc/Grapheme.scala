@@ -158,6 +158,12 @@ object Grapheme {
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = Impl.read( in, access )
 }
 trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
+   /**
+    * The idea of all traits which distinguish between read-only and modifiable sub-type is that
+    * eventually the super-type acts somewhat like an expression. It might be possible to map
+    * a grapheme with operators, and it might be preferable to avoid having to have the modifiable
+    * operations in the mapped object (cf. `Expr` versus `Expr.Var`).
+    */
    def modifiableOption : Option[ Grapheme.Modifiable[ S ]]
 
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Elem[ S ]]

@@ -23,23 +23,24 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 package impl
 
 import de.sciss.lucre.{event => evt, stm, expr, data, bitemp, DataInput, DataOutput}
-import de.sciss.synth.{stepShape, SynthGraph}
-import de.sciss.synth.expr.{Booleans, Strings, Doubles, ExprImplicits}
+import de.sciss.synth.expr.{Strings, Doubles, ExprImplicits}
 import stm.{InMemory, Sys}
-import bitemp.{BiType, Chronos, BiPin}
+import evt.Event
+import bitemp.BiType
 import expr.Expr
 import data.SkipList
 import ExprImplicits._
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import annotation.{tailrec, switch}
+import annotation.switch
 
 /*
 object ProcImpl {
-   private final val SER_VERSION = 2
+   private final val SER_VERSION = 0
 
    def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
 
@@ -65,15 +66,15 @@ object ProcImpl {
    }
    private final class ScanNode[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val key: String,
                                                   val value: Scan[ S ])
-   extends evt.StandaloneLike[ S, (String, Scan_.Update[ S ]), ScanNode[ S ]] {
+   extends evt.StandaloneLike[ S, (String, Scan.Update[ S ]), ScanNode[ S ]] {
       protected def reader: evt.Reader[ S, ScanNode[ S ]] = ScanNode.serializer[ S ]
 
-      /* private[lucre] */ def connect()( implicit tx: S#Tx ) {
-         evt.Intruder.--->( value.changed, this )
+      def connect()( implicit tx: S#Tx ) {
+         value.changed ---> this
       }
 
-      /* private[lucre] */ def disconnect()( implicit tx: S#Tx ) {
-         evt.Intruder.-/->( value.changed, this )
+      def disconnect()( implicit tx: S#Tx ) {
+         value.changed ---> this
       }
 
       protected def writeData( out: DataOutput ) {
@@ -85,7 +86,7 @@ object ProcImpl {
          value.dispose()
       }
 
-      /* private[lucre] */ def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, Scan_.Update[ S ])] =
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, Scan.Update[ S ])] =
          evt.Intruder.pullUpdate( value.changed, pull ).map( key -> _ )
    }
 
@@ -96,7 +97,7 @@ object ProcImpl {
    private final class ScanNodeSer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, ScanNode[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ScanNode[ S ] = {
          val key     = in.readString()
-         val value   = Scan_.read( in, access ) // BiPin.Expr.Modifiable.read( in, access )
+         val value   = Scan.read( in, access ) // BiPin.Expr.Modifiable.read( in, access )
          new ScanNode( targets, key, value )
       }
    }
@@ -114,7 +115,7 @@ object ProcImpl {
 
       protected def graphVar : S#Var[ Code[ SynthGraph ]]
 //      protected def playing_# : Expr.Var[ S, Boolean ]
-      protected def playing_# : BiPin.Expr.Modifiable[ S, Boolean ]
+//      protected def playing_# : BiPin.Expr.Modifiable[ S, Boolean ]
       protected def name_# : Expr.Var[ S, String ]
 
 //      protected def parMap : txn.SkipList.Map[ S, String, BiPin.Expr[ S, Param ]]
@@ -126,7 +127,8 @@ object ProcImpl {
          def get( key: String )( implicit tx: S#Tx ) : Option[ Scan[ S ]] = scanMap.get( key ).map( _.value )
          def keys( implicit tx: S#Tx ) : Set[ String ] = scanMap.keysIterator.toSet
 
-         def add( key: String, scan: Scan[ S ])( implicit tx: S#Tx ) {
+         def add( key: String )( implicit tx: S#Tx ) : Scan[ S ] = {
+            val scan: Scan[ S ] = ???
             val isConnected = targets.nonEmpty
             val tgt  = evt.Targets[ S ]   // XXX TODO : partial?
             val sn   = new ScanNode( tgt, key, scan )
@@ -140,6 +142,7 @@ object ProcImpl {
                ScanEvent += sn
                StateEvent( Proc.ScansCollectionChange( proc, Set( key ), setRemoved ))
             }
+            scan
          }
 
          def remove( key: String )( implicit tx: S#Tx ) : Boolean = {
@@ -156,50 +159,50 @@ object ProcImpl {
             }
          }
 
-         def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value[ S ]] =
-            flatValueAt( this, None, key, time )
-
-         @tailrec private def flatValueAt( scans: Scans[ S ], sourceOption: Option[ TimedProc[ S ]],
-                                           key: String, time: Long )
-                                         ( implicit tx: S#Tx ) : Option[ Grapheme.Value[ S ]] = {
-            scans.get( key ) match {
-               case Some( scan ) =>
-//                  val scan = entry.value
-                  scan.floor( time ) match {
-                     case Some( (floorTime, floorElem) ) =>
-                        floorElem match {
-                           case Grapheme.Mono( floorValueEx, _ ) =>
-                              val floorValue = floorValueEx.value.toFloat
-                              scan.ceil( time ) match {
-                                 case Some( (ceilTime, Grapheme.Mono( ceilValueEx, ceilShape )) ) =>
-                                    val ceilValue = ceilValueEx.value.toFloat
-                                    if( ceilShape == stepShape ) {
-                                       Some( Grapheme.Value.MonoConst( ceilValue ))
-                                    } else {
-                                       val ceilDur = ceilTime - floorTime
-                                       val dur     = ceilTime - time
-                                       val w       = 1.0 - (ceilDur.toDouble / dur)
-                                       val start   = ceilShape.levelAt( w.toFloat, floorValue, ceilValue )
-                                       Some( Grapheme.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
-                                    }
-                                 case _ => Some( Grapheme.Value.MonoConst( floorValue ))
-                              }
-
-                           case Grapheme.Synthesis() =>
-                              sourceOption match {
-                                 case Some( source )  => Some( Grapheme.Value.Sink( source, key ))
-                                 case _               => Some( Grapheme.Value.Source )
-                              }
-                           case Grapheme.Embedded( sourceTimed, sourceKey, offsetEx ) =>
-                              val offset = offsetEx.value
-                              flatValueAt( sourceTimed.value.scans, Some( sourceTimed ), sourceKey, time + offset )  // tail-rec
-                        }
-
-                     case _ => None
-                  }
-               case _ => None
-            }
-         }
+//         def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value ] =
+//            flatValueAt( this, None, key, time )
+//
+//         @tailrec private def flatValueAt( scans: Scans[ S ], sourceOption: Option[ TimedProc[ S ]],
+//                                           key: String, time: Long )
+//                                         ( implicit tx: S#Tx ) : Option[ Grapheme.Value ] = {
+//            scans.get( key ) match {
+//               case Some( scan ) =>
+////                  val scan = entry.value
+//                  scan.floor( time ) match {
+//                     case Some( (floorTime, floorElem) ) =>
+//                        floorElem match {
+//                           case Grapheme.Mono( floorValueEx, _ ) =>
+//                              val floorValue = floorValueEx.value.toFloat
+//                              scan.ceil( time ) match {
+//                                 case Some( (ceilTime, Grapheme.Mono( ceilValueEx, ceilShape )) ) =>
+//                                    val ceilValue = ceilValueEx.value.toFloat
+//                                    if( ceilShape == stepShape ) {
+//                                       Some( Grapheme.Value.MonoConst( ceilValue ))
+//                                    } else {
+//                                       val ceilDur = ceilTime - floorTime
+//                                       val dur     = ceilTime - time
+//                                       val w       = 1.0 - (ceilDur.toDouble / dur)
+//                                       val start   = ceilShape.levelAt( w.toFloat, floorValue, ceilValue )
+//                                       Some( Grapheme.Value.MonoSegment( start, ceilValue, dur, ceilShape ))
+//                                    }
+//                                 case _ => Some( Grapheme.Value.MonoConst( floorValue ))
+//                              }
+//
+//                           case Grapheme.Synthesis() =>
+//                              sourceOption match {
+//                                 case Some( source )  => Some( Grapheme.Value.Sink( source, key ))
+//                                 case _               => Some( Grapheme.Value.Source )
+//                              }
+//                           case Grapheme.Embedded( sourceTimed, sourceKey, offsetEx ) =>
+//                              val offset = offsetEx.value
+//                              flatValueAt( sourceTimed.value.scans, Some( sourceTimed ), sourceKey, time + offset )  // tail-rec
+//                        }
+//
+//                     case _ => None
+//                  }
+//               case _ => None
+//            }
+//         }
       }
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = {
@@ -208,13 +211,13 @@ object ProcImpl {
       final def name_=( s: Expr[ S, String ])( implicit tx: S#Tx ) {
          name_#.set( s )
       }
-      final def playing( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Boolean ] = {
-         playing_#.at( chr.time ).getOrElse( true )   // true?
-      }
-      final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-//         playing_#.set( b )
-         playing_#.add( chr.time, b )
-      }
+//      final def playing( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Boolean ] = {
+//         playing_#.at( chr.time ).getOrElse( true )   // true?
+//      }
+//      final def playing_=( b: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+////         playing_#.set( b )
+//         playing_#.add( chr.time, b )
+//      }
 
       final def graph( implicit tx: S#Tx ) : Code[ SynthGraph ] = graphVar.get
 
@@ -227,18 +230,18 @@ object ProcImpl {
          }
       }
 //      final def graph_=( block: => Any )( implicit tx: S#Tx ) { graph_=( SynthGraph.withoutSource( SynthGraph( block )))}
-      final def play()( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         playing_=( true )
-      }
-      final def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         playing_=( false )
-      }
+//      final def play()( implicit tx: S#Tx, chr: Chronos[ S ]) {
+//         playing_=( true )
+//      }
+//      final def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) {
+//         playing_=( false )
+//      }
 
       // ---- ParamMap ----
 
       private object StateEvent
-      extends evt.Trigger.Impl[ S, Proc.StateChange[ S ], Proc.StateChange[ S ], Proc[ S ]]
-      with evt.EventImpl[ S, Proc.StateChange[ S ], Proc.StateChange[ S ], Proc[ S ]]
+      extends evt.Trigger.Impl[ S, Proc.StateChange[ S ], Proc[ S ]]
+      with evt.EventImpl[ S, Proc.StateChange[ S ], Proc[ S ]]
       with evt.InvariantEvent[ S, Proc.StateChange[ S ], Proc[ S ]]
       with evt.Root[ S, Proc.StateChange[ S ]]
       {
@@ -248,7 +251,7 @@ object ProcImpl {
       }
 
       private object ScanEvent
-      extends evt.EventImpl[ S, Proc.ScansElementChange[ S ], Proc.ScansElementChange[ S ], Proc[ S ]]
+      extends evt.EventImpl[ S, Proc.ScansElementChange[ S ], Proc[ S ]]
       with evt.InvariantEvent[ S, Proc.ScansElementChange[ S ], Proc[ S ]] {
          protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
          def slot: Int = 2
@@ -258,15 +261,15 @@ object ProcImpl {
          def disconnect()( implicit tx: S#Tx ) {}
 
          def +=( entry: ScanNode[ S ])( implicit tx: S#Tx ) {
-            evt.Intruder.--->( entry, this )
+            entry ---> this
          }
 
          def -=( entry: ScanNode[ S ])( implicit tx: S#Tx ) {
-            evt.Intruder.-/->( entry, this )
+            entry -/-> this
          }
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ScansElementChange[ S ]] = {
-XXX check if casting still necessary
+            // TODO XXX check if casting still necessary
             val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ Grapheme.Update[ S ]]]) { case (map, sel) =>
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
                val node = evt.Intruder.devirtualizeNode( sel, ScanNode.serializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
@@ -291,23 +294,23 @@ XXX check if casting still necessary
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
 
-         /* private[lucre] */ def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
-            evt.Intruder.--->( StateEvent, r )
-            evt.Intruder.--->( ScanEvent, r )
+         def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+            StateEvent ---> r
+            ScanEvent  ---> r
          }
-         /* private[lucre] */ def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
-            evt.Intruder.-/->( StateEvent, r )
-            evt.Intruder.-/->( ScanEvent, r )
+         def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
+            StateEvent -/-> r
+            ScanEvent  -/-> r
          }
 
-         /* private[lucre] */ def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
-            if(      evt.Intruder.isSource( ScanEvent,  pull )) evt.Intruder.pullUpdate( ScanEvent,  pull )
-            else if( evt.Intruder.isSource( StateEvent, pull )) evt.Intruder.pullUpdate( StateEvent, pull )
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
+            if(      ScanEvent.isSource(  pull )) ScanEvent.pullUpdate(  pull )
+            else if( StateEvent.isSource( pull )) StateEvent.pullUpdate( pull )
             else None
          }
 
          def react( fun: Proc.Update[ S ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, Proc.Update[ S ], Proc[ S ]] =
-            reactTx( _ => fun )
+            reactTx( (_: S#Tx) => fun )
 
          def reactTx( fun: S#Tx => Proc.Update[ S ] => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, Proc.Update[ S ], Proc[ S ]] = {
             val obs = evt.Observer( ProcImpl.serializer[ S ], fun )
@@ -319,11 +322,11 @@ XXX check if casting still necessary
          /* private[lucre] */ def isSource( pull: evt.Pull[ S ]) : Boolean = {
             // I don't know why this method is actually called? But it _is_, so we need to correctly handle the case
 //            opNotSupported
-            evt.Intruder.isSource( StateEvent, pull ) || evt.Intruder.isSource( ScanEvent, pull )
+            ScanEvent.isSource( pull ) || StateEvent.isSource( pull )
          }
       }
 
-      final def select( slot: Int, invariant: Boolean ) : evt.NodeSelector[ S, _ ] = (slot: @switch) match {
+      final def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = (slot: @switch) match {
          case 1 => StateEvent
          case 2 => ScanEvent
       }
@@ -377,7 +380,7 @@ XXX check if casting still necessary
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
          name_#.write( out )
-         playing_#.write( out )
+//         playing_#.write( out )
          graphVar.write( out )
 //         parMap.write( out )
          scanMap.write( out )
@@ -385,7 +388,7 @@ XXX check if casting still necessary
 
       final protected def disposeData()( implicit tx: S#Tx ) {
          name_#.dispose()
-         playing_#.dispose()
+//         playing_#.dispose()
          graphVar.dispose()
 //         parMap.dispose()
          scanMap.dispose()
@@ -402,7 +405,7 @@ XXX check if casting still necessary
       protected val targets   = evt.Targets[ S ]( tx0 )
 
       protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
-      protected val playing_# = BiPin.Expr.Modifiable.partial[ S, Boolean ]/*( true )*/( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
+//      protected val playing_# = BiPin.Expr.Modifiable.partial[ S, Boolean ]/*( true )*/( tx0, Booleans ) // Booleans.newVar[ S ]( true )( tx0 )
       protected val graphVar  = {
          implicit val peerSer = SynthGraphSerializer
 //         implicit val ser     = Code.serializer[ S, SynthGraph ]
@@ -429,7 +432,7 @@ XXX check if casting still necessary
       }
 
       protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
-      protected val playing_# = BiPin.Expr.Modifiable.read[ S, Boolean ]( in, access )( tx0, Booleans )
+//      protected val playing_# = BiPin.Expr.Modifiable.read[ S, Boolean ]( in, access )( tx0, Booleans )
       protected val graphVar  = {
          implicit val peerSer = SynthGraphSerializer
          tx0.readVar[ Code[ SynthGraph ]]( id, in )

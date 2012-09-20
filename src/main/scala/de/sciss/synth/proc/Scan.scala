@@ -26,19 +26,31 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{data, stm}
+import de.sciss.lucre.{event => evt, Writable, data, stm}
 import stm.Sys
+import impl.{ScanImpl => Impl}
+import evt.Event
 
 object Scan {
    object Link {
 //      implicit def none( unit: Unit ) : Output = ???
       implicit def grapheme[ S <: Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
-      implicit def scan[     S <: Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan( link )
+      implicit def scan[     S <: Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan(     link )
 
       final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ]
       final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ]
    }
    sealed trait Link[ S ]
+
+   def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Scan[ S ] = Impl.apply
+
+   implicit def serializer[ S <: Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
+
+   sealed trait Update[ S <: Sys[ S ]] { def scan: Scan[ S ]}
+   sealed trait SinkUpdate[ S <: Sys[ S ]] extends Update[ S ] { def sink: Link[ S ]}
+   final case class SinkAdded[     S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ]
+   final case class SinkRemoved[   S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ]
+   final case class SourceChanged[ S <: Sys[ S ]]( scan: Scan[ S ], source: Option[ Link[ S ]]) extends Update[ S ]
 }
 
 /**
@@ -48,16 +60,24 @@ object Scan {
  * known as key. A scan can write to any number of targets, but may only be synchronised to one
  * source. If not synchronised to a source, the owner process' graph may feed a signal into it.
  */
-trait Scan[ S <: Sys[ S ]] {
+trait Scan[ S <: Sys[ S ]] extends Writable {
    import Scan._
 
    def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]]
    // for now, links are not in t_p; this is probably fine, because
    // we have graphemes for such a 'declarative' view, and the scan as needle is really
    // more the 'procedural' approach
-   def addSink( sink: Link[ S ])( implicit tx: S#Tx ) : Unit
-   def removeSink( sink: Link[ S ])( implicit tx: S#Tx ) : Unit
+   def addSink(    sink: Link[ S ])( implicit tx: S#Tx ) : Boolean
+   def removeSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean
 
    def source( implicit tx: S#Tx ) : Option[ Link[ S ]]
    def source_=( link: Option[ Link[ S ]])( implicit tx: S#Tx ) : Unit
+
+   def changed: Event[ S, Scan.Update[ S ], Scan[ S ]]
+
+   // called in the implementation from addSink( Link.Scan( _ )). the difference
+   // to source_= is that this method should not establish the opposite connection
+   // by calling addSink on the source, as this would result in an infinite feedback.
+   // still, this method should fire an Scan.SourceChanged event.
+   private[proc] def setScanSource( source: Scan[ S ])( implicit tx: S#Tx ) : Unit
 }
