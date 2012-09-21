@@ -89,6 +89,7 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
    _: evt.Selector[ S ] =>
 
    protected type Entry = KeyMapImpl.Entry[ S, Key, Value, ValueUpd ]
+   protected type Info  = KeyMapImpl.ValueInfo[ S, Key, Value, ValueUpd ]
 
    /**
     * The underlying non-reactive map
@@ -104,12 +105,12 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
     * Wrap the given set of added and removed keys in an appropriate update message
     * and dispatch it.
     */
-   protected def fire( added: Set[ Key ], removed: Set[ Key ]) : Unit
+   protected def fire( added: Set[ Key ], removed: Set[ Key ])( implicit tx: S#Tx ) : Unit
 
    /**
     * A helper object providing key and value serialization and an event view of the value.
     */
-   protected implicit def valueInfo: KeyMapImpl.ValueInfo[ S, Key, Value, ValueUpd ]
+   protected implicit def valueInfo: Info
 
    final def get( key: Key )( implicit tx: S#Tx ) : Option[ Value ] = map.get( key ).map( _.value )
    final def keys( implicit tx: S#Tx ): Set[ Key ] = map.keysIterator.toSet

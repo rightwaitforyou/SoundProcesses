@@ -35,7 +35,6 @@ import bitemp.BiType
 import expr.Expr
 import data.SkipList
 import ExprImplicits._
-import collection.immutable.{IndexedSeq => IIdxSeq}
 import annotation.switch
 
 object ProcImpl {
@@ -61,90 +60,26 @@ object ProcImpl {
    }
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
+   
+   private type GraphemeEntry[ S <: Sys[ S ]] = KeyMapImpl.Entry[ S, String, Grapheme[ S ], Grapheme.Update[ S ]]
+   private type ScanEntry[     S <: Sys[ S ]] = KeyMapImpl.Entry[ S, String, Scan[     S ], Scan.Update[     S ]]
 
-   // ---- GraphemeNode ----
+   implicit def graphemeEntryInfo[ S <: Sys[ S ]] : KeyMapImpl.ValueInfo[ S, String, Grapheme[ S ], Grapheme.Update[ S ]] =
+      anyGraphemeEntryInfo.asInstanceOf[ KeyMapImpl.ValueInfo[ S, String, Grapheme[ S ], Grapheme.Update[ S ]]]
 
-   private object GraphemeNode {
-      implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, GraphemeNode[ S ]] =
-         anyGraphemeNodeSer.asInstanceOf[ GraphemeNodeSer[ S ]]
-   }
-   private final class GraphemeNode[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val key: String,
-                                                     val value: Grapheme[ S ])
-   extends evt.StandaloneLike[ S, (String, Grapheme.Update[ S ]), GraphemeNode[ S ]] {
-      protected def reader: evt.Reader[ S, GraphemeNode[ S ]] = GraphemeNode.serializer[ S ]
-
-      def connect()( implicit tx: S#Tx ) {
-         value.changed ---> this
-      }
-
-      def disconnect()( implicit tx: S#Tx ) {
-         value.changed ---> this
-      }
-
-      protected def writeData( out: DataOutput ) {
-         out.writeString( key )
-         value.write( out )
-      }
-
-      protected def disposeData()( implicit tx: S#Tx ) {
-         value.dispose()
-      }
-
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, Grapheme.Update[ S ])] =
-         value.changed.pullUpdate( pull ).map( key -> _ )
+   private val anyGraphemeEntryInfo = new KeyMapImpl.ValueInfo[ I, String, Grapheme[ I ], Grapheme.Update[ I ]] {
+      def valueEvent( value: Grapheme[ I ]) = value.changed
+      val keySerializer    = stm.ImmutableSerializer.String
+      val valueSerializer  = Grapheme.serializer[ I ]
    }
 
-   private val anyGraphemeNodeSer = new GraphemeNodeSer[ I ]
+   implicit def scanEntryInfo[ S <: Sys[ S ]] : KeyMapImpl.ValueInfo[ S, String, Scan[ S ], Scan.Update[ S ]] =
+      anyScanEntryInfo.asInstanceOf[ KeyMapImpl.ValueInfo[ S, String, Scan[ S ], Scan.Update[ S ]]]
 
-   private final class GraphemeNodeSer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, GraphemeNode[ S ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : GraphemeNode[ S ] = {
-         val key     = in.readString()
-         val value   = Grapheme.read( in, access )
-         new GraphemeNode( targets, key, value )
-      }
-   }
-
-   // ---- ScanNode ----
-   // XXX TODO : DRY
-
-   private object ScanNode {
-      implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, ScanNode[ S ]] =
-         anyScanNodeSer.asInstanceOf[ ScanNodeSer[ S ]]
-   }
-   private final class ScanNode[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val key: String,
-                                                 val value: Scan[ S ])
-   extends evt.StandaloneLike[ S, (String, Scan.Update[ S ]), ScanNode[ S ]] {
-      protected def reader: evt.Reader[ S, ScanNode[ S ]] = ScanNode.serializer[ S ]
-
-      def connect()( implicit tx: S#Tx ) {
-         value.changed ---> this
-      }
-
-      def disconnect()( implicit tx: S#Tx ) {
-         value.changed ---> this
-      }
-
-      protected def writeData( out: DataOutput ) {
-         out.writeString( key )
-         value.write( out )
-      }
-
-      protected def disposeData()( implicit tx: S#Tx ) {
-         value.dispose()
-      }
-
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, Scan.Update[ S ])] =
-         value.changed.pullUpdate( pull ).map( key -> _ )
-   }
-
-   private val anyScanNodeSer = new ScanNodeSer[ I ]
-
-   private final class ScanNodeSer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, ScanNode[ S ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ScanNode[ S ] = {
-         val key     = in.readString()
-         val value   = Scan.read( in, access )
-         new ScanNode( targets, key, value )
-      }
+   private val anyScanEntryInfo = new KeyMapImpl.ValueInfo[ I, String, Scan[ I ], Scan.Update[ I ]] {
+      def valueEvent( value: Scan[ I ]) = value.changed
+      val keySerializer    = stm.ImmutableSerializer.String
+      val valueSerializer  = Scan.serializer[ I ]
    }
 
    private sealed trait Impl[ S <: Sys[ S ]]
@@ -156,21 +91,8 @@ object ProcImpl {
 
       protected def graphVar : S#Var[ Code[ SynthGraph ]]
       protected def name_# : Expr.Var[ S, String ]
-      protected def scanMap : SkipList.Map[ S, String, Unit ] // XXX TODO
-      protected def graphemeMap : SkipList.Map[ S, String, GraphemeNode[ S ]]
-
-      object scans extends Scans.Modifiable[ S ] {
-         def get( key: String )( implicit tx: S#Tx ) : Option[ Scan[ S ]] = ??? // scanMap.get( key ).map( _.value )
-         def keys( implicit tx: S#Tx ) : Set[ String ] = scanMap.keysIterator.toSet
-
-         def add( key: String )( implicit tx: S#Tx ) : Scan[ S ] = {
-            ???
-         }
-
-         def remove( key: String )( implicit tx: S#Tx ) : Boolean = {
-            ???
-         }
-      }
+      protected def scanMap : SkipList.Map[ S, String, ScanEntry[ S ]]
+      protected def graphemeMap : SkipList.Map[ S, String, GraphemeEntry[ S ]]
 
       final def name( implicit tx: S#Tx ) : Expr[ S, String ] = name_#.get
       final def name_=( s: Expr[ S, String ])( implicit tx: S#Tx ) {
@@ -187,78 +109,40 @@ object ProcImpl {
          }
       }
 
-      // ---- ParamMap ----
+      // ---- key maps ----
+
+      sealed trait ProcEvent {
+         final protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer
+         final def node: Proc[ S ] with evt.Node[ S ] = proc
+      }
+
+      sealed trait KeyMap[ Value, ValueUpd, OuterUpd ]
+      extends evt.EventImpl[ S, OuterUpd, Proc[ S ]]
+      with evt.InvariantEvent[ S, OuterUpd, Proc[ S ]]
+      with ProcEvent
+      with impl.KeyMapImpl[ S, String, Value, ValueUpd ] {
+         protected def wrapKey( key: String ) : AssociativeKey
+
+         // ---- keymapimpl details ----
+
+         final protected def fire( added: Set[ String ], removed: Set[ String ])( implicit tx: S#Tx ) {
+            StateEvent( Proc.AssociativeChange( proc, added   = added.map( wrapKey ), removed = removed.map( wrapKey )))
+         }
+
+         final protected def isConnected( implicit tx: S#Tx ) : Boolean = proc.targets.nonEmpty
+      }
 
       object graphemes extends Graphemes.Modifiable[ S ]
-      with evt.EventImpl[ S, Proc.GraphemeChange[ S ], Proc[ S ]]
-      with evt.InvariantEvent[ S, Proc.GraphemeChange[ S ], Proc[ S ]] {
-         // ---- event ----
-
-         protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
-         def slot: Int = 1
-         def node: Proc[ S ] with evt.Node[ S ] = proc
-
-         def connect()( implicit tx: S#Tx ) {
-            graphemeMap.iterator.foreach { case (_, node) => node ---> this }
-         }
-         def disconnect()( implicit tx: S#Tx ) {
-            graphemeMap.iterator.foreach { case (_, node) => node -/-> this }
-         }
+      with KeyMap[ Grapheme[ S ], Grapheme.Update[ S ], Proc.GraphemeChange[ S ]] {
+         final val slot = 1
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.GraphemeChange[ S ]] = {
             ???
-         }
-
-         // ---- graphemes ----
-
-         def keys( implicit tx: S#Tx ) : Set[ String ] = graphemeMap.keysIterator.toSet
-
-         def get( key: String )( implicit tx: S#Tx ) : Option[ Grapheme[ S ]] = graphemeMap.get( key ).map( _.value )
-
-         def add( key: String, grapheme: Grapheme[ S ])( implicit tx: S#Tx ) {
-            val isConnected   = proc.targets.nonEmpty
-            val tgt           = evt.Targets[ S ]   // XXX TODO : partial?
-            val n             = new GraphemeNode( tgt, key, grapheme )
-            val setRemoved: Set[ AssociativeKey ] = graphemeMap.add( key -> n ) match {
-               case Some( oldNode ) =>
-                  if( isConnected ) this -= oldNode
-                  Set( GraphemeKey( key ))
-               case _ => Set.empty
-            }
-            if( isConnected ) {
-               this += n
-               StateEvent( Proc.AssociativeChange( proc, added = Set( GraphemeKey( key )), removed = setRemoved ))
-            }
-         }
-
-         def remove( key: String )( implicit tx: S#Tx ) : Boolean = {
-            graphemeMap.remove( key ) match {
-               case Some( oldNode ) =>
-                  val isConnected = proc.targets.nonEmpty
-                  if( isConnected ) {
-                     this -= oldNode
-                     StateEvent( Proc.AssociativeChange( proc, Set.empty, Set( GraphemeKey( key ))))
-                  }
-                  true
-
-               case _ => false
-            }
-         }
-
-         private def +=( entry: GraphemeNode[ S ])( implicit tx: S#Tx ) {
-            entry ---> this
-         }
-
-         private def -=( entry: GraphemeNode[ S ])( implicit tx: S#Tx ) {
-            entry -/-> this
-         }
-
-//         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ScansElementChange[ S ]] = {
 //            // TODO XXX check if casting still necessary
 //            val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ Grapheme.Update[ S ]]]) { case (map, sel) =>
 ////               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
-//               val node = evt.Intruder.devirtualizeNode( sel, GraphemeNode.serializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
-//                  .asInstanceOf[ GraphemeNode[ S ]]
+//               val node = evt.Intruder.devirtualizeNode( sel, GraphemeEntry.serializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
+//                  .asInstanceOf[ GraphemeEntry[ S ]]
 //               evt.Intruder.pullUpdate( node, pull ) match {
 //                  case Some( (name, upd) ) => map + (name -> (map.getOrElse( name, IIdxSeq.empty ) :+ upd))
 //                  case None => map
@@ -266,40 +150,67 @@ object ProcImpl {
 //            }
 //
 //            if( changes.isEmpty ) None else Some( Proc.ScansElementChange( proc, changes ))
-//         }
+         }
+
+         protected def wrapKey( key: String ) = GraphemeKey( key )
+
+         protected def map: SkipList.Map[ S, String, Entry ] = graphemeMap
+
+         protected def valueInfo = graphemeEntryInfo[ S ]
+      }
+
+      object scans extends Scans.Modifiable[ S ]
+      with KeyMap[ Scan[ S ], Scan.Update[ S ], Proc.ScanChange[ S ]] {
+         final val slot = 2
+
+         protected def wrapKey( key: String ) = ScanKey( key )
+
+         def add( key: String )( implicit tx: S#Tx ) : Scan[ S ] = {
+            val scan = Scan[ S ]
+            add( key, scan )
+            scan
+         }
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ): Option[ Proc.ScanChange[ S ]] = {
+            ???
+         }
+
+         protected def map: SkipList.Map[ S, String, Entry ] = scanMap
+
+         protected def valueInfo = scanEntryInfo[ S ]
       }
 
       private object StateEvent
       extends evt.Trigger.Impl[ S, Proc.StateChange[ S ], Proc[ S ]]
       with evt.InvariantEvent[ S, Proc.StateChange[ S ], Proc[ S ]]
       with evt.Root[ S, Proc.StateChange[ S ]]
-      {
-         protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
-         def slot: Int = 2
-         def node: Proc[ S ] with evt.Node[ S ] = proc
+      with ProcEvent {
+         final val slot = 4
       }
 
       private object ChangeEvent
       extends evt.Event[ S, Proc.Update[ S ], Proc[ S ]]
-      with evt.InvariantSelector[ S ] {
-         protected def reader : evt.Reader[ S, Proc[ S ]] = ProcImpl.serializer // ( eventView )
+      with evt.InvariantSelector[ S ]
+      with ProcEvent {
          def slot: Int = opNotSupported
-         def node: Proc[ S ] with evt.Node[ S ] = proc
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
 
          def --->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             graphemes  ---> r
+            scans      ---> r
             StateEvent ---> r
          }
          def -/->( r: evt.Selector[ S ])( implicit tx: S#Tx ) {
             graphemes  -/-> r
+            scans      -/-> r
             StateEvent -/-> r
          }
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
             if(      graphemes.isSource(  pull )) graphemes.pullUpdate(  pull )
+            else if( scans.isSource(      pull )) scans.pullUpdate(      pull )
             else if( StateEvent.isSource( pull )) StateEvent.pullUpdate( pull )
             else None
          }
@@ -309,66 +220,26 @@ object ProcImpl {
 
          def reactTx[ A1 >: Proc.Update[ S ]]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, Proc[ S ]] = {
             val obs = evt.Observer( ProcImpl.serializer[ S ], fun )
-            obs.add( graphemes )
+            obs.add( graphemes  )
+            obs.add( scans      )
             obs.add( StateEvent )
             obs
          }
 
          def isSource( pull: evt.Pull[ S ]) : Boolean = {
             // I don't know why this method is actually called? But it _is_, so we need to correctly handle the case
-            graphemes.isSource( pull ) || StateEvent.isSource( pull )
+            graphemes.isSource( pull ) || scans.isSource( pull ) || StateEvent.isSource( pull )
          }
       }
 
       final def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = (slot: @switch) match {
-         case 1 => graphemes
-         case 2 => StateEvent
+         case graphemes.slot  => graphemes
+         case scans.slot      => scans
+         case StateEvent.slot => StateEvent
       }
 
-//      final def par: ParamMap[ S ] = this
-//
-//      final def get( key: String )( implicit tx: S#Tx ) : Option[ BiPin.Expr[ S, Param ]] =
-//         parMap.get( key ).map( _.value )
-//
-//      final def apply( key: String )( implicit tx: S#Tx ) : BiPin.Expr[ S, Param ] = {
-//         get( key ).getOrElse {
-//            if( keys.contains( key )) {
-//               implicit val doubles = Doubles
-//               val expr = BiPin.Expr.Modifiable[ S, Param ] // ( 0d )   // XXX retrieve default value
-//               val tgt  = evt.Targets[ S ]   // XXX partial?
-//               val node = new GraphemeNode[ S ]( tgt, key, expr )
-//               parMap += key -> node
-//               expr
-//            } else {
-//               throw new NoSuchElementException( key )
-//            }
-//         }
-//      }
-//
-//      final def keys( implicit tx: S#Tx ) : Set[ String ] = graphKeys( graph.synthGraph )
-//
-//      final def entriesAt( time: Long )( implicit tx: S#Tx ) : Map[ String, Param ] = {
-//         keys.flatMap( key => {
-//            parMap.get( key ).flatMap { bi =>
-//               bi.value.at( time ).map( ex => key -> ex.value )
-//            }
-//         })( breakOut )
-//      }
-
-//      private def graphKeys( g: SynthGraph ) : Set[ String ] = g.controlProxies.flatMap( _.name )
-
-//      private def updatePars( oldGraph: SynthGraph, newGraph: SynthGraph )( implicit tx: S#Tx ) {
-//         val oldNames   = graphKeys( oldGraph )
-//         val newNames   = graphKeys( newGraph )
-//         val removed    = oldNames -- newNames
-//         val added      = newNames -- oldNames
-//         if( removed.nonEmpty || added.nonEmpty ) {
-//
-//         }
-//      }
-
       final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
-      final def changed : evt.Event[ S, Update[ S ], Proc[ S ]] = ChangeEvent // = renamed | graphChanged | playingChanged | paramChanged
+      final def changed :      evt.Event[ S, Update[      S ], Proc[ S ]] = ChangeEvent
 
       final protected def writeData( out: DataOutput ) {
          out.writeUnsignedByte( SER_VERSION )
@@ -399,12 +270,12 @@ object ProcImpl {
 
       protected val scanMap = {
          implicit val tx = tx0
-         ???
+         SkipList.Map.empty[ S, String, ScanEntry[ S ]]
       }
 
       protected val graphemeMap = {
          implicit val tx = tx0
-         SkipList.Map.empty[ S, String, GraphemeNode[ S ]]
+         SkipList.Map.empty[ S, String, GraphemeEntry[ S ]]
       }
    }
 
@@ -425,12 +296,12 @@ object ProcImpl {
 
       protected val scanMap = {
          implicit val tx = tx0
-         ??? // SkipList.Map.read[ S, String, GraphemeNode[ S ]]( in, access )
+         SkipList.Map.read[ S, String, ScanEntry[ S ]]( in, access )
       }
 
       protected val graphemeMap = {
          implicit val tx = tx0
-         SkipList.Map.read[ S, String, GraphemeNode[ S ]]( in, access )
+         SkipList.Map.read[ S, String, GraphemeEntry[ S ]]( in, access )
       }
    }
 }

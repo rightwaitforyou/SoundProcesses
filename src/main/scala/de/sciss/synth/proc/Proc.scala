@@ -59,6 +59,7 @@ object Proc {
    final case class GraphemeKey( name: String ) extends AssociativeKey
 
 //   final case class ParamChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ BiPin.Expr.Update[ S, Param ]]]) extends Update[ S ]
+   final case class ScanChange[     S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Scan.Update[     S ]]]) extends Update[ S ]
    final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Grapheme.Update[ S ]]]) extends Update[ S ]
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
