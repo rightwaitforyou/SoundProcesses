@@ -33,6 +33,7 @@ import bitemp.Span
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
+import evt.Event
 
 object Grapheme {
    // If necessary for some views, we could eventually add the Elems, too,
@@ -168,4 +169,6 @@ trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Elem[ S ]]
    def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value ]
+
+   def changed: Event[ S, Grapheme.Update[ S ], Grapheme[ S ]]
 }

@@ -35,7 +35,7 @@ import bitemp.{Span, BiPin}
 import de.sciss.synth.expr.{Doubles, Longs}
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import evt.EventLikeSerializer
+import evt.{Event, EventLikeSerializer}
 import io.AudioFileSpec
 
 object GraphemeImpl {
@@ -280,6 +280,8 @@ object GraphemeImpl {
       override def toString = "Grapheme" + pin.id
 
       def modifiableOption : Option[ Modifiable[ S ]] = Some( this )
+
+      def changed: Event[ S, Grapheme.Update[ S ], Grapheme[ S ]] = this
 
       private def wrap( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = elem match {
          case curve @ Curve( _ ) =>

@@ -1,0 +1,29 @@
+skiplist graphemenode
+
+  given: grapheme
+
+  added: (key: String)
+
+:::::::::
+
+the idea would be to have an extendable evt.Node; e.g. adding readNode to object Grapheme we'd have
+
+trait KeyedGrapheme extends NodeExtension[ Grapheme.Update, KeyedGrapheme.Update ] {
+   val grapheme: Grapheme
+   val key: String
+
+   protected def node: evt.Node = grapheme
+   protected def mapUpdate( node: Grapheme.Update ) : Option[ KeyedGrapheme.Update ]
+}
+
+this is the most simple case, where the extension doesn't include additional events. one might imagine a more complex case:
+
+trait TimedElem extends NodeExtension[ Elem.Update, TimedElem.Update ] {
+   object TimeChanged extends AdditionalEvent
+}
+
+where evt.Node would have some mechanism like maxSlot ?
+
+:::::::::
+
+so that in the end, we do not need to multiple the evt.Target instances which is kind of annoying and slows things down
