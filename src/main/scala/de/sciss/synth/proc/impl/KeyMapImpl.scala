@@ -163,7 +163,7 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
 
    final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, IIdxSeq[ ValueUpd ]] = {
       pull.parents( this ).foldLeft( Map.empty[ Key, IIdxSeq[ ValueUpd ]]) { case (map, sel) =>
-         val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer ) // [ S, Key, Value, ValueUpd ])
+         val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer )
          entryEvt.pullUpdate( pull ) match {
             case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, IIdxSeq.empty ) :+ upd))
             case None => map

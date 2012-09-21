@@ -118,6 +118,9 @@ object ScanImpl {
 
          sinkMap.put( sinkID, sink )
          sinkList.addHead( sink )   // faster than addLast; but perhaps we should use addLast to have a better iterator order?
+         sink match {
+            case Link.Scan( peer ) => peer.setScanSource( this )  // source_= would create loop!
+         }
          fire( Scan.SinkAdded( me, sink ))
          true
       }

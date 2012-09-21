@@ -95,7 +95,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)
-      val p = Proc[ S ]()
+      val p = Proc[ S ]
       p.name_=( name )
       p.graph_=( SynthGraph {
          import synth._

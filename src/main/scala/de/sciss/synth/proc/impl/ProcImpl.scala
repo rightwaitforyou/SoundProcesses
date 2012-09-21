@@ -43,7 +43,7 @@ object ProcImpl {
 
    implicit val paramType : BiType[ Param ] = Doubles
 
-   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
+   def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Proc[ S ] = new New[ S ]( tx )
 
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] =
       serializer[ S ].read( in, access )

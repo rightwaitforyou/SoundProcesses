@@ -26,20 +26,20 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{stm, event => evt, bitemp, expr, DataInput}
+import de.sciss.lucre.{stm, event => evt, expr, DataInput}
 import stm.Sys
-import bitemp.{BiPin, Chronos}
 import expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import impl.{ProcImpl => Impl}
 
 object Proc {
    // ---- implementation forwards ----
 
-   def apply[ S <: Sys[ S ]]()( implicit tx: S#Tx /*, store: ArtifactStore[ S ] */ ) : Proc[ S ] = ??? // impl.ProcImpl[ S ]()
+   def apply[ S <: Sys[ S ]]( implicit tx: S#Tx /*, store: ArtifactStore[ S ] */ ) : Proc[ S ] = Impl[ S ]
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = ??? // impl.ProcImpl.read( in, access )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = Impl.read( in, access )
 
-   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = ??? // impl.ProcImpl.serializer[ S ]
+   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = Impl.serializer[ S ]
 
    // ---- event types ----
 
@@ -53,14 +53,26 @@ object Proc {
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
 
    final case class AssociativeChange[ S <: Sys[ S ]]( proc: Proc[ S ], added:   Set[ AssociativeKey ],
-                                                                        removed: Set[ AssociativeKey ]) extends StateChange[ S ]
+                                                                        removed: Set[ AssociativeKey ]) extends StateChange[ S ] {
+      override def toString = "AssociativeChange(" + proc +
+         (if( added.isEmpty ) "" else ", added = " + added.mkString( ", " )) +
+         (if( removed.isEmpty) "" else ", removed = " + removed.mkString( ", " )) + ")"
+   }
    sealed trait AssociativeKey { def name: String }
-   final case class ScanKey(     name: String ) extends AssociativeKey
-   final case class GraphemeKey( name: String ) extends AssociativeKey
+   final case class ScanKey(     name: String ) extends AssociativeKey {
+      override def toString = "[scan: " + name + "]"
+   }
+   final case class GraphemeKey( name: String ) extends AssociativeKey {
+      override def toString = "[grapheme: " + name + "]"
+   }
 
 //   final case class ParamChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ BiPin.Expr.Update[ S, Param ]]]) extends Update[ S ]
-   final case class ScanChange[     S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Scan.Update[     S ]]]) extends Update[ S ]
-   final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Grapheme.Update[ S ]]]) extends Update[ S ]
+   final case class ScanChange[     S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Scan.Update[     S ]]]) extends Update[ S ] {
+      override def toString = "ScanChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
+   }
+   final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Grapheme.Update[ S ]]]) extends Update[ S ] {
+      override def toString = "GraphemeChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
+   }
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
    import Proc._

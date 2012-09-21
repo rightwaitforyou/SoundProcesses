@@ -36,8 +36,14 @@ object Scan {
       implicit def grapheme[ S <: Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
       implicit def scan[     S <: Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan(     link )
 
-      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] { def id = peer.id }
-      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] { def id = peer.id }
+      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] {
+         def id = peer.id
+         override def toString = peer.toString
+      }
+      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] {
+         def id = peer.id
+         override def toString = peer.toString
+      }
    }
    sealed trait Link[ S <: Sys[ S ]] { def id: S#ID }
 
@@ -49,9 +55,15 @@ object Scan {
 
    sealed trait Update[ S <: Sys[ S ]] { def scan: Scan[ S ]}
    sealed trait SinkUpdate[ S <: Sys[ S ]] extends Update[ S ] { def sink: Link[ S ]}
-   final case class SinkAdded[     S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ]
-   final case class SinkRemoved[   S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ]
-   final case class SourceChanged[ S <: Sys[ S ]]( scan: Scan[ S ], source: Option[ Link[ S ]]) extends Update[ S ]
+   final case class SinkAdded[     S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ] {
+      override def toString = "[" + scan + " ---> " + sink + "]"
+   }
+   final case class SinkRemoved[   S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ] {
+      override def toString = "[" + scan + " -/-> " + sink + "]"
+   }
+   final case class SourceChanged[ S <: Sys[ S ]]( scan: Scan[ S ], source: Option[ Link[ S ]]) extends Update[ S ] {
+      override def toString = "[" + scan + " <--- " + source + "]"
+   }
 }
 
 /**
