@@ -106,8 +106,6 @@ object ScanImpl {
    with evt.StandaloneLike[ S, Scan.Update[ S ], Scan[ S ]]
    with evt.Generator[ S, Scan.Update[ S ], Scan[ S ]]
    with evt.Root[ S, Scan.Update[ S ]] {
-      me =>
-
       override def toString = "Scan" + id
 
       def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkList.iterator
@@ -120,8 +118,9 @@ object ScanImpl {
          sinkList.addHead( sink )   // faster than addLast; but perhaps we should use addLast to have a better iterator order?
          sink match {
             case Link.Scan( peer ) => peer.setScanSource( this )  // source_= would create loop!
+            case _ =>
          }
-         fire( Scan.SinkAdded( me, sink ))
+         fire( Scan.SinkAdded( this, sink ))
          true
       }
 
@@ -130,7 +129,7 @@ object ScanImpl {
          if( !sinkMap.contains( sinkID )) return false
          sinkMap.remove( sinkID )
          sinkList.remove( sink )
-         fire( Scan.SinkRemoved( me, sink ))
+         fire( Scan.SinkRemoved( this, sink ))
          true
       }
 
@@ -154,7 +153,7 @@ object ScanImpl {
             case Some( Link.Scan( peer )) => peer.removeSink( this )
             case _ =>
          }
-         fire( Scan.SourceChanged( me, link ))
+         fire( Scan.SourceChanged( this, link ))
          true
       }
 
