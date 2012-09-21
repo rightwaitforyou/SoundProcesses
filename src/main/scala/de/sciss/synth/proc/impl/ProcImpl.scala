@@ -38,7 +38,6 @@ import ExprImplicits._
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import annotation.switch
 
-/*
 object ProcImpl {
    private final val SER_VERSION = 0
 
@@ -87,7 +86,7 @@ object ProcImpl {
       }
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ (String, Scan.Update[ S ])] =
-         evt.Intruder.pullUpdate( value.changed, pull ).map( key -> _ )
+         value.changed.pullUpdate( pull ).map( key -> _ )
    }
 
    implicit val paramType : BiType[ Param ] = Doubles
@@ -452,4 +451,3 @@ object ProcImpl {
 //      }
    }
 }
-*/

@@ -36,5 +36,4 @@ object Scans {
 trait Scans[ S <: Sys[ S ]] {
    def get( key: String )( implicit tx: S#Tx ) : Option[ Scan[ S ]]
    def keys( implicit tx: S#Tx ): Set[ String ]
-//   def valueAt( key: String, time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value[ S ]]
 }
