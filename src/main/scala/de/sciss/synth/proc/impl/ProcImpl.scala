@@ -36,6 +36,7 @@ import expr.Expr
 import data.SkipList
 import ExprImplicits._
 import annotation.switch
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object ProcImpl {
    private final val SER_VERSION = 0
@@ -137,19 +138,8 @@ object ProcImpl {
          final val slot = 1
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.GraphemeChange[ S ]] = {
-            ???
-//            // TODO XXX check if casting still necessary
-//            val changes = pull.parents( this ).foldLeft( Map.empty[ String, IIdxSeq[ Grapheme.Update[ S ]]]) { case (map, sel) =>
-////               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
-//               val node = evt.Intruder.devirtualizeNode( sel, GraphemeEntry.serializer ) // .asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]])
-//                  .asInstanceOf[ GraphemeEntry[ S ]]
-//               evt.Intruder.pullUpdate( node, pull ) match {
-//                  case Some( (name, upd) ) => map + (name -> (map.getOrElse( name, IIdxSeq.empty ) :+ upd))
-//                  case None => map
-//               }
-//            }
-//
-//            if( changes.isEmpty ) None else Some( Proc.ScansElementChange( proc, changes ))
+            val changes = foldUpdate( pull )
+            if( changes.isEmpty ) None else Some( Proc.GraphemeChange( proc, changes ))
          }
 
          protected def wrapKey( key: String ) = GraphemeKey( key )
@@ -171,8 +161,9 @@ object ProcImpl {
             scan
          }
 
-         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ): Option[ Proc.ScanChange[ S ]] = {
-            ???
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ScanChange[ S ]] = {
+            val changes = foldUpdate( pull )
+            if( changes.isEmpty ) None else Some( Proc.ScanChange( proc, changes ))
          }
 
          protected def map: SkipList.Map[ S, String, Entry ] = scanMap

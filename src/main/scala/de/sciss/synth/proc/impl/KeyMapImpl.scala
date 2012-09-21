@@ -31,6 +31,7 @@ import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data}
 import stm.Sys
 import data.SkipList
 import evt.EventLike
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object KeyMapImpl {
    trait ValueInfo[ S <: Sys[ S ], Key, Value, ValueUpd ] {
@@ -86,7 +87,7 @@ object KeyMapImpl {
  * @tparam ValueUpd  the value updates fired
  */
 trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
-   _: evt.Selector[ S ] =>
+   _: evt.VirtualNodeSelector[ S ] =>
 
    protected type Entry = KeyMapImpl.Entry[ S, Key, Value, ValueUpd ]
    protected type Info  = KeyMapImpl.ValueInfo[ S, Key, Value, ValueUpd ]
@@ -158,5 +159,15 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
    }
    final def disconnect()( implicit tx: S#Tx ) {
       map.iterator.foreach { case (_, node) => this -= node }
+   }
+
+   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, IIdxSeq[ ValueUpd ]] = {
+      pull.parents( this ).foldLeft( Map.empty[ Key, IIdxSeq[ ValueUpd ]]) { case (map, sel) =>
+         val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer ) // [ S, Key, Value, ValueUpd ])
+         entryEvt.pullUpdate( pull ) match {
+            case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, IIdxSeq.empty ) :+ upd))
+            case None => map
+         }
+      }
    }
 }
