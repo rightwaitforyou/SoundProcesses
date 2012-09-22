@@ -231,43 +231,115 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
          if( newFrame == oldInfo.frame ) return
 //         lastTime.set( newFrame )
 
-         val g = group
-         val oldFrame = oldInfo.frame
-         val needsNewProcTime = oldFrame > newFrame || oldInfo.nextProcTime < newFrame
-         val (itAdded, itRemoved) = if( needsNewProcTime ) {
-            // the new time frame lies outside the range for the known next proc event.
-            // therefore we need to fire proc additions and removals (if there are any)
-            // and recalculate the next proc event time after the new time frame
-            val (remStart, remStop, addStart, addStop) = if( newFrame > oldFrame ) {
-               // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
-               // ... those which begin in the interval (LRP, t] && end > t must be added ...
-               val skipInt = Span( oldFrame + 1, newFrame + 1 )
-               (Span.until( oldFrame + 1 ), skipInt, skipInt, Span.from( newFrame + 1 ))
+         implicit val itx     = tx.inMemory
+         val g                = group
+         val oldFrame         = oldInfo.frame
+         val needsNewProcTime = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
+         val newFrameP        = newFrame + 1
+
+         // algorithm [A] or [B]
+         if( needsNewProcTime ) {
+            // algorithm [A]
+            val (itAdded, itRemoved) = if( newFrame == oldInfo.nextProcTime ) {
+               // we went exactly till a known event spot
+               // - find the procs to remove and add via group.eventsAt.
+               g.eventsAt( newFrame )
+
+            // algorithm [B]
             } else {
-               // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
-               // ... those which end in the interval (t, LRP] && begin <=t must be added ...
-               val skipInt = Span( newFrame + 1, oldFrame + 1 )
-               (skipInt, Span.from( oldFrame + 1 ), Span.until( newFrame + 1 ), skipInt)
+               // the new time frame lies outside the range for the known next proc event.
+               // therefore we need to fire proc additions and removals (if there are any)
+               // and recalculate the next proc event time after the new time frame
+
+               // - find the procs with to remove and add via range searches
+
+               val (remStart, remStop, addStart, addStop) = if( newFrame > oldFrame ) {
+                  // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
+                  // ... those which begin in the interval (LRP, t] && end > t must be added ...
+                  val skipInt = Span( oldFrame + 1, newFrameP )
+                  (Span.until( oldFrame + 1 ), skipInt, skipInt, Span.from( newFrameP ))
+               } else {
+                  // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
+                  // ... those which end in the interval (t, LRP] && begin <=t must be added ...
+                  val skipInt = Span( newFrameP, oldFrame + 1 )
+                  (skipInt, Span.from( oldFrame + 1 ), Span.until( newFrameP ), skipInt)
+               }
+
+               (g.rangeSearch( addStart, addStop ), g.rangeSearch( remStart, remStop ))
             }
 
-            (g.rangeSearch( addStart, addStop ), g.rangeSearch( remStart, remStop ))
+            // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
+            val procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
+            procRemoved.foreach {
+               case (_, timed) =>
+                  val id = timed.id
+                  timedMap.remove( id )                              // in (3)
+                  val entries = gMap.get( id )
+                  gMap.remove( id )                                  // in (1)
+                  entries.foreach {
+                     case (staleID, scanMap) =>
+                        scanMap.foreach {
+                           case (_, (time, _)) =>
+                              gPrio.get( time ).foreach { staleMap =>
+                                 val newStaleMap = staleMap - staleID
+                                 gPrio.add( time -> newStaleMap )    // in (2)
+                              }
+                        }
+                  }
+            }
+
+            // - for the added procs, find all sinks whose source connects to a grapheme. calculate the values
+            //   of those graphemes at the current transport time. (NOT YET: this goes with the Transport.Update so that
+            //   listeners do not need to perform that step themselves. Also this information is useful because it
+            //   yields the ceil time ct); if no value is found at the current transport time, find the ceiling time ct
+            //   explicitly; for ct, evaluate the grapheme value and store it in (1) and (2) accordingly.
+            //   store procs in (3)
+            val procAdded = itAdded.flatMap( flatSpans ).toIndexedSeq
+            procAdded.foreach {
+               case (span, timed) =>
+                  val id   = timed.id
+                  val p    = timed.value
+//                  var procVals = Map.empty[ String, Scan.Link ]
+                  var scanMap    = Map.empty[ String, (Long, Grapheme.Value) ]
+                  var skipMap    = Map.empty[ Long, Map[ String, Grapheme.Value ]]
+                  p.scans.iterator.foreach {
+                     case (key, scan) =>
+                        scan.source match {
+                           case Some( link @ Scan.Link.Grapheme( peer )) =>
+//                              procVals += ...
+                              peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
+                                 peer.valueAt( ceilTime ).foreach { ceilValue =>
+                                    scanMap   += key -> (ceilTime, ceilValue)
+                                    val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilValue)
+                                    skipMap   += ceilTime -> newMap
+                                 }
+                              }
+//                           case Some( link @ Scan.Link.Scan( peer )) =>
+//                              procVals += ...
+                           case _ => None
+                        }
+                  }
+                  gMap.put( id, id -> scanMap )       // in (1)
+                  skipMap.foreach {
+                     case (time, keyMap) =>
+                        val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
+                        gPrio.add( time -> newMap )   // in (2)
+                  }
+                  timedMap.put( id, timed )           // in (3)
+            }
 
 //            val nextProcTime  = g.nearestEventAfter( newFrame + 1 )
-
-         } else if( newFrame == oldInfo.nextProcTime ) {
-            // we went exactly till a known event spot
-            g.eventsAt( newFrame )
-
-         } else {
-            itNoProcs
          }
 
-         if( itAdded.nonEmpty || itRemoved.nonEmpty ) {
-            val procAdded   = itAdded.flatMap(   flatSpans ).toIndexedSeq
-            val procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
+         // continue algorithm [A] with removed and added procs
 
-            ??? // fire
-         }
+
+//         if( itAdded.nonEmpty || itRemoved.nonEmpty ) {
+//            val procAdded   = itAdded.flatMap(   flatSpans ).toIndexedSeq
+//            val procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
+//
+//            ??? // fire
+//         }
 
          val needsNewGraphemeTime = oldFrame > newFrame || oldInfo.nextGraphemeTime < newFrame
          if( needsNewGraphemeTime ) {
@@ -278,9 +350,9 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
 
          } else if( newFrame == oldInfo.nextGraphemeTime ) {
             // we went exactly till a known event spot
-            graphemePrio.remove( newFrame ).flatMap { infoSeq =>
-               ???
-            }
+//            graphemePrio.remove( newFrame ).flatMap { infoSeq =>
+//               ???
+//            }
          }
 
          val ggg: Grapheme[ S ] = ???
