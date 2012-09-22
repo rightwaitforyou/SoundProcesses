@@ -47,8 +47,8 @@ object TransportViewImpl {
    private sealed trait NonScheduled extends State {
       final def targetFrame = Long.MaxValue
    }
-   private case object Stopped extends NonScheduled { def isRunning = false }
-   private case object FreeWheel extends NonScheduled { def isRunning = true }
+   private case object Stopped   extends NonScheduled { def isRunning = false }
+   private case object FreeWheel extends NonScheduled { def isRunning = true  }
    private case class Scheduled( targetFrame: Long ) extends State { def isRunning = true }
 
 //   private sealed trait Running[ +S ] extends State[ S ] { final def isRunning = true }
@@ -105,7 +105,21 @@ object TransportViewImpl {
 
       private val microsPerSample = 1000000 / sampleRate
 
-      private val graphemePrio: SkipList.Map[ I, Long, IIdxSeq[ GraphemeInfo[ S#ID ]]] = ???
+      // the three structures maintained for the update algorithm
+      // (1) for each observed timed proc, store information about all scans whose source is a grapheme.
+      //     an observed proc is one whose time span overlaps the current span in the transport info.
+      //     the value found in the map is a tuple. the tuple's first element is the _stale_ ID which
+      //     corresponds to the ID when the underlying grapheme value was stored in structure (2), thereby
+      //     allowing to find that value in (2). the tuple's second element is a map from the scan keys
+      //     to a tuple consisting of a time value and the grapheme value. the time value is the value at
+      //     which the grapheme value was stored in (2)
+      // (2) a skiplist is used as priority queue for the next interesting point in time at which the
+      //     transport needs to emit an advancement message. the value is a map from stale timed-proc ID's
+      //     to a map from scan keys to grapheme values, i.e. for scans whose source is a grapheme.
+      // (3) a refreshment map for the timed procs
+      private val gMap: IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])]  = ??? // (1)
+      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]         = ??? // (2)
+      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                             = ??? // (3)
 
       private def play()( implicit tx: S#Tx ) {
          if( isPlaying ) return
@@ -171,6 +185,47 @@ object TransportViewImpl {
          ??? // fire
       }
 
+      // [A]
+      // algorithm: given that the transport arrived at exactly info.nextProcTime, update the structures in
+      // anticipation of the next scheduling, and collect event dispatch information.
+      // - find the procs to remove and add via group.eventsAt.
+      // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
+      // - for the added procs, find all sinks whose source connects to a grapheme. calculate the values
+      //   of those graphemes at the current transport time. this goes with the Transport.Update so that
+      //   listeners do not need to perform that step themselves. Also this information is useful because it
+      //   yields the ceil time ct; if no value is found at the current transport time, find the ceiling time ct
+      //   explicitly; for ct, evaluate the grapheme value and store it in (1) and (2) accordingly.
+
+      // [B]
+      // algorithm: given that that the transport arrived at a time which was unobserved by the structures
+      // (e.g. before the info's start frame, or after the info's nextProcTime).
+      // - find the procs with to remove and add via range searches
+      // - proceed as in [A]
+
+      // [C]
+      // algorithm: given that the transport arrived at exactly info.nextGraphemeTime, update the
+      // structures in anticipation of the next scheduling, and collect event dispatch information.
+      // - in (2) find and remove the map for the given time frame
+      // - for each scan (S#ID, String) collect the grapheme values so that they be dispatched
+      //   in the advancement message
+      // - and for each of these scans, look up the timed proc through (3) and gather the new next grapheme
+      //   values, store (replace) them in (1) and (2), and calculate the new nextGraphemeTime.
+
+      // [D]
+      // algorithm: given that the transport arrived at a time which was unobserved by the structures
+      // (e.g. before the info's start frame, or after the info's nextGraphemeTime).
+      // - assume that interesting procs have already been removed and added (algorithm [A] or [B])
+      // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
+      //   at the new time, yielding all timed procs active at that point
+      // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
+      //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and <= the
+      //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
+      //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
+      //   the new time and the new grapheme value; perform the corresponding update in (2).
+      // - for the changed entries, collect those which overlap the current transport time, so that they
+      //   will go into the advancement message
+      // - retrieve the new nextGraphemeTime by looking at the head element in (2).
+
       private def performSeek( oldInfo: Info[ S ], newFrame: Long )( implicit tx: S#Tx ) {
 if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " + newFrame + ")" )
          if( newFrame == oldInfo.frame ) return
@@ -178,7 +233,8 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
 
          val g = group
          val oldFrame = oldInfo.frame
-         val (itAdded, itRemoved) = if( oldFrame > newFrame || oldInfo.nextProcTime < newFrame ) {
+         val needsNewProcTime = oldFrame > newFrame || oldInfo.nextProcTime < newFrame
+         val (itAdded, itRemoved) = if( needsNewProcTime ) {
             // the new time frame lies outside the range for the known next proc event.
             // therefore we need to fire proc additions and removals (if there are any)
             // and recalculate the next proc event time after the new time frame
@@ -213,13 +269,25 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
             ??? // fire
          }
 
-         if( oldFrame > newFrame || oldInfo.nextGraphemeTime < newFrame ) {
+         val needsNewGraphemeTime = oldFrame > newFrame || oldInfo.nextGraphemeTime < newFrame
+         if( needsNewGraphemeTime ) {
             // the new time frame lies outside the range for the known next grapheme event.
             // therefore we need to fire grapheme changes (if there are any)
             // and recalculate the next grapheme event time after the new time frame
 
 
+         } else if( newFrame == oldInfo.nextGraphemeTime ) {
+            // we went exactly till a known event spot
+            graphemePrio.remove( newFrame ).flatMap { infoSeq =>
+               ???
+            }
          }
+
+         val ggg: Grapheme[ S ] = ???
+         ggg.valueAt( time )
+
+
+
 //         if( removed.nonEmpty || added.nonEmpty || params.nonEmpty ) {
 //            fire( Transport.Advance( this, playing, newFrame, added, removed, params ))
 //         }

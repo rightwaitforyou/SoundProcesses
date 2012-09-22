@@ -169,3 +169,36 @@ NextEvent:
    procs: Boolean
 
 
+::::::::::
+
+say we have IDMap[ Grapheme.Value ]
+
+grapheme updates are IIdxSeq[ Grapheme.Value ]
+
+do we need to previous times?
+
+Proc will have Map[ String -> IIdxSeq[ Grapheme.Update ]]
+
+:: transport view observation algorithm ::
+
+U = ProcGroup will have (group, IIdxSeq[ (TimedProc[ S ], Map[ String -> IIdxSeq[ Grapheme.Update ]])
+                                         = ID
+
+if transport view maintains: 
+(1) IDMap[ ID(stale) -> Map[ String, (Long, Grapheme.Value) ]]
+(2) SkipList.Map[ Long, Map[ (ID(stale), Map[ String, Grapheme.Value ]]]
+(3) IDMap[ TimedProc[ S ]]
+
+with update U arriving, we will be able
+- to check whether we are currently observing the proc, by trying contains in (3)
+- if so, to look up the (ID(stale), Long, Grapheme.Value) stored in (1)
+- to filter wrt the grapheme value's span (whether U affects invalidates that value)
+    - invalidation means: the update's span.stop is greater than the current transport time
+                          && the update's span.start is smaller than the stored value's span.stop
+- if so, to consequently look up and remove the value from the skiplist, and re-insert the updated value
+
+:: this does not yet deal with the scan indirection ::
+
+let's assume that the String elements above are the _scan keys_ not _grapheme keys_, i.e. referring to
+scans of the process whose _source_ is a grapheme (no matter where that grapheme is stored)
+
