@@ -268,6 +268,8 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                (g.rangeSearch( addStart, addStop ), g.rangeSearch( remStart, remStop ))
             }
 
+            // continue algorithm [A] with removed and added procs
+
             // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
             val procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
             procRemoved.foreach {
@@ -327,12 +329,56 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                   }
                   timedMap.put( id, timed )           // in (3)
             }
-
-//            val nextProcTime  = g.nearestEventAfter( newFrame + 1 )
          }
 
-         // continue algorithm [A] with removed and added procs
+         val needsNewGraphemeTime = newFrame < oldFrame || newFrame >= oldInfo.nextGraphemeTime
 
+         // algorithm [C] or [D]
+         if( needsNewGraphemeTime ) {
+            // [C]
+            if( newFrame == oldInfo.nextGraphemeTime ) {
+               // we went exactly till a known event spot
+
+               // - in (2) find and remove the map for the given time frame
+               // - for each scan (S#ID, String) collect the grapheme values so that they be dispatched
+               //   in the advancement message
+               // - and for each of these scans, look up the timed proc through (3) and gather the new next grapheme
+               //   values, store (replace) them in (1) and (2), and calculate the new nextGraphemeTime.
+
+               gPrio.remove( newFrame ).foreach { staleMap =>
+                  staleMap.foreach {
+                     case (staleID, keyMap) =>
+
+                  }
+               }
+
+            // [D]
+            } else {
+               // the new time frame lies outside the range for the known next grapheme event.
+               // therefore we need to fire grapheme changes (if there are any)
+               // and recalculate the next grapheme event time after the new time frame
+
+//            graphemePrio.remove( newFrame ).flatMap { infoSeq =>
+//               ???
+//            }
+            }
+         }
+
+         val nextProcTime = if( needsNewProcTime ) {
+            g.nearestEventAfter( newFrameP ).getOrElse( Long.MaxValue )
+         } else {
+            oldInfo.nextProcTime
+         }
+
+         val nextGraphemeTime = if( needsNewGraphemeTime ) {
+            ??? // gPrio.headOption.map( _._1 ).getOrElse( Long.MaxValue )
+         } else {
+            oldInfo.nextGraphemeTime
+         }
+
+//         val newState =
+         val newInfo = Info( cpuTime = ???, frame = newFrame, state = ???,
+                             nextProcTime = nextProcTime, nextGraphemeTime = ???, graphemes = ??? )
 
 //         if( itAdded.nonEmpty || itRemoved.nonEmpty ) {
 //            val procAdded   = itAdded.flatMap(   flatSpans ).toIndexedSeq
@@ -340,24 +386,6 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
 //
 //            ??? // fire
 //         }
-
-         val needsNewGraphemeTime = oldFrame > newFrame || oldInfo.nextGraphemeTime < newFrame
-         if( needsNewGraphemeTime ) {
-            // the new time frame lies outside the range for the known next grapheme event.
-            // therefore we need to fire grapheme changes (if there are any)
-            // and recalculate the next grapheme event time after the new time frame
-
-
-         } else if( newFrame == oldInfo.nextGraphemeTime ) {
-            // we went exactly till a known event spot
-//            graphemePrio.remove( newFrame ).flatMap { infoSeq =>
-//               ???
-//            }
-         }
-
-         val ggg: Grapheme[ S ] = ???
-         ggg.valueAt( time )
-
 
 
 //         if( removed.nonEmpty || added.nonEmpty || params.nonEmpty ) {
