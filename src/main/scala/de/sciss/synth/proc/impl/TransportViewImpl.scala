@@ -280,8 +280,8 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                   gMap.remove( id )                                  // in (1)
                   entries.foreach {
                      case (staleID, scanMap) =>
-                        scanMap.foreach {
-                           case (_, (time, _)) =>
+                        scanMap.valuesIterator.foreach {
+                           case (time, _) =>
                               gPrio.get( time ).foreach { staleMap =>
                                  val newStaleMap = staleMap - staleID
                                  gPrio.add( time -> newStaleMap )    // in (2)
@@ -345,11 +345,40 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                // - and for each of these scans, look up the timed proc through (3) and gather the new next grapheme
                //   values, store (replace) them in (1) and (2), and calculate the new nextGraphemeTime.
 
-               gPrio.remove( newFrame ).foreach { staleMap =>
-                  staleMap.foreach {
+               val scanMap = gPrio.remove( newFrame ) match {
+                  case Some( staleMap ) => staleMap.flatMap {
                      case (staleID, keyMap) =>
+                        timedMap.get( staleID ).map( _ -> keyMap )
 
+                     case _ => None
                   }
+                  case _ => Map.empty
+               }
+               scanMap.foreach {
+                  case (timed, removeKeyMap) =>
+                     val id      = timed.id // the new "stale" (now fresh) id
+                     var keyMap  = gMap.get( id ).map( _._2 ).getOrElse( Map.empty )
+                     removeKeyMap.keysIterator.foreach { key =>
+                        val p = timed.value
+                        val valueOption = p.scans.get( key ).flatMap { scan =>
+                           scan.source.flatMap {
+                              case Scan.Link.Grapheme( peer ) =>
+                                 peer.nearestEventAfter( newFrameP ).flatMap { ceilTime =>
+                                    peer.valueAt( ceilTime ).map( ceilTime -> _ )
+                                 }
+                              case _ => None
+                           }
+                        }
+                        valueOption match {
+                           case Some( tup @ (time, value) ) =>
+                              keyMap += key -> tup
+                              ??? // and update gPrio
+
+                           case _ =>
+                              keyMap -= key
+                        }
+                     }
+                     gMap.put( id, id -> keyMap )
                }
 
             // [D]
@@ -358,10 +387,19 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                // therefore we need to fire grapheme changes (if there are any)
                // and recalculate the next grapheme event time after the new time frame
 
-//            graphemePrio.remove( newFrame ).flatMap { infoSeq =>
-//               ???
-//            }
+               // - assume that interesting procs have already been removed and added (algorithm [A] or [B])
+               // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
+               //   at the new time, yielding all timed procs active at that point
+               // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
+               //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and <= the
+               //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
+               //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
+               //   the new time and the new grapheme value; perform the corresponding update in (2).
+               // - for the changed entries, collect those which overlap the current transport time, so that they
+               //   will go into the advancement message
             }
+
+//            Transport.Proc.GraphemesChanged( m: Map[ String, Grapheme.Value ])
          }
 
          val nextProcTime = if( needsNewProcTime ) {
