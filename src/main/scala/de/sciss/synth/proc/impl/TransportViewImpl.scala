@@ -89,7 +89,7 @@ object TransportViewImpl {
 
 //   private val emptySeq = IIdxSeq.empty
 
-   private val itNoProcs = (data.Iterator.empty, data.Iterator.empty)
+//   private val itNoProcs = (data.Iterator.empty, data.Iterator.empty)
 
    final class Impl[ S <: Sys[ S ]]( groupStale: ProcGroup[ S ],val sampleRate: Double,
                                      playingVar: Expr.Var[ S, Boolean ], validVar: I#Var[ Int ],
@@ -121,10 +121,10 @@ object TransportViewImpl {
       private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]         = ??? // (2)
       private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                             = ??? // (3)
 
-      private def play()( implicit tx: S#Tx ) {
-         if( isPlaying ) return
-//         scheduleNext( ??? )
-      }
+//      private def play()( implicit tx: S#Tx ) {
+//         if( isPlaying ) return
+////         scheduleNext( ??? )
+//      }
 
 //      private def setCurrentFrame( time: Long )( implicit tx: S#Tx ) {
 //
@@ -143,9 +143,9 @@ object TransportViewImpl {
 
       def time( implicit tx: S#Tx ) : Long = calcCurrentTime( infoVar.get( tx.inMemory ))
 
-      private def fire( evt: Transport.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
-         ???
-      }
+//      private def fire( evt: Transport.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
+//         ???
+//      }
 
       private def invalidateScheduled()( implicit tx: S#Tx ) {
          validVar.transform( _ + 1 )( tx.inMemory )   // invalidate scheduled tasks
@@ -356,8 +356,8 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                }
                scanMap.foreach {
                   case (timed, removeKeyMap) =>
-                     val id      = timed.id // the new "stale" (now fresh) id
-                     var keyMap  = gMap.get( id ).map( _._2 ).getOrElse( Map.empty )
+                     val id = timed.id
+                     var (staleID, keyMap) = gMap.get( id ).getOrElse( id -> Map.empty[ String, (Long, Grapheme.Value) ])
                      removeKeyMap.keysIterator.foreach { key =>
                         val p = timed.value
                         val valueOption = p.scans.get( key ).flatMap { scan =>
@@ -371,14 +371,17 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                         }
                         valueOption match {
                            case Some( tup @ (time, value) ) =>
-                              keyMap += key -> tup
-                              ??? // and update gPrio
+                              keyMap        += key -> tup
+                              val staleMap   = gPrio.get( time ).getOrElse( Map.empty )
+                              val keyMap2    = staleMap.get( staleID )  .getOrElse( Map.empty ) + (key -> value)
+                              val newMap     = staleMap + (staleID -> keyMap2)
+                              gPrio.add( time -> newMap )
 
                            case _ =>
                               keyMap -= key
                         }
                      }
-                     gMap.put( id, id -> keyMap )
+                     gMap.put( id, staleID -> keyMap )
                }
 
             // [D]
