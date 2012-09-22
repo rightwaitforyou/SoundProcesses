@@ -1,4 +1,5 @@
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
 import de.sciss.lucre.{bitemp, expr, stm, event => evt, data}
 import bitemp.{SpanLike, BiGroup, Chronos}
@@ -35,7 +36,12 @@ object Transport {
    final case class Play[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
    final case class Stop[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
 
-   sealed trait ProcUpdate[ S ]
+   // particular update for ProcTransport
+   object Proc {
+      sealed trait Update[ +S ]
+      final case class Changed[ S <: Sys[ S ]]( peer: proc.Proc.Update[ S ]) extends Update[ S ]
+      final case class GraphemesChanged( map: Map[ String, Grapheme.Value ]) extends Update[ Nothing ]
+   }
 }
 trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S ] {
    def id: S#ID

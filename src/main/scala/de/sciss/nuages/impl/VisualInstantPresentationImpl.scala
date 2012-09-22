@@ -125,7 +125,7 @@ object VisualInstantPresentationImpl {
          }
       }
 
-      transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Transport.ProcUpdate[ S ]]] { implicit tx => {
+      transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]]] { implicit tx => {
          case Transport.Advance( _, _, time, added, removed, params ) => ??? // advance( time, added, removed, params )
          case Transport.Play( _ ) => playStop( b = true  )
          case Transport.Stop( _ ) => playStop( b = false )
