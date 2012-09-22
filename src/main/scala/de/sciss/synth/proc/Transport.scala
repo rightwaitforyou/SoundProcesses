@@ -20,9 +20,9 @@ object Transport {
 
    final case class Advance[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], playing: Boolean,
                                                     time: Long,
-                                                    added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem, U ])],
-                                                    removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem, U ])],
-                                                    params:  IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem, U ],
+                                                    added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
+                                                    removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
+                                                    params:  IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ],
                                                        Map[ String, Param ])])
    extends Update[ S, Elem, U ] {
       override def toString =
@@ -44,7 +44,7 @@ trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S 
 
    def sampleRate: Double
 
-   def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem, U ])]
+   def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])]
 
    def group: BiGroup[ S, Elem, U ]
 

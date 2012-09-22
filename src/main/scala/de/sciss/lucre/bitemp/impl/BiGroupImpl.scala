@@ -114,7 +114,7 @@ object BiGroupImpl {
    private final class TimedElemImpl[ S <: Sys[ S ], Elem, U ]( group: Impl[ S, Elem, U ],
       protected val targets: evt.Targets[ S ], val span: Expr[ S, SpanLike ], val value: Elem )
 //   extends TimedElem[ S, Elem, U ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElemImpl[ S, Elem, U ]]
-   extends TimedElem[ S, Elem, U ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem, U ]]
+   extends TimedElem[ S, Elem ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]]
    {
       import group.{eventView, elemSerializer, spanType}
 
@@ -132,7 +132,7 @@ object BiGroupImpl {
          if( res.nonEmpty ) Some( res ) else None
       }
 
-      def changed: Event[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem, U ]] = this
+      def changed: Event[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]] = this
 
       protected def writeData( out: DataOutput ) {
          span.write( out )
@@ -187,7 +187,7 @@ object BiGroupImpl {
    {
       group =>
 
-      implicit def pointView: (Leaf[ S, Elem, U ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
+      implicit def pointView: (Leaf[ S, Elem ], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint( tup._1 )
       implicit def hyperSer: ImmutableSerializer[ LongSquare ] = SpaceSerializers.LongSquareSerializer
 
       protected def tree: Tree[ S, Elem, U ]
@@ -260,7 +260,7 @@ object BiGroupImpl {
          }
 
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Element[ S, Elem, U ]] = {
-            val changes: IIdxSeq[ (TimedElem[ S, Elem, U ], BiGroup.ElementUpdate[ U ])] = pull.parents( this ).flatMap( sel => {
+            val changes: IIdxSeq[ (TimedElem[ S, Elem ], BiGroup.ElementUpdate[ U ])] = pull.parents( this ).flatMap( sel => {
 //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
 //val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
 //   asInstanceOf[ Elem ]
@@ -360,7 +360,7 @@ object BiGroupImpl {
          }
       }
 
-      final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : TimedElem[ S, Elem, U ] = {
+      final def add( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : TimedElem[ S, Elem ] = {
          val spanVal = span.value
          val tgt     = evt.Targets[ S ]   // XXX partial?
          val timed   = new TimedElemImpl[ S, Elem, U ]( group, tgt, span, elem )
@@ -440,7 +440,7 @@ object BiGroupImpl {
 //      final def iterator( implicit tx: S#Tx, chr: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]  =
 //         intersect( chr.time.value )
 
-      final def intersect( time: Long )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem, U ]] = {
+      final def intersect( time: Long )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          val start   = time
          val stop    = time + 1
 //         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
@@ -450,7 +450,7 @@ object BiGroupImpl {
          rangeSearch( shape )
       }
 
-      final def intersect( span: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem, U ]] = {
+      final def intersect( span: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          // horizontally: until query_stop; vertically: from query_start
          span match {
             case Span( start, stop ) =>
@@ -470,7 +470,7 @@ object BiGroupImpl {
          }
       }
 
-      final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem, U ]] = {
+      final def rangeSearch( start: SpanLike, stop: SpanLike )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          if( start == Span.Void || stop == Span.Void ) return Iterator.empty
 
          val startP  = searchSpanToPoint( start )
@@ -481,7 +481,7 @@ object BiGroupImpl {
       }
 
       // this can be easily implemented with two rectangular range searches
-      final def eventsAt( time: Long )( implicit tx: S#Tx ) : (Iterator[ S#Tx, Leaf[ S, Elem, U ]], Iterator[ S#Tx, Leaf[ S, Elem, U ]]) = {
+      final def eventsAt( time: Long )( implicit tx: S#Tx ) : (Iterator[ S#Tx, Leaf[ S, Elem ]], Iterator[ S#Tx, Leaf[ S, Elem ]]) = {
          val startShape = LongRectangle( time, MIN_COORD, 1, MAX_SIDE )
          val stopShape  = LongRectangle( MIN_COORD, time, MAX_SIDE, 1 )
          (rangeSearch( startShape ), rangeSearch( stopShape ))
@@ -519,7 +519,7 @@ object BiGroupImpl {
          }
       }
 
-      private def rangeSearch( shape: LongRectangle )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem, U ]] = {
+      private def rangeSearch( shape: LongRectangle )( implicit tx: S#Tx ) : Iterator[ S#Tx, Leaf[ S, Elem ]] = {
          val res = tree.rangeQuery( shape ) // .flatMap ....
 //if( VERBOSE ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
          res
