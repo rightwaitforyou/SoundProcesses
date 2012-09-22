@@ -7,33 +7,35 @@ import stm.{Cursor, Serializer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.Event
 import data.Iterator
+//import imp.{TransportImpl => Impl}
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
-                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : Transport[ S, Proc[ S ], Proc.Update[ S ]] =
-      impl.TransportImpl( group, sampleRate )
+                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : ProcTransport[ S ] =
+      ??? // impl.TransportImpl( group, sampleRate )
 
-   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, Transport[ S, Proc[ S ], Proc.Update[ S ]]] =
-         impl.TransportImpl.serializer( cursor )
+   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
+      ??? // impl.TransportImpl.serializer( cursor )
 
    sealed trait Update[ S <: Sys[ S ], Elem, U ] { def transport: Transport[ S, Elem, U ]}
 
    final case class Advance[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], playing: Boolean,
-                                                    time: Long,
-                                                    added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
-                                                    removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
-                                                    params:  IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ],
-                                                       Map[ String, Param ])])
+                                                       time: Long,
+                                                       added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
+                                                       removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
+                                                       changes: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ], U) ])
    extends Update[ S, Elem, U ] {
       override def toString =
          (if( playing ) "Advance" else "Seek") + "(" + transport + ", " + time +
             (if( added.nonEmpty )   added.mkString(   ", added = ",   ",", "" ) else "") +
             (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", "" ) else "") +
-            (if( params.nonEmpty )  params.mkString(  ", params = ",  ",", "" ) else "") + ")"
+            (if( changes.nonEmpty )  changes.mkString(  ", changes = ",  ",", "" ) else "") + ")"
    }
 
    final case class Play[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
    final case class Stop[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
+
+   sealed trait ProcUpdate[ S ]
 }
 trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S ] {
    def id: S#ID

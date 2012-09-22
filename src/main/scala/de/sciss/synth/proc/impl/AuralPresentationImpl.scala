@@ -85,12 +85,13 @@ object AuralPresentationImpl {
 //                  timed.foreach( booted.procAdded )
 //               }
             }
-            transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Proc.Update[ S ]]] { implicit tx => {
+            transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Transport.ProcUpdate[ S ]]] { implicit tx => {
                case Transport.Advance( tr, true, time, added, removed, params ) =>
                   implicit val chr: Chronos[ S ] = tr
 //println( "AQUI: added = " + added + "; removed = " + removed )
                   removed.foreach { case (_, p)    => booted.procRemoved( p )}
-                  params.foreach  { case (_, p, m) => booted.procParamsChanged( p, m )}
+                  ???
+//                  params.foreach  { case (_, p, m) => booted.procParamsChanged( p, m )}
                   added.foreach   { case (_, p)    => booted.procAdded( p )}
 //                  if( added.nonEmpty ) {
 //                     val timed = added.collect { case (_, pt) if pt.value.playing.value => pt }

@@ -47,6 +47,8 @@ import prefuse.render.DefaultRendererFactory
 import prefuse.util.force.{AbstractForce, ForceItem}
 
 object VisualInstantPresentationImpl {
+   private def ??? : Nothing = sys.error( "TODO" )
+
    def apply[ S <: Sys[ S ]]( transport: ProcTransport[ S ])
                             ( implicit tx: S#Tx, cursor: Cursor[ S ]) : VisualInstantPresentation[ S ] = {
 
@@ -123,8 +125,8 @@ object VisualInstantPresentationImpl {
          }
       }
 
-      transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Proc.Update[ S ]]] { implicit tx => {
-         case Transport.Advance( _, _, time, added, removed, params ) => advance( time, added, removed, params )
+      transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Transport.ProcUpdate[ S ]]] { implicit tx => {
+         case Transport.Advance( _, _, time, added, removed, params ) => ??? // advance( time, added, removed, params )
          case Transport.Play( _ ) => playStop( b = true  )
          case Transport.Stop( _ ) => playStop( b = false )
       }}

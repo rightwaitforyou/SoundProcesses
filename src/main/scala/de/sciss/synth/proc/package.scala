@@ -33,7 +33,7 @@ package object proc {
 
    type ProcGroup[ S <: Sys[ S ]] = BiGroup[ S, Proc[ S ], Proc.Update[ S ]]
    type TimedProc[ S <: Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ]]
-   type ProcTransport[ S <: Sys[ S ]] = Transport[ S, Proc[ S ], Proc.Update[ S ]]
+   type ProcTransport[ S <: Sys[ S ]] = Transport[ S, Proc[ S ], Transport.ProcUpdate[ S ]] // Proc.Update[ S ]
    type Param = Double
 
 //   type ScanElem[ S <: Sys[ S ]] = de.sciss.synth.proc.Scan.Elem

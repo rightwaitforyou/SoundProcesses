@@ -23,6 +23,7 @@
  *  contact@sciss.de
  */
 
+/*
 package de.sciss.synth.proc
 package impl
 
@@ -328,3 +329,4 @@ if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + ef
       protected def reader: evt.Reader[ S, ProcTransport[ S ]] = serializer[ S ]
    }
 }
+*/
