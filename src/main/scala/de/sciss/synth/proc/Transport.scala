@@ -46,6 +46,8 @@ trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S 
 
    def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem, U ])]
 
+   def group: BiGroup[ S, Elem, U ]
+
    def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
 
    // unfortunately this needs to go in the API because of the self-access problem

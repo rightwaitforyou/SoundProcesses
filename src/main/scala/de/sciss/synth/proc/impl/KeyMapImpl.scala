@@ -116,6 +116,9 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
    final def get( key: Key )( implicit tx: S#Tx ) : Option[ Value ] = map.get( key ).map( _.value )
    final def keys( implicit tx: S#Tx ): Set[ Key ] = map.keysIterator.toSet
 
+   final def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (Key, Value)] =
+      map.iterator.map { case (key, entry) => key -> entry.value }
+
    final def add( key: Key, value: Value )( implicit tx: S#Tx ) {
       val con  = isConnected
       val tgt  = evt.Targets[ S ]   // XXX TODO : partial?

@@ -40,12 +40,12 @@ object BiGroup {
    }
    sealed trait Collection[ S <: Sys[ S ], Elem, U ] extends Update[ S, Elem, U ] {
       def elem: TimedElem[ S, Elem, U ]
-      def span: SpanLike
+      def span: SpanLike // Span.HasStart
    }
-   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem, U ])
+   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike /* Span.HasStart */, elem: TimedElem[ S, Elem, U ])
    extends Collection[ S, Elem, U ]
 
-   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike, elem: TimedElem[ S, Elem, U ])
+   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike /* Span.HasStart */, elem: TimedElem[ S, Elem, U ])
    extends Collection[ S, Elem, U ]
 
    final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ],
@@ -56,15 +56,8 @@ object BiGroup {
    final case class Moved( change: evt.Change[ SpanLike ]) extends ElementUpdate[ Nothing ]
    final case class Mutated[ U ]( change: U ) extends ElementUpdate[ U ]
 
-   type Leaf[ S <: Sys[ S ], Elem, U ] = (SpanLike, IIdxSeq[ TimedElem[ S, Elem, U ]])
+   type Leaf[ S <: Sys[ S ], Elem, U ] = (SpanLike /* Span.HasStart */, IIdxSeq[ TimedElem[ S, Elem, U ]])
 
-//   object TimedElem {
-//      def read[ S <: Sys[ S ], Elem, U ]( in: DataInput, access: S#Acc )
-//                                        ( implicit tx: S#Tx,
-//                                          elemSerializer: Serializer[ S#Tx, S#Acc, Elem ],
-//                                          spanType: Type[ SpanLike ]) : TimedElem[ S, Elem, U ] =
-//         Impl.readTimedElem( in, access )
-//   }
    object TimedElem {
       def apply[ S <: Sys[ S ], Elem, U ]( id: S#ID, span: Expr[ S, SpanLike ], value: Elem ) : TimedElem[ S, Elem, U ] =
          Wrapper( id, span, value )

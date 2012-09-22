@@ -25,7 +25,8 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{stm, data}
+import stm.Sys
 
 object Scans {
    trait Modifiable[ S <: Sys[ S ]] extends Scans[ S ] {
@@ -36,4 +37,5 @@ object Scans {
 trait Scans[ S <: Sys[ S ]] {
    def get( key: String )( implicit tx: S#Tx ) : Option[ Scan[ S ]]
    def keys( implicit tx: S#Tx ): Set[ String ]
+   def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (String, Scan[ S ])]
 }

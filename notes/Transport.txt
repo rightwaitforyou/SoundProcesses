@@ -143,3 +143,29 @@ why the tests have failed
 - S#Var --> uses its own path
 - tx.access( ) --> not implemented in Confluent (Exception is stupidly eaten)
 - IDMap --> works only correctly with up-to-date ID
+
+:::::::::::::::::::::::::::::::
+:::::::::::::::::::::::::::::::
+
+Transport[ S ] {
+   seek
+   <>playing
+   sampleRate
+   iterator
+   
+   changed: Event
+}
+
+TransportView[ S ] {
+   def transport: Transport[ S ]
+
+   def changed: Event
+}
+
+::::::::::::::
+
+NextEvent:
+   graphemes: IIdxSeq[ (S#ID, String) ]  // timed-id, key
+   procs: Boolean
+
+

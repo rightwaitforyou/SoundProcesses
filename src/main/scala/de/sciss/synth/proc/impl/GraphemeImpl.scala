@@ -311,6 +311,8 @@ object GraphemeImpl {
 
       def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem[ S ]] = pin.at( time ).map( _.value )
 
+      def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = pin.nearestEventAfter( time )
+
       // ---- extensions ----
 
       def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ] = {

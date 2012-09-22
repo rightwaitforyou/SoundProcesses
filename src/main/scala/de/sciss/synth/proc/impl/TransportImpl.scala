@@ -93,7 +93,7 @@ object TransportImpl {
    private type ProcTransportUpd[ S <: Sys[ S ]] = Transport.Update[ S, Proc[ S ], Proc.Update[ S ]]
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                             group: ProcGroup[ S ],
+                                             val group: ProcGroup[ S ],
                                              val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ],
                                              validVar: S#Var[ Int ], lastTime: S#Var[ Long ],
                                              csrPos: S#Acc )

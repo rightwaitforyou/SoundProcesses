@@ -50,6 +50,7 @@ object Span {
    }
 
    sealed trait NonVoid          extends SpanLike
+   sealed trait Bounded          extends NonVoid
    sealed trait FromOrAll        extends Open   { def nonEmptyOption : Option[ FromOrAll ]}
    sealed trait HasStartOrVoid   extends SpanLike { def nonEmptyOption : Option[ HasStart ]}
    sealed trait UntilOrAll       extends Open { def nonEmptyOption : Option[ UntilOrAll ]}
@@ -69,7 +70,12 @@ object Span {
       def nonEmptyOption : Option[ Span ]
    }
 
-   sealed trait HasStart extends HasStartOrVoid with NonVoid {
+   object HasStart {
+      def unapply( span: SpanLike ) : Option[ HasStart ] = {
+         if( span.isInstanceOf[ HasStart ]) Some( span.asInstanceOf[ HasStart ]) else None
+      }
+   }
+   sealed trait HasStart extends Bounded with HasStartOrVoid {
       /**
        * @return  the start position of the span. this is considered included in the interval
        */
@@ -83,7 +89,7 @@ object Span {
       def subtract( that: Span.Open ) : HasStartOrVoid
       def subtract( that: SpanLike ) : IIdxSeq[ HasStart ]
    }
-   sealed trait HasStop extends HasStopOrVoid with NonVoid {
+   sealed trait HasStop extends Bounded with HasStopOrVoid {
       /**
        * @return  the stop position of the span. this is considered excluded in the interval
        */

@@ -169,6 +169,7 @@ trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Elem[ S ]]
    def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value ]
+   def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
 
    def changed: Event[ S, Grapheme.Update[ S ], Grapheme[ S ]]
 }
