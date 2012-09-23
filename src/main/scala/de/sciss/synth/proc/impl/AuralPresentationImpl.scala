@@ -89,10 +89,10 @@ object AuralPresentationImpl {
                case Transport.Advance( tr, isSeek, true, time, added, removed, params ) =>
                   implicit val chr: Chronos[ S ] = tr
 //println( "AQUI: added = " + added + "; removed = " + removed )
-                  removed.foreach { case (_, p)    => booted.procRemoved( p )}
+                  removed.foreach { timed => booted.procRemoved( timed )}
                   ???
-//                  params.foreach  { case (_, p, m) => booted.procParamsChanged( p, m )}
-                  added.foreach   { case (_, p)    => booted.procAdded( p )}
+//                  params.foreach  { case (timed, m) => booted.procParamsChanged( timed, m )}
+                  added.foreach   { timed => booted.procAdded( timed )}
 //                  if( added.nonEmpty ) {
 //                     val timed = added.collect { case (_, pt) if pt.value.playing.value => pt }
 //                     booted.procsAdded( timed )

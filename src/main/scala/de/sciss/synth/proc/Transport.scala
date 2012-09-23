@@ -25,9 +25,9 @@ object Transport {
 
    final case class Advance[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], time: Long,
                                                        isSeek: Boolean, isPlaying: Boolean,
-                                                       added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
-                                                       removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
-                                                       changes: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ], U) ])
+                                                       added:   IIdxSeq[  BiGroup.TimedElem[ S, Elem ]],
+                                                       removed: IIdxSeq[  BiGroup.TimedElem[ S, Elem ]],
+                                                       changes: IIdxSeq[ (BiGroup.TimedElem[ S, Elem ], U) ])
    extends Update[ S, Elem, U ] {
       override def toString =
          (if( isSeek ) "Seek" else "Advance") + "(" + transport + ", " + time +

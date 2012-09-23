@@ -102,6 +102,8 @@ object TransportImpl {
       in._2.map { span -> _ }
    }
 
+//   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ TimedProc[ S ]])) : IIdxSeq[ TimedProc[ S ]] = in._2
+
    private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
    @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
 
@@ -323,9 +325,9 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
          val needsNewProcTime = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
          val newFrameP        = newFrame + 1
 
-         var procAdded        = emptySeq[ (SpanLike, TimedProc[ S ])]
-         var procRemoved      = emptySeq[ (SpanLike, TimedProc[ S ])]
-         var procUpdated      = emptySeq[ (SpanLike, TimedProc[ S ], Transport.Proc.Update[ S ])]
+         var procAdded        = emptySeq[  TimedProc[ S ]]
+         var procRemoved      = emptySeq[  TimedProc[ S ]]
+         var procUpdated      = emptySeq[ (TimedProc[ S ], Transport.Proc.Update[ S ])]
 
          // algorithm [A] or [B]
          if( needsNewProcTime ) {
@@ -361,23 +363,22 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
             // continue algorithm [A] with removed and added procs
 
             // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
-            procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
-            procRemoved.foreach {
-               case (_, timed) =>
-                  val id = timed.id
-                  timedMap.remove( id )                              // in (3)
-                  val entries = gMap.get( id )
-                  gMap.remove( id )                                  // in (1)
-                  entries.foreach {
-                     case (staleID, scanMap) =>
-                        scanMap.valuesIterator.foreach {
-                           case (time, _) =>
-                              gPrio.get( time ).foreach { staleMap =>
-                                 val newStaleMap = staleMap - staleID
-                                 gPrio.add( time -> newStaleMap )    // in (2)
-                              }
-                        }
-                  }
+            procRemoved = itRemoved.flatMap( _._2 ).toIndexedSeq
+            procRemoved.foreach { timed =>
+               val id = timed.id
+               timedMap.remove( id )                              // in (3)
+               val entries = gMap.get( id )
+               gMap.remove( id )                                  // in (1)
+               entries.foreach {
+                  case (staleID, scanMap) =>
+                     scanMap.valuesIterator.foreach {
+                        case (time, _) =>
+                           gPrio.get( time ).foreach { staleMap =>
+                              val newStaleMap = staleMap - staleID
+                              gPrio.add( time -> newStaleMap )    // in (2)
+                           }
+                     }
+               }
             }
 
             // - for the added procs, find all sinks whose source connects to a grapheme. calculate the values
@@ -386,38 +387,37 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
             //   yields the ceil time ct); if no value is found at the current transport time, find the ceiling time ct
             //   explicitly; for ct, evaluate the grapheme value and store it in (1) and (2) accordingly.
             //   store procs in (3)
-            procAdded = itAdded.flatMap( flatSpans ).toIndexedSeq
-            procAdded.foreach {
-               case (span, timed) =>
-                  val id   = timed.id
-                  val p    = timed.value
+            procAdded = itAdded.flatMap( _._2 ).toIndexedSeq
+            procAdded.foreach { timed =>
+               val id   = timed.id
+               val p    = timed.value
 //                  var procVals = Map.empty[ String, Scan.Link ]
-                  var scanMap    = Map.empty[ String, (Long, Grapheme.Value) ]
-                  var skipMap    = Map.empty[ Long, Map[ String, Grapheme.Value ]]
-                  p.scans.iterator.foreach {
-                     case (key, scan) =>
-                        scan.source match {
-                           case Some( link @ Scan.Link.Grapheme( peer )) =>
+               var scanMap    = Map.empty[ String, (Long, Grapheme.Value) ]
+               var skipMap    = Map.empty[ Long, Map[ String, Grapheme.Value ]]
+               p.scans.iterator.foreach {
+                  case (key, scan) =>
+                     scan.source match {
+                        case Some( link @ Scan.Link.Grapheme( peer )) =>
 //                              procVals += ...
-                              peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
-                                 peer.valueAt( ceilTime ).foreach { ceilValue =>
-                                    scanMap   += key -> (ceilTime, ceilValue)
-                                    val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilValue)
-                                    skipMap   += ceilTime -> newMap
-                                 }
+                           peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
+                              peer.valueAt( ceilTime ).foreach { ceilValue =>
+                                 scanMap   += key -> (ceilTime, ceilValue)
+                                 val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilValue)
+                                 skipMap   += ceilTime -> newMap
                               }
+                           }
 //                           case Some( link @ Scan.Link.Scan( peer )) =>
 //                              procVals += ...
-                           case _ => None
-                        }
-                  }
-                  gMap.put( id, id -> scanMap )       // in (1)
-                  skipMap.foreach {
-                     case (time, keyMap) =>
-                        val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
-                        gPrio.add( time -> newMap )   // in (2)
-                  }
-                  timedMap.put( id, timed )           // in (3)
+                        case _ => None
+                     }
+               }
+               gMap.put( id, id -> scanMap )       // in (1)
+               skipMap.foreach {
+                  case (time, keyMap) =>
+                     val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
+                     gPrio.add( time -> newMap )   // in (2)
+               }
+               timedMap.put( id, timed )           // in (3)
             }
          }
 
@@ -492,7 +492,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                // - for the changed entries, collect those which overlap the current transport time, so that they
                //   will go into the advancement message
 
-               val newProcs: Set[ TimedProc[ S ]] = procAdded.map( _._2 )( breakOut )
+               val newProcs: Set[ TimedProc[ S ]] = procAdded.toSet // .map( _._2 )( breakOut )
 
                // filter because new procs have already build up their scan maps
                val oldProcs = g.intersect( newFrame ).flatMap( _._2.filterNot( newProcs.contains ))
@@ -583,7 +583,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                itMap.toIndexedSeq
             }
 
-            procUpdated = updMap.map { case (timed, map) => (timed.span.value, timed, Transport.Proc.GraphemesChanged( map ))}
+            procUpdated = updMap.map { case (timed, map) => timed -> Transport.Proc.GraphemesChanged( map )}
 
 //            Transport.Proc.GraphemesChanged( m: Map[ String, Grapheme.Value ])
          }
