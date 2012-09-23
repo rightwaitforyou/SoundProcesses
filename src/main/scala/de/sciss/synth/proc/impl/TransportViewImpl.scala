@@ -7,6 +7,7 @@ import stm.{IdentifierMap, Sys, Cursor}
 import bitemp.{SpanLike, Span}
 import data.SkipList
 import expr.Expr
+import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn, TxnLocal}
 import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
@@ -86,6 +87,9 @@ object TransportViewImpl {
       val span = in._1
       in._2.map { span -> _ }
    }
+
+   private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
+   @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
 
 //   private val emptySeq = IIdxSeq.empty
 
@@ -218,7 +222,7 @@ object TransportViewImpl {
       // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
       //   at the new time, yielding all timed procs active at that point
       // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
-      //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and <= the
+      //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and < the
       //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
       //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
       //   the new time and the new grapheme value; perform the corresponding update in (2).
@@ -236,6 +240,9 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
          val oldFrame         = oldInfo.frame
          val needsNewProcTime = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
          val newFrameP        = newFrame + 1
+
+         var procAdded        = emptySeq[ (SpanLike, TimedProc[ S ])]
+         var procRemoved      = emptySeq[ (SpanLike, TimedProc[ S ])]
 
          // algorithm [A] or [B]
          if( needsNewProcTime ) {
@@ -271,7 +278,7 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
             // continue algorithm [A] with removed and added procs
 
             // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
-            val procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
+            procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
             procRemoved.foreach {
                case (_, timed) =>
                   val id = timed.id
@@ -296,7 +303,7 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
             //   yields the ceil time ct); if no value is found at the current transport time, find the ceiling time ct
             //   explicitly; for ct, evaluate the grapheme value and store it in (1) and (2) accordingly.
             //   store procs in (3)
-            val procAdded = itAdded.flatMap( flatSpans ).toIndexedSeq
+            procAdded = itAdded.flatMap( flatSpans ).toIndexedSeq
             procAdded.foreach {
                case (span, timed) =>
                   val id   = timed.id
@@ -373,7 +380,7 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                            case Some( tup @ (time, value) ) =>
                               keyMap        += key -> tup
                               val staleMap   = gPrio.get( time ).getOrElse( Map.empty )
-                              val keyMap2    = staleMap.get( staleID )  .getOrElse( Map.empty ) + (key -> value)
+                              val keyMap2    = staleMap.get( staleID ).getOrElse( Map.empty ) + (key -> value)
                               val newMap     = staleMap + (staleID -> keyMap2)
                               gPrio.add( time -> newMap )
 
@@ -394,12 +401,42 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
                //   at the new time, yielding all timed procs active at that point
                // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
-               //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and <= the
+               //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and < the
                //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
                //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
                //   the new time and the new grapheme value; perform the corresponding update in (2).
                // - for the changed entries, collect those which overlap the current transport time, so that they
                //   will go into the advancement message
+
+               val newProcs: Set[ TimedProc[ S ]] = procAdded.map( _._2 )( breakOut )
+
+               // filter because new procs have already build up their scan maps
+               g.intersect( newFrame ).flatMap( _._2.filterNot( newProcs.contains )).foreach { timed =>
+                  val id   = timed.id
+                  val p    = timed.value
+                  var (staleID, keyMap) = gMap.get( id ).getOrElse( id -> Map.empty[ String, (Long, Grapheme.Value) ])
+                  keyMap.foreach {
+                     case (key, (time, value)) =>
+                        val timeVerify = if( newFrame < oldFrame || newFrame >= time ) { // need to verify next time point
+                           p.scans.get( key ).flatMap( scan => {
+                              scan.source.map {
+                                 case Scan.Link.Grapheme( peer ) =>
+                                    peer.nearestEventAfter( newFrameP )
+                                 case _ => None
+                              }
+                           }).getOrElse( Long.MaxValue )
+                        } else time
+
+                        if( timeVerify != time ) {
+                           if( timeVerify != Long.MaxValue ) {
+                              ???
+                           } else {
+                              keyMap -= key
+                              ??? // remove from gPrio
+                           }
+                        }
+                  }
+               }
             }
 
 //            Transport.Proc.GraphemesChanged( m: Map[ String, Grapheme.Value ])
@@ -421,16 +458,10 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
          val newInfo = Info( cpuTime = ???, frame = newFrame, state = ???,
                              nextProcTime = nextProcTime, nextGraphemeTime = ???, graphemes = ??? )
 
-//         if( itAdded.nonEmpty || itRemoved.nonEmpty ) {
-//            val procAdded   = itAdded.flatMap(   flatSpans ).toIndexedSeq
-//            val procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
-//
-//            ??? // fire
-//         }
-
-
-//         if( removed.nonEmpty || added.nonEmpty || params.nonEmpty ) {
-//            fire( Transport.Advance( this, playing, newFrame, added, removed, params ))
+//         if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated ) {
+//            val upd = Transport.Advanced( this, playing?, newFrame, procAdded, procRemoved, procUpdated )
+//            Changed( upd )
+//            ???
 //         }
       }
 
