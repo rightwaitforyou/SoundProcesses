@@ -2,7 +2,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{stm, bitemp, expr, data}
+import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm, bitemp, expr, data}
 import stm.{IdentifierMap, Sys, Cursor}
 import bitemp.{SpanLike, Span}
 import data.SkipList
@@ -11,22 +11,38 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn, TxnLocal}
 import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
+import de.sciss.synth.expr.Booleans
 
 object TransportViewImpl {
    var VERBOSE = true
 
-   def apply[ S <: Sys[ S ]]( transport: ProcTransport[ S ])( implicit tx: S#Tx, cursor: Cursor[ S ]) /* : TransportView[ S ] */ = {
-      val time    = transport.time
-//      val flags   = tx.newInMemoryIDMap[ Flag[ S ]]
-      val view: Impl[ S ] = ??? //    = new Impl( transport, ???, flags )
-      transport.group.intersect( time ).foreach {
-         case (Span.HasStart( span ), seq) =>
-            seq.foreach { timed => view.add( span, timed )}
-         case _ =>
-      }
+   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )( implicit tx: S#Tx, cursor: Cursor[ S ]) /* : TransportView[ S ] */ = {
+      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
+//      val id         = targets.id
+      val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
+      implicit val itx = tx.inMemory
+      val iid        = itx.newID()
+      implicit val infoSer = dummySerializer[ Info ]
+      val infoVar    = itx.newVar( iid, Info.init )
+      val gMap       = tx.newInMemoryIDMap[ (S#ID, Map[ String, (Long, Grapheme.Value) ])]      // (1)
+      implicit val skipSer = dummySerializer[ Map[ S#ID, Map[ String, Grapheme.Value ]]]
+      val gPrio      = SkipList.Map.empty[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]  // (2)
+      val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                     // (3)
+      val view       = new Impl[ S ]( targets, group, sampleRate, playingVar, infoVar,
+                                      gMap, gPrio, timedMap, cursor.position )
+//      group.intersect( time ).foreach {
+//         case (Span.HasStart( span ), seq) =>
+//            seq.foreach { timed => view.add( span, timed )}
+//         case _ =>
+//      }
       view
    }
 
+   private def sysMicros() = System.nanoTime()/1000
+
+   private object Info {
+      val init: Info = apply( 0L, 0L, Stopped, Long.MaxValue, Long.MaxValue, 0 )
+   }
    /**
     * Information about the current situation of the transport.
     *
@@ -83,7 +99,7 @@ object TransportViewImpl {
       res
    }
 
-   private val cpuTime = TxnLocal( System.nanoTime()/1000 )    // system wide wall clock in microseconds
+   private val cpuTime = TxnLocal( sysMicros() )    // system wide wall clock in microseconds
 
    private def shutdownScheduler() {
      if( VERBOSE )println( "Shutting down scheduler thread pool" )
@@ -98,9 +114,21 @@ object TransportViewImpl {
    private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
    @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
 
-   final class Impl[ S <: Sys[ S ]]( groupStale: ProcGroup[ S ],val sampleRate: Double,
+   private def dummySerializer[ A ] : stm.Serializer[ I#Tx, I#Acc, A ] =
+      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
+
+   private object DummySerializer extends stm.Serializer[ I#Tx, I#Acc, Nothing ] {
+      def write( v: Nothing, out: DataOutput) {}
+      def read( in: DataInput, access: I#Acc )( implicit tx: I#Tx ) : Nothing = sys.error( "Operation not supported" )
+   }
+
+   final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+                                     groupStale: ProcGroup[ S ],val sampleRate: Double,
                                      playingVar: Expr.Var[ S, Boolean ], /* validVar: I#Var[ Int ], */
                                      infoVar: I#Var[ Info ],
+                                     gMap: IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
+                                     gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
+                                     timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
                                      csrPos: S#Acc )
                                    ( implicit cursor: Cursor[ S ]) {
 
@@ -119,9 +147,9 @@ object TransportViewImpl {
       //     transport needs to emit an advancement message. the value is a map from stale timed-proc ID's
       //     to a map from scan keys to grapheme values, i.e. for scans whose source is a grapheme.
       // (3) a refreshment map for the timed procs
-      private val gMap: IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])]  = ??? // (1)
-      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]         = ??? // (2)
-      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                             = ??? // (3)
+//      private val gMap: IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])]   // (1)
+//      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]          // (2)
+//      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                              // (3)
 
       private def calcCurrentTime( info: Info )( implicit tx: S#Tx ) : Long = {
          val startFrame = info.frame
@@ -487,7 +515,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
 //         if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated ) {
 //            val upd = Transport.Advanced( this, playing?, newFrame, procAdded, procRemoved, procUpdated )
 //            Changed( upd )
-//            ???
+            ???
 //         }
       }
 
@@ -501,7 +529,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
          val logicalDelay  = ((targetFrame - info.frame) * microsPerSample).toLong
          val logicalNow    = info.cpuTime
          val schedValid    = info.valid
-         val jitter        = System.nanoTime()/1000 - logicalNow
+         val jitter        = sysMicros() - logicalNow
          val actualDelay   = math.max( 0L, logicalDelay - jitter )
 if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay + ", targetFrame = " + targetFrame )
          Txn.afterCommit( _ => {
@@ -529,24 +557,24 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          scheduleNext()
       }
 
-      def add( span: Span.HasStart, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
-         ???
-//         implicit val itx: I#Tx = ???
-//         val w = waitSpan.get
-//         if( w.touches( span )) {
-//            // interrupt scheduled task
-//
-////            val p = timed.value
-////            p.scans.iterator.foreach {
-////               case (key, scan) => scan.source match {
-////                  case Some( Scan.Link.Grapheme( grapheme )) =>
-////                     grapheme.nearestEventAfter( span.start )   // XXX
-////                  case _ =>
-////               }
-////            }
-//         } else {
-//            // see if it appears earlier than the next region
-//         }
-      }
+//      def add( span: Span.HasStart, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
+//         ???
+////         implicit val itx: I#Tx = ???
+////         val w = waitSpan.get
+////         if( w.touches( span )) {
+////            // interrupt scheduled task
+////
+//////            val p = timed.value
+//////            p.scans.iterator.foreach {
+//////               case (key, scan) => scan.source match {
+//////                  case Some( Scan.Link.Grapheme( grapheme )) =>
+//////                     grapheme.nearestEventAfter( span.start )   // XXX
+//////                  case _ =>
+//////               }
+//////            }
+////         } else {
+////            // see if it appears earlier than the next region
+////         }
+//      }
    }
 }
