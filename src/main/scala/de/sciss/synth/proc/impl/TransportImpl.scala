@@ -3,7 +3,7 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm, bitemp, expr, data}
-import stm.{IdentifierMap, Sys, Cursor}
+import stm.{Disposable, IdentifierMap, Sys, Cursor}
 import bitemp.{BiGroup, SpanLike, Span}
 import data.SkipList
 import expr.Expr
@@ -18,7 +18,7 @@ object TransportImpl {
    var VERBOSE = true
 
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )( implicit tx: S#Tx, cursor: Cursor[ S ]) /* : TransportView[ S ] */ = {
-      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
+//      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
 //      val id         = targets.id
       val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
       implicit val itx = tx.inMemory
@@ -29,7 +29,7 @@ object TransportImpl {
       implicit val skipSer = dummySerializer[ Map[ S#ID, Map[ String, Grapheme.Value ]]]
       val gPrio      = SkipList.Map.empty[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]  // (2)
       val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                     // (3)
-      val view       = new Impl[ S ]( targets, group, sampleRate, playingVar, infoVar,
+      val view       = new Impl[ S ]( /* targets, */ group, sampleRate, playingVar, infoVar,
                                       gMap, gPrio, timedMap, cursor.position )
 //      group.intersect( time ).foreach {
 //         case (Span.HasStart( span ), seq) =>
@@ -113,7 +113,7 @@ object TransportImpl {
       def read( in: DataInput, access: I#Acc )( implicit tx: I#Tx ) : Nothing = sys.error( "Operation not supported" )
    }
 
-   final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+   final class Impl[ S <: Sys[ S ]]( /* protected val targets: evt.Targets[ S ], */
                                      groupStale:            ProcGroup[ S ],
                                      val sampleRate:        Double,
                                      playingVar:            Expr.Var[ S, Boolean ],
@@ -123,7 +123,7 @@ object TransportImpl {
                                      timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
                                      csrPos:                S#Acc )
                                    ( implicit cursor: Cursor[ S ])
-   extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] with evt.Node[ S ] {
+   extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] /* with evt.Node[ S ] */ {
       impl =>
 
       private implicit val procGroupSer      = ProcGroup_.serializer[ S ]
@@ -145,6 +145,10 @@ object TransportImpl {
 //      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]          // (2)
 //      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                              // (3)
 
+      def dispose()( implicit tx: S#Tx ) {
+         disposeData()
+      }
+
       // ---- evt.Node ----
 
       protected def disposeData()( implicit tx: S#Tx ) {
@@ -157,15 +161,15 @@ object TransportImpl {
          timedMap.dispose()
       }
 
-      protected def writeData( out: DataOutput ) {}   // there is no serialization for this class
-
-      def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = {
-         require( slot == 1 )
-         ChangeEvent
-      }
-
-      def changed: Event[ S, Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]], ProcTransport[ S ]] =
-         ChangeEvent
+//      protected def writeData( out: DataOutput ) {}   // there is no serialization for this class
+//
+//      def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = {
+//         require( slot == 1 )
+//         ChangeEvent
+//      }
+//
+//      def changed: Event[ S, Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]], ProcTransport[ S ]] =
+//         ChangeEvent
 
       def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
          group.intersect( time ).flatMap( flatSpans )
@@ -192,7 +196,7 @@ object TransportImpl {
          val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
                                      state   = Playing )
          infoVar.set( newInfo )
-         ChangeEvent( Transport.Play( impl, newInfo.frame ))
+         fire( Transport.Play( impl, newInfo.frame ))
          scheduleNext( newInfo )
       }
 
@@ -205,7 +209,7 @@ object TransportImpl {
                                      frame   = calcCurrentTime( oldInfo ),
                                      state   = Stopped )
          infoVar.set( newInfo )
-         ChangeEvent( Transport.Stop( impl, newInfo.frame ))
+         fire( Transport.Stop( impl, newInfo.frame ))
       }
 
       def group( implicit tx: S#Tx ) : ProcGroup[ S ] =  tx.refresh( csrPos, groupStale )
@@ -218,30 +222,43 @@ object TransportImpl {
 
       private type Update = Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]]
 
-      private object ChangeEvent
-//      extends evt.Trigger.Impl[ S, Update, ProcTransport[ S ]]
-      extends evt.Trigger[ S, Update, ProcTransport[ S ]] // with event.EventImpl[ S, A, Repr ]
-      with evt.Generator[ S, Update, ProcTransport[ S ]]
-      with evt.InvariantEvent[ S, Update, ProcTransport[ S ]]
-      with evt.Root[ S, Update ]
-      {
-         def slot = 1
-         def node : ProcTransport[ S ] with evt.Node[ S ] = impl
+//      private object ChangeEvent
+////      extends evt.Trigger.Impl[ S, Update, ProcTransport[ S ]]
+//      extends evt.Trigger[ S, Update, ProcTransport[ S ]] // with event.EventImpl[ S, A, Repr ]
+//      with evt.Generator[ S, Update, ProcTransport[ S ]]
+//      with evt.InvariantEvent[ S, Update, ProcTransport[ S ]]
+//      with evt.Root[ S, Update ]
+//      {
+//         def slot = 1
+//         def node : ProcTransport[ S ] with evt.Node[ S ] = impl
+//
+//         def isSource( pull: evt.Pull[ S ]) : Boolean = pull.hasVisited( this )
+//         def apply( update: Update )( implicit tx: S#Tx ) { fire( update )}
+//
+////         protected def reader = null
+//
+//         def react[ A1 >: Update ]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] =
+//            reactTx( _ => fun )
+//
+//         def reactTx[ A1 >: Update ]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] = {
+////            val res = Observer[ S, A1, Repr ]( reader, fun )
+////            res.add( this )
+////            res
+//         }
+//      }
 
-         def isSource( pull: evt.Pull[ S ]) : Boolean = pull.hasVisited( this )
-         def apply( update: Update )( implicit tx: S#Tx ) { fire( update )}
+      private def fire( update: Update )( implicit tx: S#Tx ) {
+         ???
+      }
 
-//         protected def reader = null
+      def react( fun: Update => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] =
+         reactTx( _ => fun )
 
-         def react[ A1 >: Update ]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] =
-            reactTx( _ => fun )
-
-         def reactTx[ A1 >: Update ]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] = {
-            ???
+      def reactTx( fun: S#Tx => Update => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] = {
+         ???
 //            val res = Observer[ S, A1, Repr ]( reader, fun )
 //            res.add( this )
 //            res
-         }
       }
 
       // [A]
@@ -562,7 +579,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
          if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty ) {
             val upd = Transport.Advance( impl, newFrame, isSeek = isSeek, isPlaying = newInfo.isRunning,
                                          added = procAdded, removed = procRemoved, changes = procUpdated )
-            ChangeEvent( upd )
+            fire( upd )
          }
 
          if( newState == Playing ) scheduleNext( newInfo )

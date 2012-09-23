@@ -4,7 +4,7 @@ package proc
 import de.sciss.lucre.{bitemp, expr, stm, event => evt, data}
 import bitemp.{SpanLike, BiGroup, Chronos}
 import expr.Expr
-import stm.{Cursor, Serializer, Sys}
+import stm.{Disposable, Cursor, Serializer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.Event
 import data.Iterator
@@ -46,8 +46,8 @@ object Transport {
       final case class GraphemesChanged( map: Map[ String, Grapheme.Value ]) extends Update[ Nothing ]
    }
 }
-trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S ] {
-   def id: S#ID
+trait Transport[ S <: Sys[ S ], Elem, U ] extends Disposable[ S#Tx ] /* evt.Node[ S ] */ with Chronos[ S ] {
+//   def id: S#ID
 
    def seek( time: Long )( implicit tx: S#Tx ) : Unit
    def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
@@ -61,7 +61,10 @@ trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S 
 //
 //   def group: BiGroup[ S, Elem, U ]
 
-   def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
+//   def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
+
+   def react( fun: Transport.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ]
+   def reactTx( fun: S#Tx => Transport.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ]
 
 //   // unfortunately this needs to go in the API because of the self-access problem
 //   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
