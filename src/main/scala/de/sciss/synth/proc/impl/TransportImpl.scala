@@ -27,9 +27,9 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{DataOutput, DataInput, stm, bitemp, expr, data}
+import de.sciss.lucre.{DataOutput, DataInput, stm, bitemp, data}
 import stm.{Disposable, IdentifierMap, Sys, Cursor}
-import bitemp.{SpanLike, Span}
+import bitemp.{BiGroup, SpanLike, Span}
 import data.SkipList
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -61,6 +61,7 @@ object TransportImpl {
 //            seq.foreach { timed => view.add( span, timed )}
 //         case _ =>
 //      }
+      t.init()
       t.seek( 0L )
       t
    }
@@ -169,16 +170,15 @@ object TransportImpl {
    }
 
    private final class Impl[ S <: Sys[ S ]]( /* protected val targets: evt.Targets[ S ], */
-                                     groupStale:            ProcGroup[ S ],
-                                     val sampleRate:        Double,
-//                                     playingVar:            Expr.Var[ S, Boolean ],
-                                     infoVar:               I#Var[ Info ],
-                                     gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
-                                     gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
-                                     timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
-                                     obsVar:                I#Var[ IIdxSeq[ Observation[ S ]]],
-                                     csrPos:                S#Acc )
-                                   ( implicit cursor: Cursor[ S ])
+                      groupStale:            ProcGroup[ S ],
+                      val sampleRate:        Double,
+                      infoVar:               I#Var[ Info ],
+                      gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
+                      gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
+                      timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
+                      obsVar:                I#Var[ IIdxSeq[ Observation[ S ]]],
+                      csrPos:                S#Acc )
+                    ( implicit cursor: Cursor[ S ])
    extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] /* with evt.Node[ S ] */ {
       impl =>
 
@@ -201,17 +201,50 @@ object TransportImpl {
 //      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]          // (2)
 //      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                              // (3)
 
-      def dispose()( implicit tx: S#Tx ) {
-         disposeData()
+      private var groupObs : Disposable[ S#Tx ] = _
+
+      private def addRemoveProcs( span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]], procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
+         implicit val itx = tx.inMemory
+         val oldInfo    = infoVar.get
+         val newFrame   = calcCurrentTime( oldInfo )
+         val isPly      = oldInfo.isRunning
+
+         procRemoved.foreach { timed => removeProc( timed )}
+         procAdded.foreach   { timed => addProc( newFrame, timed )}
+
+         ??? // TODO: determine from oldInfo vs. span whether nextProcTime needs recalculation
+
+         val newInfo    = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ), frame = newFrame )
+         infoVar.set( newInfo )
+         fire( Transport.Advance( transport = this, time = newFrame, isSeek = false, isPlaying = isPly,
+                                  added = procAdded, removed = procRemoved, changes = emptySeq ))
+         if( isPly ) scheduleNext( newInfo )
       }
 
-      override def toString = "Transport(group=" + groupStale.id + ")@" + hashCode.toHexString
+      def init()( implicit tx: S#Tx ) {
+         // we can use groupStale because init is called straight away after instantiating Impl
+         groupObs = groupStale.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
+            case BiGroup.Added( _, span, timed ) =>
+               // the easiest check is not to fiddle around with span overlaps,
+               // but simple check if the proc was registered (in timedMap)
+               if( timedMap.contains( timed.id )) {
+                  addRemoveProcs( span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
+               }
 
-      // ---- evt.Node ----
+            case BiGroup.Removed( _, span, timed ) =>
+               if( timedMap.contains( timed.id )) {
+                  addRemoveProcs( span, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
+               }
 
-      protected def disposeData()( implicit tx: S#Tx ) {
+            case BiGroup.Element( g, changes ) =>
+               // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ Proc.Update[ S ]])]
+               ???
+         }}
+      }
+
+      def dispose()( implicit tx: S#Tx ) {
          implicit val itx = tx.inMemory
-//         playingVar.dispose()
+         groupObs.dispose()
          infoVar.set( Info.init )   // if there is pending scheduled tasks, they should abort gracefully
 //         infoVar.dispose()
          gMap.dispose()
@@ -220,15 +253,7 @@ object TransportImpl {
          obsVar.dispose()
       }
 
-//      protected def writeData( out: DataOutput ) {}   // there is no serialization for this class
-//
-//      def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = {
-//         require( slot == 1 )
-//         ChangeEvent
-//      }
-//
-//      def changed: Event[ S, Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]], ProcTransport[ S ]] =
-//         ChangeEvent
+      override def toString = "Transport(group=" + groupStale.id + ")@" + hashCode.toHexString
 
       def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
          group.intersect( time ).flatMap( flatSpans )
@@ -276,7 +301,7 @@ object TransportImpl {
       def isPlaying( implicit tx: S#Tx ) : Boolean = infoVar.get( tx.inMemory ).isRunning // playingVar.value
 
       def seek( time: Long )( implicit tx: S#Tx ) {
-         advance( isSeek = true, startPlay = false, newFrame = time )
+         advance( isSeek = true, newFrame = time )
       }
 
       private def fire( update: Update[ S ])( implicit tx: S#Tx ) {
@@ -338,6 +363,58 @@ object TransportImpl {
       //   will go into the advancement message
       // - retrieve the new nextGraphemeTime by looking at the head element in (2).
 
+      private def removeProc( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
+         implicit val itx = tx.inMemory
+         val id = timed.id
+         timedMap.remove( id )                              // in (3)
+         val entries = gMap.get( id )
+         gMap.remove( id )                                  // in (1)
+         entries.foreach {
+            case (staleID, scanMap) =>
+               scanMap.valuesIterator.foreach {
+                  case (time, _) =>
+                     gPrio.get( time ).foreach { staleMap =>
+                        val newStaleMap = staleMap - staleID
+                        gPrio.add( time -> newStaleMap )    // in (2)
+                     }
+               }
+         }
+      }
+
+      private def addProc( newFrame: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
+         val newFrameP = newFrame + 1
+         implicit val itx = tx.inMemory
+         val id   = timed.id
+         val p    = timed.value
+//                  var procVals = Map.empty[ String, Scan.Link ]
+         var scanMap    = Map.empty[ String, (Long, Grapheme.Value) ]
+         var skipMap    = Map.empty[ Long, Map[ String, Grapheme.Value ]]
+         p.scans.iterator.foreach {
+            case (key, scan) =>
+               scan.source match {
+                  case Some( link @ Scan.Link.Grapheme( peer )) =>
+//                              procVals += ...
+                     peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
+                        peer.valueAt( ceilTime ).foreach { ceilValue =>
+                           scanMap   += key -> (ceilTime, ceilValue)
+                           val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilValue)
+                           skipMap   += ceilTime -> newMap
+                        }
+                     }
+//                           case Some( link @ Scan.Link.Scan( peer )) =>
+//                              procVals += ...
+                  case _ => None
+               }
+         }
+         gMap.put( id, id -> scanMap )       // in (1)
+         skipMap.foreach {
+            case (time, keyMap) =>
+               val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
+               gPrio.add( time -> newMap )   // in (2)
+         }
+         timedMap.put( id, timed )           // in (3)
+      }
+
       /**
        * The core method: based on the previous info and the reached target frame, update the structures
        * accordingly (invalidate obsolete information, gather new information regarding the next
@@ -348,12 +425,13 @@ object TransportImpl {
        *                   the information is carried in the fired event.
        * @param newFrame   the frame which has been reached
        */
-      private def advance( isSeek: Boolean, startPlay: Boolean, newFrame: Long )( implicit tx: S#Tx ) {
+      private def advance( newFrame: Long, isSeek: Boolean = false, startPlay: Boolean = false )( implicit tx: S#Tx ) {
          implicit val itx     = tx.inMemory
          val oldInfo          = infoVar.get
          val oldFrame         = oldInfo.frame
 if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newFrame + "); oldInfo = " + oldInfo )
-         if( newFrame == oldFrame ) return
+         // do not short cut and return; because we may want to enforce play and call `scheduleNext`
+//         if( newFrame == oldFrame ) return
 
          val g                = group
          val needsNewProcTime = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
@@ -398,22 +476,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
 
             // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
             procRemoved = itRemoved.flatMap( _._2 ).toIndexedSeq
-            procRemoved.foreach { timed =>
-               val id = timed.id
-               timedMap.remove( id )                              // in (3)
-               val entries = gMap.get( id )
-               gMap.remove( id )                                  // in (1)
-               entries.foreach {
-                  case (staleID, scanMap) =>
-                     scanMap.valuesIterator.foreach {
-                        case (time, _) =>
-                           gPrio.get( time ).foreach { staleMap =>
-                              val newStaleMap = staleMap - staleID
-                              gPrio.add( time -> newStaleMap )    // in (2)
-                           }
-                     }
-               }
-            }
+            procRemoved.foreach( removeProc )
 
             // - for the added procs, find all sinks whose source connects to a grapheme. calculate the values
             //   of those graphemes at the current transport time. (NOT YET: this goes with the Transport.Update so that
@@ -422,37 +485,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
             //   explicitly; for ct, evaluate the grapheme value and store it in (1) and (2) accordingly.
             //   store procs in (3)
             procAdded = itAdded.flatMap( _._2 ).toIndexedSeq
-            procAdded.foreach { timed =>
-               val id   = timed.id
-               val p    = timed.value
-//                  var procVals = Map.empty[ String, Scan.Link ]
-               var scanMap    = Map.empty[ String, (Long, Grapheme.Value) ]
-               var skipMap    = Map.empty[ Long, Map[ String, Grapheme.Value ]]
-               p.scans.iterator.foreach {
-                  case (key, scan) =>
-                     scan.source match {
-                        case Some( link @ Scan.Link.Grapheme( peer )) =>
-//                              procVals += ...
-                           peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
-                              peer.valueAt( ceilTime ).foreach { ceilValue =>
-                                 scanMap   += key -> (ceilTime, ceilValue)
-                                 val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilValue)
-                                 skipMap   += ceilTime -> newMap
-                              }
-                           }
-//                           case Some( link @ Scan.Link.Scan( peer )) =>
-//                              procVals += ...
-                        case _ => None
-                     }
-               }
-               gMap.put( id, id -> scanMap )       // in (1)
-               skipMap.foreach {
-                  case (time, keyMap) =>
-                     val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
-                     gPrio.add( time -> newMap )   // in (2)
-               }
-               timedMap.put( id, timed )           // in (3)
-            }
+            procAdded.foreach( timed => addProc( newFrame, timed ))
          }
 
          val needsNewGraphemeTime = newFrame < oldFrame || newFrame >= oldInfo.nextGraphemeTime
@@ -712,7 +745,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          // time we targetted at; then in the next scheduleNext call, the jitter is properly
          // calculated.
          cpuTime.set( newLogical )( tx.peer )
-         advance( isSeek = false, startPlay = false, newFrame = info.nextTime )
+         advance( newFrame = info.nextTime )
       }
 
 //      def add( span: Span.HasStart, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
