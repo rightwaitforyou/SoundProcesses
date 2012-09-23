@@ -7,7 +7,7 @@ import bitemp.{BiType, BiGroup, BiPin, Chronos, Span, SpanLike}
 import expr.Expr
 import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
-import de.sciss.nuages.VisualInstantPresentation
+//import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
 import de.sciss.confluent.Confluent
 import java.io.File
@@ -66,7 +66,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
       implicit val procVarSer: Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = Transport.serializer[ S ]( cursor )
+      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
    }
 
    import Implicits._
@@ -167,30 +167,30 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       def run() { thunk }
    })}
 
-   private var frameVar: JFrame = null
-   def frame = frameVar
-
-   private val visVar = STMRef( Option.empty[ VisualInstantPresentation[ S ]])
-
-   def gui() { t { implicit tx =>
-      implicit val itx = tx.peer
-      if( visVar().isEmpty ) {
-         val vis = VisualInstantPresentation( trans )
-         visVar.set( Some( vis ))
-         STMTxn.afterCommit( _ => defer {
-            val f    = new JFrame( "Vis" )
-            frameVar = f
-            val cp   = f.getContentPane
-            cp.add( vis.view, BorderLayout.CENTER )
-            f.pack()
-            f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
-            f.setLocationRelativeTo( null )
-            f.setLocation( f.getX, 0 )
-            f.setAlwaysOnTop( true )
-            f.setVisible( true )
-         })
-      }
-   }}
+//   private var frameVar: JFrame = null
+//   def frame = frameVar
+//
+//   private val visVar = STMRef( Option.empty[ VisualInstantPresentation[ S ]])
+//
+//   def gui() { t { implicit tx =>
+//      implicit val itx = tx.peer
+//      if( visVar().isEmpty ) {
+//         val vis = VisualInstantPresentation( trans )
+//         visVar.set( Some( vis ))
+//         STMTxn.afterCommit( _ => defer {
+//            val f    = new JFrame( "Vis" )
+//            frameVar = f
+//            val cp   = f.getContentPane
+//            cp.add( vis.view, BorderLayout.CENTER )
+//            f.pack()
+//            f.setDefaultCloseOperation( WindowConstants.EXIT_ON_CLOSE )
+//            f.setLocationRelativeTo( null )
+//            f.setLocation( f.getX, 0 )
+//            f.setAlwaysOnTop( true )
+//            f.setVisible( true )
+//         })
+//      }
+//   }}
 
    private val auralVar = STMRef( Option.empty[ AuralPresentation[ S ]])
 
