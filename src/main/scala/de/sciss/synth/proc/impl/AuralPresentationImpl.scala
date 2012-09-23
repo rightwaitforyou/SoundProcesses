@@ -86,7 +86,7 @@ object AuralPresentationImpl {
 //               }
             }
             transport.changed.reactTx[ Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]]] { implicit tx => {
-               case Transport.Advance( tr, true, time, added, removed, params ) =>
+               case Transport.Advance( tr, isSeek, true, time, added, removed, params ) =>
                   implicit val chr: Chronos[ S ] = tr
 //println( "AQUI: added = " + added + "; removed = " + removed )
                   removed.foreach { case (_, p)    => booted.procRemoved( p )}

@@ -192,7 +192,7 @@ object TransportImpl {
          val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
                                      state   = Playing )
          infoVar.set( newInfo )
-         ??? // fire( newState )
+         ChangeEvent( Transport.Play( impl, newInfo.frame ))
          scheduleNext( newInfo )
       }
 
@@ -205,7 +205,7 @@ object TransportImpl {
                                      frame   = calcCurrentTime( oldInfo ),
                                      state   = Stopped )
          infoVar.set( newInfo )
-         ??? // fire( newState )
+         ChangeEvent( Transport.Stop( impl, newInfo.frame ))
       }
 
       def group( implicit tx: S#Tx ) : ProcGroup[ S ] =  tx.refresh( csrPos, groupStale )
@@ -308,6 +308,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
 
          var procAdded        = emptySeq[ (SpanLike, TimedProc[ S ])]
          var procRemoved      = emptySeq[ (SpanLike, TimedProc[ S ])]
+         var procUpdated      = emptySeq[ (SpanLike, TimedProc[ S ], Transport.Proc.Update[ S ])]
 
          // algorithm [A] or [B]
          if( needsNewProcTime ) {
@@ -544,7 +545,8 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
          }
 
          val nextGraphemeTime = if( needsNewGraphemeTime ) {
-            ??? // gPrio.headOption.map( _._1 ).getOrElse( Long.MaxValue )
+            val headOption = gPrio.ceil( Long.MinValue ) // headOption method missing
+            headOption.map( _._1 ).getOrElse( Long.MaxValue )
          } else {
             oldInfo.nextGraphemeTime
          }
@@ -557,11 +559,11 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                                      nextGraphemeTime = nextGraphemeTime )
          infoVar.set( newInfo )
 
-//         if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated ) {
-//            val upd = Transport.Advanced( this, playing?, newFrame, procAdded, procRemoved, procUpdated )
-//            Changed( upd )
-            ???   // fire
-//         }
+         if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty ) {
+            val upd = Transport.Advance( impl, newFrame, isSeek = isSeek, isPlaying = newInfo.isRunning,
+                                         added = procAdded, removed = procRemoved, changes = procUpdated )
+            ChangeEvent( upd )
+         }
 
          if( newState == Playing ) scheduleNext( newInfo )
       }

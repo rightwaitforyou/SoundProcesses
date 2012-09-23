@@ -18,23 +18,26 @@ object Transport {
 //   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
 //      Impl.serializer( cursor )
 
-   sealed trait Update[ S <: Sys[ S ], Elem, U ] { def transport: Transport[ S, Elem, U ]}
+   sealed trait Update[ S <: Sys[ S ], Elem, U ] {
+      def transport: Transport[ S, Elem, U ]
+      def time: Long
+   }
 
-   final case class Advance[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], playing: Boolean,
-                                                       time: Long,
+   final case class Advance[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], time: Long,
+                                                       isSeek: Boolean, isPlaying: Boolean,
                                                        added:   IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
                                                        removed: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ])],
                                                        changes: IIdxSeq[ (SpanLike, BiGroup.TimedElem[ S, Elem ], U) ])
    extends Update[ S, Elem, U ] {
       override def toString =
-         (if( playing ) "Advance" else "Seek") + "(" + transport + ", " + time +
+         (if( isSeek ) "Seek" else "Advance") + "(" + transport + ", " + time +
             (if( added.nonEmpty )   added.mkString(   ", added = ",   ",", "" ) else "") +
             (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", "" ) else "") +
-            (if( changes.nonEmpty )  changes.mkString(  ", changes = ",  ",", "" ) else "") + ")"
+            (if( changes.nonEmpty ) changes.mkString( ", changes = ", ",", "" ) else "") + ")"
    }
 
-   final case class Play[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
-   final case class Stop[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ]) extends Update[ S, Elem, U ]
+   final case class Play[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], time: Long ) extends Update[ S, Elem, U ]
+   final case class Stop[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], time: Long ) extends Update[ S, Elem, U ]
 
    // particular update for ProcTransport
    object Proc {
@@ -49,6 +52,8 @@ trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S 
    def seek( time: Long )( implicit tx: S#Tx ) : Unit
    def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
    def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
+
+   def isPlaying( implicit tx: S#Tx ) : Boolean
 
    def sampleRate: Double
 
