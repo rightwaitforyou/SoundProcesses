@@ -8,6 +8,8 @@ import de.sciss.lucre.stm.impl.BerkeleyDB
 import java.io.File
 
 object ScansTest extends App {
+   val AURAL = false
+
    type S = Durable
    val imp  = new ExprImplicits[ S ]
    import imp._
@@ -56,18 +58,28 @@ object ScansTest extends App {
 
    def run() {
       implicit val sys = makeSys()
-      lazy val server: AuralSystem = AuralSystem().start().whenStarted { _ =>
-//         Thread.sleep( 1000 )
+
+      def body( auralSystem: Option[ AuralSystem ]) {
          sys.step { implicit tx =>
             val group   = ProcGroup_.Modifiable[ S ]
             test( group )
 //            transp.playing_=( true )
 val transp  = Transport( group )
-/* val view = */ AuralPresentation.run( transp, server )
+            auralSystem.foreach { as => AuralPresentation.run( transp, as )}
             transp.play()
          }
       }
-      server
+
+      if( AURAL ) {
+         lazy val as: AuralSystem = AuralSystem().start().whenStarted { _ =>
+         //         Thread.sleep( 1000 )
+            body( Some( as ))
+         }
+         as
+      } else {
+         body( None )
+      }
+
 //      Thread.sleep( 1000 )
    }
 

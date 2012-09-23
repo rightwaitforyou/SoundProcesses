@@ -63,14 +63,14 @@ object BiGroup {
          Wrapper( id, span, value )
 
       private final case class Wrapper[ S <: Sys[ S ], Elem ]( id: S#ID, span: Expr[ S, SpanLike ], value: Elem )
-      extends TimedElem[ S, Elem ] {
-         override def toString = "TimedElem(" + id + ", " + span + ", " + value + ")"
-      }
+      extends TimedElem[ S, Elem ]
    }
    trait TimedElem[ S <: Sys[ S ], Elem ] /* extends evt.Node[ S ] */ {
       def id: S#ID
       def span: Expr[ S, SpanLike ]
       def value: Elem
+
+      override def toString = "TimedElem(" + id + ", " + span + ", " + value + ")"
 
 //      def changed: Event[ S, IIdxSeq[ ElementUpdate[ U ]], TimedElem[ S, Elem, U ]]
    }

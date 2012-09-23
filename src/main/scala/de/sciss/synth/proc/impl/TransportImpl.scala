@@ -35,6 +35,7 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn, TxnLocal}
 import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
+import java.text.SimpleDateFormat
 
 object TransportImpl {
    var VERBOSE = true
@@ -66,11 +67,13 @@ object TransportImpl {
 
    private def sysMicros() = System.nanoTime()/1000
 
+   private lazy val df = new SimpleDateFormat( "HH:mm:ss.SSS" )
+
    private object Info {
       // the initial info is at minimum possible frame. that way, calling seek(0L) which initialise
       // the structures properly
-      val init: Info = apply( cpuTime = 0L, frame = Long.MinValue, state = Stopped, nextProcTime = Long.MaxValue,
-                              nextGraphemeTime = Long.MaxValue, valid = -1 )
+      val init: Info = apply( cpuTime = 0L, frame = Long.MinValue, state = Stopped, nextProcTime = Long.MinValue + 1,
+                              nextGraphemeTime = Long.MinValue + 1, valid = -1 )
    }
    /**
     * Information about the current situation of the transport.
@@ -108,7 +111,13 @@ object TransportImpl {
          case _ => n.toString
       }
 
-      override def toString = "Info(cpuTime = " + cpuTime + "; frame = " + smartLong( frame ) + ", state = " + state +
+      private def smartMicros( n: Long ) : String = {
+         val msDelta = (n - sysMicros()) / 1000
+         val d = new java.util.Date( System.currentTimeMillis() + msDelta )
+         df.format( d )
+      }
+
+      override def toString = "Info(cpuTime = " + smartMicros( cpuTime ) + "; frame = " + smartLong( frame ) + ", state = " + state +
          ", nextProcTime = " + smartLong( nextProcTime ) + ", nextGraphemeTime = " + smartLong( nextGraphemeTime ) +
          ", valid = " + valid + ")"
    }
@@ -195,6 +204,8 @@ object TransportImpl {
       def dispose()( implicit tx: S#Tx ) {
          disposeData()
       }
+
+      override def toString = "Transport(group=" + groupStale.id + ")@" + hashCode.toHexString
 
       // ---- evt.Node ----
 

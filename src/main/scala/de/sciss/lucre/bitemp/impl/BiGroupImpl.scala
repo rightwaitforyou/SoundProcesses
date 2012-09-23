@@ -114,7 +114,7 @@ object BiGroupImpl {
    private final class TimedElemImpl[ S <: Sys[ S ], Elem, U ]( group: Impl[ S, Elem, U ],
       protected val targets: evt.Targets[ S ], val span: Expr[ S, SpanLike ], val value: Elem )
 //   extends TimedElem[ S, Elem, U ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElemImpl[ S, Elem, U ]]
-   extends TimedElem[ S, Elem ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]]
+   extends evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]] with TimedElem[ S, Elem ]
    {
       import group.{eventView, elemSerializer, spanType}
 
