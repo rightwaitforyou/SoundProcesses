@@ -416,26 +416,56 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
                   val p    = timed.value
                   var (staleID, keyMap) = gMap.get( id ).getOrElse( id -> Map.empty[ String, (Long, Grapheme.Value) ])
                   keyMap.foreach {
-                     case (key, (time, value)) =>
-                        val timeVerify = if( newFrame < oldFrame || newFrame >= time ) { // need to verify next time point
-                           p.scans.get( key ).flatMap( scan => {
-                              scan.source.map {
+                     case (key, tup @ (time, value)) =>
+                        val (timeVerify, newValue) = if( newFrame < oldFrame || newFrame >= time ) { // need to verify next time point
+                           val opt: Option[ (Long, Grapheme.Value) ] = p.scans.get( key ).flatMap( scan => {
+                              scan.source.flatMap {
                                  case Scan.Link.Grapheme( peer ) =>
-                                    peer.nearestEventAfter( newFrameP )
+                                    peer.nearestEventAfter( newFrameP ).flatMap { ceilTime =>
+                                       peer.valueAt( ceilTime ).map( ceilTime -> _ )
+                                    }
                                  case _ => None
                               }
-                           }).getOrElse( Long.MaxValue )
-                        } else time
+                           })
+                           opt.getOrElse( Long.MaxValue -> value )
+                        } else tup
 
                         if( timeVerify != time ) {
+                           // remove old entry from gPrio
+                           gPrio.get( time ).foreach { staleMap =>
+                              staleMap.get( staleID ).foreach { scanMap =>
+                                 val newScanMap = scanMap - key
+                                 val newStaleMap = if( newScanMap.isEmpty ) {
+                                    staleMap - staleID
+                                 } else {
+                                    staleMap + (staleID -> newScanMap)
+                                 }
+                                 if( newStaleMap.isEmpty ) {
+                                    gPrio.remove( time )
+                                 } else {
+                                    gPrio.add( time -> newStaleMap )
+                                 }
+                              }
+                           }
+                           // check if there is a new entry
                            if( timeVerify != Long.MaxValue ) {
-                              ???
-                           } else {
+                              // ...yes... store the new entry
+                              keyMap += key -> (timeVerify -> newValue)
+                              val staleMap   = gPrio.get( timeVerify ).getOrElse( Map.empty )
+                              val scanMap    = staleMap.getOrElse( staleID, Map.empty ) + (key -> newValue)
+                              val newStaleMap= staleMap + (staleID -> scanMap)
+                              gPrio.add( timeVerify, newStaleMap )
+
+                           } else { // no event after newFrame
                               keyMap -= key
-                              ??? // remove from gPrio
                            }
                         }
                   }
+
+                  // - for the changed entries, collect those which overlap the current transport time, so that they
+                  //   will go into the advancement message
+                  ???
+
                }
             }
 
