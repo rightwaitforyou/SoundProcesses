@@ -53,20 +53,24 @@ object TransportImpl {
       val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                     // (3)
       implicit val obsSer = dummySerializer[ IIdxSeq[ Observation[ S ]]]
       val obsVar     = itx.newVar( iid, IIdxSeq.empty[ Observation[ S ]])
-      val view       = new Impl[ S ]( /* targets, */ group, sampleRate, /* playingVar, */ infoVar,
+      val t          = new Impl[ S ]( /* targets, */ group, sampleRate, /* playingVar, */ infoVar,
                                       gMap, gPrio, timedMap, obsVar, cursor.position )
 //      group.intersect( time ).foreach {
 //         case (Span.HasStart( span ), seq) =>
 //            seq.foreach { timed => view.add( span, timed )}
 //         case _ =>
 //      }
-      view
+      t.seek( 0L )
+      t
    }
 
    private def sysMicros() = System.nanoTime()/1000
 
    private object Info {
-      val init: Info = apply( 0L, 0L, Stopped, Long.MaxValue, Long.MaxValue, 0 )
+      // the initial info is at minimum possible frame. that way, calling seek(0L) which initialise
+      // the structures properly
+      val init: Info = apply( cpuTime = 0L, frame = Long.MinValue, state = Stopped, nextProcTime = Long.MaxValue,
+                              nextGraphemeTime = Long.MaxValue, valid = -1 )
    }
    /**
     * Information about the current situation of the transport.
@@ -97,16 +101,21 @@ object TransportImpl {
 
       def isRunning  = state == Playing
       def nextTime   = math.min( nextProcTime, nextGraphemeTime )
+
+      private def smartLong( n: Long ) : String = n match {
+         case Long.MinValue => "-inf"
+         case Long.MaxValue => "inf"
+         case _ => n.toString
+      }
+
+      override def toString = "Info(cpuTime = " + cpuTime + "; frame = " + smartLong( frame ) + ", state = " + state +
+         ", nextProcTime = " + smartLong( nextProcTime ) + ", nextGraphemeTime = " + smartLong( nextGraphemeTime ) +
+         ", valid = " + valid + ")"
    }
 
    private sealed trait State
    private case object Stopped extends State
    private case object Playing extends State
-
-   private trait GraphemeInfo[ +ID ] {
-      def id: ID
-      def key: String
-   }
 
    private lazy val pool : ScheduledExecutorService = {        // system wide scheduler
       val res = Executors.newScheduledThreadPool( 1 )
@@ -645,11 +654,13 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                                      nextProcTime     = nextProcTime,
                                      nextGraphemeTime = nextGraphemeTime )
          infoVar.set( newInfo )
+if( VERBOSE ) println( "::: advance - newInfo = " + newInfo )
 
          if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty ) {
             val upd = Transport.Advance( transport = impl, time = newFrame,
                                          isSeek = isSeek, isPlaying = newInfo.isRunning,
                                          added = procAdded, removed = procRemoved, changes = procUpdated )
+if( VERBOSE ) println( "::: advance - fire " + upd )
             fire( upd )
          }
 

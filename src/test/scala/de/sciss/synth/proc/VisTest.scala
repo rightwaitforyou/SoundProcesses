@@ -59,14 +59,14 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
 //   private type PG = ProcGroup.Modifiable[ S ]
    private type PG = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
-   type Acc = (PG, ProcTransport[ S ])
+   type Acc = PG // (PG, ProcTransport[ S ])
 
    object Implicits {
 //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
       implicit val procVarSer: Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
+//      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
    }
 
    import Implicits._
@@ -77,21 +77,27 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
-      val tr = Transport( g )
-      tr.changed.react { upd =>
-         println( "Transport observed: " + upd )
-      }
-//      val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
-      (g, tr)
+      g // (g, tr)
    }
 
    access // initialize !
 
+   val trans = cursor.step { implicit tx =>
+      val g = access.get
+      val tr = Transport( g )
+      tr.react { upd =>
+         println( "Transport observed: " + upd )
+      }
+      tr
+   }
+//      val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
+
+
 //   val groupAccess:     Source[ S#Tx, ProcGroup.Modifiable[ S ]] = Source.map( access )( _._1 )
 //   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
 
-   def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ] = access.get._1
-   def trans( implicit tx: S#Tx ) : ProcTransport[ S ]         = access.get._2
+   def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ] = access.get // ._1
+//   def trans( implicit tx: S#Tx ) : ProcTransport[ S ]         = access.get._2
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)
@@ -141,17 +147,20 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
    }
 
    def play() {
-      t { implicit tx => trans.playing = true }
+//      t { implicit tx => trans.playing = true }
+      t { implicit tx => trans.play() }
    }
 
    def stop() {
-      t { implicit tx => trans.playing = false }
+//      t { implicit tx => trans.playing = false }
+      t { implicit tx => trans.stop() }
    }
 
    def rewind() { seek( 0L )}
 
    def seek( pos: Long ) { t { implicit tx =>
-      trans.playing = false
+//      trans.playing = false
+      trans.stop()
       trans.seek( pos )
    }}
 

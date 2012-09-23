@@ -60,10 +60,11 @@ object ScansTest extends App {
 //         Thread.sleep( 1000 )
          sys.step { implicit tx =>
             val group   = ProcGroup_.Modifiable[ S ]
-            val transp  = Transport( group )
-            /* val view = */ AuralPresentation.run( transp, server )
             test( group )
-            transp.playing_=( true )
+//            transp.playing_=( true )
+val transp  = Transport( group )
+/* val view = */ AuralPresentation.run( transp, server )
+            transp.play()
          }
       }
       server

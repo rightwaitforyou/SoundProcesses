@@ -41,12 +41,12 @@ object AuralPresentationImpl {
    def run[ S <: Sys[ S ]]( transport: ProcTransport[ S ], aural: AuralSystem )
                           ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
 
-      val c = new Client( cursor.position, transport, aural )
+      val c = new Client( /* cursor.position, */ transport, aural )
       Txn.afterCommit( _ => aural.addClient( c ))( tx.peer )
       c
    }
 
-   private final class Client[ S <: Sys[ S ]]( csrPos: S#Acc, transportStale: ProcTransport[ S ],
+   private final class Client[ S <: Sys[ S ]]( /* csrPos: S#Acc, */ transport: ProcTransport[ S ],
                                                aural: AuralSystem )( implicit cursor: Cursor[ S ])
    extends AuralPresentation[ S ] with AuralSystem.Client {
 
@@ -74,7 +74,7 @@ object AuralPresentationImpl {
             val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new RunningImpl( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-            val transport: ProcTransport[ S ] = ??? // = tx.refresh( csrPos, transportStale )
+//            val transport: ProcTransport[ S ] = ??? // = tx.refresh( csrPos, transportStale )
             transport.react { x => println( "Aural observation: " + x )}
             if( transport.isPlaying ) {
                implicit val chr: Chronos[ S ] = transport
