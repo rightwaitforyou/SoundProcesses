@@ -13,9 +13,11 @@ import concurrent.stm.{Txn, TxnLocal}
 import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
 
 object TransportViewImpl {
+   var VERBOSE = true
+
    def apply[ S <: Sys[ S ]]( transport: ProcTransport[ S ])( implicit tx: S#Tx, cursor: Cursor[ S ]) /* : TransportView[ S ] */ = {
       val time    = transport.time
-      val flags   = tx.newInMemoryIDMap[ Flag[ S ]]
+//      val flags   = tx.newInMemoryIDMap[ Flag[ S ]]
       val view: Impl[ S ] = ??? //    = new Impl( transport, ???, flags )
       transport.group.intersect( time ).foreach {
          case (Span.HasStart( span ), seq) =>
@@ -25,17 +27,35 @@ object TransportViewImpl {
       view
    }
 
-   private sealed trait Flag[ +S ] {
-      def time: Long
-   }
-   private final case class GroupFlag( time: Long ) extends Flag[ Nothing ]
-   private final case class ProcFlag[ S <: Sys[ S ]]( id: S#ID, time: Long ) extends Flag[ S ]
+   /**
+    * Information about the current situation of the transport.
+    *
+    * @param cpuTime             the CPU time in microseconds at which the info was last updated
+    * @param frame               the frame corresponding to the transport position at the time the info was updated
+    * @param state               the current state of the transport scheduling (stopped, scheduled, free-wheeling).
+    *                            when scheduled, the state contains the target frame aimed at in the subsequent
+    *                            scheduler invocation.
+    * @param nextProcTime        the next frame greater than `frame` at which a significant event happens in terms
+    *                            of processes starting or stopping in the transport's group
+    * @param nextGraphemeTime    the next frame greater than `frame` at which
+    * @param valid               a counter which is automatically incremented by the `copy` method, used to determine
+    *                            whether a scheduled runnable is still valid. the scheduler needs to read this value
+    *                            before scheduling the runnable, then after the runnable is invoked, the current
+    *                            info must be retrieved and its valid counter compared to the previously extracted
+    *                            valid value. if both are equal, the runnable should go on executing, otherwise it
+    *                            is meant to silently abort.
+    */
+   private final case class Info private( cpuTime: Long, frame: Long, state: State, nextProcTime: Long,
+                                          nextGraphemeTime: Long, valid: Int ) {
+      require( nextProcTime > frame && nextGraphemeTime > frame )
 
-   private final case class Info[ S <: Sys[ S ]]( cpuTime: Long, frame: Long, state: State,
-                                                  nextProcTime: Long, nextGraphemeTime: Long,
-                                                  graphemes: IIdxSeq[ GraphemeInfo[ S#ID ]]) {
-      def isRunning = state.isRunning
-//      def touches( time: Long ) = frame <= time && state.targetFrame >= time
+      def copy( cpuTime: Long = cpuTime, frame: Long = frame, state: State = state,
+                nextProcTime: Long = nextProcTime, nextGraphemeTime: Long = nextGraphemeTime ) : Info =
+         Info( cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
+               nextGraphemeTime = nextGraphemeTime, valid = valid + 1 )
+
+      def isRunning  = state.isRunning
+      def nextTime   = math.min( nextProcTime, nextGraphemeTime )
    }
 
    private sealed trait State {
@@ -52,17 +72,6 @@ object TransportViewImpl {
    private case object FreeWheel extends NonScheduled { def isRunning = true  }
    private case class Scheduled( targetFrame: Long ) extends State { def isRunning = true }
 
-//   private sealed trait Running[ +S ] extends State[ S ] { final def isRunning = true }
-//   private final case class Stopped( cpuTime: Long, frame: Long ) extends NonScheduled { def isRunning = false }
-//   private final case class FreeWheel( cpuTime: Long, frame: Long ) extends NonScheduled with Running[ Nothing ]
-//   private final case class Scheduled[ S <: Sys[ S ]]( cpuTime: Long, frame: Long, targetFrame: Long,
-//                                                       nextProcTime: Long, nextGraphemeTime: Long,
-//                                                       graphemes: IIdxSeq[ GraphemeInfo[ S#ID ]])
-//   extends Running[ S ] {
-//      def nextTime   = math.min( nextProcTime, nextGraphemeTime )
-////      def isValid    = nextTime != Long.MaxValue
-//   }
-
    private trait GraphemeInfo[ +ID ] {
       def id: ID
       def key: String
@@ -75,8 +84,6 @@ object TransportViewImpl {
    }
 
    private val cpuTime = TxnLocal( System.nanoTime()/1000 )    // system wide wall clock in microseconds
-
-   var VERBOSE = true
 
    private def shutdownScheduler() {
      if( VERBOSE )println( "Shutting down scheduler thread pool" )
@@ -91,23 +98,14 @@ object TransportViewImpl {
    private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
    @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
 
-//   private val emptySeq = IIdxSeq.empty
-
-//   private val itNoProcs = (data.Iterator.empty, data.Iterator.empty)
-
    final class Impl[ S <: Sys[ S ]]( groupStale: ProcGroup[ S ],val sampleRate: Double,
-                                     playingVar: Expr.Var[ S, Boolean ], validVar: I#Var[ Int ],
-                                     infoVar: I#Var[ Info[ S ]],
-                                     csrPos: S#Acc,
-                                     flags: IdentifierMap[ S#ID, S#Tx, Flag[ S ]])
+                                     playingVar: Expr.Var[ S, Boolean ], /* validVar: I#Var[ Int ], */
+                                     infoVar: I#Var[ Info ],
+                                     csrPos: S#Acc )
                                    ( implicit cursor: Cursor[ S ]) {
 
-//      private val prevTime: I#Var[ Long ] = ???
-//      private val nextTime: I#Var[ Long ] = ???
-
-      private implicit val procGroupSer = ProcGroup_.serializer[ S ]
-
-      private val microsPerSample = 1000000 / sampleRate
+      private implicit val procGroupSer      = ProcGroup_.serializer[ S ]
+      private val          microsPerSample   = 1000000 / sampleRate
 
       // the three structures maintained for the update algorithm
       // (1) for each observed timed proc, store information about all scans whose source is a grapheme.
@@ -125,16 +123,7 @@ object TransportViewImpl {
       private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]         = ??? // (2)
       private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                             = ??? // (3)
 
-//      private def play()( implicit tx: S#Tx ) {
-//         if( isPlaying ) return
-////         scheduleNext( ??? )
-//      }
-
-//      private def setCurrentFrame( time: Long )( implicit tx: S#Tx ) {
-//
-//      }
-
-      private def calcCurrentTime( info: Info[ S ])( implicit tx: S#Tx ) : Long = {
+      private def calcCurrentTime( info: Info )( implicit tx: S#Tx ) : Long = {
          val startFrame = info.frame
          val state      = info.state
          if( state.isRunning ) {
@@ -151,42 +140,35 @@ object TransportViewImpl {
 //         ???
 //      }
 
-      private def invalidateScheduled()( implicit tx: S#Tx ) {
-         validVar.transform( _ + 1 )( tx.inMemory )   // invalidate scheduled tasks
+//      private def invalidateScheduled()( implicit tx: S#Tx ) {
+//         validVar.transform( _ + 1 )( tx.inMemory )   // invalidate scheduled tasks
+//      }
+
+      private def play()( implicit tx: S#Tx ) {
+         if( isPlaying ) return
+         ??? // fire( newState )
+         scheduleNext()
       }
 
-      def stop()( implicit tx: S#Tx ) {
+      private def stop()( implicit tx: S#Tx ) {
          implicit val itx = tx.inMemory
          val oldInfo = infoVar.get
          if( !oldInfo.isRunning ) return
 
-         invalidateScheduled()
-         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ), frame = calcCurrentTime( oldInfo ), state = Stopped )
+         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
+                                     frame   = calcCurrentTime( oldInfo ),
+                                     state   = Stopped )
          infoVar.set( newInfo )
          ??? // fire( newState )
       }
-
-//      private def processScheduled( evt: Scheduled[ S ])( implicit tx: S#Tx ) {
-//         ???
-//      }
 
       def group( implicit tx: S#Tx ) : ProcGroup[ S ] =  tx.refresh( csrPos, groupStale )
 
       def isPlaying( implicit tx: S#Tx ) : Boolean = infoVar.get( tx.inMemory ).state.isRunning // playingVar.value
 
       def seek( time: Long )( implicit tx: S#Tx ) {
-         implicit val itx = tx.inMemory
-         val oldInfo = infoVar.get
-         if( oldInfo.isRunning ) {
-//            val t = calcCurrentTime( oldState )
-            invalidateScheduled()
-            performSeek(  oldInfo = oldInfo, newFrame = time )
-            scheduleNext( oldInfo = oldInfo, newFrame = time )
-         } else {
-            val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ), frame = time )
-            infoVar.set( newInfo )
-         }
-         ??? // fire
+         advance( isSeek = true, newFrame = time )
+         scheduleNext()
       }
 
       // [A]
@@ -230,12 +212,22 @@ object TransportViewImpl {
       //   will go into the advancement message
       // - retrieve the new nextGraphemeTime by looking at the head element in (2).
 
-      private def performSeek( oldInfo: Info[ S ], newFrame: Long )( implicit tx: S#Tx ) {
-if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " + newFrame + ")" )
-         if( newFrame == oldInfo.frame ) return
-//         lastTime.set( newFrame )
-
+      /**
+       * The core method: based on the previous info and the reached target frame, update the structures
+       * accordingly (invalidate obsolete information, gather new information regarding the next
+       * advancement), assemble and fire the corresponding events, and update the info to be ready for
+       * a subsequent call to `scheduleNext`.
+       *
+       * @param isSeek     whether the advancement is due to a hard seek (`true`) or a regular passing of time (`false`).
+       *                   the information is carried in the fired event.
+       * @param newFrame   the frame which has been reached
+       */
+      private def advance( isSeek: Boolean, newFrame: Long )( implicit tx: S#Tx ) {
          implicit val itx     = tx.inMemory
+         val oldInfo          = infoVar.get
+if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newFrame + "); oldInfo = " + oldInfo )
+         if( newFrame == oldInfo.frame ) return
+
          val g                = group
          val oldFrame         = oldInfo.frame
          val needsNewProcTime = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
@@ -484,9 +476,13 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
             oldInfo.nextGraphemeTime
          }
 
-//         val newState =
-         val newInfo = Info( cpuTime = ???, frame = newFrame, state = ???,
-                             nextProcTime = nextProcTime, nextGraphemeTime = ???, graphemes = ??? )
+         val newState: State = ???
+         val newInfo = oldInfo.copy( cpuTime          = cpuTime.get( tx.peer ),
+                                     frame            = newFrame,
+                                     state            = newState,
+                                     nextProcTime     = nextProcTime,
+                                     nextGraphemeTime = nextGraphemeTime )
+         infoVar.set( newInfo )
 
 //         if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated ) {
 //            val upd = Transport.Advanced( this, playing?, newFrame, procAdded, procRemoved, procUpdated )
@@ -495,53 +491,42 @@ if( VERBOSE ) println( "::: performSeek(oldInfo = " + oldInfo + ", newFrame = " 
 //         }
       }
 
-      private def scheduleNext( oldInfo: Info[ S ], newFrame: Long )( implicit tx: S#Tx ) {
+      private def scheduleNext()( implicit tx: S#Tx ) {
          implicit val itx  = tx.inMemory
-         val searchStart   = newFrame + 1
+         val info          = infoVar.get
+         val targetFrame   = info.nextTime
 
-         ???
-//         val newEvt0       = if( oldEvt.nextProcTime <= oldFrame ) {       // have to search for the next group event
-//            oldEvt.copy( nextProcTime = group.nearestEventAfter( searchStart ).getOrElse( Long.MaxValue ))
-//         } else oldEvt
-//
-//         val newEvt1       = if( oldEvt.nextGraphemeTime <= oldFrame ) {   // have to search for the next grapheme event
-//            val (gTime, gInfos) = graphemePrio.ceil( searchStart ).getOrElse( Long.MaxValue -> IIdxSeq.empty )
-//            newEvt0.copy( nextGraphemeTime = gTime, graphemes = gInfos )
-//         } else newEvt0
-//
-//         val newFrame   = newEvt1.nextTime
-//         if( newFrame == Long.MaxValue ) return
-//
-//         val logicalDelay = ((newFrame - oldFrame) * microsPerSample).toLong
-//         val v          = validVar.get
-//         val logicalNow = cpuTime.get( tx.peer )
-//         val newEvt     = newEvt1.copy( cpuTime = logicalNow )
-//         state.set( newEvt )
-//         val jitter     = System.nanoTime()/1000 - logicalNow
-//         val actualDelay = math.max( 0L, logicalDelay - jitter )
-//if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay + ", new frame = " + newFrame )
-//         Txn.afterCommit( _ => {
-//            pool.schedule( new Runnable {
-//               def run() { cursor.step { implicit tx =>
-//                  // if the transport had been stopped between scheduling and actual
-//                  // execution of the scheduled Runnable, then we will find a
-//                  // discrepancy in validVar. In that case, just don't do anything.
-//                  implicit val itx: I#Tx = tx.inMemory
-//                  if( v == validVar.get ) {
-//                     eventReached( logicalNow + logicalDelay, oldFrame, newFrame, newEvt )
-//                  }
-//               }}
-//            }, actualDelay, TimeUnit.MICROSECONDS )
-//         })( tx.peer )
+         if( !info.isRunning || targetFrame == Long.MaxValue ) return
+
+         val logicalDelay  = ((targetFrame - info.frame) * microsPerSample).toLong
+         val logicalNow    = info.cpuTime
+         val schedValid    = info.valid
+         val jitter        = System.nanoTime()/1000 - logicalNow
+         val actualDelay   = math.max( 0L, logicalDelay - jitter )
+if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay + ", targetFrame = " + targetFrame )
+         Txn.afterCommit( _ => {
+            pool.schedule( new Runnable {
+               def run() {
+                  cursor.step { implicit tx =>
+                     eventReached( schedValid, logicalNow + logicalDelay )
+                  }
+               }
+            }, actualDelay, TimeUnit.MICROSECONDS )
+         })( tx.peer )
       }
 
-      private def eventReached( newLogical: Long, oldFrame: Long, newFrame: Long,
-                                info: Info[ S ])( implicit tx: S#Tx ) {
-//         cpuTime.set( newLogical )( tx.peer )
-//         processScheduled( evt )
-////         advance( playing = true, oldFrame = oldFrame, newFrame = newFrame, hasProcEvent, hasParEvent )
-////         scheduleNext()
-         ???
+      private def eventReached( expectedValid: Int, newLogical: Long )( implicit tx: S#Tx ) {
+         implicit val itx = tx.inMemory
+         val info = infoVar.get
+         if( info.valid != expectedValid ) return  // the scheduled task was invalidated by an intermediate stop or seek command
+
+         // this is crucial to eliminate drift: since we reached the scheduled event, do not
+         // let the cpuTime txn-local determine a new free wheeling time, but set it to the
+         // time we targetted at; then in the next scheduleNext call, the jitter is properly
+         // calculated.
+         cpuTime.set( newLogical )( tx.peer )
+         advance( isSeek = false, newFrame = info.nextTime )
+         scheduleNext()
       }
 
       def add( span: Span.HasStart, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
