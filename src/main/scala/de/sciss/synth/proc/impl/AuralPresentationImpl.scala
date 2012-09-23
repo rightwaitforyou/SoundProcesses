@@ -74,7 +74,7 @@ object AuralPresentationImpl {
             val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new RunningImpl( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-            val transport = tx.refresh( csrPos, transportStale )
+            val transport: ProcTransport[ S ] = ??? // = tx.refresh( csrPos, transportStale )
             transport.changed.react { x => println( "Aural observation: " + x )}
             if( transport.playing.value ) {
                implicit val chr: Chronos[ S ] = transport

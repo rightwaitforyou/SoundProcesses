@@ -8,15 +8,15 @@ import stm.{Cursor, Serializer, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.Event
 import data.Iterator
-//import imp.{TransportImpl => Impl}
+import impl.{TransportImpl => Impl}
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
                             ( implicit tx: S#Tx, cursor: Cursor[ S ]) : ProcTransport[ S ] =
-      ??? // impl.TransportImpl( group, sampleRate )
+      Impl( group, sampleRate )
 
-   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
-      ??? // impl.TransportImpl.serializer( cursor )
+//   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
+//      Impl.serializer( cursor )
 
    sealed trait Update[ S <: Sys[ S ], Elem, U ] { def transport: Transport[ S, Elem, U ]}
 

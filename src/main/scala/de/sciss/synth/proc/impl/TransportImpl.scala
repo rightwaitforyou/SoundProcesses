@@ -1,72 +1,87 @@
-/*
- *  TransportImpl.scala
- *  (SoundProcesses)
- *
- *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
- *
- *  This software is free software; you can redistribute it and/or
- *  modify it under the terms of the GNU General Public License
- *  as published by the Free Software Foundation; either
- *  version 2, june 1991 of the License, or (at your option) any later version.
- *
- *  This software is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
- *  General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public
- *  License (gpl.txt) along with this software; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- *
- *  For further information, please contact Hanns Holger Rutz at
- *  contact@sciss.de
- */
-
-/*
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 package impl
 
-import de.sciss.lucre.{stm, expr, data, bitemp, event => evt, DataInput, DataOutput}
-import stm.{Cursor, Sys}
+import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm, bitemp, expr, data}
+import stm.{IdentifierMap, Sys, Cursor}
 import bitemp.{BiGroup, SpanLike, Span}
+import data.SkipList
 import expr.Expr
 import evt.Event
-import data.Iterator
-import de.sciss.synth.expr.Booleans
+import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import java.util.concurrent.{TimeUnit, ScheduledExecutorService, Executors}
-import concurrent.stm.{Txn => STMTxn, TxnLocal => STMTxnLocal}
+import concurrent.stm.{Txn, TxnLocal}
+import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
+import de.sciss.synth.expr.Booleans
 
 object TransportImpl {
-   private val VERBOSE = false
+   var VERBOSE = true
 
-   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )
-                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : ProcTransport[ S ] = {
-      val targets    = evt.Targets[ S ]
-      val id         = targets.id
+   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )( implicit tx: S#Tx, cursor: Cursor[ S ]) /* : TransportView[ S ] */ = {
+      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
+//      val id         = targets.id
       val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
-      val validVar   = tx.newIntVar( id, 0 )
-      val lastTime   = tx.newLongVar( id, 0L )
-      val csrPos     = cursor.position
-      new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, csrPos )
+      implicit val itx = tx.inMemory
+      val iid        = itx.newID()
+      implicit val infoSer = dummySerializer[ Info ]
+      val infoVar    = itx.newVar( iid, Info.init )
+      val gMap       = tx.newInMemoryIDMap[ (S#ID, Map[ String, (Long, Grapheme.Value) ])]      // (1)
+      implicit val skipSer = dummySerializer[ Map[ S#ID, Map[ String, Grapheme.Value ]]]
+      val gPrio      = SkipList.Map.empty[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]  // (2)
+      val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                     // (3)
+      val view       = new Impl[ S ]( targets, group, sampleRate, playingVar, infoVar,
+                                      gMap, gPrio, timedMap, cursor.position )
+//      group.intersect( time ).foreach {
+//         case (Span.HasStart( span ), seq) =>
+//            seq.foreach { timed => view.add( span, timed )}
+//         case _ =>
+//      }
+      view
    }
 
-   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]) : evt.NodeSerializer[ S, ProcTransport[ S ]] =
-      new Ser[ S ]
+   private def sysMicros() = System.nanoTime()/1000
 
-   private final class Ser[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ])
-   extends evt.NodeSerializer[ S, ProcTransport[ S ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ProcTransport[ S ] = {
-         val id         = targets.id
-         val group      = ProcGroup_.read( in, access )
-         val sampleRate = in.readDouble()
-         val playingVar = Booleans.readVar( in, access )
-         val validVar   = tx.readIntVar( id, in )
-         val lastTime   = tx.readLongVar( id, in )
-         val csrPos     = cursor.position
-         new Impl( targets, group, sampleRate, playingVar, validVar, lastTime, csrPos )
-      }
+   private object Info {
+      val init: Info = apply( 0L, 0L, Stopped, Long.MaxValue, Long.MaxValue, 0 )
+   }
+   /**
+    * Information about the current situation of the transport.
+    *
+    * @param cpuTime             the CPU time in microseconds at which the info was last updated
+    * @param frame               the frame corresponding to the transport position at the time the info was updated
+    * @param state               the current state of the transport scheduling (stopped, scheduled, free-wheeling).
+    *                            when scheduled, the state contains the target frame aimed at in the subsequent
+    *                            scheduler invocation.
+    * @param nextProcTime        the next frame greater than `frame` at which a significant event happens in terms
+    *                            of processes starting or stopping in the transport's group
+    * @param nextGraphemeTime    the next frame greater than `frame` at which
+    * @param valid               a counter which is automatically incremented by the `copy` method, used to determine
+    *                            whether a scheduled runnable is still valid. the scheduler needs to read this value
+    *                            before scheduling the runnable, then after the runnable is invoked, the current
+    *                            info must be retrieved and its valid counter compared to the previously extracted
+    *                            valid value. if both are equal, the runnable should go on executing, otherwise it
+    *                            is meant to silently abort.
+    */
+   private final case class Info private( cpuTime: Long, frame: Long, state: State, nextProcTime: Long,
+                                          nextGraphemeTime: Long, valid: Int ) {
+      require( nextProcTime > frame && nextGraphemeTime > frame )
+
+      def copy( cpuTime: Long = cpuTime, frame: Long = frame, state: State = state,
+                nextProcTime: Long = nextProcTime, nextGraphemeTime: Long = nextGraphemeTime ) : Info =
+         Info( cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
+               nextGraphemeTime = nextGraphemeTime, valid = valid + 1 )
+
+      def isRunning  = state == Playing
+      def nextTime   = math.min( nextProcTime, nextGraphemeTime )
+   }
+
+   private sealed trait State
+   private case object Stopped extends State
+   private case object Playing extends State
+
+   private trait GraphemeInfo[ +ID ] {
+      def id: ID
+      def key: String
    }
 
    private lazy val pool : ScheduledExecutorService = {        // system wide scheduler
@@ -74,259 +89,536 @@ object TransportImpl {
       sys.addShutdownHook( shutdownScheduler() )
       res
    }
-   private val cpuTime = STMTxnLocal( System.nanoTime()/1000 ) // system wide wall clock in microseconds
 
-   def shutdownScheduler() {
-     println( "Shutting down scheduler thread pool" )
+   private val cpuTime = TxnLocal( sysMicros() )    // system wide wall clock in microseconds
+
+   private def shutdownScheduler() {
+     if( VERBOSE )println( "Shutting down scheduler thread pool" )
      pool.shutdown()
    }
-
-//   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ (Expr[ S, SpanLike ], Proc[ S ])])) : IIdxSeq[ (SpanLike, Proc[ S ])] = {
-//      val span = in._1
-//      in._2.map { case (_, proc) => (span, proc) }
-//   }
 
    private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ TimedProc[ S ]])) : IIdxSeq[ (SpanLike, TimedProc[ S ])] = {
       val span = in._1
       in._2.map { span -> _ }
    }
 
-   private type ProcTransportUpd[ S <: Sys[ S ]] = Transport.Update[ S, Proc[ S ], Proc.Update[ S ]]
+   private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
+   @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
 
-   private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                             val group: ProcGroup[ S ],
-                                             val sampleRate: Double, playingVar: Expr.Var[ S, Boolean ],
-                                             validVar: S#Var[ Int ], lastTime: S#Var[ Long ],
-                                             csrPos: S#Acc )
-                                           ( implicit cursor: Cursor[ S ])
-   extends Transport[ S, Proc[ S ], Proc.Update[ S ]]
-   with evt.Trigger.Impl[ S, ProcTransportUpd[ S ], ProcTransport[ S ]]
-   with evt.StandaloneLike[ S, ProcTransportUpd[ S ], ProcTransport[ S ]]
-//   with evt.Root[ S, Transport.Update[ S, Proc[ S ]]]
-   {
-      me =>
+   private def dummySerializer[ A ] : stm.Serializer[ I#Tx, I#Acc, A ] =
+      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
 
-      private val microsPerSample = 1000000 / sampleRate
+   private object DummySerializer extends stm.Serializer[ I#Tx, I#Acc, Nothing ] {
+      def write( v: Nothing, out: DataOutput) {}
+      def read( in: DataInput, access: I#Acc )( implicit tx: I#Tx ) : Nothing = sys.error( "Operation not supported" )
+   }
 
-      private type Elem = Proc[ S ]
+   final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+                                     groupStale:            ProcGroup[ S ],
+                                     val sampleRate:        Double,
+                                     playingVar:            Expr.Var[ S, Boolean ],
+                                     infoVar:               I#Var[ Info ],
+                                     gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
+                                     gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
+                                     timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
+                                     csrPos:                S#Acc )
+                                   ( implicit cursor: Cursor[ S ])
+   extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] with evt.Node[ S ] {
+      impl =>
 
-      override def toString() = "Transport" + id
+      private implicit val procGroupSer      = ProcGroup_.serializer[ S ]
+      private val          microsPerSample   = 1000000 / sampleRate
 
-      protected def writeData( out: DataOutput ) {
-         group.write( out )
-         out.writeDouble( sampleRate )
-         playingVar.write( out )
-         validVar.write( out )
-         lastTime.write( out )
-      }
+      // the three structures maintained for the update algorithm
+      // (1) for each observed timed proc, store information about all scans whose source is a grapheme.
+      //     an observed proc is one whose time span overlaps the current span in the transport info.
+      //     the value found in the map is a tuple. the tuple's first element is the _stale_ ID which
+      //     corresponds to the ID when the underlying grapheme value was stored in structure (2), thereby
+      //     allowing to find that value in (2). the tuple's second element is a map from the scan keys
+      //     to a tuple consisting of a time value and the grapheme value. the time value is the value at
+      //     which the grapheme value was stored in (2)
+      // (2) a skiplist is used as priority queue for the next interesting point in time at which the
+      //     transport needs to emit an advancement message. the value is a map from stale timed-proc ID's
+      //     to a map from scan keys to grapheme values, i.e. for scans whose source is a grapheme.
+      // (3) a refreshment map for the timed procs
+//      private val gMap: IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])]   // (1)
+//      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]          // (2)
+//      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                              // (3)
+
+      // ---- evt.Node ----
 
       protected def disposeData()( implicit tx: S#Tx ) {
+         implicit val itx = tx.inMemory
          playingVar.dispose()
-         validVar.dispose()
-         lastTime.dispose()
+         infoVar.set( Info.init )   // if there is pending scheduled tasks, they should abort gracefully
+//         infoVar.dispose()
+         gMap.dispose()
+         gPrio.dispose()
+         timedMap.dispose()
       }
 
-      // ---- event ----
+      protected def writeData( out: DataOutput ) {}   // there is no serialization for this class
 
-//      private object TransportEvent
-//      extends evt.Trigger.Impl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-//      with evt.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-//      with evt.InvariantEvent[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-//      with evt.Root[ S, BiGroup.Collection[ S, Elem, U ]]
-//      {
-//         protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
-//         def slot: Int = 1
-//         def node: evt.Node[ S ] = group
-//      }
-
-      def connect()( implicit tx: S#Tx ) {
-         group.changed ---> this
+      def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = {
+         require( slot == 1 )
+         ChangeEvent
       }
 
-      def disconnect()( implicit tx: S#Tx ) {
-         group.changed -/-> this
-      }
+      def changed: Event[ S, Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]], ProcTransport[ S ]] =
+         ChangeEvent
 
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ProcTransportUpd[ S ]] = {
-         if( pull.parents( this ).isEmpty ) {
-            pull.resolve[ ProcTransportUpd[ S ]]
-         } else {
-            /*
-               XXX TODO: if the transport is running
-               - cancel the future
-               - calculate interpolated current time t_now
-               - if added/removed and span ends before t_now: ignore
-               - if t_now contains span: fire
-               - recalculate next event time _if necessary_
-               - create new future
-             */
-            group.changed.pullUpdate( pull ).flatMap { gu: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]] =>
-               val tim = time // XXX TODO
-               gu match {
-                  case BiGroup.Added( gr, span, elem ) =>
-                     if( span.contains( tim )) {
-
-                        None
-                     } else if( span.overlaps( Span.from( tim ))) {
-
-                        None
-                     } else {
-                        None
-                     }
-                  case BiGroup.Removed( gr, span, elem ) =>
-                     None
-                  case BiGroup.Element( gr, changes ) =>
-                     None
-               }
-            }
-         }
-      }
-
-      def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
+      def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
          group.intersect( time ).flatMap( flatSpans )
 
-      def seek( time: Long )( implicit tx: S#Tx ) {
-         advance( playing = false, lastTime.get, time, true, true )
+      private def calcCurrentTime( info: Info )( implicit tx: S#Tx ) : Long = {
+         val startFrame = info.frame
+         if( info.isRunning ) {
+            val logicalNow    = cpuTime.get( tx.peer )
+            val logicalDelay  = logicalNow - info.cpuTime
+            val stopFrame     = info.nextTime
+            math.min( stopFrame - 1, startFrame + (logicalDelay / microsPerSample).toLong )
+         } else startFrame
       }
 
-      private def advance( playing: Boolean, oldFrame: Long, newFrame: Long,
-                           hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) {
-if( VERBOSE ) println( "::: advance(" + playing + ", " + oldFrame + ", " + newFrame + ")" )
-         if( newFrame == oldFrame ) return
-         lastTime.set( newFrame )
-
-         val (removed, added) = if( hasProcEvent ) {
-            val (remStart, remStop, addStart, addStop) = if( newFrame > oldFrame ) {
-               // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
-               // ... those which begin in the interval (LRP, t] && end > t must be added ...
-               val skipInt = Span( oldFrame + 1, newFrame + 1 )
-               (Span.until( oldFrame + 1 ), skipInt, skipInt, Span.from( newFrame + 1 ))
-            } else {
-               // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
-               // ... those which end in the interval (t, LRP] && begin <=t must be added ...
-               val skipInt = Span( newFrame + 1, oldFrame + 1 )
-               (skipInt, Span.from( oldFrame + 1 ), Span.until( newFrame + 1 ), skipInt)
-            }
-
-            (group.rangeSearch( remStart, remStop ).flatMap( flatSpans ).toIndexedSeq,
-             group.rangeSearch( addStart, addStop ).flatMap( flatSpans ).toIndexedSeq)
-         } else (IIdxSeq.empty, IIdxSeq.empty)
-
-         val params = if( hasParEvent  ) {
-            var res = IIdxSeq.empty[ (SpanLike, TimedProc[ S ], Map[ String, Param ])]
-            group.intersect( newFrame ).foreach { case (span, entries) =>
-               entries.foreach { case timed =>
-// XXX TODO
-//                  val par = timed.value.par
-                  var map = Map.empty[ String, Param ]
-//                  par.keys.foreach { key =>
-//                     par.get( key ).foreach { bi =>
-//                        val oldExO = bi.at( oldFrame )
-//                        val newExO = bi.at( newFrame )
-//                        newExO.foreach { newEx =>
-//                           if( oldExO != newExO ) {
-//                              map += key -> newEx.value
-//                           }
-//                        }
-//                     }
-//                  }
-                  if( map.nonEmpty ) res :+= (span, timed, map)
-               }
-            }
-            res
-         } else IIdxSeq.empty
-
-//         if( removed.nonEmpty || added.nonEmpty || params.nonEmpty ) {
-            fire( Transport.Advance( this, playing, newFrame, added, removed, params ))
-//         }
-      }
+      def time( implicit tx: S#Tx ) : Long = calcCurrentTime( infoVar.get( tx.inMemory ))
 
       def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
-
-      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) {
-         val wasPlaying = playingVar.get.value
-         val isPlaying  = expr.value
-         playingVar.set( expr )
-         if( wasPlaying != isPlaying ) {
-            if( isPlaying ) play() else stop()
-         }
-      }
+      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playingVar.set( expr )}
 
       private def play()( implicit tx: S#Tx ) {
-         scheduleNext()
-         fire( Transport.Play( this ))
+         implicit val itx = tx.inMemory
+         val oldInfo = infoVar.get
+         if( oldInfo.isRunning ) return
+         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
+                                     state   = Playing )
+         infoVar.set( newInfo )
+         ??? // fire( newState )
+         scheduleNext( newInfo )
       }
 
       private def stop()( implicit tx: S#Tx ) {
-         validVar.transform( _ + 1 )
-         fire( Transport.Stop( this ))
+         implicit val itx = tx.inMemory
+         val oldInfo = infoVar.get
+         if( !oldInfo.isRunning ) return
+
+         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
+                                     frame   = calcCurrentTime( oldInfo ),
+                                     state   = Stopped )
+         infoVar.set( newInfo )
+         ??? // fire( newState )
       }
 
-      private def scheduleNext()( implicit tx: S#Tx ) {
-         val oldFrame      = lastTime.get
-         val searchStart   = oldFrame + 1
-         val procMin       = group.nearestEventAfter( searchStart ).getOrElse( Long.MaxValue )
-         val hasProcEvent  = procMin != Long.MaxValue
-//         val innerSpan     = if( hasProcEvent ) {
-//            Span( searchStart, procMin )
-//         } else {
-//            Span.from( searchStart )
-//         }
-         val /* var */ parMin = Long.MaxValue
-// XXX TODO
-//         group.intersect( innerSpan ).foreach { case (span, entries) =>
-//            entries.foreach { case timed =>
-//               val par = timed.value.par
-//               par.keys.foreach { key =>
-//                  par.get( key ).foreach { bi =>
-//                     bi.nearestEventAfter( searchStart ) match {
-//                        case Some( time ) if (time < parMin) && (span.compareStart( time ) < 0) && (span.compareStop( time ) > 0) => parMin = time
-//                        case _ =>
-//                     }
-//                  }
-//               }
-//            }
-//         }
-         val hasParEvent = parMin != Long.MaxValue
+      def group( implicit tx: S#Tx ) : ProcGroup[ S ] =  tx.refresh( csrPos, groupStale )
 
-         if( hasProcEvent || hasParEvent ) {
-            val newFrame   = math.min( procMin, parMin )
-            val delay      = ((newFrame - oldFrame) * microsPerSample).toLong
-            val v          = validVar.get
-            val logical    = cpuTime.get( tx.peer )
-            val jitter     = System.nanoTime()/1000 - logical
-            val effective  = math.max( 0L, delay - jitter )
-if( VERBOSE ) println( "::: scheduled: delay = " + delay + ", effective = " + effective + ", new frame = " + newFrame )
-            STMTxn.afterCommit( _ => {
-               pool.schedule( new Runnable {
-                  def run() { cursor.step { implicit tx =>
-                     val self = tx.refresh[ ProcTransport[ S ]]( csrPos, me )
-                     self.eventReached( v, logical + delay, oldFrame, newFrame, hasProcEvent, hasParEvent )
-                  }}
-               }, effective, TimeUnit.MICROSECONDS )
-            })( tx.peer )
+      def isPlaying( implicit tx: S#Tx ) : Boolean = infoVar.get( tx.inMemory ).isRunning // playingVar.value
+
+      def seek( time: Long )( implicit tx: S#Tx ) {
+         advance( isSeek = true, startPlay = false, newFrame = time )
+      }
+
+      private type Update = Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]]
+
+      private object ChangeEvent
+//      extends evt.Trigger.Impl[ S, Update, ProcTransport[ S ]]
+      extends evt.Trigger[ S, Update, ProcTransport[ S ]] // with event.EventImpl[ S, A, Repr ]
+      with evt.Generator[ S, Update, ProcTransport[ S ]]
+      with evt.InvariantEvent[ S, Update, ProcTransport[ S ]]
+      with evt.Root[ S, Update ]
+      {
+         def slot = 1
+         def node : ProcTransport[ S ] with evt.Node[ S ] = impl
+
+         def isSource( pull: evt.Pull[ S ]) : Boolean = pull.hasVisited( this )
+         def apply( update: Update )( implicit tx: S#Tx ) { fire( update )}
+
+//         protected def reader = null
+
+         def react[ A1 >: Update ]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] =
+            reactTx( _ => fun )
+
+         def reactTx[ A1 >: Update ]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] = {
+            ???
+//            val res = Observer[ S, A1, Repr ]( reader, fun )
+//            res.add( this )
+//            res
          }
       }
 
-      def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
-                        hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) {
-         // if the transport had been stopped between scheduling and actual
-         // execution of the scheduled Runnable, then we will find a
-         // discrepancy in validVar. In that case, just don't do anything.
-         if( valid == validVar.get ) {
-            cpuTime.set( newLogical )( tx.peer )
-            advance( playing = true, oldFrame = oldFrame, newFrame = newFrame, hasProcEvent, hasParEvent )
-            scheduleNext()
+      // [A]
+      // algorithm: given that the transport arrived at exactly info.nextProcTime, update the structures in
+      // anticipation of the next scheduling, and collect event dispatch information.
+      // - find the procs to remove and add via group.eventsAt.
+      // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
+      // - for the added procs, find all sinks whose source connects to a grapheme. calculate the values
+      //   of those graphemes at the current transport time. this goes with the Transport.Update so that
+      //   listeners do not need to perform that step themselves. Also this information is useful because it
+      //   yields the ceil time ct; if no value is found at the current transport time, find the ceiling time ct
+      //   explicitly; for ct, evaluate the grapheme value and store it in (1) and (2) accordingly.
+
+      // [B]
+      // algorithm: given that that the transport arrived at a time which was unobserved by the structures
+      // (e.g. before the info's start frame, or after the info's nextProcTime).
+      // - find the procs with to remove and add via range searches
+      // - proceed as in [A]
+
+      // [C]
+      // algorithm: given that the transport arrived at exactly info.nextGraphemeTime, update the
+      // structures in anticipation of the next scheduling, and collect event dispatch information.
+      // - in (2) find and remove the map for the given time frame
+      // - for each scan (S#ID, String) collect the grapheme values so that they be dispatched
+      //   in the advancement message
+      // - and for each of these scans, look up the timed proc through (3) and gather the new next grapheme
+      //   values, store (replace) them in (1) and (2), and calculate the new nextGraphemeTime.
+
+      // [D]
+      // algorithm: given that the transport arrived at a time which was unobserved by the structures
+      // (e.g. before the info's start frame, or after the info's nextGraphemeTime).
+      // - assume that interesting procs have already been removed and added (algorithm [A] or [B])
+      // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
+      //   at the new time, yielding all timed procs active at that point
+      // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
+      //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and < the
+      //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
+      //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
+      //   the new time and the new grapheme value; perform the corresponding update in (2).
+      // - for the changed entries, collect those which overlap the current transport time, so that they
+      //   will go into the advancement message
+      // - retrieve the new nextGraphemeTime by looking at the head element in (2).
+
+      /**
+       * The core method: based on the previous info and the reached target frame, update the structures
+       * accordingly (invalidate obsolete information, gather new information regarding the next
+       * advancement), assemble and fire the corresponding events, and update the info to be ready for
+       * a subsequent call to `scheduleNext`.
+       *
+       * @param isSeek     whether the advancement is due to a hard seek (`true`) or a regular passing of time (`false`).
+       *                   the information is carried in the fired event.
+       * @param newFrame   the frame which has been reached
+       */
+      private def advance( isSeek: Boolean, startPlay: Boolean, newFrame: Long )( implicit tx: S#Tx ) {
+         implicit val itx     = tx.inMemory
+         val oldInfo          = infoVar.get
+if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newFrame + "); oldInfo = " + oldInfo )
+         if( newFrame == oldInfo.frame ) return
+
+         val g                = group
+         val oldFrame         = oldInfo.frame
+         val needsNewProcTime = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
+         val newFrameP        = newFrame + 1
+
+         var procAdded        = emptySeq[ (SpanLike, TimedProc[ S ])]
+         var procRemoved      = emptySeq[ (SpanLike, TimedProc[ S ])]
+
+         // algorithm [A] or [B]
+         if( needsNewProcTime ) {
+            // algorithm [A]
+            val (itAdded, itRemoved) = if( newFrame == oldInfo.nextProcTime ) {
+               // we went exactly till a known event spot
+               // - find the procs to remove and add via group.eventsAt.
+               g.eventsAt( newFrame )
+
+            // algorithm [B]
+            } else {
+               // the new time frame lies outside the range for the known next proc event.
+               // therefore we need to fire proc additions and removals (if there are any)
+               // and recalculate the next proc event time after the new time frame
+
+               // - find the procs with to remove and add via range searches
+
+               val (remStart, remStop, addStart, addStop) = if( newFrame > oldFrame ) {
+                  // ... those which end in the interval (LRP, t] && begin <= LRP must be removed ...
+                  // ... those which begin in the interval (LRP, t] && end > t must be added ...
+                  val skipInt = Span( oldFrame + 1, newFrameP )
+                  (Span.until( oldFrame + 1 ), skipInt, skipInt, Span.from( newFrameP ))
+               } else {
+                  // ... those which begin in the interval (t, LRP] && end > LRP must be removed ...
+                  // ... those which end in the interval (t, LRP] && begin <=t must be added ...
+                  val skipInt = Span( newFrameP, oldFrame + 1 )
+                  (skipInt, Span.from( oldFrame + 1 ), Span.until( newFrameP ), skipInt)
+               }
+
+               (g.rangeSearch( addStart, addStop ), g.rangeSearch( remStart, remStop ))
+            }
+
+            // continue algorithm [A] with removed and added procs
+
+            // - for the removed procs, remove the corresponding entries in (1), (2), and (3)
+            procRemoved = itRemoved.flatMap( flatSpans ).toIndexedSeq
+            procRemoved.foreach {
+               case (_, timed) =>
+                  val id = timed.id
+                  timedMap.remove( id )                              // in (3)
+                  val entries = gMap.get( id )
+                  gMap.remove( id )                                  // in (1)
+                  entries.foreach {
+                     case (staleID, scanMap) =>
+                        scanMap.valuesIterator.foreach {
+                           case (time, _) =>
+                              gPrio.get( time ).foreach { staleMap =>
+                                 val newStaleMap = staleMap - staleID
+                                 gPrio.add( time -> newStaleMap )    // in (2)
+                              }
+                        }
+                  }
+            }
+
+            // - for the added procs, find all sinks whose source connects to a grapheme. calculate the values
+            //   of those graphemes at the current transport time. (NOT YET: this goes with the Transport.Update so that
+            //   listeners do not need to perform that step themselves. Also this information is useful because it
+            //   yields the ceil time ct); if no value is found at the current transport time, find the ceiling time ct
+            //   explicitly; for ct, evaluate the grapheme value and store it in (1) and (2) accordingly.
+            //   store procs in (3)
+            procAdded = itAdded.flatMap( flatSpans ).toIndexedSeq
+            procAdded.foreach {
+               case (span, timed) =>
+                  val id   = timed.id
+                  val p    = timed.value
+//                  var procVals = Map.empty[ String, Scan.Link ]
+                  var scanMap    = Map.empty[ String, (Long, Grapheme.Value) ]
+                  var skipMap    = Map.empty[ Long, Map[ String, Grapheme.Value ]]
+                  p.scans.iterator.foreach {
+                     case (key, scan) =>
+                        scan.source match {
+                           case Some( link @ Scan.Link.Grapheme( peer )) =>
+//                              procVals += ...
+                              peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
+                                 peer.valueAt( ceilTime ).foreach { ceilValue =>
+                                    scanMap   += key -> (ceilTime, ceilValue)
+                                    val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilValue)
+                                    skipMap   += ceilTime -> newMap
+                                 }
+                              }
+//                           case Some( link @ Scan.Link.Scan( peer )) =>
+//                              procVals += ...
+                           case _ => None
+                        }
+                  }
+                  gMap.put( id, id -> scanMap )       // in (1)
+                  skipMap.foreach {
+                     case (time, keyMap) =>
+                        val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
+                        gPrio.add( time -> newMap )   // in (2)
+                  }
+                  timedMap.put( id, timed )           // in (3)
+            }
          }
+
+         val needsNewGraphemeTime = newFrame < oldFrame || newFrame >= oldInfo.nextGraphemeTime
+
+         // algorithm [C] or [D]
+         if( needsNewGraphemeTime ) {
+            // [C]
+            if( newFrame == oldInfo.nextGraphemeTime ) {
+               // we went exactly till a known event spot
+
+               // - in (2) find and remove the map for the given time frame
+               // - for each scan (S#ID, String) collect the grapheme values so that they be dispatched
+               //   in the advancement message
+               // - and for each of these scans, look up the timed proc through (3) and gather the new next grapheme
+               //   values, store (replace) them in (1) and (2), and calculate the new nextGraphemeTime.
+
+               val scanMap = gPrio.remove( newFrame ) match {
+                  case Some( staleMap ) => staleMap.flatMap {
+                     case (staleID, keyMap) =>
+                        timedMap.get( staleID ).map( _ -> keyMap )
+
+                     case _ => None
+                  }
+                  case _ => Map.empty
+               }
+               scanMap.foreach {
+                  case (timed, removeKeyMap) =>
+                     val id = timed.id
+                     var (staleID, keyMap) = gMap.get( id ).getOrElse( id -> Map.empty[ String, (Long, Grapheme.Value) ])
+                     removeKeyMap.keysIterator.foreach { key =>
+                        val p = timed.value
+                        val valueOption = p.scans.get( key ).flatMap { scan =>
+                           scan.source.flatMap {
+                              case Scan.Link.Grapheme( peer ) =>
+                                 peer.nearestEventAfter( newFrameP ).flatMap { ceilTime =>
+                                    peer.valueAt( ceilTime ).map( ceilTime -> _ )
+                                 }
+                              case _ => None
+                           }
+                        }
+                        valueOption match {
+                           case Some( tup @ (time, value) ) =>
+                              keyMap        += key -> tup
+                              val staleMap   = gPrio.get( time ).getOrElse( Map.empty )
+                              val keyMap2    = staleMap.get( staleID ).getOrElse( Map.empty ) + (key -> value)
+                              val newMap     = staleMap + (staleID -> keyMap2)
+                              gPrio.add( time -> newMap )
+
+                           case _ =>
+                              keyMap -= key
+                        }
+                     }
+                     gMap.put( id, staleID -> keyMap )
+               }
+
+            // [D]
+            } else {
+               // the new time frame lies outside the range for the known next grapheme event.
+               // therefore we need to fire grapheme changes (if there are any)
+               // and recalculate the next grapheme event time after the new time frame
+
+               // - assume that interesting procs have already been removed and added (algorithm [A] or [B])
+               // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
+               //   at the new time, yielding all timed procs active at that point
+               // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
+               //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and < the
+               //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
+               //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
+               //   the new time and the new grapheme value; perform the corresponding update in (2).
+               // - for the changed entries, collect those which overlap the current transport time, so that they
+               //   will go into the advancement message
+
+               val newProcs: Set[ TimedProc[ S ]] = procAdded.map( _._2 )( breakOut )
+
+               // filter because new procs have already build up their scan maps
+               g.intersect( newFrame ).flatMap( _._2.filterNot( newProcs.contains )).foreach { timed =>
+                  val id   = timed.id
+                  val p    = timed.value
+                  var (staleID, keyMap) = gMap.get( id ).getOrElse( id -> Map.empty[ String, (Long, Grapheme.Value) ])
+                  keyMap.foreach {
+                     case (key, tup @ (time, value)) =>
+                        val (timeVerify, newValue) = if( newFrame < oldFrame || newFrame >= time ) { // need to verify next time point
+                           val opt: Option[ (Long, Grapheme.Value) ] = p.scans.get( key ).flatMap( scan => {
+                              scan.source.flatMap {
+                                 case Scan.Link.Grapheme( peer ) =>
+                                    peer.nearestEventAfter( newFrameP ).flatMap { ceilTime =>
+                                       peer.valueAt( ceilTime ).map( ceilTime -> _ )
+                                    }
+                                 case _ => None
+                              }
+                           })
+                           opt.getOrElse( Long.MaxValue -> value )
+                        } else tup
+
+                        if( timeVerify != time ) {
+                           // remove old entry from gPrio
+                           gPrio.get( time ).foreach { staleMap =>
+                              staleMap.get( staleID ).foreach { scanMap =>
+                                 val newScanMap = scanMap - key
+                                 val newStaleMap = if( newScanMap.isEmpty ) {
+                                    staleMap - staleID
+                                 } else {
+                                    staleMap + (staleID -> newScanMap)
+                                 }
+                                 if( newStaleMap.isEmpty ) {
+                                    gPrio.remove( time )
+                                 } else {
+                                    gPrio.add( time -> newStaleMap )
+                                 }
+                              }
+                           }
+                           // check if there is a new entry
+                           if( timeVerify != Long.MaxValue ) {
+                              // ...yes... store the new entry
+                              keyMap += key -> (timeVerify -> newValue)
+                              val staleMap   = gPrio.get( timeVerify ).getOrElse( Map.empty )
+                              val scanMap    = staleMap.getOrElse( staleID, Map.empty ) + (key -> newValue)
+                              val newStaleMap= staleMap + (staleID -> scanMap)
+                              gPrio.add( timeVerify, newStaleMap )
+
+                           } else { // no event after newFrame
+                              keyMap -= key
+                           }
+                        }
+                  }
+
+                  // - for the changed entries, collect those which overlap the current transport time, so that they
+                  //   will go into the advancement message
+                  ???
+
+               }
+            }
+
+//            Transport.Proc.GraphemesChanged( m: Map[ String, Grapheme.Value ])
+         }
+
+         val nextProcTime = if( needsNewProcTime ) {
+            g.nearestEventAfter( newFrameP ).getOrElse( Long.MaxValue )
+         } else {
+            oldInfo.nextProcTime
+         }
+
+         val nextGraphemeTime = if( needsNewGraphemeTime ) {
+            ??? // gPrio.headOption.map( _._1 ).getOrElse( Long.MaxValue )
+         } else {
+            oldInfo.nextGraphemeTime
+         }
+
+         val newState: State = if( startPlay ) Playing else oldInfo.state
+         val newInfo = oldInfo.copy( cpuTime          = cpuTime.get( tx.peer ),
+                                     frame            = newFrame,
+                                     state            = newState,
+                                     nextProcTime     = nextProcTime,
+                                     nextGraphemeTime = nextGraphemeTime )
+         infoVar.set( newInfo )
+
+//         if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated ) {
+//            val upd = Transport.Advanced( this, playing?, newFrame, procAdded, procRemoved, procUpdated )
+//            Changed( upd )
+            ???   // fire
+//         }
+
+         if( newState == Playing ) scheduleNext( newInfo )
       }
 
-      def time( implicit tx: S#Tx ) : Long = lastTime.get   // XXX // Expr[ S, Long ] = timeExpr
+      private def scheduleNext( info: Info )( implicit tx: S#Tx ) {
+//         implicit val itx  = tx.inMemory
+//         val info          = infoVar.get
+         val targetFrame   = info.nextTime
 
-      // ---- event stuff ----
+         if( /* !info.isRunning || */ targetFrame == Long.MaxValue ) return
 
-      def changed : Event[ S, ProcTransportUpd[ S ], ProcTransport[ S ]] = this
+         val logicalDelay  = ((targetFrame - info.frame) * microsPerSample).toLong
+         val logicalNow    = info.cpuTime
+         val schedValid    = info.valid
+         val jitter        = sysMicros() - logicalNow
+         val actualDelay   = math.max( 0L, logicalDelay - jitter )
+if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay + ", targetFrame = " + targetFrame )
+         Txn.afterCommit( _ => {
+            pool.schedule( new Runnable {
+               def run() {
+                  cursor.step { implicit tx =>
+                     eventReached( schedValid, logicalNow + logicalDelay )
+                  }
+               }
+            }, actualDelay, TimeUnit.MICROSECONDS )
+         })( tx.peer )
+      }
 
-      protected def reader: evt.Reader[ S, ProcTransport[ S ]] = serializer[ S ]
+      private def eventReached( expectedValid: Int, newLogical: Long )( implicit tx: S#Tx ) {
+         implicit val itx = tx.inMemory
+         val info = infoVar.get
+         if( info.valid != expectedValid ) return  // the scheduled task was invalidated by an intermediate stop or seek command
+
+         // this is crucial to eliminate drift: since we reached the scheduled event, do not
+         // let the cpuTime txn-local determine a new free wheeling time, but set it to the
+         // time we targetted at; then in the next scheduleNext call, the jitter is properly
+         // calculated.
+         cpuTime.set( newLogical )( tx.peer )
+         advance( isSeek = false, startPlay = false, newFrame = info.nextTime )
+      }
+
+//      def add( span: Span.HasStart, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
+////         val w = waitSpan.get
+////         if( w.touches( span )) {
+////            // interrupt scheduled task
+////
+//////            val p = timed.value
+//////            p.scans.iterator.foreach {
+//////               case (key, scan) => scan.source match {
+//////                  case Some( Scan.Link.Grapheme( grapheme )) =>
+//////                     grapheme.nearestEventAfter( span.start )   // XXX
+//////                  case _ =>
+//////               }
+//////            }
+////         } else {
+////            // see if it appears earlier than the next region
+////         }
+//      }
    }
 }
-*/
