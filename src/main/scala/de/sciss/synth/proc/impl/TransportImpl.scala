@@ -203,38 +203,65 @@ object TransportImpl {
 
       private var groupObs : Disposable[ S#Tx ] = _
 
-      private def addRemoveProcs( span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]], procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
+      private def addRemoveProcs( g: ProcGroup[ S ], span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]], procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
          implicit val itx = tx.inMemory
          val oldInfo    = infoVar.get
          val newFrame   = calcCurrentTime( oldInfo )
          val isPly      = oldInfo.isRunning
 
-         procRemoved.foreach { timed => removeProc( timed )}
-         procAdded.foreach   { timed => addProc( newFrame, timed )}
+         // So in short: - if update span contains `v`, perform add/remove and recalc new next
+         //              - if info span contains update span's start, recalc new next
+         val perceived        = span.contains( newFrame )
+         val needsNewProcTime = perceived || (span match {
+            case hs: Span.HasStart => oldInfo.frame <= hs.start && oldInfo.nextProcTime > hs.start
+            case _ => false
+         })
 
-         ??? // TODO: determine from oldInfo vs. span whether nextProcTime needs recalculation
+         if( !(perceived || needsNewProcTime) ) return   // keep scheduled task running, don't overwrite infoVar
 
-         val newInfo    = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ), frame = newFrame )
+         val nextProcTime = if( needsNewProcTime ) {
+            g.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
+         } else {
+            oldInfo.nextProcTime
+         }
+         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ), frame = newFrame, nextProcTime = nextProcTime )
          infoVar.set( newInfo )
-         fire( Transport.Advance( transport = this, time = newFrame, isSeek = false, isPlaying = isPly,
-                                  added = procAdded, removed = procRemoved, changes = emptySeq ))
+
+         if( perceived ) {
+            procRemoved.foreach { timed => removeProc( timed )}
+            procAdded.foreach   { timed => addProc( newFrame, timed )}
+
+            fire( Transport.Advance( transport = this, time = newFrame, isSeek = false, isPlaying = isPly,
+                                     added = procAdded, removed = procRemoved, changes = emptySeq ))
+         }
+
          if( isPly ) scheduleNext( newInfo )
       }
 
       def init()( implicit tx: S#Tx ) {
          // we can use groupStale because init is called straight away after instantiating Impl
          groupObs = groupStale.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
-            case BiGroup.Added( _, span, timed ) =>
-               // the easiest check is not to fiddle around with span overlaps,
-               // but simple check if the proc was registered (in timedMap)
-               if( timedMap.contains( timed.id )) {
-                  addRemoveProcs( span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
-               }
-
-            case BiGroup.Removed( _, span, timed ) =>
-               if( timedMap.contains( timed.id )) {
-                  addRemoveProcs( span, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
-               }
+            // the following illustrates what actions need to be done with respect
+            // to the overlap/touch or not between the current info span and the change span
+            // (the `v` indicates the result of calcCurrentTime; ! is a non-important point, wheras | is an important point)
+            //
+            // info:              |....v.......|
+            // proc: (1)    !........| --> proc ends before `v` = NO ACTION
+            //       (2)            !,,,,,,| --> proc contains `v` = ADD/REMOVE and calc NEW NEXT
+            //       (3)                 |.........! --> proc starts after info began but before info ends = JUST NEW NEXT
+            //       (4)                       |.......! --> proc starts no earlier than info ends = NO ACTION
+            //
+            // (Note that case (1) can only be addition; removal would mean that the stop time
+            //  existed after info.frame but before info.nextTime which is in contraction to
+            //  the definition of info.nextTime)
+            //
+            // So in short: - if update span contains `v`, perform add/remove and recalc new next
+            //              - if info span contains update span's start, recalc new next
+            //              (implementation: see method addRemoveProcs)
+            case BiGroup.Added( g, span, timed ) =>
+               addRemoveProcs( g, span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
+            case BiGroup.Removed( g, span, timed ) =>
+               addRemoveProcs( g, span, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
 
             case BiGroup.Element( g, changes ) =>
                // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ Proc.Update[ S ]])]
@@ -264,6 +291,8 @@ object TransportImpl {
             val logicalNow    = cpuTime.get( tx.peer )
             val logicalDelay  = logicalNow - info.cpuTime
             val stopFrame     = info.nextTime
+            // for this to work as expected it is crucial that the reported current time is
+            // _less than_ the info's target time (<= stopFrame -1)
             math.min( stopFrame - 1, startFrame + (logicalDelay / microsPerSample).toLong )
          } else startFrame
       }
