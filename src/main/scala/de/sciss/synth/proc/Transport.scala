@@ -53,14 +53,14 @@ trait Transport[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] with Chronos[ S 
    def sampleRate: Double
 
    def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])]
-
-   def group: BiGroup[ S, Elem, U ]
+//
+//   def group: BiGroup[ S, Elem, U ]
 
    def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
 
-   // unfortunately this needs to go in the API because of the self-access problem
-   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
-                                   hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) : Unit
+//   // unfortunately this needs to go in the API because of the self-access problem
+//   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
+//                                   hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) : Unit
 
 //   def play()( implicit time: Chronos[ S ]) : Unit
 //   def stop()( implicit time: Chronos[ S ]) : Unit

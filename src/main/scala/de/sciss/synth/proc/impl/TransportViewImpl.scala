@@ -4,9 +4,10 @@ package impl
 
 import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm, bitemp, expr, data}
 import stm.{IdentifierMap, Sys, Cursor}
-import bitemp.{SpanLike, Span}
+import bitemp.{BiGroup, SpanLike, Span}
 import data.SkipList
 import expr.Expr
+import evt.Event
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn, TxnLocal}
@@ -70,23 +71,23 @@ object TransportViewImpl {
          Info( cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
                nextGraphemeTime = nextGraphemeTime, valid = valid + 1 )
 
-      def isRunning  = state.isRunning
+      def isRunning  = state == Playing // state.isRunning
       def nextTime   = math.min( nextProcTime, nextGraphemeTime )
    }
 
    private sealed trait State {
-      /**
-       * For scheduled, the frame at which the scheduled event will happen, otherwise `Long.MaxValue`
-       */
-      def targetFrame: Long
-      def isRunning: Boolean
+//      /**
+//       * For scheduled, the frame at which the scheduled event will happen, otherwise `Long.MaxValue`
+//       */
+//      def targetFrame: Long
+//      def isRunning: Boolean
    }
-   private sealed trait NonScheduled extends State {
-      final def targetFrame = Long.MaxValue
-   }
-   private case object Stopped   extends NonScheduled { def isRunning = false }
-   private case object FreeWheel extends NonScheduled { def isRunning = true  }
-   private case class Scheduled( targetFrame: Long ) extends State { def isRunning = true }
+//   private sealed trait NonScheduled extends State {
+//      final def targetFrame = Long.MaxValue
+//   }
+   private case object Stopped extends State // NonScheduled { def isRunning = false }
+   private case object Playing extends State // NonScheduled { def isRunning = true  }
+//   private case class Scheduled( targetFrame: Long ) extends State { def isRunning = true }
 
    private trait GraphemeInfo[ +ID ] {
       def id: ID
@@ -123,14 +124,16 @@ object TransportViewImpl {
    }
 
    final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                     groupStale: ProcGroup[ S ],val sampleRate: Double,
-                                     playingVar: Expr.Var[ S, Boolean ], /* validVar: I#Var[ Int ], */
-                                     infoVar: I#Var[ Info ],
-                                     gMap: IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
-                                     gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
-                                     timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
-                                     csrPos: S#Acc )
-                                   ( implicit cursor: Cursor[ S ]) {
+                                     groupStale:            ProcGroup[ S ],
+                                     val sampleRate:        Double,
+                                     playingVar:            Expr.Var[ S, Boolean ],
+                                     infoVar:               I#Var[ Info ],
+                                     gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
+                                     gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
+                                     timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
+                                     csrPos:                S#Acc )
+                                   ( implicit cursor: Cursor[ S ])
+   extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] with evt.Node[ S ] {
 
       private implicit val procGroupSer      = ProcGroup_.serializer[ S ]
       private val          microsPerSample   = 1000000 / sampleRate
@@ -151,13 +154,33 @@ object TransportViewImpl {
 //      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]          // (2)
 //      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                              // (3)
 
+      // ---- evt.Node ----
+
+      protected def disposeData()( implicit tx: S#Tx ) {
+         implicit val itx = tx.inMemory
+         playingVar.dispose()
+         infoVar.set( Info.init )   // if there is pending scheduled tasks, they should abort gracefully
+//         infoVar.dispose()
+         gMap.dispose()
+         gPrio.dispose()
+         timedMap.dispose()
+      }
+
+      protected def writeData( out: DataOutput ) {}   // there is no serialization for this class
+
+      def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = ???
+
+      def changed: Event[ S, Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]], ProcTransport[ S ]] = ???
+
+      def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
+         group.intersect( time ).flatMap( flatSpans )
+
       private def calcCurrentTime( info: Info )( implicit tx: S#Tx ) : Long = {
          val startFrame = info.frame
-         val state      = info.state
-         if( state.isRunning ) {
+         if( info.isRunning ) {
             val logicalNow    = cpuTime.get( tx.peer )
             val logicalDelay  = logicalNow - info.cpuTime
-            val stopFrame     = state.targetFrame
+            val stopFrame     = info.nextTime
             math.min( stopFrame - 1, startFrame + (logicalDelay / microsPerSample).toLong )
          } else startFrame
       }
@@ -172,10 +195,18 @@ object TransportViewImpl {
 //         validVar.transform( _ + 1 )( tx.inMemory )   // invalidate scheduled tasks
 //      }
 
+      def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
+      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playingVar.set( expr )}
+
       private def play()( implicit tx: S#Tx ) {
-         if( isPlaying ) return
+         implicit val itx = tx.inMemory
+         val oldInfo = infoVar.get
+         if( oldInfo.isRunning ) return
+         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
+                                     state   = Playing )
+         infoVar.set( newInfo )
          ??? // fire( newState )
-         scheduleNext()
+         scheduleNext( newInfo )
       }
 
       private def stop()( implicit tx: S#Tx ) {
@@ -192,11 +223,10 @@ object TransportViewImpl {
 
       def group( implicit tx: S#Tx ) : ProcGroup[ S ] =  tx.refresh( csrPos, groupStale )
 
-      def isPlaying( implicit tx: S#Tx ) : Boolean = infoVar.get( tx.inMemory ).state.isRunning // playingVar.value
+      def isPlaying( implicit tx: S#Tx ) : Boolean = infoVar.get( tx.inMemory ).isRunning // playingVar.value
 
       def seek( time: Long )( implicit tx: S#Tx ) {
-         advance( isSeek = true, newFrame = time )
-         scheduleNext()
+         advance( isSeek = true, startPlay = false, newFrame = time )
       }
 
       // [A]
@@ -250,7 +280,7 @@ object TransportViewImpl {
        *                   the information is carried in the fired event.
        * @param newFrame   the frame which has been reached
        */
-      private def advance( isSeek: Boolean, newFrame: Long )( implicit tx: S#Tx ) {
+      private def advance( isSeek: Boolean, startPlay: Boolean, newFrame: Long )( implicit tx: S#Tx ) {
          implicit val itx     = tx.inMemory
          val oldInfo          = infoVar.get
 if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newFrame + "); oldInfo = " + oldInfo )
@@ -504,7 +534,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
             oldInfo.nextGraphemeTime
          }
 
-         val newState: State = ???
+         val newState: State = if( startPlay ) Playing else oldInfo.state
          val newInfo = oldInfo.copy( cpuTime          = cpuTime.get( tx.peer ),
                                      frame            = newFrame,
                                      state            = newState,
@@ -517,14 +547,16 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
 //            Changed( upd )
             ???
 //         }
+
+         if( newState == Playing ) scheduleNext( newInfo )
       }
 
-      private def scheduleNext()( implicit tx: S#Tx ) {
-         implicit val itx  = tx.inMemory
-         val info          = infoVar.get
+      private def scheduleNext( info: Info )( implicit tx: S#Tx ) {
+//         implicit val itx  = tx.inMemory
+//         val info          = infoVar.get
          val targetFrame   = info.nextTime
 
-         if( !info.isRunning || targetFrame == Long.MaxValue ) return
+         if( /* !info.isRunning || */ targetFrame == Long.MaxValue ) return
 
          val logicalDelay  = ((targetFrame - info.frame) * microsPerSample).toLong
          val logicalNow    = info.cpuTime
@@ -553,8 +585,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          // time we targetted at; then in the next scheduleNext call, the jitter is properly
          // calculated.
          cpuTime.set( newLogical )( tx.peer )
-         advance( isSeek = false, newFrame = info.nextTime )
-         scheduleNext()
+         advance( isSeek = false, startPlay = false, newFrame = info.nextTime )
       }
 
 //      def add( span: Span.HasStart, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
