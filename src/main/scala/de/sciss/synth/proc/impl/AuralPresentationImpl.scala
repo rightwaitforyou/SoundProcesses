@@ -76,7 +76,7 @@ object AuralPresentationImpl {
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
             val transport: ProcTransport[ S ] = ??? // = tx.refresh( csrPos, transportStale )
             transport.react { x => println( "Aural observation: " + x )}
-            if( transport.playing.value ) {
+            if( transport.isPlaying ) {
                implicit val chr: Chronos[ S ] = transport
                transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
 //               val it = transport.iterator

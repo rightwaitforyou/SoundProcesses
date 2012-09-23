@@ -1,17 +1,40 @@
+/*
+ *  TransportImpl.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
+ *
+ *  This software is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU General Public License
+ *  as published by the Free Software Foundation; either
+ *  version 2, june 1991 of the License, or (at your option) any later version.
+ *
+ *  This software is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ *  General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public
+ *  License (gpl.txt) along with this software; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm, bitemp, expr, data}
+import de.sciss.lucre.{DataOutput, DataInput, stm, bitemp, expr, data}
 import stm.{Disposable, IdentifierMap, Sys, Cursor}
 import bitemp.{SpanLike, Span}
 import data.SkipList
-import expr.Expr
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn, TxnLocal}
 import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
-import de.sciss.synth.expr.Booleans
 
 object TransportImpl {
    var VERBOSE = true
@@ -19,7 +42,7 @@ object TransportImpl {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )( implicit tx: S#Tx, cursor: Cursor[ S ]) : ProcTransport[ S ] = {
 //      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
 //      val id         = targets.id
-      val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
+//      val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
       implicit val itx = tx.inMemory
       val iid        = itx.newID()
       implicit val infoSer = dummySerializer[ Info ]
@@ -30,7 +53,7 @@ object TransportImpl {
       val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                     // (3)
       implicit val obsSer = dummySerializer[ IIdxSeq[ Observation[ S ]]]
       val obsVar     = itx.newVar( iid, IIdxSeq.empty[ Observation[ S ]])
-      val view       = new Impl[ S ]( /* targets, */ group, sampleRate, playingVar, infoVar,
+      val view       = new Impl[ S ]( /* targets, */ group, sampleRate, /* playingVar, */ infoVar,
                                       gMap, gPrio, timedMap, obsVar, cursor.position )
 //      group.intersect( time ).foreach {
 //         case (Span.HasStart( span ), seq) =>
@@ -118,7 +141,7 @@ object TransportImpl {
 
    private type Update[ S <: Sys[ S ]] = Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]]
 
-   private final class Observation[ S <: Sys[ S ]]( impl: Impl[ S ], fun: S#Tx => Update[ S ] => Unit )
+   private final class Observation[ S <: Sys[ S ]]( impl: Impl[ S ], val fun: S#Tx => Update[ S ] => Unit )
    extends Disposable[ S#Tx ] {
       override def toString = impl.toString + ".react@" + hashCode().toHexString
 
@@ -130,7 +153,7 @@ object TransportImpl {
    private final class Impl[ S <: Sys[ S ]]( /* protected val targets: evt.Targets[ S ], */
                                      groupStale:            ProcGroup[ S ],
                                      val sampleRate:        Double,
-                                     playingVar:            Expr.Var[ S, Boolean ],
+//                                     playingVar:            Expr.Var[ S, Boolean ],
                                      infoVar:               I#Var[ Info ],
                                      gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
                                      gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
@@ -168,12 +191,13 @@ object TransportImpl {
 
       protected def disposeData()( implicit tx: S#Tx ) {
          implicit val itx = tx.inMemory
-         playingVar.dispose()
+//         playingVar.dispose()
          infoVar.set( Info.init )   // if there is pending scheduled tasks, they should abort gracefully
 //         infoVar.dispose()
          gMap.dispose()
          gPrio.dispose()
          timedMap.dispose()
+         obsVar.dispose()
       }
 
 //      protected def writeData( out: DataOutput ) {}   // there is no serialization for this class
@@ -201,10 +225,10 @@ object TransportImpl {
 
       def time( implicit tx: S#Tx ) : Long = calcCurrentTime( infoVar.get( tx.inMemory ))
 
-      def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
-      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playingVar.set( expr )}
+//      def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
+//      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playingVar.set( expr )}
 
-      private def play()( implicit tx: S#Tx ) {
+      def play()( implicit tx: S#Tx ) {
          implicit val itx = tx.inMemory
          val oldInfo = infoVar.get
          if( oldInfo.isRunning ) return
@@ -215,7 +239,7 @@ object TransportImpl {
          scheduleNext( newInfo )
       }
 
-      private def stop()( implicit tx: S#Tx ) {
+      def stop()( implicit tx: S#Tx ) {
          implicit val itx = tx.inMemory
          val oldInfo = infoVar.get
          if( !oldInfo.isRunning ) return
@@ -236,7 +260,8 @@ object TransportImpl {
       }
 
       private def fire( update: Update[ S ])( implicit tx: S#Tx ) {
-         ???
+         val obs = obsVar.get( tx.inMemory )
+         obs.foreach( _.fun( tx )( update ))
       }
 
       def removeObservation( obs: Observation[ S ])( implicit tx: S#Tx ) {
