@@ -501,6 +501,8 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                   val p    = timed.value
                   var (staleID, keyMap) = gMap.get( id ).getOrElse( id -> Map.empty[ String, (Long, Grapheme.Value) ])
 
+                  var scanMap = Map.empty[ String, Grapheme.Value ]
+
                   // check again all scan's which are linked to a grapheme source,
                   // because we may have new entries for which no data existed before
                   p.scans.iterator.foreach {
@@ -510,9 +512,9 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
 
                               def addNewEntry( time: Long, value: Grapheme.Value ) {
                                  keyMap += key -> (time -> value)
-                                 val staleMap   = gPrio.get( time ).getOrElse( Map.empty )
-                                 val scanMap    = staleMap.getOrElse( staleID, Map.empty ) + (key -> value)
-                                 val newStaleMap= staleMap + (staleID -> scanMap)
+                                 val staleMap      = gPrio.get( time ).getOrElse( Map.empty )
+                                 val m             = staleMap.getOrElse( staleID, Map.empty ) + (key -> value)
+                                 val newStaleMap   = staleMap + (staleID -> m)
                                  gPrio.add( time, newStaleMap )
                               }
 
@@ -529,12 +531,12 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                                     if( newTime != time ) {
                                        // remove old entry from gPrio
                                        gPrio.get( time ).foreach { staleMap =>
-                                          staleMap.get( staleID ).foreach { scanMap =>
-                                             val newScanMap = scanMap - key
-                                             val newStaleMap = if( newScanMap.isEmpty ) {
+                                          staleMap.get( staleID ).foreach { mOld =>
+                                             val m = mOld - key
+                                             val newStaleMap = if( m.isEmpty ) {
                                                 staleMap - staleID
                                              } else {
-                                                staleMap + (staleID -> newScanMap)
+                                                staleMap + (staleID -> m)
                                              }
                                              if( newStaleMap.isEmpty ) {
                                                 gPrio.remove( time )
@@ -572,11 +574,13 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                         }
                   }
 
+                  ??? // need to populate scanMap
+
                   // - for the changed entries, collect those which overlap the current transport time, so that they
                   //   will go into the advancement message
-                  timed -> keyMap
+                  timed -> scanMap
                }
-               ??? // itMap.toIndexedSeq
+               itMap.toIndexedSeq
             }
 
             procUpdated = updMap.map { case (timed, map) => (timed.span.value, timed, Transport.Proc.GraphemesChanged( map ))}
