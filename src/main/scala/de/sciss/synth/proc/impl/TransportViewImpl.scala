@@ -71,23 +71,13 @@ object TransportViewImpl {
          Info( cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
                nextGraphemeTime = nextGraphemeTime, valid = valid + 1 )
 
-      def isRunning  = state == Playing // state.isRunning
+      def isRunning  = state == Playing
       def nextTime   = math.min( nextProcTime, nextGraphemeTime )
    }
 
-   private sealed trait State {
-//      /**
-//       * For scheduled, the frame at which the scheduled event will happen, otherwise `Long.MaxValue`
-//       */
-//      def targetFrame: Long
-//      def isRunning: Boolean
-   }
-//   private sealed trait NonScheduled extends State {
-//      final def targetFrame = Long.MaxValue
-//   }
-   private case object Stopped extends State // NonScheduled { def isRunning = false }
-   private case object Playing extends State // NonScheduled { def isRunning = true  }
-//   private case class Scheduled( targetFrame: Long ) extends State { def isRunning = true }
+   private sealed trait State
+   private case object Stopped extends State
+   private case object Playing extends State
 
    private trait GraphemeInfo[ +ID ] {
       def id: ID
@@ -134,6 +124,7 @@ object TransportViewImpl {
                                      csrPos:                S#Acc )
                                    ( implicit cursor: Cursor[ S ])
    extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] with evt.Node[ S ] {
+      impl =>
 
       private implicit val procGroupSer      = ProcGroup_.serializer[ S ]
       private val          microsPerSample   = 1000000 / sampleRate
@@ -227,6 +218,34 @@ object TransportViewImpl {
 
       def seek( time: Long )( implicit tx: S#Tx ) {
          advance( isSeek = true, startPlay = false, newFrame = time )
+      }
+
+      private type Update = Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]]
+
+      private object ChangeEvent
+//      extends evt.Trigger.Impl[ S, Update, ProcTransport[ S ]]
+      extends evt.Trigger[ S, Update, ProcTransport[ S ]] // with event.EventImpl[ S, A, Repr ]
+      with evt.Generator[ S, Update, ProcTransport[ S ]]
+      with evt.InvariantEvent[ S, Update, ProcTransport[ S ]]
+      with evt.Root[ S, Update ]
+      {
+         def slot = 1
+         def node : ProcTransport[ S ] with evt.Node[ S ] = impl
+
+         def isSource( pull: evt.Pull[ S ]) : Boolean = pull.hasVisited( this )
+         def apply( update: Update )( implicit tx: S#Tx ) { fire( update )}
+
+//         protected def reader = null
+
+         def react[ A1 >: Update ]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] =
+            reactTx( _ => fun )
+
+         def reactTx[ A1 >: Update ]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, ProcTransport[ S ]] = {
+            ???
+//            val res = Observer[ S, A1, Repr ]( reader, fun )
+//            res.add( this )
+//            res
+         }
       }
 
       // [A]
