@@ -116,7 +116,7 @@ object BiGroupImpl {
 //   extends TimedElem[ S, Elem, U ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElemImpl[ S, Elem, U ]]
    extends evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]] with TimedElem[ S, Elem ]
    {
-      import group.{eventView, elemSerializer, spanType}
+      import group.{eventView, elemSerializer}
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ IIdxSeq[ BiGroup.ElementUpdate[ U ]]] = {
          var res = IIdxSeq.empty[ BiGroup.ElementUpdate[ U ]]

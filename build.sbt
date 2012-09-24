@@ -18,8 +18,8 @@ scalaVersion := "2.9.2" // "2.10.0-M7"
 
 libraryDependencies ++= Seq(
    "de.sciss" %% "scalacollider" % "1.1.0-SNAPSHOT", // "0.34",
-   "de.sciss" %% "temporalobjects" % "1.2.0-SNAPSHOT",
-   "de.sciss" %% "lucreexpr" % "1.2.0-SNAPSHOT",
+   "de.sciss" %% "temporalobjects" % "1.2.0",
+   "de.sciss" %% "lucreexpr" % "1.2.0",
    "de.sciss" % "prefuse-core" % "0.21"
 )
 
