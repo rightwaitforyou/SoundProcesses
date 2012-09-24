@@ -203,16 +203,30 @@ object TransportImpl {
 
       private var groupObs : Disposable[ S#Tx ] = _
 
+      // the following illustrates what actions need to be done with respect
+      // to the overlap/touch or not between the current info span and the change span
+      // (the `v` indicates the result of calcCurrentTime; ! is a non-important point, wheras | is an important point)
+      //
+      // info:              |....v.......|
+      // proc: (a)    !........| --> proc ends before `v` = NO ACTION
+      //       (b)            !,,,,,,| --> proc contains `v` = ADD/REMOVE and calc NEW NEXT
+      //       (c)                 |.........! --> proc starts after info began but before info ends = JUST NEW NEXT
+      //       (d)                       |.......! --> proc starts no earlier than info ends = NO ACTION
+      //
+      // (Note that case (a) can only be addition; removal would mean that the stop time
+      //  existed after info.frame but before info.nextTime which is in contraction to
+      //  the definition of info.nextTime)
+      //
+      // So in short: - (1) if update span contains `v`, perform add/remove and recalc new next
+      //              - (2) if info span contains update span's start, recalc new next
       private def addRemoveProcs( g: ProcGroup[ S ], span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]], procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
          implicit val itx = tx.inMemory
          val oldInfo    = infoVar.get
          val newFrame   = calcCurrentTime( oldInfo )
          val isPly      = oldInfo.isRunning
 
-         // So in short: - if update span contains `v`, perform add/remove and recalc new next
-         //              - if info span contains update span's start, recalc new next
-         val perceived        = span.contains( newFrame )
-         val needsNewProcTime = perceived || (span match {
+         val perceived        = span.contains( newFrame )   // (1)
+         val needsNewProcTime = perceived || (span match {  // (2)
             case hs: Span.HasStart => oldInfo.frame <= hs.start && oldInfo.nextProcTime > hs.start
             case _ => false
          })
@@ -224,7 +238,16 @@ object TransportImpl {
          } else {
             oldInfo.nextProcTime
          }
-         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ), frame = newFrame, nextProcTime = nextProcTime )
+         val nextGraphemeTime = if( perceived ) {
+            val headOption = gPrio.ceil( Long.MinValue ) // headOption method missing
+            headOption.map( _._1 ).getOrElse( Long.MaxValue )
+         } else {
+            oldInfo.nextGraphemeTime
+         }
+         val newInfo = oldInfo.copy( cpuTime          = cpuTime.get( tx.peer ),
+                                     frame            = newFrame,
+                                     nextProcTime     = nextProcTime,
+                                     nextGraphemeTime = nextGraphemeTime )
          infoVar.set( newInfo )
 
          if( perceived ) {
@@ -241,31 +264,42 @@ object TransportImpl {
       def init()( implicit tx: S#Tx ) {
          // we can use groupStale because init is called straight away after instantiating Impl
          groupObs = groupStale.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
-            // the following illustrates what actions need to be done with respect
-            // to the overlap/touch or not between the current info span and the change span
-            // (the `v` indicates the result of calcCurrentTime; ! is a non-important point, wheras | is an important point)
-            //
-            // info:              |....v.......|
-            // proc: (1)    !........| --> proc ends before `v` = NO ACTION
-            //       (2)            !,,,,,,| --> proc contains `v` = ADD/REMOVE and calc NEW NEXT
-            //       (3)                 |.........! --> proc starts after info began but before info ends = JUST NEW NEXT
-            //       (4)                       |.......! --> proc starts no earlier than info ends = NO ACTION
-            //
-            // (Note that case (1) can only be addition; removal would mean that the stop time
-            //  existed after info.frame but before info.nextTime which is in contraction to
-            //  the definition of info.nextTime)
-            //
-            // So in short: - if update span contains `v`, perform add/remove and recalc new next
-            //              - if info span contains update span's start, recalc new next
-            //              (implementation: see method addRemoveProcs)
             case BiGroup.Added( g, span, timed ) =>
                addRemoveProcs( g, span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
             case BiGroup.Removed( g, span, timed ) =>
                addRemoveProcs( g, span, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
 
             case BiGroup.Element( g, changes ) =>
-               // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ Proc.Update[ S ]])]
-               ???
+               // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
+               // ElementUpdate is either of Moved( change: evt.Change[ SpanLike ])
+               //                         or Mutated[ U ]( change: U ) ; U = Proc.Update[ S ]
+               // Mutated:
+               // ... only process procs which are observed (found in timedMap)
+               // ... first of all, the update is passed on as such. additional processing:
+               // ... where each Proc.Update can be one of
+               //     StateChange
+               //        AssociativeChange : we need to track the addition and removal of scans.
+               //                            filter only those AssociativeKeys which are ScanKeys.
+               //                            track appearance or disappearence of graphemes as sources
+               //                            of these scans, and update structures
+               //        other StateChange : -
+               //     ScanChange
+               //        SinkAdded, SinkRemoved : -
+               //        TODO : SourceUpdate passing on changes in a grapheme source. this is not yet implemented in Scan
+               //               grapheme changes must then be tracked, structures updated
+               //        SourceChanged : if it means a grapheme is connected or disconnect, update structures
+               //     GraphemeChange : - (the grapheme is not interested, we only see them as sources of scans)
+               //
+               // Moved:
+               // ... possible situations
+               //     (1) old span contains current time frame `v`, but new span not --> treat as removal
+               //     (2) old span does not contain `v`, but new span does --> treat as addition
+               //     (3) neither old nor new span contain `v`
+               //         --> info.span contains start point of either span? then recalc nextProcTime.
+               //         (indeed we could call addRemoveProcs with empty lists for the procs, and a
+               //          second span argument, which would be just Span.Void in the normal add/remove calls)
+               //     (4) both old and new span contain `v`
+               //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
          }}
       }
 
@@ -776,23 +810,5 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          cpuTime.set( newLogical )( tx.peer )
          advance( newFrame = info.nextTime )
       }
-
-//      def add( span: Span.HasStart, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
-////         val w = waitSpan.get
-////         if( w.touches( span )) {
-////            // interrupt scheduled task
-////
-//////            val p = timed.value
-//////            p.scans.iterator.foreach {
-//////               case (key, scan) => scan.source match {
-//////                  case Some( Scan.Link.Grapheme( grapheme )) =>
-//////                     grapheme.nearestEventAfter( span.start )   // XXX
-//////                  case _ =>
-//////               }
-//////            }
-////         } else {
-////            // see if it appears earlier than the next region
-////         }
-//      }
    }
 }
