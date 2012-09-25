@@ -25,11 +25,12 @@
 
 package de.sciss.synth
 
-import de.sciss.lucre.stm.{Sys, InMemory}
-import de.sciss.lucre.bitemp.{BiPin, BiGroup}
+import de.sciss.lucre.{bitemp, event => evt}
+import bitemp.BiGroup
+import evt.Sys
 
 package object proc {
-   private[proc] type I = InMemory
+   private[proc] type I = evt.InMemory
 
    type ProcGroup[ S <: Sys[ S ]] = BiGroup[ S, Proc[ S ], Proc.Update[ S ]]
    type TimedProc[ S <: Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ]]
@@ -43,4 +44,10 @@ package object proc {
 //   type Grapheme[ S <: Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
 
    def ??? : Nothing = sys.error( "TODO" )
+
+   implicit def dummyInMem[ S <: Sys[ S ]]( tx: S#Tx ) : _HasInMem.type = _HasInMem
+
+   object _HasInMem {
+      def inMemory : evt.InMemory#Tx = ???
+   }
 }

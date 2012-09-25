@@ -1,9 +1,9 @@
 package de.sciss.synth.proc
 
-import de.sciss.confluent.Confluent
-import de.sciss.lucre.{stm, bitemp, expr}
-import stm.{Cursor, Sys}
+import de.sciss.lucre.{stm, bitemp, expr, event => evt}
+import stm.Cursor
 import stm.impl.BerkeleyDB
+import evt.{InMemory, Sys}
 import bitemp.{BiType, BiPin}
 import expr.Expr
 import java.io.File
@@ -12,11 +12,13 @@ import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
 
 object BiTempTest extends App {
    {
-      val dir        = File.createTempFile( "database", "db" )
-      dir.delete()
-      val store      = BerkeleyDB.factory( dir )
-      implicit val s = Confluent( store )
-      run[ Confluent ]
+//      val dir        = File.createTempFile( "database", "db" )
+//      dir.delete()
+//      val store      = BerkeleyDB.factory( dir )
+//      implicit val s = Confluent( store )
+//      run[ Confluent ]
+      implicit val s = InMemory()
+      run[ InMemory ]
    }
 
    def run[ S <: Sys[ S ]]( implicit system: S, cursor: Cursor[ S ]) {

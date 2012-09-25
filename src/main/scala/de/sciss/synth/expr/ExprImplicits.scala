@@ -1,18 +1,18 @@
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{stm, expr, bitemp}
-import stm.{InMemory, Sys}
+import de.sciss.lucre.{stm, expr, bitemp, event => evt}
 import bitemp.{SpanLike, Span}
+import evt.Sys
 import expr.Expr
 
 object ExprImplicits {
-   implicit def stringConst[   S <: Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )
-   implicit def booleanConst[  S <: Sys[ S ]]( b: Boolean )  : Expr[ S, Boolean  ] = Booleans.newConst(  b )
-   implicit def doubleConst[   S <: Sys[ S ]]( d: Double )   : Expr[ S, Double   ] = Doubles.newConst(   d )
-   implicit def intConst[      S <: Sys[ S ]]( i: Int )      : Expr[ S, Int      ] = Ints.newConst(      i )
-   implicit def longConst[     S <: Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
-   implicit def spanConst[     S <: Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
-   implicit def spanLikeConst[ S <: Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
+   implicit def stringConst[   S <: stm.Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )
+   implicit def booleanConst[  S <: stm.Sys[ S ]]( b: Boolean )  : Expr[ S, Boolean  ] = Booleans.newConst(  b )
+   implicit def doubleConst[   S <: stm.Sys[ S ]]( d: Double )   : Expr[ S, Double   ] = Doubles.newConst(   d )
+   implicit def intConst[      S <: stm.Sys[ S ]]( i: Int )      : Expr[ S, Int      ] = Ints.newConst(      i )
+   implicit def longConst[     S <: stm.Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
+   implicit def spanConst[     S <: stm.Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
+   implicit def spanLikeConst[ S <: stm.Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
 
 //   trait LowPriority[ S <: Sys[ S ]] {
 //      implicit def lowSpanLikeConst( s: Span ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
@@ -22,7 +22,7 @@ object ExprImplicits {
 
    def apply[ S <: Sys[ S ]] : ExprImplicits[ S ] = Imp.asInstanceOf[ ExprImplicits[ S ]]
 
-   private object Imp extends ExprImplicits[ InMemory ]
+   private object Imp extends ExprImplicits[ evt.InMemory ]
 }
 
 /**

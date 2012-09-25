@@ -26,8 +26,7 @@
 package de.sciss.synth.expr
 
 import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt, expr, bitemp}
-import stm.Sys
-import evt.Targets
+import evt.{Targets, Sys}
 import expr.Expr
 import bitemp.{Span, SpanLike}
 import annotation.switch
@@ -59,7 +58,7 @@ object SpanLikes extends BiTypeImpl[ SpanLike ] {
          def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
                                  ( implicit tx: S#Tx ) : Tuple1[ S, T1 ]
 
-         def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ]) : String = name + "(" + _1 + ")"
+         def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, T1 ]) : String = name + "(" + _1 + ")"
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
@@ -82,12 +81,12 @@ object SpanLikes extends BiTypeImpl[ SpanLike ] {
 
       case object From extends LongOp( 0 ) {
          def value( a: Long ) : SpanLike = Span.from( a )
-         override def toString[ S <: Sys[ S ]]( _1: Expr[ S, Long ]) : String = "Span.from(" + _1 + ")"
+         override def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, Long ]) : String = "Span.from(" + _1 + ")"
       }
 
       case object Until extends LongOp( 1 ) {
          def value( a: Long ) : SpanLike = Span.until( a )
-         override def toString[ S <: Sys[ S ]]( _1: Expr[ S, Long ]) : String = "Span.until(" + _1 + ")"
+         override def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, Long ]) : String = "Span.until(" + _1 + ")"
       }
    }
 
@@ -96,7 +95,7 @@ object SpanLikes extends BiTypeImpl[ SpanLike ] {
          def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
                                  ( implicit tx: S#Tx ) : Tuple2[ S, T1, T2 ]
 
-         def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ], _2: Expr[ S, T2 ]) : String = _1.toString + "." + name + "(" + _2 + ")"
+         def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, T1 ], _2: Expr[ S, T2 ]) : String = _1.toString + "." + name + "(" + _2 + ")"
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
@@ -132,7 +131,7 @@ object SpanLikes extends BiTypeImpl[ SpanLike ] {
       }
 
       case object Apply extends LongLongOp( 0 ) {
-         override def toString[ S <: Sys[ S ]]( _1: Expr[ S, Long ], _2: Expr[ S, Long ]) : String = "Span(" + _1 + ", " + _2 + ")"
+         override def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, Long ], _2: Expr[ S, Long ]) : String = "Span(" + _1 + ", " + _2 + ")"
          def value( a: Long, b: Long ) : SpanLike = Span( a, b )
       }
 

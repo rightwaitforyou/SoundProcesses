@@ -27,9 +27,8 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.{event => evt, DataInput, data, stm}
-import stm.Sys
 import impl.{ScanImpl => Impl}
-import evt.Event
+import evt.{Event, Sys}
 
 object Scan {
    object Link {

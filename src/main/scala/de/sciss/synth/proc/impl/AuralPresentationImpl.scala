@@ -27,9 +27,10 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{stm, bitemp}
-import stm.{IdentifierMap, Sys, Cursor}
+import de.sciss.lucre.{stm, bitemp, event => evt}
+import stm.{IdentifierMap, Cursor}
 import bitemp.Chronos
+import evt.Sys
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{InTxn, TxnLocal, Txn}

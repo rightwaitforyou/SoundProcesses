@@ -27,13 +27,13 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.{bitemp, stm, expr, DataInput, event => evt}
-import stm.{Serializer, Sys}
+import stm.Serializer
 import expr.Expr
 import bitemp.Span
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
-import evt.Event
+import evt.{Event, Sys}
 
 object Grapheme {
    // If necessary for some views, we could eventually add the Elems, too,

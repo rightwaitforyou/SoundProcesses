@@ -1,8 +1,9 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Serializer, Sys}
-import de.sciss.lucre.{Writable, DataOutput, DataInput}
+import de.sciss.lucre.{stm, DataOutput, DataInput, event => evt}
+import stm.Serializer
 import annotation.switch
+import evt.Sys
 
 object Code {
    implicit def serializer[ S <: Sys[ S ], A ]( implicit peerSer: Serializer[ S#Tx, S#Acc, A ]) : Serializer[ S#Tx, S#Acc, Code[ A ]] =

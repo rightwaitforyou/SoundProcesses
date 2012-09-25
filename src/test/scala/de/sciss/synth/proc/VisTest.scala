@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{stm, bitemp, expr}
-import stm.{Serializer, Cursor, Sys, InMemory}
+import de.sciss.lucre.{stm, bitemp, expr, event => evt}
+import stm.{Serializer, Cursor}
 import stm.impl.BerkeleyDB
 import bitemp.{BiType, BiGroup, BiPin, Chronos, Span, SpanLike}
 import expr.Expr
@@ -9,11 +9,11 @@ import java.awt.{BorderLayout, EventQueue}
 import javax.swing.{WindowConstants, JFrame}
 //import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
-import de.sciss.confluent.Confluent
 import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.expr.{SpanLikes, Longs, ExprImplicits}
 import synth.SynthGraph
+import evt.{InMemory, Sys}
 
 object VisTest {
    def apply() : VisTest[ InMemory ] = {
@@ -23,13 +23,18 @@ object VisTest {
 
    def dataDir = new File( new File( sys.props( "user.home" ), "sound_processes" ), "db" )
 
-   def conf() : VisTest[ Confluent ] = {
-      val dir              = dataDir
-      dir.mkdirs()
-      val store            = BerkeleyDB.factory( dir )
-      implicit val system  = Confluent( store )
+   def inMem() : VisTest[ InMemory ] = {
+      implicit val system  = InMemory()
       new VisTest( system )
    }
+
+//   def conf() : VisTest[ Confluent ] = {
+//      val dir              = dataDir
+//      dir.mkdirs()
+//      val store            = BerkeleyDB.factory( dir )
+//      implicit val system  = Confluent( store )
+//      new VisTest( system )
+//   }
 
    def wipe( sure: Boolean = false ) {
       if( !sure ) return
@@ -39,7 +44,8 @@ object VisTest {
 
    def main( args: Array[ String ]) {
 //      TemporalObjects.showConfluentLog = true
-      val vis = VisTest.conf()
+//val vis = VisTest.conf()
+      val vis = VisTest.inMem()
       import vis._
       add()
       aural()

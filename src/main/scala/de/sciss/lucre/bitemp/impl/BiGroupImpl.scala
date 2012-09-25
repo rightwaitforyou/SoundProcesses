@@ -28,8 +28,8 @@ package bitemp
 package impl
 
 import de.sciss.lucre.{event => evt}
-import evt.{Event, EventLike}
-import stm.{ImmutableSerializer, Serializer, Sys}
+import evt.{Event, EventLike, impl => evti, Sys}
+import stm.{ImmutableSerializer, Serializer}
 import data.{SpaceSerializers, SkipOctree, Iterator}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
@@ -114,7 +114,7 @@ object BiGroupImpl {
    private final class TimedElemImpl[ S <: Sys[ S ], Elem, U ]( group: Impl[ S, Elem, U ],
       protected val targets: evt.Targets[ S ], val span: Expr[ S, SpanLike ], val value: Elem )
 //   extends TimedElem[ S, Elem, U ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElemImpl[ S, Elem, U ]]
-   extends evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]] with TimedElem[ S, Elem ]
+   extends evti.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]] with TimedElem[ S, Elem ]
    {
       import group.{eventView, elemSerializer}
 
@@ -211,10 +211,10 @@ object BiGroupImpl {
       // ---- event behaviour ----
 
       private object CollectionEvent
-      extends evt.Trigger.Impl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-      with evt.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+      extends evti.TriggerImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+      with evti.EventImpl[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-      with evt.Root[ S, BiGroup.Collection[ S, Elem, U ]]
+      with evti.Root[ S, BiGroup.Collection[ S, Elem, U ]]
       {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 1
@@ -242,7 +242,7 @@ object BiGroupImpl {
       }
 
       private object ElementEvent
-      extends evt.EventImpl[ S, BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+      extends evti.EventImpl[ S, BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiGroup.Element[ S, Elem, U ], BiGroup[ S, Elem, U ]] {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 2

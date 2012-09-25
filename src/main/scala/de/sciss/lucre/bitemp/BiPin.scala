@@ -29,8 +29,7 @@ package bitemp
 import impl.BiPinImpl
 import de.sciss.lucre.{event => evt}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import stm.{Serializer, Sys}
-import evt.{Event, EventLike}
+import evt.{Event, EventLike, Sys}
 import expr.Type
 
 object BiPin {
@@ -44,14 +43,14 @@ object BiPin {
          BiPinImpl.read[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
       }
 
-      def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : Serializer[ S#Tx, S#Acc, Expr[ S, A ]] = {
+      def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, Expr[ S, A ]] = {
 //         import elemType.{serializer => elemSer}
 //         implicit val timeType = elemType.longType
          BiPinImpl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
       }
 
       object Modifiable {
-         def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : Serializer[ S#Tx, S#Acc, BiPin.Expr.Modifiable[ S, A ]] = {
+         def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, BiPin.Expr.Modifiable[ S, A ]] = {
 //            import elemType.{serializer => elemSer}
 //            implicit val timeType = elemType.longType
             BiPinImpl.modifiableSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
@@ -92,20 +91,20 @@ object BiPin {
 
       def read[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])( in: DataInput, access: S#Acc )
                                         ( implicit tx: S#Tx,
-                                          elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                          elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                           timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] = {
          BiPinImpl.readModifiable[ S, Elem, U ]( in, access, eventView )
       }
 
       def apply[ S <: Sys[ S ], Elem, U ]/*( default: Elem )*/( eventView: Elem => EventLike[ S, U, Elem ])
                                          ( implicit tx: S#Tx,
-                                           elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                           elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                            timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] =
          BiPinImpl.newModifiable[ S, Elem, U ]( /* default, */ eventView )
 
       def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
-                                              ( implicit elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-                                                timeType: Type[ Long ]) : Serializer[ S#Tx, S#Acc, BiPin.Modifiable[ S, Elem, U ]] =
+                                              ( implicit elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                                timeType: Type[ Long ]) : stm.Serializer[ S#Tx, S#Acc, BiPin.Modifiable[ S, Elem, U ]] =
          BiPinImpl.modifiableSerializer[ S, Elem, U ]( eventView )
    }
    trait Modifiable[ S <: Sys[ S ], Elem, U ] extends BiPin[ S, Elem, U ] {
@@ -116,14 +115,14 @@ object BiPin {
 
    def read[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])( in: DataInput, access: S#Acc )
                                      ( implicit tx: S#Tx,
-                                       elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                       elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                        timeType: Type[ Long ]) : BiPin[ S, Elem, U ] = {
       BiPinImpl.read[ S, Elem, U ]( in, access, eventView )
    }
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
-                                           ( implicit elemSerializer: Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-                                             timeType: Type[ Long ]) : Serializer[ S#Tx, S#Acc, BiPin[ S, Elem, U ]] =
+                                           ( implicit elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
+                                             timeType: Type[ Long ]) : stm.Serializer[ S#Tx, S#Acc, BiPin[ S, Elem, U ]] =
       BiPinImpl.serializer[ S, Elem, U ]( eventView )
 }
 sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {

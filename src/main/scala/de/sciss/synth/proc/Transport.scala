@@ -26,12 +26,13 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{bitemp, stm, data}
+import de.sciss.lucre.{bitemp, stm, data, event => evt}
 import bitemp.{SpanLike, BiGroup, Chronos}
-import stm.{Disposable, Cursor, Sys}
+import stm.{Disposable, Cursor}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import data.Iterator
 import impl.{TransportImpl => Impl}
+import evt.Sys
 
 object Transport {
    def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )

@@ -28,8 +28,8 @@ package bitemp
 package impl
 
 import de.sciss.lucre.{event => evt}
-import evt.{Change, Event, EventLike}
-import stm.{Serializer, Sys}
+import evt.{Change, Event, EventLike, impl => evti, Sys}
+import stm.Serializer
 import data.SkipList
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
@@ -144,8 +144,8 @@ object BiPinImpl {
       // ---- event behaviour ----
 
       private object CollChanged
-      extends evt.Trigger.Impl[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
-      with evt.EventImpl[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      extends evti.TriggerImpl[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      with evti.EventImpl[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
 //      with evt.Root[ S, BiPin.Collection[ S, Elem, U ]]
       {
@@ -216,7 +216,7 @@ object BiPinImpl {
       }
 
       private object ElemChanged
-      extends evt.EventImpl[ S, BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]]
+      extends evti.EventImpl[ S, BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]]
       with evt.InvariantEvent[ S, BiPin.Element[ S, Elem, U ], BiPin[ S, Elem, U ]] {
          protected def reader : evt.Reader[ S, BiPin[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = 2

@@ -1,16 +1,17 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.stm.Durable
-import expr.{Doubles, ExprImplicits}
-import de.sciss.lucre.bitemp.Span
-import de.sciss.lucre.stm.impl.BerkeleyDB
+import de.sciss.lucre.{event => evt, bitemp, stm}
+import expr.ExprImplicits
+import bitemp.Span
+import stm.impl.BerkeleyDB
 import java.io.File
+import evt.InMemory
 
 object ScansTest extends App {
    val AURAL = false
 
-   type S = Durable
+   type S = InMemory // Durable
    val imp  = new ExprImplicits[ S ]
    import imp._
 
@@ -19,10 +20,11 @@ object ScansTest extends App {
       case _ => run()
    }
 
-   def makeSys() : Durable = {
-      val dir = File.createTempFile( "scans", "db" )
-      dir.delete()
-      Durable( BerkeleyDB.factory( dir ))
+   def makeSys() : InMemory /* Durable */ = {
+//      val dir = File.createTempFile( "scans", "db" )
+//      dir.delete()
+//      Durable( BerkeleyDB.factory( dir ))
+      InMemory()
    }
 
    def preliminaryTest() {

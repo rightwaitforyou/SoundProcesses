@@ -29,14 +29,12 @@ package impl
 
 import de.sciss.lucre.{event => evt, stm, expr, data, bitemp, DataInput, DataOutput}
 import de.sciss.synth.expr.{Strings, Doubles, ExprImplicits}
-import stm.{InMemory, Sys}
-import evt.Event
+import evt.{Event, impl => evti, Sys}
 import bitemp.BiType
 import expr.Expr
 import data.SkipList
 import ExprImplicits._
 import annotation.switch
-import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object ProcImpl {
    private final val SER_VERSION = 0
@@ -53,7 +51,7 @@ object ProcImpl {
 
    final val emptyGraph: SynthGraph = SynthGraph {}
 
-   private val anySer = new Serializer[ InMemory ]
+   private val anySer = new Serializer[ evt.InMemory ]
 
    private class Serializer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Proc[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Proc[ S ] =
@@ -118,7 +116,7 @@ object ProcImpl {
       }
 
       sealed trait KeyMap[ Value, ValueUpd, OuterUpd ]
-      extends evt.EventImpl[ S, OuterUpd, Proc[ S ]]
+      extends evti.EventImpl[ S, OuterUpd, Proc[ S ]]
       with evt.InvariantEvent[ S, OuterUpd, Proc[ S ]]
       with ProcEvent
       with impl.KeyMapImpl[ S, String, Value, ValueUpd ] {
@@ -172,9 +170,9 @@ object ProcImpl {
       }
 
       private object StateEvent
-      extends evt.Trigger.Impl[ S, Proc.StateChange[ S ], Proc[ S ]]
+      extends evti.TriggerImpl[ S, Proc.StateChange[ S ], Proc[ S ]]
       with evt.InvariantEvent[ S, Proc.StateChange[ S ], Proc[ S ]]
-      with evt.Root[ S, Proc.StateChange[ S ]]
+      with evti.Root[ S, Proc.StateChange[ S ]]
       with ProcEvent {
          final val slot = 4
       }
@@ -261,11 +259,15 @@ object ProcImpl {
 
       protected val scanMap = {
          implicit val tx = tx0
+//         implicit val _scanSer = implicitly[ stm.Serializer[ S#Tx, S#Acc, Scan[ S ]]]
+//         implicit val _scanSer : stm.Serializer[ S#Tx, S#Acc, Scan[ S ]] = Scan.serializer
+         implicit val _screwYou : stm.Serializer[ S#Tx, S#Acc, ScanEntry[ S ]] = KeyMapImpl.entrySerializer
          SkipList.Map.empty[ S, String, ScanEntry[ S ]]
       }
 
       protected val graphemeMap = {
          implicit val tx = tx0
+         implicit val _screwYou : stm.Serializer[ S#Tx, S#Acc, GraphemeEntry[ S ]] = KeyMapImpl.entrySerializer
          SkipList.Map.empty[ S, String, GraphemeEntry[ S ]]
       }
    }
@@ -287,11 +289,13 @@ object ProcImpl {
 
       protected val scanMap = {
          implicit val tx = tx0
+         implicit val _screwYou : stm.Serializer[ S#Tx, S#Acc, ScanEntry[ S ]] = KeyMapImpl.entrySerializer
          SkipList.Map.read[ S, String, ScanEntry[ S ]]( in, access )
       }
 
       protected val graphemeMap = {
          implicit val tx = tx0
+         implicit val _screwYou : stm.Serializer[ S#Tx, S#Acc, GraphemeEntry[ S ]] = KeyMapImpl.entrySerializer
          SkipList.Map.read[ S, String, GraphemeEntry[ S ]]( in, access )
       }
    }

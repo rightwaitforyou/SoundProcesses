@@ -27,15 +27,14 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, Writable, bitemp, expr, DataOutput, stm, DataInput}
-import stm.Sys
+import de.sciss.lucre.{event => evt, Writable, bitemp, expr, DataOutput, DataInput}
 import annotation.switch
 import expr.Expr
 import bitemp.{Span, BiPin}
 import de.sciss.synth.expr.{Doubles, Longs}
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import evt.{Event, EventLikeSerializer}
+import evt.{Event, EventLikeSerializer, impl => evti, Sys}
 import io.AudioFileSpec
 
 object GraphemeImpl {
@@ -124,12 +123,12 @@ object GraphemeImpl {
    }
 
    private sealed trait ConstHolder[ S <: Sys[ S ]] extends ElemHolder[ S ]
-   with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evt.Constant[ S ] {
+   with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evti.Constant {
       final def timeOption : Option[ Expr[ S, Long ]] = None
    }
 
    private sealed trait MutableHolder[ S <: Sys[ S ]] extends ElemHolder[ S ]
-   with evt.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
+   with evti.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
       def time: Expr[ S, Long ]
 
       final protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
@@ -274,7 +273,7 @@ object GraphemeImpl {
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
                                              pin: BiPin.Modifiable[ S, ElemHolder[ S ], ElemHolderUpdate ])
-   extends Modifiable[ S ] with evt.StandaloneLike[ S, Grapheme.Update[ S ], Grapheme[ S ]] {
+   extends Modifiable[ S ] with evti.StandaloneLike[ S, Grapheme.Update[ S ], Grapheme[ S ]] {
       graph =>
 
       override def toString = "Grapheme" + pin.id

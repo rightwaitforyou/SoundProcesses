@@ -25,11 +25,10 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.event.Targets
+import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt, expr}
+import evt.{Targets, Sys}
 import annotation.switch
-import de.sciss.lucre.expr.Expr
+import expr.Expr
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
 //           8 = string, 9 = spanlike
@@ -113,7 +112,7 @@ object Ints extends BiTypeImpl[ Int ] {
          def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
                                  ( implicit tx: S#Tx ) : Tuple1[ S, T1 ]
 
-         def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ]) : String = _1.toString + "." + name
+         def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, T1 ]) : String = _1.toString + "." + name
 
          def make[ S <: Sys[ S ]]( a: Expr[ S, T1 ])( implicit tx: S#Tx ) : Ex[ S ] = {
             new Tuple1( typeID, this, Targets.partial[ S ], a )
@@ -136,14 +135,14 @@ object Ints extends BiTypeImpl[ Int ] {
 
       case object Neg extends IntOp( 0 ) {
          def value( a: Int ) : Int = -a
-         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
+         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
       }
       case object Abs         extends IntOp(  5 ) {
          def value( a: Int ) : Int = math.abs( a )
       }
       case object BitNot extends IntOp( 4 ) {
          def value( a: Int ) : Int = ~a
-         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = "~" + _1
+         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ]) : String = "~" + _1
       }
    // case object ToLong     extends Op(  6 )
    // case object ToInt       extends Op(  7 )
@@ -165,7 +164,7 @@ object Ints extends BiTypeImpl[ Int ] {
          }
          def value( a: Int, b: Int ) : Int
 
-         def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
+         def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
@@ -177,7 +176,7 @@ object Ints extends BiTypeImpl[ Int ] {
       trait Infix {
          _: Op =>
 
-         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
+         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
             "(" + _1 + " " + name + " " + _2 + ")"
       }
 

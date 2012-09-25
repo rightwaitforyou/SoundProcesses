@@ -28,8 +28,8 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data, expr}
-import stm.{IdentifierMap, Sys}
-import evt.Event
+import stm.IdentifierMap
+import evt.{Event, impl => evti, Sys}
 import annotation.switch
 import expr.LinkedList
 
@@ -103,9 +103,9 @@ object ScanImpl {
                                              protected val sinkMap: IdentifierMap[ S#ID, S#Tx, Link[ S ]],
                                              protected val sinkList: LinkedList.Modifiable[ S, Link[ S ], Unit ])
    extends Scan[ S ]
-   with evt.StandaloneLike[ S, Scan.Update[ S ], Scan[ S ]]
-   with evt.Generator[ S, Scan.Update[ S ], Scan[ S ]]
-   with evt.Root[ S, Scan.Update[ S ]] {
+   with evti.StandaloneLike[ S, Scan.Update[ S ], Scan[ S ]]
+   with evti.Generator[ S, Scan.Update[ S ], Scan[ S ]]
+   with evti.Root[ S, Scan.Update[ S ]] {
       override def toString = "Scan" + id
 
       def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkList.iterator

@@ -25,11 +25,8 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.expr.Type
-import de.sciss.lucre.event.Targets
-import annotation.switch
+import de.sciss.lucre.{stm, DataInput, DataOutput, event => evt}
+import evt.{Targets, Sys}
 
 object Strings extends BiTypeImpl[ String ] {
    private final val typeID = 8
@@ -51,7 +48,7 @@ object Strings extends BiTypeImpl[ String ] {
          }
          def value( a: String, b: String ) : String
 
-         def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
+         def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length

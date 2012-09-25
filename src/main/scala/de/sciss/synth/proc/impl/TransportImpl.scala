@@ -27,8 +27,9 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{DataOutput, DataInput, stm, bitemp, data}
-import stm.{Disposable, IdentifierMap, Sys, Cursor}
+import de.sciss.lucre.{DataOutput, DataInput, stm, bitemp, data, event => evt}
+import stm.{Disposable, IdentifierMap, Cursor}
+import evt.Sys
 import bitemp.{BiGroup, SpanLike, Span}
 import data.SkipList
 import collection.breakOut
@@ -380,7 +381,7 @@ object TransportImpl {
          reactTx( _ => fun )
 
       def reactTx( fun: S#Tx => Update[ S ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] = {
-         val obs = new Observation( this, fun )
+         val obs = new Observation[ S ]( this, fun )
          obsVar.transform( _ :+ obs )( tx.inMemory )
          obs
       }

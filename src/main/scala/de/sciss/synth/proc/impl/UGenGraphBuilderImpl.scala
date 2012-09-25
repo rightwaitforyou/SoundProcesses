@@ -4,7 +4,8 @@ package impl
 
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{event => evt}
+import evt.Sys
 
 //private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 

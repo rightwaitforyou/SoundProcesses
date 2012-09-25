@@ -23,12 +23,10 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.expr
+package de.sciss.synth
+package expr
 
-import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.stm.Sys
-import de.sciss.synth.RichDouble
-import de.sciss.lucre.event.Targets
+import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt}
 import annotation.switch
 
 // typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
@@ -39,7 +37,7 @@ object Doubles extends BiTypeImpl[ Double ] {
    /* protected */ def readValue( in: DataInput ) : Double = in.readDouble()
    /* protected */ def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
+   def readTuple[ S <: evt.Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[ S ])
                                 ( implicit tx: S#Tx ) : ExN[ S ] = {
       (cookie: @switch) match {
          case 1 =>
@@ -152,13 +150,13 @@ object Doubles extends BiTypeImpl[ Double ] {
       import RichDouble._
 
       sealed abstract class Op( val id: Int ) extends Tuple1Op[ Double ] {
-         final def make[ S <: Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple1( typeID, this, Targets.partial[ S ], a )
+         final def make[ S <: evt.Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
+            new Tuple1( typeID, this, evt.Targets.partial[ S ], a )
          }
 
 //         def value( a: Double ) : Double
 
-         def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = _1.toString + "." + name
+         def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ]) : String = _1.toString + "." + name
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
@@ -169,7 +167,7 @@ object Doubles extends BiTypeImpl[ Double ] {
       
       case object Neg extends Op( 0 ) {
          def value( a: Double ) : Double = rd_neg( a )
-         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
+         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
       }
       case object Abs         extends Op(  5 ) {
          def value( a: Double ) : Double = rd_abs( a )
@@ -286,12 +284,12 @@ object Doubles extends BiTypeImpl[ Double ] {
       import RichDouble._
 
       sealed abstract class Op( val id: Int ) extends Tuple2Op[ Double, Double ] {
-         final def make[ S <: Sys[ S ]]( a: Ex[ S ], b: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple2( typeID, this, Targets.partial[ S ], a, b )
+         final def make[ S <: evt.Sys[ S ]]( a: Ex[ S ], b: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
+            new Tuple2( typeID, this, evt.Targets.partial[ S ], a, b )
          }
          def value( a: Double, b: Double ) : Double
 
-         def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
+         def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
 
          def name: String = { val cn = getClass.getName
             val sz   = cn.length
@@ -303,7 +301,7 @@ object Doubles extends BiTypeImpl[ Double ] {
       trait Infix {
          _: Op =>
 
-         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
+         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
             "(" + _1 + " " + name + " " + _2 + ")"
       }
 
@@ -416,7 +414,7 @@ object Doubles extends BiTypeImpl[ Double ] {
 //      case object Firstarg       extends Op( 46 )
    }
 
-   final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
+   final class Ops[ S <: evt.Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       private type E = Ex[ S ]
 
       import UnaryOp._
@@ -433,7 +431,7 @@ object Doubles extends BiTypeImpl[ Double ] {
       def /( b: E ) : E          = Div.make( ex, b )
    }
 
-   final class RichOps[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
+   final class RichOps[ S <: evt.Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       private type E = Ex[ S ]
       
       import UnaryOp._

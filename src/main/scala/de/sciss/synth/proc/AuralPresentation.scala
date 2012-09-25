@@ -26,7 +26,9 @@
 package de.sciss.synth.proc
 
 import impl.AuralPresentationImpl
-import de.sciss.lucre.stm.{Disposable, Cursor, Sys}
+import de.sciss.lucre.{stm, event => evt}
+import stm.{Disposable, Cursor}
+import evt.Sys
 
 object AuralPresentation {
    // ---- implementation forwards ----

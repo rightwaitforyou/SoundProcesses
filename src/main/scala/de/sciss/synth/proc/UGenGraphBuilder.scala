@@ -1,7 +1,8 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{event => evt}
+import evt.Sys
 import impl.{UGenGraphBuilderImpl => Impl}
 import util.control.ControlThrowable
 

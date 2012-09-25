@@ -25,9 +25,8 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{DataInput, DataOutput}
-import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.event.Targets
+import de.sciss.lucre.{DataInput, DataOutput, event => evt}
+import evt.{Sys, Targets}
 
 object Booleans extends BiTypeImpl[ Boolean ] {
    /* protected */ def readValue( in: DataInput ) : Boolean = in.readBoolean()

@@ -26,11 +26,11 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{stm, event => evt, expr, DataInput}
-import stm.Sys
+import de.sciss.lucre.{event => evt, expr, DataInput}
 import expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import impl.{ProcImpl => Impl}
+import evt.Sys
 
 object Proc {
    // ---- implementation forwards ----
@@ -53,7 +53,7 @@ object Proc {
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
 
    final case class AssociativeChange[ S <: Sys[ S ]]( proc: Proc[ S ], added:   Set[ AssociativeKey ],
-                                                                        removed: Set[ AssociativeKey ]) extends StateChange[ S ] {
+                                                                            removed: Set[ AssociativeKey ]) extends StateChange[ S ] {
       override def toString = "AssociativeChange(" + proc +
          (if( added.isEmpty ) "" else ", added = " + added.mkString( ", " )) +
          (if( removed.isEmpty) "" else ", removed = " + removed.mkString( ", " )) + ")"

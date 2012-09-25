@@ -26,10 +26,8 @@
 package de.sciss.lucre
 package bitemp
 
-import stm.{ImmutableSerializer, Sys}
-import de.sciss.lucre.{event => evt}
-import evt.{Pull, Targets}
-import expr.{Expr, Type}
+import stm.ImmutableSerializer
+import expr.Type
 
 /**
  * Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object.

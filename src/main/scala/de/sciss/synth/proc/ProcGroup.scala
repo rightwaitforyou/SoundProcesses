@@ -28,9 +28,9 @@ package de.sciss.synth.proc
 import de.sciss.lucre.{stm, bitemp, expr, event => evt, DataInput}
 import bitemp.{SpanLike, BiGroup}
 import expr.Type
-import stm.{Serializer, Sys}
+import stm.Serializer
 import de.sciss.synth.expr.SpanLikes
-import evt.EventLike
+import evt.{EventLike, Sys}
 
 // scalac 2.9.2 crashes if we name this ProcGroup$ :-(
 object ProcGroup_ {

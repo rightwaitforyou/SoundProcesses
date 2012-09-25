@@ -25,7 +25,8 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{event => evt}
+import evt.Sys
 
 trait ArtifactStore[ S <: Sys[ S ]] {
    /**

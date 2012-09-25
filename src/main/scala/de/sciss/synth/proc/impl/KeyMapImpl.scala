@@ -28,9 +28,8 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data}
-import stm.Sys
 import data.SkipList
-import evt.EventLike
+import evt.{EventLike, impl => evti, Sys}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object KeyMapImpl {
@@ -54,7 +53,7 @@ object KeyMapImpl {
 
    final class Entry[ S <: Sys[ S ], Key, Value, ValueUpd ]( protected val targets: evt.Targets[ S ], val key: Key,
                                                              val value: Value )( implicit info: ValueInfo[ S, Key, Value, ValueUpd ])
-   extends evt.StandaloneLike[ S, (Key, ValueUpd), Entry[ S, Key, Value, ValueUpd ]] {
+   extends evti.StandaloneLike[ S, (Key, ValueUpd), Entry[ S, Key, Value, ValueUpd ]] {
       protected def reader: evt.Reader[ S, Entry[ S, Key, Value, ValueUpd ]] = entrySerializer
 
       def connect()( implicit tx: S#Tx ) {
