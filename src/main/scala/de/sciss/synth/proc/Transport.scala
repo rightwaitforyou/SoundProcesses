@@ -35,9 +35,9 @@ import impl.{TransportImpl => Impl}
 import evt.Sys
 
 object Transport {
-   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
-                            ( implicit tx: S#Tx, cursor: Cursor[ S ]) : ProcTransport[ S ] =
-      Impl( group, sampleRate )
+   def apply[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )
+                            ( implicit tx: S#Tx, cursor: Cursor[ S ], bridge: S#Tx => I#Tx ) : ProcTransport[ S ] =
+      Impl[ S, I ]( group, sampleRate )
 
 //   implicit def serializer[ S <: Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
 //      Impl.serializer( cursor )

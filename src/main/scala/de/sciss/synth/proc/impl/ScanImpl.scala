@@ -54,6 +54,8 @@ object ScanImpl {
    implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Scan[ S ]] =
       anySer.asInstanceOf[ evt.NodeSerializer[ S, Scan[ S ]]]
 
+   private type I = evt.InMemory
+
    private val anySer : evt.NodeSerializer[ I, Scan[ I ]] = new Ser[ I ]
 
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Scan[ S ]] {

@@ -50,7 +50,7 @@ object GraphemeImpl {
    implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Grapheme[ S ]] =
       anySer.asInstanceOf[ evt.NodeSerializer[ S, Grapheme[ S ]]]
 
-   private val anySer = new Ser[ I ]
+   private val anySer = new Ser[ evt.InMemory ]
 
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme[ S ] = {
@@ -68,7 +68,7 @@ object GraphemeImpl {
    private implicit def elemSerializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, ElemHolder[ S ]] =
       anyElemSer.asInstanceOf[ EventLikeSerializer[ S, ElemHolder[ S ]]]
 
-   private val anyElemSer = new ElemSer[ I ]
+   private val anyElemSer = new ElemSer[ evt.InMemory ]
 
    // ---- ElemHolder ----
 

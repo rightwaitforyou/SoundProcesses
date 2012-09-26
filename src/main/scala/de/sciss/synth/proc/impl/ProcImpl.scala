@@ -66,6 +66,8 @@ object ProcImpl {
    implicit def graphemeEntryInfo[ S <: Sys[ S ]] : KeyMapImpl.ValueInfo[ S, String, Grapheme[ S ], Grapheme.Update[ S ]] =
       anyGraphemeEntryInfo.asInstanceOf[ KeyMapImpl.ValueInfo[ S, String, Grapheme[ S ], Grapheme.Update[ S ]]]
 
+   private type I = evt.InMemory
+
    private val anyGraphemeEntryInfo = new KeyMapImpl.ValueInfo[ I, String, Grapheme[ I ], Grapheme.Update[ I ]] {
       def valueEvent( value: Grapheme[ I ]) = value.changed
       val keySerializer    = stm.ImmutableSerializer.String

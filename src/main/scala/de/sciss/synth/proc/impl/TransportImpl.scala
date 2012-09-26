@@ -41,21 +41,24 @@ import java.text.SimpleDateFormat
 object TransportImpl {
    var VERBOSE = true
 
-   def apply[ S <: Sys[ S ]]( group: ProcGroup[ S ], sampleRate: Double )( implicit tx: S#Tx, cursor: Cursor[ S ]) : ProcTransport[ S ] = {
+   def apply[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double )
+                                           ( implicit tx: S#Tx, cursor: Cursor[ S ], bridge: S#Tx => I#Tx ) : ProcTransport[ S ] = {
 //      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
 //      val id         = targets.id
 //      val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
-      implicit val itx = tx.inMemory
+      implicit val itx: I#Tx = tx
       val iid        = itx.newID()
-      implicit val infoSer = dummySerializer[ Info ]
-      val infoVar    = itx.newVar( iid, Info.init )
-      val gMap       = tx.newInMemoryIDMap[ (S#ID, Map[ String, (Long, Grapheme.Value) ])]      // (1)
-      implicit val skipSer = dummySerializer[ Map[ S#ID, Map[ String, Grapheme.Value ]]]
-      val gPrio      = SkipList.Map.empty[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]  // (2)
-      val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                     // (3)
-      implicit val obsSer = dummySerializer[ IIdxSeq[ Observation[ S ]]]
-      val obsVar     = itx.newVar( iid, IIdxSeq.empty[ Observation[ S ]])
-      val t          = new Impl[ S ]( /* targets, */ group, sampleRate, /* playingVar, */ infoVar,
+      implicit val infoSer = dummySerializer[ Info, I ]
+      val infoVar    = itx.newVar( iid, Info.init ) // ( dummySerializer )
+      val gMap       = tx.newInMemoryIDMap[ (S#ID, Map[ String, (Long, Grapheme.Value) ])]         // (1)
+      implicit val skipSer = dummySerializer[ Map[ S#ID, Map[ String, Grapheme.Value ]], I ]
+      val gPrio      = SkipList.Map.empty[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]]     // (2)
+//val gPrio      = mkSkipList[ s.IM, S#ID ]
+//      val gPrio      = mkSkipList[ , S#ID ]
+      val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                        // (3)
+      implicit val obsSer = dummySerializer[ IIdxSeq[ Observation[ S, I ]], I ]
+      val obsVar     = itx.newVar( iid, IIdxSeq.empty[ Observation[ S, I ]])
+      val t          = new Impl[ S, I ]( /* targets, */ group, sampleRate, /* playingVar, */ infoVar,
                                       gMap, gPrio, timedMap, obsVar, cursor.position )
 //      group.intersect( time ).foreach {
 //         case (Span.HasStart( span ), seq) =>
@@ -151,17 +154,17 @@ object TransportImpl {
    private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
    @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
 
-   private def dummySerializer[ A ] : stm.Serializer[ I#Tx, I#Acc, A ] =
+   private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
       DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
 
-   private object DummySerializer extends stm.Serializer[ I#Tx, I#Acc, Nothing ] {
+   private object DummySerializer extends stm.Serializer[ stm.InMemory#Tx, stm.InMemory#Acc, Nothing ] {
       def write( v: Nothing, out: DataOutput) {}
-      def read( in: DataInput, access: I#Acc )( implicit tx: I#Tx ) : Nothing = sys.error( "Operation not supported" )
+      def read( in: DataInput, access: stm.InMemory#Acc )( implicit tx: stm.InMemory#Tx ) : Nothing = sys.error( "Operation not supported" )
    }
 
    private type Update[ S <: Sys[ S ]] = Transport.Update[ S, Proc[ S ], Transport.Proc.Update[ S ]]
 
-   private final class Observation[ S <: Sys[ S ]]( impl: Impl[ S ], val fun: S#Tx => Update[ S ] => Unit )
+   private final class Observation[ S <: Sys[ S ], I <: stm.Sys[ I ]]( impl: Impl[ S, I ], val fun: S#Tx => Update[ S ] => Unit )
    extends Disposable[ S#Tx ] {
       override def toString = impl.toString + ".react@" + hashCode().toHexString
 
@@ -170,16 +173,16 @@ object TransportImpl {
       }
    }
 
-   private final class Impl[ S <: Sys[ S ]]( /* protected val targets: evt.Targets[ S ], */
+   private final class Impl[ S <: Sys[ S ], I <: stm.Sys[ I ]]( /* protected val targets: evt.Targets[ S ], */
                       groupStale:            ProcGroup[ S ],
                       val sampleRate:        Double,
                       infoVar:               I#Var[ Info ],
                       gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
                       gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
                       timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
-                      obsVar:                I#Var[ IIdxSeq[ Observation[ S ]]],
+                      obsVar:                I#Var[ IIdxSeq[ Observation[ S, I ]]],
                       csrPos:                S#Acc )
-                    ( implicit cursor: Cursor[ S ])
+                    ( implicit cursor: Cursor[ S ], trans: S#Tx => I#Tx )
    extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] /* with evt.Node[ S ] */ {
       impl =>
 
@@ -221,7 +224,7 @@ object TransportImpl {
       // So in short: - (1) if update span contains `v`, perform add/remove and recalc new next
       //              - (2) if info span contains update span's start, recalc new next
       private def addRemoveProcs( g: ProcGroup[ S ], span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]], procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
-         implicit val itx = tx.inMemory
+         implicit val itx: I#Tx = tx
          val oldInfo    = infoVar.get
          val newFrame   = calcCurrentTime( oldInfo )
          val isPly      = oldInfo.isRunning
@@ -305,7 +308,7 @@ object TransportImpl {
       }
 
       def dispose()( implicit tx: S#Tx ) {
-         implicit val itx = tx.inMemory
+         implicit val itx: I#Tx = tx
          groupObs.dispose()
          infoVar.set( Info.init )   // if there is pending scheduled tasks, they should abort gracefully
 //         infoVar.dispose()
@@ -332,13 +335,16 @@ object TransportImpl {
          } else startFrame
       }
 
-      def time( implicit tx: S#Tx ) : Long = calcCurrentTime( infoVar.get( tx.inMemory ))
+      def time( implicit tx: S#Tx ) : Long = {
+         implicit val itx: I#Tx = tx
+         calcCurrentTime( infoVar.get )
+      }
 
 //      def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
 //      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playingVar.set( expr )}
 
       def play()( implicit tx: S#Tx ) {
-         implicit val itx = tx.inMemory
+         implicit val itx: I#Tx = tx
          val oldInfo = infoVar.get
          if( oldInfo.isRunning ) return
          val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
@@ -349,7 +355,7 @@ object TransportImpl {
       }
 
       def stop()( implicit tx: S#Tx ) {
-         implicit val itx = tx.inMemory
+         implicit val itx: I#Tx = tx
          val oldInfo = infoVar.get
          if( !oldInfo.isRunning ) return
 
@@ -362,27 +368,33 @@ object TransportImpl {
 
       def group( implicit tx: S#Tx ) : ProcGroup[ S ] =  tx.refresh( csrPos, groupStale )
 
-      def isPlaying( implicit tx: S#Tx ) : Boolean = infoVar.get( tx.inMemory ).isRunning // playingVar.value
+      def isPlaying( implicit tx: S#Tx ) : Boolean = {
+         implicit val itx: I#Tx = tx
+         infoVar.get.isRunning
+      } // playingVar.value
 
       def seek( time: Long )( implicit tx: S#Tx ) {
          advance( isSeek = true, newFrame = time )
       }
 
       private def fire( update: Update[ S ])( implicit tx: S#Tx ) {
-         val obs = obsVar.get( tx.inMemory )
+         implicit val itx: I#Tx = tx
+         val obs = obsVar.get
          obs.foreach( _.fun( tx )( update ))
       }
 
-      def removeObservation( obs: Observation[ S ])( implicit tx: S#Tx ) {
-         obsVar.transform( _.filterNot( _ == obs ))( tx.inMemory )
+      def removeObservation( obs: Observation[ S, I ])( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx = tx
+         obsVar.transform( _.filterNot( _ == obs ))
       }
 
       def react( fun: Update[ S ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] =
          reactTx( _ => fun )
 
       def reactTx( fun: S#Tx => Update[ S ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] = {
-         val obs = new Observation[ S ]( this, fun )
-         obsVar.transform( _ :+ obs )( tx.inMemory )
+         implicit val itx: I#Tx = tx
+         val obs = new Observation[ S, I ]( this, fun )
+         obsVar.transform( _ :+ obs )
          obs
       }
 
@@ -428,7 +440,7 @@ object TransportImpl {
       // - retrieve the new nextGraphemeTime by looking at the head element in (2).
 
       private def removeProc( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
-         implicit val itx = tx.inMemory
+         implicit val itx: I#Tx = tx
          val id = timed.id
          timedMap.remove( id )                              // in (3)
          val entries = gMap.get( id )
@@ -446,8 +458,8 @@ object TransportImpl {
       }
 
       private def addProc( newFrame: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx = tx
          val newFrameP = newFrame + 1
-         implicit val itx = tx.inMemory
          val id   = timed.id
          val p    = timed.value
 //                  var procVals = Map.empty[ String, Scan.Link ]
@@ -490,7 +502,7 @@ object TransportImpl {
        * @param newFrame   the frame which has been reached
        */
       private def advance( newFrame: Long, isSeek: Boolean = false, startPlay: Boolean = false )( implicit tx: S#Tx ) {
-         implicit val itx     = tx.inMemory
+         implicit val itx: I#Tx = tx
          val oldInfo          = infoVar.get
          val oldFrame         = oldInfo.frame
 if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newFrame + "); oldInfo = " + oldInfo )
@@ -800,7 +812,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
       }
 
       private def eventReached( expectedValid: Int, newLogical: Long )( implicit tx: S#Tx ) {
-         implicit val itx = tx.inMemory
+         implicit val itx: I#Tx = tx
          val info = infoVar.get
          if( info.valid != expectedValid ) return  // the scheduled task was invalidated by an intermediate stop or seek command
 

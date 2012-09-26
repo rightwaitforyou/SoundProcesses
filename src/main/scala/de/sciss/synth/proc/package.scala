@@ -30,7 +30,7 @@ import bitemp.BiGroup
 import evt.Sys
 
 package object proc {
-   private[proc] type I = evt.InMemory
+//   private[proc] type I = evt.InMemory
 
    type ProcGroup[ S <: Sys[ S ]] = BiGroup[ S, Proc[ S ], Proc.Update[ S ]]
    type TimedProc[ S <: Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ]]
@@ -45,9 +45,9 @@ package object proc {
 
    def ??? : Nothing = sys.error( "TODO" )
 
-   implicit def dummyInMem[ S <: Sys[ S ]]( tx: S#Tx ) : _HasInMem.type = _HasInMem
-
-   object _HasInMem {
-      def inMemory : evt.InMemory#Tx = ???
-   }
+//   implicit def dummyInMem[ S <: Sys[ S ]]( tx: S#Tx ) : _HasInMem.type = _HasInMem
+//
+//   object _HasInMem {
+//      def inMemory : evt.InMemory#Tx = ???
+//   }
 }
