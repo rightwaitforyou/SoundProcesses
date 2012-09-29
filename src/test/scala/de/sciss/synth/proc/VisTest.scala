@@ -16,14 +16,14 @@ import synth.SynthGraph
 import evt.{InMemory, Sys}
 
 object VisTest {
-   def apply() : VisTest[ InMemory ] = {
+   def apply() : VisTest[ InMemory, InMemory ] = {
       implicit val system = InMemory()
       new VisTest( system )
    }
 
    def dataDir = new File( new File( sys.props( "user.home" ), "sound_processes" ), "db" )
 
-   def inMem() : VisTest[ InMemory ] = {
+   def inMem() : VisTest[ InMemory, InMemory ] = {
       implicit val system  = InMemory()
       new VisTest( system )
    }
@@ -53,8 +53,9 @@ object VisTest {
       play()
    }
 }
-final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy ]) extends ExprImplicits[ Sy ] {
-   type S  = Sy
+final class VisTest[ S <: Sys[ S ], I <: Sys[ I ]]( system: S )( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx )
+extends ExprImplicits[ S ] {
+//   type S  = Sy
    type Tx = S#Tx
 
    def t[ A ]( fun: S#Tx => A ) : A = {
@@ -90,7 +91,7 @@ final class VisTest[ Sy <: Sys[ Sy ]]( system: Sy )( implicit cursor: Cursor[ Sy
 
    val trans = cursor.step { implicit tx =>
       val g = access.get
-      val tr = Transport( g )
+      val tr = Transport[ S, I ]( g )
       tr.react { upd =>
          println( "Transport observed: " + upd )
       }

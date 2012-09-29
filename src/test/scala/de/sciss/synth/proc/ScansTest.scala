@@ -7,25 +7,39 @@ import bitemp.Span
 import stm.impl.BerkeleyDB
 import java.io.File
 import evt.InMemory
+import de.sciss.lucre.confluent.reactive.ConfluentReactive
 
 object ScansTest extends App {
    val AURAL = false
 
-   type S = InMemory // Durable
-   val imp  = new ExprImplicits[ S ]
-   import imp._
+//   type S = InMemory // Durable
+//   type I = InMemory
 
    args.headOption match {
-      case Some( "--prelim" ) => preliminaryTest()
-      case _ => run()
+      case Some( "--prelim" )    => preliminaryTest()
+      case Some( "--mem-scan" )  =>
+         implicit val sys = evt.InMemory()
+         run[ InMemory, InMemory ]()
+      case Some( "--confluent-scan" ) =>
+         implicit val sys = ConfluentReactive.tmp()
+         run[ ConfluentReactive, stm.InMemory ]()
+
+      case _ =>
+         println(
+            """
+              |Options: --prelim
+              |         --mem-scan
+              |         --confluent-scan
+            """.stripMargin )
+         sys.exit( 1 )
    }
 
-   def makeSys() : InMemory /* Durable */ = {
-//      val dir = File.createTempFile( "scans", "db" )
-//      dir.delete()
-//      Durable( BerkeleyDB.factory( dir ))
-      InMemory()
-   }
+//   def makeSys() : InMemory /* Durable */ = {
+////      val dir = File.createTempFile( "scans", "db" )
+////      dir.delete()
+////      Durable( BerkeleyDB.factory( dir ))
+//      InMemory()
+//   }
 
    def preliminaryTest() {
       ???
@@ -58,15 +72,17 @@ object ScansTest extends App {
 ////      }
    }
 
-   def run() {
-      implicit val sys = makeSys()
+   def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit cursor: stm.Cursor[ S ], bridge: S#Tx => I#Tx ) {
+//      implicit val sys = makeSys()
+      val imp  = new ExprImplicits[ S ]
+      import imp._
 
       def body( auralSystem: Option[ AuralSystem ]) {
-         sys.step { implicit tx =>
+         cursor.step { implicit tx =>
             val group   = ProcGroup_.Modifiable[ S ]
             test( group )
 //            transp.playing_=( true )
-val transp  = Transport( group )
+val transp  = Transport[ S, I ]( group )
             auralSystem.foreach { as => AuralPresentation.run( transp, as )}
             transp.play()
          }
@@ -85,8 +101,11 @@ val transp  = Transport( group )
 //      Thread.sleep( 1000 )
    }
 
-   def test /* [ S <: Sys[ S ]] */( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
+   def test[ S <: evt.Sys[ S ]]( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
       SoundProcesses.showLog = true
+
+      val imp  = new ExprImplicits[ S ]
+      import imp._
 
       val p1 = Proc[ S ]
       val p2 = Proc[ S ]
