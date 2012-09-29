@@ -72,7 +72,7 @@ object ScansTest extends App {
 ////      }
    }
 
-   def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit cursor: stm.Cursor[ S ], bridge: S#Tx => I#Tx ) {
+   def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit system: S, cursor: stm.Cursor[ S ], bridge: S#Tx => I#Tx ) {
 //      implicit val sys = makeSys()
       val imp  = new ExprImplicits[ S ]
       import imp._
@@ -87,6 +87,9 @@ val transp  = Transport[ S, I ]( group )
             transp.play()
          }
       }
+
+      // ensure index tree 0 is build
+      system.root( _ => () )
 
       if( AURAL ) {
          lazy val as: AuralSystem = AuralSystem().start().whenStarted { _ =>
