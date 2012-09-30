@@ -58,8 +58,9 @@ object TransportImpl {
       val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                        // (3)
       implicit val obsSer = dummySerializer[ IIdxSeq[ Observation[ S, I ]], I ]
       val obsVar     = itx.newVar( iid, IIdxSeq.empty[ Observation[ S, I ]])
-      val t          = new Impl[ S, I ]( /* targets, */ group, sampleRate, /* playingVar, */ infoVar,
-                                      gMap, gPrio, timedMap, obsVar, cursor.position )
+      val groupH     = tx.newHandle( group )( ProcGroup_.serializer )
+      val t          = new Impl[ S, I ]( /* targets, */ groupH, sampleRate, /* playingVar, */ infoVar,
+                                      gMap, gPrio, timedMap, obsVar /* , cursor.position */)
 //      group.intersect( time ).foreach {
 //         case (Span.HasStart( span ), seq) =>
 //            seq.foreach { timed => view.add( span, timed )}
@@ -174,14 +175,13 @@ object TransportImpl {
    }
 
    private final class Impl[ S <: Sys[ S ], I <: stm.Sys[ I ]]( /* protected val targets: evt.Targets[ S ], */
-                      groupStale:            ProcGroup[ S ],
+                      groupHandle:           stm.Source[ S#Tx, ProcGroup[ S ]],
                       val sampleRate:        Double,
                       infoVar:               I#Var[ Info ],
                       gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, (Long, Grapheme.Value) ])],
                       gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Grapheme.Value ]]],
                       timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
-                      obsVar:                I#Var[ IIdxSeq[ Observation[ S, I ]]],
-                      csrPos:                S#Acc )
+                      obsVar:                I#Var[ IIdxSeq[ Observation[ S, I ]]])
                     ( implicit cursor: Cursor[ S ], trans: S#Tx => I#Tx )
    extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] /* with evt.Node[ S ] */ {
       impl =>
@@ -267,7 +267,7 @@ object TransportImpl {
 
       def init()( implicit tx: S#Tx ) {
          // we can use groupStale because init is called straight away after instantiating Impl
-         groupObs = groupStale.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
+         groupObs = group.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
             case BiGroup.Added( g, span, timed ) =>
                addRemoveProcs( g, span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
             case BiGroup.Removed( g, span, timed ) =>
@@ -318,7 +318,7 @@ object TransportImpl {
          obsVar.dispose()
       }
 
-      override def toString = "Transport(group=" + groupStale.id + ")@" + hashCode.toHexString
+      override def toString = "Transport(group=" + groupHandle + ")@" + hashCode.toHexString
 
       def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
          group.intersect( time ).flatMap( flatSpans )
@@ -366,7 +366,7 @@ object TransportImpl {
          fire( Transport.Stop( impl, newInfo.frame ))
       }
 
-      def group( implicit tx: S#Tx ) : ProcGroup[ S ] =  tx.refresh( csrPos, groupStale )
+      def group( implicit tx: S#Tx ) : ProcGroup[ S ] = groupHandle.get // tx.refresh( csrPos, groupStale )
 
       def isPlaying( implicit tx: S#Tx ) : Boolean = {
          implicit val itx: I#Tx = tx
