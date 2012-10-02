@@ -36,19 +36,20 @@ final case class RichBuffer( buf: Buffer ) /* extends RichObject */ {
    def server = buf.server
 
    def alloc( numFrames: Int, numChannels: Int = 1 )( implicit tx: ProcTxn ) {
-      tx.add( buf.allocMsg( numFrames, numChannels ), Some( (RequiresChange, isOnline, true) ), false )
+      tx.add( buf.allocMsg( numFrames, numChannels ), change = Some( (RequiresChange, isOnline, true) ), audible = false )
    }
 
    def cue( path: String, startFrame: Int = 0 )( implicit tx: ProcTxn ) {
-      tx.add( buf.cueMsg( path, startFrame ), Some( (Always, hasContent, true) ), false, Map( isOnline -> true ))
+      tx.add( buf.cueMsg( path, startFrame ), change = Some( (Always, hasContent, true) ),
+         audible = false, dependencies = Map( isOnline -> true ))
    }
 
    def record( path: String, fileType: AudioFileType, sampleFormat: SampleFormat )( implicit tx: ProcTxn ) {
-      tx.add( buf.writeMsg( path, fileType, sampleFormat, 0, 0, true ),
-         Some( (Always, hasContent, true) ), false, Map( isOnline -> true )) // hasContent is a bit misleading...
+      tx.add( buf.writeMsg( path, fileType, sampleFormat, 0, 0, leaveOpen = true ),
+         change = Some( (Always, hasContent, true) ), audible = false, dependencies = Map( isOnline -> true )) // hasContent is a bit misleading...
    }
 
    def zero( implicit tx: ProcTxn ) {
-      tx.add( buf.zeroMsg, Some( (Always, hasContent, true) ), false, Map( isOnline -> true ))
+      tx.add( buf.zeroMsg, change = Some( (Always, hasContent, true) ), audible = false, dependencies = Map( isOnline -> true ))
    }
 }

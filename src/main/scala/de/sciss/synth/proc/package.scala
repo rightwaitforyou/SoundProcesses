@@ -44,10 +44,4 @@ package object proc {
 //   type Grapheme[ S <: Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
 
    def ??? : Nothing = sys.error( "TODO" )
-
-//   implicit def dummyInMem[ S <: Sys[ S ]]( tx: S#Tx ) : _HasInMem.type = _HasInMem
-//
-//   object _HasInMem {
-//      def inMemory : evt.InMemory#Tx = ???
-//   }
 }

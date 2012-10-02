@@ -49,7 +49,7 @@ final class RichGroup private( val group: Group, initOnline: Boolean ) extends R
       // We thus try out a workaround by declaring a group's newMsg also audible...
 //      tx.add( group.newMsg( target.node, addAction ), Some( (RequiresChange, isOnline, true) ), false,
 //              Map( target.isOnline -> true ))
-      tx.add( group.newMsg( target.node, addAction ), Some( (RequiresChange, isOnline, true) ), true,
-              Map( target.isOnline -> true ))
+      tx.add( group.newMsg( target.node, addAction ), change = Some( (RequiresChange, isOnline, true) ),
+              audible = true, dependencies = Map( target.isOnline -> true ))
    }
 }

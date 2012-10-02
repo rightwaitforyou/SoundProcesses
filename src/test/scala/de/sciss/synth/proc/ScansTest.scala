@@ -74,8 +74,8 @@ object ScansTest extends App {
 
    def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit system: S, cursor: stm.Cursor[ S ], bridge: S#Tx => I#Tx ) {
 //      implicit val sys = makeSys()
-      val imp  = new ExprImplicits[ S ]
-      import imp._
+//      val imp  = new ExprImplicits[ S ]
+//      import imp._
 
       def body( auralSystem: Option[ AuralSystem ]) {
          cursor.step { implicit tx =>

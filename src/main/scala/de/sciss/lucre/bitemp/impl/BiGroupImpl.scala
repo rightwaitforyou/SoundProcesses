@@ -60,7 +60,7 @@ object BiGroupImpl {
       case Span.From( start ) => LongPoint2D( start, MAX_COORD )
       case Span.Until( stop ) => LongPoint2D( MIN_COORD, stop )
       case Span.All           => LongPoint2D( MIN_COORD, MAX_COORD )
-      case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
+      case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ?? what to do with this case ?? forbid?
    }
 
    private def searchSpanToPoint( span: SpanLike ) : LongPoint2D = span match {
@@ -68,7 +68,7 @@ object BiGroupImpl {
       case Span.From( start ) => LongPoint2D( start, MAX_COORD + 1 )
       case Span.Until( stop ) => LongPoint2D( MIN_COORD, stop )
       case Span.All           => LongPoint2D( MIN_COORD, MAX_COORD + 1 )
-      case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ??? what to do with this case ??? forbid?
+      case Span.Void          => LongPoint2D( MAX_COORD, MIN_COORD )  // ?? what to do with this case ?? forbid?
    }
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(
