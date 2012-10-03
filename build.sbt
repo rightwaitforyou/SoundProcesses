@@ -39,21 +39,31 @@ testOptions in Test += Tests.Argument("-oF")
 
 fork in run := true  // required for shutdown hook, and also the scheduled thread pool, it seems
 
-initialCommands in console := """// thanks to Rex Kerr for this trick (http://www.scala-lang.org/node/11813)
-def shortresults[T](t: => T) = {
-   val s = t.toString
-   val name = s.takeWhile(_ != ':')
-   val idx = s.indexOf(" = ")
-   val full = if (idx >= 0) name + s.substring(idx) else s
-   val short = if (full.length>799) full.substring(0,796)+"..." else full
-   print(short)
-   t
-}
-import de.sciss.synth._; import ugen._; import proc._
-import de.sciss.lucre.stm.InMemory
-import de.sciss.lucre.expr.{Expr, LinkedList}
-import de.sciss.lucre.bitemp.Span
-import de.sciss.lucre.{event => evt}
-import expr.{Ints, Longs, Doubles, Spans}
-println( "To disable result types:\n :power\n :wrap shortresults\n: silent" )
-"""
+initialCommands in console :=
+   """// thanks to Rex Kerr for this trick (http://www.scala-lang.org/node/11813)
+     |def shortresults[T](t: => T) = {
+     |  val s = t.toString
+     |  val name = s.takeWhile(_ != ':')
+     |  val idx = s.indexOf(" = ")
+     |  val full = if (idx >= 0) name + s.substring(idx) else s
+     |  val short = if (full.length>799) full.substring(0,796)+"..." else full
+     |  print(short)
+     |  t
+     |}
+     |import de.sciss.synth._; import ugen._; import proc._
+     |import de.sciss.lucre.stm.InMemory
+     |import de.sciss.lucre.expr.{Expr, LinkedList}
+     |import de.sciss.lucre.bitemp.Span
+     |import de.sciss.lucre.{event => evt}
+     |import expr.{Ints, Longs, Doubles, Spans}
+     |println( "To disable result types:\n :power\n :wrap shortresults\n: silent" )""".stripMargin +
+   "\nprintln( \"\"\"" +
+   """
+     |val vis = VisTest()
+     |import vis._
+     |val p     = t { implicit tx => val res = proc( "test" ); res.changed.react { u => println( "Proc observed: " + u )}; res }
+     |val scan  = t { implicit tx => p.scans.add( "freq" )}
+     |val g     = t { implicit tx => grapheme }
+     |t { implicit tx => scan.source = Some( g )}
+     |t { implicit tx => g.add( 0L, curve( 456.7 ))}
+   """.stripMargin + "\"\"\")"

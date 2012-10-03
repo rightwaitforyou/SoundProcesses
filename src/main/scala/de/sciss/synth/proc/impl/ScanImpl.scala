@@ -29,9 +29,10 @@ package impl
 
 import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data, expr}
 import stm.IdentifierMap
-import evt.{Event, impl => evti, Sys}
+import evt.{impl => evti, Event, Sys}
 import annotation.switch
 import expr.LinkedList
+import proc.Scan
 
 object ScanImpl {
    import Scan.Link
@@ -106,8 +107,7 @@ object ScanImpl {
                                              protected val sinkList: LinkedList.Modifiable[ S, Link[ S ], Unit ])
    extends Scan[ S ]
    with evti.StandaloneLike[ S, Scan.Update[ S ], Scan[ S ]]
-   with evti.Generator[ S, Scan.Update[ S ], Scan[ S ]]
-   with evti.Root[ S, Scan.Update[ S ]] {
+   with evti.Generator[ S, Scan.Update[ S ], Scan[ S ]] {
       override def toString = "Scan" + id
 
       def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkList.iterator
@@ -150,9 +150,18 @@ object ScanImpl {
          val old = sourceRef.get
          if( old == link ) return false
 
+         val con = targets.nonEmpty
          sourceRef.set( link )
          old match {
-            case Some( Link.Scan( peer )) => peer.removeSink( this )
+            case Some( Link.Scan( peer )) =>
+               peer.removeSink( this )
+            case Some( Link.Grapheme( peer )) if( con ) =>
+               peer.changed -/-> this
+            case _ =>
+         }
+         if( con ) link match {
+            case Some( Link.Grapheme( peer )) =>
+               peer.changed ---> this
             case _ =>
          }
          fire( Scan.SourceChanged( this, link ))
@@ -160,6 +169,32 @@ object ScanImpl {
       }
 
       def changed: Event[ S, Scan.Update[ S ], Scan[ S ]] = this
+
+      def connect()( implicit tx: S#Tx ) {
+         source match {
+            case Some( Scan.Link.Grapheme( peer )) => peer.changed ---> this
+            case _ =>
+         }
+      }
+
+      def disconnect()(implicit tx: S#Tx) {
+         source match {
+            case Some( Scan.Link.Grapheme( peer )) => peer.changed -/-> this
+            case _ =>
+         }
+      }
+
+      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Scan.Update[ S ]] = {
+         if( pull.parents( this ).isEmpty ) {
+            pull.resolve[ Scan.Update[ S ]]
+         } else {
+            source.flatMap {
+               case Scan.Link.Grapheme( peer ) =>
+                  peer.changed.pullUpdate( pull ).map( Scan.SourceUpdate( this, _ ))
+               case _ => None
+            }
+         }
+      }
 
       // called in the implementation from addSink( Link.Scan( _ )). the difference
       // to source_= is that this method should not establish the opposite connection

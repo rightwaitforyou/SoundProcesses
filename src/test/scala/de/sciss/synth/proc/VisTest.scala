@@ -12,7 +12,7 @@ import de.sciss.synth
 import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.expr.{SpanLikes, Longs, ExprImplicits}
-import synth.SynthGraph
+import synth.{Env, linShape, SynthGraph}
 import evt.{InMemory, Sys}
 
 object VisTest {
@@ -53,9 +53,9 @@ object VisTest {
       play()
    }
 }
-final class VisTest[ S <: Sys[ S ], I <: Sys[ I ]]( system: S )( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx )
-extends ExprImplicits[ S ] {
-//   type S  = Sy
+final class VisTest[ Sy <: Sys[ Sy ], I <: Sys[ I ]]( system: Sy )( implicit cursor: Cursor[ Sy ], bridge: Sy#Tx => I#Tx )
+extends ExprImplicits[ Sy ] {
+   type S  = Sy
    type Tx = S#Tx
 
    def t[ A ]( fun: S#Tx => A ) : A = {
@@ -105,6 +105,10 @@ extends ExprImplicits[ S ] {
 
    def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ] = access.get // ._1
 //   def trans( implicit tx: S#Tx ) : ProcTransport[ S ]         = access.get._2
+
+   def grapheme( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = Grapheme.Modifiable[ S ]
+
+   def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape ) = Grapheme.Elem.Curve( amp -> shape )
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)

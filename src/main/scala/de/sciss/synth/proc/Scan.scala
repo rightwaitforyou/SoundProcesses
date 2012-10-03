@@ -54,15 +54,16 @@ object Scan {
 
    sealed trait Update[ S <: Sys[ S ]] { def scan: Scan[ S ]}
    sealed trait SinkUpdate[ S <: Sys[ S ]] extends Update[ S ] { def sink: Link[ S ]}
-   final case class SinkAdded[     S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ] {
+   final case class SinkAdded[     S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
       override def toString = "[" + scan + " ---> " + sink + "]"
    }
-   final case class SinkRemoved[   S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends Update[ S ] {
+   final case class SinkRemoved[   S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
       override def toString = "[" + scan + " -/-> " + sink + "]"
    }
    final case class SourceChanged[ S <: Sys[ S ]]( scan: Scan[ S ], source: Option[ Link[ S ]]) extends Update[ S ] {
       override def toString = "[" + scan + " <--- " + source + "]"
    }
+   final case class SourceUpdate[ S <: Sys[ S ]]( scan: Scan[ S ], source: Grapheme.Update[ S ]) extends Update[ S ]
 }
 
 /**
