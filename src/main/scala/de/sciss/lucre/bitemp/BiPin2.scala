@@ -1,5 +1,5 @@
 /*
- *  BiPin.scala
+ *  BiPin2.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -26,55 +26,53 @@
 package de.sciss.lucre
 package bitemp
 
-import impl.{BiPinImpl => Impl}
+//import impl.{BiPin2Impl => Impl}
 import de.sciss.lucre.{event => evt}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.{Event, EventLike, Sys}
 import expr.Type
 
-object BiPin {
+object BiPin2 {
    import expr.{Expr => Ex}
 
+   def ??? : Nothing = sys.error( "TODO" )
+
    object Expr {
-      type Update[     S <: Sys[ S ], A ] = BiPin.Update[     S, Ex[ S, A ], evt.Change[ A ]]
-      type Modifiable[ S <: Sys[ S ], A ] = BiPin.Modifiable[ S, Ex[ S, A ], evt.Change[ A ]]
+      type Update[     S <: Sys[ S ], A ] = BiPin2.Update[     S, Ex[ S, A ], evt.Change[ A ]]
+      type Modifiable[ S <: Sys[ S ], A ] = BiPin2.Modifiable[ S, Ex[ S, A ], evt.Change[ A ]]
 
       def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr[ S, A ] = {
-         Impl.read[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+         ??? // Impl.read[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
       }
 
       def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, Expr[ S, A ]] = {
-//         import elemType.{serializer => elemSer}
-//         implicit val timeType = elemType.longType
-         Impl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
+         ??? // Impl.serializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
       }
 
       object Modifiable {
-         def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, BiPin.Expr.Modifiable[ S, A ]] = {
-//            import elemType.{serializer => elemSer}
-//            implicit val timeType = elemType.longType
-            Impl.modifiableSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
+         def serializer[ S <: Sys[ S ], A ]( implicit elemType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, BiPin2.Expr.Modifiable[ S, A ]] = {
+            ??? // Impl.modifiableSerializer[ S, Ex[ S, A ], evt.Change[ A ]]( _.changed )( elemType.serializer, elemType.longType )
          }
 
          def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr.Modifiable[ S, A ] = {
-            Impl.readModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+            ??? // Impl.readModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( in, access, _.changed )( tx, elemType.serializer[ S ], elemType.longType )
          }
 
          def apply[ S <: Sys[ S ], A ]/*( default: Ex[ S, A ])*/( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr.Modifiable[ S, A ] =
-            Impl.newModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( /* default, */ _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+            ??? // Impl.newModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( /* default, */ _.changed )( tx, elemType.serializer[ S ], elemType.longType )
 
          def partial[ S <: Sys[ S ], A ]/*( default: Ex[ S, A ])*/
                                         ( implicit tx: S#Tx, elemType: BiType[ A ]) : Expr.Modifiable[ S, A ] =
-            Impl.newPartialModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( /* default, */ _.changed )( tx, elemType.serializer[ S ], elemType.longType )
+            ??? // Impl.newPartialModifiable[ S, Ex[ S, A ], evt.Change[ A ]]( /* default, */ _.changed )( tx, elemType.serializer[ S ], elemType.longType )
       }
    }
-   type Expr[ S <: Sys[ S ], A ] = BiPin[ S, Ex[ S, A ], evt.Change[ A ]]
+   type Expr[ S <: Sys[ S ], A ] = BiPin2[ S, Ex[ S, A ], evt.Change[ A ]]
 
    sealed trait Update[ S <: Sys[ S ], Elem, U ] {
-      def pin: BiPin[ S, Elem, U ]
+      def pin: BiPin2[ S, Elem, U ]
    }
-   final case class Collection[ S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ Region[ Elem ]]) extends Update[ S, Elem, U ]
-   final case class Element[    S <: Sys[ S ], Elem, U ]( pin: BiPin[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ])     extends Update[ S, Elem, U ]
+   final case class Collection[ S <: Sys[ S ], Elem, U ]( pin: BiPin2[ S, Elem, U ], changes: IIdxSeq[ Region[ Elem ]]) extends Update[ S, Elem, U ]
+   final case class Element[    S <: Sys[ S ], Elem, U ]( pin: BiPin2[ S, Elem, U ], changes: IIdxSeq[ (Elem, U) ])     extends Update[ S, Elem, U ]
 
    type Region[ Elem ] = (Span.HasStart, Elem)
 
@@ -83,9 +81,9 @@ object BiPin {
 
    object Modifiable {
       /**
-       * Extractor to check if a `BiPin` is actually a `BiPin.Modifiable`
+       * Extractor to check if a `BiPin2` is actually a `BiPin2.Modifiable`
        */
-      def unapply[ S <: Sys[ S ], Elem, U ]( v: BiPin[ S, Elem, U ]) : Option[ Modifiable[ S, Elem, U ]] = {
+      def unapply[ S <: Sys[ S ], Elem, U ]( v: BiPin2[ S, Elem, U ]) : Option[ Modifiable[ S, Elem, U ]] = {
          if( v.isInstanceOf[ Modifiable[ _, _, _ ]]) Some( v.asInstanceOf[ Modifiable[ S, Elem, U ]]) else None
       }
 
@@ -93,21 +91,21 @@ object BiPin {
                                         ( implicit tx: S#Tx,
                                           elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                           timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] = {
-         Impl.readModifiable[ S, Elem, U ]( in, access, eventView )
+         ??? // Impl.readModifiable[ S, Elem, U ]( in, access, eventView )
       }
 
       def apply[ S <: Sys[ S ], Elem, U ]/*( default: Elem )*/( eventView: Elem => EventLike[ S, U, Elem ])
                                          ( implicit tx: S#Tx,
                                            elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
                                            timeType: Type[ Long ]) : Modifiable[ S, Elem, U ] =
-         Impl.newModifiable[ S, Elem, U ]( /* default, */ eventView )
+         ??? // Impl.newModifiable[ S, Elem, U ]( /* default, */ eventView )
 
       def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                               ( implicit elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-                                                timeType: Type[ Long ]) : stm.Serializer[ S#Tx, S#Acc, BiPin.Modifiable[ S, Elem, U ]] =
-         Impl.modifiableSerializer[ S, Elem, U ]( eventView )
+                                                timeType: Type[ Long ]) : stm.Serializer[ S#Tx, S#Acc, BiPin2.Modifiable[ S, Elem, U ]] =
+         ??? // Impl.modifiableSerializer[ S, Elem, U ]( eventView )
    }
-   trait Modifiable[ S <: Sys[ S ], Elem, U ] extends BiPin[ S, Elem, U ] {
+   trait Modifiable[ S <: Sys[ S ], Elem, U ] extends BiPin2[ S, Elem, U ] {
       def add(    time: Ex[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Unit
       def remove( time: Ex[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Boolean
       def clear()( implicit tx: S#Tx ) : Unit
@@ -116,21 +114,21 @@ object BiPin {
    def read[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])( in: DataInput, access: S#Acc )
                                      ( implicit tx: S#Tx,
                                        elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-                                       timeType: Type[ Long ]) : BiPin[ S, Elem, U ] = {
-      Impl.read[ S, Elem, U ]( in, access, eventView )
+                                       timeType: Type[ Long ]) : BiPin2[ S, Elem, U ] = {
+      ??? // Impl.read[ S, Elem, U ]( in, access, eventView )
    }
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
                                            ( implicit elemSerializer: stm.Serializer[ S#Tx, S#Acc, Elem ] with evt.Reader[ S, Elem ],
-                                             timeType: Type[ Long ]) : stm.Serializer[ S#Tx, S#Acc, BiPin[ S, Elem, U ]] =
-      Impl.serializer[ S, Elem, U ]( eventView )
+                                             timeType: Type[ Long ]) : stm.Serializer[ S#Tx, S#Acc, BiPin2[ S, Elem, U ]] =
+      ??? // Impl.serializer[ S, Elem, U ]( eventView )
 }
-sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
-   import BiPin.Leaf
+sealed trait BiPin2[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
+   import BiPin2.Leaf
 
 //   def value( implicit tx: S#Tx, time: Chronos[ S ]) : A
 
-   def modifiableOption : Option[ BiPin.Modifiable[ S, Elem, U ]]
+   def modifiableOption : Option[ BiPin2.Modifiable[ S, Elem, U ]]
 
    /**
     * Queries the element valid for the given point in time.
@@ -138,7 +136,7 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
     * the same point in time, this returns the most recently added element.
     *
     * We propose that this should be the unambiguous way to evaluate
-    * the `BiPin` for a given moment in time.
+    * the `BiPin2` for a given moment in time.
     *
     * @param time the query time point
     * @return  an element for the given time point, if it exists, otherwise `None`
@@ -175,9 +173,9 @@ sealed trait BiPin[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
    def intersect( time: Long )( implicit tx: S#Tx ) : Leaf[ S, Elem ]
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
-   def collectionChanged:  Event[ S, BiPin.Collection[ S, Elem, U ], BiPin[ S, Elem, U ]]
-   def elementChanged:     Event[ S, BiPin.Element[    S, Elem, U ], BiPin[ S, Elem, U ]]
-   def changed :           Event[ S, BiPin.Update[     S, Elem, U ], BiPin[ S, Elem, U ]]
+   def collectionChanged:  Event[ S, BiPin2.Collection[ S, Elem, U ], BiPin2[ S, Elem, U ]]
+   def elementChanged:     Event[ S, BiPin2.Element[    S, Elem, U ], BiPin2[ S, Elem, U ]]
+   def changed :           Event[ S, BiPin2.Update[     S, Elem, U ], BiPin2[ S, Elem, U ]]
 
    /**
     * Finds the entry with the smallest time which is greater than or equal to the query time.
