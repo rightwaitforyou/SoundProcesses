@@ -338,18 +338,22 @@ object GraphemeImpl {
       private def curveValueFromFloor( floorTime: Long, floorValues: IIdxSeq[ Double ])( implicit tx: S#Tx ) : Value = {
          pin.ceil( floorTime + 1 ) match {
             case Some( (ceilTime, ceilHolder) ) =>
-               val span = Span( floorTime, ceilTime )
-               ceilHolder.value match {
-                  case ceilCurve @ Elem.Curve( ceilValues @ _* ) if floorValues.size == ceilValues.size =>
-                     val segmValues = (floorValues zip ceilValues).map { case (startVal, (stop, shape)) =>
-                        (startVal, stop.value, shape)
-                     }
-                     Value.Segment( span, segmValues: _* )
-                  case _ =>
-                     Value.Const( span, floorValues: _* )
-               }
+               curveValue( floorTime, floorValues, ceilTime, ceilHolder )
             case _ =>
                Value.Const( Span.from( floorTime ), floorValues: _* )
+         }
+      }
+
+      private def curveValue( floorTime: Long, floorValues: IIdxSeq[ Double ], ceilTime: Long, ceilHolder: ElemHolder[ S ])( implicit tx: S#Tx ) : Value = {
+         val span = Span( floorTime, ceilTime )
+         ceilHolder.value match {
+            case ceilCurve @ Elem.Curve( ceilValues @ _* ) if floorValues.size == ceilValues.size =>
+               val segmValues = (floorValues zip ceilValues).map { case (startVal, (stop, shape)) =>
+                  (startVal, stop.value, shape)
+               }
+               Value.Segment( span, segmValues: _* )
+            case _ =>
+               Value.Const( span, floorValues: _* )
          }
       }
 
@@ -367,10 +371,52 @@ object GraphemeImpl {
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Grapheme.Update[ S ]] = {
          pin.changed.pullUpdate( pull ).map {
+            // the BiPin.Collection update assumes the 'pin' character
+            // of the elements. that means that for example, an insertion
+            //
+            // |------I-------|
+            // floor          ceil
+            //
+            // will fire the dirty region
+            //
+            //        I-------|
+            //
+            // but the grapheme will change significantly more when curves are involved:
+            // - if `I` is `Audio`
+            //   - it may have been that ceil was a curve, and thus a segment was
+            //     stretching from floorTime to ceilTime, which is now replaced by
+            //     a constant from floorTime to I-time. Note that because multiple changes
+            //     might be collapsed, we should not assume that the segment was constructed
+            //     with the value now found at ceilTime. Instead, pessimistically, we will
+            //     always assume that the span floor--I must be fired.
+            //   - the span I--ceil is straight forward and does not need additional evaluations
+            // - if `I` is `Curve`
+            //   - the dirty region floor--I must be fired as above.
+            //   - additionally the span I--ceil must be resolved by looking at the holder at
+            //     ceilTime: if ceilTime is undefined, or if it is `Audio`, the span I--ceil is a
+            //     constant, otherwise if it is `Curve` we need to calculate the curve segment.
             case BiPin.Collection( _, changes ) =>
                // changes = IIdxSeq[ (Span.HasStart, ElemHolder) ]
-               val values = changes.map { case (span, elem) =>
-                  valueFromFloor( span.start, elem )
+               val values = changes.map { case (changeSpan, changeHolder) =>
+                  val changeTime = changeSpan.start
+//                  pin.floor( changeTime - 1 ).map {
+//                     case (floorTime, floorHolder) =>
+//                        floorHolder.value match {
+//                           case floorCurve @ Elem.Curve( floorValues @ _* ) =>
+//                              val floorValuesVal: IIdxSeq[ Double ] = floorValues.map( _._1.value )( breakOut )
+//                              curveValue( floorTime, floorValuesVal, changeTime, changeHolder )
+//
+//                           case Elem.Audio( artifact, spec, offset, gain ) =>
+//                              val offsetVal  = offset.value
+//                              val gainVal    = gain.value
+//                              val floorSpan  = Span( floorTime, changeTime )
+//                              Value.Audio( floorSpan, artifact, spec, offsetVal, gainVal )
+//                           }
+//
+//                  }
+//                  ...
+
+                  valueFromFloor( changeTime, changeHolder )
                }
                Grapheme.Update( graph, values )
 

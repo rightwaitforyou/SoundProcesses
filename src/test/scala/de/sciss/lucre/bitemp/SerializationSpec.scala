@@ -1,4 +1,5 @@
-package de.sciss.lucre
+package de.sciss
+package lucre
 package bitemp
 
 import org.scalatest.fixture
@@ -12,24 +13,8 @@ import expr.Expr
  *
  * test-only de.sciss.lucre.bitemp.SerializationSpec
  */
-class SerializationSpec extends fixture.FlatSpec with ShouldMatchers {
-   type FixtureParam = ConfluentReactive
-   type S = FixtureParam
-
-   implicit val IntType = Ints
-
+class SerializationSpec extends ConfluentEventSpec {
    confluent.showLog = true
-
-   def withFixture( test: OneArgTest ) {
-      val system = ConfluentReactive.tmp()
-      try {
-         system.root( _ => () )
-         test( system )
-      }
-      finally {
-         system.close()
-      }
-   }
 
    "BiPin" should "serialize and deserialize" in { system =>
       val bipH = system.step { implicit tx =>
@@ -39,8 +24,7 @@ class SerializationSpec extends fixture.FlatSpec with ShouldMatchers {
       val acc = system.step { implicit tx => tx.inputAccess }
       println( "--step; bipH = " + bipH + "; cursor pos = " + acc )
 
-      implicit val bipSer = BiPin.Expr.Modifiable.serializer[ S, Int ]
-      val imp = new ExprImplicits[ S ]
+//      implicit val bipSer = BiPin.Expr.Modifiable.serializer[ S, Int ]
       import imp._
 
       val key: Expr[ S, Long ]   = 1234L
