@@ -157,14 +157,36 @@ class BiPinSpec extends ConfluentEventSpec {
 
          time.set( 15000L )
          obs.assertEquals(
-            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
+            BiPin.Collection( bip, IIdxSeq( Span(     0L, 15000L ) -> (1: IntEx),
+                                            Span( 15000L, 20000L ) -> (3: IntEx) ))
          )
          obs.clear()
 
-//         time.set( -5000L )
-//         time.set( 25000L )
-//         time.set( 35000L )
-//         expr.set( 6 )
+         time.set( -5000L )
+         obs.assertEquals(
+            BiPin.Collection( bip, IIdxSeq( Span(     0L, 20000L ) -> (1: IntEx),
+                                            Span( -5000L,     0L ) -> (3: IntEx) ))
+         )
+         obs.clear()
+
+         time.set( 25000L ) // the region -5000 ... 0 is 'swallowed'
+         obs.assertEquals(
+            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
+         )
+         obs.clear()
+
+         time.set( 35000L )
+         obs.assertEquals(
+            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
+                                            Span.from( 35000L )    -> (3: IntEx) ))
+         )
+         obs.clear()
+
+         expr.set( 6 )
+         obs.assertEquals(
+            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
+         )
+         obs.clear()
       }
    }
 }
