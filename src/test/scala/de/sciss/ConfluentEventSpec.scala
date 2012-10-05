@@ -4,7 +4,7 @@ import lucre.confluent.reactive.ConfluentReactive
 import lucre.stm
 import org.scalatest.fixture
 import org.scalatest.matchers.ShouldMatchers
-import synth.expr.{ExprImplicits, Ints}
+import synth.expr.{Longs, ExprImplicits, Ints}
 import concurrent.stm.TxnLocal
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
@@ -12,9 +12,9 @@ trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
    final type FixtureParam = ConfluentReactive
    final type S = FixtureParam
 
-   implicit final val IntType = Ints
-
-   final val imp = new ExprImplicits[ S ]
+   implicit final protected val IntType   = Ints
+   implicit final protected val LongType  = Longs
+   final protected val imp = new ExprImplicits[ S ]
 
    final def withFixture( test: OneArgTest ) {
       val system = ConfluentReactive.tmp()
