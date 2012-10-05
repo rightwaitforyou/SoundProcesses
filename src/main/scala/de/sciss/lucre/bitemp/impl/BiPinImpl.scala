@@ -439,18 +439,17 @@ object BiPinImpl {
                   val seqNew = seq.patch( i, IIdxSeq.empty[ TimedElem[ S, Elem ]], 1 )
                   tree += timeVal -> seqNew
 //                  val IIdxSeq( (_, startElem), _* ) = seqNew.head
-                  val startElem = seqNew.head._2
-                  tree.ceil( timeVal + 1 ) match {
-                     case Some( (stop, _) ) =>
-                        Some( Span( timeVal, stop ) -> startElem )
+                  if( i == 0 ) { // only assume dirty when it was the visible element
+                     val startElem = seqNew.head._2
+                     tree.ceil( timeVal + 1 ) match {
+                        case Some( (stop, _) ) =>
+                           Some( Span( timeVal, stop ) -> startElem )
 
-                     case None =>
-                        Some( Span.from( timeVal ) -> startElem )
-                  }
-
-               } else {
-                  None
-               }
+                        case None =>
+                           Some( Span.from( timeVal ) -> startElem )
+                     }
+                  } else None
+               } else None
             case None => None
          }
       }

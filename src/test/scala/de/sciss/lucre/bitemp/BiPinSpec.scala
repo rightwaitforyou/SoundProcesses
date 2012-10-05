@@ -48,6 +48,30 @@ class BiPinSpec extends ConfluentEventSpec {
             BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
                                             Span.from(    15000L ) -> (3: IntEx) ))
          )
+         obs.clear()
+
+         bip.add( 20000L, 4 )
+         obs.assertEquals(
+            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (4: IntEx) ))
+         )
+         obs.clear()
+
+         bip.add( 15000L, 5 ) // should override the `3`
+         bip.add( 15000L, 6 ) // should override the `5`
+         obs.assertEquals(
+            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (5: IntEx) )),
+            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (6: IntEx) ))
+         )
+         obs.clear()
+
+         bip.remove( 15000L, 5 ) // should not be noticable
+         obs.assertEmpty()
+
+         bip.remove( 15000L, 6 ) // should fall back to `3`
+         obs.assertEquals(
+            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (3: IntEx) ))
+         )
+         obs.clear()
       }
    }
 }
