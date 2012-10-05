@@ -5,6 +5,7 @@ package bitemp
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import expr.Expr
 import synth.expr.{Ints, Longs}
+import event.Change
 
 /**
  * To run only this suite:
@@ -144,11 +145,22 @@ class BiPinSpec extends ConfluentEventSpec {
       }
 
       system.step { implicit tx =>
+         val bip  = bipH.get
          val time = timeH.get
          val expr = exprH.get
 
          expr.set( 5 )
-//         time.set( 15000L )
+         obs.assertEquals(
+            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
+         )
+         obs.clear()
+
+         time.set( 15000L )
+         obs.assertEquals(
+            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
+         )
+         obs.clear()
+
 //         time.set( -5000L )
 //         time.set( 25000L )
 //         time.set( 35000L )
