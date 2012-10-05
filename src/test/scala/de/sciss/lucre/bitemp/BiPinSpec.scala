@@ -43,8 +43,9 @@ class BiPinSpec extends ConfluentEventSpec {
 
 //         println( "at 10000 : " + bip.at( 10000L ))
 
+         // note: the shrunken regions are _not_ fired!
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 15000L ) -> (1: IntEx),
+            BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
                                             Span.from(    15000L ) -> (3: IntEx) ))
          )
       }

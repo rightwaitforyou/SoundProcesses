@@ -362,6 +362,14 @@ object BiPinImpl {
          case (time2, leaf) => leaf.headOption.map { case (_, elem) => time2 -> elem }
       }
 
+      /**
+       * Adds a new value, and returns the dirty which corresponds to the new region holding `elem`.
+       *
+       * @param timeVal the time value at which the new element is inserted
+       * @param time    the time expression at which the new element is inserted
+       * @param elem    the element which is inserted
+       * @return
+       */
       private def addNoFire( timeVal: Long, time: Expr[ S, Long ], elem: Elem )( implicit tx: S#Tx ) : Span.HasStart = {
          val entry = (time, elem)
          (tree.floor( timeVal ), tree.ceil( timeVal + 1 )) match {
@@ -376,11 +384,12 @@ object BiPinImpl {
             case (Some( (start, startLeaf) ), None) =>
                if( start == timeVal ) {
                   tree += timeVal -> (entry +: startLeaf)
-                  Span.from( timeVal )
+//                  Span.from( timeVal )
                } else {
                   tree += timeVal -> IIdxSeq( entry )
-                  Span( start, timeVal )
+//                  Span( start, timeVal )
                }
+               Span.from( timeVal )
 
             case (None, Some( (stop, _) )) =>
                tree += timeVal -> IIdxSeq( entry )
