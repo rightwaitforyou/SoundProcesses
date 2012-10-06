@@ -2,10 +2,6 @@ package de.sciss
 package lucre
 package bitemp
 
-import org.scalatest.fixture
-import org.scalatest.matchers.ShouldMatchers
-import confluent.reactive.ConfluentReactive
-import de.sciss.synth.expr.{ExprImplicits, Ints}
 import expr.Expr
 
 /**
@@ -15,8 +11,6 @@ import expr.Expr
  */
 class SerializationSpec extends ConfluentEventSpec {
    confluent.showLog = true
-
-   def ??? : Nothing = sys.error( "TODO" )
 
    "BiPin" should "serialize and deserialize" in { system =>
       val bipH = system.step { implicit tx =>
