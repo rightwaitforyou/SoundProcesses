@@ -30,6 +30,7 @@ import impl.{BiPinImpl => Impl}
 import de.sciss.lucre.{event => evt}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.{EventLike, Sys}
+import stm.Disposable
 
 object BiPin {
    sealed trait Update[ S <: Sys[ S ], A ] {
@@ -80,7 +81,7 @@ object BiPin {
    def serializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, BiPin[ S, A ]] =
       Impl.serializer[ S, A ]
 }
-sealed trait BiPin[ S <: Sys[ S ], A ] extends Writable {
+sealed trait BiPin[ S <: Sys[ S ], A ] extends Writable with Disposable[ S#Tx ] {
    import BiPin.Leaf
 
    final protected type Elem = BiExpr[ S, A ]

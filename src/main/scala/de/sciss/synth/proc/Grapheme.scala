@@ -150,7 +150,8 @@ object Grapheme {
                                              ( implicit tx: S#Tx ) : ExN[ S ] = ???
    }
 //   sealed trait Elem[ S ] { def numChannels: Int }
-   type Elem[ S <: Sys[ S ]] = Expr[ S, Value ]
+   type Elem[ S <: Sys[ S ]]        = Expr[ S, Value ]
+   type TimedElem[ S <: Sys[ S ]]   = BiExpr[ S, Value ]
 
    trait Modifiable[ S <: Sys[ S ]] extends Grapheme[ S ] {
       def add(    elem: BiExpr[ S, Value ])( implicit tx: S#Tx ) : Unit
