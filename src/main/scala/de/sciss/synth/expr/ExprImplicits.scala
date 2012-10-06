@@ -1,7 +1,7 @@
 package de.sciss.synth.expr
 
 import de.sciss.lucre.{stm, expr, bitemp, event => evt}
-import bitemp.{SpanLike, Span}
+import bitemp.{BiExpr, BiType, SpanLike, Span}
 import evt.Sys
 import expr.Expr
 
@@ -60,4 +60,11 @@ class ExprImplicits[ S <: Sys[ S ]] /* extends ExprImplicits.LowPriority[ S ] */
    implicit def spanOps( ex: Expr[ S, Span ])( implicit tx: S#Tx ) : Spans.Ops[ S ] = new Spans.Ops( ex )
    implicit def spanLikeConst( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
    implicit def spanLikeOps( ex: Expr[ S, SpanLike ])( implicit tx: S#Tx ) : SpanLikes.Ops[ S ] = new SpanLikes.Ops( ex )
+
+   // ---- biexpr ----
+   implicit def biExpr[ A, A1, T ]( tuple: (T, A1) )
+                                  ( implicit tx: S#Tx, magType: BiType[ A ],
+                                    timeView: T => Expr[ S, Long ],
+                                    magView: A1 => Expr[ S, A ]) : BiExpr[ S, A ] =
+      BiExpr[ S, A ]( timeView( tuple._1 ), magView( tuple._2 ))
 }

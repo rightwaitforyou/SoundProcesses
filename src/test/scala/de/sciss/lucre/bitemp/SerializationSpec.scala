@@ -16,10 +16,12 @@ import expr.Expr
 class SerializationSpec extends ConfluentEventSpec {
    confluent.showLog = true
 
+   def ??? : Nothing = sys.error( "TODO" )
+
    "BiPin" should "serialize and deserialize" in { system =>
       val bipH = system.step { implicit tx =>
-         val bip = BiPin.Expr.Modifiable[ S, Int ]
-         tx.newHandle( bip )( BiPin.Expr.Modifiable.serializer[ S, Int ])
+         val bip = BiPin.Modifiable[ S, Int ]
+         tx.newHandle( bip )( BiPin.Modifiable.serializer[ S, Int ])
       }
       val acc = system.step { implicit tx => tx.inputAccess }
       println( "--step; bipH = " + bipH + "; cursor pos = " + acc )

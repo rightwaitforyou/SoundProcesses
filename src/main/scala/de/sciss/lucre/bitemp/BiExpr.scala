@@ -43,6 +43,12 @@ object BiExpr {
       }
    }
 
+//   implicit def fromTuple[ S <: evt.Sys[ S ], A, A1, T ]( tuple: (T, A1) )
+//                                                        ( implicit tx: S#Tx, magType: BiType[ A ],
+//                                                          timeView: T => Expr[ S, Long ],
+//                                                          magView: A1 => Expr[ S, A ]) : BiExpr[ S, A ] =
+//      apply[ S, A ]( timeView( tuple._1 ), magView( tuple._2 ))
+
    implicit def serializer[ S <: evt.Sys[ S ], A ]( implicit magType: BiType[ A ]) : evt.Serializer[ S, BiExpr[ S, A ]] =
       new Ser
 

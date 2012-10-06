@@ -16,27 +16,33 @@ class BiPinSpec extends ConfluentEventSpec {
    type IntEx = Expr[ S, Int ]
    import imp._
 
+   def ??? : Nothing = sys.error( "TODO" )
+
    "BiPin" should "notify observers about all relevant collection events" in { system =>
       val obs  = new Observation[ S ]
       val bipH = system.step { implicit tx =>
-         val bip = BiPin.Expr.Modifiable[ S, Int ]
+         val bip = BiPin.Modifiable[ S, Int ]
          bip.changed.reactTx( obs.register )
-         val res = tx.newHandle( bip )( BiPin.Expr.Modifiable.serializer[ S, Int ])
+         val res = tx.newHandle( bip )( BiPin.Modifiable.serializer[ S, Int ])
          obs.assertEmpty()
          res
       }
 
+      def ??? : Nothing = sys.error( "TODO" )
+
       system.step { implicit tx =>
          val bip = bipH.get
-         bip.add( 10000L, 1 )
+         bip.add( 10000L -> 1 )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
+            ???
          )
          obs.clear()
 
          bip.add( 5000L, 2 )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 5000L, 10000L ) -> (2: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span( 5000L, 10000L ) -> (2: IntEx) ))
+            ???
          )
          obs.clear()
 
@@ -44,29 +50,33 @@ class BiPinSpec extends ConfluentEventSpec {
 //         println( "at 10000 : " + bip.at( 10000L ))
          // note: the shrunken regions are _not_ fired!
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
-                                            Span.from( 15000L ) -> (3: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
+//                                            Span.from( 15000L ) -> (3: IntEx) ))
+            ???
          )
          obs.clear()
 
          bip.add( 20000L, 4 )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (4: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (4: IntEx) ))
+            ???
          )
          obs.clear()
 
          bip.add( 15000L, 5 ) // should override the `3`
          bip.add( 15000L, 6 ) // should override the `5`
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (5: IntEx) )),
-            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (6: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (5: IntEx) )),
+//            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (6: IntEx) ))
+            ???
          )
          obs.clear()
 
          bip.remove( 15000L, 5 ) // should not be noticable
          bip.remove( 15000L, 6 ) // should fall back to `3`
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (3: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (3: IntEx) ))
+            ???
          )
          obs.clear()
 
@@ -76,13 +86,15 @@ class BiPinSpec extends ConfluentEventSpec {
 
          bip.remove( 15000L, 3 )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (1: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (1: IntEx) ))
+            ???
          )
          obs.clear()
 
          bip.remove( 20000L, 4 )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
+            ???
          )
          obs.clear()
 
@@ -100,9 +112,9 @@ class BiPinSpec extends ConfluentEventSpec {
    "BiPin" should "notify observers about all relevant element events" in { system =>
       val obs  = new Observation[ S ]
       val bipH = system.step { implicit tx =>
-         val bip = BiPin.Expr.Modifiable[ S, Int ]
+         val bip = BiPin.Modifiable[ S, Int ]
          bip.changed.reactTx( obs.register )
-         val res = tx.newHandle( bip )( BiPin.Expr.Modifiable.serializer[ S, Int ])
+         val res = tx.newHandle( bip )( BiPin.Modifiable.serializer[ S, Int ])
          obs.assertEmpty()
          res
       }
@@ -128,8 +140,9 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.add(     0L, 1 )
          bip.add( 20000L, 2 )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span.from(     0L ) -> (1: IntEx) )),
-            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (2: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span.from(     0L ) -> (1: IntEx) )),
+//            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (2: IntEx) ))
+            ???
          )
          obs.clear()
 
@@ -138,8 +151,9 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.add( time, 3 )
          bip.add( 30000L, expr )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (3: IntEx) )),
-            BiPin.Collection( bip, IIdxSeq( Span.from( 30000L ) -> expr ))
+//            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (3: IntEx) )),
+//            BiPin.Collection( bip, IIdxSeq( Span.from( 30000L ) -> expr ))
+            ???
          )
          obs.clear()
       }
@@ -151,40 +165,46 @@ class BiPinSpec extends ConfluentEventSpec {
 
          expr.set( 5 )
          obs.assertEquals(
-            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
+//            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
+            ???
          )
          obs.clear()
 
          time.set( 15000L )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span(     0L, 15000L ) -> (1: IntEx),
-                                            Span( 15000L, 20000L ) -> (3: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span(     0L, 15000L ) -> (1: IntEx),
+//                                            Span( 15000L, 20000L ) -> (3: IntEx) ))
+            ???
          )
          obs.clear()
 
          time.set( -5000L )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span(     0L, 20000L ) -> (1: IntEx),
-                                            Span( -5000L,     0L ) -> (3: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span(     0L, 20000L ) -> (1: IntEx),
+//                                            Span( -5000L,     0L ) -> (3: IntEx) ))
+            ???
          )
          obs.clear()
 
          time.set( 25000L ) // the region -5000 ... 0 is 'swallowed'
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
+            ???
          )
          obs.clear()
 
          time.set( 35000L )
          obs.assertEquals(
-            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
-                                            Span.from( 35000L )    -> (3: IntEx) ))
+//            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
+//                                            Span.from( 35000L )    -> (3: IntEx) ))
+            ???
          )
          obs.clear()
 
          expr.set( 6 )
          obs.assertEquals(
-            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
+//            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
+            ???
          )
          obs.clear()
       }
