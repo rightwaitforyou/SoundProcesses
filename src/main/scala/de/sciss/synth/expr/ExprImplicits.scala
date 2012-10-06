@@ -67,4 +67,6 @@ class ExprImplicits[ S <: Sys[ S ]] /* extends ExprImplicits.LowPriority[ S ] */
                                     timeView: T => Expr[ S, Long ],
                                     magView: A1 => Expr[ S, A ]) : BiExpr[ S, A ] =
       BiExpr[ S, A ]( timeView( tuple._1 ), magView( tuple._2 ))
+
+   implicit def biExprSer[ A ]( implicit biType: BiType[ A ]) = BiExpr.serializer[ S, A ]
 }
