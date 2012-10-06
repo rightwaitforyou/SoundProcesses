@@ -26,12 +26,15 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{bitemp, stm, expr, DataInput, event => evt}
+import de.sciss.lucre.{event => evt, Writable, DataOutput, bitemp, stm, expr, DataInput}
+import impl.CommonSerializers
 import stm.Serializer
 import expr.Expr
-import bitemp.Span
+import bitemp.{SpanLike, BiType, BiExpr, Span}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import impl.{GraphemeImpl => Impl}
+import de.sciss.synth.expr.{SpanLikes, Longs}
+
+//import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
 import evt.{Event, Sys}
 
@@ -43,48 +46,63 @@ object Grapheme {
    final case class Update[ S <: Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Value ])
 
    implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
-      Impl.serializer[ S ]
+      ??? // Impl.serializer[ S ]
 
    object Value {
       /**
        * A mono- or polyphonic constant value
        */
-      final case class Const( span: Span.HasStart, values: Double* ) extends Value {
+      final case class Curve( values: (Double, Env.ConstShape)* ) extends Value {
          def numChannels = values.size
-      }
-
-      /**
-       * A mono- or polyphonic envelope segment
-       *
-       * @param span    the span value covered by this segment
-       * @param values  a sequence of tuples, each consisting of the value at start of the segment,
-       *                the target value of the segment, and the shape of the segment
-       */
-      final case class Segment( span: Span.HasStart, values: (Double, Double, Env.ConstShape)* ) extends Value {
-         def numChannels = values.size
-
-         def from( start: Long ) : Segment = {
-            val newSpan = span.intersect( Span.from( start )).nonEmptyOption.getOrElse {
-               throw new IllegalArgumentException(
-                  "Segment.from - start position " + start + " lies outside of span " + span )
+         def write( out: DataOutput ) {
+            val sz = values.size
+            out.writeInt( sz )
+            values.foreach { case (mag, shape) =>
+               out.writeDouble( mag )
+               CommonSerializers.EnvConstShape.write( shape, out )
             }
-            val newValues  = span match {
-               case Span( oldStart, oldStop) =>
-                  val pos = (start - oldStart).toDouble / (oldStop - oldStart)
-                  values.map { case (oldStartVal, stopVal, shape) =>
-                     val newStartVal = shape.levelAt( pos.toFloat, oldStartVal.toFloat, stopVal.toFloat).toDouble
-                     (newStartVal, stopVal, shape)
-                  }
-
-               case _ => values // either of start or stop is infinite, therefore interpolation does not make sense
-            }
-            Segment( newSpan, newValues: _* )
          }
       }
 
-      final case class Audio( span: Span.HasStart, artifact: Artifact, spec: AudioFileSpec, offset: Long, gain: Double )
+//      /**
+//       * A mono- or polyphonic envelope segment
+//       *
+//       * @param span    the span value covered by this segment
+//       * @param values  a sequence of tuples, each consisting of the value at start of the segment,
+//       *                the target value of the segment, and the shape of the segment
+//       */
+//      final case class Segment( span: Span.HasStart, values: (Double, Double, Env.ConstShape)* ) extends Value {
+//         def numChannels = values.size
+//
+//         def from( start: Long ) : Segment = {
+//            val newSpan = span.intersect( Span.from( start )).nonEmptyOption.getOrElse {
+//               throw new IllegalArgumentException(
+//                  "Segment.from - start position " + start + " lies outside of span " + span )
+//            }
+//            val newValues  = span match {
+//               case Span( oldStart, oldStop) =>
+//                  val pos = (start - oldStart).toDouble / (oldStop - oldStart)
+//                  values.map { case (oldStartVal, stopVal, shape) =>
+//                     val newStartVal = shape.levelAt( pos.toFloat, oldStartVal.toFloat, stopVal.toFloat).toDouble
+//                     (newStartVal, stopVal, shape)
+//                  }
+//
+//               case _ => values // either of start or stop is infinite, therefore interpolation does not make sense
+//            }
+//            Segment( newSpan, newValues: _* )
+//         }
+//      }
+
+      final case class Audio( artifact: Artifact, spec: AudioFileSpec, offset: Long, gain: Double )
       extends Value {
          def numChannels = spec.numChannels
+
+         def write( out: DataOutput ) {
+            artifact.write( out )
+            CommonSerializers.AudioFileSpec.write( spec, out )
+            out.writeLong( offset )
+            out.writeDouble( gain )
+         }
       }
    }
 
@@ -93,60 +111,55 @@ object Grapheme {
     * envelope segment, or a real-time signal, coming either from the same process (`Source`) or being
     * fed by another embedded process (`Sink`).
     */
-   sealed trait Value {
+   sealed trait Value extends Writable {
       def numChannels: Int
-      def span: Span.HasStart
+//      def span: Span.HasStart
    }
 
-   object Elem {
-      // Note: we do not need to carry along `elem` because the outer collection
-      // (`BiPin`) already does that for us.
-//      sealed trait Update[ S ] // { def elem: Elem[ S ]}
-//      final case class MonoChanged[ S <: Sys[ S ]]( /* elem: Mono[ S ], */ change: evt.Change[ Double ]) extends Update[ S ]
-////      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChange: Option[ Grapheme.Update[ S ]], offset: Long ) extends Update[ S ]
-//      final case class EmbeddedChanged[ S <: Sys[ S ]]( /* elem: Embedded[ S ], */ refChanges: IIdxSeq[ BiGroup.ElementUpdate[ Proc.Update[ S ]]], offset: Long ) extends Update[ S ]
-
-      final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ] {
-         def isConstant : Boolean = values.forall { tup => Expr.isConst( tup._1 )}
-         def numChannels = values.size
+   object Elem extends BiType[ Value ] {
+      object Curve {
+         def apply[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) : Elem[ S ] = ???
+         def unapplySeq[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = ???
       }
 
-      final case class Audio[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
-      extends Elem[ S ] {
-         def isConstant : Boolean = Expr.isConst( offset ) && Expr.isConst( gain )
-         def numChannels = spec.numChannels
+      object Audio {
+         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ]) : Elem[ S ] = ???
+         def unapply[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ])] = ???
       }
 
-      // XXX TODO: if we get too ambitious:
-      // trait Embed[ S <: Sys[ S ]] { def peer: Grapheme[ S ], offset: Expr[ S, Long ]}
-      // trait Graph[ S <: Sys[ S ]] { def fun: GraphFunction }
-      // trait Proc[ S <: Sys[ S ]] { def proc: proc.Proc[ S ]; def scanKey: String }
+//      final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ] {
+//         def isConstant : Boolean = values.forall { tup => Expr.isConst( tup._1 )}
+//         def numChannels = values.size
+//      }
+//
+//      final case class Audio[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+//      extends Elem[ S ] {
+//         def isConstant : Boolean = Expr.isConst( offset ) && Expr.isConst( gain )
+//         def numChannels = spec.numChannels
+//      }
+
+      // ---- bitype ----
+
+      def longType : BiType[ Long ] = Longs
+      def spanLikeType : BiType[ SpanLike ] = SpanLikes
+
+      def readValue( in: DataInput ) : Value = ???
+      def writeValue( value: Value, out: DataOutput ) { value.write( out )}
+
+      protected def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[ S ])
+                                             ( implicit tx: S#Tx ) : ExN[ S ] = ???
    }
-   sealed trait Elem[ S ] { def numChannels: Int }
-
-//         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Elem.Update[ S ]] = {
-//println( "WARNING: Span.Embedded pullUpdate not yet implemented" )
-//None
-////            val refEvt  = ref.changed
-////            val refUpd  = if( evt.Intruder.isSource( refEvt, pull )) evt.Intruder.pullUpdate( refEvt, pull ) else None
-////            val offEvtL = offset.changed
-////            val offUpd  = if( offEvtL.isInstanceOf[ evt.NodeSelector[ _, _ ]]) {   // XXX TODO ugly
-////               val offEvt = offEvtL.asInstanceOf[ Event[ S, evt.Change[ Long ], Expr[ S, Long ]]]
-////               if( evt.Intruder.isSource( offEvt, pull )) evt.Intruder.pullUpdate( offEvt, pull ) else None
-////            } else None
-////            val offVal  = offUpd.map( _.now ).getOrElse( offset.value )
-////
-////            Some( Elem.EmbeddedChanged( /* this, */ refUpd.getOrElse( IIdxSeq.empty ), offVal ))
-//         }
+//   sealed trait Elem[ S ] { def numChannels: Int }
+   type Elem[ S <: Sys[ S ]] = Expr[ S, Value ]
 
    trait Modifiable[ S <: Sys[ S ]] extends Grapheme[ S ] {
-      def add(    time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : Unit
-      def remove( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : Boolean
+      def add(    elem: BiExpr[ S, Value ])( implicit tx: S#Tx ) : Unit
+      def remove( elem: BiExpr[ S, Value ])( implicit tx: S#Tx ) : Boolean
       def clear()( implicit tx: S#Tx ) : Unit
    }
 
    object Modifiable {
-      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = Impl.modifiable[ S ]
+      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = ??? // Impl.modifiable[ S ]
 
       /**
        * Extractor to check if a `Grapheme` is actually a `Grapheme.Modifiable`
@@ -156,7 +169,7 @@ object Grapheme {
       }
    }
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = Impl.read( in, access )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = ??? // Impl.read( in, access )
 }
 trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
    /**

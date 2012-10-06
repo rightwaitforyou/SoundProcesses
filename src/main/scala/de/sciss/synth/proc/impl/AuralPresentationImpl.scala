@@ -269,21 +269,21 @@ object AuralPresentationImpl {
                      busUsers :+= bm
                   }
 
-                  timed.value.graphemes.get( key ).flatMap( _.valueAt( time )).foreach {   // if not found, stick with default
-                     case const: Const =>
-                        ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
-                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
-
-                     case segm: Segment =>
-                        ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
-                        ??? // MonoSegmentWriter
-
-                     case audio: Audio =>
-                        ??? // AudioFileWriter
-
-//                     case Source                         => makeBusMapper( timed,       key       )
-//                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
-                  }
+//                  timed.value.graphemes.get( key ).flatMap( _.valueAt( time )).foreach {   // if not found, stick with default
+//                     case const: Const =>
+//                        ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
+//                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
+//
+//                     case segm: Segment =>
+//                        ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
+//                        ??? // MonoSegmentWriter
+//
+//                     case audio: Audio =>
+//                        ??? // AudioFileWriter
+//
+////                     case Source                         => makeBusMapper( timed,       key       )
+////                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
+//                  }
 
                   ??? // need to look at time.value.scans instead
                }

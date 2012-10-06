@@ -665,21 +665,22 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                               // - for the changed entries, collect those which overlap the current
                               //   transport time, so that they will go into the advancement message
                               def addToScanMap( maybeNowValue: Option[ Grapheme.Value ]) {
-                                 maybeNowValue match {
-                                    case Some( nextValue ) if nextValue.span.contains( newFrame ) =>
-                                       // next value is valid also for current time, so re-use it
-                                       scanMap += key -> nextValue
-
-                                    case _ =>
-                                       // either no value, or ceilTime is larger than now, need to find value explicitly
-                                       peer.valueAt( newFrame ).foreach { nowValue =>
-                                          // only add it if it did not cover the previous transport position
-                                          // (because if it did, it would not constitute a change)
-                                          if( !nowValue.span.contains( oldFrame )) {
-                                             scanMap += key -> nowValue
-                                          }
-                                       }
-                                 }
+                                 ???
+//                                 maybeNowValue match {
+//                                    case Some( nextValue ) if nextValue.span.contains( newFrame ) =>
+//                                       // next value is valid also for current time, so re-use it
+//                                       scanMap += key -> nextValue
+//
+//                                    case _ =>
+//                                       // either no value, or ceilTime is larger than now, need to find value explicitly
+//                                       peer.valueAt( newFrame ).foreach { nowValue =>
+//                                          // only add it if it did not cover the previous transport position
+//                                          // (because if it did, it would not constitute a change)
+//                                          if( !nowValue.span.contains( oldFrame )) {
+//                                             scanMap += key -> nowValue
+//                                          }
+//                                       }
+//                                 }
                               }
 
                               keyMap.get( key ) match {
@@ -713,7 +714,8 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                                        if( newTime != Long.MaxValue ) {
                                           // ...yes... store the new entry
                                           addNewEntry( newTime, newValue )
-                                          if( !newValue.span.contains( oldFrame )) addToScanMap( Some( newValue ))
+//                                          if( !newValue.span.contains( oldFrame )) addToScanMap( Some( newValue ))
+                                          ???
 
                                        } else { // no event after newFrame
                                           keyMap -= key
