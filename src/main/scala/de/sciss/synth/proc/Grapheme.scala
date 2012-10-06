@@ -44,7 +44,7 @@ object Grapheme {
    // like `changes: IIdxSeq[ (Elem[ S ], Value) ]`. Then the question would be
    // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
    // where `trait StoredElem[ S <: Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
-   final case class Update[ S <: Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Value ])
+   final case class Update[ S <: Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Segment ])
 
    implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
       Impl.serializer[ S ]
@@ -149,20 +149,25 @@ object Grapheme {
    }
 
    object Segment {
-      final case class Const( span: Span.HasStart, values: IIdxSeq[ Double ]) extends Segment {
+      sealed trait Defined extends Segment {
+         def numChannels: Int
+      }
+
+      final case class Const( span: Span.HasStart, values: IIdxSeq[ Double ]) extends Defined {
          def numChannels = values.size
       }
 
-      final case class Curve( span: Span, values: IIdxSeq[ (Double, Double, Env.ConstShape) ]) extends Segment {
+      final case class Curve( span: Span, values: IIdxSeq[ (Double, Double, Env.ConstShape) ]) extends Defined {
          def numChannels = values.size
       }
 
-      final case class Audio( span: Span.HasStart, value: Value.Audio ) extends Segment {
+      final case class Audio( span: Span.HasStart, value: Value.Audio ) extends Defined {
          def numChannels = value.numChannels
       }
+
+      final case class Undefined( span: Span.HasStart ) extends Segment
    }
    sealed trait Segment {
-      def numChannels: Int
       def span: Span.HasStart
    }
 
