@@ -172,10 +172,16 @@ object Grapheme {
       object Audio {
          def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
                                   ( implicit tx: S#Tx ) : Elem[ S ] = {
-            ???
+            val targets = evt.Targets.partial[ S ] // XXX TODO partial?
+            new AudioImpl( targets, artifact, spec, offset, gain )
          }
          def unapply[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ])] = {
-            ???
+            if( expr.isInstanceOf[ AudioImpl[ _ ]]) {
+               val a = expr.asInstanceOf[ AudioImpl[ S ]]
+               Some( (a.artifact, a.spec, a.offset, a.gain) )
+            } else {
+               None
+            }
          }
       }
 
@@ -234,18 +240,61 @@ object Grapheme {
                CommonSerializers.EnvConstShape.write( tup._2, out )
             }
          }
+
+         override def toString = "Elem.Curve" + id
       }
 
-//      final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ] {
-//         def isConstant : Boolean = values.forall { tup => Expr.isConst( tup._1 )}
-//         def numChannels = values.size
-//      }
-//
-//      final case class Audio[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
-//      extends Elem[ S ] {
-//         def isConstant : Boolean = Expr.isConst( offset ) && Expr.isConst( gain )
-//         def numChannels = spec.numChannels
-//      }
+      private final class AudioImpl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val artifact: Artifact,
+                                                     val spec: AudioFileSpec, val offset: Expr[ S, Long ],
+                                                     val gain: Expr[ S, Double ])
+      extends expr.impl.NodeImpl[ S, Value ] {
+         def value( implicit tx: S#Tx ) : Value = {
+            val offsetVal  = offset.value
+            val gainVal    = gain.value
+            Value.Audio( artifact, spec, offsetVal, gainVal )
+         }
+
+         def connect()( implicit tx: S#Tx ) {
+            offset.changed ---> this
+            gain.changed   ---> this
+         }
+
+         def disconnect()( implicit tx: S#Tx ) {
+            offset.changed -/-> this
+            gain.changed   -/-> this
+         }
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ evt.Change[ Value ]] = {
+            val offsetEvt = offset.changed
+            val offsetOpt = if( offsetEvt.isSource( pull )) offsetEvt.pullUpdate( pull ) else None
+            val (offsetBefore, offsetNow) = offsetOpt.map( _.toTuple ).getOrElse {
+               val ov = offset.value
+               (ov, ov)
+            }
+
+            val gainEvt = gain.changed
+            val gainOpt = if( gainEvt.isSource( pull )) gainEvt.pullUpdate( pull ) else None
+            val (gainBefore, gainNow) = gainOpt.map( _.toTuple ).getOrElse {
+               val gv = gain.value
+               (gv, gv)
+            }
+
+            change( Value.Audio( artifact, spec, offsetBefore, gainBefore ),
+                    Value.Audio( artifact, spec, offsetNow,    gainNow    ))
+         }
+
+         protected def reader = serializer[ S ]
+
+         protected def writeData( out: DataOutput ) {
+            out.writeUnsignedByte( audioCookie )
+            artifact.write( out )
+            CommonSerializers.AudioFileSpec.write( spec, out )
+            offset.write( out )
+            gain.write( out )
+         }
+
+         override def toString = "Elem.Audio" + id
+      }
 
       // ---- bitype ----
 
@@ -268,7 +317,11 @@ object Grapheme {
                new CurveImpl( targets, values )
 
             case `audioCookie` =>
-               ???
+               val artifact   = Artifact.read( in )
+               val spec       = CommonSerializers.AudioFileSpec.read( in )
+               val offset     = Longs.readExpr( in, access )
+               val gain       = Doubles.readExpr( in, access )
+               new AudioImpl( targets, artifact, spec, offset, gain )
 
             case _ => sys.error( "Unexpected cookie " + cookie )
          }
