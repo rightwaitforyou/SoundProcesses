@@ -170,7 +170,16 @@ object BiPinImpl {
                e.pullUpdate( pull ).map( elem -> _ )
             })( breakOut )
 
-            if( changes.isEmpty ) None else Some( BiPin.Element( pin, changes ))
+            if( changes.isEmpty ) None else {
+               changes.foreach { case (elem, change) =>
+                  val (timeChange, _) = change.unzip
+                  if( timeChange.isSignificant ) {
+                     removeNoFire( timeChange.before, elem )
+                     addNoFire(    timeChange.now,    elem )
+                  }
+               }
+               Some( BiPin.Element( pin, changes ))
+            }
          }
       }
 

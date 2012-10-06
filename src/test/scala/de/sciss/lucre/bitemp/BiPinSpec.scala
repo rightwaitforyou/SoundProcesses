@@ -208,8 +208,8 @@ class BiPinSpec extends ConfluentEventSpec {
 
          val Expr.Var( timeVar ) = time.time
          timeVar.set( 15000L )
-         println( "DEBUG " + bip.debugList() )
-         println( "DEBUG " + bip.valueAt( 10000L ))
+//         println( "DEBUG " + bip.debugList() )
+//         println( "DEBUG " + bip.valueAt( 10000L ))
          assert( bip.valueAt( 10000L ) === Some( tup1._2 ))
          assert( bip.valueAt( 15000L ) === Some( time.magValue ))
          obs.assertEquals(
@@ -229,27 +229,29 @@ class BiPinSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-//         time.set( 25000L ) // the region -5000 ... 0 is 'swallowed'
-//         obs.assertEquals(
-////            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
-//            ???
-//         )
-//         obs.clear()
-//
-//         time.set( 35000L )
-//         obs.assertEquals(
-////            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
-////                                            Span.from( 35000L )    -> (3: IntEx) ))
-//            ???
-//         )
-//         obs.clear()
-//
-//         expr.set( 6 )
-//         obs.assertEquals(
-////            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
-//            ???
-//         )
-//         obs.clear()
+         timeVar.set( 25000L ) // the region -5000 ... 0 is 'swallowed' (NO: OBSOLETE)
+         obs.assertEquals(
+//            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
+            BiPin.Element[ S, Int ]( bip, IIdxSeq( time -> Change( -5000L -> 3, 25000L -> 3 )))
+         )
+         obs.clear()
+
+         timeVar.set( 35000L )
+         obs.assertEquals(
+//            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
+//                                            Span.from( 35000L )    -> (3: IntEx) ))
+            BiPin.Element[ S, Int ]( bip, IIdxSeq( time -> Change( 25000L -> 3, 35000L -> 3 )))
+         )
+         obs.clear()
+
+         exprVar.set( 6 )
+         obs.assertEquals(
+//            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
+            BiPin.Element[ S, Int ]( bip, IIdxSeq( expr -> Change( 30000L -> 5, 30000L -> 6 )))
+         )
+         obs.clear()
+
+         assert( bip.debugList() === List( 0L -> 1, 20000L -> 2, 30000L -> 6, 35000L -> 3 ))
       }
    }
 }
