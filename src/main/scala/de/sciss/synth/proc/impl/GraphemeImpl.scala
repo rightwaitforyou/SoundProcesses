@@ -36,6 +36,7 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.{Event, EventLikeSerializer, impl => evti, Sys}
 import io.AudioFileSpec
+import proc.Grapheme.Segment
 
 object GraphemeImpl {
    import Grapheme.{Elem, TimedElem, Value, Modifiable}
@@ -315,6 +316,34 @@ object GraphemeImpl {
 
       def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ] = {
          pin.floor( time ).map( _.magValue )
+      }
+
+      def segment( time: Long )( implicit tx: S#Tx ) : Option[ Segment ] = {
+         pin.floor( time ).map { elem =>
+            val (floorTime, floorVal) = elem.value
+            floorVal match {
+               case floorCurve: Value.Curve =>
+                  pin.ceil( time + 1 ) match {
+                     case Some( ceilElem ) =>
+                        val (ceilTime, ceilVal) = ceilElem.value
+                        ceilVal match {
+                           case ceilCuve: Value.Curve =>
+                              ???
+                           case _ =>
+                              Segment.Const( Span.from( floorTime ), floorCurve.values.map( _._1 )( breakOut ))
+                        }
+                     case None =>
+                        Segment.Const( Span.from( floorTime ), floorCurve.values.map( _._1 )( breakOut ))
+                  }
+
+               case av: Value.Audio =>
+                  val span = pin.nearestEventAfter( time + 1 ) match {
+                     case Some( ceilTime )   => Span( floorTime, ceilTime )
+                     case _                  => Span.from( floorTime )
+                  }
+                  Segment.Audio( span, av )
+            }
+         }
       }
 
       private def valueFromFloor( floorTime: Long, floorHolder: Elem[ S ])( implicit tx: S#Tx ) : Value = {

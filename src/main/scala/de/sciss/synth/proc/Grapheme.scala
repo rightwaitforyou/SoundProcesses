@@ -148,6 +148,15 @@ object Grapheme {
 //      def span: Span.HasStart
    }
 
+   object Segment {
+      final case class Const( span: Span.HasStart, values: IIdxSeq[ Double ]) extends Segment {
+         def numChannels = values.size
+      }
+
+      final case class Audio( span: Span.HasStart, value: Value.Audio ) extends Segment {
+         def numChannels = value.numChannels
+      }
+   }
    sealed trait Segment {
       def numChannels: Int
       def span: Span.HasStart
@@ -361,6 +370,8 @@ trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.TimedElem[ S ]]
    def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value ]
+   def segment( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Segment ]
+
    def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
 
    def changed: Event[ S, Grapheme.Update[ S ], Grapheme[ S ]]
