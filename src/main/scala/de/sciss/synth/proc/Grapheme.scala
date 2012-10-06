@@ -32,10 +32,10 @@ import stm.{ImmutableSerializer, Serializer}
 import expr.Expr
 import bitemp.{SpanLike, BiType, BiExpr, Span}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.synth.expr.{SpanLikes, Longs}
+import de.sciss.synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 
-//import impl.{GraphemeImpl => Impl}
+import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
 import evt.{Event, Sys}
 
@@ -47,7 +47,11 @@ object Grapheme {
    final case class Update[ S <: Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Value ])
 
    implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
-      ??? // Impl.serializer[ S ]
+      Impl.serializer[ S ]
+
+   // 0 reserved for variables
+   private final val curveCookie = 1
+   private final val audioCookie = 2
 
    object Value {
       implicit object Serializer extends ImmutableSerializer[ Value ] {
@@ -74,9 +78,6 @@ object Grapheme {
             }
          }
       }
-
-      private final val curveCookie = 0
-      private final val audioCookie = 1
 
       /**
        * A mono- or polyphonic constant value
@@ -147,15 +148,92 @@ object Grapheme {
 //      def span: Span.HasStart
    }
 
+   sealed trait Segment {
+      def numChannels: Int
+      def span: Span.HasStart
+   }
+
    object Elem extends BiType[ Value ] {
       object Curve {
-         def apply[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) : Elem[ S ] = ???
-         def unapplySeq[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = ???
+         def apply[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Elem[ S ] = {
+            val targets = evt.Targets.partial[ S ] // XXX TODO partial?
+            new CurveImpl( targets, values.toIndexedSeq )
+         }
+         def unapplySeq[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = {
+            if( expr.isInstanceOf[ CurveImpl[ _ ]]) {
+               val c = expr.asInstanceOf[ CurveImpl[ S ]]
+               Some( c.values )
+            } else {
+               None
+            }
+         }
       }
 
       object Audio {
-         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ]) : Elem[ S ] = ???
-         def unapply[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ])] = ???
+         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+                                  ( implicit tx: S#Tx ) : Elem[ S ] = {
+            ???
+         }
+         def unapply[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ])] = {
+            ???
+         }
+      }
+
+      private final class CurveImpl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+                                                     val values: IIdxSeq[ (Expr[ S, Double ], Env.ConstShape) ])
+      extends expr.impl.NodeImpl[ S, Value ] {
+         def value( implicit tx: S#Tx ) : Value = {
+            val v = values.map { case (mag, shape) => mag.value -> shape }
+            Value.Curve( v: _* )
+         }
+
+         def connect()( implicit tx: S#Tx ) {
+            values.foreach { tup =>
+               tup._1.changed ---> this
+            }
+         }
+
+         def disconnect()( implicit tx: S#Tx ) {
+            values.foreach { tup =>
+               tup._1.changed -/-> this
+            }
+         }
+
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ evt.Change[ Value ]] = {
+            val beforeVals = IIdxSeq.newBuilder[ (Double, Env.ConstShape) ]
+            val nowVals    = IIdxSeq.newBuilder[ (Double, Env.ConstShape) ]
+            values.foreach { case (mag, shape) =>
+               val magEvt = mag.changed
+               if( magEvt.isSource( pull )) {
+                  magEvt.pullUpdate( pull ) match {
+                     case Some( evt.Change( magBefore, magNow )) =>
+                        beforeVals += magBefore -> shape
+                        nowVals    += magNow    -> shape
+                     case _ =>
+                        val mv = mag.value
+                        beforeVals += mv -> shape
+                        nowVals    += mv -> shape
+                  }
+               } else {
+                  val mv = mag.value
+                  beforeVals += mv -> shape
+                  nowVals    += mv -> shape
+               }
+            }
+            change( Value.Curve( beforeVals.result(): _* ), Value.Curve( nowVals.result(): _* ))
+         }
+
+         protected def reader = serializer[ S ]
+
+         protected def writeData( out: DataOutput ) {
+            out.writeUnsignedByte( curveCookie )
+            val sz = values.size
+            out.writeInt( sz )
+            values.foreach { tup =>
+               tup._1.write( out )
+               CommonSerializers.EnvConstShape.write( tup._2, out )
+            }
+         }
       }
 
 //      final case class Curve[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* ) extends Elem[ S ] {
@@ -174,11 +252,27 @@ object Grapheme {
       def longType : BiType[ Long ] = Longs
       def spanLikeType : BiType[ SpanLike ] = SpanLikes
 
-      def readValue( in: DataInput ) : Value = ???
+      def readValue( in: DataInput ) : Value = Value.Serializer.read( in )
       def writeValue( value: Value, out: DataOutput ) { value.write( out )}
 
       protected def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[ S ])
-                                             ( implicit tx: S#Tx ) : ExN[ S ] = ???
+                                             ( implicit tx: S#Tx ) : Elem[ S ] with evt.Node[ S ] = {
+         (cookie: @switch) match {
+            case `curveCookie` =>
+               val sz         = in.readInt()
+               val values     = IIdxSeq.fill( sz ) {
+                  val mag     = Doubles.readExpr( in, access )
+                  val shape   = CommonSerializers.EnvConstShape.read( in )
+                  (mag, shape)
+               }
+               new CurveImpl( targets, values )
+
+            case `audioCookie` =>
+               ???
+
+            case _ => sys.error( "Unexpected cookie " + cookie )
+         }
+      }
    }
 //   sealed trait Elem[ S ] { def numChannels: Int }
    type Elem[ S <: Sys[ S ]]        = Expr[ S, Value ]
@@ -191,7 +285,7 @@ object Grapheme {
    }
 
    object Modifiable {
-      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = ??? // Impl.modifiable[ S ]
+      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = Impl.modifiable[ S ]
 
       /**
        * Extractor to check if a `Grapheme` is actually a `Grapheme.Modifiable`
@@ -201,7 +295,7 @@ object Grapheme {
       }
    }
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = ??? // Impl.read( in, access )
+   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = Impl.read( in, access )
 }
 trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
    /**
