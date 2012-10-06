@@ -153,6 +153,10 @@ object Grapheme {
          def numChannels = values.size
       }
 
+      final case class Curve( span: Span, values: IIdxSeq[ (Double, Double, Env.ConstShape) ]) extends Segment {
+         def numChannels = values.size
+      }
+
       final case class Audio( span: Span.HasStart, value: Value.Audio ) extends Segment {
          def numChannels = value.numChannels
       }

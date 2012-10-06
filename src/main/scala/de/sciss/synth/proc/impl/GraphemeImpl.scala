@@ -68,210 +68,6 @@ object GraphemeImpl {
       new Impl( targets, pin )
    }
 
-//   private implicit def elemSerializer[ S <: Sys[ S ]] : EventLikeSerializer[ S, ElemHolder[ S ]] =
-//      anyElemSer.asInstanceOf[ EventLikeSerializer[ S, ElemHolder[ S ]]]
-//
-//   private val anyElemSer = new ElemSer[ evt.InMemory ]
-//
-//   // ---- ElemHolder ----
-//
-//   private sealed trait ElemHolderUpdate { def time: Long }
-//   private final case class CurveHolderUpdate( time: Long,
-////                                               before: IIdxSeq[ (Double, Env.ConstShape) ],
-//                                               now:    IIdxSeq[ (Double, Env.ConstShape) ])
-//   extends ElemHolderUpdate
-//
-//   private final case class AudioHolderUpdate( time: Long, artifact: Artifact, spec: AudioFileSpec,
-////                                               beforeOffset: Long, beforeGain: Double,
-//                                               nowOffset:    Long, nowGain:    Double )
-//   extends ElemHolderUpdate
-//
-////   private final case class ElemHolderUpdate( time: Long )
-//
-//   private sealed trait ElemHolder[ S <: Sys[ S ]]
-//   extends evt.EventLike[ S, ElemHolderUpdate, ElemHolder[ S ]] with Writable {
-//      def timeOption: Option[ Expr[ S, Long ]]
-//      def value: Elem[ S ]
-//   }
-//
-//   private final val curveCookie = 0
-//   private final val audioCookie = 1
-//
-//   private sealed trait CurveHolder[ S <: Sys[ S ]] extends ElemHolder[ S ] {
-//      def value: Curve[ S ]
-//
-//      final protected def writeData( out: DataOutput ) {
-//         out.writeUnsignedByte( curveCookie )
-//         timeOption.foreach( _.write( out ))
-//         val idx = value.values.toIndexedSeq
-//         out.writeInt( idx.size )
-//         idx.foreach { tup =>
-//            tup._1.write( out )
-//            CommonSerializers.EnvConstShape.write( tup._2, out )
-//         }
-//      }
-//   }
-//
-//   private sealed trait AudioHolder[ S <: Sys[ S ]] extends ElemHolder[ S ] {
-//      def value: Audio[ S ]
-//
-//      final protected def writeData( out: DataOutput ) {
-//         out.writeUnsignedByte( audioCookie )
-//         timeOption.foreach( _.write( out ))
-//         value.artifact.write( out )
-//         CommonSerializers.AudioFileSpec.write( value.spec, out )
-//         value.offset.write( out )
-//         value.gain.write( out )
-//      }
-//   }
-//
-//   private sealed trait ConstHolder[ S <: Sys[ S ]] extends ElemHolder[ S ]
-//   with evt.Dummy[ S, ElemHolderUpdate, ElemHolder[ S ]] with evti.Constant {
-//      final def timeOption : Option[ Expr[ S, Long ]] = None
-//   }
-//
-//   private sealed trait MutableHolder[ S <: Sys[ S ]] extends ElemHolder[ S ]
-//   with evti.StandaloneLike[ S, ElemHolderUpdate, ElemHolder[ S ]] {
-//      def time: Expr[ S, Long ]
-//
-//      final protected def reader : evt.Reader[ S, ElemHolder[ S ]] = elemSerializer[ S ]
-//      final def timeOption : Option[ Expr[ S, Long ]] = Some( time )
-//      final protected def disposeData()( implicit tx: S#Tx ) {}
-//   }
-//
-//   private final case class ConstCurve[ S <: Sys[ S ]]( value: Curve[ S ])
-//   extends CurveHolder[ S ] with ConstHolder[ S ]
-//
-//   private final class MutableCurve[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val time: Expr[ S, Long ],
-//                                                     val value: Curve[ S ])
-//   extends CurveHolder[ S ] with MutableHolder[ S ] {
-//      def connect()( implicit tx: S#Tx ) {
-//         value.values.foreach( tup => tup._1.changed ---> this )
-//      }
-//
-//      def disconnect()( implicit tx: S#Tx ) {
-//         value.values.foreach( tup => tup._1.changed -/-> this )
-//      }
-//
-//      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate ] = {
-//         // parent is Expr[ S, Double ] coming from one or more of the curve's values
-//         val valueChanges: IIdxSeq[ ((Double, Env.ConstShape), (Double, Env.ConstShape))] =
-//            value.values.map({ case (mag, shape) =>
-//               val magEvt  = mag.changed
-//               val magCh   = if( magEvt.isSource( pull )) magEvt.pullUpdate( pull ) else None
-//               magCh match {
-//                  case Some( evt.Change( oldMag, newMag )) => (oldMag, shape) -> (newMag, shape)
-//                  case None =>
-//                     val flat = (mag.value, shape)
-//                     flat -> flat
-//               }
-//            })( breakOut )
-//         val (before, now) = valueChanges.unzip
-//         if( before != now ) {
-//            Some( CurveHolderUpdate( time.value, /* before, */ now ))
-//         } else None
-//      }
-//   }
-//
-//   private final case class ConstAudio[ S <: Sys[ S ]]( value: Audio[ S ])
-//   extends AudioHolder[ S ] with ConstHolder[ S ]
-//
-//   private final class MutableAudio[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val time: Expr[ S, Long ],
-//                                                     val value: Audio[ S ])
-//   extends AudioHolder[ S ] with MutableHolder[ S ] {
-//      def connect()( implicit tx: S#Tx ) {
-//         value.offset.changed ---> this
-//         value.gain.changed   ---> this
-//      }
-//
-//      def disconnect()( implicit tx: S#Tx ) {
-//         value.offset.changed -/-> this
-//         value.gain.changed   -/-> this
-//      }
-//
-//      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ ElemHolderUpdate ] = {
-//         val offset     = value.offset
-//         val gain       = value.gain
-//         val offsetEvt  = offset.changed
-//         val gainEvt    = gain.changed
-//         val offsetCh   = if( offsetEvt.isSource( pull )) offsetEvt.pullUpdate( pull ) else None
-//         val gainCh     = if( gainEvt.isSource(   pull )) gainEvt.pullUpdate(   pull ) else None
-//
-//         val (oldOffset, newOffset) = offsetCh match {
-//            case Some( evt.Change( _old, _new )) => _old -> _new
-//            case None =>
-//               val offsetVal = offset.value
-//               offsetVal -> offsetVal
-//         }
-//
-//         val (oldGain, newGain) = gainCh match {
-//            case Some( evt.Change( _old, _new )) => _old -> _new
-//            case None =>
-//               val gainVal = gain.value
-//               gainVal -> gainVal
-//         }
-//
-//         if( oldOffset != newOffset || oldGain != newGain ) {
-//            Some( AudioHolderUpdate( time.value, value.artifact, value.spec, /* oldOffset, oldGain, */ newOffset, newGain ))
-//         } else None
-//      }
-//   }
-//
-//   private final class ElemSer[ S <: Sys[ S ]] extends EventLikeSerializer[ S, ElemHolder[ S ]] {
-//      def readConstant( in: DataInput )( implicit tx: S#Tx ) : ElemHolder[ S ] = {
-//         (in.readUnsignedByte(): @switch) match {
-//            case `curveCookie` =>
-//               val sz      = in.readInt()
-//               val values  = IIdxSeq.fill( sz ) {
-//                  val value   = Doubles.readConst[ S ]( in )
-//                  val shape   = CommonSerializers.EnvConstShape.read( in )
-//                  value -> shape
-//               }
-//               val curve = Curve( values: _* )
-//               ConstCurve( curve )
-//
-//            case `audioCookie` =>
-//               val artifact   = Artifact.read( in )
-//               val spec       = CommonSerializers.AudioFileSpec.read( in )
-//               val offset     = Longs.readConst[ S ]( in )
-//               val gain       = Doubles.readConst[ S ]( in )
-//               val audio   = Audio( artifact, spec, offset, gain )
-//               ConstAudio( audio )
-//
-//            case other => sys.error( "Unexpected cookie " + other )
-//         }
-//      }
-//
-//      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] with evt.Node[ S ] = {
-//         (in.readUnsignedByte(): @switch) match {
-//            case `curveCookie` =>
-//               val time    = Longs.readExpr( in, access )
-//               val sz      = in.readInt()
-//               val values  = IIdxSeq.fill( sz ) {
-//      //                  val value   = Doubles.readConst[ S ]( in )
-//                  val value   = Doubles.readExpr( in, access )
-//                  val shape   = CommonSerializers.EnvConstShape.read( in )
-//                  value -> shape
-//               }
-//               val curve = Curve( values: _* )
-//               new MutableCurve( targets, time, curve )
-//
-//            case `audioCookie` =>
-//               val time    = Longs.readExpr( in, access )
-//               val artifact   = Artifact.read( in )
-//               val spec       = CommonSerializers.AudioFileSpec.read( in )
-//      //               val offset     = Longs.readConst[ S ]( in )
-//               val offset     = Longs.readExpr[ S ]( in, access )
-//      //               val gain       = Doubles.readConst[ S ]( in )
-//               val gain       = Doubles.readExpr[ S ]( in, access )
-//               val audio   = Audio( artifact, spec, offset, gain )
-//               new MutableAudio( targets, time, audio )
-//
-//            case other => sys.error( "Unexpected cookie " + other )
-//         }
-//      }
-//   }
-
    // ---- actual implementation ----
 
    private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
@@ -285,26 +81,11 @@ object GraphemeImpl {
 
       def changed: Event[ S, Grapheme.Update[ S ], Grapheme[ S ]] = this
 
-//      private def wrap( time: Expr[ S, Long ], elem: Elem[ S ])( implicit tx: S#Tx ) : ElemHolder[ S ] = elem match {
-//         case curve @ Curve( _ ) =>
-//            if( curve.isConstant ) ConstCurve( curve ) else new MutableCurve( evt.Targets[ S ], time, curve )  // XXX TODO partial?
-//         case audio @ Audio( _, _, _, _ ) =>
-//            if( audio.isConstant ) ConstAudio( audio ) else new MutableAudio( evt.Targets[ S ], time, audio )  // XXX TODO partial?
-//      }
-
       // ---- forwarding to pin ----
 
       def add( elem: TimedElem[ S ] )( implicit tx: S#Tx ) { pin.add( elem )}
 
       def remove( elem: TimedElem[ S ] )( implicit tx: S#Tx ) : Boolean = pin.remove( elem )
-//         
-//         val timeVal = time.value
-//         pin.intersect( timeVal ).find({ case (time2, hold) => time2 == time && hold.value == elem }) match {
-//            case Some( (time2, hold) ) => pin.remove( time2, hold )
-//            case _ => false
-//         }
-////         pin.remove( time, elem )
-//      }
 
       def clear()( implicit tx: S#Tx ) { pin.clear() }
 
@@ -323,17 +104,22 @@ object GraphemeImpl {
             val (floorTime, floorVal) = elem.value
             floorVal match {
                case floorCurve: Value.Curve =>
+                  val floorCurveVals: IIdxSeq[ Double ] = floorCurve.values.map( _._1 )( breakOut )
                   pin.ceil( time + 1 ) match {
                      case Some( ceilElem ) =>
                         val (ceilTime, ceilVal) = ceilElem.value
+                        val span = Span( floorTime, ceilTime )
                         ceilVal match {
-                           case ceilCuve: Value.Curve =>
-                              ???
+                           case ceilCurve: Value.Curve if ceilCurve.numChannels == floorCurve.numChannels =>
+                              val curveValues = floorCurveVals.zip( ceilCurve.values ).map {
+                                 case (floor, (ceil, shape)) => (floor, ceil, shape)
+                              }
+                              Segment.Curve( span, curveValues )
                            case _ =>
-                              Segment.Const( Span.from( floorTime ), floorCurve.values.map( _._1 )( breakOut ))
+                              Segment.Const( span, floorCurveVals )
                         }
                      case None =>
-                        Segment.Const( Span.from( floorTime ), floorCurve.values.map( _._1 )( breakOut ))
+                        Segment.Const( Span.from( floorTime ), floorCurveVals )
                   }
 
                case av: Value.Audio =>
@@ -400,7 +186,7 @@ object GraphemeImpl {
       }
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Grapheme.Update[ S ]] = {
-         ???
+         None // ???
 //         pin.changed.pullUpdate( pull ).map {
 //            // the BiPin.Collection update assumes the 'pin' character
 //            // of the elements. that means that for example, an insertion
