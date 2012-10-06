@@ -28,11 +28,12 @@ package proc
 
 import de.sciss.lucre.{event => evt, Writable, DataOutput, bitemp, stm, expr, DataInput}
 import impl.CommonSerializers
-import stm.Serializer
+import stm.{ImmutableSerializer, Serializer}
 import expr.Expr
 import bitemp.{SpanLike, BiType, BiExpr, Span}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.expr.{SpanLikes, Longs}
+import annotation.switch
 
 //import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
@@ -49,12 +50,41 @@ object Grapheme {
       ??? // Impl.serializer[ S ]
 
    object Value {
+      implicit object Serializer extends ImmutableSerializer[ Value ] {
+         def write( v: Value, out: DataOutput ) { v.write( out )}
+         def read( in: DataInput ) : Value = {
+            (in.readUnsignedByte() : @switch) match {
+               case `curveCookie` =>
+                  val sz = in.readInt()
+                  val values = IIdxSeq.fill( sz ) {
+                     val mag = in.readDouble()
+                     val env = CommonSerializers.EnvConstShape.read( in )
+                     (mag, env)
+                  }
+                  Curve( values: _* )
+
+               case `audioCookie` =>
+                  val artifact   = Artifact.read( in )
+                  val spec       = CommonSerializers.AudioFileSpec.read( in )
+                  val offset     = in.readLong()
+                  val gain       = in.readDouble()
+                  Audio( artifact, spec, offset, gain )
+
+               case cookie => sys.error( "Unexpected cookie " + cookie )
+            }
+         }
+      }
+
+      private final val curveCookie = 0
+      private final val audioCookie = 1
+
       /**
        * A mono- or polyphonic constant value
        */
       final case class Curve( values: (Double, Env.ConstShape)* ) extends Value {
          def numChannels = values.size
          def write( out: DataOutput ) {
+            out.writeUnsignedByte( curveCookie )
             val sz = values.size
             out.writeInt( sz )
             values.foreach { case (mag, shape) =>
@@ -98,6 +128,7 @@ object Grapheme {
          def numChannels = spec.numChannels
 
          def write( out: DataOutput ) {
+            out.writeUnsignedByte( audioCookie )
             artifact.write( out )
             CommonSerializers.AudioFileSpec.write( spec, out )
             out.writeLong( offset )
@@ -181,7 +212,7 @@ trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
     */
    def modifiableOption : Option[ Grapheme.Modifiable[ S ]]
 
-   def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Elem[ S ]]
+   def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.TimedElem[ S ]]
    def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value ]
    def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
 
