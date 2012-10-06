@@ -27,6 +27,7 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.{event => evt, Writable, DataOutput, bitemp, stm, expr, DataInput}
+import bitemp.Span.HasStart
 import impl.CommonSerializers
 import stm.{ImmutableSerializer, Serializer}
 import expr.Expr
@@ -155,20 +156,24 @@ object Grapheme {
 
       final case class Const( span: Span.HasStart, values: IIdxSeq[ Double ]) extends Defined {
          def numChannels = values.size
+//         def subtract( that: HasStart ) = span.subtract( that ).map( s => Const( s, values ))
       }
 
       final case class Curve( span: Span, values: IIdxSeq[ (Double, Double, Env.ConstShape) ]) extends Defined {
          def numChannels = values.size
+//         def subtract( that: HasStart ) = ???
       }
 
       final case class Audio( span: Span.HasStart, value: Value.Audio ) extends Defined {
          def numChannels = value.numChannels
+//         def subtract( that: HasStart ) = span.subtract( that ).map( s => Audio( s, value ))
       }
 
       final case class Undefined( span: Span.HasStart ) extends Segment
    }
    sealed trait Segment {
       def span: Span.HasStart
+//      def subtract( span: Span.HasStart ) : IIdxSeq[ Segment ]
    }
 
    object Elem extends BiType[ Value ] {

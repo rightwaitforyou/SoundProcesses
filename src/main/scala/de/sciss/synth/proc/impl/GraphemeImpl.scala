@@ -27,20 +27,16 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, Writable, bitemp, expr, DataOutput, DataInput}
-import annotation.switch
-import expr.Expr
+import de.sciss.lucre.{event => evt, bitemp, DataOutput, DataInput}
 import bitemp.{Span, BiPin}
-import de.sciss.synth.expr.{Doubles, Longs}
+import de.sciss.synth.expr.Longs
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import evt.{Event, EventLikeSerializer, impl => evti, Sys}
-import io.AudioFileSpec
+import evt.{Event, impl => evti, Sys}
 import proc.Grapheme.Segment
 
 object GraphemeImpl {
    import Grapheme.{Elem, TimedElem, Value, Modifiable}
-   import Elem.{Audio, Curve}
 
    private implicit val timeEx = Longs
 
@@ -174,6 +170,27 @@ object GraphemeImpl {
          pin.changed -/-> this
       }
 
+      private def incorporate( in: IIdxSeq[ Segment ], add: Segment ) : IIdxSeq[ Segment ] = {
+         val addSpan       = add.span
+//         val (pre, tmp)    = in.span(  s => !s.span.overlaps( addSpan ))
+//         val (mid, post)   = tmp.span( s =>  s.span.overlaps( addSpan ))
+//         assert( mid.forall( _.span == addSpan ))
+//         pre :+ add +: post
+         val addStart = addSpan.start
+         val i = in.indexWhere( _.span.start >= addStart )
+         if( i < 0 ) {
+            in :+ add
+         } else {
+            val inSpan = in( i ).span
+            if( inSpan == addSpan ) {
+               in.patch( i, IIdxSeq( add ), 1 )
+            } else {
+               assert( !inSpan.overlaps( addSpan ))
+               in.patch( i, IIdxSeq( add ), 0 )
+            }
+         }
+      }
+
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Grapheme.Update[ S ]] = {
          pin.changed.pullUpdate( pull ).flatMap { upd =>
             val segm: IIdxSeq[ Segment ] = upd match {
@@ -207,12 +224,13 @@ object GraphemeImpl {
 
                case BiPin.Element( _, changes ) =>
                   // changes = IIdxSeq[ (BiExpr[ S, A ], evt.Change[ (Long, A) ])]
-                  changes.flatMap { case (elem, elemCh) =>
+                  changes.foldLeft( IIdxSeq.empty[ Segment ]) { case (res, (elem, elemCh)) =>
                      val (timeCh, magCh) = elemCh.unzip
                      val seqAdd = segmentsAfterAdded( timeCh.now, magCh.now )
                      if( timeCh.isSignificant ) {
                         segmentAfterRemoved( timeCh.before ) +: seqAdd
                      } else seqAdd
+                     seqAdd.foldLeft( res )( incorporate )
                   }
             }
             if( segm.nonEmpty ) Some( Grapheme.Update( graph, segm )) else None
