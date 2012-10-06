@@ -26,15 +26,13 @@
 package de.sciss.lucre
 package bitemp
 
-//import impl.{BiPin2Impl => Impl}
+import impl.{BiPinImpl2 => Impl}
 import de.sciss.lucre.{event => evt}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.{EventLike, Sys}
 import expr.Expr
 
 object BiPin2 {
-   def ??? : Nothing = sys.error( "TODO" )
-
    sealed trait Update[ S <: Sys[ S ], A ] {
       def pin: BiPin2[ S, A ]
    }
@@ -60,14 +58,14 @@ object BiPin2 {
 
       def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
                                   ( implicit tx: S#Tx, biType: BiType[ A ]) : Modifiable[ S, A ] = {
-         ??? // Impl.readModifiable[ S, Elem, U ]( in, access, eventView )
+         Impl.readModifiable[ S, A ]( in, access )
       }
 
       def apply[ S <: Sys[ S ], A ]( implicit tx: S#Tx, biType: BiType[ A ]) : Modifiable[ S, A ] =
-         ??? // Impl.newModifiable[ S, Elem, U ]( /* default, */ eventView )
+         Impl.newModifiable[ S, A ]
 
       def serializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, BiPin2.Modifiable[ S, A ]] =
-         ??? // Impl.modifiableSerializer[ S, Elem, U ]( eventView )
+         Impl.modifiableSerializer[ S, A ]
    }
    trait Modifiable[ S <: Sys[ S ], A ] extends BiPin2[ S, A ] {
       def add(    elem: BiExpr[ S, A ])( implicit tx: S#Tx ) : Unit
@@ -77,11 +75,11 @@ object BiPin2 {
 
    def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
                                ( implicit tx: S#Tx, biType: BiType[ A ]) : BiPin2[ S, A ] = {
-      ??? // Impl.read[ S, Elem, U ]( in, access, eventView )
+      Impl.read[ S, A ]( in, access )
    }
 
    def serializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, BiPin2[ S, A ]] =
-      ??? // Impl.serializer[ S, Elem, U ]( eventView )
+      Impl.serializer[ S, A ]
 }
 sealed trait BiPin2[ S <: Sys[ S ], A ] extends Writable {
    import BiPin2.Leaf
@@ -134,7 +132,7 @@ sealed trait BiPin2[ S <: Sys[ S ], A ] extends Writable {
     * @param time the query point
     * @return  the sequence of elements found along with their time expressions
     */
-   def intersect( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Leaf[ S, A ])]
+   def intersect( time: Long )( implicit tx: S#Tx ) : Leaf[ S, A ]
 
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 

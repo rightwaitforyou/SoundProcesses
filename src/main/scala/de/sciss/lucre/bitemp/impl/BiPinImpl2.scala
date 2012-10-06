@@ -28,13 +28,11 @@ package bitemp
 package impl
 
 import de.sciss.lucre.{event => evt}
-import evt.{Change, Event, EventLike, impl => evti, Sys}
-import stm.Serializer
+import evt.{Event, EventLike, impl => evti, Sys}
 import data.SkipList
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 import annotation.switch
-import expr.{Expr, Type}
 
 object BiPinImpl2 {
    import BiPin2.{Leaf, Modifiable}
@@ -68,11 +66,11 @@ object BiPinImpl2 {
       new Impl( evt.Targets.partial[ S ], tree ) // XXX TODO partial?
    }
 
-   def serializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : evt.NodeSerializer[ S, BiPin2[ S, A ]] =
-      new Ser
+   def serializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : evt.Serializer[ S, BiPin2[ S, A ]] =
+      new Ser[ S, A, BiPin2[ S, A ]]
 
-   def modifiableSerializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : evt.NodeSerializer[ S, BiPin2.Modifiable[ S, A ]] =
-      new ModSer
+   def modifiableSerializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : evt.Serializer[ S, BiPin2.Modifiable[ S, A ]] =
+      new Ser[ S, A, BiPin2.Modifiable[ S, A ]]
 
    def readModifiable[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )( implicit tx: S#Tx, biType: BiType[ A ]) : BiPin2.Modifiable[ S, A ] = {
       val targets = evt.Targets.read[ S ]( in, access )
@@ -88,23 +86,30 @@ object BiPinImpl2 {
       new Impl( targets, tree )
    }
 
-   private class Ser[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ])
-   extends evt.NodeSerializer[ S, BiPin2[ S, A ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin2[ S, A ] = {
+   private class Ser[ S <: Sys[ S ], A, Repr >: Impl[ S, A ] <: BiPin2[ S, A ]]( implicit biType: BiType[ A ])
+   extends stm.Serializer[ S#Tx, S#Acc, Repr ] with evt.Reader[ S, Repr ] {
+      def write( v: Repr, out: DataOutput ) { v.write( out )}
+
+      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Repr with evt.Node[ S ] = {
          BiPinImpl2.readImpl( in, access, targets )
+      }
+
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Repr = {
+         val targets = evt.Targets.read( in, access )
+         read( in, access, targets )
       }
    }
 
-   private class ModSer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ])
-   extends evt.NodeSerializer[ S, BiPin2.Modifiable[ S, A ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin2.Modifiable[ S, A ] = {
-         BiPinImpl2.readImpl( in, access, targets)
-      }
-   }
+//   private class ModSer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ])
+//   extends evt.NodeSerializer[ S, BiPin2.Modifiable[ S, A ]] {
+//      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin2.Modifiable[ S, A ] with evt.Node[ S ] = {
+//         BiPinImpl2.readImpl( in, access, targets)
+//      }
+//   }
 
    private final class Impl[ S <: Sys[ S ], A ]( protected val targets: evt.Targets[ S ], tree: Tree[ S, A ])
                                                ( implicit biType: BiType[ A ])
-   extends Modifiable[ S, A ]
+   extends Modifiable[ S, A ] with evt.Node[ S ]
 //   with evt.Compound[ S, Impl[ S, A ], Impl.type ]
 //   with evt.Trigger.Impl[ S, BiPin2.Update[ S, A ], BiPin2.Update[ S, A ], BiPin2[ S, A ]]
 //   with evt.StandaloneLike[ S, BiPin2.Update[ S, A ], BiPin2[ S, A ]]
@@ -125,17 +130,16 @@ object BiPinImpl2 {
 
       private object CollChanged
       extends evti.TriggerImpl[ S, BiPin2.Collection[ S, A ], BiPin2[ S, A ]]
-      with evti.EventImpl[ S, BiPin2.Collection[ S, A ], BiPin2[ S, A ]]
       with evt.InvariantEvent[ S, BiPin2.Collection[ S, A ], BiPin2[ S, A ]]
       with evti.Root[ S, BiPin2.Collection[ S, A ]]
       {
          protected def reader : evt.Reader[ S, BiPin2[ S, A ]] = serializer
          def slot: Int = 1
-         def node: BiPin2[ S, A ] = pin
+         def node: BiPin2[ S, A ] with evt.Node[ S ] = pin
 
-         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin2.Collection[ S, A ]] = {
-            pull.resolve[ BiPin2.Collection[ S, A ]]
-         }
+//         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin2.Collection[ S, A ]] = {
+//            pull.resolve[ BiPin2.Collection[ S, A ]]
+//         }
       }
 
       private object ElemChanged
@@ -143,7 +147,7 @@ object BiPinImpl2 {
       with evt.InvariantEvent[ S, BiPin2.Element[ S, A ], BiPin2[ S, A ]] {
          protected def reader : evt.Reader[ S, BiPin2[ S, A ]] = serializer
          def slot: Int = 2
-         def node: BiPin2[ S, A ] = pin
+         def node: BiPin2[ S, A ] with evt.Node[ S ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -159,7 +163,7 @@ object BiPinImpl2 {
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin2.Element[ S, A ]] = {
             val changes: IIdxSeq[ (Elem, ElemChange) ] = pull.parents( this ).flatMap( sel => {
                // wow... how does this get the event update type right I'm wondering... ?
-               // UPDATE: ha! it doesn't. hell, this produces a runtime exception re Nothing???
+               // UPDATE: ha! it doesn't. hell, this produces a runtime exception re Nothing??
                // --> fix: evt needs type ascription!!!
                val e    = sel.devirtualize[ ElemChange, Elem ]( BiExpr.serializer[ S, A ])
                val elem = e.node
@@ -175,7 +179,7 @@ object BiPinImpl2 {
       with evt.InvariantSelector[ S ] {
          protected def reader : evt.Reader[ S, BiPin2[ S, A ]] = serializer
          def slot: Int = opNotSupported
-         def node: BiPin2[ S, A ] = pin
+         def node: BiPin2[ S, A ] with evt.Node[ S ] = pin
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -261,29 +265,25 @@ object BiPinImpl2 {
          }
       }
 
-      def intersect( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Leaf[ S, A ])] = {
-         tree.floor( time )
+      def intersect( time: Long )( implicit tx: S#Tx ) : Leaf[ S, A ] = tree.floor( time ) match {
+         case Some( (_, seq) ) => seq
+         case _ => IIdxSeq.empty
       }
 
       def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = tree.ceil( time ).map( _._1 )
 
-      def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem ] = intersect( time ).flatMap( _._2.headOption )
+      def at( time: Long )( implicit tx: S#Tx ) : Option[ Elem ] = intersect( time ).headOption
 
-      def floor( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ] = tree.floor( time ).flatMap {
-         case (t, IIdxSeq( elem, rest @ _* )) => Some( t -> elem )
-         case _ => None
-      }
+      def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ A ] = intersect( time ).headOption.map( _.magValue )
 
-      def ceil( time: Long )( implicit tx: S#Tx ) : Option[ (Long, Elem) ] = tree.ceil( time ).flatMap {
-         case (t, IIdxSeq( elem, rest @ _* )) => Some( t -> elem )
-         case _ => None
-      }
+      def floor( time: Long )( implicit tx: S#Tx ) : Option[ Elem ] = tree.floor( time ).flatMap( _._2.headOption )
+
+      def ceil( time: Long )( implicit tx: S#Tx ) : Option[ Elem ] = tree.ceil( time ).flatMap( _._2.headOption )
 
       /**
        * Adds a new value, and returns the dirty which corresponds to the new region holding `elem`.
        *
        * @param timeVal the time value at which the new element is inserted
-       * @param time    the time expression at which the new element is inserted
        * @param elem    the element which is inserted
        * @return
        */
