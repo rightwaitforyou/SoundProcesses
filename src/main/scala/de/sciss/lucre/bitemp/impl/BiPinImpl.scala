@@ -149,8 +149,20 @@ object BiPinImpl {
          def slot: Int = 2
          def node: BiPin[ S, A ] with evt.Node[ S ] = pin
 
-         def connect()( implicit tx: S#Tx ) {}
-         def disconnect()( implicit tx: S#Tx ) {}
+//         def connect()( implicit tx: S#Tx ) {}
+//         def disconnect()( implicit tx: S#Tx ) {}
+
+         private def foreach( fun: Elem => Unit )( implicit tx: S#Tx ) {
+            tree.iterator.foreach { case (_, seq) => seq.foreach( fun )}
+         }
+
+         def connect()( implicit tx: S#Tx ) {
+            foreach( += _ )
+         }
+
+         def disconnect()( implicit tx: S#Tx ) {
+            foreach( -= _ )
+         }
 
          def +=( elem: Elem )( implicit tx: S#Tx ) {
             elem.changed ---> this
@@ -227,18 +239,6 @@ object BiPinImpl {
 
       protected def writeData( out: DataOutput ) {
          tree.write( out )
-      }
-
-      private def foreach( fun: Elem => Unit )( implicit tx: S#Tx ) {
-         tree.iterator.foreach { case (_, seq) => seq.foreach( fun )}
-      }
-
-      def connect()( implicit tx: S#Tx ) {
-         foreach( ElemChanged += _ )
-      }
-
-      def disconnect()( implicit tx: S#Tx ) {
-         foreach( ElemChanged -= _ )
       }
 
       def select( slot: Int, invariant: Boolean ) : Event[ S, Any, Any ] = (slot: @switch) match {

@@ -91,7 +91,9 @@ class ScanSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
+//lucre.event.showLog = true
          timeVar.set( 4000L )                               // ...
+//lucre.event.showLog = false
          obs.assertEquals(
             Proc.ScanChange( p, Map( "freq" -> Scan.SourceUpdate( scan,
                Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Curve( Span( 2000L, 4000L ), IIdxSeq( (5678.0, 9876.0, linShape) )),
