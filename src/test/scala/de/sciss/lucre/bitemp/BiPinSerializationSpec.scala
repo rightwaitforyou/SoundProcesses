@@ -17,8 +17,8 @@ class BiPinSerializationSpec extends ConfluentEventSpec {
          val bip = BiPin.Modifiable[ S, Int ]
          tx.newHandle( bip )( BiPin.Modifiable.serializer[ S, Int ])
       }
-      val acc = system.step { implicit tx => tx.inputAccess }
-      println( "--step; bipH = " + bipH + "; cursor pos = " + acc )
+//      val acc = system.step { implicit tx => tx.inputAccess }
+//      println( "--step; bipH = " + bipH + "; cursor pos = " + acc )
 
 //      implicit val bipSer = BiPin.Expr.Modifiable.serializer[ S, Int ]
       import imp._

@@ -15,7 +15,7 @@ class GraphemeSpec extends ConfluentEventSpec {
    type IntEx = Expr[ S, Int ]
    import imp._
 
-   def ??? : Nothing = sys.error( "TODO" )
+//   def ??? : Nothing = sys.error( "TODO" )
 
    import Grapheme.{Value, Modifiable, Update, Segment}
 

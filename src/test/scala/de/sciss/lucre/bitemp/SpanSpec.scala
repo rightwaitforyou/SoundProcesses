@@ -5,6 +5,11 @@ import org.scalatest.matchers.ShouldMatchers
 import org.scalatest.FlatSpec
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
+/**
+ * To run only this suite:
+ *
+ * test-only de.sciss.lucre.bitemp.SpanSpec
+ */
 class SpanSpec extends FlatSpec with ShouldMatchers {
    val span1   = Span( 30, 40 )
    val span2   = Span( 40, 50 )
