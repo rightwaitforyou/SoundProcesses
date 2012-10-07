@@ -253,7 +253,7 @@ object ProcImpl {
    private final class New[ S <: Sys[ S ]]( tx0: S#Tx ) extends Impl[ S ] {
       protected val targets   = evt.Targets[ S ]( tx0 )
 
-      protected val name_#    = Strings.newVar[ S ]( "unnamed" )( tx0 )
+      protected val name_#    = Strings.newVar[ S ]( Strings.newConst( "unnamed" ))( tx0 )
       protected val graphVar  = {
          implicit val peerSer = SynthGraphSerializer
          tx0.newVar[ Code[ SynthGraph ]]( id, emptyGraph )

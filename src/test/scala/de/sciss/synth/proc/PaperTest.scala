@@ -46,7 +46,7 @@
 //   def run[ S <: KSys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
 //      implicit val whyOhWhy   = ProcGroup.varSerializer[ S ]
 //      implicit val whyOhWhy2  = Proc.serializer[ S ]
-//      val imp = new ExprImplicits[ S ]
+//      val imp = ExprImplicits[ S ]
 //      import imp._
 //
 //      implicit object doubleVarSerializer extends TxnSerializer[ S#Tx, S#Acc, Expr.Var[ S, Double ]] {

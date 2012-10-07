@@ -87,7 +87,7 @@
 //class Example2(implicit s: Confluent, c: Cursor[Confluent]) {
 //  type S = Confluent
 //
-//  val imp = new ExprImplicits[S]
+//  val imp = ExprImplicits[S]
 //  val helper = new PaperTest2.Helper[S](imp)
 //  import helper._
 //  import imp._

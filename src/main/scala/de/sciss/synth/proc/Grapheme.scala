@@ -27,7 +27,6 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.{event => evt, Writable, DataOutput, bitemp, stm, expr, DataInput}
-import bitemp.Span.HasStart
 import impl.CommonSerializers
 import stm.{ImmutableSerializer, Serializer}
 import expr.Expr
@@ -55,6 +54,8 @@ object Grapheme {
    private final val audioCookie = 2
 
    object Value {
+      implicit val biType : BiType[ Value ] = Elem
+
       implicit object Serializer extends ImmutableSerializer[ Value ] {
          def write( v: Value, out: DataOutput ) { v.write( out )}
          def read( in: DataInput ) : Value = {
@@ -362,6 +363,12 @@ object Grapheme {
 
    object Modifiable {
       def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = Impl.modifiable[ S ]
+
+      def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Modifiable[ S ] =
+         Impl.readModifiable( in, access )
+
+      implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Modifiable[ S ]] =
+         Impl.modifiableSerializer[ S ]
 
       /**
        * Extractor to check if a `Grapheme` is actually a `Grapheme.Modifiable`

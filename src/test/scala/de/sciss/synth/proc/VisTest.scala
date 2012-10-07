@@ -108,7 +108,7 @@ extends ExprImplicits[ Sy ] {
 
    def grapheme( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = Grapheme.Modifiable[ S ]
 
-   def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape ) = Grapheme.Elem.Curve( amp -> shape )
+   def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape )( implicit tx: S#Tx ) = Grapheme.Elem.Curve( amp -> shape )
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)

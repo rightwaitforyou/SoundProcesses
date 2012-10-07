@@ -22,7 +22,7 @@
 //   }
 //
 //   def run[ S <: Sys[ S ]]( implicit system: S, cursor: Cursor[ S ]) {
-//      val exprImp = new ExprImplicits[ S ]
+//      val exprImp = ExprImplicits[ S ]
 //      import exprImp._
 //
 //      implicit def biSer[ A ]( implicit peer: BiType[ A ]) = BiPin.Modifiable.serializer[ S, A ]

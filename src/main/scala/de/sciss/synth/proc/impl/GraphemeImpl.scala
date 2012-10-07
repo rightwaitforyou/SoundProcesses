@@ -44,10 +44,18 @@ object GraphemeImpl {
       serializer[ S ].read( in, access )
    }
 
+   def readModifiable[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = {
+      modifiableSerializer[ S ].read( in, access )
+   }
+
    implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Grapheme[ S ]] =
       anySer.asInstanceOf[ evt.NodeSerializer[ S, Grapheme[ S ]]]
 
-   private val anySer = new Ser[ evt.InMemory ]
+   implicit def modifiableSerializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Grapheme.Modifiable[ S ]] =
+      anySer.asInstanceOf[ evt.NodeSerializer[ S, Grapheme.Modifiable[ S ]]] // whatever...
+
+   private val anySer      = new Ser[ evt.InMemory ]
+//   private val anyModSer   = new ModSer[ evt.InMemory ]
 
    private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme[ S ]] {
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme[ S ] = {
@@ -56,6 +64,14 @@ object GraphemeImpl {
          new Impl( targets, pin )
       }
    }
+
+//   private final class ModSer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme.Modifiable[ S ]] {
+//      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = {
+//         implicit val elemType = Elem // .serializer[ S ]
+//         val pin = BiPin.Modifiable.read[ S, Value ]( in, access )
+//         new Impl( targets, pin )
+//      }
+//   }
 
    def modifiable[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = {
       val targets = evt.Targets[ S ]   // XXX TODO: partial?

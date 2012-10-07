@@ -4,15 +4,16 @@ import de.sciss.lucre.{stm, expr, bitemp, event => evt}
 import bitemp.{BiExpr, BiType, SpanLike, Span}
 import evt.Sys
 import expr.Expr
+import de.sciss.synth.proc.Grapheme
 
 object ExprImplicits {
-   implicit def stringConst[   S <: stm.Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )
-   implicit def booleanConst[  S <: stm.Sys[ S ]]( b: Boolean )  : Expr[ S, Boolean  ] = Booleans.newConst(  b )
-   implicit def doubleConst[   S <: stm.Sys[ S ]]( d: Double )   : Expr[ S, Double   ] = Doubles.newConst(   d )
-   implicit def intConst[      S <: stm.Sys[ S ]]( i: Int )      : Expr[ S, Int      ] = Ints.newConst(      i )
-   implicit def longConst[     S <: stm.Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
-   implicit def spanConst[     S <: stm.Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
-   implicit def spanLikeConst[ S <: stm.Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
+//   implicit def stringConst[   S <: stm.Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )
+//   implicit def booleanConst[  S <: stm.Sys[ S ]]( b: Boolean )  : Expr[ S, Boolean  ] = Booleans.newConst(  b )
+//   implicit def doubleConst[   S <: stm.Sys[ S ]]( d: Double )   : Expr[ S, Double   ] = Doubles.newConst(   d )
+//   implicit def intConst[      S <: stm.Sys[ S ]]( i: Int )      : Expr[ S, Int      ] = Ints.newConst(      i )
+//   implicit def longConst[     S <: stm.Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
+//   implicit def spanConst[     S <: stm.Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
+//   implicit def spanLikeConst[ S <: stm.Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
 
 //   trait LowPriority[ S <: Sys[ S ]] {
 //      implicit def lowSpanLikeConst( s: Span ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
@@ -32,7 +33,7 @@ object ExprImplicits {
  * that require an existing expression (e.g. `longOps2`). This is so that primitive standard operations remain
  * outside the implicit scope (e.g. addition on longs).
  */
-class ExprImplicits[ S <: Sys[ S ]] /* extends ExprImplicits.LowPriority[ S ] */ {
+class ExprImplicits[ S <: Sys[ S ]] protected /* extends ExprImplicits.LowPriority[ S ] */ {
    implicit def stringConst( s: String ) : Expr[ S, String ] = Strings.newConst( s )
 //   implicit def stringOps[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, String ]) : Strings.Ops[ S ] =
 //      new Strings.Ops( ex )
@@ -69,4 +70,8 @@ class ExprImplicits[ S <: Sys[ S ]] /* extends ExprImplicits.LowPriority[ S ] */
       BiExpr[ S, A ]( timeView( tuple._1 ), magView( tuple._2 ))
 
    implicit def biExprSer[ A ]( implicit biType: BiType[ A ]) = BiExpr.serializer[ S, A ]
+
+   // ---- XXX TODO ...making package synth.expr a bad choice... ----
+
+   implicit def graphemeConst( v: Grapheme.Value ) : Grapheme.Elem[ S ] = Grapheme.Elem.newConst( v )
 }

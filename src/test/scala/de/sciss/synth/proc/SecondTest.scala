@@ -15,7 +15,7 @@
 //
 //   def run[ S <: Sys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
 //      implicit val whyOhWhy = ProcGroup.varSerializer[ S ]
-//      val imp = new ExprImplicits[ S ]
+//      val imp = ExprImplicits[ S ]
 //      import imp._
 //
 //      implicit val ts = Chronos[ S ]( 0L )

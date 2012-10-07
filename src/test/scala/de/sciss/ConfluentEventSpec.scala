@@ -14,7 +14,7 @@ trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
 
    implicit final protected val IntType   = Ints
    implicit final protected val LongType  = Longs
-   final protected val imp = new ExprImplicits[ S ]
+   final protected val imp = ExprImplicits[ S ]
 
    final def withFixture( test: OneArgTest ) {
       val system = ConfluentReactive.tmp()

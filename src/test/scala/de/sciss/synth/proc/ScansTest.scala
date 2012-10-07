@@ -74,7 +74,7 @@ object ScansTest extends App {
 
    def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit system: S, cursor: stm.Cursor[ S ], bridge: S#Tx => I#Tx ) {
 //      implicit val sys = makeSys()
-//      val imp  = new ExprImplicits[ S ]
+//      val imp  = ExprImplicits[ S ]
 //      import imp._
 
       def body( auralSystem: Option[ AuralSystem ]) {
@@ -107,7 +107,7 @@ val transp  = Transport[ S, I ]( group )
    def test[ S <: evt.Sys[ S ]]( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
       SoundProcesses.showLog = true
 
-      val imp  = new ExprImplicits[ S ]
+      val imp  = ExprImplicits[ S ]
       import imp._
 
       val p1 = Proc[ S ]

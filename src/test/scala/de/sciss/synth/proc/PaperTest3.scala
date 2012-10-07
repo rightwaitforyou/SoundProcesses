@@ -31,7 +31,7 @@
 //   def run[ S <: KSys[ S ]]()( implicit system: S, cursor: Cursor[ S ]) {
 //      implicit val whyOhWhy   = ProcGroup.serializer[ S ]
 //      implicit val whyOhWhy2  = Proc.serializer[ S ]
-//      val imp = new ExprImplicits[ S ]
+//      val imp = ExprImplicits[ S ]
 //      import imp._
 //
 //      implicit val ts = Chronos[ S ]( 0L )

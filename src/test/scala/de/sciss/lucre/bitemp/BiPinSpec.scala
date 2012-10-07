@@ -16,7 +16,7 @@ class BiPinSpec extends ConfluentEventSpec {
    type IntEx = Expr[ S, Int ]
    import imp._
 
-   def ??? : Nothing = sys.error( "TODO" )
+//   def ??? : Nothing = sys.error( "TODO" )
 
    "BiPin" should "notify observers about all relevant collection events" in { system =>
       val obs  = new Observation[ S ]
