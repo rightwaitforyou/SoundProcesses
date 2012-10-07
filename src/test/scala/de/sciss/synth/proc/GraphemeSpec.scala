@@ -38,6 +38,27 @@ class GraphemeSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
+         g.add( 10000L, Value.Curve( 882.0 -> expShape ))
+         obs.assertEquals(
+            Update( g, IIdxSeq( Segment.Curve( Span( 0L, 10000L ), IIdxSeq( (441.0, 882.0, expShape) )),
+                                Segment.Const( Span.from( 10000L ), IIdxSeq( 882.0 ))))
+         )
+         obs.clear()
+
+         g.add( 20000L, Value.Curve( 123.4 -> sinShape, 567.8 -> sinShape ))
+         obs.assertEquals(
+            Update( g, IIdxSeq( Segment.Const( Span( 10000L, 20000L ), IIdxSeq( 882.0 )), // no curve if channel mismatch
+                                Segment.Const( Span.from( 20000L ), IIdxSeq( 123.4, 567.8 ))))
+         )
+         obs.clear()
+
+         g.add( 30000L, Value.Curve( 987.6 -> welchShape, 543.2 -> stepShape ))
+         obs.assertEquals(
+            Update( g, IIdxSeq( Segment.Curve( Span( 20000L, 30000L ), IIdxSeq( (123.4, 987.6, welchShape), (567.8, 543.2, stepShape) )),
+                                Segment.Const( Span.from( 30000L ), IIdxSeq( 987.6, 543.2 ))))
+         )
+         obs.clear()
+
 //         obs.print()
 
 //         bip.add( tup1 )
