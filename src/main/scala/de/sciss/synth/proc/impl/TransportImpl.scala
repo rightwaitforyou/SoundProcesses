@@ -154,8 +154,6 @@ object TransportImpl {
       res
    }
 
-   private val cpuTime = TxnLocal( sysMicros() )    // system wide wall clock in microseconds
-
    private def shutdownScheduler() {
      if( VERBOSE )println( "Shutting down scheduler thread pool" )
      pool.shutdown()
@@ -202,7 +200,13 @@ object TransportImpl {
                       protected val obsVar:        I#Var[ IIdxSeq[ Observation[ S, I ]]])
                     ( implicit protected val trans: S#Tx => I#Tx )
    extends Impl[ S, I ] with Transport.Offline[ S, Proc[ S ], Transport.Proc.Update[ S ]] {
-      private val submitRef = Ref( (0L, 0L, -1) )
+      private val submitRef   = Ref( (0L, 0L, -1) )
+      private val timeRef     = Ref( 0L )
+
+      protected def logicalTime()( implicit tx: S#Tx ) : Long = timeRef.get( tx.peer )
+      protected def logicalTime_=( value: Long )( implicit tx: S#Tx ) {
+         timeRef.set( value )( tx.peer )
+      }
 
       protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
 if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay ) // + ", targetFrame = " + targetFrame )
@@ -215,7 +219,14 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay ) // + ",
             eventReached( logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid )
          }
       }
+
+      def elapse( seconds: Double )( implicit tx: S#Tx ) {
+         val micros = (seconds * 1e6).toLong
+         timeRef.transform( _ + micros )( tx.peer )
+      }
    }
+
+   private final val rt_cpuTime = TxnLocal( sysMicros() )    // system wide wall clock in microseconds
 
    private final class Realtime[ S <: Sys[ S ], I <: stm.Sys[ I ]](
                       protected val groupHandle:   stm.Source[ S#Tx, ProcGroup[ S ]],
@@ -227,6 +238,12 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay ) // + ",
                       protected val obsVar:        I#Var[ IIdxSeq[ Observation[ S, I ]]])
                     ( implicit cursor: Cursor[ S ], protected val trans: S#Tx => I#Tx )
    extends Impl[ S, I ] {
+
+      protected def logicalTime()( implicit tx: S#Tx ) : Long = rt_cpuTime.get( tx.peer )
+      protected def logicalTime_=( value: Long )( implicit tx: S#Tx ) {
+         rt_cpuTime.set( value )( tx.peer )
+      }
+
       protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
          val jitter        = sysMicros() - logicalNow
          val actualDelay   = math.max( 0L, logicalDelay - jitter )
@@ -302,9 +319,12 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          // time we targetted at; then in the next scheduleNext call, the jitter is properly
          // calculated.
          val newLogical = logicalNow + logicalDelay
-         cpuTime.set( newLogical )( tx.peer )
+         logicalTime_=( newLogical )
          advance( newFrame = info.nextTime )
       }
+
+      protected def logicalTime()( implicit tx: S#Tx ) : Long
+      protected def logicalTime_=( value: Long )( implicit tx: S#Tx ) : Unit
 
       // the following illustrates what actions need to be done with respect
       // to the overlap/touch or not between the current info span and the change span
@@ -348,7 +368,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          } else {
             oldInfo.nextGraphemeTime
          }
-         val newInfo = oldInfo.copy( cpuTime          = cpuTime.get( tx.peer ),
+         val newInfo = oldInfo.copy( cpuTime          = logicalTime(),
                                      frame            = newFrame,
                                      nextProcTime     = nextProcTime,
                                      nextGraphemeTime = nextGraphemeTime )
@@ -429,7 +449,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
       private def calcCurrentTime( info: Info )( implicit tx: S#Tx ) : Long = {
          val startFrame = info.frame
          if( info.isRunning ) {
-            val logicalNow    = cpuTime.get( tx.peer )
+            val logicalNow    = logicalTime()
             val logicalDelay  = logicalNow - info.cpuTime
             val stopFrame     = info.nextTime
             // for this to work as expected it is crucial that the reported current time is
@@ -450,7 +470,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          implicit val itx: I#Tx = tx
          val oldInfo = infoVar.get
          if( oldInfo.isRunning ) return
-         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
+         val newInfo = oldInfo.copy( cpuTime = logicalTime(),
                                      state   = Playing )
          infoVar.set( newInfo )
          fire( Transport.Play( impl, newInfo.frame ))
@@ -462,7 +482,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          val oldInfo = infoVar.get
          if( !oldInfo.isRunning ) return
 
-         val newInfo = oldInfo.copy( cpuTime = cpuTime.get( tx.peer ),
+         val newInfo = oldInfo.copy( cpuTime = logicalTime(),
                                      frame   = calcCurrentTime( oldInfo ),
                                      state   = Stopped )
          infoVar.set( newInfo )
@@ -907,7 +927,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
          }
 
          val newState: State = if( startPlay ) Playing else oldInfo.state
-         val newInfo = oldInfo.copy( cpuTime          = cpuTime.get( tx.peer ),
+         val newInfo = oldInfo.copy( cpuTime          = logicalTime(),
                                      frame            = newFrame,
                                      state            = newState,
                                      nextProcTime     = nextProcTime,

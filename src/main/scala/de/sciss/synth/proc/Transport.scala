@@ -63,13 +63,18 @@ object Transport {
        * Advances the transport to the next position (if there is any)
        */
       def step()( implicit tx: S#Tx ) : Unit
+
+      /**
+       * Advances the offline logical clock by a given amount of seconds.
+       */
+      def elapse( seconds: Double )( implicit tx: S#Tx ) : Unit
    }
 
    final case class Advance[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], time: Long,
                                                        isSeek: Boolean, isPlaying: Boolean,
-                                                       added:   IIdxSeq[  BiGroup.TimedElem[ S, Elem ]],
-                                                       removed: IIdxSeq[  BiGroup.TimedElem[ S, Elem ]],
-                                                       changes: IIdxSeq[ (BiGroup.TimedElem[ S, Elem ], U) ])
+                                                       added:   IIdxSeq[  BiGroup.TimedElem[ S, Elem ]] = IIdxSeq.empty,
+                                                       removed: IIdxSeq[  BiGroup.TimedElem[ S, Elem ]] = IIdxSeq.empty,
+                                                       changes: IIdxSeq[ (BiGroup.TimedElem[ S, Elem ], U) ] = IIdxSeq.empty )
    extends Update[ S, Elem, U ] {
       override def toString =
          (if( isSeek ) "Seek" else "Advance") + "(" + transport + ", " + time +
