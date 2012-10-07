@@ -5,6 +5,7 @@ package proc
 import lucre.expr.Expr
 import lucre.bitemp.Span
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import expr.{Doubles, Longs}
 
 /**
  * To run only this suite:
@@ -17,7 +18,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 
 //   def ??? : Nothing = sys.error( "TODO" )
 
-   import Grapheme.{Value, Modifiable, Update, Segment, TimedElem}
+   import Grapheme.{Value, Modifiable, Update, Segment, Elem, TimedElem}
 
    "Grapheme" should "notify observers about all relevant events" in { system =>
       val obs  = new Observation[ S ]
@@ -125,6 +126,43 @@ class GraphemeSpec extends ConfluentEventSpec {
          obs.clear()
 
          assert( g.debugList() === Nil )
+      }
+
+      // ok, now test with non-constant expressions
+      system.step { implicit tx =>
+         val g       = gH.get
+         val time1   = Longs.newVar[ S ](      0L)
+         val mag1    = Doubles.newVar[ S ]( 1234.5)
+         val value1  = Elem.Curve( mag1 -> linShape )
+         val elem1: TimedElem[ S ] = time1 -> value1
+
+         val time2   = Longs.newVar[ S ]( 10000L )
+         val mag2    = Doubles.newVar[ S ]( 6789.0 )
+         val value2  = Elem.Curve( mag2 -> linShape )
+         val elem2: TimedElem[ S ] = time2 -> value2
+
+         val time3   = time2 + 1000L
+         val mag3    = mag1 + 1000.0
+         val value3  = Elem.Curve( mag3 -> linShape )
+         val elem3: TimedElem[ S ] = time3 -> value3
+
+         g.add( elem1 )
+         g.add( elem2 )
+         g.add( elem3 )
+
+         obs.assertEquals(
+            Update( g, IIdxSeq(
+               Segment.Const( Span.from( 0L ), IIdxSeq( 1234.5 ))
+            )),
+            Update( g, IIdxSeq(
+               Segment.Curve( Span( 0L, 10000L ), IIdxSeq( (1234.5, 6789.0, linShape) )),
+               Segment.Const( Span.from( 10000L ), IIdxSeq( 6789.0 ))
+            )),
+            Update( g, IIdxSeq(
+               Segment.Curve( Span( 10000L, 11000L ), IIdxSeq( (6789.0, 2234.5, linShape) )),
+               Segment.Const( Span.from( 11000L ), IIdxSeq( 2234.5 ))
+            ))
+         )
       }
    }
 }
