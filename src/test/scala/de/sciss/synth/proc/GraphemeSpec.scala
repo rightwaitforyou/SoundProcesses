@@ -174,6 +174,26 @@ class GraphemeSpec extends ConfluentEventSpec {
          )
 //         obs.print()
          obs.clear()
+
+         mag1.set( 666.6 )
+         obs.assertEquals(
+            Update( g, IIdxSeq (
+               Segment.Curve( Span( 2000L, 10000L ), IIdxSeq( (666.6, 6789.0, linShape) )),
+               Segment.Curve( Span( 10000L, 11000L ), IIdxSeq( (6789.0, 1666.6, linShape) )),
+               Segment.Const( Span.from( 11000L ), IIdxSeq( 1666.6 ))
+            ))
+         )
+         obs.clear()
+
+         time2.set( 11000L )
+         obs.assertEquals(
+            Update( g, IIdxSeq (
+               Segment.Curve( Span( 2000L, 11000L ), IIdxSeq( (666.6, 6789.0, linShape) )),
+               Segment.Curve( Span( 11000L, 12000L ), IIdxSeq( (6789.0, 1666.6, linShape) )),
+               Segment.Const( Span.from( 12000L ), IIdxSeq( 1666.6 ))
+            ))
+         )
+         obs.clear()
       }
    }
 }
