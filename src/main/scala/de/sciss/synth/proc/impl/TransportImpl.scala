@@ -34,7 +34,7 @@ import bitemp.{BiGroup, SpanLike, Span}
 import data.SkipList
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{Txn, TxnLocal}
+import concurrent.stm.{Ref, Txn, TxnLocal}
 import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
 import java.text.SimpleDateFormat
 
@@ -44,8 +44,33 @@ object TransportImpl {
    import Grapheme.Segment
    import Segment.{Defined => DefSeg}
 
-   def apply[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double )
-                                           ( implicit tx: S#Tx, cursor: Cursor[ S ], bridge: S#Tx => I#Tx ) : ProcTransport[ S ] = {
+   def apply[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double )(
+      implicit tx: S#Tx, cursor: Cursor[ S ], bridge: S#Tx => I#Tx ) : ProcTransport[ S ] = {
+
+      val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[ S, I ]( group )
+      val t = new Realtime[ S, I ]( groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar )
+      t.init()
+      t
+   }
+
+   def offline[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double )(
+      implicit tx: S#Tx, bridge: S#Tx => I#Tx ) : Transport.Offline[ S, Proc[ S ], Transport.Proc.Update[ S ]] = {
+
+      val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[ S, I ]( group )
+      val t = new Offline[ S, I ]( groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar )
+      t.init()
+      t
+   }
+
+   private def prepare[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ])
+                                                         ( implicit tx: S#Tx, bridge: S#Tx => I#Tx ) :
+      (stm.Source[ S#Tx, ProcGroup[ S ]],
+       I#Var[ Info ],
+       IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, DefSeg ])],
+       SkipList.Map[ I, Long, Map[ S#ID, Map[ String, DefSeg ]]],
+       IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
+       I#Var[ IIdxSeq[ Observation[ S, I ]]]) = {
+
       implicit val itx: I#Tx = tx
       val iid        = itx.newID()
       implicit val infoSer = dummySerializer[ Info, I ]
@@ -57,10 +82,8 @@ object TransportImpl {
       implicit val obsSer = dummySerializer[ IIdxSeq[ Observation[ S, I ]], I ]
       val obsVar     = itx.newVar( iid, IIdxSeq.empty[ Observation[ S, I ]])
       val groupH     = tx.newHandle( group )( ProcGroup_.serializer )
-      val t          = new Realtime[ S, I ]( groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar )
-      t.init()
-      t.seek( 0L )
-      t
+
+      (groupH, infoVar, gMap, gPrio, timedMap, obsVar)
    }
 
    private def sysMicros() = System.nanoTime()/1000
@@ -169,7 +192,32 @@ object TransportImpl {
 
    private final val dummySegment = Segment.Undefined( Span.from( Long.MaxValue ))
 
-   private final class Realtime[ S <: Sys[ S ], I <: stm.Sys[ I ]]( /* protected val targets: evt.Targets[ S ], */
+   private final class Offline[ S <: Sys[ S ], I <: stm.Sys[ I ]](
+                      protected val groupHandle:   stm.Source[ S#Tx, ProcGroup[ S ]],
+                      val sampleRate:              Double,
+                      protected val infoVar:       I#Var[ Info ],
+                      protected val gMap:          IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, DefSeg ])],
+                      protected val gPrio:         SkipList.Map[ I, Long, Map[ S#ID, Map[ String, DefSeg ]]],
+                      protected val timedMap:      IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
+                      protected val obsVar:        I#Var[ IIdxSeq[ Observation[ S, I ]]])
+                    ( implicit protected val trans: S#Tx => I#Tx )
+   extends Impl[ S, I ] with Transport.Offline[ S, Proc[ S ], Transport.Proc.Update[ S ]] {
+      private val submitRef = Ref( (0L, 0L, -1) )
+
+      protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
+if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay ) // + ", targetFrame = " + targetFrame )
+         submitRef.set( (logicalNow, logicalDelay, schedValid) )( tx.peer )
+      }
+
+      def step()( implicit tx: S#Tx ) {
+         val (logicalNow, logicalDelay, schedValid) = submitRef.swap( (0L, 0L, -1) )( tx.peer )
+         if( schedValid >= 0 ) {
+            eventReached( logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid )
+         }
+      }
+   }
+
+   private final class Realtime[ S <: Sys[ S ], I <: stm.Sys[ I ]](
                       protected val groupHandle:   stm.Source[ S#Tx, ProcGroup[ S ]],
                       val sampleRate:              Double,
                       protected val infoVar:       I#Var[ Info ],
@@ -358,6 +406,8 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
                ???
          }}
+
+         seek( 0L )
       }
 
       final def dispose()( implicit tx: S#Tx ) {
