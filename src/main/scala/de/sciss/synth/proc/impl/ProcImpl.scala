@@ -28,12 +28,11 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, stm, expr, data, bitemp, DataInput, DataOutput}
-import de.sciss.synth.expr.{Strings, Doubles, ExprImplicits}
+import de.sciss.synth.expr.{Strings, Doubles}
 import evt.{Event, impl => evti, Sys}
 import bitemp.BiType
 import expr.Expr
 import data.SkipList
-import ExprImplicits._
 import annotation.switch
 
 object ProcImpl {

@@ -67,11 +67,19 @@ object Proc {
    }
 
 //   final case class ParamChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ BiPin.Expr.Update[ S, Param ]]]) extends Update[ S ]
-   final case class ScanChange[     S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Scan.Update[     S ]]]) extends Update[ S ] {
-      override def toString = "ScanChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
+
+//   final case class ScanChange[     S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Scan.Update[     S ]]]) extends Update[ S ] {
+//      override def toString = "ScanChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
+//   }
+//   final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Grapheme.Update[ S ]]]) extends Update[ S ] {
+//      override def toString = "GraphemeChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
+//   }
+
+   final case class ScanChange[     S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, Scan.Update[ S ]]) extends Update[ S ] {
+      override def toString = "ScanChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2 ).mkString( "(" + ", " + ")" ) + ")"
    }
-   final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Grapheme.Update[ S ]]]) extends Update[ S ] {
-      override def toString = "GraphemeChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
+   final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, Grapheme.Update[ S ]]) extends Update[ S ] {
+      override def toString = "GraphemeChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2 ).mkString( "(" + ", " + ")" ) + ")"
    }
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {

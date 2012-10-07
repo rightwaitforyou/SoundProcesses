@@ -163,11 +163,21 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
       map.iterator.foreach { case (_, node) => this -= node }
    }
 
-   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, IIdxSeq[ ValueUpd ]] = {
-      pull.parents( this ).foldLeft( Map.empty[ Key, IIdxSeq[ ValueUpd ]]) { case (map, sel) =>
+//   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, IIdxSeq[ ValueUpd ]] = {
+//      pull.parents( this ).foldLeft( Map.empty[ Key, IIdxSeq[ ValueUpd ]]) { case (map, sel) =>
+//         val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer )
+//         entryEvt.pullUpdate( pull ) match {
+//            case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, IIdxSeq.empty ) :+ upd))
+//            case None => map
+//         }
+//      }
+//   }
+
+   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, ValueUpd ] = {
+      pull.parents( this ).foldLeft( Map.empty[ Key, ValueUpd ]) { case (map, sel) =>
          val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer )
          entryEvt.pullUpdate( pull ) match {
-            case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, IIdxSeq.empty ) :+ upd))
+            case Some( (key, upd) ) => map + (key -> upd)
             case None => map
          }
       }

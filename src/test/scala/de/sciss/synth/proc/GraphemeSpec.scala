@@ -13,7 +13,6 @@ import expr.{Doubles, Longs}
  * test-only de.sciss.synth.proc.GraphemeSpec
  */
 class GraphemeSpec extends ConfluentEventSpec {
-   type IntEx = Expr[ S, Int ]
    import imp._
 
 //   def ??? : Nothing = sys.error( "TODO" )
