@@ -3,6 +3,8 @@ package synth
 package proc
 
 import lucre.expr.Expr
+import lucre.bitemp.Span
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 /**
  * To run only this suite:
@@ -15,7 +17,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 
    def ??? : Nothing = sys.error( "TODO" )
 
-   import Grapheme.{Value, Modifiable}
+   import Grapheme.{Value, Modifiable, Update, Segment}
 
    "Grapheme" should "notify observers about all relevant events" in { system =>
       val obs  = new Observation[ S ]
@@ -31,6 +33,12 @@ class GraphemeSpec extends ConfluentEventSpec {
          val g = gH.get
 
          g.add( 0L -> Value.Curve( 441.0 -> linShape ))
+         obs.assertEquals(
+            Update( g, IIdxSeq( Segment.Const( Span.from( 0L ), IIdxSeq( 441.0 ))))
+         )
+         obs.clear()
+
+//         obs.print()
 
 //         bip.add( tup1 )
 //         obs.assertEquals(

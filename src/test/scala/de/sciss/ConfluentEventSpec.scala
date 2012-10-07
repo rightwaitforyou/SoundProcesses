@@ -45,5 +45,9 @@ trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
       }
 
       def assertEmpty()( implicit tx: S#Tx ) { assertEquals() }
+
+      def print()( implicit tx: S#Tx ) {
+         println( seqRef.get( tx.peer ).mkString( "[", ", ", "]" ))
+      }
    }
 }
