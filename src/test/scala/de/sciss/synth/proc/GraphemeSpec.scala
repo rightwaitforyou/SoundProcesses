@@ -29,6 +29,7 @@ class GraphemeSpec extends ConfluentEventSpec {
          res
       }
 
+      // adding constants
       system.step { implicit tx =>
          val g = gH.get
 
@@ -39,8 +40,9 @@ class GraphemeSpec extends ConfluentEventSpec {
          obs.clear()
 
          g.add( 10000L, Value.Curve( 882.0 -> expShape ))
+         val s0_10000 = Segment.Curve( Span( 0L, 10000L ), IIdxSeq( (441.0, 882.0, expShape) ))
          obs.assertEquals(
-            Update( g, IIdxSeq( Segment.Curve( Span( 0L, 10000L ), IIdxSeq( (441.0, 882.0, expShape) )),
+            Update( g, IIdxSeq( s0_10000,
                                 Segment.Const( Span.from( 10000L ), IIdxSeq( 882.0 ))))
          )
          obs.clear()
@@ -59,92 +61,30 @@ class GraphemeSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-//         obs.print()
+         // override a stereo signal with a mono signal
+         g.add( 20000L, Value.Curve( 500.0 -> curveShape( -4f )))
+         obs.assertEquals(
+            Update( g, IIdxSeq( Segment.Curve( Span( 10000L, 20000L ), IIdxSeq( (882.0, 500.0, curveShape( -4f )))),
+                                Segment.Const( Span( 20000L, 30000L ), IIdxSeq( 500.0 ))))
+         )
+         obs.clear()
 
-//         bip.add( tup1 )
-//         obs.assertEquals(
-//            BiPin.Added[ S, Int ]( bip, tup1, tup1 )
-//         )
-//         obs.clear()
-//         assert( bip.valueAt( tup1._1 - 1 ) === None )
-//         assert( bip.valueAt( tup1._1     ) === Some( tup1._2 ))
-//         assert( bip.valueAt( tup1._1 + 1 ) === Some( tup1._2 ))
-//
-//         bip.add( tup2 )
-//         obs.assertEquals(
-//            BiPin.Added[ S, Int ]( bip, tup2, tup2 )
-//         )
-//         obs.clear()
-//
-//         bip.add( tup3 )
-////         println( "at 10000 : " + bip.at( 10000L ))
-//         // note: the shrunken regions are _not_ fired!
-//         obs.assertEquals(
-//            BiPin.Added[ S, Int ]( bip, tup3, tup3 )
-//         )
-//         obs.clear()
-//
-//         bip.add( tup4 )
-//         obs.assertEquals(
-//            BiPin.Added[ S, Int ]( bip, tup4, tup4 )
-//         )
-//         obs.clear()
-//
-//         assert( bip.valueAt( tup3._1 ) === Some( tup3._2 ))
-//         bip.add( tup5 ) // should override the `3`
-//         assert( bip.valueAt( tup3._1 ) === Some( tup5._2 ))
-//         bip.add( tup6 ) // should override the `5`
-//         assert( bip.valueAt( tup3._1 ) === Some( tup6._2 ))
-//
-//         assert( bip.intersect( tup3._1 ) === IIdxSeq[ BiExpr[ S, Int ]]( tup6, tup5, tup3 )) // recent values first
-//
-//         obs.assertEquals(
-//            BiPin.Added[ S, Int ]( bip, tup5, tup5 ),
-//            BiPin.Added[ S, Int ]( bip, tup6, tup6 )
-//         )
-//         obs.clear()
-//
-//         bip.remove( tup5 ) // should not be noticable
-//         assert( bip.valueAt( tup3._1 ) === Some( tup6._2 ))
-//         assert( bip.intersect( tup3._1 ) === IIdxSeq[ BiExpr[ S, Int ]]( tup6, tup3 ))
-//
-//         bip.remove( tup6 ) // should fall back to `3`
-//         assert( bip.valueAt( tup3._1 ) === Some( tup3._2 ))
-//         assert( bip.intersect( tup3._1 ) === IIdxSeq[ BiExpr[ S, Int ]]( tup3 ))
-//
-//         // tup5 removal not noticable!
-//         obs.assertEquals(
-//            BiPin.Removed[ S, Int ]( bip, tup6, tup6 )
-//         )
-//         obs.clear()
-//
-//         bip.remove( 15000L -> 11 )   // should be ignored
-//         bip.remove( 15001L -> 3 )   // should be ignored
-//         obs.assertEmpty()
-//         assert( bip.valueAt( tup3._1 ) === Some( tup3._2 ))
-//
-//         bip.remove( tup3 )
-//         obs.assertEquals(
-//            BiPin.Removed[ S, Int ]( bip, tup3, tup3 )
-//         )
-//         obs.clear()
-//         assert( bip.valueAt( tup3._1 ) === Some( tup1._2 ))
-//
-//         bip.remove( tup4 )
-//         obs.assertEquals(
-//            BiPin.Removed[ S, Int ]( bip, tup4, tup4 )
-//         )
-//         obs.clear()
-//
-//         bip.remove( tup2 )
-//         bip.remove( tup1 )
-//         obs.assertEquals(
-//            BiPin.Removed[ S, Int ]( bip, tup2, tup2 ),
-//            BiPin.Removed[ S, Int ]( bip, tup1, tup1 )
-//         )
-//         obs.clear()
-//
-//         assert( bip.intersect( 0L ).isEmpty && bip.intersect( 20000L ).isEmpty )
+         assert(  g.segment(    -1L ) === None )
+         assert(  g.segment(     0L ) === Some( s0_10000 ))
+         assert(  g.segment(  9999L ) === Some( s0_10000 ))
+         assert( (g.segment( 10000L ) === Some( s0_10000 )).isDefined )
+
+         assert( g.debugList() === List(
+            s0_10000,
+            Segment.Curve( Span( 10000L, 20000L ), IIdxSeq( (882.0, 500.0, curveShape( -4f )))),
+            Segment.Const( Span( 20000L, 30000L ), IIdxSeq( 500.0 )),
+            Segment.Const( Span.from( 30000L ), IIdxSeq( 987.6, 543.2 ))
+         ))
+      }
+
+      // removals
+      system.step { implicit tx =>
+
       }
    }
 }

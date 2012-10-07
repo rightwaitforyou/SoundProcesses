@@ -381,19 +381,23 @@ object Grapheme {
    def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = Impl.read( in, access )
 }
 trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
+   import Grapheme.{Value, Segment, Modifiable, TimedElem, Update}
+
    /**
     * The idea of all traits which distinguish between read-only and modifiable sub-type is that
     * eventually the super-type acts somewhat like an expression. It might be possible to map
     * a grapheme with operators, and it might be preferable to avoid having to have the modifiable
     * operations in the mapped object (cf. `Expr` versus `Expr.Var`).
     */
-   def modifiableOption : Option[ Grapheme.Modifiable[ S ]]
+   def modifiableOption : Option[ Modifiable[ S ]]
 
-   def at( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.TimedElem[ S ]]
-   def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Value ]
-   def segment( time: Long )( implicit tx: S#Tx ) : Option[ Grapheme.Segment ]
+   def at( time: Long )( implicit tx: S#Tx ) : Option[ TimedElem[ S ]]
+   def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ]
+   def segment( time: Long )( implicit tx: S#Tx ) : Option[ Segment ]
 
    def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
 
-   def changed: Event[ S, Grapheme.Update[ S ], Grapheme[ S ]]
+   def changed: Event[ S, Update[ S ], Grapheme[ S ]]
+
+   def debugList()( implicit tx: S#Tx ) : List[ Segment ]
 }

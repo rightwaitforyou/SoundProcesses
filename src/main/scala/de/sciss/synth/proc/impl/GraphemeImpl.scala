@@ -34,6 +34,7 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.{Event, impl => evti, Sys}
 import proc.Grapheme.Segment
+import annotation.tailrec
 
 object GraphemeImpl {
    import Grapheme.{Elem, TimedElem, Value, Modifiable}
@@ -106,6 +107,15 @@ object GraphemeImpl {
       def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ] = pin.nearestEventAfter( time )
 
       // ---- extensions ----
+
+      def debugList()( implicit tx: S#Tx ) : List[ Segment ] = {
+         @tailrec def loop( time: Long, tail: List[ Segment ]) : List[ Segment ] = segment( time ) match {
+            case Some( s ) =>
+               loop( s.span.start - 1, s :: tail )
+            case _ => tail
+         }
+         loop( Long.MaxValue - 1, Nil )
+      }
 
       def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ] = {
          pin.floor( time ).map( _.magValue )
