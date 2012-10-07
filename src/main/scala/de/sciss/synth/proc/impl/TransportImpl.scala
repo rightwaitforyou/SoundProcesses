@@ -46,9 +46,6 @@ object TransportImpl {
 
    def apply[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double )
                                            ( implicit tx: S#Tx, cursor: Cursor[ S ], bridge: S#Tx => I#Tx ) : ProcTransport[ S ] = {
-//      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
-//      val id         = targets.id
-//      val playingVar = Booleans.newVar[ S ]( Booleans.newConst( false ))
       implicit val itx: I#Tx = tx
       val iid        = itx.newID()
       implicit val infoSer = dummySerializer[ Info, I ]
@@ -56,19 +53,11 @@ object TransportImpl {
       val gMap       = tx.newInMemoryIDMap[ (S#ID, Map[ String, DefSeg ])]             // (1)
       implicit val skipSer = dummySerializer[ Map[ S#ID, Map[ String, DefSeg ]], I ]
       val gPrio      = SkipList.Map.empty[ I, Long, Map[ S#ID, Map[ String, DefSeg ]]] // (2)
-//val gPrio      = mkSkipList[ s.IM, S#ID ]
-//      val gPrio      = mkSkipList[ , S#ID ]
-      val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                                     // (3)
+      val timedMap   = tx.newInMemoryIDMap[ TimedProc[ S ]]                            // (3)
       implicit val obsSer = dummySerializer[ IIdxSeq[ Observation[ S, I ]], I ]
       val obsVar     = itx.newVar( iid, IIdxSeq.empty[ Observation[ S, I ]])
       val groupH     = tx.newHandle( group )( ProcGroup_.serializer )
-      val t          = new Impl[ S, I ]( /* targets, */ groupH, sampleRate, /* playingVar, */ infoVar,
-                                      gMap, gPrio, timedMap, obsVar /* , cursor.position */)
-//      group.intersect( time ).foreach {
-//         case (Span.HasStart( span ), seq) =>
-//            seq.foreach { timed => view.add( span, timed )}
-//         case _ =>
-//      }
+      val t          = new Realtime[ S, I ]( groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar )
       t.init()
       t.seek( 0L )
       t
@@ -81,8 +70,9 @@ object TransportImpl {
    private object Info {
       // the initial info is at minimum possible frame. that way, calling seek(0L) which initialise
       // the structures properly
-      val init: Info = apply( cpuTime = 0L, frame = Long.MinValue, state = Stopped, nextProcTime = Long.MinValue + 1,
-                              nextGraphemeTime = Long.MinValue + 1, valid = -1 )
+      final val init: Info = apply( cpuTime = 0L, frame = Long.MinValue, state = Stopped,
+                                    nextProcTime     = Long.MinValue + 1,
+                                    nextGraphemeTime = Long.MinValue + 1, valid = -1 )
    }
    /**
     * Information about the current situation of the transport.
@@ -179,20 +169,38 @@ object TransportImpl {
 
    private final val dummySegment = Segment.Undefined( Span.from( Long.MaxValue ))
 
-   private final class Impl[ S <: Sys[ S ], I <: stm.Sys[ I ]]( /* protected val targets: evt.Targets[ S ], */
-                      groupHandle:           stm.Source[ S#Tx, ProcGroup[ S ]],
-                      val sampleRate:        Double,
-                      infoVar:               I#Var[ Info ],
-                      gMap:                  IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, DefSeg ])],
-                      gPrio:                 SkipList.Map[ I, Long, Map[ S#ID, Map[ String, DefSeg ]]],
-                      timedMap:              IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
-                      obsVar:                I#Var[ IIdxSeq[ Observation[ S, I ]]])
-                    ( implicit cursor: Cursor[ S ], trans: S#Tx => I#Tx )
-   extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] /* with evt.Node[ S ] */ {
+   private final class Realtime[ S <: Sys[ S ], I <: stm.Sys[ I ]]( /* protected val targets: evt.Targets[ S ], */
+                      protected val groupHandle:   stm.Source[ S#Tx, ProcGroup[ S ]],
+                      val sampleRate:              Double,
+                      protected val infoVar:       I#Var[ Info ],
+                      protected val gMap:          IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, DefSeg ])],
+                      protected val gPrio:         SkipList.Map[ I, Long, Map[ S#ID, Map[ String, DefSeg ]]],
+                      protected val timedMap:      IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]],
+                      protected val obsVar:        I#Var[ IIdxSeq[ Observation[ S, I ]]])
+                    ( implicit cursor: Cursor[ S ], protected val trans: S#Tx => I#Tx )
+   extends Impl[ S, I ] {
+      protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
+         val jitter        = sysMicros() - logicalNow
+         val actualDelay   = math.max( 0L, logicalDelay - jitter )
+if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay ) // + ", targetFrame = " + targetFrame )
+         Txn.afterCommit( _ => {
+            pool.schedule( new Runnable {
+               def run() {
+                  cursor.step { implicit tx =>
+                     eventReached( logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid )
+                  }
+               }
+            }, actualDelay, TimeUnit.MICROSECONDS )
+         })( tx.peer )
+      }
+   }
+
+   private sealed trait Impl[ S <: Sys[ S ], I <: stm.Sys[ I ]]
+   extends Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] {
       impl =>
 
-      private implicit val procGroupSer      = ProcGroup_.serializer[ S ]
-      private val          microsPerSample   = 1000000 / sampleRate
+      private implicit final val procGroupSer      = ProcGroup_.serializer[ S ]
+      private final val          microsPerSample   = 1000000 / sampleRate
 
       // the three structures maintained for the update algorithm
       // (1) for each observed timed proc, store information about all scans whose source is a grapheme.
@@ -206,11 +214,49 @@ object TransportImpl {
       //     transport needs to emit an advancement message. the value is a map from stale timed-proc ID's
       //     to a map from scan keys to grapheme values, i.e. for scans whose source is a grapheme.
       // (3) a refreshment map for the timed procs
-//      private val gMap: IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, Segment ])]   // (1)
-//      private val gPrio: SkipList.Map[ I, Long, Map[ S#ID, Map[ String, Segment ]]]          // (2)
-//      private val timedMap: IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                              // (3)
+      protected def gMap:        IdentifierMap[ S#ID, S#Tx, (S#ID, Map[ String, DefSeg ])]   // (1)
+      protected def gPrio:       SkipList.Map[ I, Long, Map[ S#ID, Map[ String, DefSeg ]]]   // (2)
+      protected def timedMap:    IdentifierMap[ S#ID, S#Tx, TimedProc[ S ]]                  // (3)
 
-      private var groupObs : Disposable[ S#Tx ] = _
+      protected def groupHandle: stm.Source[ S#Tx, ProcGroup[ S ]]
+      protected def infoVar:     I#Var[ Info ]
+      protected def obsVar:      I#Var[ IIdxSeq[ Observation[ S, I ]]]
+
+      protected implicit def trans: S#Tx => I#Tx
+
+      private final var groupObs : Disposable[ S#Tx ] = _
+
+      /**
+       * Invoked to submit a schedule step either to a realtime scheduler or other mechanism.
+       * When the step is performed, execution should be handed over to `eventReached`, passing
+       * over the same three arguments.
+       *
+       * @param logicalNow       the logical now time at the time the event was scheduled
+       * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
+       * @param schedValid       the valid counter at the time of scheduling
+       */
+      protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) : Unit
+
+      /**
+       * Invoked from the `submit` body after the scheduled event is reached.
+       *
+       * @param logicalNow       the logical now time at the time the event was scheduled
+       * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
+       * @param expectedValid    the valid counter at the time of scheduling
+       */
+      final protected def eventReached( logicalNow: Long, logicalDelay: Long, expectedValid: Int )( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx = tx
+         val info = infoVar.get
+         if( info.valid != expectedValid ) return  // the scheduled task was invalidated by an intermediate stop or seek command
+
+         // this is crucial to eliminate drift: since we reached the scheduled event, do not
+         // let the cpuTime txn-local determine a new free wheeling time, but set it to the
+         // time we targetted at; then in the next scheduleNext call, the jitter is properly
+         // calculated.
+         val newLogical = logicalNow + logicalDelay
+         cpuTime.set( newLogical )( tx.peer )
+         advance( newFrame = info.nextTime )
+      }
 
       // the following illustrates what actions need to be done with respect
       // to the overlap/touch or not between the current info span and the change span
@@ -228,7 +274,8 @@ object TransportImpl {
       //
       // So in short: - (1) if update span contains `v`, perform add/remove and recalc new next
       //              - (2) if info span contains update span's start, recalc new next
-      private def addRemoveProcs( g: ProcGroup[ S ], span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]], procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
+      private def addRemoveProcs( g: ProcGroup[ S ], span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]],
+                                  procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          val oldInfo    = infoVar.get
          val newFrame   = calcCurrentTime( oldInfo )
@@ -270,7 +317,7 @@ object TransportImpl {
          if( isPly ) scheduleNext( newInfo )
       }
 
-      def init()( implicit tx: S#Tx ) {
+      final def init()( implicit tx: S#Tx ) {
          // we can use groupStale because init is called straight away after instantiating Impl
          groupObs = group.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
             case BiGroup.Added( g, span, timed ) =>
@@ -313,7 +360,7 @@ object TransportImpl {
          }}
       }
 
-      def dispose()( implicit tx: S#Tx ) {
+      final def dispose()( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          groupObs.dispose()
          infoVar.set( Info.init )   // if there is pending scheduled tasks, they should abort gracefully
@@ -326,7 +373,7 @@ object TransportImpl {
 
       override def toString = "Transport(group=" + groupHandle + ")@" + hashCode.toHexString
 
-      def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
+      final def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, (SpanLike, TimedProc[ S ])] =
          group.intersect( time ).flatMap( flatSpans )
 
       private def calcCurrentTime( info: Info )( implicit tx: S#Tx ) : Long = {
@@ -341,7 +388,7 @@ object TransportImpl {
          } else startFrame
       }
 
-      def time( implicit tx: S#Tx ) : Long = {
+      final def time( implicit tx: S#Tx ) : Long = {
          implicit val itx: I#Tx = tx
          calcCurrentTime( infoVar.get )
       }
@@ -349,7 +396,7 @@ object TransportImpl {
 //      def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
 //      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playingVar.set( expr )}
 
-      def play()( implicit tx: S#Tx ) {
+      final def play()( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          val oldInfo = infoVar.get
          if( oldInfo.isRunning ) return
@@ -360,7 +407,7 @@ object TransportImpl {
          scheduleNext( newInfo )
       }
 
-      def stop()( implicit tx: S#Tx ) {
+      final def stop()( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          val oldInfo = infoVar.get
          if( !oldInfo.isRunning ) return
@@ -372,16 +419,30 @@ object TransportImpl {
          fire( Transport.Stop( impl, newInfo.frame ))
       }
 
-      def group( implicit tx: S#Tx ) : ProcGroup[ S ] = groupHandle.get // tx.refresh( csrPos, groupStale )
+      final def seek( time: Long )( implicit tx: S#Tx ) {
+         advance( isSeek = true, newFrame = time )
+      }
 
-      def isPlaying( implicit tx: S#Tx ) : Boolean = {
+      final def isPlaying( implicit tx: S#Tx ) : Boolean = {
          implicit val itx: I#Tx = tx
          infoVar.get.isRunning
       } // playingVar.value
 
-      def seek( time: Long )( implicit tx: S#Tx ) {
-         advance( isSeek = true, newFrame = time )
+      private def scheduleNext( info: Info )( implicit tx: S#Tx ) {
+//         implicit val itx  = tx.inMemory
+//         val info          = infoVar.get
+         val targetFrame   = info.nextTime
+
+         if( /* !info.isRunning || */ targetFrame == Long.MaxValue ) return
+
+         val logicalDelay  = ((targetFrame - info.frame) * microsPerSample).toLong
+         val logicalNow    = info.cpuTime
+         val schedValid    = info.valid
+
+         submit( logicalNow = logicalNow, logicalDelay = logicalDelay, schedValid = schedValid )
       }
+
+      final def group( implicit tx: S#Tx ) : ProcGroup[ S ] = groupHandle.get // tx.refresh( csrPos, groupStale )
 
       private def fire( update: Update[ S ])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
@@ -389,15 +450,15 @@ object TransportImpl {
          obs.foreach( _.fun( tx )( update ))
       }
 
-      def removeObservation( obs: Observation[ S, I ])( implicit tx: S#Tx ) {
+      final def removeObservation( obs: Observation[ S, I ])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          obsVar.transform( _.filterNot( _ == obs ))
       }
 
-      def react( fun: Update[ S ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] =
+      final def react( fun: Update[ S ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] =
          reactTx( _ => fun )
 
-      def reactTx( fun: S#Tx => Update[ S ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] = {
+      final def reactTx( fun: S#Tx => Update[ S ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ] = {
          implicit val itx: I#Tx = tx
          val obs = new Observation[ S, I ]( this, fun )
          obsVar.transform( _ :+ obs )
@@ -647,6 +708,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                   val p    = timed.value
                   var (staleID, keyMap) = gMap.get( id ).getOrElse( id -> Map.empty[ String, DefSeg ])
 
+                  // we collect in here the scan grapheme source changes to fire as update
                   var scanMap = Map.empty[ String, DefSeg ]
 
                   // check again all scan's which are linked to a grapheme source,
@@ -656,6 +718,9 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                         scan.source match {
                            case Some( Scan.Link.Grapheme( peer )) =>
 
+                              // store a new entry in the structure, and
+                              // also make sure an update entry in scan map
+                              // is produced (if it exists and is new)
                               def addNewEntry( segm: DefSeg ) {
                                  keyMap += key -> segm // (time -> value)
                                  val time          = segm.span.start
@@ -663,28 +728,37 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                                  val m             = staleMap.getOrElse( staleID, Map.empty ) + (key -> segm)
                                  val newStaleMap   = staleMap + (staleID -> m)
                                  gPrio.add( time, newStaleMap )
+
+
+                                 // deal with scanMap (fired update)
+                                 // - for the changed entries, collect those which overlap the current
+                                 //   transport time but not the previous one, so that they will go into
+                                 //   the advancement message
+
+                                 // if next segment is valid also for current time, re-use it
+                                 if( segm.span.contains( newFrame )) {
+                                    // only add it if it did not cover the previous transport position
+                                    // (because if it did, it would not constitute a change)
+                                    if( !segm.span.contains( oldFrame )) {
+                                       scanMap += key -> segm
+                                    }
+                                 } else {
+                                 // either no value, or ceilTime is larger than now, need to find value explicitly
+                                    findAndAddToScanMap()
+                                 }
                               }
 
-                              // deal with scanMap (fired update)
-                              // - for the changed entries, collect those which overlap the current
-                              //   transport time, so that they will go into the advancement message
-                              def addToScanMap( maybeNowValue: Option[ DefSeg ]) {
-                                 ???
-//                                 maybeNowValue match {
-//                                    case Some( nextValue ) if nextValue.span.contains( newFrame ) =>
-//                                       // next value is valid also for current time, so re-use it
-//                                       scanMap += key -> nextValue
-//
-//                                    case _ =>
-//                                       // either no value, or ceilTime is larger than now, need to find value explicitly
-//                                       peer.valueAt( newFrame ).foreach { nowValue =>
-//                                          // only add it if it did not cover the previous transport position
-//                                          // (because if it did, it would not constitute a change)
-//                                          if( !nowValue.span.contains( oldFrame )) {
-//                                             scanMap += key -> nowValue
-//                                          }
-//                                       }
-//                                 }
+                              // given that no potentially re-usable segment was found,
+                              // find one for the new frame, and if one exists and is
+                              // new (didn't overlap with the previous old frame), add it to the scan map
+                              def findAndAddToScanMap() {
+                                 peer.segment( newFrame ).foreach { nowSegm =>
+                                    // only add it if it did not cover the previous transport position
+                                    // (because if it did, it would not constitute a change)
+                                    if( !nowSegm.span.contains( oldFrame )) {
+                                       scanMap += key -> nowSegm
+                                    }
+                                 }
                               }
 
                               keyMap.get( key ) match {
@@ -724,36 +798,37 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                                           case segm: DefSeg =>
                                              // ...yes... store the new entry
                                              addNewEntry( segm )
-   //                                          if( !newValue.span.contains( oldFrame )) addToScanMap( Some( newValue ))
-                                             ???
 
                                           case _ =>
                                              // no event after newFrame
                                              keyMap -= key
-                                             addToScanMap( None )
+                                             findAndAddToScanMap()
                                        }
 
                                     } else {
-                                       // no change in next value (because the next time did not change);
+                                       // no change in next segment;
                                        // however if we went backwards in time, the current value might
                                        // have changed!
-                                       if( newFrame < oldFrame ) addToScanMap( None ) // None triggers explicit search
+                                       if( newFrame < oldFrame ) findAndAddToScanMap()
                                     }
 
                                  // second case: there was not entry in the previous info.
                                  // if we advanced in time, there might be new data.
                                  // if we went back in time, it means there can't be any
-                                 // previous data
+                                 // previous data (so we won't need to search for an update segment)
                                  case _ =>
                                     if( newFrame > oldFrame ) {
-                                       val maybeNowValue = peer.nearestEventAfter( newFrameP ).flatMap { ceilTime =>
-                                          peer.segment( ceilTime ).map { ceilSegm =>
-                                             // a new entry
-                                             addNewEntry( ceilSegm )
-                                             ceilSegm
-                                          }
+                                       peer.nearestEventAfter( newFrameP ) match {
+                                          case Some( ceilTime ) =>
+                                             peer.segment( ceilTime ) match {
+                                                case Some( ceilSegm ) =>
+                                                   // a new entry
+                                                   addNewEntry( ceilSegm )
+
+                                                case _ => findAndAddToScanMap()
+                                             }
+                                          case _ => findAndAddToScanMap()
                                        }
-                                       addToScanMap( maybeNowValue )
                                     }
                               }
 
@@ -799,43 +874,6 @@ if( VERBOSE ) println( "::: advance - fire " + upd )
          }
 
          if( newState == Playing ) scheduleNext( newInfo )
-      }
-
-      private def scheduleNext( info: Info )( implicit tx: S#Tx ) {
-//         implicit val itx  = tx.inMemory
-//         val info          = infoVar.get
-         val targetFrame   = info.nextTime
-
-         if( /* !info.isRunning || */ targetFrame == Long.MaxValue ) return
-
-         val logicalDelay  = ((targetFrame - info.frame) * microsPerSample).toLong
-         val logicalNow    = info.cpuTime
-         val schedValid    = info.valid
-         val jitter        = sysMicros() - logicalNow
-         val actualDelay   = math.max( 0L, logicalDelay - jitter )
-if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay + ", targetFrame = " + targetFrame )
-         Txn.afterCommit( _ => {
-            pool.schedule( new Runnable {
-               def run() {
-                  cursor.step { implicit tx =>
-                     eventReached( schedValid, logicalNow + logicalDelay )
-                  }
-               }
-            }, actualDelay, TimeUnit.MICROSECONDS )
-         })( tx.peer )
-      }
-
-      private def eventReached( expectedValid: Int, newLogical: Long )( implicit tx: S#Tx ) {
-         implicit val itx: I#Tx = tx
-         val info = infoVar.get
-         if( info.valid != expectedValid ) return  // the scheduled task was invalidated by an intermediate stop or seek command
-
-         // this is crucial to eliminate drift: since we reached the scheduled event, do not
-         // let the cpuTime txn-local determine a new free wheeling time, but set it to the
-         // time we targetted at; then in the next scheduleNext call, the jitter is properly
-         // calculated.
-         cpuTime.set( newLogical )( tx.peer )
-         advance( newFrame = info.nextTime )
       }
    }
 }
