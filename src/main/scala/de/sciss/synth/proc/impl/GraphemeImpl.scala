@@ -147,15 +147,22 @@ object GraphemeImpl {
       }
 
       private def segmentsAfterAdded( addTime: Long, addValue: Value )( implicit tx: S#Tx ) : IIdxSeq[ Segment ] = {
-         val seq = pin.floor( addTime - 1 ) match {
+         val floorSegm = pin.floor( addTime - 1 ) match {
             case Some( floorElem ) =>
-               val (floorTime, floorVal) = floorElem.value
-
-
+               val (floorTime, floorValue) = floorElem.value
+               val s = floorValue match {
+                  case floorCurve: Value.Curve =>
+                     val floorCurveVals: IIdxSeq[ Double ] = floorCurve.values.map( _._1 )( breakOut )
+                     segmentFromSpan( floorTime, floorCurveVals, addTime, addValue )
+                  case av: Value.Audio =>
+                     Segment.Audio( Span( floorTime, addTime ), av )
+               }
+               IIdxSeq( s )
             case _ =>
                IIdxSeq.empty
          }
-         ???
+
+         floorSegm :+ segmentFromFloor( addTime, addValue )
       }
 
       // ---- node and event ----
