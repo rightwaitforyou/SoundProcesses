@@ -15,8 +15,6 @@ import expr.{Doubles, Longs}
 class GraphemeSpec extends ConfluentEventSpec {
    import imp._
 
-//   def ??? : Nothing = sys.error( "TODO" )
-
    import Grapheme.{Value, Modifiable, Update, Segment, Elem, TimedElem}
 
    "Grapheme" should "notify observers about all relevant events" in { system =>

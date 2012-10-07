@@ -153,28 +153,28 @@ object Grapheme {
    object Segment {
       sealed trait Defined extends Segment {
          def numChannels: Int
+         final def isDefined = true
       }
 
       final case class Const( span: Span.HasStart, values: IIdxSeq[ Double ]) extends Defined {
          def numChannels = values.size
-//         def subtract( that: HasStart ) = span.subtract( that ).map( s => Const( s, values ))
       }
 
       final case class Curve( span: Span, values: IIdxSeq[ (Double, Double, Env.ConstShape) ]) extends Defined {
          def numChannels = values.size
-//         def subtract( that: HasStart ) = ???
       }
 
       final case class Audio( span: Span.HasStart, value: Value.Audio ) extends Defined {
          def numChannels = value.numChannels
-//         def subtract( that: HasStart ) = span.subtract( that ).map( s => Audio( s, value ))
       }
 
-      final case class Undefined( span: Span.HasStart ) extends Segment
+      final case class Undefined( span: Span.HasStart ) extends Segment {
+         def isDefined = false
+      }
    }
    sealed trait Segment {
-      def span: Span.HasStart
-//      def subtract( span: Span.HasStart ) : IIdxSeq[ Segment ]
+      def span : Span.HasStart
+      def isDefined : Boolean
    }
 
    object Elem extends BiType[ Value ] {
@@ -393,11 +393,11 @@ trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    def at( time: Long )( implicit tx: S#Tx ) : Option[ TimedElem[ S ]]
    def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ]
-   def segment( time: Long )( implicit tx: S#Tx ) : Option[ Segment ]
+   def segment( time: Long )( implicit tx: S#Tx ) : Option[ Segment.Defined ]
 
    def nearestEventAfter( time: Long )( implicit tx: S#Tx ) : Option[ Long ]
 
    def changed: Event[ S, Update[ S ], Grapheme[ S ]]
 
-   def debugList()( implicit tx: S#Tx ) : List[ Segment ]
+   def debugList()( implicit tx: S#Tx ) : List[ Segment.Defined ]
 }

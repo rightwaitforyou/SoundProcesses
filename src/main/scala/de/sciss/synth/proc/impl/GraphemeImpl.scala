@@ -108,12 +108,14 @@ object GraphemeImpl {
 
       // ---- extensions ----
 
-      def debugList()( implicit tx: S#Tx ) : List[ Segment ] = {
-         @tailrec def loop( time: Long, tail: List[ Segment ]) : List[ Segment ] = segment( time ) match {
-            case Some( s ) =>
-               loop( s.span.start - 1, s :: tail )
-            case _ => tail
-         }
+      def debugList()( implicit tx: S#Tx ) : List[ Segment.Defined ] = {
+         @tailrec def loop( time: Long, tail: List[ Segment.Defined ]) : List[ Segment.Defined ] =
+            segment( time ) match {
+               case Some( s ) =>
+                  loop( s.span.start - 1, s :: tail )
+               case _ => tail
+            }
+
          loop( Long.MaxValue - 1, Nil )
       }
 
@@ -121,7 +123,7 @@ object GraphemeImpl {
          pin.floor( time ).map( _.magValue )
       }
 
-      def segment( time: Long )( implicit tx: S#Tx ) : Option[ Segment ] = {
+      def segment( time: Long )( implicit tx: S#Tx ) : Option[ Segment.Defined ] = {
          pin.floor( time ).map { elem =>
             val (floorTime, floorVal) = elem.value
             segmentFromFloor( floorTime, floorVal )
@@ -129,7 +131,7 @@ object GraphemeImpl {
       }
 
       private def segmentFromSpan( floorTime: Long, floorCurveVals: IIdxSeq[ Double ],
-                                   ceilTime: Long, ceilValue: Value ) : Segment = {
+                                   ceilTime: Long, ceilValue: Value ) : Segment.Defined = {
          val span = Span( floorTime, ceilTime )
          ceilValue match {
             case ceilCurve: Value.Curve if ceilCurve.numChannels == floorCurveVals.size =>
@@ -142,7 +144,7 @@ object GraphemeImpl {
          }
       }
 
-      private def segmentFromFloor( floorTime: Long, floorValue: Value )( implicit tx: S#Tx ) : Segment = {
+      private def segmentFromFloor( floorTime: Long, floorValue: Value )( implicit tx: S#Tx ) : Segment.Defined = {
          val t1 = floorTime + 1
          floorValue match {
             case floorCurve: Value.Curve =>

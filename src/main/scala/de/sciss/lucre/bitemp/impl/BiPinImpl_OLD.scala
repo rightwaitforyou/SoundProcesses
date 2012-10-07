@@ -236,7 +236,7 @@
 //         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Element[ S, Elem, U ]] = {
 //            val changes: IIdxSeq[ (Elem, U) ] = pull.parents( this ).flatMap( sel => {
 //               // wow... how does this get the event update type right I'm wondering... ?
-//               // UPDATE: ha! it doesn't. hell, this produces a runtime exception re Nothing???
+//               // UPDATE: ha! it doesn't. hell, this produces a runtime exception re Nothing??
 //               // --> fix: evt needs type ascription!!!
 //               val evt  = sel.devirtualize[ U, Elem ]( elemSerializer )
 //               val elem = evt.node

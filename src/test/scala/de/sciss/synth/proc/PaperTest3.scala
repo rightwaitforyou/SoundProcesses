@@ -222,7 +222,7 @@
 //               // however, selectors are stored and retrieved using writeVal / readVal
 //               // (`Targets.readAndExpand[ S ]( in, access )`
 //               //  --> `tx.readVal[ VirtualNode[ S ]]( id )`)
-//               // --- and this is probably wrong, because it goes back to confluent ids ???
+//               // --- and this is probably wrong, because it goes back to confluent ids ??
 //               freqStep( 50.0 )
 //            }
 //         }).start()
