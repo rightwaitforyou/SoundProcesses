@@ -260,10 +260,10 @@ object GraphemeImpl {
                   changes.foldLeft( IIdxSeq.empty[ Segment ]) { case (res, (elem, elemCh)) =>
                      val (timeCh, magCh) = elemCh.unzip
                      val seqAdd = segmentsAfterAdded( timeCh.now, magCh.now )
-                     if( timeCh.isSignificant ) {
+                     val seq = if( timeCh.isSignificant ) {
                         segmentAfterRemoved( timeCh.before ) +: seqAdd
                      } else seqAdd
-                     seqAdd.foldLeft( res )( incorporate )
+                     seq.foldLeft( res )( incorporate )
                   }
             }
             if( segm.nonEmpty ) Some( Grapheme.Update( graph, segm )) else None
