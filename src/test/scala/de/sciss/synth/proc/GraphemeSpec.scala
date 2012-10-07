@@ -84,6 +84,17 @@ class GraphemeSpec extends ConfluentEventSpec {
 
       // removals
       system.step { implicit tx =>
+         val g = gH.get
+         println( g.debugList() )
+//         assert( g.remove( 20000L, Value.Curve( 123.4 -> sinShape, 567.8 -> sinShape )))  // assert it was found
+//         obs.assertEmpty() // ... but it was hidden
+//
+//         assert( !g.remove( 20001L, Value.Curve( 500.0 -> curveShape( -4f )))) // assert it was not found
+//         assert(  g.remove( 20000L, Value.Curve( 500.0 -> curveShape( -4f )))) // assert it was found
+//         obs.assertEquals(
+//            Update( g, IIdxSeq( Segment.Const( Span( 10000L, 30000L ), IIdxSeq( 882.0 ))))
+//         )
+//         obs.clear()
 
       }
    }

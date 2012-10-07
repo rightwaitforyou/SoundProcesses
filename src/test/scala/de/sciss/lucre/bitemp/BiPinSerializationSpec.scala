@@ -7,9 +7,9 @@ import expr.Expr
 /**
  * To test only this suite:
  *
- * test-only de.sciss.lucre.bitemp.SerializationSpec
+ * test-only de.sciss.lucre.bitemp.BiPinSerializationSpec
  */
-class SerializationSpec extends ConfluentEventSpec {
+class BiPinSerializationSpec extends ConfluentEventSpec {
    confluent.showLog = true
 
    "BiPin" should "serialize and deserialize" in { system =>
@@ -34,8 +34,9 @@ class SerializationSpec extends ConfluentEventSpec {
       system.step { implicit tx =>
          val bip = bipH.get // tx.refresh( acc, bip0 )
          assert( bip.intersect( key.value - 1 ).isEmpty, "BiPin should be empty before the first pin" )
-         val res = bip.intersect( key.value ).toIndexedSeq
-         assert( res == IndexedSeq( key -> value ), "Unexpected retrieval " + res )
+         val res        = bip.intersect( key.value ).toIndexedSeq
+         val expected   = IndexedSeq[ BiExpr[ S, Int ]]( key -> value )
+         assert( res === expected ) // , "Unexpected retrieval " + res )
       }
    }
 }

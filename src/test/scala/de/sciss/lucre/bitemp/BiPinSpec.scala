@@ -86,6 +86,10 @@ class BiPinSpec extends ConfluentEventSpec {
             BiPin.Added[ S, Int ]( bip, tup6, tup6 )
          )
          obs.clear()
+      }
+
+      system.step { implicit tx =>
+         val bip = bipH.get
 
          bip.remove( tup5 ) // should not be noticable
          assert( bip.valueAt( tup3._1 ) === Some( tup6._2 ))
