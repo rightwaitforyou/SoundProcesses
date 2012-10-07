@@ -28,7 +28,6 @@ package proc
 
 import de.sciss.lucre.{event => evt, expr, DataInput}
 import expr.Expr
-import collection.immutable.{IndexedSeq => IIdxSeq}
 import impl.{ProcImpl => Impl}
 import evt.Sys
 

@@ -81,12 +81,35 @@ class ScanSpec extends ConfluentEventSpec {
          obs.clear()
 
          scan.source_=( None )                              // ...
-         val timeVar = Longs.newVar[ S ]( 3000L )
+         val timeVar = Longs.newVar[   S ]( 3000L )
          val ampVar  = Doubles.newVar[ S ]( 9876.0 )
          gr.add( timeVar, curve( ampVar ))                  // should not be observed
          scan.source_=( Some( Scan.Link.Grapheme( gr )))    // should be observed
+         obs.assertEquals(
+            Proc.ScanChange( p, Map( "freq" -> Scan.SourceChanged( scan, None ))),
+            Proc.ScanChange( p, Map( "freq" -> Scan.SourceChanged( scan, Some( Scan.Link.Grapheme( gr )))))
+         )
+         obs.clear()
+
          timeVar.set( 4000L )                               // ...
-         ampVar.set( 5432.0 )                               // ...
+         obs.assertEquals(
+            Proc.ScanChange( p, Map( "freq" -> Scan.SourceUpdate( scan,
+               Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Curve( Span( 2000L, 4000L ), IIdxSeq( (5678.0, 9876.0, linShape) )),
+                                             Grapheme.Segment.Const( Span.from( 4000L ), IIdxSeq( 9876.0 )))
+               )
+            )))
+         )
+         obs.clear()
+
+         ampVar.set( 5432.0 )                             // ...
+         obs.assertEquals(
+            Proc.ScanChange( p, Map( "freq" -> Scan.SourceUpdate( scan,
+               Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Curve( Span( 2000L, 4000L ), IIdxSeq( (5678.0, 5432.0, linShape) )),
+                                             Grapheme.Segment.Const( Span.from( 4000L ), IIdxSeq( 5432.0 )))
+               )
+            )))
+         )
+         obs.clear()
       }
    }
 }

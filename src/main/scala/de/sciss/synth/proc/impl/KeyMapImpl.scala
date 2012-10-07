@@ -30,7 +30,6 @@ package impl
 import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data}
 import data.SkipList
 import evt.{EventLike, impl => evti, Sys}
-import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object KeyMapImpl {
    trait ValueInfo[ S <: Sys[ S ], Key, Value, ValueUpd ] {
@@ -177,8 +176,11 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
       pull.parents( this ).foldLeft( Map.empty[ Key, ValueUpd ]) { case (map, sel) =>
          val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer )
          entryEvt.pullUpdate( pull ) match {
-            case Some( (key, upd) ) => map + (key -> upd)
-            case None => map
+            case Some( (key, upd) ) =>
+               assert( !map.contains( key ))
+               map + (key -> upd)
+            case None =>
+               map
          }
       }
    }
