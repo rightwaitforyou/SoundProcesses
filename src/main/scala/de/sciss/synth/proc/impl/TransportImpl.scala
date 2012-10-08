@@ -357,6 +357,11 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
 
          if( !(perceived || needsNewProcTime) ) return   // keep scheduled task running, don't overwrite infoVar
 
+         if( perceived ) {
+            procRemoved.foreach { timed => removeProc( timed )}
+            procAdded.foreach   { timed => addProc( newFrame, timed )}
+         }
+
          val nextProcTime = if( needsNewProcTime ) {
             g.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
          } else {
@@ -375,9 +380,6 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          infoVar.set( newInfo )
 
          if( perceived ) {
-            procRemoved.foreach { timed => removeProc( timed )}
-            procAdded.foreach   { timed => addProc( newFrame, timed )}
-
             fire( Transport.Advance( transport = this, time = newFrame, isSeek = false, isPlaying = isPly,
                                      added = procAdded, removed = procRemoved, changes = emptySeq ))
          }

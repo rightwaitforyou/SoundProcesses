@@ -14,6 +14,8 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
  */
 class TransportSpec extends ConfluentEventSpec {
    import Transport.Advance
+   import Grapheme.Segment
+   import Transport.Proc.GraphemesChanged
 
    type I = stm.InMemory
 
@@ -65,6 +67,14 @@ class TransportSpec extends ConfluentEventSpec {
          t.step()
          obs.assertEquals(
             Advance( t, time = 5000L, isSeek = false, isPlaying = true, added = IIdxSeq( pt2 ))
+         )
+         obs.clear()
+
+         t.step()
+         obs.assertEquals(
+            Advance( t, time = 7000L, isSeek = false, isPlaying = true, changes =
+               IIdxSeq( pt1 -> GraphemesChanged( Map( "freq" -> Segment.Const( Span.from( 7000L ), IIdxSeq( 441.0 )))))
+            )
          )
          obs.clear()
       }
