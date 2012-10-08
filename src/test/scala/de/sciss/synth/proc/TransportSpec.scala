@@ -77,6 +77,37 @@ class TransportSpec extends ConfluentEventSpec {
             )
          )
          obs.clear()
+
+         t.step()
+         obs.assertEquals(
+            Advance( t, time = 10000L, isSeek = false, isPlaying = true, removed = IIdxSeq( pt1 ), changes =
+               IIdxSeq( pt2 -> GraphemesChanged( Map( "amp" -> Segment.Curve( Span( 10000L, 15000L ), IIdxSeq( (0.5, 0.7, linShape) )))))
+            )
+         )
+         obs.clear()
+
+         t.step()
+         obs.assertEquals(
+            Advance( t, time = 15000L, isSeek = false, isPlaying = true, changes =
+               IIdxSeq( pt2 -> GraphemesChanged( Map( "amp" -> Segment.Curve( Span( 15000L, 25000L ), IIdxSeq( (0.7, 1.0, linShape) )))))
+            )
+         )
+         obs.clear()
+
+         t.step()
+         obs.assertEquals(
+            Advance( t, time = 20000L, isSeek = false, isPlaying = true, removed = IIdxSeq( pt2 ))
+         )
+         obs.clear()
+
+         t.step()
+         obs.assertEmpty()
+
+         t.stop()
+         obs.assertEquals(
+            Transport.Stop( t, 25000L )   // will advance to grapheme stuff even beyond proc spans
+         )
+         obs.clear()
       }
    }
 }
