@@ -49,7 +49,8 @@ class ScanSpec extends ConfluentEventSpec {
          )
       }
 
-      def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape )( implicit tx: S#Tx ) = Grapheme.Elem.Curve( amp -> shape )
+      def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape )( implicit tx: S#Tx ) =
+         Grapheme.Elem.Curve( amp -> shape )
 
       system.step { implicit tx =>
          val p = ph.get

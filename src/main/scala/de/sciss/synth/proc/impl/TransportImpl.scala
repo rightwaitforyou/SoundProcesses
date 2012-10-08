@@ -39,7 +39,7 @@ import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
 import java.text.SimpleDateFormat
 
 object TransportImpl {
-   var VERBOSE = true
+   var VERBOSE = false
    
    import Grapheme.Segment
    import Segment.{Defined => DefSeg}
@@ -424,7 +424,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                //          second span argument, which would be just Span.Void in the normal add/remove calls)
                //     (4) both old and new span contain `v`
                //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
-               ???
+               println( "WARNING: Transport observing BiGroup.Element not yet implemented" ) // ???
          }}
 
          seek( 0L )
