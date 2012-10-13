@@ -166,8 +166,10 @@ object TransportImpl {
 
 //   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ TimedProc[ S ]])) : IIdxSeq[ TimedProc[ S ]] = in._2
 
-   private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
-   @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
+//   private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
+//   @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
+
+   private val emptySeq = IIdxSeq.empty[ Nothing ]
 
    private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
       DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
@@ -387,6 +389,36 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          if( isPly ) scheduleNext( newInfo )
       }
 
+      private def procMoved( g: ProcGroup[ S ], timed: TimedProc[ S ], oldSpan: SpanLike, newSpan: SpanLike )( implicit tx: S#Tx ) {
+         // ... possible situations
+         //     (1) old span contains current time frame `v`, but new span not --> treat as removal
+         //     (2) old span does not contain `v`, but new span does --> treat as addition
+         //     (3) neither old nor new span contain `v`
+         //         --> info.span contains start point of either span? then recalc nextProcTime.
+         //         (indeed we could call addRemoveProcs with empty lists for the procs, and a
+         //          second span argument, which would be just Span.Void in the normal add/remove calls)
+         //     (4) both old and new span contain `v`
+         //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
+
+         implicit val itx: I#Tx = tx
+         val oldInfo    = infoVar.get
+         val newFrame   = calcCurrentTime( oldInfo )
+
+         val oldPercv   = oldSpan.contains( newFrame )
+         val newPercv   = newSpan.contains( newFrame )
+
+         (oldPercv, newPercv) match {
+            case (true,  false)  => // case (1)
+               addRemoveProcs( g, oldSpan, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
+            case (false, true)   => // case (2)
+               addRemoveProcs( g, newSpan, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
+            case (false, false)  => // case (3)
+               ???
+            case (true,  true)   => // case (4)
+               ???
+         }
+      }
+
       final def init()( implicit tx: S#Tx ) {
          // we can use groupStale because init is called straight away after instantiating Impl
          groupObs = group.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
@@ -445,7 +477,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                      case _ => // ignore StateChange other than AssociativeChange, and ignore GraphemeChange
                   }
                   case (timed, BiGroup.Moved( evt.Change( oldSpan, newSpan ))) =>
-                     ???
+                     procMoved( g, timed, oldSpan, newSpan )
                }
          }}
 
@@ -670,9 +702,9 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
          val needsNewProcTime = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
          val newFrameP        = newFrame + 1
 
-         var procAdded        = emptySeq[  TimedProc[ S ]]
-         var procRemoved      = emptySeq[  TimedProc[ S ]]
-         var procUpdated      = emptySeq[ (TimedProc[ S ], Transport.Proc.Update[ S ])]
+         var procAdded:   IIdxSeq[  TimedProc[ S ]] = emptySeq
+         var procRemoved: IIdxSeq[  TimedProc[ S ]] = emptySeq
+         var procUpdated: IIdxSeq[ (TimedProc[ S ], Transport.Proc.Update[ S ])] = emptySeq
 
          // algorithm [A] or [B]
          if( needsNewProcTime ) {
@@ -740,7 +772,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                         case (staleID, keyMap) => timedMap.get( staleID ).map( _ -> keyMap )
 //                        case _ => None
                      })( breakOut )
-                  case _ => IIdxSeq.empty // Map.empty
+                  case _ => emptySeq // Map.empty
                }
                scanMap.foreach {
                   case (timed, removeKeyMap) =>
