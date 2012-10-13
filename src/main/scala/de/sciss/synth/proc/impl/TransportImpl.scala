@@ -499,6 +499,40 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          }
       }
 
+      private def u_removeScan( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx  = tx
+         val id = timed.id
+         gMap.get( id ).foreach { case (staleID, keyMap1) =>
+            keyMap1.get( key ).foreach { segm =>
+               val newKeyMap1 = keyMap1 - key
+               if( newKeyMap1.isEmpty ) {
+                  gMap.remove( id )
+               } else {
+                  gMap.put( id, staleID -> newKeyMap1 )
+               }
+               val time = segm.span.start
+               gPrio.get( time ).foreach { skipMap =>
+                  skipMap.get( staleID ).foreach { keyMap2 =>
+                     val newKeyMap2 = keyMap2 - key
+                     val newSkipMap = if( newKeyMap2.isEmpty ) {
+                        skipMap - staleID
+                     } else {
+                        skipMap + (staleID -> newKeyMap2)
+                     }
+                     if( newSkipMap.isEmpty ) {
+                        gPrio.remove( time )
+                     } else {
+                        gPrio.add( time -> newSkipMap )
+                     }
+                  }
+               }
+
+   //                     // clients might want to know about the removal...
+   //                     u_addSegment( state, timed, key, dummySegment )
+            }
+         }
+      }
+
       private def u_assocChange( state: GroupUpdateState, timed: TimedProc[ S ], added: Set[ Proc.AssociativeKey ],
                                  removed: Set[ Proc.AssociativeKey ])( implicit tx: S#Tx ) {
          //        AssociativeChange : we need to track the addition and removal of scans.
@@ -506,9 +540,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          //                            track appearance or disappearence of graphemes as sources
          //                            of these scans, and update structures
 
-         implicit val itx: I#Tx  = tx
-         val p                   = timed.value
-         val id                  = timed.id
+         val p = timed.value
 
          added.foreach {
             case Proc.ScanKey( key ) =>
@@ -522,38 +554,38 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          }
 
          removed.foreach {
-            case Proc.ScanKey( key ) =>
-               gMap.get( id ).foreach { case (staleID, keyMap1) =>
-                  keyMap1.get( key ).foreach { segm =>
-                     val newKeyMap1 = keyMap1 - key
-                     if( newKeyMap1.isEmpty ) {
-                        gMap.remove( id )
-                     } else {
-                        gMap.put( id, staleID -> newKeyMap1 )
-                     }
-                     val time = segm.span.start
-                     gPrio.get( time ).foreach { skipMap =>
-                        skipMap.get( staleID ).foreach { keyMap2 =>
-                           val newKeyMap2 = keyMap2 - key
-                           val newSkipMap = if( newKeyMap2.isEmpty ) {
-                              skipMap - staleID
-                           } else {
-                              skipMap + (staleID -> newKeyMap2)
-                           }
-                           if( newSkipMap.isEmpty ) {
-                              gPrio.remove( time )
-                           } else {
-                              gPrio.add( time -> newSkipMap )
-                           }
-                        }
-                     }
-
-//                     // clients might want to know about the removal...
-//                     u_addSegment( state, timed, key, dummySegment )
-                  }
-               }
+            case Proc.ScanKey( key ) => u_removeScan( timed, key )
             case _ =>
          }
+      }
+
+      private def u_scanSourceUpdate( state: GroupUpdateState, timed: TimedProc[ S ], scan: Scan[ S ],
+                                      graphUpd: Grapheme.Update[ S ])( implicit tx: S#Tx ) {
+         //        SourceUpdate (passing on changes in a grapheme source) :
+         //          - grapheme changes must then be tracked, structures updated
+
+
+         ???
+      }
+
+      private def u_scanSourceChange( state: GroupUpdateState, timed: TimedProc[ S ], key: String, scan: Scan[ S ],
+                                      sourceOpt: Option[ Scan.Link[ S ]])( implicit tx: S#Tx ) {
+         //        SourceChanged : if it means a grapheme is connected or disconnect, update structures
+
+//         val id                  = timed.id
+//         var (staleID, keyMap)   = gMap.get( id ).getOrElse( id -> Map.empty[ String, DefSeg ])
+//         if( !keyMap.contains( key ) && sourceOpt.isEmpty ) return   // drop this case
+
+         u_removeScan( timed, key )
+
+//         keyMap.get( key ).foreach { segm =>
+//
+//         }
+//
+//
+//         gMap.get( id ).foreach()
+
+         ???
       }
 
       private def biGroupUpdate( groupUpd: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
@@ -622,11 +654,11 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                            case Proc.ScanChange( _, scanChanges ) =>
                               scanChanges.foreach {
                                  case (key, Scan.SourceUpdate( scan, graphUpd )) =>
-                                    println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
-      //                              ???
+                                    u_scanSourceUpdate( state, timed, scan, graphUpd )
+
                                  case (key, Scan.SourceChanged( scan, sourceOpt )) =>
-                                    println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
-      //                              ???
+                                    u_scanSourceChange( state, timed, key, scan, sourceOpt )
+
                                  case _ =>   // SinkAdded, SinkRemoved
                               }
                            case _ => // StateChange other than AssociativeChange, or GraphemeChange
