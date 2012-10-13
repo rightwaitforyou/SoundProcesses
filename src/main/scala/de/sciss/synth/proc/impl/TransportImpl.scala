@@ -330,7 +330,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
 
       // the following illustrates what actions need to be done with respect
       // to the overlap/touch or not between the current info span and the change span
-      // (the `v` indicates the result of calcCurrentTime; ! is a non-important point, wheras | is an important point)
+      // (the `v` indicates the result of calcCurrentTime; ! is a non-important point, whereas | is an important point)
       //
       // info:              |....v.......|
       // proc: (a)    !........| --> proc ends before `v` = NO ACTION
@@ -344,7 +344,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
       //
       // So in short: - (1) if update span contains `v`, perform add/remove and recalc new next
       //              - (2) if info span contains update span's start, recalc new next
-      private def addRemoveProcs( g: ProcGroup[ S ], oldSpan: SpanLike, newSpan: SpanLike,
+      private def addRemoveProcs( g: ProcGroup[ S ], doFire: Boolean, oldSpan: SpanLike, newSpan: SpanLike,
                                   procAdded: IIdxSeq[ TimedProc[ S ]],
                                   procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
@@ -357,8 +357,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
             case _ => false
          }
 
-         val perceived        = (procAdded.nonEmpty || procRemoved.nonEmpty) &&                 // (1)
-                                (oldSpan.contains( newFrame ) || newSpan.contains( newFrame ))
+         val perceived        = (oldSpan.contains( newFrame ) || newSpan.contains( newFrame ))  // (1)
          val needsNewProcTime = perceived ||                                                    // (2)
                                 calcNeedsNewProcTime( oldSpan ) || calcNeedsNewProcTime( newSpan )
 
@@ -386,7 +385,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                                      nextGraphemeTime = nextGraphemeTime )
          infoVar.set( newInfo )
 
-         if( perceived ) {
+         if( perceived && doFire ) {
             fire( Transport.Advance( transport = this, time = newFrame, isSeek = false, isPlaying = isPly,
                                      added = procAdded, removed = procRemoved, changes = emptySeq ))
          }
@@ -411,24 +410,24 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
 
          val oldPercv   = oldSpan.contains( newFrame )
          val newPercv   = newSpan.contains( newFrame )
+         val doFire     = oldPercv ^ newPercv   // fire for cases (1) and (2)
 
-         if( oldPercv && newPercv ) {  // case (4)
-            ???
-
-         } else { // cases (1) to (3)
-            val procRemoved   = if( oldPercv ) IIdxSeq( timed ) else emptySeq    // case (1)
-            val procAdded     = if( newPercv ) IIdxSeq( timed ) else emptySeq    // case (2)
-            addRemoveProcs( g, oldSpan = oldSpan, newSpan = newSpan, procAdded = procAdded, procRemoved = procRemoved )
-         }
+         val procRemoved   = if( oldPercv ) IIdxSeq( timed ) else emptySeq    // case (1)
+         val procAdded     = if( newPercv ) IIdxSeq( timed ) else emptySeq    // case (2)
+         addRemoveProcs( g, doFire = doFire, oldSpan = oldSpan, newSpan = newSpan,
+                            procAdded = procAdded, procRemoved = procRemoved )
       }
 
       final def init()( implicit tx: S#Tx ) {
          // we can use groupStale because init is called straight away after instantiating Impl
          groupObs = group.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
             case BiGroup.Added( g, span, timed ) =>
-               addRemoveProcs( g, oldSpan = Span.Void, newSpan = span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
+               addRemoveProcs( g, doFire = true, oldSpan = Span.Void, newSpan = span,
+                                  procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
+
             case BiGroup.Removed( g, span, timed ) =>
-               addRemoveProcs( g, oldSpan = Span.Void, newSpan = span, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
+               addRemoveProcs( g, doFire = true, oldSpan = Span.Void, newSpan = span,
+                                  procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
 
             case BiGroup.Element( g, changes ) =>
                // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
@@ -463,18 +462,19 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                //     (4) both old and new span contain `v`
                //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
 
-//               println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
-
                changes.foreach {
                   case (timed, BiGroup.Mutated( procUpd )) => procUpd match {
                      case Proc.AssociativeChange( _, added, removed ) =>
-                        ???
+                        println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
+//                        ???
                      case Proc.ScanChange( _, scanChanges ) =>
                         scanChanges.foreach {
                            case (key, Scan.SourceUpdate( scan, graphUpd )) =>
-                              ???
+                              println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
+//                              ???
                            case (key, Scan.SourceChanged( scan, sourceOpt )) =>
-                              ???
+                              println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
+//                              ???
                            case _ =>   // ignore SinkAdded, SinkRemoved
                         }
                      case _ => // ignore StateChange other than AssociativeChange, and ignore GraphemeChange
