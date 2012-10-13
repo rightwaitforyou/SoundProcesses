@@ -447,6 +447,52 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          seek( 0L )
       }
 
+      private def u_addScan( state: GroupUpdateState, timed: TimedProc[ S ], key: String, peer: Grapheme[ S ])
+                           ( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx  = tx
+         val newFrame            = state.info.frame
+         val id                  = timed.id
+         val ceilTimeOpt         = peer.segment( newFrame ) match {
+            case Some( segm ) =>
+               val entry = key -> segm
+               // try to re-use and update a previous grapheme changed message in the state
+               state.procChanged.lastOption match {
+                  case Some( (`timed`, Transport.Proc.GraphemesChanged( map ))) =>
+                     val newMap = Transport.Proc.GraphemesChanged( map + entry )
+                     state.procChanged = state.procChanged.init :+ (timed -> newMap)
+                  case _ =>
+                     val map = Transport.Proc.GraphemesChanged( Map( entry ))
+                     state.procChanged :+= timed -> map
+               }
+               segm.span match {
+                  case hs: Span.HasStop => Some( hs.stop )
+                  case _ => None
+               }
+            case _ => peer.nearestEventAfter( newFrame + 1 )
+         }
+
+         ceilTimeOpt.foreach { ceilTime =>
+            peer.segment( ceilTime ).foreach { ceilSeg =>
+               val (staleID, keyMap)   = gMap.get( id ).getOrElse( id -> Map.empty[ String, DefSeg ])
+               val entry               = key -> ceilSeg
+               val newKeyMap           = keyMap + entry
+               gMap.put( id, staleID -> newKeyMap )
+               assert( ceilSeg.span.start == ceilTime )
+               val oldMap              = gPrio.get( ceilTime ).getOrElse( Map.empty )
+               val skipMap             = oldMap.getOrElse( staleID, Map.empty )
+               val newSkipMap          = skipMap + entry
+               val newMap              = oldMap + (staleID -> newSkipMap)
+               gPrio.add( ceilTime -> newMap )
+
+               val needsNewGraphemeTime = ceilTime < state.info.nextGraphemeTime
+               if( needsNewGraphemeTime ) {
+                  assert( ceilTime > newFrame )
+                  state.info = state.info.copy1( nextGraphemeTime = ceilTime )
+               }
+            }
+         }
+      }
+
       private def u_assocChange( state: GroupUpdateState, timed: TimedProc[ S ], added: Set[ Proc.AssociativeKey ],
                                  removed: Set[ Proc.AssociativeKey ])( implicit tx: S#Tx ) {
          //        AssociativeChange : we need to track the addition and removal of scans.
@@ -455,34 +501,17 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          //                            of these scans, and update structures
 
          val p = timed.value
+
          added.foreach {
             case Proc.ScanKey( key ) =>
                p.scans.get( key ).foreach { scan =>
                   scan.source match {
-                     case Some( Scan.Link.Grapheme( peer )) =>
-                        ???
+                     case Some( Scan.Link.Grapheme( peer )) => u_addScan( state, timed, key, peer )
                      case _ =>
                   }
                }
             case _ =>
          }
-
-//               gMap.put( id, id -> scanMap )       // in (1)
-//               skipMap.foreach {
-//                  case (time, keyMap) =>
-//                     val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
-//                     gPrio.add( time -> newMap )   // in (2)
-//               }
-//               timedMap.put( id, timed )           // in (3)
-
-//               peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
-//                  peer.segment( ceilTime ).foreach { ceilSeg =>
-//                     scanMap   += key -> ceilSeg
-//                     assert( ceilSeg.span.start == ceilTime )
-//                     val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilSeg)
-//                     skipMap   += ceilTime -> newMap
-//                  }
-//               }
 
          ???
       }
