@@ -409,10 +409,11 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                //                            track appearance or disappearence of graphemes as sources
                //                            of these scans, and update structures
                //        other StateChange : -
-               //     ScanChange
+               //     ScanChange (carrying a Map[ String, Scan.Update[ S ]])
+               //        ...where a Scan.Update is either of:
                //        SinkAdded, SinkRemoved : -
-               //        TODO : SourceUpdate passing on changes in a grapheme source. this is not yet implemented in Scan
-               //               grapheme changes must then be tracked, structures updated
+               //        SourceUpdate (passing on changes in a grapheme source) :
+               //          - grapheme changes must then be tracked, structures updated
                //        SourceChanged : if it means a grapheme is connected or disconnect, update structures
                //     GraphemeChange : - (the grapheme is not interested, we only see them as sources of scans)
                //
@@ -426,7 +427,26 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                //          second span argument, which would be just Span.Void in the normal add/remove calls)
                //     (4) both old and new span contain `v`
                //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
-               println( "WARNING: Transport observing BiGroup.Element not yet implemented" ) // ???
+
+//               println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
+
+               changes.foreach {
+                  case (timed, BiGroup.Mutated( procUpd )) => procUpd match {
+                     case Proc.AssociativeChange( _, added, removed ) =>
+                        ???
+                     case Proc.ScanChange( _, scanChanges ) =>
+                        scanChanges.foreach {
+                           case (key, Scan.SourceUpdate( scan, graphUpd )) =>
+                              ???
+                           case (key, Scan.SourceChanged( scan, sourceOpt )) =>
+                              ???
+                           case _ =>   // ignore SinkAdded, SinkRemoved
+                        }
+                     case _ => // ignore StateChange other than AssociativeChange, and ignore GraphemeChange
+                  }
+                  case (timed, BiGroup.Moved( evt.Change( oldSpan, newSpan ))) =>
+                     ???
+               }
          }}
 
          seek( 0L )
