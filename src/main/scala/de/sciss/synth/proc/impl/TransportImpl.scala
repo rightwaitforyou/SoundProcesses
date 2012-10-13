@@ -447,6 +447,46 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          seek( 0L )
       }
 
+      private def u_assocChange( state: GroupUpdateState, timed: TimedProc[ S ], added: Set[ Proc.AssociativeKey ],
+                                 removed: Set[ Proc.AssociativeKey ])( implicit tx: S#Tx ) {
+         //        AssociativeChange : we need to track the addition and removal of scans.
+         //                            filter only those AssociativeKeys which are ScanKeys.
+         //                            track appearance or disappearence of graphemes as sources
+         //                            of these scans, and update structures
+
+         val p = timed.value
+         added.foreach {
+            case Proc.ScanKey( key ) =>
+               p.scans.get( key ).foreach { scan =>
+                  scan.source match {
+                     case Some( Scan.Link.Grapheme( peer )) =>
+                        ???
+                     case _ =>
+                  }
+               }
+            case _ =>
+         }
+
+//               gMap.put( id, id -> scanMap )       // in (1)
+//               skipMap.foreach {
+//                  case (time, keyMap) =>
+//                     val newMap = gPrio.get( time ).getOrElse( Map.empty ) + (id -> keyMap)
+//                     gPrio.add( time -> newMap )   // in (2)
+//               }
+//               timedMap.put( id, timed )           // in (3)
+
+//               peer.nearestEventAfter( newFrameP ).foreach { ceilTime =>
+//                  peer.segment( ceilTime ).foreach { ceilSeg =>
+//                     scanMap   += key -> ceilSeg
+//                     assert( ceilSeg.span.start == ceilTime )
+//                     val newMap = skipMap.getOrElse( ceilTime, Map.empty ) + (key -> ceilSeg)
+//                     skipMap   += ceilTime -> newMap
+//                  }
+//               }
+
+         ???
+      }
+
       private def biGroupUpdate( groupUpd: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          val state = {
@@ -502,25 +542,29 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                //     (4) both old and new span contain `v`
                //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
 
-               changes.foreach {
-                  case (timed, BiGroup.Mutated( procUpd )) => procUpd match {
-                     case Proc.AssociativeChange( _, added, removed ) =>
-                        println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
-//                        ???
-                     case Proc.ScanChange( _, scanChanges ) =>
-                        scanChanges.foreach {
-                           case (key, Scan.SourceUpdate( scan, graphUpd )) =>
-                              println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
-//                              ???
-                           case (key, Scan.SourceChanged( scan, sourceOpt )) =>
-                              println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
-//                              ???
-                           case _ =>   // ignore SinkAdded, SinkRemoved
+               changes.foreach { case (timed, elemUpd) =>
+                  elemUpd match {
+                     case BiGroup.Mutated( procUpd ) =>
+                        if( gMap.contains( timed.id )) state.procChanged :+= timed -> Transport.Proc.Changed( procUpd )
+                        procUpd match {
+                           case assoc @ Proc.AssociativeChange( _, added, removed ) =>
+                              u_assocChange( state, timed, added = added, removed = removed )
+
+                           case Proc.ScanChange( _, scanChanges ) =>
+                              scanChanges.foreach {
+                                 case (key, Scan.SourceUpdate( scan, graphUpd )) =>
+                                    println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
+      //                              ???
+                                 case (key, Scan.SourceChanged( scan, sourceOpt )) =>
+                                    println( "WARNING: Transport observing BiGroup.Element not yet implemented" )
+      //                              ???
+                                 case _ =>   // SinkAdded, SinkRemoved
+                              }
+                           case _ => // StateChange other than AssociativeChange, or GraphemeChange
                         }
-                     case _ => // ignore StateChange other than AssociativeChange, and ignore GraphemeChange
+                     case BiGroup.Moved( evt.Change( oldSpan, newSpan )) =>
+                        u_moveProc( state, timed, oldSpan, newSpan )
                   }
-                  case (timed, BiGroup.Moved( evt.Change( oldSpan, newSpan ))) =>
-                     u_moveProc( state, timed, oldSpan, newSpan )
                }
          }
 
@@ -717,7 +761,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                         }
                      }
 
-                  case _ => None
+                  case _ =>
                }
          }
          gMap.put( id, id -> scanMap )       // in (1)
