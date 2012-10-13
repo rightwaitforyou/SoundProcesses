@@ -344,18 +344,23 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
       //
       // So in short: - (1) if update span contains `v`, perform add/remove and recalc new next
       //              - (2) if info span contains update span's start, recalc new next
-      private def addRemoveProcs( g: ProcGroup[ S ], span: SpanLike, procAdded: IIdxSeq[ TimedProc[ S ]],
+      private def addRemoveProcs( g: ProcGroup[ S ], oldSpan: SpanLike, newSpan: SpanLike,
+                                  procAdded: IIdxSeq[ TimedProc[ S ]],
                                   procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          val oldInfo    = infoVar.get
          val newFrame   = calcCurrentTime( oldInfo )
          val isPly      = oldInfo.isRunning
 
-         val perceived        = span.contains( newFrame )   // (1)
-         val needsNewProcTime = perceived || (span match {  // (2)
+         @inline def calcNeedsNewProcTime( span: SpanLike ) : Boolean = span match {
             case hs: Span.HasStart => oldInfo.frame <= hs.start && oldInfo.nextProcTime > hs.start
             case _ => false
-         })
+         }
+
+         val perceived        = (procAdded.nonEmpty || procRemoved.nonEmpty) &&                 // (1)
+                                (oldSpan.contains( newFrame ) || newSpan.contains( newFrame ))
+         val needsNewProcTime = perceived ||                                                    // (2)
+                                calcNeedsNewProcTime( oldSpan ) || calcNeedsNewProcTime( newSpan )
 
          if( !(perceived || needsNewProcTime) ) return   // keep scheduled task running, don't overwrite infoVar
 
@@ -407,15 +412,13 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          val oldPercv   = oldSpan.contains( newFrame )
          val newPercv   = newSpan.contains( newFrame )
 
-         (oldPercv, newPercv) match {
-            case (true,  false)  => // case (1)
-               addRemoveProcs( g, oldSpan, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
-            case (false, true)   => // case (2)
-               addRemoveProcs( g, newSpan, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
-            case (false, false)  => // case (3)
-               ???
-            case (true,  true)   => // case (4)
-               ???
+         if( oldPercv && newPercv ) {  // case (4)
+            ???
+
+         } else { // cases (1) to (3)
+            val procRemoved   = if( oldPercv ) IIdxSeq( timed ) else emptySeq    // case (1)
+            val procAdded     = if( newPercv ) IIdxSeq( timed ) else emptySeq    // case (2)
+            addRemoveProcs( g, oldSpan = oldSpan, newSpan = newSpan, procAdded = procAdded, procRemoved = procRemoved )
          }
       }
 
@@ -423,9 +426,9 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          // we can use groupStale because init is called straight away after instantiating Impl
          groupObs = group.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
             case BiGroup.Added( g, span, timed ) =>
-               addRemoveProcs( g, span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
+               addRemoveProcs( g, oldSpan = Span.Void, newSpan = span, procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
             case BiGroup.Removed( g, span, timed ) =>
-               addRemoveProcs( g, span, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
+               addRemoveProcs( g, oldSpan = Span.Void, newSpan = span, procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
 
             case BiGroup.Element( g, changes ) =>
                // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
