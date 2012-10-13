@@ -447,42 +447,48 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          seek( 0L )
       }
 
+      private def u_addSegment( state: GroupUpdateState, timed: TimedProc[ S ], key: String, segm: Grapheme.Segment )
+                              ( implicit tx: S#Tx ) {
+         val entry = key -> segm
+         // try to re-use and update a previous grapheme changed message in the state
+         state.procChanged.lastOption match {
+            case Some( (`timed`, Transport.Proc.GraphemesChanged( map ))) =>
+               val newMap = Transport.Proc.GraphemesChanged( map + entry )
+               state.procChanged = state.procChanged.init :+ (timed -> newMap)
+            case _ =>
+               val map = Transport.Proc.GraphemesChanged( Map( entry ))
+               state.procChanged :+= timed -> map
+         }
+      }
+
+      // adds the structure for a newly added scan, and also adds the current grapheme segment if applicable
       private def u_addScan( state: GroupUpdateState, timed: TimedProc[ S ], key: String, peer: Grapheme[ S ])
                            ( implicit tx: S#Tx ) {
          implicit val itx: I#Tx  = tx
          val newFrame            = state.info.frame
          val id                  = timed.id
-         val ceilTimeOpt         = peer.segment( newFrame ) match {
+         val ceilTime            = peer.segment( newFrame ) match {
             case Some( segm ) =>
-               val entry = key -> segm
-               // try to re-use and update a previous grapheme changed message in the state
-               state.procChanged.lastOption match {
-                  case Some( (`timed`, Transport.Proc.GraphemesChanged( map ))) =>
-                     val newMap = Transport.Proc.GraphemesChanged( map + entry )
-                     state.procChanged = state.procChanged.init :+ (timed -> newMap)
-                  case _ =>
-                     val map = Transport.Proc.GraphemesChanged( Map( entry ))
-                     state.procChanged :+= timed -> map
-               }
+               u_addSegment( state, timed, key, segm )
                segm.span match {
-                  case hs: Span.HasStop => Some( hs.stop )
-                  case _ => None
+                  case hs: Span.HasStop   => hs.stop
+                  case _                  => Long.MaxValue
                }
-            case _ => peer.nearestEventAfter( newFrame + 1 )
+            case _ => peer.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
          }
 
-         ceilTimeOpt.foreach { ceilTime =>
+         if( ceilTime != Long.MaxValue ) {
             peer.segment( ceilTime ).foreach { ceilSeg =>
-               val (staleID, keyMap)   = gMap.get( id ).getOrElse( id -> Map.empty[ String, DefSeg ])
+               val (staleID, keyMap1)  = gMap.get( id ).getOrElse( id -> Map.empty[ String, DefSeg ])
                val entry               = key -> ceilSeg
-               val newKeyMap           = keyMap + entry
-               gMap.put( id, staleID -> newKeyMap )
+               val newKeyMap1          = keyMap1 + entry
+               gMap.put( id, staleID -> newKeyMap1 )
                assert( ceilSeg.span.start == ceilTime )
-               val oldMap              = gPrio.get( ceilTime ).getOrElse( Map.empty )
-               val skipMap             = oldMap.getOrElse( staleID, Map.empty )
-               val newSkipMap          = skipMap + entry
-               val newMap              = oldMap + (staleID -> newSkipMap)
-               gPrio.add( ceilTime -> newMap )
+               val skipMap             = gPrio.get( ceilTime ).getOrElse( Map.empty )
+               val keyMap2             = skipMap.getOrElse( staleID, Map.empty )
+               val newKeyMap2          = keyMap2 + entry
+               val newSkipMap          = skipMap + (staleID -> newKeyMap2)
+               gPrio.add( ceilTime -> newSkipMap )
 
                val needsNewGraphemeTime = ceilTime < state.info.nextGraphemeTime
                if( needsNewGraphemeTime ) {
@@ -500,7 +506,9 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          //                            track appearance or disappearence of graphemes as sources
          //                            of these scans, and update structures
 
-         val p = timed.value
+         implicit val itx: I#Tx  = tx
+         val p                   = timed.value
+         val id                  = timed.id
 
          added.foreach {
             case Proc.ScanKey( key ) =>
@@ -513,7 +521,39 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
             case _ =>
          }
 
-         ???
+         removed.foreach {
+            case Proc.ScanKey( key ) =>
+               gMap.get( id ).foreach { case (staleID, keyMap1) =>
+                  keyMap1.get( key ).foreach { segm =>
+                     val newKeyMap1 = keyMap1 - key
+                     if( newKeyMap1.isEmpty ) {
+                        gMap.remove( id )
+                     } else {
+                        gMap.put( id, staleID -> newKeyMap1 )
+                     }
+                     val time = segm.span.start
+                     gPrio.get( time ).foreach { skipMap =>
+                        skipMap.get( staleID ).foreach { keyMap2 =>
+                           val newKeyMap2 = keyMap2 - key
+                           val newSkipMap = if( newKeyMap2.isEmpty ) {
+                              skipMap - staleID
+                           } else {
+                              skipMap + (staleID -> newKeyMap2)
+                           }
+                           if( newSkipMap.isEmpty ) {
+                              gPrio.remove( time )
+                           } else {
+                              gPrio.add( time -> newSkipMap )
+                           }
+                        }
+                     }
+
+//                     // clients might want to know about the removal...
+//                     u_addSegment( state, timed, key, dummySegment )
+                  }
+               }
+            case _ =>
+         }
       }
 
       private def biGroupUpdate( groupUpd: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
