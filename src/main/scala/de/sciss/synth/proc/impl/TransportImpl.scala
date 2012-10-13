@@ -124,6 +124,15 @@ object TransportImpl {
          Info( cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
                nextGraphemeTime = nextGraphemeTime, valid = valid + 1 )
 
+      // does not increment valid
+      def copy1( cpuTime: Long = cpuTime, frame: Long = frame, state: State = state,
+                 nextProcTime: Long = nextProcTime, nextGraphemeTime: Long = nextGraphemeTime ) : Info =
+         Info( cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
+               nextGraphemeTime = nextGraphemeTime, valid = valid )
+
+      def incValid : Info = Info( cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
+                                  nextGraphemeTime = nextGraphemeTime, valid = valid + 1 )
+
       def isRunning  = state == Playing
       def nextTime   = math.min( nextProcTime, nextGraphemeTime )
 
@@ -293,6 +302,22 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
 
       private final var groupObs : Disposable[ S#Tx ] = _
 
+      private final class GroupUpdateState( val g: ProcGroup[ S ], info0: Info ) {
+         var info: Info                                                          = info0
+         var procAdded:   IIdxSeq[  TimedProc[ S ]]                              = emptySeq
+         var procRemoved: IIdxSeq[  TimedProc[ S ]]                              = emptySeq
+         var procChanged: IIdxSeq[ (TimedProc[ S ], Transport.Proc.Update[ S ])] = emptySeq
+
+         def shouldFire : Boolean = procAdded.nonEmpty || procRemoved.nonEmpty || procChanged.nonEmpty
+         def infoChanged : Boolean = info != info0
+
+         def advanceMessage = {
+            val isPly = info.isRunning
+            Transport.Advance( transport = impl, time = info.frame, isSeek = false, isPlaying = isPly,
+                               added = procAdded, removed = procRemoved, changes = procChanged )
+         }
+      }
+
       /**
        * Invoked to submit a schedule step either to a realtime scheduler or other mechanism.
        * When the step is performed, execution should be handed over to `eventReached`, passing
@@ -344,13 +369,14 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
       //
       // So in short: - (1) if update span contains `v`, perform add/remove and recalc new next
       //              - (2) if info span contains update span's start, recalc new next
-      private def addRemoveProcs( g: ProcGroup[ S ], doFire: Boolean, oldSpan: SpanLike, newSpan: SpanLike,
-                                  procAdded: IIdxSeq[ TimedProc[ S ]],
-                                  procRemoved: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx ) {
-         implicit val itx: I#Tx = tx
-         val oldInfo    = infoVar.get
-         val newFrame   = calcCurrentTime( oldInfo )
-         val isPly      = oldInfo.isRunning
+
+      // returns: `true` if the changes are perceived (updates should be fired), else `false`
+      private def u_addRemoveProcs( state: GroupUpdateState, doFire: Boolean, oldSpan: SpanLike, newSpan: SpanLike,
+                                    procAdded: Option[ TimedProc[ S ]],
+                                    procRemoved: Option[ TimedProc[ S ]])( implicit tx: S#Tx ) {
+
+         val oldInfo    = state.info
+         val newFrame   = oldInfo.frame
 
          @inline def calcNeedsNewProcTime( span: SpanLike ) : Boolean = span match {
             case hs: Span.HasStart => oldInfo.frame <= hs.start && oldInfo.nextProcTime > hs.start
@@ -364,36 +390,35 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          if( !(perceived || needsNewProcTime) ) return   // keep scheduled task running, don't overwrite infoVar
 
          if( perceived ) {
-            procRemoved.foreach { timed => removeProc( timed )}
-            procAdded.foreach   { timed => addProc( newFrame, timed )}
+            procRemoved.foreach { timed =>
+               removeProc( timed )
+               if( doFire ) state.procRemoved :+= timed
+            }
+            procAdded.foreach { timed =>
+               addProc( newFrame, timed )
+               if( doFire ) state.procAdded :+= timed
+            }
          }
 
          val nextProcTime = if( needsNewProcTime ) {
-            g.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
+            state.g.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
          } else {
             oldInfo.nextProcTime
          }
          val nextGraphemeTime = if( perceived ) {
+            implicit val itx: I#Tx = tx
             val headOption = gPrio.ceil( Long.MinValue ) // headOption method missing
             headOption.map( _._1 ).getOrElse( Long.MaxValue )
          } else {
             oldInfo.nextGraphemeTime
          }
-         val newInfo = oldInfo.copy( cpuTime          = logicalTime(),
-                                     frame            = newFrame,
-                                     nextProcTime     = nextProcTime,
-                                     nextGraphemeTime = nextGraphemeTime )
-         infoVar.set( newInfo )
-
-         if( perceived && doFire ) {
-            fire( Transport.Advance( transport = this, time = newFrame, isSeek = false, isPlaying = isPly,
-                                     added = procAdded, removed = procRemoved, changes = emptySeq ))
-         }
-
-         if( isPly ) scheduleNext( newInfo )
+         val newInfo = oldInfo.copy1( nextProcTime     = nextProcTime,
+                                      nextGraphemeTime = nextGraphemeTime )
+         state.info = newInfo
       }
 
-      private def procMoved( g: ProcGroup[ S ], timed: TimedProc[ S ], oldSpan: SpanLike, newSpan: SpanLike )( implicit tx: S#Tx ) {
+      private def u_moveProc( state: GroupUpdateState, timed: TimedProc[ S ],
+                              oldSpan: SpanLike, newSpan: SpanLike )( implicit tx: S#Tx ) {
          // ... possible situations
          //     (1) old span contains current time frame `v`, but new span not --> treat as removal
          //     (2) old span does not contain `v`, but new span does --> treat as addition
@@ -404,32 +429,47 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          //     (4) both old and new span contain `v`
          //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
 
-         implicit val itx: I#Tx = tx
-         val oldInfo    = infoVar.get
-         val newFrame   = calcCurrentTime( oldInfo )
+         val newFrame   = state.info.frame
 
          val oldPercv   = oldSpan.contains( newFrame )
          val newPercv   = newSpan.contains( newFrame )
          val doFire     = oldPercv ^ newPercv   // fire for cases (1) and (2)
 
-         val procRemoved   = if( oldPercv ) IIdxSeq( timed ) else emptySeq    // case (1)
-         val procAdded     = if( newPercv ) IIdxSeq( timed ) else emptySeq    // case (2)
-         addRemoveProcs( g, doFire = doFire, oldSpan = oldSpan, newSpan = newSpan,
-                            procAdded = procAdded, procRemoved = procRemoved )
+         val procRemoved   = if( oldPercv ) Some( timed ) else None  // case (1)
+         val procAdded     = if( newPercv ) Some( timed ) else None  // case (2)
+         u_addRemoveProcs( state, doFire = doFire, oldSpan = oldSpan, newSpan = newSpan,
+                           procAdded = procAdded, procRemoved = procRemoved )
       }
 
       final def init()( implicit tx: S#Tx ) {
          // we can use groupStale because init is called straight away after instantiating Impl
-         groupObs = group.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => {
-            case BiGroup.Added( g, span, timed ) =>
-               addRemoveProcs( g, doFire = true, oldSpan = Span.Void, newSpan = span,
-                                  procAdded = IIdxSeq( timed ), procRemoved = emptySeq )
+         groupObs = group.changed.reactTx[ ProcGroup_.Update[ S ]] { implicit tx => biGroupUpdate( _ )( tx )}
+         seek( 0L )
+      }
 
-            case BiGroup.Removed( g, span, timed ) =>
-               addRemoveProcs( g, doFire = true, oldSpan = Span.Void, newSpan = span,
-                                  procAdded = emptySeq, procRemoved = IIdxSeq( timed ))
+      private def biGroupUpdate( groupUpd: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx = tx
+         val state = {
+            val info0      = infoVar.get
+            val newFrame   = calcCurrentTime( info0 )
+            // actualize logical time and frame, but do _not_ increment valid counter
+            // (call `copy1` instead of `copy`; valid counter is incremented only if
+            //  if info is written back to infoVar)
+            val info1      = info0.copy1( cpuTime = logicalTime(), frame = newFrame )
+            // info only needs to be written back to infoVar if it is != info0 at the end of the processing
+            new GroupUpdateState( groupUpd.group, info1 )
+         }
 
-            case BiGroup.Element( g, changes ) =>
+         groupUpd match {
+            case BiGroup.Added( _, span, timed ) =>
+               u_addRemoveProcs( state, doFire = true, oldSpan = Span.Void, newSpan = span,
+                                 procAdded = Some( timed ), procRemoved = None )
+
+            case BiGroup.Removed( _, span, timed ) =>
+               u_addRemoveProcs( state, doFire = true, oldSpan = Span.Void, newSpan = span,
+                                 procAdded = None, procRemoved = Some( timed ))
+
+            case BiGroup.Element( _, changes ) =>
                // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
                // ElementUpdate is either of Moved( change: evt.Change[ SpanLike ])
                //                         or Mutated[ U ]( change: U ) ; U = Proc.Update[ S ]
@@ -480,11 +520,17 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                      case _ => // ignore StateChange other than AssociativeChange, and ignore GraphemeChange
                   }
                   case (timed, BiGroup.Moved( evt.Change( oldSpan, newSpan ))) =>
-                     procMoved( g, timed, oldSpan, newSpan )
+                     u_moveProc( state, timed, oldSpan, newSpan )
                }
-         }}
+         }
 
-         seek( 0L )
+         if( state.shouldFire ) fire( state.advanceMessage )
+         if( state.infoChanged ) {   // meaning that either nextProcTime or nextGraphemeTime changed
+            val infoNew = state.info.incValid
+            val isPly   = infoNew.isRunning
+            infoVar.set( infoNew )
+            if( isPly ) scheduleNext( infoNew )
+         }
       }
 
       final def dispose()( implicit tx: S#Tx ) {
