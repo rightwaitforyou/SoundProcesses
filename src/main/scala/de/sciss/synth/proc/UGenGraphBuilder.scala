@@ -58,23 +58,36 @@ private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
    def addScanOut( key: String, numChannels: Int ) : Unit
 
    /**
-    * Current set of used inputs. This is guaranteed to only grow during incremental building, never shrink.
+    * Current set of used inputs (scan keys to number of channels).
+    * This is guaranteed to only grow during incremental building, never shrink.
     */
    def scanIns : Map[ String, Int ] // Set[ String ]
    /**
-    * Current set of used outputs. This is guaranteed to only grow during incremental building, never shrink.
+    * Current set of used outputs (scan keys to number of channels).
+    * This is guaranteed to only grow during incremental building, never shrink.
     */
    def scanOuts : Map[ String, Int ]
 
    /**
-    * Current set of missing scan inputs.
+    * Current set of missing scan inputs. This may shrink during incremental build, and will be empty when
+    * `tryBuild` returns `true`.
     */
    def missingIns: Set[ MissingIn[ S ]]
 
+   /**
+    * Determines whether the graph was fully build (`true`) or is incomplete (`false`) due to
+    * missing inputs. Once this method returns `true`, it is safe to call `finish`.
+    */
    def isComplete : Boolean
 
+   /**
+    * The process which is building this graph.
+    */
    def timed: TimedProc[ S ]
 
+   /**
+    * The transport time at which this graph is built.
+    */
    def time: Long
 
    def tx: S#Tx
@@ -89,5 +102,9 @@ private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
     */
    def tryBuild() : Boolean // UGenGraphBuilder.BuildResult[ S ]
 
+   /**
+    * Finishes the build process and returns the ugen graph. If the builder is not complete
+    * (`isComplete` returns `false`) this throws a runtime exception.
+    */
    def finish: UGenGraph
 }

@@ -231,75 +231,85 @@ object AuralPresentationImpl {
 //         }).getOrElse( throw MissingIn( timed, key ))
 //      }
 
+      private def launchProc( builder: AuralProcBuilder[ S ]) {
+         val ugen          = builder.ugen
+         // finalise the ugen graph
+         val ug            = ugen.finish
+         implicit val tx   = ugen.tx
+         implicit val itx  = tx.peer
+         implicit val ptx  = ProcTxn()
+         // get a rich synth def and synth playing just in the default group
+         // (we'll have additional messages moving the group into place if needed,
+         // as well as setting and mapping controls)
+         val df            = ProcDemiurg.getSynthDef( server, ug ) // RichSynthDef()
+         val synth         = df.play( target = RichGroup.default( server ), addAction = addToHead )
+
+         // ---- handle input buses ----
+         val time       = ugen.time
+         val timed      = ugen.timed
+         var setMap     = IIdxSeq.empty[ ControlSetMap ]
+         var busUsers   = IIdxSeq.empty[ DynamicBusUser ]
+         val p          = timed.value
+
+         import Grapheme.Segment
+
+         ugen.scanIns.foreach { case (key, numCh) =>
+
+            def ensureChannels( n: Int ) {
+               require( n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")" )
+            }
+
+            def makeBusMapper( t: TimedProc[ S ], k: String ) {
+               val bus = getBus( t, k ).getOrElse( // ... or could just stick with the default control value
+                  sys.error( "Bus disappeared " + t.value + " -> " + k ))
+               ensureChannels( bus.numChannels )  // ... or could insert a channel coercing synth
+               val bm = BusNodeSetter.mapper( scan.inControlName( key /* ! not k */ ), bus, synth )
+               bm.add()
+               busUsers :+= bm
+            }
+
+            val sourceOpt = p.scans.get( key ).flatMap( _.source )
+            sourceOpt.foreach {   // if not found, stick with default
+               case Scan.Link.Grapheme( peer ) =>
+                  val segmOpt = peer.segment( time )
+                  segmOpt.foreach { // again if not found... stick with default
+                     case const: Segment.Const =>
+                        ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
+                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
+
+                     case segm: Segment.Curve =>
+                        ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
+                        ??? // MonoSegmentWriter
+
+                     case audio: Segment.Audio =>
+                        ??? // AudioFileWriter
+                  }
+               case Scan.Link.Scan( peer ) =>
+                  ???   // makeBusMapper
+            }
+         }
+
+         // ---- handle output buses ----
+         val outBuses = builder.outBuses
+         builder.outBuses.foreach { case (key, bus) =>
+            val bw = BusNodeSetter.writer( scan.outControlName( key ), bus, synth )
+            bw.add()
+            busUsers :+= bw
+         }
+
+         // wrap as AuralProc and save it in the identifier map for later lookup
+         val aural = AuralProc( synth, outBuses, busUsers )
+         viewMap.put( builder.id, aural )
+
+      }
+
       private def beforeCommit( itx: InTxn ) {
          ongoingBuild.get( itx ).seq.foreach { builder =>
-            val ugen          = builder.ugen
+            val ugen = builder.ugen
             if( ugen.isComplete ) {
-               // finalise the ugen graph
-               val ug            = ugen.finish
-               implicit val tx   = ugen.tx
-               implicit val itx  = tx.peer
-               implicit val ptx  = ProcTxn()
-               // get a rich synth def and synth playing just in the default group
-               // (we'll have additional messages moving the group into place if needed,
-               // as well as setting and mapping controls)
-               val df            = ProcDemiurg.getSynthDef( server, ug ) // RichSynthDef()
-               val synth         = df.play( target = RichGroup.default( server ), addAction = addToHead )
-
-               // ---- handle input buses ----
-               val time       = ugen.time
-               val timed      = ugen.timed
-               var setMap     = IIdxSeq.empty[ ControlSetMap ]
-               var busUsers   = IIdxSeq.empty[ DynamicBusUser ]
-
-               ugen.scanIns.foreach { case (key, numCh) =>
-                  import Grapheme.Value._
-
-                  def ensureChannels( n: Int ) {
-                     require( n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")" )
-                  }
-
-                  def makeBusMapper( t: TimedProc[ S ], k: String ) {
-                     val bus = getBus( t, k ).getOrElse( // ... or could just stick with the default control value
-                        sys.error( "Bus disappeared " + t.value + " -> " + k ))
-                     ensureChannels( bus.numChannels )  // ... or could insert a channel coercing synth
-                     val bm = BusNodeSetter.mapper( scan.inControlName( key /* ! not k */ ), bus, synth )
-                     bm.add()
-                     busUsers :+= bm
-                  }
-
-//                  timed.value.graphemes.get( key ).flatMap( _.valueAt( time )).foreach {   // if not found, stick with default
-//                     case const: Const =>
-//                        ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
-//                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
-//
-//                     case segm: Segment =>
-//                        ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
-//                        ??? // MonoSegmentWriter
-//
-//                     case audio: Audio =>
-//                        ??? // AudioFileWriter
-//
-////                     case Source                         => makeBusMapper( timed,       key       )
-////                     case Sink( sourceTimed, sourceKey ) => makeBusMapper( sourceTimed, sourceKey )
-//                  }
-
-                  ??? // need to look at time.value.scans instead
-               }
-
-               // ---- handle output buses ----
-               val outBuses      = builder.outBuses
-               builder.outBuses.foreach { case (key, bus) =>
-                  val bw = BusNodeSetter.writer( scan.outControlName( key ), bus, synth )
-                  bw.add()
-                  busUsers :+= bw
-               }
-
-               // wrap as AuralProc and save it in the identifier map for later lookup
-               val aural = AuralProc( synth, outBuses, busUsers )
-               viewMap.put( builder.id, aural )
-
+               launchProc( builder )
             } else {
+               // XXX TODO: do we need to free buses associated with ugen.scanOuts ?
                println( "Warning: Incomplete aural proc build for " + ugen.timed.value )
             }
          }
