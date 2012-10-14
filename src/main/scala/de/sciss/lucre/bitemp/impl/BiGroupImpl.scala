@@ -299,6 +299,7 @@ object BiGroupImpl {
             ElementEvent    -/-> r
          }
 
+// XXX TODO: potential problem with event collapsing
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiGroup.Update[ S, Elem, U ]] = {
             if(   CollectionEvent.isSource( pull )) CollectionEvent.pullUpdate( pull )
             else if( ElementEvent.isSource( pull )) ElementEvent.pullUpdate(    pull )
