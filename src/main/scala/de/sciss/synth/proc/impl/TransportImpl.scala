@@ -43,6 +43,7 @@ object TransportImpl {
    
    import Grapheme.Segment
    import Segment.{Defined => DefSeg}
+   import Transport.Proc.{GraphemesChanged, Changed => ProcChanged}
 
    def apply[ S <: Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double )(
       implicit tx: S#Tx, cursor: Cursor[ S ], bridge: S#Tx => I#Tx ) : ProcTransport[ S ] = {
@@ -453,11 +454,11 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          val entry = key -> segm
          // try to re-use and update a previous grapheme changed message in the state
          state.procChanged.lastOption match {
-            case Some( (`timed`, Transport.Proc.GraphemesChanged( map ))) =>
-               val newMap = Transport.Proc.GraphemesChanged( map + entry )
+            case Some( (`timed`, GraphemesChanged( map ))) =>
+               val newMap = GraphemesChanged( map + entry )
                state.procChanged = state.procChanged.init :+ (timed -> newMap)
             case _ =>
-               val map = Transport.Proc.GraphemesChanged( Map( entry ))
+               val map = GraphemesChanged( Map( entry ))
                state.procChanged :+= timed -> map
          }
       }
@@ -673,7 +674,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                   if( gMap.contains( timed.id )) elemUpd match {
                      case BiGroup.Mutated( procUpd ) =>
                         def forward( u: Proc.Update[ S ]) {
-                           state.procChanged :+= timed -> Transport.Proc.Changed( u )
+                           state.procChanged :+= timed -> ProcChanged( u )
                         }
                         procUpd match {
                            case assoc @ Proc.AssociativeChange( _, added, removed ) =>
@@ -1192,7 +1193,7 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                itMap.toIndexedSeq
             }
 
-            procUpdated = updMap.map { case (timed, map) => timed -> Transport.Proc.GraphemesChanged( map )}
+            procUpdated = updMap.map { case (timed, map) => timed -> GraphemesChanged( map )}
          }
 
          val nextProcTime = if( needsNewProcTime ) {
