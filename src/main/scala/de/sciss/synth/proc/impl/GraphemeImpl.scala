@@ -228,9 +228,10 @@ object GraphemeImpl {
 
       def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Grapheme.Update[ S ]] = {
          pin.changed.pullUpdate( pull ).flatMap { upd =>
-            val segm: IIdxSeq[ Segment ] = upd match {
-               case BiPin.Added( _, (addTime, addVal), _ ) => segmentsAfterAdded( addTime, addVal )
-               case BiPin.Removed( _, (remTime, _), _ ) => IIdxSeq( segmentAfterRemoved( remTime ))
+            val segm: IIdxSeq[ Segment ] = upd.changes.foldLeft( IIdxSeq.empty[ Segment ]) { case (res, ch) =>
+               val seq = ch match {
+                  case BiPin.Added(   (addTime, addVal), _ ) =>          segmentsAfterAdded(  addTime, addVal )
+                  case BiPin.Removed( (remTime, _),      _ ) => IIdxSeq( segmentAfterRemoved( remTime ))
 
                // the BiPin.Collection update assumes the 'pin' character
                // of the elements. that means that for example, an insertion
@@ -257,16 +258,14 @@ object GraphemeImpl {
                //     ceilTime: if ceilTime is undefined, or if it is `Audio`, the span I--ceil is a
                //     constant, otherwise if it is `Curve` we need to calculate the curve segment.
 
-               case BiPin.Element( _, changes ) =>
-                  // changes = IIdxSeq[ (BiExpr[ S, A ], evt.Change[ (Long, A) ])]
-                  changes.foldLeft( IIdxSeq.empty[ Segment ]) { case (res, (elem, elemCh)) =>
+                  case BiPin.Element( elem, elemCh ) =>
                      val (timeCh, magCh) = elemCh.unzip
                      val seqAdd = segmentsAfterAdded( timeCh.now, magCh.now )
-                     val seq = if( timeCh.isSignificant ) {
+                     if( timeCh.isSignificant ) {
                         segmentAfterRemoved( timeCh.before ) +: seqAdd
                      } else seqAdd
-                     seq.foldLeft( res )( incorporate )
-                  }
+               }
+               seq.foldLeft( res )( incorporate )
             }
             if( segm.nonEmpty ) Some( Grapheme.Update( graph, segm )) else None
          }
