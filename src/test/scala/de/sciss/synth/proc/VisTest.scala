@@ -117,7 +117,7 @@ extends ExprImplicits[ Sy ] {
       p.graph_=( SynthGraph {
          import synth._
          import ugen._
-         val f = "freq".kr       // fundamental frequency
+         val f = graph.scan( "freq" ).ar( 50 ) // fundamental frequency
          val p = 20              // number of partials per channel
          val m = Mix.tabulate(p) { i =>
             FSinOsc.ar(f * (i+1)) *
@@ -131,6 +131,9 @@ extends ExprImplicits[ Sy ] {
 
          Out.ar( 0, m )
       })
+      val g = Grapheme.Modifiable[ S ]
+      val scan = p.scans.add( "freq" )
+      scan.source_=( Some( Scan.Link.Grapheme( g )))
 
 //      p.trigger( "silence" )
 
@@ -226,13 +229,12 @@ extends ExprImplicits[ Sy ] {
    def pr( time: Long = 4 * 44100 )( implicit tx: S#Tx ) = group.intersect( time ).next._2.head.value
 
    def addFreq( time: Expr[ S, Long ] = 0, freq: Expr[ S, Param ]) {
-      ???
-//      t { implicit tx =>
-//         pr().scans.get( "freq" ) match {
-//            case Some( BiPin.Modifiable( v )) => v.add( time, Scan_.Mono( freq ))
-//            case _ =>
-//         }
-//      }
+      t { implicit tx =>
+         pr().scans.get( "freq" ).flatMap( _.source ).foreach {
+            case Scan.Link.Grapheme( Grapheme.Modifiable( peer )) => peer.add( time -> curve( freq ))
+            case _ =>
+         }
+      }
    }
 
    implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )

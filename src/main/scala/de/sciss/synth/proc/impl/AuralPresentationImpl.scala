@@ -34,7 +34,7 @@ import evt.Sys
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{InTxn, TxnLocal, Txn}
-import SoundProcesses.logConfig
+import SoundProcesses.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
 
@@ -72,23 +72,28 @@ object AuralPresentationImpl {
 
       def started( server: Server ) {
          val impl = cursor.step { implicit tx =>
+            log( "started" )
+
             val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new RunningImpl( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-            transport.react { x => println( "Aural observation: " + x )}
+//            transport.react { x => println( "Aural observation: " + x )}
             if( transport.isPlaying ) {
                implicit val chr: Chronos[ S ] = transport
                transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
             }
             transport.reactTx { implicit tx => {
-               case Transport.Advance( tr, isSeek, true, time, added, removed, changes ) =>
+               case Transport.Advance( tr, time, isSeek, true, added, removed, changes ) =>
                   implicit val chr: Chronos[ S ] = tr
-//println( "AQUI: added = " + added + "; removed = " + removed )
+                  log( "at " + time + " added " + added.mkString(   "[", ", ", "]" ) +
+                                   "; removed " + removed.mkString( "[", ", ", "]" ))
                   removed.foreach { timed             => booted.procRemoved( timed )}
                   changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
-                  added.foreach   { timed             => booted.procAdded( timed )}
-               case _ =>
+                  added.foreach   { timed             => booted.procAdded(   timed )}
+               case other =>
+//                  log( "other " + other )
             }}
+
             booted
          }
          sync.synchronized( running = Some( impl ))
@@ -346,9 +351,9 @@ object AuralPresentationImpl {
       }
 
       def procAdded( timed: TimedProc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-         val p       = timed.value
+//         val p       = timed.value
          val time    = chr.time
-         logConfig( "aural added " + p ) // + " -- playing? " + playing )
+         log( "added " + timed )
          buildAuralProc( timed, time )
       }
 
@@ -442,7 +447,7 @@ object AuralPresentationImpl {
             case Some( aural ) =>
                viewMap.remove( id )
                implicit val ptx = ProcTxn()( tx.peer )
-               logConfig( "aural removed " + timed.value ) // + " -- playing? " + aural.playing )
+               log( "removed " + timed ) // + " -- playing? " + aural.playing )
                aural.stop()
 
             case _ =>

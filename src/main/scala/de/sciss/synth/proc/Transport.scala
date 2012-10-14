@@ -77,10 +77,10 @@ object Transport {
                                                        changes: IIdxSeq[ (BiGroup.TimedElem[ S, Elem ], U) ] = IIdxSeq.empty )
    extends Update[ S, Elem, U ] {
       override def toString =
-         (if( isSeek ) "Seek" else "Advance") + "(" + transport + ", " + time +
-            (if( added.nonEmpty )   added.mkString(   ", added = ",   ",", "" ) else "") +
-            (if( removed.nonEmpty ) removed.mkString( ", removed = ", ",", "" ) else "") +
-            (if( changes.nonEmpty ) changes.mkString( ", changes = ", ",", "" ) else "") + ")"
+         "Advance(" + transport + ", " + time + ", isSeek = " + isSeek + ", isPlaying = " + isPlaying +
+            (if( added.nonEmpty )   added.mkString(   ", added = [",   ",", "]" ) else "") +
+            (if( removed.nonEmpty ) removed.mkString( ", removed = [", ",", "]" ) else "") +
+            (if( changes.nonEmpty ) changes.mkString( ", changes = [", ",", "]" ) else "") + ")"
    }
 
    final case class Play[ S <: Sys[ S ], Elem, U ]( transport: Transport[ S, Elem, U ], time: Long ) extends Update[ S, Elem, U ]
