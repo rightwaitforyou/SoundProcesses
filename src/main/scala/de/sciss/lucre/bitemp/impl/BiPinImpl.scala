@@ -129,9 +129,9 @@ object BiPinImpl {
       // ---- event behaviour ----
 
       private object CollChanged
-      extends evti.TriggerImpl[ S, BiPin.Collection[ S, A ], BiPin[ S, A ]]
-      with evt.InvariantEvent[ S, BiPin.Collection[ S, A ], BiPin[ S, A ]]
-      with evti.Root[ S, BiPin.Collection[ S, A ]]
+      extends evti.TriggerImpl[ S, BiPin.Update[ S, A ], BiPin[ S, A ]]
+      with evt.InvariantEvent[ S, BiPin.Update[ S, A ], BiPin[ S, A ]]
+      with evti.Root[ S, BiPin.Update[ S, A ]]
       {
          protected def reader : evt.Reader[ S, BiPin[ S, A ]] = serializer
          def slot: Int = 1
@@ -143,8 +143,8 @@ object BiPinImpl {
       }
 
       private object ElemChanged
-      extends evti.EventImpl[ S, BiPin.Element[ S, A ], BiPin[ S, A ]]
-      with evt.InvariantEvent[ S, BiPin.Element[ S, A ], BiPin[ S, A ]] {
+      extends evti.EventImpl[ S, BiPin.Update[ S, A ], BiPin[ S, A ]]
+      with evt.InvariantEvent[ S, BiPin.Update[ S, A ], BiPin[ S, A ]] {
          protected def reader : evt.Reader[ S, BiPin[ S, A ]] = serializer
          def slot: Int = 2
          def node: BiPin[ S, A ] with evt.Node[ S ] = pin
@@ -172,25 +172,26 @@ object BiPinImpl {
             elem.changed -/-> this
          }
 
-         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Element[ S, A ]] = {
-            val changes: IIdxSeq[ (Elem, ElemChange) ] = pull.parents( this ).flatMap( sel => {
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Update[ S, A ]] = {
+            val changes: IIdxSeq[ BiPin.Element[ S, A ]] = pull.parents( this ).flatMap( sel => {
                // wow... how does this get the event update type right I'm wondering... ?
                // UPDATE: ha! it doesn't. hell, this produces a runtime exception re Nothing??
                // --> fix: evt needs type ascription!!!
                val e    = sel.devirtualize[ ElemChange, Elem ]( BiExpr.serializer[ S, A ])
                val elem = e.node
-               e.pullUpdate( pull ).map( elem -> _ )
+               val opt: Option[ BiPin.Element[ S, A ]] = e.pullUpdate( pull ).map( BiPin.Element( elem, _ ))
+               opt
             })( breakOut )
 
             if( changes.isEmpty ) None else {
-               changes.foreach { case (elem, change) =>
+               changes.foreach { case BiPin.Element( elem, change ) =>
                   val (timeChange, _) = change.unzip
                   if( timeChange.isSignificant ) {
                      removeNoFire( timeChange.before, elem )
                      addNoFire(    timeChange.now,    elem )
                   }
                }
-               Some( BiPin.Element( pin, changes ))
+               Some( BiPin.Update( pin, changes ))
             }
          }
       }
@@ -216,9 +217,16 @@ object BiPinImpl {
 
 // XXX TODO: potential problem with event collapsing
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Update[ S, A ]] = {
-            if(      CollChanged.isSource( pull )) CollChanged.pullUpdate( pull )
-            else if( ElemChanged.isSource( pull )) ElemChanged.pullUpdate( pull )
-            else None
+            val collOpt = if( CollChanged.isSource( pull )) CollChanged.pullUpdate( pull ) else None
+            val elemOpt = if( ElemChanged.isSource( pull )) ElemChanged.pullUpdate( pull ) else None
+
+            (collOpt, elemOpt) match {
+               case (coll @ Some( _ ), None) => coll
+               case (None, elem @ Some( _ )) => elem
+               case (Some( BiPin.Update( _, coll )), Some( BiPin.Update( _, elem ))) =>
+                  Some( BiPin.Update( pin, coll ++ elem ))
+               case _                        => None
+            }
          }
 
          def react[ A1 >: BiPin.Update[ S, A ]]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiPin[ S, A ]] =
@@ -271,7 +279,7 @@ object BiPinImpl {
          if( isConnected ) {
 //            CollChanged += time
             ElemChanged += elem
-            CollChanged( BiPin.Added( pin, timeVal -> elem.magValue, elem ))
+            CollChanged( BiPin.Update( pin, IIdxSeq( BiPin.Added( timeVal -> elem.magValue, elem ))))
          }
       }
 
@@ -312,7 +320,7 @@ object BiPinImpl {
          if( visible && isConnected ) {
 //            CollChanged -= time
             ElemChanged -= elem
-            CollChanged( BiPin.Removed( pin, timeVal -> elem.magValue, elem ))
+            CollChanged( BiPin.Update( pin, IIdxSeq( BiPin.Removed( timeVal -> elem.magValue, elem ))))
          }
          found
       }

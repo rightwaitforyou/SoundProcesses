@@ -33,18 +33,19 @@ import evt.{EventLike, Sys}
 import stm.Disposable
 
 object BiPin {
-   sealed trait Update[ S <: Sys[ S ], A ] {
-      def pin: BiPin[ S, A ]
-   }
-   sealed trait Collection[ S <: Sys[ S ], A ] extends Update[ S, A ] {
+   final case class Update[ S <: Sys[ S ], A ]( pin: BiPin[ S, A ], changes: IIdxSeq[ Change[ S, A ]])
+
+   sealed trait Change[ S <: Sys[ S ], A ]
+
+   sealed trait Collection[ S <: Sys[ S ], A ] extends Change[ S, A ] {
       def value: (Long, A)
       def elem: BiExpr[ S, A ]
    }
-   final case class Added[   S <: Sys[ S ], A ]( pin: BiPin[ S, A ], value: (Long, A), elem: BiExpr[ S, A ]) extends Collection[ S, A ]
-   final case class Removed[ S <: Sys[ S ], A ]( pin: BiPin[ S, A ], value: (Long, A), elem: BiExpr[ S, A ]) extends Collection[ S, A ]
+   final case class Added[   S <: Sys[ S ], A ]( value: (Long, A), elem: BiExpr[ S, A ]) extends Collection[ S, A ]
+   final case class Removed[ S <: Sys[ S ], A ]( value: (Long, A), elem: BiExpr[ S, A ]) extends Collection[ S, A ]
 
-   final case class Element[ S <: Sys[ S ], A ]( pin: BiPin[ S, A ], changes: IIdxSeq[ (BiExpr[ S, A ], evt.Change[ (Long, A) ])])
-   extends Update[ S, A ]
+   final case class Element[ S <: Sys[ S ], A ]( elem: BiExpr[ S, A ], elemUpdate: evt.Change[ (Long, A) ])
+   extends Change[ S, A ]
 
    type Leaf[ S <: Sys[ S ], A ] = IIdxSeq[ BiExpr[ S, A ]]
 
