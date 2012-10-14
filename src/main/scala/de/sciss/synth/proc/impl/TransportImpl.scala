@@ -462,24 +462,27 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          }
       }
 
-      // adds the structure for a newly added scan, and also adds the current grapheme segment if applicable
+      // adds the structure for a newly added scan
+      // NOT: also adds the current grapheme segment if applicable
       private def u_addScan( state: GroupUpdateState, timed: TimedProc[ S ], key: String, sourceOpt: Option[ Scan.Link[ S ]])
                            ( implicit tx: S#Tx ) {
          sourceOpt match {
             case Some( Scan.Link.Grapheme( peer )) =>
 //               implicit val itx: I#Tx  = tx
                val newFrame            = state.info.frame
-               val ceilTime            = peer.segment( newFrame ) match {
-                  case Some( segm ) =>
-                     u_addSegment( state, timed, key, segm )
-                     segm.span match {
-                        case hs: Span.HasStop   => hs.stop
-                        case _                  => Long.MaxValue
-                     }
-                  case _ => peer.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
-               }
+//               val ceilTime            = peer.segment( newFrame ) match {
+//                  case Some( segm ) =>
+//// do _not_ add the segment
+////                     u_addSegment( state, timed, key, segm )
+//                     segm.span match {
+//                        case hs: Span.HasStop   => hs.stop
+//                        case _                  => Long.MaxValue
+//                     }
+//                  case _ => peer.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
+//               }
 
-               if( ceilTime != Long.MaxValue ) {
+               peer.nearestEventAfter( newFrame + 1 ).foreach { ceilTime =>
+//               if( ceilTime != Long.MaxValue ) {
                   peer.segment( ceilTime ).foreach { ceilSegm =>
                      assert( ceilSegm.span.start == ceilTime && ceilTime > newFrame )
                      u_addScan2( state, timed, key, ceilSegm )
@@ -490,6 +493,8 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          }
       }
 
+      // store a new scan connected to grapheme source in the stucture,
+      // given an already calculated segment
       private def u_addScan2( state: GroupUpdateState, timed: TimedProc[ S ], key: String, segm: DefSeg )
                             ( implicit tx: S#Tx ) {
          implicit val itx: I#Tx  = tx
@@ -552,6 +557,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          //                            filter only those AssociativeKeys which are ScanKeys.
          //                            track appearance or disappearence of graphemes as sources
          //                            of these scans, and update structures
+         // addendum: Meaning, _do not_ include segments in updates
 
          val p = timed.value
 
