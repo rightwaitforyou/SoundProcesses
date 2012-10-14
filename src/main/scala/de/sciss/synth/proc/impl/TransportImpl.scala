@@ -552,8 +552,8 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          }
       }
 
-      private def u_assocChange( state: GroupUpdateState, timed: TimedProc[ S ], added: Set[ Proc.AssociativeKey ],
-                                 removed: Set[ Proc.AssociativeKey ])( implicit tx: S#Tx ) {
+      private def u_assocChange( state: GroupUpdateState, timed: TimedProc[ S ], change: Proc.AssociativeChange )
+                               ( implicit tx: S#Tx ) {
          //        AssociativeChange : we need to track the addition and removal of scans.
          //                            filter only those AssociativeKeys which are ScanKeys.
          //                            track appearance or disappearence of graphemes as sources
@@ -562,14 +562,11 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
 
          val p = timed.value
 
-         added.foreach {
-            case Proc.ScanKey( key ) =>
+         change match {
+            case Proc.AssociationAdded( Proc.ScanKey( key )) =>
                p.scans.get( key ).foreach { scan => u_addScan( state, timed, key, scan.source )}
-            case _ =>
-         }
-
-         removed.foreach {
-            case Proc.ScanKey( key ) => u_removeScan( timed, key )
+            case Proc.AssociationRemoved( Proc.ScanKey( key )) =>
+               u_removeScan( timed, key )
             case _ =>
          }
       }
@@ -616,102 +613,97 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
       }
 
       private def biGroupUpdate( groupUpd: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
-//         implicit val itx: I#Tx = tx
-//         val state = {
-//            val info0      = infoVar.get
-//            val newFrame   = calcCurrentTime( info0 )
-//            // actualize logical time and frame, but do _not_ increment valid counter
-//            // (call `copy1` instead of `copy`; valid counter is incremented only if
-//            //  if info is written back to infoVar)
-//            val info1      = info0.copy1( cpuTime = logicalTime(), frame = newFrame )
-//            // info only needs to be written back to infoVar if it is != info0 at the end of the processing
-//            new GroupUpdateState( groupUpd.group, info1 )
-//         }
-//
-//         groupUpd match {
-//            case BiGroup.Added( _, span, timed ) =>
-//               u_addRemoveProcs( state, doFire = true, oldSpan = Span.Void, newSpan = span,
-//                                 procAdded = Some( timed ), procRemoved = None )
-//
-//            case BiGroup.Removed( _, span, timed ) =>
-//               u_addRemoveProcs( state, doFire = true, oldSpan = Span.Void, newSpan = span,
-//                                 procAdded = None, procRemoved = Some( timed ))
-//
-//            case BiGroup.Element( _, changes ) =>
-//               // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
-//               // ElementUpdate is either of Moved( change: evt.Change[ SpanLike ])
-//               //                         or Mutated[ U ]( change: U ) ; U = Proc.Update[ S ]
-//               // Mutated:
-//               // ... only process procs which are observed (found in timedMap)
-//               // ... first of all, the update is passed on as such. additional processing:
-//               // ... where each Proc.Update can be one of
-//               //     StateChange
-//               //        AssociativeChange : we need to track the addition and removal of scans.
-//               //                            filter only those AssociativeKeys which are ScanKeys.
-//               //                            track appearance or disappearence of graphemes as sources
-//               //                            of these scans, and update structures
-//               //        other StateChange : -
-//               //     ScanChange (carrying a Map[ String, Scan.Update[ S ]])
-//               //        ...where a Scan.Update is either of:
-//               //        SinkAdded, SinkRemoved : -
-//               //        SourceUpdate (passing on changes in a grapheme source) :
-//               //          - grapheme changes must then be tracked, structures updated
-//               //        SourceChanged : if it means a grapheme is connected or disconnect, update structures
-//               //     GraphemeChange : - (the grapheme is not interested, we only see them as sources of scans)
-//               //
-//               // Moved:
-//               // ... possible situations
-//               //     (1) old span contains current time frame `v`, but new span not --> treat as removal
-//               //     (2) old span does not contain `v`, but new span does --> treat as addition
-//               //     (3) neither old nor new span contain `v`
-//               //         --> info.span contains start point of either span? then recalc nextProcTime.
-//               //         (indeed we could call addRemoveProcs with empty lists for the procs, and a
-//               //          second span argument, which would be just Span.Void in the normal add/remove calls)
-//               //     (4) both old and new span contain `v`
-//               //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
-//
-//               changes.foreach { case (timed, elemUpd) =>
-//                  if( gMap.contains( timed.id )) elemUpd match {
-//                     case BiGroup.Mutated( procUpd ) =>
-//                        def forward( u: Proc.Update[ S ]) {
-//                           state.procChanged :+= timed -> ProcChanged( u )
-//                        }
-//                        procUpd match {
-//                           case assoc @ Proc.AssociativeChange( _, added, removed ) =>
-//                              forward( assoc )
-//                              u_assocChange( state, timed, added = added, removed = removed )
-//
-//                           case sc @ Proc.ScanChange( _, scanChanges ) =>
-//                              val fwd = scanChanges.filter {
-//                                 case (key, Scan.SourceUpdate( scan, graphUpd )) =>
-//                                    u_scanSourceUpdate( state, timed, key, scan, graphUpd )
-//                                    false // scan changes are filtered and prepared already by u_scanSourceUpdate
-//
-//                                 case (key, Scan.SourceChanged( scan, sourceOpt )) =>
-//                                    u_scanSourceChange( state, timed, key, scan, sourceOpt )
-//                                    true
-//
-//                                 case _ => true  // SinkAdded, SinkRemoved
-//                              }
-//                              if( fwd.nonEmpty ) forward( sc.copy( changes = fwd ))
-//
-//                           case other => // StateChange other than AssociativeChange, or GraphemeChange
-//                              forward( other )
-//                        }
-//                     case BiGroup.Moved( evt.Change( oldSpan, newSpan )) =>
-//                        u_moveProc( state, timed, oldSpan, newSpan )
-//                  }
-//               }
-//         }
-//
-//         if( state.shouldFire ) fire( state.advanceMessage )
-//         if( state.infoChanged ) {   // meaning that either nextProcTime or nextGraphemeTime changed
-//            val infoNew = state.info.incValid
-//            val isPly   = infoNew.isRunning
-//            infoVar.set( infoNew )
-//            if( isPly ) scheduleNext( infoNew )
-//         }
-         ???
+         implicit val itx: I#Tx = tx
+         val state = {
+            val info0      = infoVar.get
+            val newFrame   = calcCurrentTime( info0 )
+            // actualize logical time and frame, but do _not_ increment valid counter
+            // (call `copy1` instead of `copy`; valid counter is incremented only if
+            //  if info is written back to infoVar)
+            val info1      = info0.copy1( cpuTime = logicalTime(), frame = newFrame )
+            // info only needs to be written back to infoVar if it is != info0 at the end of the processing
+            new GroupUpdateState( groupUpd.group, info1 )
+         }
+
+         groupUpd.changes.foreach {
+            case BiGroup.Added( span, timed ) =>
+               u_addRemoveProcs( state, doFire = true, oldSpan = Span.Void, newSpan = span,
+                                 procAdded = Some( timed ), procRemoved = None )
+
+            case BiGroup.Removed( span, timed ) =>
+               u_addRemoveProcs( state, doFire = true, oldSpan = Span.Void, newSpan = span,
+                                 procAdded = None, procRemoved = Some( timed ))
+
+               // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
+               // ElementUpdate is either of Moved( change: evt.Change[ SpanLike ])
+               //                         or Mutated[ U ]( change: U ) ; U = Proc.Update[ S ]
+               // Mutated:
+               // ... only process procs which are observed (found in timedMap)
+               // ... first of all, the update is passed on as such. additional processing:
+               // ... where each Proc.Update can be one of
+               //     StateChange
+               //        AssociativeChange : we need to track the addition and removal of scans.
+               //                            filter only those AssociativeKeys which are ScanKeys.
+               //                            track appearance or disappearence of graphemes as sources
+               //                            of these scans, and update structures
+               //        other StateChange : -
+               //     ScanChange (carrying a Map[ String, Scan.Update[ S ]])
+               //        ...where a Scan.Update is either of:
+               //        SinkAdded, SinkRemoved : -
+               //        SourceUpdate (passing on changes in a grapheme source) :
+               //          - grapheme changes must then be tracked, structures updated
+               //        SourceChanged : if it means a grapheme is connected or disconnect, update structures
+               //     GraphemeChange : - (the grapheme is not interested, we only see them as sources of scans)
+               //
+               // Moved:
+               // ... possible situations
+               //     (1) old span contains current time frame `v`, but new span not --> treat as removal
+               //     (2) old span does not contain `v`, but new span does --> treat as addition
+               //     (3) neither old nor new span contain `v`
+               //         --> info.span contains start point of either span? then recalc nextProcTime.
+               //         (indeed we could call addRemoveProcs with empty lists for the procs, and a
+               //          second span argument, which would be just Span.Void in the normal add/remove calls)
+               //     (4) both old and new span contain `v`
+               //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
+
+            case BiGroup.ElementMutated( timed, procUpd ) =>
+               def forward( u: Proc.Change[ S ]) {
+                  ???
+//                  state.procChanged :+= timed -> ProcChanged( u )
+               }
+               if( gMap.contains( timed.id )) procUpd.changes.foreach {
+                  case assoc: Proc.AssociativeChange =>
+                     forward( assoc )
+                     u_assocChange( state, timed, assoc )
+
+                  case sc @ Proc.ScanChange( key, scanChange ) =>
+                     val fwd = scanChange match {
+                        case Scan.SourceUpdate( scan, graphUpd ) =>
+                           u_scanSourceUpdate( state, timed, key, scan, graphUpd )
+                           false // scan changes are filtered and prepared already by u_scanSourceUpdate
+
+                        case Scan.SourceChanged( scan, sourceOpt ) =>
+                           u_scanSourceChange( state, timed, key, scan, sourceOpt )
+                           true
+
+                        case _ => true  // SinkAdded, SinkRemoved
+                     }
+                     if( fwd ) forward( sc )
+
+                  case other => // StateChange other than AssociativeChange, or GraphemeChange
+                     forward( other )
+               }
+            case BiGroup.ElementMoved( timed, evt.Change( oldSpan, newSpan )) =>
+               if( gMap.contains( timed.id )) u_moveProc( state, timed, oldSpan, newSpan )
+         }
+
+         if( state.shouldFire ) fire( state.advanceMessage )
+         if( state.infoChanged ) {   // meaning that either nextProcTime or nextGraphemeTime changed
+            val infoNew = state.info.incValid
+            val isPly   = infoNew.isRunning
+            infoVar.set( infoNew )
+            if( isPly ) scheduleNext( infoNew )
+         }
       }
 
       final def dispose()( implicit tx: S#Tx ) {
