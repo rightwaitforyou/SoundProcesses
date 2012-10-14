@@ -20,6 +20,16 @@ private[proc] object UGenGraphBuilder {
 //   final case class Partial[ S <: Sys[ S ]]( missingScanIns: Set[ MissingIn[ S ]], advanced: Boolean )
 //   extends BuildResult[ S ]
 
+   /**
+    * An exception thrown when during incremental build an input is required for which the underlying source
+    * cannot yet be determined.
+    *
+    * This can be a case class because it is used only within the same transaction,
+    * and thereby the `timed` argument does not become stale.
+    *
+    * @param timed   the process which is the ''source'' of the required input
+    * @param key     the scan key in the source
+    */
    final case class MissingIn[ S <: Sys[ S ]]( timed: TimedProc[ S ], key: String ) extends ControlThrowable
 
    /**

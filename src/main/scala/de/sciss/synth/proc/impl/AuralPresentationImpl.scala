@@ -203,6 +203,11 @@ object AuralPresentationImpl {
       def id: S#ID = ugen.timed.id
    }
 
+   /*
+    * @param missingMap maps each missing input to a set of builders who requested that input
+    * @param idMap      map's timed-ids to aural proc builders
+    * @param seq        sequence of builders in the current transaction
+    */
    private final case class OngoingBuild[ S <: Sys[ S ]]( var missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
                                                             Map.empty[  MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
                                                           var idMap: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
@@ -389,6 +394,7 @@ object AuralPresentationImpl {
          builderMap.put( ugen.timed.id, builder )
 
          // if the last iteration did not complete the build process, store the missing in keys
+         // (since missingMap is a map and the values are sets, it is safe to re-add existing entries)
          if( !ugen.isComplete ) {
             var newMissing = ongoing.missingMap
             ugen.missingIns.foreach { miss =>
@@ -400,8 +406,8 @@ object AuralPresentationImpl {
          // if new scan outputs have been determined, find out whether other incomplete
          // processes depend on them, so that their building might be advanced
          val retry = if( newOuts.nonEmpty ) {
-            // the retried entries are those whose missing scan in corresponds
-            // to any of the newly determined scan outs
+            // the retried entries are those whose missing scan ins contain
+            // any of the newly determined scan outs
             val keys: Set[ MissingIn[ S ]] = newOuts.map({ case (key, _) => MissingIn( ugen.timed, key )})( breakOut )
             // divide missing map according to these keys
             val (retE, keep) = ongoing.missingMap.partition { case (key, _) => keys.contains( key )}
@@ -416,9 +422,6 @@ object AuralPresentationImpl {
             Set.empty[ AuralProcBuilder[ S ]]
          }
 
-//         // store the most recent version of the updated ongoing build information
-//         ongoingBuild.set( newOngoing3 )
-
          // advance the ugen graph builder for all processes which have been selected for retry
          retry.foreach( r => incrementalBuild( ongoing, r ))
       }
@@ -430,35 +433,12 @@ object AuralPresentationImpl {
                viewMap.remove( id )
                implicit val ptx = ProcTxn()( tx.peer )
                logConfig( "aural removed " + timed.value ) // + " -- playing? " + aural.playing )
-//               if( aural.playing ) {
-                  aural.stop()
-//               }
+               aural.stop()
+
             case _ =>
                println( "WARNING: could not find view for proc " + timed.value )
          }
       }
-
-//      def procRenamed( p: Proc[ S ], newName: String )( implicit tx: S#Tx ) {
-//         viewMap.get( p.id ) match {
-//            case Some( aural ) =>
-//               implicit val ptx = ProcTxn()( tx.peer )
-//               logConfig( "aural renamed " + p + " -- " + newName )
-//               aural.name = newName
-//            case _ =>
-//               println( "WARNING: could not find view for proc " + p )
-//         }
-//      }
-
-//      def procPlayingChanged( timed: TimedProc[ S ], newPlaying: Boolean )( implicit tx: S#Tx ) {
-//         viewMap.get( timed.id ) match {
-//            case Some( aural ) =>
-//               implicit val ptx = ProcTxn()( tx.peer )
-//               logConfig( "aural playing " + timed.value + " -- " + newPlaying )
-//               aural.playing_=( newPlaying )
-//            case _ =>
-//               println( "WARNING: could not find view for proc " + timed.value )
-//         }
-//      }
 
 //      def procGraphChanged( timed: TimedProc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ) {
 //         viewMap.get( timed.id ) match {
