@@ -215,7 +215,6 @@ object BiPinImpl {
             ElemChanged -/-> r
          }
 
-// XXX TODO: potential problem with event collapsing
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ BiPin.Update[ S, A ]] = {
             val collOpt = if( CollChanged.isSource( pull )) CollChanged.pullUpdate( pull ) else None
             val elemOpt = if( ElemChanged.isSource( pull )) ElemChanged.pullUpdate( pull ) else None

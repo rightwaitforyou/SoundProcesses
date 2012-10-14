@@ -34,26 +34,33 @@ import expr.{Expr, Type}
 import data.Iterator
 
 object BiGroup {
-   sealed trait Update[ S <: Sys[ S ], Elem, U ] {
-      def group: BiGroup[ S, Elem, U ]
-   }
-   sealed trait Collection[ S <: Sys[ S ], Elem, U ] extends Update[ S, Elem, U ] {
+   // ---- updates ----
+
+   final case class Update[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], changes: IIdxSeq[ Change[ S, Elem, U ]])
+
+   sealed trait Change[ S <: Sys[ S ], Elem, +U ]
+
+   sealed trait Collection[ S <: Sys[ S ], Elem ] extends Change[ S, Elem, Nothing ] {
       def elem: TimedElem[ S, Elem ]
       def span: SpanLike // Span.HasStart
    }
-   final case class Added[   S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike /* Span.HasStart */, elem: TimedElem[ S, Elem ])
-   extends Collection[ S, Elem, U ]
+   final case class Added[   S <: Sys[ S ], Elem ]( span: SpanLike /* Span.HasStart */, elem: TimedElem[ S, Elem ])
+   extends Collection[ S, Elem ]
 
-   final case class Removed[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ], span: SpanLike /* Span.HasStart */, elem: TimedElem[ S, Elem ])
-   extends Collection[ S, Elem, U ]
+   final case class Removed[ S <: Sys[ S ], Elem ]( span: SpanLike /* Span.HasStart */, elem: TimedElem[ S, Elem ])
+   extends Collection[ S, Elem ]
 
-   final case class Element[ S <: Sys[ S ], Elem, U ]( group: BiGroup[ S, Elem, U ],
-                                                       changes: IIdxSeq[ (TimedElem[ S, Elem ], ElementUpdate[ U ])])
-   extends Update[ S, Elem, U ]
+   sealed trait Element[ S <: Sys[ S ], Elem, +U ] extends Change[ S, Elem, U ] {
+      def elem: TimedElem[ S, Elem ]
+   }
 
-   sealed trait ElementUpdate[ +U ]
-   final case class Moved( change: evt.Change[ SpanLike ]) extends ElementUpdate[ Nothing ]
-   final case class Mutated[ U ]( change: U ) extends ElementUpdate[ U ]
+   final case class ElementMoved[ S <: Sys[ S ], Elem ]( elem: TimedElem[ S, Elem ], change: evt.Change[ SpanLike ])
+   extends Element[ S, Elem, Nothing ]
+
+   final case class ElementMutated[ S <: Sys[ S ], Elem, U ]( elem: TimedElem[ S, Elem ], change: U )
+   extends Element[ S, Elem, U ]
+
+   // ---- structural data ----
 
    type Leaf[ S <: Sys[ S ], Elem ] = (SpanLike /* Span.HasStart */, IIdxSeq[ TimedElem[ S, Elem ]])
 
@@ -208,9 +215,9 @@ trait BiGroup[ S <: Sys[ S ], Elem, U ] extends evt.Node[ S ] {
 
 //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
 
-   def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-   def elementChanged:     Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]]
-   def changed:            Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]]
+//   def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+//   def elementChanged:     Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]]
+   def changed: EventLike[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
 
    def debugList()( implicit tx: S#Tx ) : List[ (SpanLike, Elem) ]
 }
