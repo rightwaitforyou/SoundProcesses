@@ -208,13 +208,24 @@ object ProcImpl {
             StateEvent -/-> r
          }
 
-// XXX TODO: this is wrong. It means that when an event originated both from graphemes and scans,
-// the latter will be swallowed
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
-            if(      graphemes.isSource(  pull )) graphemes.pullUpdate(  pull )
-            else if( scans.isSource(      pull )) scans.pullUpdate(      pull )
-            else if( StateEvent.isSource( pull )) StateEvent.pullUpdate( pull )
-            else None
+            val graphOpt   = if( graphemes.isSource(  pull )) graphemes.pullUpdate(  pull ) else None
+            val scansOpt   = if( scans.isSource(      pull )) scans.pullUpdate(      pull ) else None
+            val stateOpt   = if( StateEvent.isSource( pull )) StateEvent.pullUpdate( pull ) else None
+
+            val seq0 = graphOpt match {
+               case Some( u ) => u.changes
+               case _         => IIdxSeq.empty
+            }
+            val seq1 = scansOpt match {
+               case Some( u ) => if( seq0.isEmpty ) u.changes else seq0 ++ u.changes
+               case _ => seq0
+            }
+            val seq2 = stateOpt match {
+               case Some( u ) => if( seq1.isEmpty ) u.changes else seq1 ++ u.changes
+               case _ => seq1
+            }
+            if( seq2.isEmpty ) None else Some( Proc.Update( proc, seq2 ))
          }
 
          def react[ A1 >: Proc.Update[ S ] ]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, Proc[ S ]] =

@@ -26,7 +26,7 @@ class TransportSpec extends ConfluentEventSpec {
    def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape )( implicit tx: S#Tx ) =
       Grapheme.Elem.Curve( amp -> shape )
 
-   ignore /* "Transport" */ should "notify observers about all relevant events" in { system =>
+   "Transport" should "notify observers about all relevant events" in { system =>
       val obs  = new Observation[ S ]
       val (pgH, t) = system.step { implicit tx =>
          val pg   = ProcGroup_.Modifiable[ S ]
@@ -111,7 +111,7 @@ class TransportSpec extends ConfluentEventSpec {
       }
    }
 
-   ignore should "handle process updates in a sensible way" in { system =>
+   it should "handle process updates in a sensible way" in { system =>
       val obs  = new Observation[ S ]
       val (pgH, t) = system.step { implicit tx =>
          val pg   = ProcGroup_.Modifiable[ S ]
@@ -140,8 +140,8 @@ class TransportSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-println( "PROC " + p1 + " WITH GRAPHEMES " + p1.graphemes + " AND SCANS " + p1.scans )
-println( "GRAPHEME " + g1 )
+//println( "PROC " + p1 + " WITH GRAPHEMES " + p1.graphemes + " AND SCANS " + p1.scans )
+//println( "GRAPHEME " + g1 )
 
          t.elapse( 0.1 )   // t now at 1000 frames
          val scan = p1.scans.add( "freq" )
@@ -149,15 +149,14 @@ println( "GRAPHEME " + g1 )
          scan.source_=( sourceOpt )
          // note: there will be separate Advance messages because there is no way to bundle them if they
          // originate from distinct actions (scans.add versus scan.source_=)
-// XXX
-//         obs.assertEquals(
-//            Advance( t, time = 1000L, isSeek = false, isPlaying = true, changes =
-//               IIdxSeq( pt1 -> ProcChanged(
-//                           Proc.AssociativeChange( p1, added = Set( Proc.ScanKey( "freq" )), removed = Set.empty )))),
-//            Advance( t, time = 1000L, isSeek = false, isPlaying = true, changes =
-//               IIdxSeq( pt1 -> ProcChanged(
-//                           Proc.ScanChange( p1, Map( "freq" -> Scan.SourceChanged( scan, sourceOpt ))))))
-//         )
+         obs.assertEquals(
+            Advance( t, time = 1000L, isSeek = false, isPlaying = true, changes =
+               IIdxSeq( pt1 -> ProcChanged(
+                           Proc.AssociationAdded( Proc.ScanKey( "freq" ))))),
+            Advance( t, time = 1000L, isSeek = false, isPlaying = true, changes =
+               IIdxSeq( pt1 -> ProcChanged(
+                           Proc.ScanChange( "freq", Scan.SourceChanged( scan, sourceOpt )))))
+         )
          obs.clear()
 
          g1.add( 6000L -> curve( 882.0 ))
