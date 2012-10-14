@@ -125,6 +125,10 @@ abstract class RichNode( val initOnline: Boolean ) /* extends RichObject */ {
       tx.add( node.setMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
+   final def setn( audible: Boolean, pairs: ControlSetMap* )( implicit tx: ProcTxn ) {
+      tx.add( node.setnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+   }
+
    final def setIfOnline( pairs: ControlSetMap* )( implicit tx: ProcTxn ) {
       // XXX eventually this should be like set with different failure resolution
       if( isOnline.get ) tx.add( node.setMsg( pairs: _* ), change = None, audible = true, noErrors = true )

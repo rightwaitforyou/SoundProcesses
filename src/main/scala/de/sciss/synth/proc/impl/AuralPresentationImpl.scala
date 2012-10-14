@@ -280,7 +280,13 @@ object AuralPresentationImpl {
                   segmOpt.foreach { // again if not found... stick with default
                      case const: Segment.Const =>
                         ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
-                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
+//                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
+                        val cKey = scan.inControlName( key )
+                        setMap :+= (if( const.numChannels == 1 ) {
+                           ControlSetMap.Single( cKey, const.values.head.toFloat )
+                        } else {
+                           ControlSetMap.Multi( cKey, const.values.map( _.toFloat ))
+                        })
 
                      case segm: Segment.Curve =>
                         ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
@@ -304,6 +310,8 @@ object AuralPresentationImpl {
 
          // wrap as AuralProc and save it in the identifier map for later lookup
          val aural = AuralProc( synth, outBuses, busUsers )
+         if( setMap.nonEmpty ) synth.set( audible = true, setMap: _* )
+         log( "launched " + synth )
          viewMap.put( builder.id, aural )
 
       }
