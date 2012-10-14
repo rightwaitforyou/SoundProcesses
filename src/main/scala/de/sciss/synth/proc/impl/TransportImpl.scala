@@ -668,8 +668,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
 
             case BiGroup.ElementMutated( timed, procUpd ) =>
                def forward( u: Proc.Change[ S ]) {
-                  ???
-//                  state.procChanged :+= timed -> ProcChanged( u )
+                  state.procChanged :+= timed -> ProcChanged( u )
                }
                if( gMap.contains( timed.id )) procUpd.changes.foreach {
                   case assoc: Proc.AssociativeChange =>

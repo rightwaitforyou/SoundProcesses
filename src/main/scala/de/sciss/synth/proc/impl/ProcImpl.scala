@@ -130,7 +130,9 @@ object ProcImpl {
          final protected def fire( added: Set[ String ], removed: Set[ String ])( implicit tx: S#Tx ) {
             val seqAdd: IIdxSeq[ Proc.StateChange ] = added.map(   key => Proc.AssociationAdded(   wrapKey( key )))( breakOut )
             val seqRem: IIdxSeq[ Proc.StateChange ] = removed.map( key => Proc.AssociationRemoved( wrapKey( key )))( breakOut )
-            val seq = if( seqAdd.isEmpty ) seqRem else if( seqRem.isEmpty ) seqAdd else seqAdd ++ seqRem
+            // convention: first the removals, then the additions. thus, overwriting a key yields
+            // successive removal and addition of the same key.
+            val seq = if( seqAdd.isEmpty ) seqRem else if( seqRem.isEmpty ) seqAdd else seqRem ++ seqAdd
 
             StateEvent( Proc.Update( proc, seq ))
          }

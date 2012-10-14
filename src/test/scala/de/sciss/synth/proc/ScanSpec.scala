@@ -36,16 +36,31 @@ class ScanSpec extends ConfluentEventSpec {
          p.graphemes.remove( "test" )
          p.graphemes.add( "gr", gr )
          val gr2 = Grapheme.Modifiable[ S ]
+//         p.graphemes.add( "gr", gr2 )
+//         gr.dispose()
+         obs.assertEquals(
+            Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.ScanKey( "amp" )))),
+//            Proc.AssociativeChange( p, added = Set( Proc.ScanKey( "amp"  )), removed = Set.empty ),
+            Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.ScanKey( "freq" )))),
+//            Proc.AssociativeChange( p, added = Set( Proc.ScanKey( "freq" )), removed = Set.empty ),
+            Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.ScanKey( "amp" )))),
+//            Proc.AssociativeChange( p, added = Set.empty, removed = Set( Proc.ScanKey( "amp" ))),
+            Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "test" )))),
+//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "test"  )), removed = Set.empty ),
+            Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "test" )))),
+//            Proc.AssociativeChange( p, added = Set.empty, removed = Set( Proc.GraphemeKey( "test" ))),
+            Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "gr" ))))
+//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set.empty ),
+//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set( Proc.GraphemeKey( "gr" )))
+         )
+         obs.clear()
+
          p.graphemes.add( "gr", gr2 )
          gr.dispose()
          obs.assertEquals(
-            Proc.AssociativeChange( p, added = Set( Proc.ScanKey( "amp"  )), removed = Set.empty ),
-            Proc.AssociativeChange( p, added = Set( Proc.ScanKey( "freq" )), removed = Set.empty ),
-            Proc.AssociativeChange( p, added = Set.empty, removed = Set( Proc.ScanKey( "amp" ))),
-            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "test"  )), removed = Set.empty ),
-            Proc.AssociativeChange( p, added = Set.empty, removed = Set( Proc.GraphemeKey( "test" ))),
-            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set.empty ),
-            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set( Proc.GraphemeKey( "gr" )))
+            Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "gr" )),
+                                     Proc.AssociationAdded(   Proc.GraphemeKey( "gr" ))))
+//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set( Proc.GraphemeKey( "gr" )))
          )
       }
 
@@ -59,25 +74,27 @@ class ScanSpec extends ConfluentEventSpec {
 
          gr.add( 0L, curve( 1234.0 ))                       // should be observed only directly through proc (but not scan)
          obs.assertEquals(
-            Proc.GraphemeChange( p, Map(
-               "gr" -> Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Const( Span.from( 0L ), IIdxSeq( 1234.0 ))))
-            ))
+            Proc.Update( p, IIdxSeq( Proc.GraphemeChange( "gr",
+               Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Const( Span.from( 0L ), IIdxSeq( 1234.0 ))))
+            )))
          )
          obs.clear()
 
          scan.source_=( Some( Scan.Link.Grapheme( gr )))    // should be observed
          obs.assertEquals(
-            Proc.ScanChange( p, Map( "freq" -> Scan.SourceChanged( scan, Some( Scan.Link.Grapheme( gr )))))
+            Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq",
+               Scan.SourceChanged( scan, Some( Scan.Link.Grapheme( gr )))
+            )))
          )
          obs.clear()
 
          gr.add( 2000L, curve( 5678.0 ))                    // ...
          obs.assertEquals(
-            Proc.ScanChange( p, Map( "freq" -> Scan.SourceUpdate( scan,
+            Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq", Scan.SourceUpdate( scan,
                Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Curve( Span( 0L, 2000L ), IIdxSeq( (1234.0, 5678.0, linShape) )),
                                              Grapheme.Segment.Const( Span.from( 2000L ), IIdxSeq( 5678.0 )))
                )
-            )))
+            ))))
          )
          obs.clear()
 
@@ -87,8 +104,8 @@ class ScanSpec extends ConfluentEventSpec {
          gr.add( timeVar, curve( ampVar ))                  // should not be observed
          scan.source_=( Some( Scan.Link.Grapheme( gr )))    // should be observed
          obs.assertEquals(
-            Proc.ScanChange( p, Map( "freq" -> Scan.SourceChanged( scan, None ))),
-            Proc.ScanChange( p, Map( "freq" -> Scan.SourceChanged( scan, Some( Scan.Link.Grapheme( gr )))))
+            Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq", Scan.SourceChanged( scan, None )))),
+            Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq", Scan.SourceChanged( scan, Some( Scan.Link.Grapheme( gr ))))))
          )
          obs.clear()
 
@@ -96,21 +113,21 @@ class ScanSpec extends ConfluentEventSpec {
          timeVar.set( 4000L )                               // ...
 //lucre.event.showLog = false
          obs.assertEquals(
-            Proc.ScanChange( p, Map( "freq" -> Scan.SourceUpdate( scan,
+            Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq", Scan.SourceUpdate( scan,
                Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Curve( Span( 2000L, 4000L ), IIdxSeq( (5678.0, 9876.0, linShape) )),
                                              Grapheme.Segment.Const( Span.from( 4000L ), IIdxSeq( 9876.0 )))
                )
-            )))
+            ))))
          )
          obs.clear()
 
          ampVar.set( 5432.0 )                             // ...
          obs.assertEquals(
-            Proc.ScanChange( p, Map( "freq" -> Scan.SourceUpdate( scan,
+            Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq", Scan.SourceUpdate( scan,
                Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Curve( Span( 2000L, 4000L ), IIdxSeq( (5678.0, 5432.0, linShape) )),
                                              Grapheme.Segment.Const( Span.from( 4000L ), IIdxSeq( 5432.0 )))
                )
-            )))
+            ))))
          )
          obs.clear()
       }
