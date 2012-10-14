@@ -46,8 +46,8 @@ object Proc {
       def proc: Proc[ S ]
    }
    sealed trait StateChange[ S <: Sys[ S ]] extends Update[ S ]
-   final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])             extends StateChange[ S ]
-   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ])         extends StateChange[ S ]
+   final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends StateChange[ S ]
+   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends StateChange[ S ]
 //   final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
 

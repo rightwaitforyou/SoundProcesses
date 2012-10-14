@@ -672,22 +672,30 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
                changes.foreach { case (timed, elemUpd) =>
                   if( gMap.contains( timed.id )) elemUpd match {
                      case BiGroup.Mutated( procUpd ) =>
-                        state.procChanged :+= timed -> Transport.Proc.Changed( procUpd )
+                        def forward( u: Proc.Update[ S ]) {
+                           state.procChanged :+= timed -> Transport.Proc.Changed( u )
+                        }
                         procUpd match {
                            case assoc @ Proc.AssociativeChange( _, added, removed ) =>
+                              forward( assoc )
                               u_assocChange( state, timed, added = added, removed = removed )
 
-                           case Proc.ScanChange( _, scanChanges ) =>
-                              scanChanges.foreach {
+                           case sc @ Proc.ScanChange( _, scanChanges ) =>
+                              val fwd = scanChanges.filter {
                                  case (key, Scan.SourceUpdate( scan, graphUpd )) =>
                                     u_scanSourceUpdate( state, timed, key, scan, graphUpd )
+                                    false // scan changes are filtered and prepared already by u_scanSourceUpdate
 
                                  case (key, Scan.SourceChanged( scan, sourceOpt )) =>
                                     u_scanSourceChange( state, timed, key, scan, sourceOpt )
+                                    true
 
-                                 case _ =>   // SinkAdded, SinkRemoved
+                                 case _ => true  // SinkAdded, SinkRemoved
                               }
-                           case _ => // StateChange other than AssociativeChange, or GraphemeChange
+                              if( fwd.nonEmpty ) forward( sc.copy( changes = fwd ))
+
+                           case other => // StateChange other than AssociativeChange, or GraphemeChange
+                              forward( other )
                         }
                      case BiGroup.Moved( evt.Change( oldSpan, newSpan )) =>
                         u_moveProc( state, timed, oldSpan, newSpan )
