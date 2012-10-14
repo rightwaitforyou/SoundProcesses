@@ -34,6 +34,8 @@ import bitemp.BiType
 import expr.Expr
 import data.SkipList
 import annotation.switch
+import collection.breakOut
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object ProcImpl {
    private final val SER_VERSION = 0
@@ -105,7 +107,7 @@ object ProcImpl {
          val old = graphVar.get
          if( old != g ) {
             graphVar.set( g )
-            StateEvent( GraphChange( this, evt.Change( old.value, g.value )))
+            StateEvent( Proc.Update( proc, IIdxSeq( GraphChange( evt.Change( old.value, g.value )))))
          }
       }
 
@@ -121,24 +123,29 @@ object ProcImpl {
       with evt.InvariantEvent[ S, OuterUpd, Proc[ S ]]
       with ProcEvent
       with impl.KeyMapImpl[ S, String, Value, ValueUpd ] {
-         protected def wrapKey( key: String ) : AssociativeKey
+         protected def wrapKey( key: String ) : Proc.AssociativeKey
 
          // ---- keymapimpl details ----
 
          final protected def fire( added: Set[ String ], removed: Set[ String ])( implicit tx: S#Tx ) {
-            StateEvent( Proc.AssociativeChange( proc, added   = added.map( wrapKey ), removed = removed.map( wrapKey )))
+            val seqAdd: IIdxSeq[ Proc.StateChange ] = added.map(   key => Proc.AssociationAdded(   wrapKey( key )))( breakOut )
+            val seqRem: IIdxSeq[ Proc.StateChange ] = removed.map( key => Proc.AssociationRemoved( wrapKey( key )))( breakOut )
+            val seq = if( seqAdd.isEmpty ) seqRem else if( seqRem.isEmpty ) seqAdd else seqAdd ++ seqRem
+
+            StateEvent( Proc.Update( proc, seq ))
          }
 
          final protected def isConnected( implicit tx: S#Tx ) : Boolean = proc.targets.nonEmpty
       }
 
       object graphemes extends Graphemes.Modifiable[ S ]
-      with KeyMap[ Grapheme[ S ], Grapheme.Update[ S ], Proc.GraphemeChange[ S ]] {
+      with KeyMap[ Grapheme[ S ], Grapheme.Update[ S ], Proc.Update[ S ]] {
          final val slot = 1
 
-         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.GraphemeChange[ S ]] = {
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
             val changes = foldUpdate( pull )
-            if( changes.isEmpty ) None else Some( Proc.GraphemeChange( proc, changes ))
+            if( changes.isEmpty ) None else Some( Proc.Update( proc,
+               changes.map({ case (key, u) => Proc.GraphemeChange( key, u )})( breakOut )))
          }
 
          protected def wrapKey( key: String ) = GraphemeKey( key )
@@ -149,7 +156,7 @@ object ProcImpl {
       }
 
       object scans extends Scans.Modifiable[ S ]
-      with KeyMap[ Scan[ S ], Scan.Update[ S ], Proc.ScanChange[ S ]] {
+      with KeyMap[ Scan[ S ], Scan.Update[ S ], Proc.Update[ S ]] {
          final val slot = 2
 
          protected def wrapKey( key: String ) = ScanKey( key )
@@ -160,9 +167,10 @@ object ProcImpl {
             scan
          }
 
-         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.ScanChange[ S ]] = {
+         def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
             val changes = foldUpdate( pull )
-            if( changes.isEmpty ) None else Some( Proc.ScanChange( proc, changes ))
+            if( changes.isEmpty ) None else Some( Proc.Update( proc,
+               changes.map({ case (key, u) => Proc.ScanChange( key, u )})( breakOut )))
          }
 
          protected def map: SkipList.Map[ S, String, Entry ] = scanMap
@@ -171,9 +179,9 @@ object ProcImpl {
       }
 
       private object StateEvent
-      extends evti.TriggerImpl[ S, Proc.StateChange[ S ], Proc[ S ]]
-      with evt.InvariantEvent[ S, Proc.StateChange[ S ], Proc[ S ]]
-      with evti.Root[ S, Proc.StateChange[ S ]]
+      extends evti.TriggerImpl[ S, Proc.Update[ S ], Proc[ S ]]
+      with evt.InvariantEvent[ S, Proc.Update[ S ], Proc[ S ]]
+      with evti.Root[ S, Proc.Update[ S ]]
       with ProcEvent {
          final val slot = 4
       }
@@ -230,7 +238,7 @@ object ProcImpl {
          case StateEvent.slot => StateEvent
       }
 
-      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
+//      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
       final def changed :      evt.Event[ S, Update[      S ], Proc[ S ]] = ChangeEvent
 
       final protected def writeData( out: DataOutput ) {

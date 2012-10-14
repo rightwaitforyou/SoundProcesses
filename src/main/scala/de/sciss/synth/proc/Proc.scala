@@ -30,6 +30,7 @@ import de.sciss.lucre.{event => evt, expr, DataInput}
 import expr.Expr
 import impl.{ProcImpl => Impl}
 import evt.Sys
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Proc {
    // ---- implementation forwards ----
@@ -42,21 +43,28 @@ object Proc {
 
    // ---- event types ----
 
-   sealed trait Update[ S <: Sys[ S ]] {
-      def proc: Proc[ S ]
-   }
-   sealed trait StateChange[ S <: Sys[ S ]] extends Update[ S ]
-   final case class Rename[ S <: Sys[ S ]](        proc: Proc[ S ], change: evt.Change[ String ])     extends StateChange[ S ]
-   final case class GraphChange[ S <: Sys[ S ]](   proc: Proc[ S ], change: evt.Change[ SynthGraph ]) extends StateChange[ S ]
+   final case class Update[ S <: Sys[ S ]]( proc: Proc[ S ], changes: IIdxSeq[ Change[ S ]])
+
+   sealed trait Change[ +S ]
+
+   sealed trait StateChange extends Change[ Nothing ]
+   final case class Rename( change: evt.Change[ String ]) extends StateChange
+   final case class GraphChange( change: evt.Change[ SynthGraph ]) extends StateChange
 //   final case class PlayingChange[ S <: Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
 //   final case class FreqChange[ S <: Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
 
-   final case class AssociativeChange[ S <: Sys[ S ]]( proc: Proc[ S ], added:   Set[ AssociativeKey ],
-                                                                        removed: Set[ AssociativeKey ]) extends StateChange[ S ] {
-      override def toString = "AssociativeChange(" + proc +
-         (if( added.isEmpty ) "" else ", added = " + added.mkString( ", " )) +
-         (if( removed.isEmpty) "" else ", removed = " + removed.mkString( ", " )) + ")"
-   }
+   sealed trait AssociativeChange extends StateChange { def key: AssociativeKey  }
+   final case class AssociationAdded( key: AssociativeKey ) extends AssociativeChange
+   final case class AssociationRemoved( key: AssociativeKey ) extends AssociativeChange
+//   final case class GraphemeAdded( name: String ) extends AssociativeChange
+//   final case class GraphemeRemoved( name: String ) extends AssociativeChange
+
+//   final case class AssociativeChange[ S <: Sys[ S ]]( proc: Proc[ S ], added:   Set[ AssociativeKey ],
+//                                                                        removed: Set[ AssociativeKey ]) extends StateChange[ S ] {
+//      override def toString = "AssociativeChange(" + proc +
+//         (if( added.isEmpty ) "" else ", added = " + added.mkString( ", " )) +
+//         (if( removed.isEmpty) "" else ", removed = " + removed.mkString( ", " )) + ")"
+//   }
    sealed trait AssociativeKey { def name: String }
    final case class ScanKey(     name: String ) extends AssociativeKey {
       override def toString = "[scan: " + name + "]"
@@ -74,11 +82,11 @@ object Proc {
 //      override def toString = "GraphemeChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
 //   }
 
-   final case class ScanChange[     S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, Scan.Update[ S ]]) extends Update[ S ] {
-      override def toString = "ScanChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2 ).mkString( "(" + ", " + ")" ) + ")"
+   final case class ScanChange[ S <: Sys[ S ]]( key: String, scanUpdate: Scan.Update[ S ]) extends Change[ S ] {
+      override def toString = "ScanChange(" + key + ", " + scanUpdate + ")"
    }
-   final case class GraphemeChange[ S <: Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, Grapheme.Update[ S ]]) extends Update[ S ] {
-      override def toString = "GraphemeChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2 ).mkString( "(" + ", " + ")" ) + ")"
+   final case class GraphemeChange[ S <: Sys[ S ]]( key: String, graphemeUpdate: Grapheme.Update[ S ]) extends Change[ S ] {
+      override def toString = "GraphemeChange(" + key + ", " + graphemeUpdate + ")"
    }
 }
 trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
@@ -117,7 +125,7 @@ trait Proc[ S <: Sys[ S ]] extends evt.Node[ S ] {
 
    // ---- events ----
 
-   def stateChanged:    evt.Event[ S, StateChange[ S ],  Proc[ S ]]
+//   def stateChanged:    evt.Event[ S, StateChange[ S ],  Proc[ S ]]
 //   def graphChanged:    evt.Event[ S, GraphChange[ S ],    Proc[ S ]]
 //   def playingChanged:  evt.Event[ S, PlayingChange[ S ],  Proc[ S ]]
 //   def paramChanged:    evt.Event[ S, ParamChange[ S ],    Proc[ S ]]
