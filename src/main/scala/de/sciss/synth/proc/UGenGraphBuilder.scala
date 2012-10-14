@@ -70,7 +70,7 @@ private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
    def tx: S#Tx
 
    /**
-    * Builds or continuous to build the ugen graph. Since the builder is mutable, `tryBuild` should be called
+    * Builds or continues to build the ugen graph. Since the builder is mutable, `tryBuild` should be called
     * repeatably on the same object as long as a `false` result is obtained, until either the transaction is aborted,
     * or a `true` result is obtained.
     *

@@ -107,6 +107,9 @@ trait Transport[ S <: Sys[ S ], Elem, U ] extends Disposable[ S#Tx ] /* evt.Node
 
    def sampleRate: Double
 
+   /**
+    * Iterator over all processes which intersect with the current time.
+    */
    def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])]
 //
 //   def group: BiGroup[ S, Elem, U ]

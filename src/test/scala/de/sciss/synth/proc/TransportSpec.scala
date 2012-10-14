@@ -193,7 +193,7 @@ class TransportSpec extends ConfluentEventSpec {
 //val _o = _e.react( _ => () )
 //_o.dispose()
 
-         // since g1 is part of p1.graphemes, first of all there should be a ProcChnaged with underlying
+         // since g1 is part of p1.graphemes, first of all there should be a ProcChanged with underlying
          // GraphemeChange. secondly, because it is connected to the freq-scan and overlaps the current time,
          // there should be a GraphemesChanged as well
          val elem: BiExpr[ S, Grapheme.Value ] = 1000L -> curve( 441.0 )

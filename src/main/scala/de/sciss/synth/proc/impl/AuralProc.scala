@@ -28,7 +28,6 @@ package proc
 package impl
 
 import concurrent.stm.Ref
-import collection.breakOut
 
 object AuralProc {
 //   implicit object Serializer extends stm.Serializer[ AuralProc ] {

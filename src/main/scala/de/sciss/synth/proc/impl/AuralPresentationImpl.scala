@@ -75,29 +75,18 @@ object AuralPresentationImpl {
             val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ] = tx.newInMemoryIDMap[ AuralProc ]
             val booted  = new RunningImpl( server, viewMap )
             ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
-//            val transport: ProcTransport[ S ] = ??? // = tx.refresh( csrPos, transportStale )
             transport.react { x => println( "Aural observation: " + x )}
             if( transport.isPlaying ) {
                implicit val chr: Chronos[ S ] = transport
                transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
-//               val it = transport.iterator
-//               if( it.nonEmpty ) {
-//                  val timed = it.collect({ case (_, pt) if pt.value.playing.value => pt })
-//                  timed.foreach( booted.procAdded )
-//               }
             }
             transport.reactTx { implicit tx => {
-               case Transport.Advance( tr, isSeek, true, time, added, removed, params ) =>
+               case Transport.Advance( tr, isSeek, true, time, added, removed, changes ) =>
                   implicit val chr: Chronos[ S ] = tr
 //println( "AQUI: added = " + added + "; removed = " + removed )
-                  removed.foreach { timed => booted.procRemoved( timed )}
-                  ???
-//                  params.foreach  { case (timed, m) => booted.procParamsChanged( timed, m )}
-                  added.foreach   { timed => booted.procAdded( timed )}
-//                  if( added.nonEmpty ) {
-//                     val timed = added.collect { case (_, pt) if pt.value.playing.value => pt }
-//                     booted.procsAdded( timed )
-//                  }
+                  removed.foreach { timed             => booted.procRemoved( timed )}
+                  changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
+                  added.foreach   { timed             => booted.procAdded( timed )}
                case _ =>
             }}
             booted
@@ -204,8 +193,8 @@ object AuralPresentationImpl {
       }
    }
 */
-   private final class AuralProcBuilder[ S <: Sys[ S ]]( val ugen: UGenGraphBuilder[ S ],
-                                                         var outBuses: Map[ String, RichAudioBus ]) {
+   private final class AuralProcBuilder[ S <: Sys[ S ]]( val ugen: UGenGraphBuilder[ S ]) {
+      var outBuses: Map[ String, RichAudioBus ] = Map.empty
 //      def finish : AuralProc = {
 //         val ug = ugen.finish
 //         AuralProc()
@@ -222,6 +211,11 @@ object AuralPresentationImpl {
 
    private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ])
    extends AuralPresentation.Running[ S ] {
+      // ongoingBuild is a transaction local field storing a mutable object. This is
+      // totally fine since a transaction is not shared across threads. the idea is
+      // that a fresh object is retrieved for each new transaction. If it is touched,
+      // a beforeCommit hook is invoked before the transaction successfully completes,
+      // building the unfinished aural procs if possible.
       private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
          TxnLocal( init = OngoingBuild(), beforeCommit = beforeCommit ) //  Map.empty[ MissingIn[ S ], UGenGraphBuilder[ S ]]))
 
@@ -318,25 +312,17 @@ object AuralPresentationImpl {
          }
       }
 
-      private def getBusNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
-         val bus = getBus( timed, key ).getOrElse( throw MissingIn( timed, key ))
-         bus.numChannels
-      }
+//      private def getBusNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
+//         val bus = getBus( timed, key ).getOrElse( throw MissingIn( timed, key ))
+//         bus.numChannels
+//      }
 
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
          // XXX TODO: since we are only interested in the number of channels at this point,
          // we might add a more efficient method to `Scans`
          timed.value.graphemes.get( key ).flatMap( _.valueAt( time )) match {
-            case Some( value ) =>
-               value.numChannels
-//               import Grapheme.Value._
-//               value match {
-//                  case MonoConst( _ )                 => 1
-//                  case MonoSegment( _, _, _, _ )      => 1
-//                  case Source                         => getBusNumChannels( timed, key )
-//                  case Sink( sourceTimed, sourceKey ) => getBusNumChannels( sourceTimed, sourceKey )
-//               }
-            case _ => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
+            case Some( value )   => value.numChannels
+            case _               => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
          }
       }
 
@@ -344,30 +330,16 @@ object AuralPresentationImpl {
          viewMap.dispose()
       }
 
-//      def procsAdded( timed: IIdxSeq[ TimedProc[ S ]])( implicit tx: S#Tx, chr: Chronos[ S ]) {
-//         timed.foreach( procAdded )
-//      }
-
       def procAdded( timed: TimedProc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
          val p       = timed.value
-//         val playing = p.playing.value
-//         if( !playing ) return
-
          val time    = chr.time
-//         val graph   = p.graph.value
-//
-//         val entries = Map.empty[ String, Double ] // XXX TODO p.par.entriesAt( chr.time )
-//         val aural   = AuralProc( server, /* name, */ graph, entries )
-//         viewMap.put( timed.id, aural )
          logConfig( "aural added " + p ) // + " -- playing? " + playing )
-//         if( playing ) {
-            buildAuralProc( timed, time )
-//         }
+         buildAuralProc( timed, time )
       }
 
       private def buildAuralProc( timed: TimedProc[ S ], time: Long )( implicit tx: S#Tx ) {
          val ugen      = UGenGraphBuilder( this, timed, time )
-         val builder   = new AuralProcBuilder( ugen, Map.empty )
+         val builder   = new AuralProcBuilder( ugen )
          val ongoing   = ongoingBuild.get( tx.peer )
          ongoing.seq :+= builder
          incrementalBuild( ongoing, builder )
@@ -389,7 +361,8 @@ object AuralPresentationImpl {
          ugen.tryBuild()
 
          // detect which new scan outputs have been determined in the last iteration
-         val newOuts    = builder.ugen.scanOuts.filterNot { case (key, _) => builder.outBuses.contains( key )}
+         // (newOuts is a map from `name: String` to `numChannels Int`)
+         val newOuts    = ugen.scanOuts.filterNot { case (key, _) => builder.outBuses.contains( key )}
          // if there were any, create rich audio buses for them, and store them in the builder's bus map.
          //    note that these buses initially do not have any real resources allocated, so it's safe to
          //    forget about them and have them gc'ed if the process does not complete by the end of the txn.
@@ -498,7 +471,7 @@ object AuralPresentationImpl {
 //         }
 //      }
 
-      def procParamsChanged( timed: TimedProc[ S ], changes: Map[ String, Param ])( implicit tx: S#Tx ) {
+      def procUpdated( timed: TimedProc[ S ], change: Transport.Proc.Update[ S ])( implicit tx: S#Tx ) {
 //         viewMap.get( timed.id ) match {
 //            case Some( aural ) =>
 //               implicit val ptx = ProcTxn()( tx.peer )

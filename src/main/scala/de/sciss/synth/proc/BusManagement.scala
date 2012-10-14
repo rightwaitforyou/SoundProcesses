@@ -217,7 +217,7 @@ object RichBus {
          if( verbose ) println( bus.toString + ".alloc -> " + useCount.get )
       }
 
-      final def free( implicit tx: ProcTxn ) {
+      final def free()( implicit tx: ProcTxn ) {
          implicit val itx = tx.peer
          val cnt = useCount.get - 1
          if( verbose ) println( bus.toString + ".free -> " + cnt )
@@ -353,14 +353,14 @@ object RichBus {
                val newBus     = new AudioBus( server, res.index, numChannels )
                val oldHolder  = bus.swap( res )
                rs.foreach { r =>
-                  oldHolder.free
+                  oldHolder.free()
                   r.busChanged( newBus )
-                  res.alloc
+                  res.alloc()
                }
                ws.foreach { w =>
-                  oldHolder.free
+                  oldHolder.free()
                   w.busChanged( newBus )
-                  res.alloc
+                  res.alloc()
                }
 //println( "addReader : " + this + " ; allocAudioBus " + res )
                res
@@ -374,7 +374,7 @@ object RichBus {
          readers.set( rs + u )
          // always perform this on the newly added
          // reader no matter if the bus is new:
-         bh.alloc
+         bh.alloc()
          val newBus = new AudioBus( server, bh.index, numChannels )
          u.busChanged( newBus )
       }
@@ -394,14 +394,14 @@ object RichBus {
                val newBus     = new AudioBus( server, res.index, numChannels )
                val oldHolder  = bus.swap( res )
                rs foreach { r =>
-                  oldHolder.free
+                  oldHolder.free()
                   r.busChanged( newBus )
-                  res.alloc
+                  res.alloc()
                }
                ws foreach { w =>
-                  oldHolder.free
+                  oldHolder.free()
                   w.busChanged( newBus )
-                  res.alloc
+                  res.alloc()
                }
                res
             }
@@ -411,7 +411,7 @@ object RichBus {
          writers.set( ws + u )
          // always perform this on the newly added
          // reader no matter if the bus is new:
-         bh.alloc
+         bh.alloc()
          val newBus = new AudioBus( server, bh.index, numChannels )
          u.busChanged( newBus )
       }
@@ -423,7 +423,7 @@ object RichBus {
          val rs         = rs0 - u
          readers.set( rs )
          val oldHolder  = bus()
-         oldHolder.free
+         oldHolder.free()
          if( rs.isEmpty ) {
             val ws = writers()
             if( ws.nonEmpty ) { // they can all go to write only
@@ -431,9 +431,9 @@ object RichBus {
                bus.set( bh )
                val newBus = new AudioBus( server, bh.index, numChannels )
                ws foreach { w =>
-                  oldHolder.free
+                  oldHolder.free()
                   w.busChanged( newBus )
-                  bh.alloc
+                  bh.alloc()
                }
             }
          }
@@ -446,7 +446,7 @@ object RichBus {
          val ws         = ws0 - u
          writers.set( ws )
          val oldHolder  = bus.get
-         oldHolder.free
+         oldHolder.free()
          if( ws.isEmpty ) {
             val rs = readers.get
             if( rs.nonEmpty ) { // they can all go to write only
@@ -454,9 +454,9 @@ object RichBus {
                bus.set( bh )
                val newBus = new AudioBus( server, bh.index, numChannels )
                rs foreach { r =>
-                  oldHolder.free
+                  oldHolder.free()
                   r.busChanged( newBus )
-                  bh.alloc
+                  bh.alloc()
                }
             }
          }
@@ -490,7 +490,7 @@ object RichBus {
          users.set( us + u )
          // always perform this on the newly added
          // reader no matter if the bus is new:
-         bh.alloc
+         bh.alloc()
          val newBus = new AudioBus( server, bh.index, numChannels )
          u.busChanged( newBus )
       }
@@ -503,7 +503,7 @@ object RichBus {
          val rw = users.get
          if( !rw.contains( u )) return
          users.set( rw - u )
-         bus.get.free
+         bus.get.free()
       }
    }
 
@@ -543,7 +543,7 @@ object RichBus {
          users.set( us + u )
          // always perform this on the newly added
          // reader no matter if the bus is new:
-         bh.alloc
+         bh.alloc()
          val newBus = new ControlBus( server, bh.index, numChannels )
          u.busChanged( newBus )
       }
@@ -556,7 +556,7 @@ object RichBus {
          val rw = users.get
          if( !rw.contains( u )) return
          users.set( rw - u )
-         bus.get.free
+         bus.get.free()
       }
    }
 }
