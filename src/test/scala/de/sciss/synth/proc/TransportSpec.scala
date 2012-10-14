@@ -3,7 +3,7 @@ package synth
 package proc
 
 import lucre.{bitemp, stm, expr}
-import bitemp.Span
+import bitemp.{BiExpr, Span}
 import expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
@@ -140,6 +140,9 @@ class TransportSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
+println( "PROC " + p1 + " WITH GRAPHEMES " + p1.graphemes + " AND SCANS " + p1.scans )
+println( "GRAPHEME " + g1 )
+
          t.elapse( 0.1 )   // t now at 1000 frames
          val scan = p1.scans.add( "freq" )
          val sourceOpt = Some( Scan.Link.Grapheme( g1 ))
@@ -176,18 +179,25 @@ class TransportSpec extends ConfluentEventSpec {
          obs.clear()
 
 // XXX TODO: the following causes p1.scans to disconnect ???
-//         p1.scans.remove( "egal" )
-//         obs.assertEquals(
-//            a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
-//               Proc.AssociativeChange( p1, added = Set.empty, removed = Set( Proc.ScanKey( "egal" ))))))
-//         )
-//         obs.clear()
+         p1.scans.remove( "egal" )
+         obs.assertEquals(
+            a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
+               Proc.AssociativeChange( p1, added = Set.empty, removed = Set( Proc.ScanKey( "egal" ))))))
+         )
+         obs.clear()
+//println( "NOW SCANS KEYS = " + p1.scans.keys )
+//val _o = p1.scans.get( "freq" ).get.changed.react( _ => () )
+//_o.dispose()
+//val _e = g1.changed
+//val _o = _e.react( _ => () )
+//_o.dispose()
 
          // since g1 is part of p1.graphemes, first of all there should be a ProcChnaged with underlying
          // GraphemeChange. secondly, because it is connected to the freq-scan and overlaps the current time,
          // there should be a GraphemesChanged as well
 lucre.event.showLog = true
-         g1.add( 1000L -> curve( 441.0 ))
+         val elem: BiExpr[ S, Grapheme.Value ] = 1000L -> curve( 441.0 )
+         g1.add( elem )
 lucre.event.showLog = false
          val segm = Segment.Curve( Span( 1000L, 6000L ), IIdxSeq( (441.0, 882.0, linShape) ))
          obs.assertEquals(

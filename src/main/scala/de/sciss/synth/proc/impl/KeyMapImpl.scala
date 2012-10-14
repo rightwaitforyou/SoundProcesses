@@ -129,7 +129,7 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
       }
       if( con ) {
          this += n
-         fire( Set( key ), setRemoved )
+         fire( added = Set( key ), removed = setRemoved )
       }
    }
 
@@ -139,7 +139,7 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
             val con = isConnected
             if( con ) {
                this -= oldNode
-               fire( Set.empty, Set( key ))
+               fire( added = Set.empty, removed = Set( key ))
             }
             true
 
@@ -148,17 +148,21 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
    }
 
    @inline private def +=( entry: Entry )( implicit tx: S#Tx ) {
+println( "KEY MAP " + this + " ADD ENTRY " + entry )
       entry ---> this
    }
 
    @inline private def -=( entry: Entry )( implicit tx: S#Tx ) {
+println( "KEY MAP " + this + " REMOVE ENTRY " + entry )
       entry -/-> this
    }
 
    final def connect()( implicit tx: S#Tx ) {
+println( "KEY MAP " + this + " CONNECT" )
       map.iterator.foreach { case (_, node) => this += node }
    }
    final def disconnect()( implicit tx: S#Tx ) {
+println( "KEY MAP " + this + " DISCONNECT" )
       map.iterator.foreach { case (_, node) => this -= node }
    }
 
