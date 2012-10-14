@@ -38,7 +38,7 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.add( tup1 )
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
-            BiPin.Added[ S, Int ]( bip, tup1, tup1 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup1, tup1 )))
          )
          obs.clear()
          assert( bip.valueAt( tup1._1 - 1 ) === None )
@@ -48,7 +48,7 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.add( tup2 )
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 5000L, 10000L ) -> (2: IntEx) ))
-            BiPin.Added[ S, Int ]( bip, tup2, tup2 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup2, tup2 )))
          )
          obs.clear()
 
@@ -58,14 +58,14 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
 //                                            Span.from( 15000L ) -> (3: IntEx) ))
-            BiPin.Added[ S, Int ]( bip, tup3, tup3 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup3, tup3 )))
          )
          obs.clear()
 
          bip.add( tup4 )
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (4: IntEx) ))
-            BiPin.Added[ S, Int ]( bip, tup4, tup4 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup4, tup4 )))
          )
          obs.clear()
 
@@ -80,8 +80,8 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (5: IntEx) )),
 //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (6: IntEx) ))
-            BiPin.Added[ S, Int ]( bip, tup5, tup5 ),
-            BiPin.Added[ S, Int ]( bip, tup6, tup6 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup5, tup5 ))),
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup6, tup6 )))
          )
          obs.clear()
       }
@@ -100,7 +100,7 @@ class BiPinSpec extends ConfluentEventSpec {
          // tup5 removal not noticable!
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (3: IntEx) ))
-            BiPin.Removed[ S, Int ]( bip, tup6, tup6 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup6, tup6 )))
          )
          obs.clear()
 
@@ -112,7 +112,7 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.remove( tup3 )
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (1: IntEx) ))
-            BiPin.Removed[ S, Int ]( bip, tup3, tup3 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup3, tup3 )))
          )
          obs.clear()
          assert( bip.valueAt( tup3._1 ) === Some( tup1._2 ))
@@ -120,7 +120,7 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.remove( tup4 )
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
-            BiPin.Removed[ S, Int ]( bip, tup4, tup4 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup4, tup4 )))
          )
          obs.clear()
 
@@ -128,8 +128,8 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.remove( tup1 )
 //         obs.assertEmpty()
          obs.assertEquals(
-            BiPin.Removed[ S, Int ]( bip, tup2, tup2 ),
-            BiPin.Removed[ S, Int ]( bip, tup1, tup1 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup2, tup2 ))),
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup1, tup1 )))
          )
          obs.clear()
 
@@ -175,8 +175,8 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span.from(     0L ) -> (1: IntEx) )),
 //            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (2: IntEx) ))
-            BiPin.Added[ S, Int ]( bip, tup1, tup1 ),
-            BiPin.Added[ S, Int ]( bip, tup2, tup2 )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup1, tup1 ))),
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup2, tup2 )))
          )
          obs.clear()
 
@@ -188,8 +188,8 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (3: IntEx) )),
 //            BiPin.Collection( bip, IIdxSeq( Span.from( 30000L ) -> expr ))
-            BiPin.Added[ S, Int ]( bip, 10000L -> 3, time ),
-            BiPin.Added[ S, Int ]( bip, 30000L -> 4, expr )
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( 10000L -> 3, time ))),
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( 30000L -> 4, expr )))
          )
          obs.clear()
       }
@@ -204,7 +204,7 @@ class BiPinSpec extends ConfluentEventSpec {
          exprVar.set( 5 )
          obs.assertEquals(
 //            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
-            BiPin.Element[ S, Int ]( bip, IIdxSeq( expr -> Change( 30000L -> 4, 30000L -> 5 )))
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( expr, Change( 30000L -> 4, 30000L -> 5 ))))
          )
          obs.clear()
 
@@ -217,7 +217,7 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span(     0L, 15000L ) -> (1: IntEx),
 //                                            Span( 15000L, 20000L ) -> (3: IntEx) ))
-            BiPin.Element[ S, Int ]( bip, IIdxSeq( time -> Change( 10000L -> 3, 15000L -> 3 )))
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( 10000L -> 3, 15000L -> 3 ))))
          )
          obs.clear()
 
@@ -227,14 +227,14 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span(     0L, 20000L ) -> (1: IntEx),
 //                                            Span( -5000L,     0L ) -> (3: IntEx) ))
-            BiPin.Element[ S, Int ]( bip, IIdxSeq( time -> Change( 15000L -> 3, -5000L -> 3 )))
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( 15000L -> 3, -5000L -> 3 ))))
          )
          obs.clear()
 
          timeVar.set( 25000L ) // the region -5000 ... 0 is 'swallowed' (NO: OBSOLETE)
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
-            BiPin.Element[ S, Int ]( bip, IIdxSeq( time -> Change( -5000L -> 3, 25000L -> 3 )))
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( -5000L -> 3, 25000L -> 3 ))))
          )
          obs.clear()
 
@@ -242,14 +242,14 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
 //                                            Span.from( 35000L )    -> (3: IntEx) ))
-            BiPin.Element[ S, Int ]( bip, IIdxSeq( time -> Change( 25000L -> 3, 35000L -> 3 )))
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( 25000L -> 3, 35000L -> 3 ))))
          )
          obs.clear()
 
          exprVar.set( 6 )
          obs.assertEquals(
 //            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
-            BiPin.Element[ S, Int ]( bip, IIdxSeq( expr -> Change( 30000L -> 5, 30000L -> 6 )))
+            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( expr, Change( 30000L -> 5, 30000L -> 6 ))))
          )
          obs.clear()
 

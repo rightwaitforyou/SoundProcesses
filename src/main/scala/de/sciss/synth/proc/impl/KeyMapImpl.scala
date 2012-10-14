@@ -148,21 +148,21 @@ trait KeyMapImpl[ S <: Sys[ S ], Key, Value, ValueUpd ] {
    }
 
    @inline private def +=( entry: Entry )( implicit tx: S#Tx ) {
-println( "KEY MAP " + this + " ADD ENTRY " + entry )
+//println( "KEY MAP " + this + " ADD ENTRY " + entry )
       entry ---> this
    }
 
    @inline private def -=( entry: Entry )( implicit tx: S#Tx ) {
-println( "KEY MAP " + this + " REMOVE ENTRY " + entry )
+//println( "KEY MAP " + this + " REMOVE ENTRY " + entry )
       entry -/-> this
    }
 
    final def connect()( implicit tx: S#Tx ) {
-println( "KEY MAP " + this + " CONNECT" )
+//println( "KEY MAP " + this + " CONNECT" )
       map.iterator.foreach { case (_, node) => this += node }
    }
    final def disconnect()( implicit tx: S#Tx ) {
-println( "KEY MAP " + this + " DISCONNECT" )
+//println( "KEY MAP " + this + " DISCONNECT" )
       map.iterator.foreach { case (_, node) => this -= node }
    }
 

@@ -10,7 +10,7 @@ import expr.Expr
  * test-only de.sciss.lucre.bitemp.BiPinSerializationSpec
  */
 class BiPinSerializationSpec extends ConfluentEventSpec {
-   confluent.showLog = true
+//   confluent.showLog = true
 
    "BiPin" should "serialize and deserialize" in { system =>
       val bipH = system.step { implicit tx =>

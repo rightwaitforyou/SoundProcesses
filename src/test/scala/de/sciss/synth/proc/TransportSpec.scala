@@ -179,7 +179,7 @@ println( "GRAPHEME " + g1 )
          obs.clear()
 
 // XXX TODO: the following causes p1.scans to disconnect ???
-lucre.event.showLog = true
+//lucre.event.showLog = true
          p1.scans.remove( "egal" )
          obs.assertEquals(
             a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
@@ -198,7 +198,7 @@ lucre.event.showLog = true
          // there should be a GraphemesChanged as well
          val elem: BiExpr[ S, Grapheme.Value ] = 1000L -> curve( 441.0 )
          g1.add( elem )
-lucre.event.showLog = false
+//lucre.event.showLog = false
          val segm = Segment.Curve( Span( 1000L, 6000L ), IIdxSeq( (441.0, 882.0, linShape) ))
          obs.assertEquals(
             a0.copy( changes = IIdxSeq(
