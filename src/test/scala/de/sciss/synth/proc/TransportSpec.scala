@@ -179,6 +179,7 @@ println( "GRAPHEME " + g1 )
          obs.clear()
 
 // XXX TODO: the following causes p1.scans to disconnect ???
+lucre.event.showLog = true
          p1.scans.remove( "egal" )
          obs.assertEquals(
             a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
@@ -195,7 +196,6 @@ println( "GRAPHEME " + g1 )
          // since g1 is part of p1.graphemes, first of all there should be a ProcChnaged with underlying
          // GraphemeChange. secondly, because it is connected to the freq-scan and overlaps the current time,
          // there should be a GraphemesChanged as well
-lucre.event.showLog = true
          val elem: BiExpr[ S, Grapheme.Value ] = 1000L -> curve( 441.0 )
          g1.add( elem )
 lucre.event.showLog = false

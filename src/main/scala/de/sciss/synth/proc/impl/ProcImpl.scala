@@ -198,6 +198,8 @@ object ProcImpl {
             StateEvent -/-> r
          }
 
+// XXX TODO: this is wrong. It means that when an event originated both from graphemes and scans,
+// the latter will be swallowed
          def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Proc.Update[ S ]] = {
             if(      graphemes.isSource(  pull )) graphemes.pullUpdate(  pull )
             else if( scans.isSource(      pull )) scans.pullUpdate(      pull )
