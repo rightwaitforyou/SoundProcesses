@@ -2,22 +2,28 @@ package de.sciss.synth
 package proc
 
 import impl.{AuralSystemImpl => Impl}
+import de.sciss.lucre.{event => evt, stm}
 
 object AuralSystem {
-   def apply() : AuralSystem = Impl()
-   def start() : AuralSystem = apply().start()
+   def apply[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( implicit tx: S#Tx, bridge: S#Tx => I#Tx,
+                                                     cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = Impl[ S, I ]
 
-   trait Client {
-      def started( s: Server ) : Unit
-      def stopped() : Unit
+   def start[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit tx: S#Tx, bridge: S#Tx => I#Tx,
+                                                        cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = apply[ S, I ].start()
+
+   trait Client[ S <: evt.Sys[ S ]] {
+      def started( s: Server )( implicit tx: S#Tx ) : Unit
+      def stopped()( implicit tx: S#Tx ) : Unit
    }
 }
-trait AuralSystem {
-   def start( config: Server.Config = Server.Config() ) : AuralSystem
-   def stop() : AuralSystem
+trait AuralSystem[ S <: evt.Sys[ S ]] {
+   import AuralSystem.Client
 
-   def addClient(    c: AuralSystem.Client ) : AuralSystem
-   def removeClient( c: AuralSystem.Client ) : AuralSystem
+   def start( config: Server.Config = Server.Config() )( implicit tx: S#Tx ) : AuralSystem[ S ]
+   def stop()( implicit tx: S#Tx ) : AuralSystem[ S ]
 
-   def whenStarted( fun: Server => Unit ) : AuralSystem
+   def addClient(    c: Client[ S ])( implicit tx: S#Tx ) : Unit
+   def removeClient( c: Client[ S ])( implicit tx: S#Tx ) : Unit
+
+   def whenStarted( fun: S#Tx => Server => Unit )( implicit tx: S#Tx ) : Unit
 }

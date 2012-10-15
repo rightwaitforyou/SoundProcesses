@@ -28,16 +28,15 @@ package de.sciss.synth.proc
 import impl.AuralPresentationImpl
 import de.sciss.lucre.{stm, event => evt}
 import stm.{Disposable, Cursor}
-import evt.Sys
 
 object AuralPresentation {
    // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ]]( transport: ProcTransport[ S ], aural: AuralSystem )
-                          ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] =
-      AuralPresentationImpl.run( transport, aural )
+   def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
+                          ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] =
+      AuralPresentationImpl.run[ S, I ]( transport, aural )
 
-   private[proc] trait Running[ S <: Sys[ S ]] {
+   private[proc] trait Running[ S <: evt.Sys[ S ]] {
       /**
        * Queries the number of channel associated with a scanned input.
        * Throws a control throwable when no value can be determined, making
@@ -55,4 +54,4 @@ object AuralPresentation {
       final case class MissingInfo( source: TimedProc[ S ], key: String ) extends Throwable
    }
 }
-trait AuralPresentation[ S <: Sys[ S ]] extends Disposable[ S#Tx ]
+trait AuralPresentation[ S <: evt.Sys[ S ]] extends Disposable[ S#Tx ]

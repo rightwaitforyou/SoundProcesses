@@ -30,7 +30,6 @@ package impl
 import de.sciss.lucre.{stm, bitemp, event => evt}
 import stm.{IdentifierMap, Cursor}
 import bitemp.Chronos
-import evt.Sys
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{InTxn, TxnLocal, Txn}
@@ -39,66 +38,67 @@ import UGenGraphBuilder.MissingIn
 import graph.scan
 
 object AuralPresentationImpl {
-   def run[ S <: Sys[ S ]]( transport: ProcTransport[ S ], aural: AuralSystem )
-                          ( implicit tx: S#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
+   def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
+                          ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
 
-      val c = new Client( /* cursor.position, */ transport, aural )
-      Txn.afterCommit( _ => aural.addClient( c ))( tx.peer )
+      val dummy = DummySerializerFactory[ I ]
+      import dummy._
+      implicit val itx: I#Tx  = tx
+      val id                  = itx.newID()
+      val running             = itx.newVar[ Option[ RunningImpl[ S ]]]( id, None )
+      val c = new Client[ S, I ]( running, transport, aural )
+      aural.addClient( c )
       c
    }
 
-   private final class Client[ S <: Sys[ S ]]( /* csrPos: S#Acc, */ transport: ProcTransport[ S ],
-                                               aural: AuralSystem )( implicit cursor: Cursor[ S ])
-   extends AuralPresentation[ S ] with AuralSystem.Client {
+   private final class Client[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( running: I#Var[ Option[ RunningImpl[ S ]]],
+                                                                      transport: ProcTransport[ S ],
+                                                                      aural: AuralSystem[ S ])
+                                                                    ( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx )
+   extends AuralPresentation[ S ] with AuralSystem.Client[ S ] {
 
       override def toString = "AuralPresentation@" + hashCode.toHexString
-
-      private val sync     = new AnyRef
-      private var running  = Option.empty[ RunningImpl[ S ]]
 
       def dispose()( implicit tx: S#Tx ) {
          // XXX TODO dispose running
       }
 
-      def stopped() {
+      def stopped()( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx = tx
          aural.removeClient( this )
-         sync.synchronized {
-            running.foreach { impl =>
-               // XXX TODO dispose
-            }
-            running = None
+         running.get.foreach { impl =>
+            // XXX TODO dispose
          }
+         running.set( None )
       }
 
-      def started( server: Server ) {
-         val impl = cursor.step { implicit tx =>
-            log( "started" )
+      def started( server: Server )( implicit tx: S#Tx ) {
+         implicit val itx: I#Tx = tx
+         log( "started" )
 
-            val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]      = tx.newInMemoryIDMap
-            val scanMap: IdentifierMap[ S#ID, S#Tx, (String, S#ID) ] = tx.newInMemoryIDMap
+         val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]      = tx.newInMemoryIDMap
+         val scanMap: IdentifierMap[ S#ID, S#Tx, (String, S#ID) ] = tx.newInMemoryIDMap
 
-            val booted  = new RunningImpl( server, viewMap, scanMap )
-            ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
+         val booted  = new RunningImpl( server, viewMap, scanMap )
+         ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
 //            transport.react { x => println( "Aural observation: " + x )}
-            if( transport.isPlaying ) {
-               implicit val chr: Chronos[ S ] = transport
-               transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
-            }
-            transport.reactTx { implicit tx => {
-               case Transport.Advance( tr, time, isSeek, true, added, removed, changes ) =>
-                  implicit val chr: Chronos[ S ] = tr
-                  log( "at " + time + " added " + added.mkString(   "[", ", ", "]" ) +
-                                   "; removed " + removed.mkString( "[", ", ", "]" ))
-                  removed.foreach { timed             => booted.procRemoved( timed )}
-                  changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
-                  added.foreach   { timed             => booted.procAdded(   timed )}
-               case other =>
-//                  log( "other " + other )
-            }}
-
-            booted
+         if( transport.isPlaying ) {
+            implicit val chr: Chronos[ S ] = transport
+            transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
          }
-         sync.synchronized( running = Some( impl ))
+         transport.reactTx { implicit tx => {
+            case Transport.Advance( tr, time, isSeek, true, added, removed, changes ) =>
+               implicit val chr: Chronos[ S ] = tr
+               log( "at " + time + " added " + added.mkString(   "[", ", ", "]" ) +
+                                "; removed " + removed.mkString( "[", ", ", "]" ))
+               removed.foreach { timed             => booted.procRemoved( timed )}
+               changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
+               added.foreach   { timed             => booted.procAdded(   timed )}
+            case other =>
+//                  log( "other " + other )
+         }}
+
+         running.set( Some( booted ))
       }
    }
 
@@ -200,7 +200,7 @@ object AuralPresentationImpl {
       }
    }
 */
-   private final class AuralProcBuilder[ S <: Sys[ S ]]( val ugen: UGenGraphBuilder[ S ]) {
+   private final class AuralProcBuilder[ S <: evt.Sys[ S ]]( val ugen: UGenGraphBuilder[ S ]) {
       var outBuses: Map[ String, RichAudioBus ] = Map.empty
 //      def finish : AuralProc = {
 //         val ug = ugen.finish
@@ -215,13 +215,13 @@ object AuralPresentationImpl {
     * @param idMap      map's timed-ids to aural proc builders
     * @param seq        sequence of builders in the current transaction
     */
-   private final case class OngoingBuild[ S <: Sys[ S ]]( var missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
+   private final case class OngoingBuild[ S <: evt.Sys[ S ]]( var missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
                                                             Map.empty[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
                                                           var idMap: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
                                                             None,
                                                           var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
 
-   private final class RunningImpl[ S <: Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
+   private final class RunningImpl[ S <: evt.Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
                                                     scanMap: IdentifierMap[ S#ID, S#Tx, (String, S#ID) ])
    extends AuralPresentation.Running[ S ] {
       // ongoingBuild is a transaction local field storing a mutable object. This is
