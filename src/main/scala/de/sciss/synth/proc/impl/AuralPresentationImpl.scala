@@ -82,19 +82,30 @@ object AuralPresentationImpl {
          val booted  = new RunningImpl( server, viewMap, scanMap )
          ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
 //            transport.react { x => println( "Aural observation: " + x )}
-         if( transport.isPlaying ) {
-            implicit val chr: Chronos[ S ] = transport
-            transport.iterator.foreach { case (_, p) => booted.procAdded( p )}
+
+         def t_play( time: Long )( implicit tx: S#Tx ) {
+            transport.iterator.foreach { case (_, timed) => booted.procAdded( time, timed )}
          }
+
+         def t_stop( time: Long )( implicit tx: S#Tx ) {
+            transport.iterator.foreach { case (_, timed) => booted.procRemoved( timed )}
+         }
+
+         if( transport.isPlaying ) t_play( transport.time )
+
          transport.reactTx { implicit tx => {
+            // only when playing
             case Transport.Advance( tr, time, isSeek, true, added, removed, changes ) =>
-               implicit val chr: Chronos[ S ] = tr
                log( "at " + time + " added " + added.mkString(   "[", ", ", "]" ) +
                                 "; removed " + removed.mkString( "[", ", ", "]" ))
                removed.foreach { timed             => booted.procRemoved( timed )}
                changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
-               added.foreach   { timed             => booted.procAdded(   timed )}
-            case other =>
+               added.foreach   { timed             => booted.procAdded( time, timed )}
+
+            case Transport.Play( tr, time ) => t_play( time )
+            case Transport.Stop( tr, time ) => t_stop( time )
+
+            case _ =>
 //                  log( "other " + other )
          }}
 
@@ -367,10 +378,9 @@ object AuralPresentationImpl {
          viewMap.dispose()
       }
 
-      def procAdded( timed: TimedProc[ S ])( implicit tx: S#Tx, chr: Chronos[ S ]) {
+      def procAdded( time: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
          log( "added " + timed )
 
-         val time       = chr.time
          val timedID    = timed.id
          val ugen       = UGenGraphBuilder( this, timed, time )
          val builder    = new AuralProcBuilder( ugen )

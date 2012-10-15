@@ -37,10 +37,9 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Ref, Txn, TxnLocal}
 import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
 import java.text.SimpleDateFormat
+import SoundProcesses.{logTransport => log}
 
 object TransportImpl {
-   var VERBOSE = false
-   
    import Grapheme.Segment
    import Segment.{Defined => DefSeg}
    import Transport.Proc.{GraphemesChanged, Changed => ProcChanged}
@@ -165,7 +164,7 @@ object TransportImpl {
    }
 
    private def shutdownScheduler() {
-     if( VERBOSE )println( "Shutting down scheduler thread pool" )
+     log( "Shutting down scheduler thread pool" )
      pool.shutdown()
    }
 
@@ -221,7 +220,7 @@ object TransportImpl {
       }
 
       protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
-if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay ) // + ", targetFrame = " + targetFrame )
+         log( "scheduled: logicalDelay = " + logicalDelay )
          submitRef.set( (logicalNow, logicalDelay, schedValid) )( tx.peer )
       }
 
@@ -259,7 +258,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay ) // + ",
       protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
          val jitter        = sysMicros() - logicalNow
          val actualDelay   = math.max( 0L, logicalDelay - jitter )
-if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay ) // + ", targetFrame = " + targetFrame )
+         log( "scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay )
          Txn.afterCommit( _ => {
             pool.schedule( new Runnable {
                def run() {
@@ -915,7 +914,7 @@ if( VERBOSE ) println( "::: scheduled: logicalDelay = " + logicalDelay + ", actu
          implicit val itx: I#Tx = tx
          val oldInfo          = infoVar.get
          val oldFrame         = oldInfo.frame
-if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newFrame + "); oldInfo = " + oldInfo )
+         log( "advance(newFrame = " + newFrame + ", isSeek = " + isSeek + ", startPlay = " + startPlay + "); oldInfo = " + oldInfo )
          // do not short cut and return; because we may want to enforce play and call `scheduleNext`
 //         if( newFrame == oldFrame ) return
 
@@ -1208,13 +1207,13 @@ if( VERBOSE ) println( "::: advance(isSeek = " + isSeek + "; newFrame = " + newF
                                      nextProcTime     = nextProcTime,
                                      nextGraphemeTime = nextGraphemeTime )
          infoVar.set( newInfo )
-if( VERBOSE ) println( "::: advance - newInfo = " + newInfo )
+         log( "advance - newInfo = " + newInfo )
 
          if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty ) {
             val upd = Transport.Advance( transport = impl, time = newFrame,
                                          isSeek = isSeek, isPlaying = newInfo.isRunning,
                                          added = procAdded, removed = procRemoved, changes = procUpdated )
-if( VERBOSE ) println( "::: advance - fire " + upd )
+            log( "advance - fire " + upd )
             fire( upd )
          }
 
