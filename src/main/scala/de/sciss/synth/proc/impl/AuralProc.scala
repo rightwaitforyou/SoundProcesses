@@ -28,6 +28,7 @@ package proc
 package impl
 
 import concurrent.stm.Ref
+import de.sciss.lucre.stm
 
 object AuralProc {
 //   implicit object Serializer extends stm.Serializer[ AuralProc ] {
@@ -249,3 +250,5 @@ sealed trait AuralProc /* extends Writer */ {
 //   def freq( implicit tx: ProcTxn ) : Double
 //   def freq_=( f: Double )( implicit tx: ProcTxn ) : Unit
 }
+
+// final case class AuralView[ S <: stm.Sys[ S ]]( proc: stm.Source[ S#Tx, Proc[ S ]])

@@ -5,6 +5,7 @@ import impl.{AuralSystemImpl => Impl}
 
 object AuralSystem {
    def apply() : AuralSystem = Impl()
+   def start() : AuralSystem = apply().start()
 
    trait Client {
       def started( s: Server ) : Unit

@@ -95,4 +95,7 @@ trait Scan[ S <: Sys[ S ]] extends evt.Node[ S ] {
    // by calling addSink on the source, as this would result in an infinite feedback.
    // still, this method should fire an Scan.SourceChanged event.
    private[proc] def setScanSource( source: Scan[ S ])( implicit tx: S#Tx ) : Unit
+
+//   def key: String
+//   def proc: Proc[ S ]
 }
