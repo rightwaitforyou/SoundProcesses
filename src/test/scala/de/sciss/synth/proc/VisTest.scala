@@ -220,9 +220,8 @@ extends ExprImplicits[ Sy ] {
    def aural() { t { implicit tx =>
       implicit val itx = tx.peer
       if( auralVar().isEmpty ) {
-         val as = AuralSystem()
-         as.start()  // XXX TODO non-transactional
-         auralVar.set( Some( AuralPresentation.run( trans, as )))
+         val as = AuralSystem.start[ S, I ]()
+         auralVar.set( Some( AuralPresentation.run[ S, I ]( trans, as )))
       }
    }}
 

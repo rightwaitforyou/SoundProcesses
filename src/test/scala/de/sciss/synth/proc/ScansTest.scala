@@ -77,28 +77,27 @@ object ScansTest extends App {
 //      val imp  = ExprImplicits[ S ]
 //      import imp._
 
-      def body( auralSystem: Option[ AuralSystem ]) {
-         cursor.step { implicit tx =>
-            val group   = ProcGroup_.Modifiable[ S ]
-            test( group )
+      def body( auralSystem: Option[ AuralSystem[ S ]])( implicit tx: S#Tx ) {
+         val group   = ProcGroup_.Modifiable[ S ]
+         test( group )
 //            transp.playing_=( true )
 val transp  = Transport[ S, I ]( group )
-            auralSystem.foreach { as => AuralPresentation.run( transp, as )}
-            transp.play()
-         }
+         auralSystem.foreach { as => AuralPresentation.run[ S, I ]( transp, as )}
+         transp.play()
       }
 
       // ensure index tree 0 is build
       system.root( _ => () )
 
-      if( AURAL ) {
-         lazy val as: AuralSystem = AuralSystem().start().whenStarted { _ =>
-         //         Thread.sleep( 1000 )
-            body( Some( as ))
+      cursor.step { implicit tx =>
+         if( AURAL ) {
+            val as = AuralSystem.start[ S, I ]()
+            as.whenStarted { implicit tx => { _ =>
+               body( Some( as ))
+            }}
+         } else {
+            body( None )
          }
-         as
-      } else {
-         body( None )
       }
 
 //      Thread.sleep( 1000 )
