@@ -16,7 +16,10 @@ object PatchTest extends App {
       sys.root( _ => () )
       sys.step { implicit tx =>
          val auralSys = AuralSystem.start[ S, I ]()
-         auralSys.whenStarted( implicit tx => { _ => run[ S, I ]( auralSys )})
+         auralSys.whenStarted( implicit tx => { _ =>
+//            println( "AQUI" )
+            run[ S, I ]( auralSys )
+         })
       }
    }
 
@@ -49,6 +52,7 @@ object PatchTest extends App {
 
       group.add( Span.from( 0L ), p1 )
       group.add( Span.from( 5 * 44100L ), p2 )
+
 
       trans.play()
    }

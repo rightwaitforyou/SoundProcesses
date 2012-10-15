@@ -46,7 +46,7 @@ object AuralPresentationImpl {
       implicit val itx: I#Tx  = tx
       val id                  = itx.newID()
       val running             = itx.newVar[ Option[ RunningImpl[ S ]]]( id, None )
-      val c = new Client[ S, I ]( running, transport, aural )
+      val c                   = new Client[ S, I ]( running, transport, aural )
       aural.addClient( c )
       c
    }

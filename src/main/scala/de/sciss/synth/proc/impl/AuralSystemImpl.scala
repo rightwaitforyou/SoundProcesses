@@ -71,13 +71,17 @@ object AuralSystemImpl {
                sync.synchronized { connection = None }
             case ServerConnection.Running( s ) =>
                if( dumpOSC ) s.dumpOSC( Dump.Text )
+               val sOpt = Some( s )
                sync.synchronized {
-                  connection = Some( s )
+                  connection = sOpt
                }
                cursor.step { implicit tx =>
                   implicit val itx: I#Tx = tx
+                  server.set( sOpt )
                   ProcDemiurg.addServer( s )( ProcTxn()( tx.peer ) )
-                  clients.get.foreach( _.started( s ))
+                  val cs = clients.get
+//                  println( "AQUI " + cs )
+                  cs.foreach( _.started( s ))
                }
          }
 
@@ -118,7 +122,8 @@ object AuralSystemImpl {
       def addClient( c: Client[ S ])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          clients.transform( _ :+ c )
-         server.get.foreach { s =>
+         val sOpt = server.get
+         sOpt.foreach { s =>
             c.started( s )
          }
       }

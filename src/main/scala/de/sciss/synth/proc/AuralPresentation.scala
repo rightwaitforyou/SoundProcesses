@@ -28,13 +28,14 @@ package de.sciss.synth.proc
 import impl.AuralPresentationImpl
 import de.sciss.lucre.{stm, event => evt}
 import stm.{Disposable, Cursor}
+import impl.{AuralPresentationImpl => Impl}
 
 object AuralPresentation {
    // ---- implementation forwards ----
 
    def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
                           ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] =
-      AuralPresentationImpl.run[ S, I ]( transport, aural )
+      Impl.run[ S, I ]( transport, aural )
 
    private[proc] trait Running[ S <: evt.Sys[ S ]] {
       /**
