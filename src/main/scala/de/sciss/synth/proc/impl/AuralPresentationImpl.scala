@@ -27,12 +27,11 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm, bitemp}
+import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm}
 import stm.{IdentifierMap, Cursor}
-import bitemp.Chronos
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{InTxn, TxnLocal, Txn}
+import concurrent.stm.TxnLocal
 import SoundProcesses.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
