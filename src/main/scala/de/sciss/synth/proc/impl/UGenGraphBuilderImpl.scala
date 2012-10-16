@@ -68,7 +68,7 @@ private[proc] object UGenGraphBuilderImpl {
                      elem.force( builder )
                      someSucceeded        = true
                   } catch {
-                     case miss @ MissingIn( _, _ ) =>
+                     case miss @ MissingIn( _ ) =>
                         sourceMap         = savedSourceMap
                         controlNames      = savedControlNames
                         controlValues     = savedControlValues

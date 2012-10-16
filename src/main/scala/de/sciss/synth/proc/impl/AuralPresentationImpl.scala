@@ -399,7 +399,7 @@ object AuralPresentationImpl {
                }
                busOpt match {
                   case Some( bus ) => bus.numChannels
-                  case _ => ??? // throw MissingIn()
+                  case _ => throw MissingIn( peer )
                }
 
             case None => 1   // producing a non-mapped monophonic control with default value; sounds sensible?
@@ -485,7 +485,11 @@ object AuralPresentationImpl {
          val retry = if( newOuts.nonEmpty ) {
             // the retried entries are those whose missing scan ins contain
             // any of the newly determined scan outs
-            val keys: Set[ MissingIn[ S ]] = newOuts.map({ case (key, _) => MissingIn( ugen.timed, key )})( breakOut )
+            val scans = ugen.timed.value.scans
+            val keys: Set[ MissingIn[ S ]] = newOuts.flatMap({ case (key, _) =>
+               val scanOpt = scans.get( key )
+               scanOpt.map { scan => MissingIn( scan )}
+            })( breakOut )
             // divide missing map according to these keys
             val (retE, keep) = ongoing.missingMap.partition { case (key, _) => keys.contains( key )}
             // merge all the found builder sets together

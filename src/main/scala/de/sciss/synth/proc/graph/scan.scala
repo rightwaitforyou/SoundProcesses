@@ -94,16 +94,20 @@ object scan {
          unwrap( IIdxSeq( bus.expand ) ++ in.expand.outputs )
       }
 
+      // first arg: bus control, remaining args: signal to write; thus numChannels = _args.size - 1
       protected def makeUGen( _args: IIdxSeq[ UGenIn ]) {
+         val busArg        = _args.head
+         val sigArg        = _args.tail
+         val numChannels   = sigArg.size
          UGenGraph.builder match {
             case b: UGenGraphBuilder[ _ ] =>
-               b.addScanOut( key, _args.size )
+               b.addScanOut( key, numChannels )
             case other => outsideOfContext()
          }
-         val argsAr = _args.map { ui =>
+         val sigArgAr = sigArg.map { ui =>
             if( ui.rate == audio ) ui else new UGen.SingleOut( "K2A", audio, IIdxSeq( ui ))
          }
-         new UGen.ZeroOut( name, audio, argsAr, isIndividual = true )
+         new UGen.ZeroOut( name, audio, busArg +: sigArgAr, isIndividual = true )
       }
 
 //      def dir: ProcGraph.Direction = ProcGraph.Out

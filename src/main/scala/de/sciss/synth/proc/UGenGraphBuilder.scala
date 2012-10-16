@@ -27,10 +27,10 @@ private[proc] object UGenGraphBuilder {
     * This can be a case class because it is used only within the same transaction,
     * and thereby the `timed` argument does not become stale.
     *
-    * @param timed   the process which is the ''source'' of the required input
-    * @param key     the scan key in the source
+    * @param scan    the scan which is the ''source'' of the required input
     */
-   final case class MissingIn[ S <: Sys[ S ]]( timed: TimedProc[ S ], key: String ) extends ControlThrowable
+//   final case class MissingIn[ S <: Sys[ S ]]( timed: TimedProc[ S ], key: String ) extends ControlThrowable
+   final case class MissingIn[ S <: Sys[ S ]]( scan: Scan[ S ]) extends ControlThrowable
 
    /**
     * '''Note''': The resulting object is mutable, therefore must not be shared across threads and also must be
