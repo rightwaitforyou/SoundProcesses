@@ -28,10 +28,10 @@ package de.sciss.synth.proc
 import de.sciss.osc
 import de.sciss.synth.{osc => sosc}
 import concurrent.stm.{TxnLocal, InTxn}
-import impl.ProcTxnImpl
+import impl.{ProcTxnImpl => Impl}
 
 object ProcTxn {
-   private val current = TxnLocal( initialValue = ProcTxnImpl()( _ ))
+   private val current = TxnLocal( initialValue = Impl()( _ ))
 
    def apply()( implicit tx: InTxn ) : ProcTxn = current.get
 
@@ -49,4 +49,6 @@ trait ProcTxn {
 
    def add( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, RichState, Boolean) ], audible: Boolean,
             dependencies: Map[ RichState, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
+
+   def beforeCommit( handler: ProcTxn => Unit ) : Unit
 }

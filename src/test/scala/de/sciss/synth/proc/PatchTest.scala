@@ -40,7 +40,6 @@ object PatchTest extends App {
 
       p1.graph_=( SynthGraph {
          graph.scan( "out" ) := SinOsc.ar( 0.1 ).linexp( -1, 1, 200, 2000 )
-//         Out.ar( 0, SinOsc.ar( 441 ))
       })
 
       p2.graph_=( SynthGraph {

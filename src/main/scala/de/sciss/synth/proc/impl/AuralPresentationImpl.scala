@@ -240,8 +240,14 @@ object AuralPresentationImpl {
       // that a fresh object is retrieved for each new transaction. If it is touched,
       // a beforeCommit hook is invoked before the transaction successfully completes,
       // building the unfinished aural procs if possible.
+//      private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
+//         TxnLocal( init = OngoingBuild(), beforeCommit = beforeCommit )
+
       private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
-         TxnLocal( init = OngoingBuild(), beforeCommit = beforeCommit ) //  Map.empty[ MissingIn[ S ], UGenGraphBuilder[ S ]]))
+         TxnLocal( initialValue = { itx =>
+            ProcTxn()( itx ).beforeCommit( beforeCommit )
+            OngoingBuild()
+         })
 
 //      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
 //         viewMap.get( timed.id ).flatMap({ aural =>
@@ -332,7 +338,8 @@ object AuralPresentationImpl {
 
       }
 
-      private def beforeCommit( itx: InTxn ) {
+      private def beforeCommit( ptx: ProcTxn ) {
+         val itx = ptx.peer
          ongoingBuild.get( itx ).seq.foreach { builder =>
             val ugen = builder.ugen
             if( ugen.isComplete ) {

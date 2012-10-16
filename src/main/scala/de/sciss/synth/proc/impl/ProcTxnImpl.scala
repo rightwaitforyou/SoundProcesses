@@ -65,7 +65,15 @@ object ProcTxnImpl {
       private var stateMap    = Map.empty[ RichState, Boolean ]
       private var entryCnt    = 0
 
+      private var beforeHooks = IIdxSeq.empty[ ProcTxn => Unit ]
+
+      def beforeCommit( handler: ProcTxn => Unit ) {
+         beforeHooks :+= handler
+      }
+
       def flush() {
+         if( beforeHooks.nonEmpty ) beforeHooks.foreach( _.apply( this ))
+
          logTxn( "flush" )
          val (clumps, maxSync) = establishDependancies
 val server = Server.default // XXX vergación
