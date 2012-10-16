@@ -95,6 +95,8 @@ object AuralProc {
 //         }
 //      }
 
+      override def toString = "AuralProc(" + synth + ", " + outBuses + ")"
+
       def server = synth.server
 
       def groupOption( implicit tx: ProcTxn ) : Option[ RichGroup ] = groupsRef.get( tx.peer ).map( _.main )

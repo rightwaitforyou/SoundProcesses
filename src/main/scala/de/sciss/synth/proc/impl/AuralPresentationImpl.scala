@@ -97,7 +97,8 @@ object AuralPresentationImpl {
             // only when playing
             case Transport.Advance( tr, time, isSeek, true, added, removed, changes ) =>
                log( "at " + time + " added " + added.mkString(   "[", ", ", "]" ) +
-                                "; removed " + removed.mkString( "[", ", ", "]" ))
+                                "; removed " + removed.mkString( "[", ", ", "]" ) +
+                                "; changes? " + changes.nonEmpty )
                removed.foreach { timed             => booted.procRemoved( timed )}
                changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
                added.foreach   { timed             => booted.procAdded( time, timed )}
@@ -218,7 +219,7 @@ object AuralPresentationImpl {
 //         AuralProc()
 //      }
 
-      def id: S#ID = ugen.timed.id
+//      def id: S#ID = ugen.timed.id
    }
 
    /*
@@ -245,7 +246,7 @@ object AuralPresentationImpl {
 
       private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
          TxnLocal( initialValue = { itx =>
-            ProcTxn()( itx ).beforeCommit( beforeCommit )
+            ProcTxn()( itx ).beforeCommit( flush )
             OngoingBuild()
          })
 
@@ -333,12 +334,14 @@ object AuralPresentationImpl {
          // wrap as AuralProc and save it in the identifier map for later lookup
          val aural = AuralProc( synth, outBuses, busUsers )
          if( setMap.nonEmpty ) synth.set( audible = true, setMap: _* )
-         log( "launched " + synth )
-         viewMap.put( builder.id, aural )
+         log( "launched " + aural )
+         viewMap.put( timed.id, aural )
 
       }
 
-      private def beforeCommit( ptx: ProcTxn ) {
+      // called before the transaction successfully completes.
+      // this is the place where we launch completely built procs.
+      private def flush( ptx: ProcTxn ) {
          val itx = ptx.peer
          ongoingBuild.get( itx ).seq.foreach { builder =>
             val ugen = builder.ugen
@@ -370,7 +373,9 @@ object AuralPresentationImpl {
 
       // called by UGenGraphBuilderImpl
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
-         val opt = timed.value.scans.get( key ).flatMap( _.source ).flatMap {
+         val scanOpt    = timed.value.scans.get( key )
+         val sourceOpt  = scanOpt.flatMap( _.source )
+         val chansOpt   = sourceOpt.flatMap {
             case Scan.Link.Grapheme( peer ) =>
                peer.valueAt( time ).map( _.numChannels )
             case Scan.Link.Scan( peer ) =>
@@ -378,7 +383,7 @@ object AuralPresentationImpl {
                   getBus( sourceTimedID, sourceKey ).map( _.numChannels )
                }
          }
-         opt.getOrElse( 1 )   // producing a non-mapped monophonic control with default value; sounds sensible?
+         chansOpt.getOrElse( 1 )   // producing a non-mapped monophonic control with default value; sounds sensible?
       }
 
       def dispose()( implicit tx: S#Tx ) {
@@ -386,7 +391,8 @@ object AuralPresentationImpl {
       }
 
       def procAdded( time: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
-         log( "added " + timed )
+//         val name = timed.value.name.value
+         log( "added " + timed + " (name = " + timed.value.name.value + ")" )
 
          val timedID    = timed.id
          val ugen       = UGenGraphBuilder( this, timed, time )
@@ -429,7 +435,9 @@ object AuralPresentationImpl {
          // - if found, continue building
 
          val ugen       = builder.ugen
-         ugen.tryBuild()
+         val isComplete = ugen.tryBuild()
+
+         log( "incremental " + ugen.timed + "; completed? " + isComplete )
 
          // detect which new scan outputs have been determined in the last iteration
          // (newOuts is a map from `name: String` to `numChannels Int`)
@@ -444,7 +452,7 @@ object AuralPresentationImpl {
 
          // if the last iteration did not complete the build process, store the missing in keys
          // (since missingMap is a map and the values are sets, it is safe to re-add existing entries)
-         if( !ugen.isComplete ) {
+         if( !isComplete ) {
             var newMissing = ongoing.missingMap
             ugen.missingIns.foreach { miss =>
                newMissing += miss -> (newMissing.getOrElse( miss, Set.empty ) + builder)

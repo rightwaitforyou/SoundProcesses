@@ -32,6 +32,8 @@ import ProcTxn.RequiresChange
 final case class RichSynth( synth: Synth, synthDef: RichSynthDef ) extends RichNode( false ) {
    def node: Node = synth
 
+   override def toString = "Synth(id=" + synth.id + ", def=" + synthDef.name + ")"
+
    def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil, addAction: AddAction = addToHead,
              buffers: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) {
 

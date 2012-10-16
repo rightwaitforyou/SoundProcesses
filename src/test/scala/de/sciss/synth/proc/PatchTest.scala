@@ -29,12 +29,17 @@ object PatchTest extends App {
       val imp = ExprImplicits[ S ]
       import imp._
 
+//confluent.showLog = true
+
       val group      = ProcGroup_.Modifiable[ S ]
       val trans      = Transport[ S, I ]( group )
       AuralPresentation.run[ S, I ]( trans, auralSys )
 
       val p1         = Proc[ S ]
+      p1.name_=( "p1" )
       val p2         = Proc[ S ]
+      p2.name_=( "p2" )
+
       val p1out      = p1.scans.add( "out" )
       val p2in       = p2.scans.add( "freq" )
 
@@ -43,7 +48,7 @@ object PatchTest extends App {
       })
 
       p2.graph_=( SynthGraph {
-         val freq = 441 // graph.scan( "freq" ).ar( 441 )
+         val freq = graph.scan( "freq" ).ar( 441 )
          val sig  = RLPF.ar( Pulse.ar( freq ), freq * 2, 0.1 )
          Out.ar( 0, Pan2.ar( sig ))
       })

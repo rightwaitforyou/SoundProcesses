@@ -35,6 +35,8 @@ object RichSynthDef {
 final case class RichSynthDef( server: Server, synthDef: SynthDef ) /* extends RichObject */ {
    val isOnline: RichState = new RichState( this, "isOnline", false )
 
+   override def toString = "SynthDef(" + synthDef.name + ")"
+
    def name : String = synthDef.name
 
    /**
