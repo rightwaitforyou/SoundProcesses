@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{stm, bitemp, event => evt}
+import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm, bitemp}
 import stm.{IdentifierMap, Cursor}
 import bitemp.Chronos
 import collection.breakOut
@@ -76,8 +76,8 @@ object AuralPresentationImpl {
          implicit val itx: I#Tx = tx
          log( "started" )
 
-         val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]      = tx.newInMemoryIDMap
-         val scanMap: IdentifierMap[ S#ID, S#Tx, (String, S#ID) ] = tx.newInMemoryIDMap
+         val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]                           = tx.newInMemoryIDMap
+         val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
 
          val booted  = new RunningImpl( server, viewMap, scanMap )
          ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
@@ -222,6 +222,14 @@ object AuralPresentationImpl {
 //      def id: S#ID = ugen.timed.id
    }
 
+   // this is plain stupid... another reason why the scan should reproduce the proc and key
+   private def idSerializer[ S <: stm.Sys[ S ]] : stm.Serializer[ S#Tx, S#Acc, S#ID ] = anyIDSer.asInstanceOf[ stm.Serializer[ S#Tx, S#Acc, S#ID ]]
+   private val anyIDSer = new IDSer[ stm.InMemory ]
+   private final class IDSer[ S <: stm.Sys[ S ]] extends stm.Serializer[ S#Tx, S#Acc, S#ID ] {
+      def write( id: S#ID, out: DataOutput ) { id.write( out )}
+      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : S#ID = tx.readID( in, access )
+   }
+
    /*
     * @param missingMap maps each missing input to a set of builders who requested that input
     * @param idMap      map's timed-ids to aural proc builders
@@ -234,7 +242,7 @@ object AuralPresentationImpl {
                                                           var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
 
    private final class RunningImpl[ S <: evt.Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
-                                                    scanMap: IdentifierMap[ S#ID, S#Tx, (String, S#ID) ])
+                                                        scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ])
    extends AuralPresentation.Running[ S ] {
       // ongoingBuild is a transaction local field storing a mutable object. This is
       // totally fine since a transaction is not shared across threads. the idea is
@@ -243,6 +251,8 @@ object AuralPresentationImpl {
       // building the unfinished aural procs if possible.
 //      private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
 //         TxnLocal( init = OngoingBuild(), beforeCommit = beforeCommit )
+
+      implicit def idSer = idSerializer[ S ]
 
       private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
          TxnLocal( initialValue = { itx =>
@@ -317,7 +327,8 @@ object AuralPresentationImpl {
                         ??? // AudioFileWriter
                   }
                case Scan.Link.Scan( peer ) =>
-                  scanMap.get( peer.id ).foreach { case (sourceKey, sourceTimedID) =>
+                  scanMap.get( peer.id ).foreach { case (sourceKey, idH) =>
+                     val sourceTimedID = idH.get
                      makeBusMapper( sourceTimedID, sourceKey )
                   }
             }
@@ -375,15 +386,24 @@ object AuralPresentationImpl {
       def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int = {
          val scanOpt    = timed.value.scans.get( key )
          val sourceOpt  = scanOpt.flatMap( _.source )
-         val chansOpt   = sourceOpt.flatMap {
-            case Scan.Link.Grapheme( peer ) =>
-               peer.valueAt( time ).map( _.numChannels )
-            case Scan.Link.Scan( peer ) =>
-               scanMap.get( peer.id ).flatMap { case (sourceKey, sourceTimedID) =>
-                  getBus( sourceTimedID, sourceKey ).map( _.numChannels )
+         sourceOpt match {
+            case Some( Scan.Link.Grapheme( peer )) =>
+               val chansOpt = peer.valueAt( time ).map( _.numChannels )
+               chansOpt.getOrElse( 1 )   // producing a non-mapped monophonic control with default value; sounds sensible?
+
+            case Some( Scan.Link.Scan( peer )) =>
+               val sourceOpt  = scanMap.get( peer.id )
+               val busOpt     = sourceOpt.flatMap { case (sourceKey, idH) =>
+                  val sourceTimedID = idH.get
+                  getBus( sourceTimedID, sourceKey )
                }
+               busOpt match {
+                  case Some( bus ) => bus.numChannels
+                  case _ => ??? // throw MissingIn()
+               }
+
+            case None => 1   // producing a non-mapped monophonic control with default value; sounds sensible?
          }
-         chansOpt.getOrElse( 1 )   // producing a non-mapped monophonic control with default value; sounds sensible?
       }
 
       def dispose()( implicit tx: S#Tx ) {
@@ -416,7 +436,7 @@ object AuralPresentationImpl {
          // otherwise; in the future this may change)
          val scans   = timed.value.scans
          scans.iterator.foreach { case (key, scan) =>
-            scanMap.put( scan.id, key -> timedID )
+            scanMap.put( scan.id, key -> tx.newHandle( timedID ))
          }
 
          incrementalBuild( ongoing, builder )
