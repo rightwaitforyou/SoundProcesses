@@ -295,11 +295,11 @@ object AuralPresentationImpl {
                require( n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")" )
             }
 
-            def makeBusMapper( timedID: S#ID, key: String ) {
-               val bus = getBus( timedID, key ).getOrElse( // ... or could just stick with the default control value
-                  sys.error( "Bus disappeared " + timedID + " -> " + key ))
+            def makeBusMapper( sourceTimedID: S#ID, sourceKey: String ) {
+               val bus = getBus( sourceTimedID, sourceKey ).getOrElse( // ... or could just stick with the default control value
+                  sys.error( "Bus disappeared " + sourceTimedID + " -> " + sourceKey ))
                ensureChannels( bus.numChannels )  // ... or could insert a channel coercing synth
-               val bm = BusNodeSetter.mapper( scan.inControlName( key /* ! not k */ ), bus, synth )
+               val bm = BusNodeSetter.mapper( scan.inControlName( key /* ! not sourceKey */ ), bus, synth )
                bm.add()
                busUsers :+= bm
             }
