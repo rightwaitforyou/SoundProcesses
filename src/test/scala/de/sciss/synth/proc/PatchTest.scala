@@ -10,15 +10,16 @@ import expr.ExprImplicits
 object PatchTest extends App {
 
    {
-      type S            = ConfluentReactive
-      type I            = stm.InMemory
-      implicit val sys  = ConfluentReactive.tmp()
-      sys.root( _ => () )
-      sys.step { implicit tx =>
+      type S   = ConfluentReactive
+      type I   = stm.InMemory
+      val sys  = ConfluentReactive.tmp()
+      val (_, cursor) = sys.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
+      implicit val _cursor: stm.Cursor[ S ] = cursor
+      cursor.step { implicit tx =>
          val auralSys = AuralSystem.start[ S, I ]()
          auralSys.whenStarted( implicit tx => { _ =>
 //            println( "AQUI" )
-            run[ S, I ]( auralSys )
+            run[ S, I ]( auralSys ) // ( tx, cursor )
          })
       }
    }

@@ -22,6 +22,8 @@ object ScansTest extends App {
          run[ InMemory, InMemory ]()
       case Some( "--confluent-scan" ) =>
          implicit val sys = ConfluentReactive.tmp()
+         val (_, cursor) = sys.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
+         implicit val _cursor = cursor
          run[ ConfluentReactive, stm.InMemory ]()
 
       case _ =>
@@ -85,9 +87,6 @@ val transp  = Transport[ S, I ]( group )
          auralSystem.foreach { as => AuralPresentation.run[ S, I ]( transp, as )}
          transp.play()
       }
-
-      // ensure index tree 0 is build
-      system.root( _ => () )
 
       cursor.step { implicit tx =>
          if( AURAL ) {

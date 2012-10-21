@@ -9,8 +9,8 @@ import concurrent.stm.TxnLocal
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
-   final type FixtureParam = ConfluentReactive
-   final type S = FixtureParam
+   final type S = ConfluentReactive
+   final type FixtureParam = lucre.confluent.Cursor[ S ]
 
    implicit final protected val IntType   = Ints
    implicit final protected val LongType  = Longs
@@ -19,8 +19,8 @@ trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
    final def withFixture( test: OneArgTest ) {
       val system = ConfluentReactive.tmp()
       try {
-         system.root( _ => () )
-         test( system )
+         val (_, cursor) = system.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
+         test( cursor )
       }
       finally {
          system.close()
