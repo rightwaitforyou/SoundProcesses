@@ -26,11 +26,17 @@
 package de.sciss.synth.proc
 
 import java.io.File
-import de.sciss.lucre.{DataInput, Writable}
+import de.sciss.lucre.{stm, DataInput, Writable}
+import impl.{ArtifactImpl => Impl}
+import stm.ImmutableSerializer
 
 object Artifact {
-   def read( in: DataInput ) : Artifact = ???
+   def apply( path: String ) : Artifact = Impl( path )
+
+   def read( in: DataInput ) : Artifact = Impl.read( in )
+
+   implicit def serializer : ImmutableSerializer[ Artifact ] = Impl.serializer
 }
 trait Artifact extends Writable {
-   def toFile: File
+   def toFile[ S <: stm.Sys[ S ]]( implicit tx: S#Tx, store: ArtifactStore[ S ]): File
 }

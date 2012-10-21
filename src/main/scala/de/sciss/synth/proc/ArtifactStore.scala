@@ -25,10 +25,16 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt}
-import evt.Sys
+import de.sciss.lucre.{event => evt, Writable, stm, data}
+import java.io.File
+import impl.{ArtifactStoreImpl => Impl}
 
-trait ArtifactStore[ S <: Sys[ S ]] {
+object ArtifactStore {
+   def apply[ S <: evt.Sys[ S ]]( baseDirectory: File )( implicit tx: S#Tx ) : ArtifactStore[ S ] = Impl[ S ]( baseDirectory )
+
+   def serializer[ S <: evt.Sys[ S ]] : stm.Serializer[ S#Tx, S#Acc, ArtifactStore[ S ]] = Impl.serializer[ S ]
+}
+trait ArtifactStore[ S <: stm.Sys[ S ]] extends Writable {
    /**
     * Creates a new artifact. This is a side-effect and
     * thus should be called outside of a transaction.
@@ -48,4 +54,8 @@ trait ArtifactStore[ S <: Sys[ S ]] {
     * @param artifact   the artifact to register
     */
    def register( artifact: Artifact )( implicit tx: S#Tx ) : Unit
+
+   def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Artifact ]
+
+   def baseDirectory : File
 }
