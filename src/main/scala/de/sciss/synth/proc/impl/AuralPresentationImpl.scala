@@ -31,7 +31,7 @@ import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm}
 import stm.{IdentifierMap, Cursor}
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.TxnLocal
+import concurrent.stm.{Ref, TxnLocal}
 import SoundProcesses.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
@@ -119,10 +119,9 @@ object AuralPresentationImpl {
 //      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
 //   }
 
-/*
-   private final class MonoSegmentWriter( seg: Scan_.Value.MonoSegment, val bus: RichAudioBus, aural: AuralProc, sampleRate: Double )
+   private final class SegmentWriter( segms: Grapheme.Segment.Curve, val bus: RichAudioBus, aural: AuralProc, sampleRate: Double )
    extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
-      private val synthRef: Ref[ Option[ RichSynth ]] = ???
+      private val synthRef = Ref( Option.empty[ RichSynth ])
 
       protected def synth( implicit tx: ProcTxn ) : Option[ RichSynth ] = synthRef.get( tx.peer )
       protected def synth_=( rso: Option[ RichSynth ])( implicit tx: ProcTxn ) {
@@ -143,20 +142,22 @@ object AuralPresentationImpl {
          val start   = "$start".ir
          val stop    = "$stop".ir
          val dur     = "$dur".ir
-         val sig = seg.shape match {
-            case `linShape` =>
-               Line.ar( start, stop, dur, doneAction = freeSelf )
-            case `expShape` =>
-               if( seg.start != 0f && seg.stop != 0f && seg.start * seg.stop > 0f ) {
-                  XLine.ar( start, stop, dur, doneAction = freeSelf )
-               } else {
-                  Line.ar( 0, 0, dur, doneAction = freeSelf )
-               }
-            case _ =>
-               val env = Env( start, Env.Seg( dur = dur, targetLevel = stop,
-                                              shape = varShape( "$shape".ir, "$curve".ir( 0 ))) :: Nil )
-               EnvGen.ar( env, doneAction = freeSelf )
+         val sig: GE = segms.values.map { case (segmStart, segmStop, segmShape) =>
+            segmShape match {
+               case `linShape` =>
+                  Line.ar( start, stop, dur, doneAction = freeSelf )
+               case `expShape` =>
+                  if( segmStart != 0f && segmStop != 0f && segmStart * segmStop > 0f ) {
+                     XLine.ar( start, stop, dur, doneAction = freeSelf )
+                  } else {
+                     Line.ar( 0, 0, dur, doneAction = freeSelf )
+                  }
+               case _ =>
+                  val env = Env( start, Env.Seg( dur = dur, targetLevel = stop,
+                                                 shape = varShape( "$shape".ir, "$curve".ir( 0 ))) :: Nil )
+                  EnvGen.ar( env, doneAction = freeSelf )
 
+            }
          }
          Out.ar( "$out".kr, sig )
       }
@@ -164,24 +165,25 @@ object AuralPresentationImpl {
       // ---- TxnPlayer ----
 
       def play( implicit tx: ProcTxn ) {
-         type Ctl = List[ ControlSetMap ]
-
-         val g          = graph
-         val rsd        = RichSynthDef( aural.server, g )
-         val durSecs    = seg.dur * sampleRate
-         val ctl0: Ctl  = List( "$start" -> seg.start, "$stop" -> seg.stop, "$dur" -> durSecs )
-         val shp        = seg.shape
-         val ctl1: Ctl  = if( shp != linShape && shp != expShape ) ("$shape" -> seg.shape.id) :: ctl0 else ctl0
-         val ctl: Ctl   = if( shp.curvature != 0f ) ("$curve" -> shp.curvature) :: ctl1 else ctl1
-         val rs         = rsd.play( aural.preGroup, ctl )
-
-         synth_=( Some( rs ))
-
-//         rs.onEndTxn { implicit tx =>
-//            synth.foreach( rs2 => if( rs == rs2 ) {
-//               ctrl.glidingDone
-//            })
-//         }
+         ???
+//         type Ctl = List[ ControlSetMap ]
+//
+//         val g          = graph
+//         val rsd        = RichSynthDef( aural.server, g )
+//         val durSecs    = segms.span.length * sampleRate
+//         val ctl0: Ctl  = List( "$start" -> seg.start, "$stop" -> seg.stop, "$dur" -> durSecs )
+//         val shp        = seg.shape
+//         val ctl1: Ctl  = if( shp != linShape && shp != expShape ) ("$shape" -> seg.shape.id) :: ctl0 else ctl0
+//         val ctl: Ctl   = if( shp.curvature != 0f ) ("$curve" -> shp.curvature) :: ctl1 else ctl1
+//         val rs         = rsd.play( aural.preGroup, ctl )
+//
+//         synth_=( Some( rs ))
+//
+////         rs.onEndTxn { implicit tx =>
+////            synth.foreach( rs2 => if( rs == rs2 ) {
+////               ctrl.glidingDone
+////            })
+////         }
       }
 
       def stop( implicit tx: ProcTxn ) {
@@ -198,11 +200,11 @@ object AuralPresentationImpl {
 
       // ---- DynamicAudioBusUser ----
 
-      def add( implicit tx: ProcTxn ) {
+      def add()( implicit tx: ProcTxn ) {
          bus.addWriter( this )
       }
 
-      def remove( implicit tx: ProcTxn ) {
+      def remove()( implicit tx: ProcTxn ) {
          bus.removeWriter( this )
       }
 
@@ -210,7 +212,7 @@ object AuralPresentationImpl {
          ???
       }
    }
-*/
+
    private final class AuralProcBuilder[ S <: evt.Sys[ S ]]( val ugen: UGenGraphBuilder[ S ]) {
       var outBuses: Map[ String, RichAudioBus ] = Map.empty
 //      def finish : AuralProc = {
@@ -320,9 +322,10 @@ object AuralPresentationImpl {
 
                      case segm: Segment.Curve =>
                         ensureChannels( segm.numChannels )  // ... or could just adjust to the fact that they changed
-                        ??? // MonoSegmentWriter
+                        ??? // SegmentWriter
 
                      case audio: Segment.Audio =>
+                        ensureChannels( audio.numChannels )
                         ??? // AudioFileWriter
                   }
                case Scan.Link.Scan( peer ) =>
