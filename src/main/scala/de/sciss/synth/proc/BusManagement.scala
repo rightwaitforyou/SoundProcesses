@@ -27,7 +27,7 @@ package de.sciss.synth.proc
 
 import collection.immutable.{SortedMap => ISortedMap}
 import de.sciss.synth.{AudioBus, AudioRated, Bus, ControlBus, ControlRated, Rate, Server}
-import concurrent.stm.{Ref => ScalaRef}
+import concurrent.stm.{Ref => ScalaRef, Txn}
 
 sealed trait RichBus {
    def server : Server
@@ -276,18 +276,26 @@ object RichBus {
                                  ( implicit tx: ProcTxn ) : AudioBusHolder = {
       val chanMapO = mapScalaRef.get( tx.peer ).get( server )
       val bus: AudioBusHolder = chanMapO.flatMap( _.from( numChannels ).headOption.map( _._2 )).getOrElse {
-         val res = new RichAudioBusHolder( Bus.audio( server, numChannels ), mapScalaRef )
+         val peer = Bus.audio( server, numChannels )
+         Txn.afterRollback( _ => server.busses.freeAudio( peer.index ))( tx.peer )
+         val res  = new RichAudioBusHolder( peer, mapScalaRef )
          res.add
          res
       }
       bus
    }
 
-   private def createAudioBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder =
-      new PlainBusHolder( Bus.audio( server, numChannels ))
+   private def createAudioBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder = {
+      val peer = Bus.audio( server, numChannels )
+      Txn.afterRollback( _ => server.busses.freeAudio( peer.index ))( tx.peer )
+      new PlainBusHolder( peer )
+   }
 
-   private def createControlBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : ControlBusHolder =
-      new PlainBusHolder( Bus.control( server, numChannels ))
+   private def createControlBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : ControlBusHolder = {
+      val peer = Bus.control( server, numChannels )
+      Txn.afterRollback( _ => server.busses.freeControl( peer.index ))( tx.peer )
+      new PlainBusHolder( peer )
+   }
 
    private abstract class AbstractAudioImpl extends RichAudioBus {
       import RichAudioBus.{ User => AU }

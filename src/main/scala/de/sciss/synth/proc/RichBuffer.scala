@@ -23,13 +23,21 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
-import de.sciss.synth.Buffer
-import de.sciss.synth.io.{SampleFormat, AudioFileType}
+import io.{SampleFormat, AudioFileType}
 import ProcTxn.{Always, RequiresChange}
+import concurrent.stm.Txn
 
-final case class RichBuffer( buf: Buffer ) /* extends RichObject */ {
+object RichBuffer {
+   def apply( server: Server )( implicit tx: ProcTxn ) : RichBuffer = {
+      val b = Buffer( server )
+      Txn.afterRollback( _ => server.buffers.free( b.id ))( tx.peer )
+      new RichBuffer( b )
+   }
+}
+final case class RichBuffer private( buf: Buffer ) /* extends RichObject */ {
    val isOnline: RichState   = new RichState( this, "isOnline", false )
    val hasContent: RichState = new RichState( this, "hasContent", false )
 
@@ -39,8 +47,9 @@ final case class RichBuffer( buf: Buffer ) /* extends RichObject */ {
       tx.add( buf.allocMsg( numFrames, numChannels ), change = Some( (RequiresChange, isOnline, true) ), audible = false )
    }
 
-   def cue( path: String, startFrame: Int = 0 )( implicit tx: ProcTxn ) {
-      tx.add( buf.cueMsg( path, startFrame ), change = Some( (Always, hasContent, true) ),
+   def cue( path: String, startFrame: Long = 0L )( implicit tx: ProcTxn ) {
+      require( startFrame < 0x7FFFFFFFL, "Cannot encode start frame >32 bit" )
+      tx.add( buf.cueMsg( path, startFrame.toInt ), change = Some( (Always, hasContent, true) ),
          audible = false, dependencies = Map( isOnline -> true ))
    }
 
@@ -49,7 +58,11 @@ final case class RichBuffer( buf: Buffer ) /* extends RichObject */ {
          change = Some( (Always, hasContent, true) ), audible = false, dependencies = Map( isOnline -> true )) // hasContent is a bit misleading...
    }
 
-   def zero( implicit tx: ProcTxn ) {
+   def zero()( implicit tx: ProcTxn ) {
       tx.add( buf.zeroMsg, change = Some( (Always, hasContent, true) ), audible = false, dependencies = Map( isOnline -> true ))
+   }
+
+   def closeAndFree()( implicit tx: ProcTxn ) {
+      tx.add( buf.closeMsg( buf.freeMsg ), change = Some( (Always, isOnline, false) ), audible = false )
    }
 }
