@@ -35,10 +35,12 @@ import concurrent.stm.TxnLocal
 import SoundProcesses.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
+import java.io.File
 
 object AuralPresentationImpl {
    def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
-                          ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: Cursor[ S ]) : AuralPresentation[ S ] = {
+                          ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: Cursor[ S ],
+                            artifactStore: ArtifactStore[ S ]) : AuralPresentation[ S ] = {
 
       val dummy = DummySerializerFactory[ I ]
       import dummy._
@@ -53,7 +55,8 @@ object AuralPresentationImpl {
    private final class Client[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( running: I#Var[ Option[ RunningImpl[ S ]]],
                                                                       transport: ProcTransport[ S ],
                                                                       aural: AuralSystem[ S ])
-                                                                    ( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx )
+                                                                    ( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx,
+                                                                      artifactStore: ArtifactStore[ S ])
    extends AuralPresentation[ S ] with AuralSystem.Client[ S ] {
 
       override def toString = "AuralPresentation@" + hashCode.toHexString
@@ -78,7 +81,7 @@ object AuralPresentationImpl {
          val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]                           = tx.newInMemoryIDMap
          val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
 
-         val booted  = new RunningImpl( server, viewMap, scanMap )
+         val booted  = new RunningImpl( server, viewMap, scanMap, transport.sampleRate )
          ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
 //            transport.react { x => println( "Aural observation: " + x )}
 
@@ -149,7 +152,8 @@ object AuralPresentationImpl {
                                                           var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
 
    private final class RunningImpl[ S <: evt.Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
-                                                        scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ])
+                                                        scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ])],
+                                                        sampleRate: Double )( implicit artifactStore: ArtifactStore[ S ])
    extends AuralPresentation.Running[ S ] {
       // ongoingBuild is a transaction local field storing a mutable object. This is
       // totally fine since a transaction is not shared across threads. the idea is
@@ -231,7 +235,9 @@ object AuralPresentationImpl {
 
                      case audio: Segment.Audio =>
                         ensureChannels( audio.numChannels )
-                        ??? // AudioFileWriter
+                        val file: File = audio.value.artifact.toFile( artifactStore )
+                        val aaw = new AudioArtifactWriter( audio, file, server, sampleRate )
+                        busUsers :+= aaw
                   }
                case Scan.Link.Scan( peer ) =>
                   scanMap.get( peer.id ).foreach { case (sourceKey, idH) =>

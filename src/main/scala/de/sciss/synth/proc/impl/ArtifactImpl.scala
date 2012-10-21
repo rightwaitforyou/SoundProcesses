@@ -5,7 +5,7 @@ package impl
 
 import java.io.File
 import lucre.{DataOutput, stm, DataInput}
-import stm.{Sys, ImmutableSerializer}
+import stm.ImmutableSerializer
 
 object ArtifactImpl {
    private final val SER_VERSION = 1
@@ -24,7 +24,7 @@ object ArtifactImpl {
    }
 
    private final class Impl( path: String ) extends Artifact {
-      def toFile[ S <: Sys[ S ]]( implicit tx: S#Tx, store: ArtifactStore[ S ]) : File = {
+      def toFile( implicit store: ArtifactStore[ _ ]) : File = {
          // XXX TODO: in the future we could have a better resolution scheme
          new File( store.baseDirectory, path )
       }

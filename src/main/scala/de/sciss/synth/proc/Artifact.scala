@@ -38,5 +38,5 @@ object Artifact {
    implicit def serializer : ImmutableSerializer[ Artifact ] = Impl.serializer
 }
 trait Artifact extends Writable {
-   def toFile[ S <: stm.Sys[ S ]]( implicit tx: S#Tx, store: ArtifactStore[ S ]): File
+   def toFile( implicit store: ArtifactStore[ _ ]): File
 }

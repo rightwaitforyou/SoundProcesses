@@ -221,6 +221,7 @@ extends ExprImplicits[ Sy ] {
       implicit val itx = tx.peer
       if( auralVar().isEmpty ) {
          val as = AuralSystem.start[ S, I ]()
+         implicit val artifactStore = ArtifactStore.tmp[ S ]()
          auralVar.set( Some( AuralPresentation.run[ S, I ]( trans, as )))
       }
    }}

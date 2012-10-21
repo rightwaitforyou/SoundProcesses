@@ -34,6 +34,7 @@ object PatchTest extends App {
 
       val group      = ProcGroup_.Modifiable[ S ]
       val trans      = Transport[ S, I ]( group )
+      implicit val artifactStore = ArtifactStore.tmp()
       AuralPresentation.run[ S, I ]( trans, auralSys )
 
       val p1         = Proc[ S ]

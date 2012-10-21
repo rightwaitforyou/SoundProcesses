@@ -30,6 +30,14 @@ import java.io.File
 import impl.{ArtifactStoreImpl => Impl}
 
 object ArtifactStore {
+   def tmp[ S <: evt.Sys[ S ]]()( implicit tx: S#Tx ) : ArtifactStore[ S ] = {
+      val dir = File.createTempFile( "artifacts", "tmp" )
+      dir.delete()
+      dir.mkdir()
+      dir.deleteOnExit()
+      apply( dir )
+   }
+
    def apply[ S <: evt.Sys[ S ]]( baseDirectory: File )( implicit tx: S#Tx ) : ArtifactStore[ S ] = Impl[ S ]( baseDirectory )
 
    def serializer[ S <: evt.Sys[ S ]] : stm.Serializer[ S#Tx, S#Acc, ArtifactStore[ S ]] = Impl.serializer[ S ]
