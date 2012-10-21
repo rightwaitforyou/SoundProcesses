@@ -82,6 +82,11 @@ abstract class RichNode( val initOnline: Boolean ) /* extends RichObject */ {
       reader
    }
 
+   /**
+    * Associates an audio bus with this node such that the node writes to this bus.
+    * This creates a `DynamicAudioBusUser` which will be freed automatically when
+    * this node ends.
+    */
    final def write( assoc: (RichAudioBus, String) )( implicit tx: ProcTxn ) : AudioBusNodeSetter = {
       val (rb, name) = assoc
       val writer = BusNodeSetter.writer( name, rb, this )
