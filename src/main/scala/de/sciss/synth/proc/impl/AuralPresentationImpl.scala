@@ -122,7 +122,7 @@ object AuralPresentationImpl {
 //      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
 //   }
 
-   private final class AuralProcBuilder[ S <: evt.Sys[ S ]]( val ugen: UGenGraphBuilder[ S ]) {
+   private final class AuralProcBuilder[ S <: evt.Sys[ S ]]( val ugen: UGenGraphBuilder[ S ], val name: String ) {
       var outBuses: Map[ String, RichAudioBus ] = Map.empty
 //      def finish : AuralProc = {
 //         val ug = ugen.finish
@@ -188,7 +188,7 @@ object AuralPresentationImpl {
          // get a rich synth def and synth playing just in the default group
          // (we'll have additional messages moving the group into place if needed,
          // as well as setting and mapping controls)
-         val df            = ProcDemiurg.getSynthDef( server, ug ) // RichSynthDef()
+         val df            = ProcDemiurg.getSynthDef( server, ug, nameHint = Some( builder.name )) // RichSynthDef()
          val synth         = df.play( target = RichGroup.default( server ), addAction = addToHead )
 
          // ---- handle input buses ----
@@ -206,13 +206,7 @@ object AuralPresentationImpl {
                require( n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")" )
             }
 
-            def makeBusMapper( sourceTimedID: S#ID, sourceKey: String ) {
-               val bus = getBus( sourceTimedID, sourceKey ).getOrElse( // ... or could just stick with the default control value
-                  sys.error( "Bus disappeared " + sourceTimedID + " -> " + sourceKey ))
-               ensureChannels( bus.numChannels )  // ... or could insert a channel coercing synth
-               val bm = BusNodeSetter.mapper( scan.inControlName( key /* ! not sourceKey */ ), bus, synth )
-               busUsers :+= bm
-            }
+            val inCtlName = scan.inControlName( key )
 
             val sourceOpt = p.scans.get( key ).flatMap( _.source )
             sourceOpt.foreach {   // if not found, stick with default
@@ -222,11 +216,10 @@ object AuralPresentationImpl {
                      case const: Segment.Const =>
                         ensureChannels( const.numChannels )  // ... or could just adjust to the fact that they changed
 //                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
-                        val cKey = scan.inControlName( key )
                         setMap :+= (if( const.numChannels == 1 ) {
-                           ControlSetMap.Single( cKey, const.values.head.toFloat )
+                           ControlSetMap.Single( inCtlName, const.values.head.toFloat )
                         } else {
-                           ControlSetMap.Multi( cKey, const.values.map( _.toFloat ))
+                           ControlSetMap.Multi( inCtlName, const.values.map( _.toFloat ))
                         })
 
                      case segm: Segment.Curve =>
@@ -238,11 +231,17 @@ object AuralPresentationImpl {
                         val file: File = audio.value.artifact.toFile( artifactStore )
                         val aaw = new AudioArtifactWriter( audio, file, server, sampleRate )
                         busUsers :+= aaw
+                        val bm = BusNodeSetter.mapper( inCtlName, aaw.bus, synth )
+                        busUsers :+= bm
                   }
                case Scan.Link.Scan( peer ) =>
                   scanMap.get( peer.id ).foreach { case (sourceKey, idH) =>
                      val sourceTimedID = idH.get
-                     makeBusMapper( sourceTimedID, sourceKey )
+                     val bus = getBus( sourceTimedID, sourceKey ).getOrElse( // ... or could just stick with the default control value
+                        sys.error( "Bus disappeared " + sourceTimedID + " -> " + sourceKey ))
+                     ensureChannels( bus.numChannels )  // ... or could insert a channel coercing synth
+                     val bm = BusNodeSetter.mapper( inCtlName, bus, synth )
+                     busUsers :+= bm
                   }
             }
          }
@@ -324,12 +323,12 @@ object AuralPresentationImpl {
       }
 
       def procAdded( time: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
-//         val name = timed.value.name.value
-         log( "added " + timed + " (name = " + timed.value.name.value + ")" )
+         val name = timed.value.name.value
+         log( "added " + timed + " (name = " + name + ")" )
 
          val timedID    = timed.id
          val ugen       = UGenGraphBuilder( this, timed, time )
-         val builder    = new AuralProcBuilder( ugen )
+         val builder    = new AuralProcBuilder( ugen, name )
          val ongoing    = ongoingBuild.get( tx.peer )
          ongoing.seq  :+= builder
 

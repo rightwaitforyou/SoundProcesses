@@ -27,21 +27,22 @@ package de.sciss.synth.proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
 import impl.AuralProc
-import de.sciss.synth.{UGenGraph, addAfter, addBefore, Group, Server, SynthDef, SynthGraph}
+import de.sciss.synth.{Constant, ControlUGenOutProxy, UGen, UGenProxy, UGenGraph, addAfter, addBefore, Group, Server, SynthDef, SynthGraph}
 import concurrent.stm.{TMap, InTxn, TSet, Ref => ScalaRef}
+import runtime.ScalaRunTime
 
-object ProcWorld {
-// MMM
-//   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
-//   type Listener = TxnModel.Listener[ Update ]
-}
+//object ProcWorld {
+//// MMM
+////   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
+////   type Listener = TxnModel.Listener[ Update ]
+//}
 
 class ProcWorld /* MMM extends TxnModel[ ProcWorld.Update ] */ {
-   import ProcWorld._
+//   import ProcWorld._
 
 // EEE
 //   private type Topo = Topology[ AuralProc, ProcEdge ]
-   val ugenGraphs = ScalaRef( Map.empty[ UGenGraph, RichSynthDef ])
+   val ugenGraphs = ScalaRef( Map.empty[ ProcDemiurg.GraphEquality, RichSynthDef ])
 // EEE
 //   private val topologyRef = ScalaRef[ Topo ]( Topology.empty )
 
@@ -229,11 +230,34 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //      world.removeEdge( e )
 //   }}
 
-   def getSynthDef( server: Server, graph: SynthGraph )( implicit tx: ProcTxn ) : RichSynthDef = {
-      getSynthDef( server, graph.expand )
+   private def allCharsOk( name: String ) : Boolean = {
+      val len = name.length
+      var i = 0; while( i < len ) {
+         val c    = name.charAt( i ).toInt
+         val ok   = c > 36 && c < 123 || c != 95   // in particular, disallow underscore
+         if( !ok ) return false
+      i += 1 }
+      true
    }
 
-   def getSynthDef( server: Server, graph: UGenGraph )( implicit tx: ProcTxn ) : RichSynthDef = {
+   protected def abbreviate( name: String ) : String = {
+      val len = name.length
+      if( (len <= 16) && allCharsOk( name )) return name
+
+      val sb = new StringBuffer( 16 )
+      var i = 0; while( i < len && sb.length() < 16 ) {
+         val c    = name.charAt( i ).toInt
+         val ok   = c > 36 && c < 123 || c != 95   // in particular, disallow underscore
+         if( ok ) sb.append( c )
+      i += 1 }
+      sb.toString
+   }
+
+   def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
+      getSynthDef( server, graph.expand, nameHint )
+   }
+
+   def getSynthDef( server: Server, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
       implicit val itx = tx.peer
       val w = worlds.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
 
@@ -243,11 +267,39 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       // not SynthGraph equality
 //      val u = graph.expand
 
-      w.ugenGraphs.get.get( graph ).getOrElse {
-         val name = "proc" + nextDefID()
-         val rd   = RichSynthDef( server, SynthDef( name, graph ))
-         w.ugenGraphs.transform( _ + (graph -> rd) )
+      val equ = new GraphEquality( graph )
+      println( "Checking for " + equ.hashCode + "... " )
+
+      w.ugenGraphs.get.get( equ ).getOrElse {
+         println( "... not found" )
+         val name = abbreviate( nameHint.getOrElse( "proc" )) + "_" + nextDefID()
+         val peer = SynthDef( name, graph )
+         val rd   = RichSynthDef( server, peer )
+         w.ugenGraphs.transform( _ + (equ -> rd) )
          rd
       }
+   }
+
+   final class GraphEquality( val graph: UGenGraph ) extends Proxy {
+      private def mapUGen( ugen: UGen ) : Any = {
+         val inStruct = ugen.inputs.map {
+            //         case up: UGenProxy => mapUGen( up.source )
+            case ugen: UGen.SingleOut                       => mapUGen( ugen )
+            case UGen.OutProxy( source, outputIndex: Int )  => (mapUGen( source ), outputIndex)
+            case ctl: ControlUGenOutProxy                   => ctl
+            case c: Constant                                => c
+         }
+         (ugen.name, ugen.rate, ugen.specialIndex, inStruct, ugen.outputRates)
+      }
+
+      val self : Any = {
+         val uStructs = graph.ugens.map { rich =>
+            (mapUGen( rich.ugen ), rich.inputSpecs)
+         }
+
+         (graph.constants, graph.controlValues, graph.controlNames, uStructs)
+      }
+
+      override val hashCode: Int = self.hashCode   // make it a val
    }
 }

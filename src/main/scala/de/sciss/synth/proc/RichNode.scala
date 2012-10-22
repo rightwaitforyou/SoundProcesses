@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{Ref => ScalaRef, Txn, TxnLocal}
+import concurrent.stm.{Ref => ScalaRef, TxnExecutor, Txn, TxnLocal}
 import ProcTxn.IfChanges
 
 object RichNode {
@@ -39,32 +39,44 @@ object RichNode {
 abstract class RichNode( val initOnline: Boolean ) /* extends RichObject */ {
    import RichNode._
 
+   // ---- abstract ----
+   def node: Node
+
    final val isOnline: RichState = new RichState( this, "isOnline", initOnline )
 //   private val onEndFuns   = Ref( IQueue.empty[ Function1[ ProcTxn, Unit ]])
 
    private val onEndFuns   = ScalaRef( EmptyOnEnd )
-   private val onEndTouch  = TxnLocal[ Unit ]( initialValue = { implicit itx =>
-      Txn.beforeCommit { implicit itx =>
-         val funs = onEndFuns()
-         if( funs.nonEmpty ) {
-            val ptx = ProcTxn()
+//   private val onEndTouch  = TxnLocal[ Unit ]( initialValue = { implicit itx =>
+//      Txn.beforeCommit { implicit itx =>
+//         val funs = onEndFuns()
+//         if( funs.nonEmpty ) {
+//            val ptx = ProcTxn()
+//            funs.direct.foreach( _.apply() )
+//            funs.inTxn.foreach( _.apply( ptx ))
+//         }
+//      }
+//   })
+
+   node.onEnd {
+      val funs = onEndFuns.single.get
+      if( funs.nonEmpty ) {
+         TxnExecutor.defaultAtomic { implicit itx =>
+            implicit val ptx = ProcTxn()
             funs.direct.foreach( _.apply() )
             funs.inTxn.foreach( _.apply( ptx ))
          }
       }
-   })
+   }
 
    def onEndTxn( fun: ProcTxn => Unit )( implicit tx: ProcTxn ) {
       onEndFuns.transform( e => e.copy( inTxn = e.inTxn :+ fun ))( tx.peer )
-      onEndTouch()( tx.peer )
+//      onEndTouch()( tx.peer )
    }
 
    def onEnd( code: => Unit )( implicit tx: ProcTxn ) {
       onEndFuns.transform( e => e.copy( direct = e.direct :+ (() => code) ))( tx.peer )
-      onEndTouch()( tx.peer )
+//      onEndTouch()( tx.peer )
    }
-
-   def node: Node
 
    final def server = node.server
 

@@ -23,7 +23,9 @@ object ArtifactImpl {
       def read( in: DataInput ) : Artifact = ArtifactImpl.read( in )
    }
 
-   private final class Impl( path: String ) extends Artifact {
+   private final case class Impl( path: String ) extends Artifact {
+      override def toString = "Artifact(" + path + ")"
+
       def toFile( implicit store: ArtifactStore[ _ ]) : File = {
          // XXX TODO: in the future we could have a better resolution scheme
          new File( store.baseDirectory, path )

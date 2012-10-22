@@ -15,25 +15,19 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
    def add()( implicit tx: ProcTxn ) {
 //      val bufPeer       = Buffer( server )
       val rb                  = RichBuffer( server )
+      val numChannels      = bus.numChannels
 
       val sg = SynthGraph {
          import ugen._
          val buf  = "buf".ir
          val dur  = "dur".ir( 1 )
          val out  = "out".kr
-         val sig  = DiskIn.ar( bus.numChannels, buf )
+         val sig  = DiskIn.ar( numChannels, buf )
          Line.kr( start = 0, end = 0, dur = dur, doneAction = freeSelf )
          Out.ar( out, sig )
       }
 
-      val rd      = RichSynthDef( server, sg )
-      val synPeer = Synth( server )
-      val rs      = RichSynth( synPeer, rd )
-
-      rs.onEndTxn { implicit tx =>
-//         bufPeer.close( bufPeer.freeMsg )
-         rb.closeAndFree()
-      }
+      val rd         = RichSynthDef( server, sg, nameHint = Some( "audio-artifact" ))
 
       val audioVal   = segm.value
 //      val path       = audioVal.artifact.toFile.getAbsolutePath
@@ -47,8 +41,17 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
 
       val args: Seq[ ControlSetMap ] = Seq( "buf" -> rb.buf.id, "dur" -> dur )
 
+      rb.alloc( numFrames = 32768, numChannels = numChannels )
       rb.cue( path, fileStart )
-      rs.play( target = target, args = args, buffers = rb :: Nil )
+
+      val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
+
+      rs.onEndTxn { implicit tx =>
+//         bufPeer.close( bufPeer.freeMsg )
+         rb.closeAndFree()
+      }
+
+//      rs.play( target = target, args = args, buffers = rb :: Nil )
       rs.write( bus -> "out" )
 
       val oldSynth = synthRef.swap( Some( rs ))( tx.peer )

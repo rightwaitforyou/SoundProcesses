@@ -29,8 +29,8 @@ import de.sciss.synth.{Synth, addToHead, AddAction, ControlSetMap, SynthDef, Ser
 import ProcTxn.IfChanges
 
 object RichSynthDef {
-   def apply( server: Server, graph: SynthGraph )( implicit tx: ProcTxn ) : RichSynthDef =
-      ProcDemiurg.getSynthDef( server, graph )
+   def apply( server: Server, graph: SynthGraph, nameHint: Option[ String ] = None )( implicit tx: ProcTxn ) : RichSynthDef =
+      ProcDemiurg.getSynthDef( server, graph, nameHint )
 }
 final case class RichSynthDef( server: Server, synthDef: SynthDef ) /* extends RichObject */ {
    val isOnline: RichState = new RichState( this, "isOnline", false )
@@ -49,11 +49,11 @@ final case class RichSynthDef( server: Server, synthDef: SynthDef ) /* extends R
    }
 
    def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil,
-             addAction: AddAction = addToHead, bufs: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) : RichSynth = {
+             addAction: AddAction = addToHead, buffers: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) : RichSynth = {
       recv()  // make sure it is online
       val synth   = Synth( server )
       val rs      = RichSynth( synth, this )
-      rs.play( target, args, addAction, bufs )
+      rs.play( target, args, addAction, buffers )
       rs
    }
 }

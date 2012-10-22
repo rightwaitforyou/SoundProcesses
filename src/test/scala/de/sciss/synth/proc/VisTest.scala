@@ -1,12 +1,13 @@
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
 import de.sciss.lucre.{stm, bitemp, expr, event => evt}
 import stm.{Serializer, Cursor}
-import stm.impl.BerkeleyDB
-import bitemp.{BiType, BiGroup, BiPin, Chronos, Span, SpanLike}
+import bitemp.{BiExpr, BiType, BiGroup, Chronos, Span, SpanLike}
 import expr.Expr
-import java.awt.{BorderLayout, EventQueue}
-import javax.swing.{WindowConstants, JFrame}
+import java.awt.EventQueue
+import io.AudioFile
+
 //import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
 import java.io.File
@@ -21,7 +22,9 @@ object VisTest {
       new VisTest( system )
    }
 
-   def dataDir = new File( new File( sys.props( "user.home" ), "sound_processes" ), "db" )
+   def baseDir    = new File( sys.props( "user.home" ), "sound_processes" )
+   def dataDir    = new File( baseDir, "db" )
+   def audioDir   = new File( baseDir, "artifacts" )
 
    def inMem() : VisTest[ InMemory, InMemory ] = {
       implicit val system  = InMemory()
@@ -89,13 +92,13 @@ extends ExprImplicits[ Sy ] {
 
    access // initialize !
 
-   val trans = cursor.step { implicit tx =>
+   val (trans, artifactStore) = cursor.step { implicit tx =>
       val g = access.get
       val tr = Transport[ S, I ]( g )
       tr.react { upd =>
          println( "Transport observed: " + upd )
       }
-      tr
+      tr -> ArtifactStore[ S ]( VisTest.audioDir )
    }
 //      val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
 
@@ -221,7 +224,7 @@ extends ExprImplicits[ Sy ] {
       implicit val itx = tx.peer
       if( auralVar().isEmpty ) {
          val as = AuralSystem.start[ S, I ]()
-         implicit val artifactStore = ArtifactStore.tmp[ S ]()
+         implicit val _artifactStore = artifactStore
          auralVar.set( Some( AuralPresentation.run[ S, I ]( trans, as )))
       }
    }}
@@ -230,10 +233,51 @@ extends ExprImplicits[ Sy ] {
 
    def addFreq( time: Expr[ S, Long ] = 0, freq: Expr[ S, Param ]) {
       t { implicit tx =>
-         pr().scans.get( "freq" ).flatMap( _.source ).foreach {
-            case Scan.Link.Grapheme( Grapheme.Modifiable( peer )) => peer.add( time -> curve( freq ))
-            case _ =>
-         }
+         addFreq2( time -> curve( freq ))
+      }
+   }
+
+   def audioFile( path: String ) : Grapheme.Value.Audio = {
+      implicit val _artifactStore = artifactStore
+      val artifact   = Artifact( path )
+      val spec       = AudioFile.readSpec( artifact.toFile )
+      val offset     = 0L
+      val gain       = 1.0
+      Grapheme.Value.Audio( artifact, spec, offset, gain )
+   }
+
+   def addAudio( time: Expr[ S, Long ] = 0, freq: Grapheme.Value.Audio ) {
+      t { implicit tx =>
+         addFreq2( time -> freq )
+      }
+   }
+
+   def audioTest() : Proc[ S ] = {
+      val af = audioFile( "283_7WTConWhiteCCRsmpLp.aif" )
+
+      t { implicit tx =>
+         val p    = Proc[ S ]
+         p.name_=( "AudioFilePlayer" )
+         p.graph_=( SynthGraph {
+            import synth._
+            import ugen._
+            val in = graph.scan( "in" ).ar( 0 )
+            Out.ar( 0, in * SinOsc.ar( 3 ))
+         })
+         val g = Grapheme.Modifiable[ S ]
+         val scan = p.scans.add( "in" )
+         scan.source_=( Some( Scan.Link.Grapheme( g )))
+
+         g.add( 0L -> af )
+         group.add( Span( 0.sec, 4.sec ), p )
+         p
+      }
+   }
+
+   private def addFreq2( value: BiExpr[ S, Grapheme.Value ])( implicit tx: S#Tx ) {
+      pr().scans.get( "freq" ).flatMap( _.source ).foreach {
+         case Scan.Link.Grapheme( Grapheme.Modifiable( peer )) => peer.add( value )
+         case _ =>
       }
    }
 

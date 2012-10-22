@@ -29,6 +29,9 @@ package proc
 import collection.breakOut
 import ProcTxn.RequiresChange
 
+//object RichSynth {
+//   def apply( server: Server, synthDef: RichSynthDef ) : RichSynth = ...
+//}
 final case class RichSynth( synth: Synth, synthDef: RichSynthDef ) extends RichNode( false ) {
    def node: Node = synth
 
@@ -45,5 +48,7 @@ final case class RichSynth( synth: Synth, synthDef: RichSynthDef ) extends RichN
               change = Some( (RequiresChange, isOnline, true) ),
               audible = true,
               dependencies = dependencies + (target.isOnline -> true) + (synthDef.isOnline -> true) )
+
+      node.register()   // ok to call multiple times
    }
 }
