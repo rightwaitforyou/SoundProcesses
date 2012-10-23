@@ -28,6 +28,10 @@ package de.sciss.synth
 import de.sciss.lucre.{bitemp, event => evt}
 import bitemp.BiGroup
 import evt.Sys
+import java.text.SimpleDateFormat
+import java.util.{Date, Locale}
+import annotation.elidable
+import annotation.elidable._
 
 package object proc {
 //   private[proc] type I = evt.InMemory
@@ -42,6 +46,13 @@ package object proc {
 //   type Scan[ S <: Sys[ S ]] = BiPin.Expr[ S, Scan_.Elem[ S ]]
 
 //   type Grapheme[ S <: Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
+
+   private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US )
+   var showLog          = false
+
+   @elidable(CONFIG) private[proc] def log( what: => String ) {
+      if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
+   }
 
    def ??? : Nothing = sys.error( "TODO" )
 }

@@ -266,10 +266,10 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //      val u = graph.expand
 
       val equ = new GraphEquality( graph )
-      println( "Checking for " + equ.hashCode + "... " )
+      log( "request for synth graph " + equ.hashCode )
 
       w.ugenGraphs.get.get( equ ).getOrElse {
-         println( "... not found" )
+         log( "synth graph " + equ.hashCode + " is new" )
          val name = abbreviate( nameHint.getOrElse( "proc" )) + "_" + nextDefID()
          val peer = SynthDef( name, graph )
          val rd   = RichSynthDef( server, peer )

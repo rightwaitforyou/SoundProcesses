@@ -10,7 +10,7 @@ import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm}
 object AuralSystemImpl {
    import AuralSystem.Client
 
-   var dumpOSC = true
+   var dumpOSC = false
 
    def apply[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = {
       implicit val itx: I#Tx  = tx
