@@ -39,7 +39,7 @@ import java.io.File
 
 object AuralPresentationImpl {
    def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
-                          ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: Cursor[ S ],
+                          ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
                             artifactStore: ArtifactStore[ S ]) : AuralPresentation[ S ] = {
 
       val dummy = DummySerializerFactory[ I ]
@@ -55,7 +55,7 @@ object AuralPresentationImpl {
    private final class Client[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( running: I#Var[ Option[ RunningImpl[ S ]]],
                                                                       transport: ProcTransport[ S ],
                                                                       aural: AuralSystem[ S ])
-                                                                    ( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx,
+                                                                    ( implicit /* cursor: Cursor[ S ], */ bridge: S#Tx => I#Tx,
                                                                       artifactStore: ArtifactStore[ S ])
    extends AuralPresentation[ S ] with AuralSystem.Client[ S ] {
 
@@ -452,6 +452,7 @@ object AuralPresentationImpl {
 //      }
 
       def procUpdated( timed: TimedProc[ S ], change: Transport.Proc.Update[ S ])( implicit tx: S#Tx ) {
+         // XXX TODO !
 //         viewMap.get( timed.id ) match {
 //            case Some( aural ) =>
 //               implicit val ptx = ProcTxn()( tx.peer )

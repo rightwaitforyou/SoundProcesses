@@ -23,13 +23,11 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
-import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
 import impl.AuralProc
-import de.sciss.synth.{Constant, ControlUGenOutProxy, UGen, UGenProxy, UGenGraph, addAfter, addBefore, Group, Server, SynthDef, SynthGraph}
 import concurrent.stm.{TMap, InTxn, TSet, Ref => ScalaRef}
-import runtime.ScalaRunTime
 
 //object ProcWorld {
 //// MMM

@@ -11,11 +11,20 @@ object ArtifactStoreImpl {
    private final val SER_VERSION = 1
 
    def apply[ S <: evt.Sys[ S ]]( baseDirectory: File )( implicit tx: S#Tx ) : ArtifactStore[ S ] = {
-      val ll            = LinkedList.Modifiable[ S, Artifact ]
+      val ll = LinkedList.Modifiable[ S, Artifact ]
       new Impl[ S ]( ll, baseDirectory )
    }
 
    def serializer[ S <: evt.Sys[ S ]] : stm.Serializer[ S#Tx, S#Acc, ArtifactStore[ S ]] = new Ser[ S ]
+
+   def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ArtifactStore[ S ] = {
+      val cookie  = in.readUnsignedByte()
+      require( cookie == SER_VERSION, "Version mismatch. Expected " + SER_VERSION + " but found " + cookie )
+
+      val ll            = LinkedList.Modifiable.read[ S, Artifact ]( in, access )
+      val baseDirectory = new File( in.readString() )
+      new Impl[ S ]( ll, baseDirectory )
+   }
 
    private final class Ser[ S <: evt.Sys[ S ]]
    extends stm.Serializer[ S#Tx, S#Acc, ArtifactStore[ S ]] {
@@ -24,12 +33,7 @@ object ArtifactStoreImpl {
       }
 
       def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ArtifactStore[ S ] = {
-         val cookie  = in.readUnsignedByte()
-         require( cookie == SER_VERSION, "Version mismatch. Expected " + SER_VERSION + " but found " + cookie )
-
-         val ll            = LinkedList.Modifiable.read[ S, Artifact ]( in, access )
-         val baseDirectory = new File( in.readString() )
-         new Impl[ S ]( ll, baseDirectory )
+         ArtifactStoreImpl.read( in, access )
       }
    }
 

@@ -25,7 +25,7 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt, Writable, stm, data}
+import de.sciss.lucre.{event => evt, DataInput, Writable, stm, data}
 import java.io.File
 import impl.{ArtifactStoreImpl => Impl}
 
@@ -41,6 +41,8 @@ object ArtifactStore {
    def apply[ S <: evt.Sys[ S ]]( baseDirectory: File )( implicit tx: S#Tx ) : ArtifactStore[ S ] = Impl[ S ]( baseDirectory )
 
    def serializer[ S <: evt.Sys[ S ]] : stm.Serializer[ S#Tx, S#Acc, ArtifactStore[ S ]] = Impl.serializer[ S ]
+
+   def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ArtifactStore[ S ] = Impl.read[ S ]( in, access )
 }
 trait ArtifactStore[ S <: stm.Sys[ S ]] extends Writable {
    /**
