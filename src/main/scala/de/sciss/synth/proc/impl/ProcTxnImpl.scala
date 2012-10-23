@@ -33,13 +33,13 @@ import collection.breakOut
 import collection.immutable.{IntMap, Queue => IQueue, IndexedSeq => IIdxSeq}
 import concurrent.stm.{Txn, InTxn}
 import SoundProcesses.logTxn
+import de.sciss.lucre.stm.Txn
+import concurrent.stm.Txn
 
 object ProcTxnImpl {
-   def apply()( implicit tx: InTxn ) : ProcTxn = {
-      val res = new Impl( tx )
-      Txn.beforeCommit( _ => res.flush() )   // XXX TODO should participate in external decider instead
-      res
-   }
+   trait Flushable { def flush() : Unit }
+
+   def apply()( implicit tx: InTxn ) : ProcTxn with Flushable = new Impl( tx )
 
    import ProcTxn._
 
@@ -55,7 +55,7 @@ object ProcTxnImpl {
 
    var timeoutFun : () => Unit = () => ()
 
-   private final class Impl( val peer: InTxn ) extends ProcTxn {
+   private final class Impl( val peer: InTxn ) extends ProcTxn with Flushable {
       tx =>
 
       override def toString = "ProcTxn(" + peer + ")"

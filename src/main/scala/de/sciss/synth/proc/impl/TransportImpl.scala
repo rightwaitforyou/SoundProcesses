@@ -157,8 +157,8 @@ object TransportImpl {
    private case object Stopped extends State
    private case object Playing extends State
 
-   private lazy val pool : ScheduledExecutorService = {        // system wide scheduler
-      val res = Executors.newScheduledThreadPool( 1 )
+   /* private */ lazy val pool : ScheduledExecutorService = {        // system wide scheduler
+      val res = Executors.newSingleThreadScheduledExecutor() // Executors.newScheduledThreadPool( 1 )
       sys.addShutdownHook( shutdownScheduler() )
       res
    }

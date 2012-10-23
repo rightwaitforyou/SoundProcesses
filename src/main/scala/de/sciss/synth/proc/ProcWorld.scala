@@ -246,7 +246,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       var i = 0; while( i < len && sb.length() < 16 ) {
          val c    = name.charAt( i ).toInt
          val ok   = c > 36 && c < 123 || c != 95   // in particular, disallow underscore
-         if( ok ) sb.append( c )
+         if( ok ) sb.append( c.toChar )
       i += 1 }
       sb.toString
    }

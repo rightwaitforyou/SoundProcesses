@@ -82,7 +82,7 @@ object AuralPresentationImpl {
          val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
 
          val booted  = new RunningImpl( server, viewMap, scanMap, transport.sampleRate )
-         ProcDemiurg.addServer( server )( ProcTxn()( tx.peer ))
+         ProcDemiurg.addServer( server )( ProcTxn()( tx ))
 //            transport.react { x => println( "Aural observation: " + x )}
 
          def t_play( time: Long )( implicit tx: S#Tx ) {
@@ -165,11 +165,7 @@ object AuralPresentationImpl {
 
       implicit def idSer = idSerializer[ S ]
 
-      private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
-         TxnLocal( initialValue = { itx =>
-            ProcTxn()( itx ).beforeCommit( flush )
-            OngoingBuild()
-         })
+      private val ongoingBuild = TxnLocal[ OngoingBuild[ S ]]( OngoingBuild() )
 
 //      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
 //         viewMap.get( timed.id ).flatMap({ aural =>
@@ -264,7 +260,7 @@ object AuralPresentationImpl {
 
       // called before the transaction successfully completes.
       // this is the place where we launch completely built procs.
-      private def flush( ptx: ProcTxn ) {
+      private def flush()( ptx: ProcTxn ) {
          val itx = ptx.peer
          ongoingBuild.get( itx ).seq.foreach { builder =>
             val ugen = builder.ugen
@@ -280,7 +276,7 @@ object AuralPresentationImpl {
       private def getBus( timedID: S#ID, key: String )( implicit tx: S#Tx ) : Option[ RichAudioBus ] = {
          viewMap.get( timedID ) match {
             case Some( aural ) =>
-               implicit val ptx = ProcTxn()( tx.peer )
+               implicit val ptx = ProcTxn()( tx )
                aural.getBus( key )
             case _ =>
                ongoingBuild.get( tx.peer ).idMap.flatMap { map =>
@@ -322,6 +318,10 @@ object AuralPresentationImpl {
          viewMap.dispose()
       }
 
+      private def addFlush()( implicit ptx: ProcTxn ) {
+         ptx.beforeCommit( flush()( _ ))
+      }
+
       def procAdded( time: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
          val name = timed.value.name.value
          log( "added " + timed + " (name = " + name + ")" )
@@ -329,8 +329,10 @@ object AuralPresentationImpl {
          val timedID    = timed.id
          val ugen       = UGenGraphBuilder( this, timed, time )
          val builder    = new AuralProcBuilder( ugen, name )
+         if( !ongoingBuild.isInitialized( tx.peer )) addFlush()( ProcTxn() )   // the next line (`ongoingBuild.get`) will initialise then
          val ongoing    = ongoingBuild.get( tx.peer )
          ongoing.seq  :+= builder
+         assert( ongoingBuild.isInitialized( tx.peer ))
 
          // initialise the id-to-builder map if necessary
          val builderMap = ongoing.idMap.getOrElse {
@@ -419,12 +421,13 @@ object AuralPresentationImpl {
          retry.foreach( r => incrementalBuild( ongoing, r ))
       }
 
+      // XXX TODO: ongoing build???
       def procRemoved( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
          val timedID = timed.id
          viewMap.get( timedID ) match {
             case Some( aural ) =>
                viewMap.remove( timedID )
-               implicit val ptx = ProcTxn()( tx.peer )
+               implicit val ptx = ProcTxn()( tx )
                log( "removed " + timed ) // + " -- playing? " + aural.playing )
                aural.stop()
 

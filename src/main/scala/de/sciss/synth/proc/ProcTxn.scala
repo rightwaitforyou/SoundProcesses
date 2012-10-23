@@ -27,13 +27,31 @@ package de.sciss.synth.proc
 
 import de.sciss.osc
 import de.sciss.synth.{osc => sosc}
-import concurrent.stm.{TxnLocal, InTxn}
+import concurrent.stm.{Txn => ScalaTxn, TxnLocal, InTxn}
 import impl.{ProcTxnImpl => Impl}
+import de.sciss.lucre.stm.Txn
 
 object ProcTxn {
+//   private val current = TxnLocal( initialValue = Impl()( _ ))
    private val current = TxnLocal( initialValue = Impl()( _ ))
 
-   def apply()( implicit tx: InTxn ) : ProcTxn = current.get
+//   def apply()( implicit tx: InTxn ) : ProcTxn = current.get
+   def apply()( implicit tx: Txn[ _ ]) : ProcTxn = {
+      implicit val itx = tx.peer
+      val shouldAddFlush = !current.isInitialized
+      val res = current()
+      assert( current.isInitialized )
+      if( shouldAddFlush ) tx.beforeCommit( _ => res.flush() )
+      res
+   }
+
+   private[proc] def applyPlain()( implicit tx: InTxn ) : ProcTxn = {
+      val shouldAddFlush = !current.isInitialized
+      val res = current()
+      assert( current.isInitialized )
+      if( shouldAddFlush ) ScalaTxn.beforeCommit( _ => res.flush() )
+      res
+   }
 
 //   implicit def peer( implicit tx: ProcTxn ) : InTxn = tx.peer
 

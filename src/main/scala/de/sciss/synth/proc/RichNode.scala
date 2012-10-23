@@ -61,7 +61,7 @@ abstract class RichNode( val initOnline: Boolean ) /* extends RichObject */ {
       val funs = onEndFuns.single.get
       if( funs.nonEmpty ) {
          TxnExecutor.defaultAtomic { implicit itx =>
-            implicit val ptx = ProcTxn()
+            implicit val ptx = ProcTxn.applyPlain()
             funs.direct.foreach( _.apply() )
             funs.inTxn.foreach( _.apply( ptx ))
          }

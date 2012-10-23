@@ -78,7 +78,7 @@ object AuralSystemImpl {
                cursor.step { implicit tx =>
                   implicit val itx: I#Tx = tx
                   server.set( sOpt )
-                  ProcDemiurg.addServer( s )( ProcTxn()( tx.peer ) )
+                  ProcDemiurg.addServer( s )( ProcTxn()( tx ))
                   val cs = clients.get
 //                  println( "AQUI " + cs )
                   cs.foreach( _.started( s ))
@@ -111,7 +111,7 @@ object AuralSystemImpl {
                   cursor.step { implicit tx =>
                      implicit val itx: I#Tx = tx
                      clients.get.foreach( _.stopped() )
-                     ProcDemiurg.removeServer( s )( ProcTxn()( tx.peer ))
+                     ProcDemiurg.removeServer( s )( ProcTxn()( tx ))
                   }
                   s.quit()
             }
