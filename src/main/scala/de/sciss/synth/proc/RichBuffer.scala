@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 
 import io.{SampleFormat, AudioFileType}
-import ProcTxn.{Always, RequiresChange}
+import proc.ProcTxn.{IfChanges, Always, RequiresChange}
 import concurrent.stm.Txn
 
 object RichBuffer {
@@ -63,6 +63,6 @@ final case class RichBuffer private( buf: Buffer ) /* extends RichObject */ {
    }
 
    def closeAndFree()( implicit tx: ProcTxn ) {
-      tx.add( buf.closeMsg( buf.freeMsg ), change = Some( (Always, isOnline, false) ), audible = false )
+      tx.add( buf.closeMsg( buf.freeMsg ), change = Some( (IfChanges, isOnline, false) ), audible = false )
    }
 }

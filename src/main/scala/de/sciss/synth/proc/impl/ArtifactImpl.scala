@@ -32,6 +32,7 @@ object ArtifactImpl {
       }
 
       def write( out: DataOutput ) {
+         out.writeUnsignedByte( SER_VERSION )
          out.writeString( path )
       }
    }
