@@ -29,13 +29,20 @@ import de.sciss.synth.{addToHead, AddAction, Node, Server, Group}
 import ProcTxn.RequiresChange
 
 object RichGroup {
-   def apply( group: Group ) : RichGroup     = new RichGroup( group, false )
-   def default( server: Server ) : RichGroup = new RichGroup( server.defaultGroup, true ) // not very fortunate XXX
-}
-final class RichGroup private( val group: Group, initOnline: Boolean ) extends RichNode( initOnline ) {
-   def node: Node = group
+   def apply( server: RichServer ) : RichGroup =
+      new RichGroup( server, Group( server.peer ))( initOnline = false )
 
-   override def toString = "RichGroup(" + group.toString + ")"
+   def apply( server: RichServer, peer: Group ) : RichGroup = {
+      require( server.peer == peer.server )
+      new RichGroup( server, peer )( initOnline = false )
+   }
+
+   def default( server: RichServer ) : RichGroup =
+      new RichGroup( server, server.peer.defaultGroup )( initOnline = true ) // XXX TODO: should go into RichServer
+}
+final case class RichGroup private( server: RichServer, peer: Group )( initOnline: Boolean )
+extends RichNode( initOnline ) {
+   override def toString = "RichGroup(" + peer.toString + ")"
 
    def play( target: RichNode, addAction: AddAction = addToHead )( implicit tx: ProcTxn ) {
       require( target.server == server )
@@ -49,7 +56,7 @@ final class RichGroup private( val group: Group, initOnline: Boolean ) extends R
       // We thus try out a workaround by declaring a group's newMsg also audible...
 //      tx.add( group.newMsg( target.node, addAction ), Some( (RequiresChange, isOnline, true) ), false,
 //              Map( target.isOnline -> true ))
-      tx.add( group.newMsg( target.node, addAction ), change = Some( (RequiresChange, isOnline, true) ),
+      tx.add( peer.newMsg( target.peer, addAction ), change = Some( (RequiresChange, isOnline, true) ),
               audible = true, dependencies = Map( target.isOnline -> true ))
    }
 }

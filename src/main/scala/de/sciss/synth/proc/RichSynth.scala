@@ -29,13 +29,15 @@ package proc
 import collection.breakOut
 import ProcTxn.RequiresChange
 
-//object RichSynth {
-//   def apply( server: Server, synthDef: RichSynthDef ) : RichSynth = ...
-//}
-final case class RichSynth( synth: Synth, synthDef: RichSynthDef ) extends RichNode( false ) {
-   def node: Node = synth
+object RichSynth {
+   def apply( synthDef: RichSynthDef ) : RichSynth = {
+      new RichSynth( Synth( synthDef.server.peer ), synthDef )
+   }
+}
+final case class RichSynth( peer: Synth, synthDef: RichSynthDef ) extends RichNode( false ) {
+   override def toString = "Synth(id=" + peer.id + ", def=" + synthDef.name + ")"
 
-   override def toString = "Synth(id=" + synth.id + ", def=" + synthDef.name + ")"
+   def server: RichServer = synthDef.server
 
    def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil, addAction: AddAction = addToHead,
              buffers: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) {
@@ -44,11 +46,11 @@ final case class RichSynth( synth: Synth, synthDef: RichSynthDef ) extends RichN
       buffers.foreach( b => require( b.server == server ))
 
       val dependencies: Map[ RichState, Boolean ] = buffers.map( _.hasContent -> true )( breakOut )
-      tx.add( synth.newMsg( synthDef.name, target.node, args, addAction ),
+      tx.add( peer.newMsg( synthDef.name, target.peer, args, addAction ),
               change = Some( (RequiresChange, isOnline, true) ),
               audible = true,
               dependencies = dependencies + (target.isOnline -> true) + (synthDef.isOnline -> true) )
 
-      node.register()   // ok to call multiple times
+//      peer.register()   // ok to call multiple times
    }
 }

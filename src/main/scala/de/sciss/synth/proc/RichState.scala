@@ -27,13 +27,31 @@ package de.sciss.synth.proc
 
 import concurrent.stm.{Ref => ScalaRef}
 
-final class RichState( obj: AnyRef, name: String, init: Boolean ) {
-   private val value = ScalaRef( init )
-//   def isSatisfied( value: Boolean )( implicit tx: ProcTxn ) : Boolean = this.value() == value
-//   def currentState( implicit tx: ProcTxn ) : AnyRef
-   def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = value.swap( newValue )( tx.peer )
-   def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer )
-   def set( newValue: Boolean )( implicit tx: ProcTxn ) { value.set( newValue )( tx.peer )}
+object RichState {
+   def apply( owner: Any, name: String, init: Boolean ) : RichState = new Impl( owner, name, init )
+   def and( that: RichState )( owner: Any, name: String, init: Boolean ) : RichState = new And( that, owner, name, init )
 
-   override def toString = "<" + obj.toString + " " + name + ">"
+   private final class Impl( val owner: Any, val name: String, init: Boolean ) extends RichState {
+      val value = ScalaRef( init )
+      def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = value.swap( newValue )( tx.peer )
+      def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer )
+   }
+
+   private final class And( that: RichState, val owner: Any, val name: String, init: Boolean ) extends RichState {
+      val value = ScalaRef( init )
+      def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = {
+         value.swap( newValue )( tx.peer ) && that.get
+      }
+      def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer ) && that.get
+   }
+}
+sealed trait RichState {
+   protected def value: ScalaRef[ Boolean ]
+   def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean
+   def get( implicit tx: ProcTxn ) : Boolean
+   final def set( newValue: Boolean )( implicit tx: ProcTxn ) { value.set( newValue )( tx.peer )}
+
+   protected def owner: Any
+   def name: String
+   override def toString = "<" + owner.toString + " " + name + ">"
 }

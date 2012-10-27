@@ -30,7 +30,7 @@ import de.sciss.synth.{AudioBus, AudioRated, Bus, ControlBus, ControlRated, Rate
 import concurrent.stm.{Ref => ScalaRef, Txn}
 
 sealed trait RichBus {
-   def server : Server
+   def server : RichServer
    def numChannels : Int
    def rate : Rate
 }
@@ -170,8 +170,8 @@ object RichBus {
     *    there can be situations of semi-orphaned buses (only one reader or
     *    only one writer left).
     */
-   def audio(   server: Server, numChannels: Int ) : RichAudioBus   = new AudioImpl( server, numChannels )
-   def control( server: Server, numChannels: Int ) : RichControlBus = new ControlImpl( server, numChannels )
+   def audio(   server: RichServer, numChannels: Int ) : RichAudioBus   = new AudioImpl( server, numChannels )
+   def control( server: RichServer, numChannels: Int ) : RichControlBus = new ControlImpl( server, numChannels )
    /**
     *    Constructs a new audio bus proxy for use in a short-term temporary fashion.
     *    The implementation does not maintain dummy and empty buses for the case that
@@ -182,22 +182,23 @@ object RichBus {
     *    bus re-assignments causing further busChanged notifications (which would go
     *    to concurrently freed nodes).
     */
-   def tmpAudio( server: Server, numChannels: Int ) : RichAudioBus = new TempAudioImpl( server, numChannels )
+   def tmpAudio( server: RichServer, numChannels: Int ) : RichAudioBus = new TempAudioImpl( server, numChannels )
 
-   def soundIn( server: Server, numChannels: Int, offset: Int = 0 ) : RichAudioBus = {
-      val o = server.config
+   def soundIn( server: RichServer, numChannels: Int, offset: Int = 0 ) : RichAudioBus = {
+      val o = server.peer.config
       require( offset +  numChannels <= o.inputBusChannels, "soundIn - offset is beyond allocated hardware channels" )
-      FixedImpl( new AudioBus( server, o.outputBusChannels, numChannels + offset ))
+      FixedImpl( server, new AudioBus( server.peer, o.outputBusChannels, numChannels + offset ))
    }
 
-   def soundOut( server: Server, numChannels: Int, offset: Int = 0 ) : RichAudioBus = {
-      val o = server.config
+   def soundOut( server: RichServer, numChannels: Int, offset: Int = 0 ) : RichAudioBus = {
+      val o = server.peer.config
       require( offset + numChannels <= o.outputBusChannels, "soundOut - offset is beyond allocated hardware channels" )
-      FixedImpl( new AudioBus( server, offset, numChannels ))
+      FixedImpl( server, new AudioBus( server.peer, offset, numChannels ))
    }
 
-   def wrap( bus: AudioBus ) : RichAudioBus = {
-      FixedImpl( bus )
+   def wrap( server: RichServer, bus: AudioBus ) : RichAudioBus = {
+      require( server.peer == bus.server )
+      FixedImpl( server, bus )
    }
 
 //   trait User {
@@ -207,20 +208,21 @@ object RichBus {
    var verbose = false
 
    private sealed trait BusHolder[ T <: Bus ] {
-      def bus: T
+      def peer: T
 
-      private val useCount = Ref.withCheck( 0 ) { case 0 => bus.free() }
+      // XXX TODO
+      private val useCount = Ref.withCheck( 0 ) { case 0 => peer.free() }
 
       final def alloc()( implicit tx: ProcTxn ) {
          implicit val itx = tx.peer
          useCount += 1
-         if( verbose ) println( bus.toString + ".alloc -> " + useCount.get )
+         if( verbose ) println( peer.toString + ".alloc -> " + useCount.get )
       }
 
       final def free()( implicit tx: ProcTxn ) {
          implicit val itx = tx.peer
          val cnt = useCount.get - 1
-         if( verbose ) println( bus.toString + ".free -> " + cnt )
+         if( verbose ) println( peer.toString + ".free -> " + cnt )
          require( cnt >= 0 )
          useCount.set( cnt )
          if( cnt == 0 ) {
@@ -228,7 +230,8 @@ object RichBus {
          }
       }
 
-      def index : Int = bus.index
+      final def index : Int = peer.index
+      final def numChannels : Int = peer.numChannels
 
       protected def remove()( implicit tx: ProcTxn ) : Unit
    }
@@ -236,65 +239,67 @@ object RichBus {
    private type AudioBusHolder   = BusHolder[ AudioBus ]
    private type ControlBusHolder = BusHolder[ ControlBus ]
 
-   private type ABusHolderMap = Map[ Server, ISortedMap[ Int, AudioBusHolder ]]
+   private type ABusHolderMap = Map[ RichServer, ISortedMap[ Int, AudioBusHolder ]]
 
-   private final class PlainBusHolder[ T <: Bus ]( val bus: T )
+   private final class PlainBusHolder[ T <: Bus ]( val server: RichServer, val peer: T )
    extends BusHolder[ T ] {
       protected def remove()( implicit tx: ProcTxn ) {}
    }
 
-   private final class RichAudioBusHolder( val bus: AudioBus, mapScalaRef: ScalaRef[ ABusHolderMap ])
+   private final class RichAudioBusHolder( val server: RichServer, val peer: AudioBus, mapScalaRef: ScalaRef[ ABusHolderMap ])
    extends AudioBusHolder {
-      def add( implicit tx: ProcTxn ) {
+      def add()( implicit tx: ProcTxn ) {
          mapScalaRef.transform( map => map +
-            (bus.server -> (map.getOrElse( bus.server, ISortedMap.empty[ Int, AudioBusHolder ]) + (bus.numChannels -> this)))
+            (server -> (map.getOrElse( server, ISortedMap.empty[ Int, AudioBusHolder ]) + (numChannels -> this)))
          )( tx.peer )
       }
 
       protected def remove()( implicit tx: ProcTxn ) {
          mapScalaRef.transform( map => {
-            val newMap = map( bus.server ) - bus.numChannels
+            val newMap = map( server ) - numChannels
             if( newMap.isEmpty ) {
-               map - bus.server
+               map - server
             } else {
-               map + (bus.server -> newMap)
+               map + (server -> newMap)
             }
          })( tx.peer )
       }
    }
 
-   private val readOnlyBuses  = ScalaRef( Map.empty[ Server, ISortedMap[ Int, AudioBusHolder ]])
-   private val writeOnlyBuses = ScalaRef( Map.empty[ Server, ISortedMap[ Int, AudioBusHolder ]])
+   // XXX TODO
+   private val readOnlyBuses  = ScalaRef( Map.empty[ RichServer, ISortedMap[ Int, AudioBusHolder ]])
+   private val writeOnlyBuses = ScalaRef( Map.empty[ RichServer, ISortedMap[ Int, AudioBusHolder ]])
 
-   private def createReadOnlyBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder =
+   private def createReadOnlyBus( server: RichServer, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder =
       createRichAudioBus( server, numChannels, readOnlyBuses )
 
-   private def createWriteOnlyBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder =
+   private def createWriteOnlyBus( server: RichServer, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder =
       createRichAudioBus( server, numChannels, writeOnlyBuses )
 
-   private def createRichAudioBus( server: Server, numChannels: Int, mapScalaRef: ScalaRef[ Map[ Server, ISortedMap[ Int, AudioBusHolder ]]])
+   private def createRichAudioBus( server: RichServer, numChannels: Int,
+                                   mapScalaRef: ScalaRef[ Map[ RichServer, ISortedMap[ Int, AudioBusHolder ]]])
                                  ( implicit tx: ProcTxn ) : AudioBusHolder = {
       val chanMapO = mapScalaRef.get( tx.peer ).get( server )
       val bus: AudioBusHolder = chanMapO.flatMap( _.from( numChannels ).headOption.map( _._2 )).getOrElse {
-         val peer = Bus.audio( server, numChannels )
-         Txn.afterRollback( _ => server.busses.freeAudio( peer.index ))( tx.peer )
-         val res  = new RichAudioBusHolder( peer, mapScalaRef )
-         res.add
+         val index   = server.allocAudioBus( numChannels )
+         val peer    = AudioBus( server.peer, index = index, numChannels = numChannels )
+         val res     = new RichAudioBusHolder( server, peer, mapScalaRef )
+         res.add()
          res
       }
       bus
    }
 
-   private def createAudioBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder = {
-      val peer = Bus.audio( server, numChannels )
-      Txn.afterRollback( _ => server.busses.freeAudio( peer.index ))( tx.peer )
-      new PlainBusHolder( peer )
+   private def createAudioBus( server: RichServer, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder = {
+      val index   = server.allocAudioBus( numChannels )
+      val peer    = AudioBus( server.peer, index = index, numChannels = numChannels )
+      new PlainBusHolder( server, peer )
    }
 
-   private def createControlBus( server: Server, numChannels: Int )( implicit tx: ProcTxn ) : ControlBusHolder = {
-      val peer = Bus.control( server, numChannels )
-      Txn.afterRollback( _ => server.busses.freeControl( peer.index ))( tx.peer )
-      new PlainBusHolder( peer )
+   private def createControlBus( server: RichServer, numChannels: Int )( implicit tx: ProcTxn ) : ControlBusHolder = {
+      val index   = server.allocControlBus( numChannels )
+      val peer    = ControlBus( server.peer, index = index, numChannels = numChannels )
+      new PlainBusHolder( server, peer )
    }
 
    private abstract class AbstractAudioImpl extends RichAudioBus {
@@ -304,11 +309,10 @@ object RichBus {
       final protected val writers   = ScalaRef( Set.empty[ AU ])
    }
 
-   private final case class FixedImpl( bus: AudioBus )
+   private final case class FixedImpl( server: RichServer, bus: AudioBus )
    extends AbstractAudioImpl {
       import RichAudioBus.{ User => AU }
 
-      def server        = bus.server
       def numChannels   = bus.numChannels
 
       def busOption( implicit tx: ProcTxn ) : Option[ AudioBus ] = Some( bus )
@@ -336,11 +340,11 @@ object RichBus {
 
       final def busOption( implicit tx: ProcTxn ) : Option[ AudioBus ] = {
          val bh = bus.get( tx.peer )
-         if( bh != null ) Some( bh.bus ) else None
+         if( bh != null ) Some( bh.peer ) else None
       }
    }
 
-   private final class AudioImpl( val server: Server, val numChannels: Int ) extends BasicAudioImpl {
+   private final class AudioImpl( val server: RichServer, val numChannels: Int ) extends BasicAudioImpl {
       import RichAudioBus.{ User => AU }
 
       override def toString = "sh-abus(numChannels=" + numChannels + ")@" + hashCode
@@ -358,7 +362,7 @@ object RichBus {
                res
             } else { // dispose old dummy bus, create new bus
                val res        = createAudioBus( server, numChannels )
-               val newBus     = new AudioBus( server, res.index, numChannels )
+               val newBus     = res.peer // AudioBus( server.peer, index = res.index, numChannels = numChannels )
                val oldHolder  = bus.swap( res )
                rs.foreach { r =>
                   oldHolder.free()
@@ -383,7 +387,7 @@ object RichBus {
          // always perform this on the newly added
          // reader no matter if the bus is new:
          bh.alloc()
-         val newBus = new AudioBus( server, bh.index, numChannels )
+         val newBus = bh.peer // AudioBus( server.peer, index = bh.index, numChannels = numChannels )
          u.busChanged( newBus )
       }
 
@@ -399,7 +403,7 @@ object RichBus {
                res
             } else { // dispose old dummy bus, create new bus
                val res        = createAudioBus( server, numChannels )
-               val newBus     = new AudioBus( server, res.index, numChannels )
+               val newBus     = res.peer // AudioBus( server.peer, index = res.index, numChannels = numChannels )
                val oldHolder  = bus.swap( res )
                rs foreach { r =>
                   oldHolder.free()
@@ -420,7 +424,7 @@ object RichBus {
          // always perform this on the newly added
          // reader no matter if the bus is new:
          bh.alloc()
-         val newBus = new AudioBus( server, bh.index, numChannels )
+         val newBus = bh.peer // new AudioBus( server, bh.index, numChannels )
          u.busChanged( newBus )
       }
 
@@ -437,7 +441,7 @@ object RichBus {
             if( ws.nonEmpty ) { // they can all go to write only
                val bh = createWriteOnlyBus( server, numChannels )
                bus.set( bh )
-               val newBus = new AudioBus( server, bh.index, numChannels )
+               val newBus = bh.peer // new AudioBus( server, bh.index, numChannels )
                ws foreach { w =>
                   oldHolder.free()
                   w.busChanged( newBus )
@@ -460,7 +464,7 @@ object RichBus {
             if( rs.nonEmpty ) { // they can all go to write only
                val bh = createReadOnlyBus( server, numChannels )
                bus.set( bh )
-               val newBus = new AudioBus( server, bh.index, numChannels )
+               val newBus = bh.peer // new AudioBus( server, bh.index, numChannels )
                rs foreach { r =>
                   oldHolder.free()
                   r.busChanged( newBus )
@@ -471,7 +475,7 @@ object RichBus {
       }
    }
 
-   private final class TempAudioImpl( val server: Server, val numChannels: Int ) extends BasicAudioImpl {
+   private final class TempAudioImpl( val server: RichServer, val numChannels: Int ) extends BasicAudioImpl {
       import RichAudioBus.{ User => AU }
 
       override def toString = "tmp-abus(numChannels=" + numChannels + ")@" + hashCode
@@ -499,7 +503,7 @@ object RichBus {
          // always perform this on the newly added
          // reader no matter if the bus is new:
          bh.alloc()
-         val newBus = new AudioBus( server, bh.index, numChannels )
+         val newBus = bh.peer // new AudioBus( server, bh.index, numChannels )
          u.busChanged( newBus )
       }
 
@@ -515,7 +519,7 @@ object RichBus {
       }
    }
 
-   private final class ControlImpl( val server: Server, val numChannels: Int ) extends RichControlBus {
+   private final class ControlImpl( val server: RichServer, val numChannels: Int ) extends RichControlBus {
       import RichControlBus.{ User => CU }
 
       private val bus      = ScalaRef.make[ ControlBusHolder ]
@@ -526,7 +530,7 @@ object RichBus {
 
       def busOption( implicit tx: ProcTxn ) = {
          val bh = bus.get( tx.peer )
-         if( bh != null ) Some( bh.bus ) else None
+         if( bh != null ) Some( bh.peer ) else None
       }
 
       def addReader( u: CU )( implicit tx: ProcTxn ) { add( readers, writers, u )}
@@ -552,7 +556,7 @@ object RichBus {
          // always perform this on the newly added
          // reader no matter if the bus is new:
          bh.alloc()
-         val newBus = new ControlBus( server, bh.index, numChannels )
+         val newBus = bh.peer // new ControlBus( server, bh.index, numChannels )
          u.busChanged( newBus )
       }
 

@@ -103,9 +103,8 @@ object AuralProc {
 
       def group()( implicit tx: ProcTxn ) : RichGroup = {
          groupOption.getOrElse {
-            val g    = Group( server )
-            val res  = RichGroup( g )
-            res.play( RichGroup.default( server ))
+            val res = RichGroup( server )
+            res.play( server.defaultGroup )
             group_=( res )
             res
          }
@@ -133,8 +132,7 @@ object AuralProc {
       def preGroup()( implicit tx: ProcTxn ) : RichGroup = {
          implicit val itx = tx.peer
          preGroupOption.getOrElse {
-            val g       = Group( server )
-            val res     = RichGroup( g )
+            val res     = RichGroup( server )
             /* val main = */ group()      // creates group if necessary
             val all     = groupsRef().get
 val target = anchorNode
@@ -219,7 +217,7 @@ val addAction = addBefore
    }
 }
 sealed trait AuralProc /* extends Writer */ {
-   def server : Server
+   def server : RichServer
 //   def name( implicit tx: ProcTxn ) : String
 //   def name_=( n: String )( implicit tx: ProcTxn ) : Unit
 

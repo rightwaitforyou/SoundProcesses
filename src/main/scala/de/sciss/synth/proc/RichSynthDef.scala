@@ -29,15 +29,15 @@ import de.sciss.synth.{Synth, addToHead, AddAction, ControlSetMap, SynthDef, Ser
 import ProcTxn.IfChanges
 
 object RichSynthDef {
-   def apply( server: Server, graph: SynthGraph, nameHint: Option[ String ] = None )( implicit tx: ProcTxn ) : RichSynthDef =
+   def apply( server: RichServer, graph: SynthGraph, nameHint: Option[ String ] = None )( implicit tx: ProcTxn ) : RichSynthDef =
       ProcDemiurg.getSynthDef( server, graph, nameHint )
 }
-final case class RichSynthDef( server: Server, synthDef: SynthDef ) /* extends RichObject */ {
-   val isOnline: RichState = new RichState( this, "isOnline", false )
+final case class RichSynthDef( server: RichServer, peer: SynthDef ) /* extends RichObject */ {
+   val isOnline = RichState( this, "isOnline", init = false )
 
-   override def toString = "SynthDef(" + synthDef.name + ")"
+   override def toString = "SynthDef(" + peer.name + ")"
 
-   def name : String = synthDef.name
+   def name : String = peer.name
 
    /**
     *    Actually checks if the def is already online.
@@ -45,14 +45,13 @@ final case class RichSynthDef( server: Server, synthDef: SynthDef ) /* extends R
     *    will be queued.
     */
    def recv()( implicit tx: ProcTxn ) {
-      tx.add( synthDef.recvMsg, change = Some( (IfChanges, isOnline, true) ), audible = false )
+      tx.add( peer.recvMsg, change = Some( (IfChanges, isOnline, true) ), audible = false )
    }
 
    def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil,
              addAction: AddAction = addToHead, buffers: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) : RichSynth = {
       recv()  // make sure it is online
-      val synth   = Synth( server )
-      val rs      = RichSynth( synth, this )
+      val rs      = RichSynth( this )
       rs.play( target, args, addAction, buffers )
       rs
    }

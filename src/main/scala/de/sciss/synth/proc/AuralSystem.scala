@@ -5,14 +5,12 @@ import impl.{AuralSystemImpl => Impl}
 import de.sciss.lucre.{event => evt, stm}
 
 object AuralSystem {
-   def apply[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( implicit tx: S#Tx, bridge: S#Tx => I#Tx,
-                                                     cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = Impl[ S, I ]
+   def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = Impl[ S ]
 
-   def start[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit tx: S#Tx, bridge: S#Tx => I#Tx,
-                                                        cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = apply[ S, I ].start()
+   def start[ S <: evt.Sys[ S ]]()( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = apply[ S ].start()
 
    trait Client[ S <: evt.Sys[ S ]] {
-      def started( s: Server )( implicit tx: S#Tx ) : Unit
+      def started( s: RichServer )( implicit tx: S#Tx ) : Unit
       def stopped()( implicit tx: S#Tx ) : Unit
    }
 }
@@ -25,5 +23,5 @@ trait AuralSystem[ S <: evt.Sys[ S ]] {
    def addClient(    c: Client[ S ])( implicit tx: S#Tx ) : Unit
    def removeClient( c: Client[ S ])( implicit tx: S#Tx ) : Unit
 
-   def whenStarted( fun: S#Tx => Server => Unit )( implicit tx: S#Tx ) : Unit
+   def whenStarted( fun: S#Tx => RichServer => Unit )( implicit tx: S#Tx ) : Unit
 }

@@ -7,15 +7,15 @@ import concurrent.stm.Ref
 import java.io.File
 import lucre.bitemp.Span
 
-final class AudioArtifactWriter( segm: Grapheme.Segment.Audio, file: File, server: Server, sampleRate: Double )
+final class AudioArtifactWriter( segm: Grapheme.Segment.Audio, file: File, server: RichServer, sampleRate: Double )
 extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
    private val synthRef = Ref( Option.empty[ RichSynth ])
    val bus              = RichBus.audio( server, segm.numChannels )
 
    def add()( implicit tx: ProcTxn ) {
 //      val bufPeer       = Buffer( server )
-      val rb                  = RichBuffer( server )
-      val numChannels      = bus.numChannels
+      val numChannels   = bus.numChannels
+      val rb            = RichBuffer( server )
 
       val sg = SynthGraph {
          import ugen._
@@ -39,7 +39,7 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
          case _                  => audioVal.spec.numFrames / audioVal.spec.sampleRate
       }
 
-      val args: Seq[ ControlSetMap ] = Seq( "buf" -> rb.buf.id, "dur" -> dur )
+      val args: Seq[ ControlSetMap ] = Seq( "buf" -> rb.id, "dur" -> dur )
 
       rb.alloc( numFrames = 32768, numChannels = numChannels )
       rb.cue( path, fileStart )

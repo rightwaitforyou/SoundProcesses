@@ -3,7 +3,7 @@ package proc
 package impl
 
 import de.sciss.osc.Dump
-import concurrent.stm.Txn
+import concurrent.stm.{Ref, Txn}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm}
 
@@ -12,39 +12,29 @@ object AuralSystemImpl {
 
    var dumpOSC = false
 
-   def apply[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( implicit tx: S#Tx, bridge: S#Tx => I#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = {
-      implicit val itx: I#Tx  = tx
-      val id                  = itx.newID()
-      val startStopCnt        = itx.newIntVar( id, init = 0 )
-      implicit val clientsSer = dummySerializer[ IIdxSeq[ Client[ S ]], I ]
-      val clients             = itx.newVar[ IIdxSeq[ Client[ S ]]]( id, IIdxSeq.empty )
-      implicit val serverSer  = dummySerializer[ Server, I ]
-      val server              = itx.newVar[ Option[ Server ]]( id, None )
-      new Impl[ S, I ]( startStopCnt, clients, server )
-   }
+   def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = new Impl[ S ]
 
-   private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
-      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
+//   private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
+//      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
+//
+//   private object DummySerializer extends stm.Serializer[ stm.InMemory#Tx, stm.InMemory#Acc, Nothing ] {
+//      def write( v: Nothing, out: DataOutput) {}
+//      def read( in: DataInput, access: stm.InMemory#Acc )( implicit tx: stm.InMemory#Tx ) : Nothing = sys.error( "Operation not supported" )
+//   }
 
-   private object DummySerializer extends stm.Serializer[ stm.InMemory#Tx, stm.InMemory#Acc, Nothing ] {
-      def write( v: Nothing, out: DataOutput) {}
-      def read( in: DataInput, access: stm.InMemory#Acc )( implicit tx: stm.InMemory#Tx ) : Nothing = sys.error( "Operation not supported" )
-   }
-
-   private final class Impl[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( startStopCnt: I#Var[ Int ],
-                                                                    clients: I#Var[ IIdxSeq[ Client[ S ]]],
-                                                                    server: I#Var[ Option[ Server ]])
-                                                                  ( implicit bridge: S#Tx => I#Tx, cursor: stm.Cursor[ S ])
+   private final class Impl[ S <: evt.Sys[ S ]]( implicit cursor: stm.Cursor[ S ])
    extends AuralSystem[ S ] {
       impl =>
 
       override def toString = "AuralSystem@" + hashCode.toHexString
 
-      private val sync        = new AnyRef
-      private var connection  = Option.empty[ ServerLike ]
+      private val startStopCnt   = Ref( 0 )
+      private val clients        = Ref( IIdxSeq.empty[ Client[ S ]])
+      private val server         = Ref( Option.empty[ RichServer ])
+      private val connection     = Ref( Option.empty[ ServerLike ])
 
       def start( config: Server.Config )( implicit tx: S#Tx ) : AuralSystem[ S ] = {
-         implicit val itx: I#Tx  = tx
+         implicit val itx = tx.peer
          val expected = startStopCnt.get + 1
          startStopCnt.set( expected )
 
@@ -55,7 +45,7 @@ object AuralSystemImpl {
       }
 
       def stop()( implicit tx: S#Tx ) : AuralSystem[ S ] = {
-         implicit val itx: I#Tx  = tx
+         implicit val itx = tx.peer
          val expected = startStopCnt.get + 1
          startStopCnt.set( expected )
 
@@ -68,20 +58,19 @@ object AuralSystemImpl {
       private def doStart( config: Server.Config ) {
          val c = Server.boot( "SoundProcesses", config ) {
             case ServerConnection.Aborted =>
-               sync.synchronized { connection = None }
+               connection.single() = None
+
             case ServerConnection.Running( s ) =>
                if( dumpOSC ) s.dumpOSC( Dump.Text )
-               val sOpt = Some( s )
-               sync.synchronized {
-                  connection = sOpt
-               }
                cursor.step { implicit tx =>
-                  implicit val itx: I#Tx = tx
-                  server.set( sOpt )
-                  ProcDemiurg.addServer( s )( ProcTxn()( tx ))
+                  implicit val itx = tx.peer
+                  connection() = Some( s )
+                  val rich = RichServer( s )
+                  server.set( Some( rich ))
+                  ProcDemiurg.addServer( rich )( ProcTxn()( tx ))
                   val cs = clients.get
 //                  println( "AQUI " + cs )
-                  cs.foreach( _.started( s ))
+                  cs.foreach( _.started( rich ))
                }
          }
 
@@ -89,38 +78,33 @@ object AuralSystemImpl {
             def run() { impl.shutdown() }
          }))
 
-         sync.synchronized {
-            connection = Some( c )
-         }
+         connection.single() = Some( c )
       }
 
       private def shutdown() {
-         sync.synchronized {
-            connection.foreach {
-               case s: Server => s.quit()
-               case _ =>
-            }
+         connection.single().foreach {
+            case s: Server => s.quit()
+            case _ =>
          }
       }
 
       private def doStop() {
-         sync.synchronized {
-            connection.foreach {
-               case c: ServerConnection => c.abort
-               case s: Server =>
-                  cursor.step { implicit tx =>
-                     implicit val itx: I#Tx = tx
+         connection.single.swap( None ).foreach {
+            case c: ServerConnection => c.abort
+            case s: Server =>
+               cursor.step { implicit tx =>
+                  implicit val itx = tx.peer
+                  server.get.foreach { rich =>
                      clients.get.foreach( _.stopped() )
-                     ProcDemiurg.removeServer( s )( ProcTxn()( tx ))
+                     ProcDemiurg.removeServer( rich )( ProcTxn()( tx ))
                   }
-                  s.quit()
-            }
-            connection = None
+               }
+               s.quit()
          }
       }
 
       def addClient( c: Client[ S ])( implicit tx: S#Tx ) {
-         implicit val itx: I#Tx = tx
+         implicit val itx = tx.peer
          clients.transform( _ :+ c )
          val sOpt = server.get
          sOpt.foreach { s =>
@@ -129,13 +113,13 @@ object AuralSystemImpl {
       }
 
       def removeClient( c: Client[ S ])( implicit tx: S#Tx ) {
-         implicit val itx: I#Tx = tx
+         implicit val itx = tx.peer
          clients.transform { _.filterNot( _ == c )}
       }
 
-      def whenStarted( fun: S#Tx => Server => Unit)( implicit tx: S#Tx ) {
+      def whenStarted( fun: S#Tx => RichServer => Unit)( implicit tx: S#Tx ) {
          addClient( new Client[ S ] {
-            def started( s: Server )( implicit tx: S#Tx ) {
+            def started( s: RichServer )( implicit tx: S#Tx ) {
                fun( tx )( s )
             }
 

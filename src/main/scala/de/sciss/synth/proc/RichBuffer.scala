@@ -27,42 +27,59 @@ package de.sciss.synth
 package proc
 
 import io.{SampleFormat, AudioFileType}
-import proc.ProcTxn.{IfChanges, Always, RequiresChange}
-import concurrent.stm.Txn
+import proc.ProcTxn.{Always, RequiresChange}
 
 object RichBuffer {
-   def apply( server: Server )( implicit tx: ProcTxn ) : RichBuffer = {
-      val b = Buffer( server )
-      Txn.afterRollback( _ => server.buffers.free( b.id ))( tx.peer )
-      new RichBuffer( b )
+   def apply( server: RichServer )( implicit tx: ProcTxn ) : RichBuffer = {
+      val id   = server.allocBuffer()
+      val b    = Buffer( server.peer, id )
+      new RichBuffer( server, b )
    }
 }
-final case class RichBuffer private( buf: Buffer ) /* extends RichObject */ {
-   val isOnline: RichState   = new RichState( this, "isOnline", false )
-   val hasContent: RichState = new RichState( this, "hasContent", false )
+final case class RichBuffer( server: RichServer, peer: Buffer ) {
+   val isAlive:    RichState = RichState(                this, "isAlive", init = true )
+   val isOnline:   RichState = RichState.and( isAlive )( this, "isOnline", init = false )
+   val hasContent: RichState = RichState(                this, "hasContent", init = false )
 
-   def server = buf.server
+   def id: Int = peer.id
 
    def alloc( numFrames: Int, numChannels: Int = 1 )( implicit tx: ProcTxn ) {
-      tx.add( buf.allocMsg( numFrames, numChannels ), change = Some( (RequiresChange, isOnline, true) ), audible = false )
+      tx.add( msg          = peer.allocMsg( numFrames, numChannels ),
+              change       = Some( (RequiresChange, isOnline, true) ),
+              dependencies = Map( isAlive -> true ),
+              audible      = false 
+      )
    }
 
    def cue( path: String, startFrame: Long = 0L )( implicit tx: ProcTxn ) {
       require( startFrame < 0x7FFFFFFFL, "Cannot encode start frame >32 bit" )
-      tx.add( buf.cueMsg( path, startFrame.toInt ), change = Some( (Always, hasContent, true) ),
-         audible = false, dependencies = Map( isOnline -> true ))
+      tx.add( msg          = peer.cueMsg( path, startFrame.toInt ),
+              change       = Some( (Always, hasContent, true) ),
+              dependencies = Map( isOnline -> true ),   
+              audible      = false
+      )
    }
 
    def record( path: String, fileType: AudioFileType, sampleFormat: SampleFormat )( implicit tx: ProcTxn ) {
-      tx.add( buf.writeMsg( path, fileType, sampleFormat, 0, 0, leaveOpen = true ),
-         change = Some( (Always, hasContent, true) ), audible = false, dependencies = Map( isOnline -> true )) // hasContent is a bit misleading...
+      tx.add( msg          = peer.writeMsg( path, fileType, sampleFormat, 0, 0, leaveOpen = true ),
+              change       = Some( (Always, hasContent, true) ), 
+              dependencies = Map( isOnline -> true ), // hasContent is a bit misleading...
+              audible      = false
+      )
    }
 
    def zero()( implicit tx: ProcTxn ) {
-      tx.add( buf.zeroMsg, change = Some( (Always, hasContent, true) ), audible = false, dependencies = Map( isOnline -> true ))
+      tx.add( msg          = peer.zeroMsg,
+              change       = Some( (Always, hasContent, true) ),
+              dependencies = Map( isOnline -> true ),
+              audible      = false
+      )
    }
 
    def closeAndFree()( implicit tx: ProcTxn ) {
-      tx.add( buf.closeMsg( buf.freeMsg ), change = Some( (IfChanges, isOnline, false) ), audible = false )
+      tx.add( msg          = peer.closeMsg( peer.freeMsg( release = false )),   // release = false is crucial!
+              change       = Some( (RequiresChange, isAlive, false) ),
+              audible      = false )
+      server.freeBuffer( peer.id )
    }
 }

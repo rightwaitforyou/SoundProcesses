@@ -74,7 +74,7 @@ object AuralPresentationImpl {
          running.set( None )
       }
 
-      def started( server: Server )( implicit tx: S#Tx ) {
+      def started( server: RichServer )( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          log( "started" )
 
@@ -151,7 +151,7 @@ object AuralPresentationImpl {
                                                             None,
                                                           var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
 
-   private final class RunningImpl[ S <: evt.Sys[ S ]]( server: Server, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
+   private final class RunningImpl[ S <: evt.Sys[ S ]]( server: RichServer, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
                                                         scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ])],
                                                         sampleRate: Double )( implicit artifactStore: ArtifactStore[ S ])
    extends AuralPresentation.Running[ S ] {

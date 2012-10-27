@@ -105,7 +105,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 
    var verbose = false
 
-   private val servers = TSet.empty[ Server ]
+   private val servers = TSet.empty[ RichServer ]
 
    private val uniqueDefID = ScalaRef( 0 )
    private def nextDefID()( implicit tx: InTxn ) : Int = {
@@ -114,21 +114,21 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       res
    }
 
-   def addServer( server: Server )( implicit tx: ProcTxn ) {
+   def addServer( server: RichServer )( implicit tx: ProcTxn ) {
       implicit val itx = tx.peer
       if( servers.contains( server )) return
       servers += server
       worlds  += server -> new ProcWorld
    }
 
-   def removeServer( server: Server )( implicit tx: ProcTxn ) {
+   def removeServer( server: RichServer )( implicit tx: ProcTxn ) {
       implicit val itx = tx.peer
       servers -= server
       worlds  -= server
    }
 
    // commented out for debugging inspection
-   private val worlds = TMap.empty[ Server, ProcWorld ]
+   private val worlds = TMap.empty[ RichServer, ProcWorld ]
 
 // FFF
 //   private val factoriesRef = Ref( Set.empty[ ProcFactory ])
@@ -251,11 +251,11 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       sb.toString
    }
 
-   def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
+   def getSynthDef( server: RichServer, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
       getSynthDef( server, graph.expand, nameHint )
    }
 
-   def getSynthDef( server: Server, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
+   def getSynthDef( server: RichServer, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
       implicit val itx = tx.peer
       val w = worlds.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
 
