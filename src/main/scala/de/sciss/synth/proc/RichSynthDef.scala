@@ -32,7 +32,7 @@ object RichSynthDef {
    def apply( server: RichServer, graph: SynthGraph, nameHint: Option[ String ] = None )( implicit tx: ProcTxn ) : RichSynthDef =
       ProcDemiurg.getSynthDef( server, graph, nameHint )
 }
-final case class RichSynthDef( server: RichServer, peer: SynthDef ) /* extends RichObject */ {
+final case class RichSynthDef private[proc]( server: RichServer, peer: SynthDef ) /* extends RichObject */ {
    val isOnline = RichState( this, "isOnline", init = false )
 
    override def toString = "SynthDef(" + peer.name + ")"

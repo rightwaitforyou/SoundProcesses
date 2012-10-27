@@ -1,8 +1,10 @@
 package de.sciss.synth
 package proc
 
+import impl.{RichServerImpl => Impl}
+
 object RichServer {
-   def apply( peer: Server ) : RichServer = ???
+   def apply( peer: Server ) : RichServer = Impl( peer )
 }
 trait RichServer {
    def peer: Server

@@ -34,7 +34,7 @@ object RichSynth {
       new RichSynth( Synth( synthDef.server.peer ), synthDef )
    }
 }
-final case class RichSynth( peer: Synth, synthDef: RichSynthDef ) extends RichNode( false ) {
+final case class RichSynth private( peer: Synth, synthDef: RichSynthDef ) extends RichNode( false ) {
    override def toString = "Synth(id=" + peer.id + ", def=" + synthDef.name + ")"
 
    def server: RichServer = synthDef.server

@@ -36,7 +36,7 @@ object RichBuffer {
       new RichBuffer( server, b )
    }
 }
-final case class RichBuffer( server: RichServer, peer: Buffer ) {
+final case class RichBuffer private( server: RichServer, peer: Buffer ) {
    val isAlive:    RichState = RichState(                this, "isAlive", init = true )
    val isOnline:   RichState = RichState.and( isAlive )( this, "isOnline", init = false )
    val hasContent: RichState = RichState(                this, "hasContent", init = false )
@@ -79,7 +79,8 @@ final case class RichBuffer( server: RichServer, peer: Buffer ) {
    def closeAndFree()( implicit tx: ProcTxn ) {
       tx.add( msg          = peer.closeMsg( peer.freeMsg( release = false )),   // release = false is crucial!
               change       = Some( (RequiresChange, isAlive, false) ),
-              audible      = false )
+              audible      = false
+      )
       server.freeBuffer( peer.id )
    }
 }

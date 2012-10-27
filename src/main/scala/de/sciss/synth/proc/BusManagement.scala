@@ -187,13 +187,13 @@ object RichBus {
    def soundIn( server: RichServer, numChannels: Int, offset: Int = 0 ) : RichAudioBus = {
       val o = server.peer.config
       require( offset +  numChannels <= o.inputBusChannels, "soundIn - offset is beyond allocated hardware channels" )
-      FixedImpl( server, new AudioBus( server.peer, o.outputBusChannels, numChannels + offset ))
+      FixedImpl( server, AudioBus( server.peer, index = o.outputBusChannels + offset, numChannels = numChannels ))
    }
 
    def soundOut( server: RichServer, numChannels: Int, offset: Int = 0 ) : RichAudioBus = {
       val o = server.peer.config
       require( offset + numChannels <= o.outputBusChannels, "soundOut - offset is beyond allocated hardware channels" )
-      FixedImpl( server, new AudioBus( server.peer, offset, numChannels ))
+      FixedImpl( server, AudioBus( server.peer, index = offset, numChannels = numChannels ))
    }
 
    def wrap( server: RichServer, bus: AudioBus ) : RichAudioBus = {
@@ -209,16 +209,18 @@ object RichBus {
 
    private sealed trait BusHolder[ T <: Bus ] {
       def peer: T
+//      def server: RichServer
 
-      // XXX TODO
-      private val useCount = Ref.withCheck( 0 ) { case 0 => peer.free() }
+      private val useCount = ScalaRef( 0 ) // Ref.withCheck( 0 ) { case 0 => peer.free() }
 
+      // increments use count
       final def alloc()( implicit tx: ProcTxn ) {
          implicit val itx = tx.peer
          useCount += 1
          if( verbose ) println( peer.toString + ".alloc -> " + useCount.get )
       }
 
+      // decrements use count and calls `remove` if that count reaches zero
       final def free()( implicit tx: ProcTxn ) {
          implicit val itx = tx.peer
          val cnt = useCount.get - 1
@@ -241,9 +243,18 @@ object RichBus {
 
    private type ABusHolderMap = Map[ RichServer, ISortedMap[ Int, AudioBusHolder ]]
 
-   private final class PlainBusHolder[ T <: Bus ]( val server: RichServer, val peer: T )
-   extends BusHolder[ T ] {
-      protected def remove()( implicit tx: ProcTxn ) {}
+   private final class PlainAudioBusHolder( server: RichServer, val peer: AudioBus )
+   extends BusHolder[ AudioBus ] {
+      protected def remove()( implicit tx: ProcTxn ) {
+         server.freeAudioBus( peer.index, peer.numChannels )
+      }
+   }
+
+   private final class PlainControlBusHolder( server: RichServer, val peer: ControlBus )
+   extends BusHolder[ ControlBus ] {
+      protected def remove()( implicit tx: ProcTxn ) {
+         server.freeControlBus( peer.index, peer.numChannels )
+      }
    }
 
    private final class RichAudioBusHolder( val server: RichServer, val peer: AudioBus, mapScalaRef: ScalaRef[ ABusHolderMap ])
@@ -255,6 +266,7 @@ object RichBus {
       }
 
       protected def remove()( implicit tx: ProcTxn ) {
+         server.freeAudioBus( peer.index, peer.numChannels )
          mapScalaRef.transform( map => {
             val newMap = map( server ) - numChannels
             if( newMap.isEmpty ) {
@@ -293,13 +305,13 @@ object RichBus {
    private def createAudioBus( server: RichServer, numChannels: Int )( implicit tx: ProcTxn ) : AudioBusHolder = {
       val index   = server.allocAudioBus( numChannels )
       val peer    = AudioBus( server.peer, index = index, numChannels = numChannels )
-      new PlainBusHolder( server, peer )
+      new PlainAudioBusHolder( server, peer )
    }
 
    private def createControlBus( server: RichServer, numChannels: Int )( implicit tx: ProcTxn ) : ControlBusHolder = {
       val index   = server.allocControlBus( numChannels )
       val peer    = ControlBus( server.peer, index = index, numChannels = numChannels )
-      new PlainBusHolder( server, peer )
+      new PlainControlBusHolder( server, peer )
    }
 
    private abstract class AbstractAudioImpl extends RichAudioBus {
