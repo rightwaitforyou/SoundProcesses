@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{Ref => ScalaRef, TxnExecutor, Txn, TxnLocal}
+import concurrent.stm.{Ref => ScalaRef, TxnExecutor}
 import ProcTxn.IfChanges
 
 object RichNode {

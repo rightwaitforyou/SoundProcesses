@@ -26,7 +26,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.{stm, event => evt}
-import stm.{Disposable, Cursor}
+import stm.Disposable
 import impl.{AuralPresentationImpl => Impl}
 
 object AuralPresentation {

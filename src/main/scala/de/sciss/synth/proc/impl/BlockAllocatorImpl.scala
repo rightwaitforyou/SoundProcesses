@@ -89,7 +89,7 @@ object BlockAllocatorImpl {
          val (bm1, bRem1) = merge( f.from(  address ).valuesIterator, b,   Nil   )
          val (bm,  bRem)  = merge( f.until( address ).valuesIterator, bm1, bRem1 )
 
-         val state2  = bRem.foldLeft( state1 ) { case (s, b) => removeFree( s, b )}
+         val state2  = bRem.foldLeft( state1 ) { case (s, b2) => removeFree( s, b2 )}
          val state3  = addFree( state2, bm )
          ref() = state3
       }

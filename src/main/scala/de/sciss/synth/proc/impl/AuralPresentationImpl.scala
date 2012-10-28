@@ -28,7 +28,7 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm}
-import stm.{IdentifierMap, Cursor}
+import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.TxnLocal

@@ -26,8 +26,8 @@
 package de.sciss.synth.proc
 
 import collection.immutable.{SortedMap => ISortedMap}
-import de.sciss.synth.{AudioBus, AudioRated, Bus, ControlBus, ControlRated, Rate, Server}
-import concurrent.stm.{Ref => ScalaRef, Txn}
+import de.sciss.synth.{AudioBus, AudioRated, Bus, ControlBus, ControlRated, Rate}
+import concurrent.stm.{Ref => ScalaRef}
 
 sealed trait RichBus {
    def server : RichServer

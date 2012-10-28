@@ -23,9 +23,9 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 
-import de.sciss.synth.{Synth, addToHead, AddAction, ControlSetMap, SynthDef, Server, SynthGraph}
 import ProcTxn.IfChanges
 
 object RichSynthDef {

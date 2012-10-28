@@ -25,7 +25,7 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.synth.{addToHead, AddAction, Node, Server, Group}
+import de.sciss.synth.{addToHead, AddAction, Group}
 import ProcTxn.RequiresChange
 
 object RichGroup {

@@ -31,10 +31,8 @@ import de.sciss.synth.{Server, osc => sosc}
 import actors.Futures
 import collection.breakOut
 import collection.immutable.{IntMap, Queue => IQueue, IndexedSeq => IIdxSeq}
-import concurrent.stm.{Txn, InTxn}
+import concurrent.stm.InTxn
 import SoundProcesses.logTxn
-import de.sciss.lucre.stm.Txn
-import concurrent.stm.Txn
 
 object ProcTxnImpl {
    trait Flushable { def flush() : Unit }
