@@ -49,9 +49,28 @@ package object proc {
 
    private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US )
    var showLog          = false
+   var showTxnLog       = false
+   var showAuralLog     = false
+   var showTransportLog = false
 
    @elidable(CONFIG) private[proc] def log( what: => String ) {
       if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
+   }
+
+   @elidable(CONFIG) private[proc] def logConfig( what: => String ) {
+      if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
+   }
+
+   @elidable(CONFIG) private[proc] def logAural( what: => String ) {
+      if( showAuralLog ) Console.out.println( logHeader.format( new Date() ) + "aural " + what )
+   }
+
+   @elidable(CONFIG) private[proc] def logTransport( what: => String ) {
+      if( showAuralLog ) Console.out.println( logHeader.format( new Date() ) + "transport " + what )
+   }
+
+   @elidable(CONFIG) private[proc] def logTxn( what: => String ) {
+      if( showTxnLog ) Console.out.println( logHeader.format( new Date() ) + "txn " + what )
    }
 
    def ??? : Nothing = sys.error( "TODO" )

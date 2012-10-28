@@ -32,7 +32,7 @@ import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.TxnLocal
-import SoundProcesses.{logAural => log}
+import proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
 import java.io.File
@@ -76,12 +76,12 @@ object AuralPresentationImpl {
 
       def started( server: RichServer )( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
-         log( "started" )
 
          val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]                           = tx.newInMemoryIDMap
          val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
 
          val booted  = new RunningImpl( server, viewMap, scanMap, transport.sampleRate )
+         log( "started" + " (" + booted.hashCode.toHexString + ")" )
          ProcDemiurg.addServer( server )( ProcTxn()( tx ))
 //            transport.react { x => println( "Aural observation: " + x )}
 
@@ -100,7 +100,7 @@ object AuralPresentationImpl {
             case Transport.Advance( tr, time, isSeek, true, added, removed, changes ) =>
                log( "at " + time + " added " + added.mkString(   "[", ", ", "]" ) +
                                 "; removed " + removed.mkString( "[", ", ", "]" ) +
-                                "; changes? " + changes.nonEmpty )
+                                "; changes? " + changes.nonEmpty + " (" + booted.hashCode.toHexString + ")" )
                removed.foreach { timed             => booted.procRemoved( timed )}
                changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
                added.foreach   { timed             => booted.procAdded( time, timed )}
@@ -145,16 +145,21 @@ object AuralPresentationImpl {
     * @param idMap      map's timed-ids to aural proc builders
     * @param seq        sequence of builders in the current transaction
     */
-   private final case class OngoingBuild[ S <: evt.Sys[ S ]]( var missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] =
-                                                            Map.empty[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
-                                                          var idMap: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] =
-                                                            None,
-                                                          var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty )
+   private final class OngoingBuild[ S <: evt.Sys[ S ]](
+      var missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] = Map.empty[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
+      var idMap: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] = None,
+      var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty
+   ) {
+      override def toString = "OngoingBuild(missingMap = " + missingMap + ", idMap = " + idMap + ", seq = " + seq + ")"
+   }
 
    private final class RunningImpl[ S <: evt.Sys[ S ]]( server: RichServer, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
                                                         scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ])],
                                                         sampleRate: Double )( implicit artifactStore: ArtifactStore[ S ])
    extends AuralPresentation.Running[ S ] {
+
+      override def toString = "AuralPresentation.Running@" + hashCode.toHexString
+
       // ongoingBuild is a transaction local field storing a mutable object. This is
       // totally fine since a transaction is not shared across threads. the idea is
       // that a fresh object is retrieved for each new transaction. If it is touched,
@@ -165,7 +170,7 @@ object AuralPresentationImpl {
 
       implicit def idSer = idSerializer[ S ]
 
-      private val ongoingBuild = TxnLocal[ OngoingBuild[ S ]]( OngoingBuild() )
+      private val ongoingBuild = TxnLocal( new OngoingBuild[ S ]() )
 
 //      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
 //         viewMap.get( timed.id ).flatMap({ aural =>
@@ -253,7 +258,7 @@ object AuralPresentationImpl {
          busUsers.foreach( _.add() )
          val aural = AuralProc( synth, outBuses, busUsers )
          if( setMap.nonEmpty ) synth.set( audible = true, setMap: _* )
-         log( "launched " + aural )
+         log( "launched " + aural + " (" + hashCode.toHexString + ")" )
          viewMap.put( timed.id, aural )
 
       }
@@ -324,7 +329,7 @@ object AuralPresentationImpl {
 
       def procAdded( time: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {
          val name = timed.value.name.value
-         log( "added " + timed + " (name = " + name + ")" )
+         log( "added " + timed + " (name = " + name + ")" + " (" + hashCode.toHexString + ")" )
 
          val timedID    = timed.id
          val ugen       = UGenGraphBuilder( this, timed, time )
@@ -371,7 +376,7 @@ object AuralPresentationImpl {
          val ugen       = builder.ugen
          val isComplete = ugen.tryBuild()
 
-         log( "incremental " + ugen.timed + "; completed? " + isComplete )
+         log( "incremental " + ugen.timed + "; completed? " + isComplete + " (" + hashCode.toHexString + ")")
 
          // detect which new scan outputs have been determined in the last iteration
          // (newOuts is a map from `name: String` to `numChannels Int`)
@@ -421,18 +426,31 @@ object AuralPresentationImpl {
          retry.foreach( r => incrementalBuild( ongoing, r ))
       }
 
-      // XXX TODO: ongoing build???
       def procRemoved( timed: TimedProc[ S ])( implicit tx: S#Tx ) {
          val timedID = timed.id
          viewMap.get( timedID ) match {
             case Some( aural ) =>
                viewMap.remove( timedID )
                implicit val ptx = ProcTxn()( tx )
-               log( "removed " + timed ) // + " -- playing? " + aural.playing )
+               log( "removed " + timed + " (" + hashCode.toHexString + ")" ) // + " -- playing? " + aural.playing )
                aural.stop()
 
             case _ =>
-               println( "WARNING: could not find view for proc " + timed.value )
+               def warn() {
+                  println( "WARNING: could not find view for " + timed )
+               }
+
+               val ongoing = ongoingBuild.get( tx.peer )
+               ongoing.idMap match {
+                  case Some( idMap ) => idMap.get( timedID ) match {
+                     case Some( builder ) =>
+                        idMap.remove( timedID )
+                        ongoing.seq = ongoing.seq.filterNot( _ == builder )
+
+                     case _ => warn()
+                  }
+                  case _ => warn()
+               }
          }
 
 

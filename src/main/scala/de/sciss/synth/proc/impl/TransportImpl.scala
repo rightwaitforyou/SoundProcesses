@@ -35,9 +35,9 @@ import data.SkipList
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Ref, Txn, TxnLocal}
-import java.util.concurrent.{Executors, ScheduledExecutorService, TimeUnit}
+import java.util.concurrent.TimeUnit
 import java.text.SimpleDateFormat
-import SoundProcesses.{logTransport => log}
+import proc.{logTransport => log}
 
 object TransportImpl {
    import Grapheme.Segment

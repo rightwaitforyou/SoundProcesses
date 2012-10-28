@@ -25,55 +25,9 @@
 
 package de.sciss.synth.proc
 
-import annotation.elidable
-import java.util.{Locale, Date}
-import java.text.SimpleDateFormat
-import elidable.CONFIG
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 
 object SoundProcesses {
-   val name          = "SoundProcesses"
-   val version       = 0.40
-   val isSnapshot    = true
-   val copyright     = "(C)opyright 2010-2012 Hanns Holger Rutz"
-
-   private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'Proc' - ", Locale.US )
-   var showLog          = false
-   var showTxnLog       = false
-   var showAuralLog     = false
-   var showTransportLog = false
-
-   def versionString = {
-      val s = (version + 0.001).toString.substring( 0, 4 )
-      if( isSnapshot ) s + "-SNAPSHOT" else s
-   }
-
-   def main( args: Array[ String ]) {
-      printInfo()
-      sys.exit( 1 )
-   }
-
-   def printInfo() {
-      println( "\n" + name + " v" + versionString + "\n" + copyright + ". All rights reserved.\n" +
-         "This is a library which cannot be executed directly.\n" )
-   }
-
-   @elidable(CONFIG) private[proc] def logConfig( what: => String ) {
-      if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
-   }
-
-   @elidable(CONFIG) private[proc] def logAural( what: => String ) {
-      if( showAuralLog ) Console.out.println( logHeader.format( new Date() ) + "aural " + what )
-   }
-
-   @elidable(CONFIG) private[proc] def logTransport( what: => String ) {
-      if( showAuralLog ) Console.out.println( logHeader.format( new Date() ) + "transport " + what )
-   }
-
-   @elidable(CONFIG) private[proc] def logTxn( what: => String ) {
-      if( showTxnLog ) Console.out.println( logHeader.format( new Date() ) + "txn " + what )
-   }
-
    lazy val pool : ScheduledExecutorService = {                // system wide scheduler
       val res = Executors.newSingleThreadScheduledExecutor()   // Executors.newScheduledThreadPool( 1 )
       sys.addShutdownHook( shutdownScheduler() )

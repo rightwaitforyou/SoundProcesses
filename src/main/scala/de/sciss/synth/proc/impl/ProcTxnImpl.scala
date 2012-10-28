@@ -23,16 +23,17 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss.synth
+package proc
 package impl
 
 import de.sciss.osc
-import de.sciss.synth.{Server, osc => sosc}
+import de.sciss.synth.{osc => sosc}
 import actors.Futures
 import collection.breakOut
 import collection.immutable.{IntMap, Queue => IQueue, IndexedSeq => IIdxSeq}
 import concurrent.stm.InTxn
-import SoundProcesses.logTxn
+import proc.logTxn
 
 object ProcTxnImpl {
    trait Flushable { def flush() : Unit }
