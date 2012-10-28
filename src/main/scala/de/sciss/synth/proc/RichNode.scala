@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{Ref => ScalaRef, TxnExecutor}
+import concurrent.stm.{Ref => ScalaRef, InTxn, TxnExecutor}
 import ProcTxn.IfChanges
 
 object RichNode {
@@ -61,12 +61,24 @@ abstract class RichNode( initOnline: Boolean ) /* extends RichObject */ {
    peer.onEnd {
       val funs = onEndFuns.single.get
       if( funs.nonEmpty ) {
-         TxnExecutor.defaultAtomic { implicit itx =>
+         spawn { implicit itx =>
             implicit val ptx = ProcTxn.applyPlain()
             funs.direct.foreach( _.apply() )
             funs.inTxn.foreach(  _.apply( ptx ))
          }
       }
+   }
+
+   // there is still a ScalaCollider actor problem with
+   // sending out new messages from an onEnd because that
+   // is executed within the osc receiver actor.
+   // decouple it instead.
+   private def spawn( fun: InTxn => Unit ) {
+      SoundProcesses.pool.submit( new Runnable {
+         def run() {
+            TxnExecutor.defaultAtomic( fun )
+         }
+      })
    }
 
    def onEndTxn( fun: ProcTxn => Unit )( implicit tx: ProcTxn ) {

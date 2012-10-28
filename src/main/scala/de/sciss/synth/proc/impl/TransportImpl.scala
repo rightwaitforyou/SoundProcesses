@@ -157,17 +157,6 @@ object TransportImpl {
    private case object Stopped extends State
    private case object Playing extends State
 
-   /* private */ lazy val pool : ScheduledExecutorService = {        // system wide scheduler
-      val res = Executors.newSingleThreadScheduledExecutor() // Executors.newScheduledThreadPool( 1 )
-      sys.addShutdownHook( shutdownScheduler() )
-      res
-   }
-
-   private def shutdownScheduler() {
-     log( "Shutting down scheduler thread pool" )
-     pool.shutdown()
-   }
-
    private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ TimedProc[ S ]])) : IIdxSeq[ (SpanLike, TimedProc[ S ])] = {
       val span = in._1
       in._2.map { span -> _ }
@@ -260,7 +249,7 @@ object TransportImpl {
          val actualDelay   = math.max( 0L, logicalDelay - jitter )
          log( "scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay )
          Txn.afterCommit( _ => {
-            pool.schedule( new Runnable {
+            SoundProcesses.pool.schedule( new Runnable {
                def run() {
                   cursor.step { implicit tx =>
                      eventReached( logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid )

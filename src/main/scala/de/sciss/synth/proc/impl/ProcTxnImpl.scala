@@ -88,7 +88,7 @@ val server = Server.default // XXX vergación
                   case _ =>
                      fut.revoke()
                      timeoutFun()
-                     sys.error( "Timeout" )
+                     sys.error( "Timeout (while waiting for /synced " + syncID + ")" )
                }
             } else {
                server ! osc.Bundle.now( msgs: _* ) // XXX eventually audible could have a bundle time

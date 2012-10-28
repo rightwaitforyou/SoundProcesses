@@ -29,6 +29,7 @@ import annotation.elidable
 import java.util.{Locale, Date}
 import java.text.SimpleDateFormat
 import elidable.CONFIG
+import java.util.concurrent.{Executors, ScheduledExecutorService}
 
 object SoundProcesses {
    val name          = "SoundProcesses"
@@ -71,5 +72,16 @@ object SoundProcesses {
 
    @elidable(CONFIG) private[proc] def logTxn( what: => String ) {
       if( showTxnLog ) Console.out.println( logHeader.format( new Date() ) + "txn " + what )
+   }
+
+   lazy val pool : ScheduledExecutorService = {                // system wide scheduler
+      val res = Executors.newSingleThreadScheduledExecutor()   // Executors.newScheduledThreadPool( 1 )
+      sys.addShutdownHook( shutdownScheduler() )
+      res
+   }
+
+   private def shutdownScheduler() {
+     log( "Shutting down scheduler thread pool" )
+     pool.shutdown()
    }
 }
