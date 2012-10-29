@@ -16,7 +16,7 @@ object PatchTest extends App {
       val (_, cursor) = sys.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
       implicit val _cursor: stm.Cursor[ S ] = cursor
       cursor.step { implicit tx =>
-         val auralSys = AuralSystem.start[ S, I ]()
+         val auralSys = AuralSystem.start[ S ]()
          auralSys.whenStarted( implicit tx => { _ =>
 //            println( "AQUI" )
             run[ S, I ]( auralSys ) // ( tx, cursor )

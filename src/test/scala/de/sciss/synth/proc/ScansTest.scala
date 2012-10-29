@@ -93,7 +93,7 @@ val transp  = Transport[ S, I ]( group )
 
       cursor.step { implicit tx =>
          if( AURAL ) {
-            val as = AuralSystem.start[ S, I ]()
+            val as = AuralSystem.start[ S ]()
             as.whenStarted { implicit tx => { _ =>
                body( Some( as ))
             }}
@@ -106,7 +106,7 @@ val transp  = Transport[ S, I ]( group )
    }
 
    def test[ S <: evt.Sys[ S ]]( group: ProcGroup_.Modifiable[ S ])( implicit tx: S#Tx ) {
-      SoundProcesses.showLog = true
+      proc.showLog = true
 
       val imp  = ExprImplicits[ S ]
       import imp._

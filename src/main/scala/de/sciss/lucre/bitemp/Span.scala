@@ -354,6 +354,8 @@ object Span {
          case Span.All                    => Span.All
       }
 
+      def union( that: Span ) : Span = Span( math.min( start, that.start ), math.max( stop, that.stop ))
+
       def intersect( that: SpanLike ) : SpanOrVoid = that match {
          case Span.From( thatStart ) =>
             val maxStart   = math.max( start, thatStart )
@@ -610,4 +612,5 @@ sealed trait Span extends Span.SpanOrVoid with Span.HasStart with Span.HasStop {
    def intersect( that: SpanLike ) : Span.SpanOrVoid
    def subtract( that: Span.Open ) : Span.SpanOrVoid
    def subtract( that: SpanLike ) : IIdxSeq[ Span ]
+   def union( that: Span ) : Span
 }
