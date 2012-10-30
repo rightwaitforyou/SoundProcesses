@@ -28,8 +28,13 @@ package de.sciss.synth.proc
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 
 object SoundProcesses {
+   var poolSize : Option[ Int ] = None
+
    lazy val pool : ScheduledExecutorService = {                // system wide scheduler
-      val res = Executors.newSingleThreadScheduledExecutor()   // Executors.newScheduledThreadPool( 1 )
+      val res = poolSize match {
+         case Some( sz ) => Executors.newScheduledThreadPool( sz )
+         case _          => Executors.newSingleThreadScheduledExecutor()
+      }
       sys.addShutdownHook( shutdownScheduler() )
       res
    }

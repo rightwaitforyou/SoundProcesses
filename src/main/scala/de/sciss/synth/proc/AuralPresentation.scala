@@ -55,4 +55,6 @@ object AuralPresentation {
       final case class MissingInfo( source: TimedProc[ S ], key: String ) extends Throwable
    }
 }
-trait AuralPresentation[ S <: evt.Sys[ S ]] extends Disposable[ S#Tx ]
+trait AuralPresentation[ S <: evt.Sys[ S ]] extends Disposable[ S#Tx ] {
+   def group( implicit tx: S#Tx ) : Option[ RichGroup ]
+}

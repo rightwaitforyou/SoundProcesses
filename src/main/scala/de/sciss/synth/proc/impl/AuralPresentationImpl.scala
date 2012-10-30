@@ -31,7 +31,7 @@ import de.sciss.lucre.{event => evt, DataOutput, DataInput, stm}
 import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.TxnLocal
+import concurrent.stm.{Ref, TxnLocal}
 import proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
@@ -61,6 +61,8 @@ object AuralPresentationImpl {
 
       override def toString = "AuralPresentation@" + hashCode.toHexString
 
+      private val groupRef = Ref( Option.empty[ RichGroup ])
+
       def dispose()( implicit tx: S#Tx ) {
          // XXX TODO dispose running
       }
@@ -74,13 +76,19 @@ object AuralPresentationImpl {
          running.set( None )
       }
 
+      def group( implicit tx: S#Tx ) : Option[ RichGroup ] = groupRef.get( tx.peer )
+
       def started( server: RichServer )( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
 
          val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]                           = tx.newInMemoryIDMap
          val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
 
-         val booted  = new RunningImpl( server, viewMap, scanMap, transport.sampleRate )
+         val group   = RichGroup( server )
+         group.play( target = server.defaultGroup )( ProcTxn()( tx ))
+         groupRef.set( Some( group ))( tx.peer )
+
+         val booted  = new RunningImpl( server, group, viewMap, scanMap, transport.sampleRate )
          log( "started" + " (" + booted.hashCode.toHexString + ")" )
          ProcDemiurg.addServer( server )( ProcTxn()( tx ))
 //            transport.react { x => println( "Aural observation: " + x )}
@@ -153,7 +161,8 @@ object AuralPresentationImpl {
       override def toString = "OngoingBuild(missingMap = " + missingMap + ", idMap = " + idMap + ", seq = " + seq + ")"
    }
 
-   private final class RunningImpl[ S <: evt.Sys[ S ]]( server: RichServer, viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
+   private final class RunningImpl[ S <: evt.Sys[ S ]]( server: RichServer, group: RichGroup,
+                                                        viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
                                                         scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ])],
                                                         sampleRate: Double )( implicit artifactStore: ArtifactStore[ S ])
    extends AuralPresentation.Running[ S ] {
@@ -190,7 +199,7 @@ object AuralPresentationImpl {
          // (we'll have additional messages moving the group into place if needed,
          // as well as setting and mapping controls)
          val df            = ProcDemiurg.getSynthDef( server, ug, nameHint = Some( builder.name )) // RichSynthDef()
-         val synth         = df.play( target = RichGroup.default( server ), addAction = addToHead )
+         val synth         = df.play( target = group, addAction = addToHead )
 
          // ---- handle input buses ----
          val time       = ugen.time
