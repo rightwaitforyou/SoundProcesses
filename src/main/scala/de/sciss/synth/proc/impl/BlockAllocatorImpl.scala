@@ -38,34 +38,39 @@ object BlockAllocatorImpl {
     * @param start   the start address (inclusive)
     * @param stop    the stop address (exclusive)
     */
-   def apply( stop: Int, start: Int = 0 ) : BlockAllocator = {
+   def apply( name: String, stop: Int, start: Int = 0 ) : BlockAllocator = {
       require( stop >= start, "stop (" + stop + ") must be greater than or equal to start (" + start + ")" )
-      new Impl( start = start, stop = stop )
+      new Impl( name, start = start, stop = stop )
    }
    
-   private final case class State( freeBySize: ISortedMap[ Int, Set[ Block ]],
+   private final case class State( freeBySize:  ISortedMap[ Int, Set[ Block ]],
                                    freeByStart: ISortedMap[ Int, Block ],
-                                   used: Set[ Block ])
+                                   used:        Set[ Block ])
 
-   private final class Impl( start: Int, stop: Int ) extends BlockAllocator {
+   private final class Impl( name: String, start: Int, stop: Int ) extends BlockAllocator {
       private val ref = Ref( State(
          freeBySize  = ISortedMap( (stop - start) -> Set( Block( start, stop - start ))),
          freeByStart = ISortedMap( start -> Block( start, stop - start )),
          used        = Set.empty
       ))
 
-      override def toString = "BlockAllocator(start = " + start + ", stop = " + stop + ")@" + hashCode.toHexString
+      override def toString = "BlockAllocator(name = " + name + ", start = " + start + ", stop = " + stop + ")@" + hashCode.toHexString
 
       def alloc( size: Int = 1 )( implicit tx: InTxn ) : Int = {
-         findAvailable( size ) match {
+         val res = findAvailable( size ) match {
             case Some( bFree ) =>
                val bRes = reserve( bFree, size )
                bRes.start
             case _ => -1
          }
+         logAlloc( name + " alloc " + size + " -> " + res + " @" + tx.hashCode().toHexString +
+            "/" + Thread.currentThread().hashCode().toHexString )
+         res
       }
 
       def free( address: Int, size: Int )( implicit tx: InTxn ) {
+         logAlloc( name + " free " + address + ", " + size + " @" + tx.hashCode().toHexString +
+            "/" + Thread.currentThread().hashCode().toHexString )
          val b       = Block( address, size )
          val state0  = ref()
          require( state0.used.contains( b ), "Freeing an unregistered block " + b )

@@ -41,7 +41,12 @@ object ProcTxn {
       val shouldAddFlush = !current.isInitialized
       val res = current()
       assert( current.isInitialized )
-      if( shouldAddFlush ) tx.beforeCommit( _ => res.flush() )
+      if( shouldAddFlush ) {
+         logTxn( "created    " + res.hashCode().toHexString + " (peer=" + itx.hashCode().toHexString + ")" )
+         tx.beforeCommit( _ => res.flush() )
+         ScalaTxn.afterRollback( _ => logTxn( "rollback " + res.hashCode().toHexString ))
+         ScalaTxn.afterCommit( _ => logTxn( "commited " + res.hashCode().toHexString ))
+      }
       res
    }
 
@@ -49,7 +54,12 @@ object ProcTxn {
       val shouldAddFlush = !current.isInitialized
       val res = current()
       assert( current.isInitialized )
-      if( shouldAddFlush ) ScalaTxn.beforeCommit( _ => res.flush() )
+      if( shouldAddFlush ) {
+         logTxn( "created(p) " + res.hashCode().toHexString + " (peer=" + tx.hashCode().toHexString + ")" )
+         ScalaTxn.beforeCommit( _ => res.flush() )
+         ScalaTxn.afterRollback( _ => logTxn( "rollback " + res.hashCode().toHexString ))
+         ScalaTxn.afterCommit( _ => logTxn( "commited " + res.hashCode().toHexString ))
+      }
       res
    }
 

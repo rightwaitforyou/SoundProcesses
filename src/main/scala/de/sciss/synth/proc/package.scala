@@ -52,6 +52,7 @@ package object proc {
    var showTxnLog       = false
    var showAuralLog     = false
    var showTransportLog = false
+   var showAllocLog     = false
 
    @elidable(CONFIG) private[proc] def log( what: => String ) {
       if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
@@ -71,6 +72,10 @@ package object proc {
 
    @elidable(CONFIG) private[proc] def logTxn( what: => String ) {
       if( showTxnLog ) Console.out.println( logHeader.format( new Date() ) + "txn " + what )
+   }
+
+   @elidable(CONFIG) private[proc] def logAlloc( what: => String ) {
+      if( showAllocLog ) Console.out.println( logHeader.format( new Date() ) + "block " + what )
    }
 
    def ??? : Nothing = sys.error( "TODO" )

@@ -36,7 +36,7 @@ object BlockAllocator {
     * @param start   the start address (inclusive)
     * @param stop    the stop address (exclusive)
     */
-   def apply( stop: Int, start: Int = 0 ) : BlockAllocator = Impl( start = start, stop = stop )
+   def apply( name: String, stop: Int, start: Int = 0 ) : BlockAllocator = Impl( name, start = start, stop = stop )
 }
 trait BlockAllocator {
    /**

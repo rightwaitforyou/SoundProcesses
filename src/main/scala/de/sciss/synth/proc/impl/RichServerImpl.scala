@@ -31,9 +31,9 @@ object RichServerImpl {
    def apply( peer: Server ) : RichServer = new Impl( peer )
 
    private case class Impl( peer: Server ) extends RichServer {
-      private val controlBusAllocator  = proc.BlockAllocator( peer.config.controlBusChannels )
-      private val audioBusAllocator    = proc.BlockAllocator( peer.config.audioBusChannels, peer.config.internalBusIndex )
-      private val bufferAllocator      = proc.BlockAllocator( peer.config.audioBuffers )
+      private val controlBusAllocator  = proc.BlockAllocator( "control", peer.config.controlBusChannels )
+      private val audioBusAllocator    = proc.BlockAllocator( "audio", peer.config.audioBusChannels, peer.config.internalBusIndex )
+      private val bufferAllocator      = proc.BlockAllocator( "buffer", peer.config.audioBuffers )
 
       val defaultGroup : RichGroup = RichGroup.default( this )
 

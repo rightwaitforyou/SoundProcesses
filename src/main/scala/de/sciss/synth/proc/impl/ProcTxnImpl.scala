@@ -73,7 +73,7 @@ object ProcTxnImpl {
       def flush() {
          if( beforeHooks.nonEmpty ) beforeHooks.foreach( _.apply( this ))
 
-         logTxn( "flush" )
+         logTxn( "flush @" + hashCode().toHexString + " (peer=" + peer.hashCode().toHexString + ")" )
          val (clumps, maxSync) = establishDependancies
 val server = Server.default // XXX vergación
          clumps.foreach { tup =>
