@@ -87,16 +87,20 @@ object AuralSystemImpl {
 
             case ServerConnection.Running( s ) =>
                if( dumpOSC ) s.dumpOSC( Dump.Text )
-               cursor.step { implicit tx =>
-                  implicit val itx = tx.peer
-                  connection() = Some( s )
-                  val rich = RichServer( s )
-                  server.set( Some( rich ))
-                  ProcDemiurg.addServer( rich )( ProcTxn()( tx ))
-                  val cs = clients.get
-//                  println( "AQUI " + cs )
-                  cs.foreach( _.started( rich ))
-               }
+               SoundProcesses.pool.submit( new Runnable() {
+                  def run() {
+                     cursor.step { implicit tx =>
+                        implicit val itx = tx.peer
+                        connection() = Some( s )
+                        val rich = RichServer( s )
+                        server.set( Some( rich ))
+                        ProcDemiurg.addServer( rich )( ProcTxn()( tx ))
+                        val cs = clients.get
+      //                  println( "AQUI " + cs )
+                        cs.foreach( _.started( rich ))
+                     }
+                  }
+               })
          }
 
          Runtime.getRuntime.addShutdownHook( new Thread( new Runnable {
