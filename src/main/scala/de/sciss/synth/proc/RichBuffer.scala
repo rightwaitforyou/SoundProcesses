@@ -53,7 +53,7 @@ final case class RichBuffer private( server: RichServer, peer: Buffer ) {
 
    def cue( path: String, startFrame: Long = 0L )( implicit tx: ProcTxn ) {
       require( startFrame < 0x7FFFFFFFL, "Cannot encode start frame >32 bit" )
-      tx.add( msg          = peer.cueMsg( path, startFrame.toInt ),
+      tx.add( msg          = peer.cueMsg( path, startFrame = startFrame.toInt ),
               change       = Some( (Always, hasContent, true) ),
               dependencies = Map( isOnline -> true ),   
               audible      = false
@@ -61,7 +61,7 @@ final case class RichBuffer private( server: RichServer, peer: Buffer ) {
    }
 
    def record( path: String, fileType: AudioFileType, sampleFormat: SampleFormat )( implicit tx: ProcTxn ) {
-      tx.add( msg          = peer.writeMsg( path, fileType, sampleFormat, 0, 0, leaveOpen = true ),
+      tx.add( msg          = peer.writeMsg( path, fileType, sampleFormat, startFrame = 0, numFrames = 0, leaveOpen = true ),
               change       = Some( (Always, hasContent, true) ), 
               dependencies = Map( isOnline -> true ), // hasContent is a bit misleading...
               audible      = false
@@ -77,8 +77,18 @@ final case class RichBuffer private( server: RichServer, peer: Buffer ) {
    }
 
    def closeAndFree()( implicit tx: ProcTxn ) {
-      tx.add( msg          = peer.closeMsg( peer.freeMsg( release = false )),   // release = false is crucial!
+//      tx.add( msg          = peer.closeMsg( peer.freeMsg( release = false )),   // release = false is crucial!
+//              change       = Some( (RequiresChange, isAlive, false) ),
+//              audible      = false
+//      )
+      tx.add( msg          = peer.closeMsg,
+              change       = Some( (RequiresChange, hasContent, false) ),
+              dependencies = Map( isOnline -> true ),
+              audible      = false
+      )
+      tx.add( msg          = peer.freeMsg( release = false ),
               change       = Some( (RequiresChange, isAlive, false) ),
+              dependencies = Map( hasContent -> false ),
               audible      = false
       )
       server.freeBuffer( peer.id )

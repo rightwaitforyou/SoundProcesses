@@ -17,7 +17,7 @@ scalaVersion := "2.9.2" // "2.10.0-M7"
 // crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "1.1.0", // "0.34",
+   "de.sciss" %% "scalacollider" % "1.1.1-SNAPSHOT", // "0.34",
    "de.sciss" %% "confluentreactive" % "1.4.0-SNAPSHOT",
    "de.sciss" %% "lucreexpr" % "1.3.0",
    "de.sciss" % "prefuse-core" % "0.21"
