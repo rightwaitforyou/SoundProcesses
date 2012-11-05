@@ -67,7 +67,7 @@ package object proc {
    }
 
    @elidable(CONFIG) private[proc] def logTransport( what: => String ) {
-      if( showAuralLog ) Console.out.println( logHeader.format( new Date() ) + "transport " + what )
+      if( showTransportLog ) Console.out.println( logHeader.format( new Date() ) + "transport " + what )
    }
 
    @elidable(CONFIG) private[proc] def logTxn( what: => String ) {

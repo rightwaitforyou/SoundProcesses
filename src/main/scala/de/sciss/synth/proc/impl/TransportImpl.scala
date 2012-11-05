@@ -209,7 +209,7 @@ object TransportImpl {
       }
 
       protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
-         log( "scheduled: logicalDelay = " + logicalDelay )
+         logTransport( "scheduled: logicalDelay = " + logicalDelay )
          submitRef.set( (logicalNow, logicalDelay, schedValid) )( tx.peer )
       }
 
@@ -247,7 +247,7 @@ object TransportImpl {
       protected def submit( logicalNow: Long, logicalDelay: Long, schedValid: Int )( implicit tx: S#Tx ) {
          val jitter        = sysMicros() - logicalNow
          val actualDelay   = math.max( 0L, logicalDelay - jitter )
-         log( "scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay )
+         logTransport( "scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay )
          Txn.afterCommit( _ => {
             SoundProcesses.pool.schedule( new Runnable {
                def run() {
@@ -903,7 +903,7 @@ object TransportImpl {
          implicit val itx: I#Tx = tx
          val oldInfo          = infoVar.get
          val oldFrame         = oldInfo.frame
-         log( "advance(newFrame = " + newFrame + ", isSeek = " + isSeek + ", startPlay = " + startPlay + "); oldInfo = " + oldInfo )
+         logTransport( "advance(newFrame = " + newFrame + ", isSeek = " + isSeek + ", startPlay = " + startPlay + "); oldInfo = " + oldInfo )
          // do not short cut and return; because we may want to enforce play and call `scheduleNext`
 //         if( newFrame == oldFrame ) return
 
@@ -1196,13 +1196,13 @@ object TransportImpl {
                                      nextProcTime     = nextProcTime,
                                      nextGraphemeTime = nextGraphemeTime )
          infoVar.set( newInfo )
-         log( "advance - newInfo = " + newInfo )
+         logTransport( "advance - newInfo = " + newInfo )
 
          if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty ) {
             val upd = Transport.Advance( transport = impl, time = newFrame,
                                          isSeek = isSeek, isPlaying = newInfo.isRunning,
                                          added = procAdded, removed = procRemoved, changes = procUpdated )
-            log( "advance - fire " + upd )
+            logTransport( "advance - fire " + upd )
             fire( upd )
          }
 
