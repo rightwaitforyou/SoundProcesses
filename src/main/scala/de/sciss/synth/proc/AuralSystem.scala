@@ -32,7 +32,9 @@ import de.sciss.lucre.{event => evt, stm}
 object AuralSystem {
    def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = Impl[ S ]
 
-   def start[ S <: evt.Sys[ S ]]()( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = apply[ S ].start()
+   def start[ S <: evt.Sys[ S ]]( config: Server.Config = Server.Config(), connect: Boolean = false )
+                                ( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] =
+      apply[ S ].start( config, connect = connect )
 
    trait Client[ S <: evt.Sys[ S ]] {
       def started( s: RichServer )( implicit tx: S#Tx ) : Unit
@@ -42,7 +44,7 @@ object AuralSystem {
 trait AuralSystem[ S <: evt.Sys[ S ]] {
    import AuralSystem.Client
 
-   def start( config: Server.Config = Server.Config() )( implicit tx: S#Tx ) : AuralSystem[ S ]
+   def start( config: Server.Config = Server.Config(), connect: Boolean = false  )( implicit tx: S#Tx ) : AuralSystem[ S ]
    def stop()( implicit tx: S#Tx ) : AuralSystem[ S ]
 
    def addClient(    c: Client[ S ])( implicit tx: S#Tx ) : Unit

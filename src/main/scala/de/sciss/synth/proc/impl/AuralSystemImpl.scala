@@ -58,13 +58,13 @@ object AuralSystemImpl {
       private val server         = Ref( Option.empty[ RichServer ])
       private val connection     = Ref( Option.empty[ ServerLike ])
 
-      def start( config: Server.Config )( implicit tx: S#Tx ) : AuralSystem[ S ] = {
+      def start( config: Server.Config, connect: Boolean )( implicit tx: S#Tx ) : AuralSystem[ S ] = {
          implicit val itx = tx.peer
          val expected = startStopCnt.get + 1
          startStopCnt.set( expected )
 
          Txn.beforeCommit( _ => {
-            if( startStopCnt.get == expected ) doStart( config )
+            if( startStopCnt.get == expected ) doStart( config, connect = connect )
          })( tx.peer )
          this
       }
@@ -80,8 +80,14 @@ object AuralSystemImpl {
          this
       }
 
-      private def doStart( config: Server.Config ) {
-         val c = Server.boot( "SoundProcesses", config ) {
+      private def doStart( config: Server.Config, connect: Boolean ) {
+         val launch: Model.Listener => ServerConnection = if( connect ) {
+            Server.connect( "SoundProcesses", config ) _
+         } else {
+            Server.boot( "SoundProcesses", config ) _
+         }
+
+         val c = launch {
             case ServerConnection.Aborted =>
                connection.single() = None
 
