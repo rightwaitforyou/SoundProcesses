@@ -66,7 +66,7 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
 
       val args: Seq[ ControlSetMap ] = Seq( "buf" -> rb.id, "dur" -> dur )
 
-      rb.alloc( numFrames = 32768, numChannels = numChannels )
+      rb.alloc( numFrames = SoundProcesses.cueBufferSize, numChannels = numChannels )
       rb.cue( path, fileStart )
 
       val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
