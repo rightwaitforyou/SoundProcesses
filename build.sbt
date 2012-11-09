@@ -1,25 +1,23 @@
-name := "soundprocesses"
+name := "SoundProcesses"
 
-version := "1.1.0-SNAPSHOT"
+version := "1.1.0"
 
 organization := "de.sciss"
 
-homepage := Some( url( "https://github.com/Sciss/SoundProcesses3" ))
+homepage := Some( url( "https://github.com/Sciss/SoundProcesses" ))
 
 description := "A framework for creating and managing ScalaCollider based sound processes"
 
 licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
-scalaVersion := "2.9.2" // "2.10.0-M7"
+scalaVersion := "2.9.2"
 
-// scalaBinaryVersion := "2.10.0-M7"
-
-// crossScalaVersions in ThisBuild := Seq( "2.10.0-M6", "2.9.2" )
+resolvers += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "1.1.1-SNAPSHOT", // "0.34",
-   "de.sciss" %% "confluentreactive" % "1.4.0-SNAPSHOT",
-   "de.sciss" %% "lucreexpr" % "1.3.0",
+   "de.sciss" %% "scalacollider" % "1.1.+",
+   "de.sciss" %% "confluentreactive" % "1.4.+",
+   "de.sciss" %% "lucreexpr" % "1.4.+",
    "de.sciss" % "prefuse-core" % "0.21"
 )
 
@@ -67,3 +65,59 @@ initialCommands in console :=
      |t { implicit tx => scan.source = Some( g )}
      |t { implicit tx => g.add( 0L, curve( 456.7 ))}
    """.stripMargin + "\"\"\")"
+
+// ---- build info ----
+
+buildInfoSettings
+
+sourceGenerators in Compile <+= buildInfo
+
+buildInfoKeys := Seq( name, organization, version, scalaVersion, description,
+   BuildInfoKey.map( homepage ) { case (k, opt) => k -> opt.get },
+   BuildInfoKey.map( licenses ) { case (_, Seq( (lic, _) )) => "license" -> lic }
+)
+
+buildInfoPackage := "de.sciss.synth.proc"
+
+// ---- publishing ----
+
+publishMavenStyle := true
+
+publishTo <<= version { (v: String) =>
+   Some( if( v.endsWith( "-SNAPSHOT" ))
+      "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+   else
+      "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+   )
+}
+
+publishArtifact in Test := false
+
+pomIncludeRepository := { _ => false }
+
+pomExtra :=
+<scm>
+  <url>git@github.com:Sciss/SoundProcesses.git</url>
+  <connection>scm:git:git@github.com:Sciss/SoundProcesses.git</connection>
+</scm>
+<developers>
+   <developer>
+      <id>sciss</id>
+      <name>Hanns Holger Rutz</name>
+      <url>http://www.sciss.de</url>
+   </developer>
+</developers>
+
+// ---- ls.implicit.ly ----
+
+seq( lsSettings :_* )
+
+(LsKeys.tags in LsKeys.lsync) := Seq( "sound", "music", "sound-synthesis", "computer-music" )
+
+(LsKeys.ghUser in LsKeys.lsync) := Some( "Sciss" )
+
+(LsKeys.ghRepo in LsKeys.lsync) := Some( "SoundProcesses" )
+
+// bug in ls -- doesn't find the licenses from global scope
+(licenses in LsKeys.lsync) := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
+

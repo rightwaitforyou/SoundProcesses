@@ -12,7 +12,9 @@ SoundProcesses builds with sbt 0.12 and Scala 2.9.2. The dependencies should be 
 
 The following dependency is necessary:
 
-    "de.sciss" %% "soundprocesses" % "1.0.+"
+    resolvers += "Oracle Repository" at "http://download.oracle.com/maven"
+    
+    "de.sciss" %% "soundprocesses" % "1.1.+"
 
 ### REPL example
 
