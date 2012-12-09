@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.1.2"
+version := "1.2.0-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -15,7 +15,7 @@ scalaVersion := "2.9.2"
 resolvers += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "1.1.+",
+   "de.sciss" %% "scalacollider" % "1.2.0-SNAPSHOT",
    "de.sciss" %% "confluentreactive" % "1.4.+",
    "de.sciss" %% "lucreexpr" % "1.4.+",
    "de.sciss" % "prefuse-core" % "0.21"

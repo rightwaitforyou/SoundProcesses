@@ -29,7 +29,6 @@ package impl
 
 import de.sciss.osc
 import de.sciss.synth.{osc => sosc}
-import actors.Futures
 import collection.breakOut
 import collection.immutable.{IntMap, Queue => IQueue, IndexedSeq => IIdxSeq}
 import concurrent.stm.InTxn
@@ -82,14 +81,22 @@ val server = Server.default // XXX vergación
                val syncMsg    = server.syncMsg
                val syncID     = syncMsg.id
                val bndl       = osc.Bundle.now( (msgs :+ syncMsg): _* )
-               val fut        = server !! (bndl, { case sosc.SyncedMessage( `syncID` ) => true })
-               // XXX should use heuristic for timeouts
-               Futures.awaitAll( 10000L, fut ) match {
-                  case Some( true ) :: Nil =>
-                  case _ =>
-                     fut.revoke()
-                     timeoutFun()
-                     sys.error( "Timeout (while waiting for /synced " + syncID + ")" )
+               @volatile var success = false
+               val resp       = sosc.Responder.once( server ) {
+                  case sosc.SyncedMessage( `syncID` ) =>
+                     bndl.synchronized {
+                        success = true
+                        bndl.notify()
+                     }
+               }
+               bndl.synchronized {
+                  server ! bndl
+                  bndl.wait( 10000L )
+               }
+               if( !success ) {
+                  resp.remove()
+                  timeoutFun()
+                  sys.error( "Timeout (while waiting for /synced " + syncID + ")" )
                }
             } else {
                server ! osc.Bundle.now( msgs: _* ) // XXX eventually audible could have a bundle time
