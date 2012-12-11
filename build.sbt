@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.2.0-SNAPSHOT"
+version := "1.2.0"
 
 organization := "de.sciss"
 
@@ -15,16 +15,16 @@ scalaVersion := "2.9.2"
 resolvers += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "1.2.0-SNAPSHOT",
-   "de.sciss" %% "confluentreactive" % "1.4.+",
+   "de.sciss" %% "scalacollider" % "1.2.0+",
+   "de.sciss" %% "confluentreactive" % "1.5.+",
    "de.sciss" %% "lucreexpr" % "1.4.+",
    "de.sciss" % "prefuse-core" % "0.21"
 )
 
 libraryDependencies in ThisBuild <+= scalaVersion { sv =>
    val v = sv match {
-      case "2.10.0-M7"  => "1.9-2.10.0-M7-B1"
       case "2.10.0-RC3" => "1.8-B1"
+      case "2.10.0-RC5" => "1.8-B1"
       case _            => "1.8"
    }
    "org.scalatest" %% "scalatest" % v % "test"

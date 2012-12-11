@@ -39,7 +39,7 @@ object CommonSerializers {
          val fid = spec.fileType match {
             case AudioFileType.AIFF    => 0
             case AudioFileType.Wave    => 1
-            case AudioFileType.Wave64  => 2
+//            case AudioFileType.Wave64  => 2
             case AudioFileType.IRCAM   => 3
             case AudioFileType.NeXT    => 4
             case other                 => sys.error( "Unexpected audio file type " + other )
@@ -72,7 +72,7 @@ object CommonSerializers {
          val fileType = (in.readUnsignedByte(): @switch) match {
             case 0   => AudioFileType.AIFF
             case 1   => AudioFileType.Wave
-            case 2   => AudioFileType.Wave64
+//            case 2   => AudioFileType.Wave64
             case 3   => AudioFileType.IRCAM
             case 4   => AudioFileType.NeXT
             case other => sys.error( "Unexpected audio file type ID " + other )
