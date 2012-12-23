@@ -14,7 +14,7 @@ import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.expr.{SpanLikes, Longs, ExprImplicits}
 import synth.{Env, linShape, SynthGraph}
-import evt.{InMemory, Sys}
+import evt.InMemory
 
 object VisTest {
    def apply() : VisTest[ InMemory, InMemory ] = {
@@ -56,9 +56,9 @@ object VisTest {
       play()
    }
 }
-final class VisTest[ Sy <: Sys[ Sy ], I <: Sys[ I ]]( system: Sy )( implicit cursor: Cursor[ Sy ], bridge: Sy#Tx => I#Tx )
-extends ExprImplicits[ Sy ] {
-   type S  = Sy
+final class VisTest[ S <: evt.Sys[ S ], I <: evt.Sys[ I ]]( system: S )( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx )
+extends ExprImplicits[ S ] {
+//   type S  = Sy
    type Tx = S#Tx
 
    def t[ A ]( fun: S#Tx => A ) : A = {

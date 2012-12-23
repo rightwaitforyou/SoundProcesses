@@ -27,7 +27,6 @@ package de.sciss.synth
 
 import de.sciss.lucre.{bitemp, event => evt}
 import bitemp.BiGroup
-import evt.Sys
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
 import annotation.elidable
@@ -36,16 +35,16 @@ import annotation.elidable._
 package object proc {
 //   private[proc] type I = evt.InMemory
 
-   type ProcGroup[ S <: Sys[ S ]] = BiGroup[ S, Proc[ S ], Proc.Update[ S ]]
-   type TimedProc[ S <: Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ]]
-   type ProcTransport[ S <: Sys[ S ]] = Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] // Proc.Update[ S ]
+   type ProcGroup[ S <: evt.Sys[ S ]] = BiGroup[ S, Proc[ S ], Proc.Update[ S ]]
+   type TimedProc[ S <: evt.Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ]]
+   type ProcTransport[ S <: evt.Sys[ S ]] = Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] // Proc.Update[ S ]
    type Param = Double
 
-//   type ScanElem[ S <: Sys[ S ]] = de.sciss.synth.proc.Scan.Elem
+//   type ScanElem[ S <: evt.Sys[ S ]] = de.sciss.synth.proc.Scan.Elem
 
-//   type Scan[ S <: Sys[ S ]] = BiPin.Expr[ S, Scan_.Elem[ S ]]
+//   type Scan[ S <: evt.Sys[ S ]] = BiPin.Expr[ S, Scan_.Elem[ S ]]
 
-//   type Grapheme[ S <: Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
+//   type Grapheme[ S <: evt.Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
 
    private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US )
    var showLog          = false

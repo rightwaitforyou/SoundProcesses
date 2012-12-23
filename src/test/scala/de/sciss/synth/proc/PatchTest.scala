@@ -3,6 +3,7 @@ package proc
 
 import de.sciss.lucre.{event => evt, stm, confluent}
 import confluent.reactive.ConfluentReactive
+import stm.store.BerkeleyDB
 import ugen._
 import de.sciss.lucre.bitemp.Span
 import expr.ExprImplicits
@@ -12,7 +13,7 @@ object PatchTest extends App {
    {
       type S   = ConfluentReactive
       type I   = stm.InMemory
-      val sys  = ConfluentReactive.tmp()
+      val sys  = ConfluentReactive( BerkeleyDB.tmp() )
       val (_, cursor) = sys.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
       implicit val _cursor: stm.Cursor[ S ] = cursor
       cursor.step { implicit tx =>

@@ -28,42 +28,42 @@ package proc
 
 import de.sciss.lucre.{event => evt, DataInput, data}
 import impl.{ScanImpl => Impl}
-import evt.{Event, Sys}
+import evt.Event
 
 object Scan {
    object Link {
-      implicit def grapheme[ S <: Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
-      implicit def scan[     S <: Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan(     link )
+      implicit def grapheme[ S <: evt.Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
+      implicit def scan[     S <: evt.Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan(     link )
 
-      final case class Grapheme[ S <: Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] {
+      final case class Grapheme[ S <: evt.Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] {
          def id = peer.id
          override def toString = peer.toString
       }
-      final case class Scan[     S <: Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] {
+      final case class Scan[     S <: evt.Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] {
          def id = peer.id
          override def toString = peer.toString
       }
    }
-   sealed trait Link[ S <: Sys[ S ]] { def id: S#ID }
+   sealed trait Link[ S <: evt.Sys[ S ]] { def id: S#ID }
 
-   def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Scan[ S ] = Impl.apply
+   def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx ) : Scan[ S ] = Impl.apply
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Scan[ S ] = Impl.read( in, access )
+   def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Scan[ S ] = Impl.read( in, access )
 
-   implicit def serializer[ S <: Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
+   implicit def serializer[ S <: evt.Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
 
-   sealed trait Update[ S <: Sys[ S ]] { def scan: Scan[ S ]}
-   sealed trait SinkUpdate[ S <: Sys[ S ]] extends Update[ S ] { def sink: Link[ S ]}
-   final case class SinkAdded[     S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
+   sealed trait Update[ S <: evt.Sys[ S ]] { def scan: Scan[ S ]}
+   sealed trait SinkUpdate[ S <: evt.Sys[ S ]] extends Update[ S ] { def sink: Link[ S ]}
+   final case class SinkAdded[     S <: evt.Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
       override def toString = "[" + scan + " ---> " + sink + "]"
    }
-   final case class SinkRemoved[   S <: Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
+   final case class SinkRemoved[   S <: evt.Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
       override def toString = "[" + scan + " -/-> " + sink + "]"
    }
-   final case class SourceChanged[ S <: Sys[ S ]]( scan: Scan[ S ], source: Option[ Link[ S ]]) extends Update[ S ] {
+   final case class SourceChanged[ S <: evt.Sys[ S ]]( scan: Scan[ S ], source: Option[ Link[ S ]]) extends Update[ S ] {
       override def toString = "[" + scan + " <--- " + source + "]"
    }
-   final case class SourceUpdate[ S <: Sys[ S ]]( scan: Scan[ S ], source: Grapheme.Update[ S ]) extends Update[ S ]
+   final case class SourceUpdate[ S <: evt.Sys[ S ]]( scan: Scan[ S ], source: Grapheme.Update[ S ]) extends Update[ S ]
 }
 
 /**
@@ -73,7 +73,7 @@ object Scan {
  * known as key. A scan can write to any number of targets, but may only be synchronised to one
  * source. If not synchronised to a source, the owner process' graph may feed a signal into it.
  */
-trait Scan[ S <: Sys[ S ]] extends evt.Node[ S ] {
+trait Scan[ S <: evt.Sys[ S ]] extends evt.Node[ S ] {
    import Scan._
 
    def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]]

@@ -37,16 +37,16 @@ import annotation.switch
 
 import impl.{GraphemeImpl => Impl}
 import io.AudioFileSpec
-import evt.{Event, Sys}
+import evt.Event
 
 object Grapheme {
    // If necessary for some views, we could eventually add the Elems, too,
    // like `changes: IIdxSeq[ (Elem[ S ], Value) ]`. Then the question would be
    // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
-   // where `trait StoredElem[ S <: Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
-   final case class Update[ S <: Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Segment ])
+   // where `trait StoredElem[ S <: evt.Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
+   final case class Update[ S <: evt.Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Segment ])
 
-   implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
+   implicit def serializer[ S <: evt.Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
       Impl.serializer[ S ]
 
    // 0 reserved for variables
@@ -179,11 +179,11 @@ object Grapheme {
 
    object Elem extends BiType[ Value ] {
       object Curve {
-         def apply[ S <: Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Elem[ S ] = {
+         def apply[ S <: evt.Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Elem[ S ] = {
             val targets = evt.Targets.partial[ S ] // XXX TODO partial?
             new CurveImpl( targets, values.toIndexedSeq )
          }
-         def unapplySeq[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = {
+         def unapplySeq[ S <: evt.Sys[ S ]]( expr: Elem[ S ]) : Option[ Seq[ (Expr[ S, Double ], Env.ConstShape) ]] = {
             if( expr.isInstanceOf[ CurveImpl[ _ ]]) {
                val c = expr.asInstanceOf[ CurveImpl[ S ]]
                Some( c.values )
@@ -194,12 +194,12 @@ object Grapheme {
       }
 
       object Audio {
-         def apply[ S <: Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
+         def apply[ S <: evt.Sys[ S ]]( artifact: Artifact, spec: AudioFileSpec, offset: Expr[ S, Long ], gain: Expr[ S, Double ])
                                   ( implicit tx: S#Tx ) : Elem[ S ] = {
             val targets = evt.Targets.partial[ S ] // XXX TODO partial?
             new AudioImpl( targets, artifact, spec, offset, gain )
          }
-         def unapply[ S <: Sys[ S ]]( expr: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ])] = {
+         def unapply[ S <: evt.Sys[ S ]]( expr: Elem[ S ]) : Option[ (Artifact, AudioFileSpec, Expr[ S, Long ], Expr[ S, Double ])] = {
             if( expr.isInstanceOf[ AudioImpl[ _ ]]) {
                val a = expr.asInstanceOf[ AudioImpl[ S ]]
                Some( (a.artifact, a.spec, a.offset, a.gain) )
@@ -209,7 +209,7 @@ object Grapheme {
          }
       }
 
-      private final class CurveImpl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
+      private final class CurveImpl[ S <: evt.Sys[ S ]]( protected val targets: evt.Targets[ S ],
                                                      val values: IIdxSeq[ (Expr[ S, Double ], Env.ConstShape) ])
       extends expr.impl.NodeImpl[ S, Value ] {
          def value( implicit tx: S#Tx ) : Value = {
@@ -268,7 +268,7 @@ object Grapheme {
          override def toString = "Elem.Curve" + id
       }
 
-      private final class AudioImpl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ], val artifact: Artifact,
+      private final class AudioImpl[ S <: evt.Sys[ S ]]( protected val targets: evt.Targets[ S ], val artifact: Artifact,
                                                      val spec: AudioFileSpec, val offset: Expr[ S, Long ],
                                                      val gain: Expr[ S, Double ])
       extends expr.impl.NodeImpl[ S, Value ] {
@@ -328,7 +328,7 @@ object Grapheme {
       def readValue( in: DataInput ) : Value = Value.Serializer.read( in )
       def writeValue( value: Value, out: DataOutput ) { value.write( out )}
 
-      protected def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[ S ])
+      protected def readTuple[ S <: evt.Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[ S ])
                                              ( implicit tx: S#Tx ) : Elem[ S ] with evt.Node[ S ] = {
          (cookie: @switch) match {
             case `curveCookie` =>
@@ -352,35 +352,35 @@ object Grapheme {
       }
    }
 //   sealed trait Elem[ S ] { def numChannels: Int }
-   type Elem[ S <: Sys[ S ]]        = Expr[ S, Value ]
-   type TimedElem[ S <: Sys[ S ]]   = BiExpr[ S, Value ]
+   type Elem[ S <: evt.Sys[ S ]]        = Expr[ S, Value ]
+   type TimedElem[ S <: evt.Sys[ S ]]   = BiExpr[ S, Value ]
 
-   trait Modifiable[ S <: Sys[ S ]] extends Grapheme[ S ] {
+   trait Modifiable[ S <: evt.Sys[ S ]] extends Grapheme[ S ] {
       def add(    elem: BiExpr[ S, Value ])( implicit tx: S#Tx ) : Unit
       def remove( elem: BiExpr[ S, Value ])( implicit tx: S#Tx ) : Boolean
       def clear()( implicit tx: S#Tx ) : Unit
    }
 
    object Modifiable {
-      def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = Impl.modifiable[ S ]
+      def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = Impl.modifiable[ S ]
 
-      def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Modifiable[ S ] =
+      def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Modifiable[ S ] =
          Impl.readModifiable( in, access )
 
-      implicit def serializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Modifiable[ S ]] =
+      implicit def serializer[ S <: evt.Sys[ S ]] : Serializer[ S#Tx, S#Acc, Modifiable[ S ]] =
          Impl.modifiableSerializer[ S ]
 
       /**
        * Extractor to check if a `Grapheme` is actually a `Grapheme.Modifiable`
        */
-      def unapply[ S <: Sys[ S ]]( g: Grapheme[ S ]) : Option[ Modifiable[ S ]] = {
+      def unapply[ S <: evt.Sys[ S ]]( g: Grapheme[ S ]) : Option[ Modifiable[ S ]] = {
          if( g.isInstanceOf[ Modifiable[ _ ]]) Some( g.asInstanceOf[ Modifiable[ S ]]) else None
       }
    }
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = Impl.read( in, access )
+   def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Grapheme[ S ] = Impl.read( in, access )
 }
-trait Grapheme[ S <: Sys[ S ]] extends evt.Node[ S ] {
+trait Grapheme[ S <: evt.Sys[ S ]] extends evt.Node[ S ] {
    import Grapheme.{Value, Segment, Modifiable, TimedElem, Update}
 
    /**

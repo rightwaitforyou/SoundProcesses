@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.{stm, expr, bitemp, event => evt}
 import stm.Cursor
-import evt.{InMemory, Sys}
+import evt.InMemory
 import de.sciss.synth.expr.{SpanLikes, ExprImplicits, Longs}
 import bitemp.{SpanLike, Span, BiGroup}
 import expr.Expr
@@ -10,7 +10,7 @@ import expr.Expr
 object BiGroupTest {
    def apply() : BiGroupTest[ InMemory ] = new BiGroupTest( InMemory() )
 }
-class BiGroupTest[ S <: Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S ] {
+class BiGroupTest[ S <: evt.Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S ] {
    def t[ A ]( fun: S#Tx => A ) : A = cursor.step( fun )
 
    val bi = t { implicit tx =>

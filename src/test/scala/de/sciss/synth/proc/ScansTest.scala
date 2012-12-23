@@ -4,7 +4,7 @@ package proc
 import de.sciss.lucre.{event => evt, bitemp, stm}
 import expr.ExprImplicits
 import bitemp.Span
-import stm.impl.BerkeleyDB
+import stm.store.BerkeleyDB
 import java.io.File
 import evt.InMemory
 import de.sciss.lucre.confluent.reactive.ConfluentReactive
@@ -21,7 +21,7 @@ object ScansTest extends App {
          implicit val sys = evt.InMemory()
          run[ InMemory, InMemory ]()
       case Some( "--confluent-scan" ) =>
-         implicit val sys = ConfluentReactive.tmp()
+         implicit val sys = ConfluentReactive( BerkeleyDB.tmp() )
          val (_, cursor) = sys.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
          implicit val _cursor = cursor
          run[ ConfluentReactive, stm.InMemory ]()

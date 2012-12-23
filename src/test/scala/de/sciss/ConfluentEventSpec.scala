@@ -7,6 +7,7 @@ import org.scalatest.matchers.ShouldMatchers
 import synth.expr.{Longs, ExprImplicits, Ints}
 import concurrent.stm.TxnLocal
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import stm.store.BerkeleyDB
 
 trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
    final type S = ConfluentReactive
@@ -17,7 +18,7 @@ trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
    final protected val imp = ExprImplicits[ S ]
 
    final def withFixture( test: OneArgTest ) {
-      val system = ConfluentReactive.tmp()
+      val system = ConfluentReactive( BerkeleyDB.tmp() )
       try {
          val (_, cursor) = system.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
          test( cursor )

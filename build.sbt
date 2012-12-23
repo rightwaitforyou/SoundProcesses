@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.2.0"
+version := "1.3.0-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -10,25 +10,20 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.0"
 
-resolvers += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
+crossScalaVersions := Seq( "2.10.0", "2.9.2" )
+
+resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "1.2.0+",
-   "de.sciss" %% "confluentreactive" % "1.5.+",
-   "de.sciss" %% "lucreexpr" % "1.4.+",
-   "de.sciss" % "prefuse-core" % "0.21"
+   "de.sciss" %% "scalacollider" % "1.3.+",
+   "de.sciss" %% "lucreconfluent-event" % "1.6.+",
+   "de.sciss" %% "lucreevent-expr" % "1.6.+",
+   "de.sciss" % "prefuse-core" % "0.21",
+   "de.sciss" %% "lucrestm-bdb" % "1.6.+" % "test",
+   ("org.scalatest" %% "scalatest" % "1.8" cross CrossVersion.full) % "test"
 )
-
-libraryDependencies in ThisBuild <+= scalaVersion { sv =>
-   val v = sv match {
-      case "2.10.0-RC3" => "1.8-B1"
-      case "2.10.0-RC5" => "1.8-B1"
-      case _            => "1.8"
-   }
-   "org.scalatest" %% "scalatest" % v % "test"
-}
 
 retrieveManaged := true
 
