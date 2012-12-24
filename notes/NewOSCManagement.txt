@@ -1,0 +1,143 @@
+:::::: A simple (?) model of assembling OSC messages within a transaction ::::::
+
+- client side objects maintain instances of `State` which indicate their state, such as
+  a SynthDef being online, a Buffer being allocated or filled with content, a Node running or pausing, etc.
+- a `State` carries the following information
+  ~ owner and name, for printing purposes
+  ~ current value
+  ~ bundle index sIdx, indicating the sequence number of the OSC bundle which caused the state to be
+    attained on the server side; 0 indicating initial state
+  ~ asynchronous boolean sAsync, indicating whether the changing message in the bundle as asynchronous (true)
+    or synchronous (false)
+- the client side objects provide command methods which issue state changes
+- such methods are constructed as follows:
+  ~ (1) required conditions are checked, e.g. a buf.cue must check that the allocated-state is true.
+    if a condition is not met, a runtime exception is thrown (aborting the transaction)
+  ~ required conditions may involve states from other client side objects. for instance synth.play, given
+    a list of buffers which are used by the synth, requires that all these buffers be allocated and filled
+  ~ (2) tx.addMessage is invoked with (a) the corresponding OSC message, (b) the states which are changed
+    by this method, (c) the dependencies (list of states)
+- tx.addMessage then processes these calls appropriately:
+  ~ system maintains index / async of last sent bundle sendIdx / sendAsync;
+    where sendAsync indicates whether the client has seen the bundle completed (e.g. /synced)
+  ~ the dependencies are traversed, and the target bundle index bndlIdx / async flag bndlAsync are determinated.
+    begin with bndlIdx = sendIdx + 1; bndlAsync = false
+    for each changing state S, see its bundle index sIdx / async flag sAsync:
+       if( sIdx > bndlIdx || ((sIdx == bndlIdx) && (sAsync || !bndlAsync)) ) {
+          bndlIdx   := sIdx
+          bndlAsync := sAsync
+       }
+    for each dep. state D, see its bundle index dIdx / async flag dAsync:
+       if( dIdx > bndlIdx || ((dIdx == bndlIdx) && (dAsync || !bndlAsync)) ) {
+          bndlIdx   := dIdx
+          bndlAsync := dAsync
+       }
+    finally, if the OSC message is asynchronous, adjust bndlAsync := true
+  ~ for each changing state S, update sIdx := bndlIdx, sAsync := bndlAsync
+  ~ insert the OSC message into the appropriate bundle structure.
+    + a map m from bundle index to BundlePrepare is maintained
+    + case class BundlePrepare(direct: Seq[Packet], async: Seq[Packet])
+    + bndl = m.getOrElse( bndlIdx, new BundlePrepare )
+    + isDirect = !bndlAsync || !message.isSynchronous
+    + bndl := if( isDirect ) bndl.copy(direct = bndl.direct :+ message)
+                     else    bndl.copy(async  = bndl.async  :+ message)
+    + m += bndlIdx -> bndl
+
+TODO: 'audible' flag
+
+::::::::::::::::::::::::::::
+
+scenario: (1) allocate buffer --> (2) read buffer content --> (3) start a synth --> (4) free the synth --> (5) free buffer
+(as dependencies) within one transaction.
+
+:: version 1 (without smart undo) ::
+
+(1) BundlePrepare( direct = buf.allocMsg :: Nil, async = Nil ) :: Nil
+(2) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = Nil ) :: Nil
+(3) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = synth.newMsg :: Nil ) :: Nil
+(4) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = synth.newMsg :: synth.freeMsg :: Nil ) :: Nil
+(5) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = synth.newMsg :: synth.freeMsg :: Nil ) :: BundlePrepare( direct = buf.freeMsg :: Nil, async :: Nil ) :: Nil
+
+or
+(5) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = synth.newMsg :: synth.freeMsg :: buf.freeMsg :: Nil ) :: Nil
+?
+
+:: version 2 (with smart update) ::
+
+(1) BundlePrepare( direct = buf.allocMsg :: Nil, async = Nil ) :: Nil
+(2) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = Nil ) :: Nil
+(3) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = synth.newMsg :: Nil ) :: Nil
+(4) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = Nil ) :: Nil
+(5) BundlePrepare( direct = Nil, async = Nil ) :: Nil
+
+bundle prepration:
+a0, ..., ai
+---
+b0, ..., bj
+---
+c0, ..., ck
+---
+d0, ..., dm
+
+assembled as follows:
+[ nil, a0, ..., ai, [ /async, [ nil, b0, ..., bj, [ /async, [ nil, c0, ..., ck, [ /async, [ nil, d0, ..., dm ]]]]]]]
+
+plus an optional step if bundle size becomes too big
+
+::::::::::::::::::::::::::::
+
+(1) it _will_ get easier though with smart folding
+(2) on the other hand, it will also get easier with 'throwaway' resources (do not re-use the same buffer or node)
+    ; which means in the above example, that (5) is not allowed (buf will treated synth-private and freed using
+    an n_end listening hook)
+
+::::::::::::::::::::::::::::
+
+elaborate on (2).
+
+first of all, let's review all currently generated messages / states:
+
+--- buffer ---
+allocMsg
+cueMsg
+writeMsg	--> side effect! (if leaveOption == true, we could treat it as foldable)
+zeroMsg
+closeMsg
+freeMsg
+(missing: copying messages; they would also constitute side effects)
+
+--- synth ---
+newMsg
+
+--- group ---
+newMsg
+
+--- node ---
+setMsg
+mapMsg
+moveToHeadMsg, moveToTailMsg, moveBeforeMsg, moveAfterMsg
+freeMsg
+
+--- synthdef ---
+recvMsg
+(freeMsg)	--> currently not implemented
+
+a "throwaway" approach would mean that buffer.free/close, node.free, and synthdef.free make the objects inaccessible for subsequent client operations
+
+note:
+- most dependencies are within-the-resource (e.g. true for all buffer operations)
+- few are cross-resoures (synth.newMsg depending on buffers)
+
+more observations:
+- synths are always played straight after instantiation. we can thus simplify the synth resource by not allowing instantation without automatic playback
+- similarily for buffers; we can distinguish cueing for DiskIn and DiskOut, FFT, or 'user buffers' (which may have successive reads / writes, but which
+  nevertheless will be immediately allocated)
+
+it thus suffices to maintain only one state, `disposed`, which is initially false and may be only set once to `true`
+
+Buffer.diskIn  --> yields object which can only close
+Buffer.diskOut --> dito.
+Buffer.fft     --> dito.
+Buffer.user    --> can read and write, free
+
+...

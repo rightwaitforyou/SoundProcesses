@@ -195,7 +195,7 @@ abstract class RichNode( initOnline: Boolean ) /* extends RichObject */ {
    final def moveToHeadIfOnline( group: RichGroup )( implicit tx: ProcTxn ) {
       if( isOnline.get ) {
          tx.add( peer.moveToHeadMsg( group.peer ), change = None, audible = true,
-                 dependencies = Map( group.isOnline -> true ), true )
+                 dependencies = Map( group.isOnline -> true ), noErrors = true )
       }
    }
 
