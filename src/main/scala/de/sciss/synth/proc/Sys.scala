@@ -8,8 +8,8 @@ import de.sciss.osc
 object SysLike {
    trait Txn[ S <: SysLike[ S ]] extends ConfluentReactiveLike.Txn[ S ] {
       private[proc] def addMessage( server: RichServer, msg: osc.Message with sosc.Send,
-                                    change: Option[ (RichState.FilterMode, RichState, Boolean) ], audible: Boolean,
-                                    dependencies: Map[ RichState, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
+                                    change: State.Change, audible: Boolean,
+                                    dependencies: Map[ State, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
    }
 }
 trait SysLike[ S <: SysLike[ S ]] extends ConfluentReactiveLike[ S ] {

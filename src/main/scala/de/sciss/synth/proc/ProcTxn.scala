@@ -75,8 +75,8 @@ trait ProcTxn {
 
    def peer: InTxn
 
-   def add( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, RichState, Boolean) ], audible: Boolean,
-            dependencies: Map[ RichState, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
+   def add( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, State, Boolean) ], audible: Boolean,
+            dependencies: Map[ State, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
 
    def beforeCommit( handler: ProcTxn => Unit ) : Unit
 }

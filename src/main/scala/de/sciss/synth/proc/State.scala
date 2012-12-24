@@ -1,5 +1,5 @@
 /*
- *  RichState.scala
+ *  State.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -27,17 +27,17 @@ package de.sciss.synth.proc
 
 import concurrent.stm.{Ref => ScalaRef}
 
-object RichState {
-   def apply( owner: Any, name: String, init: Boolean ) : RichState = new Impl( owner, name, init )
-   def and( that: RichState )( owner: Any, name: String, init: Boolean ) : RichState = new And( that, owner, name, init )
+object State {
+   def apply( owner: Any, name: String, init: Boolean ) : State = new Impl( owner, name, init )
+   def and( that: State )( owner: Any, name: String, init: Boolean ) : State = new And( that, owner, name, init )
 
-   private final class Impl( val owner: Any, val name: String, init: Boolean ) extends RichState {
+   private final class Impl( val owner: Any, val name: String, init: Boolean ) extends State {
       val value = ScalaRef( init )
       def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = value.swap( newValue )( tx.peer )
       def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer )
    }
 
-   private final class And( that: RichState, val owner: Any, val name: String, init: Boolean ) extends RichState {
+   private final class And( that: State, val owner: Any, val name: String, init: Boolean ) extends State {
       val value = ScalaRef( init )
       def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = {
          value.swap( newValue )( tx.peer ) && that.get
@@ -45,12 +45,34 @@ object RichState {
       def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer ) && that.get
    }
 
-   sealed abstract class FilterMode
-   case object Always extends FilterMode
-   case object IfChanges extends FilterMode
-   case object RequiresChange extends FilterMode
+   object IfEqual {
+      /**
+       * If a state change does not imply a change in the state's value, drop any associated OSC message.
+       */
+      case object Drop  extends IfEqual
+      /**
+       * If a state change does not imply a change in the state's value, send any associated OSC message anyways.
+       */
+      case object Send  extends IfEqual
+      /**
+       * If a state change does not imply a change in the state's value, throw an error (rollback transaction).
+       */
+      case object Error extends IfEqual
+   }
+   sealed trait IfEqual
+
+   /**
+    * Description of a state change.
+    *
+    * @param state   the state which changes according to an OSC message
+    * @param value   the state's target value
+    * @param ifEqual the behavior requested in the case that the state's previous and target value are the same:
+    *                `Drop` means that the OSC message should be dropped (not sent); `Send` means it should nevertheless
+    *                be sent; `Error` means this is an unexpected situation and the transaction should be rolled back.
+    */
+   final case class Change( state: State, value: Boolean, ifEqual: IfEqual )
 }
-sealed trait RichState {
+sealed trait State {
    protected def value: ScalaRef[ Boolean ]
    def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean
    def get( implicit tx: ProcTxn ) : Boolean

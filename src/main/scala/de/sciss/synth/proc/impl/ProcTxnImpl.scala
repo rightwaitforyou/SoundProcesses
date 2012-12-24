@@ -42,8 +42,8 @@ object ProcTxnImpl {
    import ProcTxn._
 
    private final case class Entry( idx: Int, msg: osc.Message with sosc.Send,
-                                   change: Option[ (FilterMode, RichState, Boolean) ],
-                                   audible: Boolean, dependencies: Map[ RichState, Boolean ],
+                                   change: Option[ (FilterMode, State, Boolean) ],
+                                   audible: Boolean, dependencies: Map[ State, Boolean ],
                                    noError: Boolean )
 
    private final case class EntryEdge( sourceVertex: Entry, targetVertex: Entry ) extends Topology.Edge[ Entry ]
@@ -59,8 +59,8 @@ object ProcTxnImpl {
       override def toString = "ProcTxn(" + peer + ")"
 
       private var entries     = IQueue.empty[ Entry ]
-      private var entryMap    = Map.empty[ (RichState, Boolean), Entry ]
-      private var stateMap    = Map.empty[ RichState, Boolean ]
+      private var entryMap    = Map.empty[ (State, Boolean), Entry ]
+      private var stateMap    = Map.empty[ State, Boolean ]
       private var entryCnt    = 0
 
       private var beforeHooks = IIdxSeq.empty[ ProcTxn => Unit ]
@@ -192,8 +192,8 @@ val server = Server.default // XXX vergación
          (sorted, if( clumps.contains( audibleIdx )) clumpIdx else clumpIdx - 1)
       }
 
-      def add( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, RichState, Boolean) ], audible: Boolean,
-               dependencies: Map[ RichState, Boolean ], noError: Boolean = false ) {
+      def add( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, State, Boolean) ], audible: Boolean,
+               dependencies: Map[ State, Boolean ], noError: Boolean = false ) {
 
          logTxn( "add " + ((msg, change, audible, dependencies, noError)) )
 

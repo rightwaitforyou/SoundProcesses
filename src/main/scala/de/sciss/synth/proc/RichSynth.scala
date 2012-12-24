@@ -45,7 +45,7 @@ final case class RichSynth private( peer: Synth, synthDef: RichSynthDef ) extend
       require( target.server == server )
       buffers.foreach( b => require( b.server == server ))
 
-      val dependencies: Map[ RichState, Boolean ] = buffers.map( _.hasContent -> true )( breakOut )
+      val dependencies: Map[ State, Boolean ] = buffers.map( _.hasContent -> true )( breakOut )
       tx.add( peer.newMsg( synthDef.name, target.peer, args, addAction ),
               change = Some( (RequiresChange, isOnline, true) ),
               audible = true,

@@ -43,7 +43,7 @@ abstract class RichNode( initOnline: Boolean ) /* extends RichObject */ {
    def peer: Node
    def server: RichServer
 
-   final val isOnline: RichState = RichState( this, "isOnline", init = initOnline )
+   final val isOnline: State = State( this, "isOnline", init = initOnline )
 //   private val onEndFuns   = Ref( IQueue.empty[ Function1[ ProcTxn, Unit ]])
 
    private val onEndFuns   = ScalaRef( EmptyOnEnd )

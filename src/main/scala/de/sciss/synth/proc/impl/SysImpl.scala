@@ -9,7 +9,6 @@ import confluent.{CacheMap, DurablePersistentMap, Cache}
 import confluent.impl.{ConfluentImpl, DurableCacheMapImpl}
 import de.sciss.osc.Message
 import de.sciss.synth.osc.Send
-import de.sciss.synth.proc.RichState.FilterMode
 
 object SysImpl {
    private type S = Sys
@@ -25,7 +24,8 @@ object SysImpl {
    trait TxnMixin[ S <: SysLike[ S ]] extends ConfluentReactiveImpl.TxnMixin[ S ] with SysLike.Txn[ S ] {
       _: S#Tx =>
 
-      private[ proc ] def addMessage(server: RichServer, msg: Message with Send, change: Option[ (FilterMode, RichState, Boolean) ], audible: Boolean, dependencies: Map[ RichState, Boolean ], noErrors: Boolean) {
+      final def addMessage( server: RichServer, msg: Message with Send, change: State.Change, audible: Boolean,
+                            dependencies: Map[ State, Boolean ], noErrors: Boolean ) {
          sys.error("TODO")
       }
    }

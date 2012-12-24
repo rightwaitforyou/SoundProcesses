@@ -37,9 +37,9 @@ object RichBuffer {
    }
 }
 final case class RichBuffer private( server: RichServer, peer: Buffer ) {
-   val isAlive:    RichState = RichState(                this, "isAlive", init = true )
-   val isOnline:   RichState = RichState.and( isAlive )( this, "isOnline", init = false )
-   val hasContent: RichState = RichState(                this, "hasContent", init = false )
+   val isAlive:    State = State(                this, "isAlive", init = true )
+   val isOnline:   State = State.and( isAlive )( this, "isOnline", init = false )
+   val hasContent: State = State(                this, "hasContent", init = false )
 
    def id: Int = peer.id
 
