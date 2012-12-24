@@ -7,8 +7,8 @@ import de.sciss.osc
 
 object SysLike {
    trait Txn[ S <: SysLike[ S ]] extends ConfluentReactiveLike.Txn[ S ] {
-      private[proc] def addMessage( msg: osc.Message with sosc.Send,
-                                    change: Option[ (Sys.FilterMode, RichState, Boolean) ], audible: Boolean,
+      private[proc] def addMessage( server: RichServer, msg: osc.Message with sosc.Send,
+                                    change: Option[ (RichState.FilterMode, RichState, Boolean) ], audible: Boolean,
                                     dependencies: Map[ RichState, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
    }
 }
@@ -19,13 +19,8 @@ trait SysLike[ S <: SysLike[ S ]] extends ConfluentReactiveLike[ S ] {
 object Sys {
    type S = Sys
 
-   sealed abstract class FilterMode
-   case object Always extends FilterMode
-   case object IfChanges extends FilterMode
-   case object RequiresChange extends FilterMode
-
    trait Txn extends SysLike.Txn[ S ] {
-      private[proc] def durable : stm.Durable#Tx
+      private[proc] def durable  : stm.Durable#Tx
       private[proc] def inMemory : stm.InMemory#Tx
    }
 }

@@ -2,10 +2,14 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.{confluent, stm, event => evt}
+import confluent.reactive.impl.ConfluentReactiveImpl
 import stm.{DataStoreFactory, DataStore}
 import concurrent.stm.InTxn
 import confluent.{CacheMap, DurablePersistentMap, Cache}
-import confluent.impl.DurableCacheMapImpl
+import confluent.impl.{ConfluentImpl, DurableCacheMapImpl}
+import de.sciss.osc.Message
+import de.sciss.synth.osc.Send
+import de.sciss.synth.proc.RichState.FilterMode
 
 object SysImpl {
    private type S = Sys
@@ -18,8 +22,34 @@ object SysImpl {
       new System( storeFactory, durable )
    }
 
+   trait TxnMixin[ S <: SysLike[ S ]] extends ConfluentReactiveImpl.TxnMixin[ S ] with SysLike.Txn[ S ] {
+      _: S#Tx =>
+
+      private[ proc ] def addMessage(server: RichServer, msg: Message with Send, change: Option[ (FilterMode, RichState, Boolean) ], audible: Boolean, dependencies: Map[ RichState, Boolean ], noErrors: Boolean) {
+         sys.error("TODO")
+      }
+   }
+
+   private sealed trait TxnImpl extends TxnMixin[ Sys ] with Sys.Txn {
+      final lazy val inMemory: stm.InMemory#Tx = system.inMemory.wrap( peer )
+   }
+
+   private final class RegularTxn( val system: Sys, val durable: stm.Durable#Tx,
+                                   val inputAccess: Sys#Acc, val cursorCache: Cache[ Sys#Tx ])
+   extends ConfluentImpl.RegularTxnMixin[ Sys, stm.Durable ] with TxnImpl {
+      lazy val peer = durable.peer
+   }
+
+   private final class RootTxn( val system: Sys, val peer: InTxn )
+   extends ConfluentImpl.RootTxnMixin[ Sys, stm.Durable ] with TxnImpl {
+      lazy val durable: stm.Durable#Tx = {
+         log( "txn durable" )
+         system.durable.wrap( peer )
+      }
+   }
+
    private final class System( protected val storeFactory: DataStoreFactory[ DataStore ], val durable: stm.Durable )
-   extends confluent.impl.ConfluentImpl.Mixin[ S ]
+   extends ConfluentImpl.Mixin[ S ]
    with evt.impl.ReactionMapImpl.Mixin[ S ]
    with Sys {
       def inMemory               = durable.inMemory

@@ -44,6 +44,11 @@ object RichState {
       }
       def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer ) && that.get
    }
+
+   sealed abstract class FilterMode
+   case object Always extends FilterMode
+   case object IfChanges extends FilterMode
+   case object RequiresChange extends FilterMode
 }
 sealed trait RichState {
    protected def value: ScalaRef[ Boolean ]
