@@ -141,3 +141,13 @@ Buffer.fft     --> dito.
 Buffer.user    --> can read and write, free
 
 ...
+
+let's review potential other commands to incorporate:
+
+n_run	- foldable
+n_order	- goes beyond single resource, won't be needed and implemented
+s_get	- will have side effect; currently not used, but might be needed when jumping in graphemes
+b_gen	- copy
+
+::::::::::::::::::::::::::::
+

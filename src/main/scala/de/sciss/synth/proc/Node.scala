@@ -1,5 +1,5 @@
 /*
- *  RichNode.scala
+ *  Node.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -23,35 +23,34 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{Ref => ScalaRef, InTxn, TxnExecutor}
-import ProcTxn.IfChanges
+import de.sciss.synth.{Node => SNode, ControlSetMap, ControlABusMap, ControlKBusMap, ControlBus, AudioBus}
 
-object RichNode {
+object Node {
    private val EmptyOnEnd = new OnEnd( IIdxSeq.empty, IIdxSeq.empty )
-   private final case class OnEnd( direct: IIdxSeq[ () => Unit ], inTxn: IIdxSeq[ ProcTxn => Unit ]) {
+   private final case class OnEnd( direct: IIdxSeq[ () => Unit ], inTxn: IIdxSeq[ Txn => Unit ]) {
       def nonEmpty = direct.nonEmpty || inTxn.nonEmpty
    }
 }
-abstract class RichNode( initOnline: Boolean ) /* extends RichObject */ {
-   import RichNode._
+abstract class Node( initOnline: Boolean ) /* extends Object */ {
+   import Node._
 
    // ---- abstract ----
-   def peer: Node
-   def server: RichServer
+   def peer: SNode
+   def server: Server
 
    final val isOnline: State = State( this, "isOnline", init = initOnline )
-//   private val onEndFuns   = Ref( IQueue.empty[ Function1[ ProcTxn, Unit ]])
+//   private val onEndFuns   = Ref( IQueue.empty[ Function1[ Txn, Unit ]])
 
    private val onEndFuns   = ScalaRef( EmptyOnEnd )
 //   private val onEndTouch  = TxnLocal[ Unit ]( initialValue = { implicit itx =>
 //      Txn.beforeCommit { implicit itx =>
 //         val funs = onEndFuns()
 //         if( funs.nonEmpty ) {
-//            val ptx = ProcTxn()
+//            val ptx = Txn()
 //            funs.direct.foreach( _.apply() )
 //            funs.inTxn.foreach( _.apply( ptx ))
 //         }
@@ -62,7 +61,7 @@ abstract class RichNode( initOnline: Boolean ) /* extends RichObject */ {
       val funs = onEndFuns.single.get
       if( funs.nonEmpty ) {
          spawn { implicit itx =>
-            implicit val ptx = ProcTxn.applyPlain()
+            implicit val ptx: Txn = ??? // = ProcTxn.applyPlain()
             funs.direct.foreach( _.apply() )
             funs.inTxn.foreach(  _.apply( ptx ))
          }
@@ -81,26 +80,26 @@ abstract class RichNode( initOnline: Boolean ) /* extends RichObject */ {
       })
    }
 
-   def onEndTxn( fun: ProcTxn => Unit )( implicit tx: ProcTxn ) {
+   def onEndTxn( fun: Txn => Unit )( implicit tx: Txn ) {
       onEndFuns.transform( e => e.copy( inTxn = e.inTxn :+ fun ))( tx.peer )
 //      onEndTouch()( tx.peer )
    }
 
-   def onEnd( code: => Unit )( implicit tx: ProcTxn ) {
+   def onEnd( code: => Unit )( implicit tx: Txn ) {
       onEndFuns.transform( e => e.copy( direct = e.direct :+ (() => code) ))( tx.peer )
 //      onEndTouch()( tx.peer )
    }
 
 //   final def server = peer.server
 
-   final def read( assoc: (RichAudioBus, String) )( implicit tx: ProcTxn ) : AudioBusNodeSetter = {
+   final def read( assoc: (RichAudioBus, String) )( implicit tx: Txn ) : AudioBusNodeSetter = {
       val (rb, name) = assoc
       val reader = BusNodeSetter.reader( name, rb, this )
       registerSetter( reader )
       reader
    }
 
-   final def read( assoc: (RichControlBus, String) )( implicit tx: ProcTxn ) : ControlBusNodeSetter = {
+   final def read( assoc: (RichControlBus, String) )( implicit tx: Txn ) : ControlBusNodeSetter = {
       val (rb, name) = assoc
       val reader = BusNodeSetter.reader( name, rb, this )
       registerSetter( reader )
@@ -112,105 +111,107 @@ abstract class RichNode( initOnline: Boolean ) /* extends RichObject */ {
     * This creates a `DynamicAudioBusUser` which will be freed automatically when
     * this node ends.
     */
-   final def write( assoc: (RichAudioBus, String) )( implicit tx: ProcTxn ) : AudioBusNodeSetter = {
+   final def write( assoc: (RichAudioBus, String) )( implicit tx: Txn ) : AudioBusNodeSetter = {
       val (rb, name) = assoc
       val writer = BusNodeSetter.writer( name, rb, this )
       registerSetter( writer )
       writer
    }
 
-   final def write( assoc: (RichControlBus, String) )( implicit tx: ProcTxn ) : ControlBusNodeSetter = {
+   final def write( assoc: (RichControlBus, String) )( implicit tx: Txn ) : ControlBusNodeSetter = {
       val (rb, name) = assoc
       val writer = BusNodeSetter.writer( name, rb, this )
       registerSetter( writer )
       writer
    }
 
-   final def readWrite( assoc: (RichAudioBus, String) )( implicit tx: ProcTxn ) : AudioBusNodeSetter = {
+   final def readWrite( assoc: (RichAudioBus, String) )( implicit tx: Txn ) : AudioBusNodeSetter = {
       val (rb, name) = assoc
       val rw = BusNodeSetter.readerWriter( name, rb, this )
       registerSetter( rw )
       rw
    }
 
-   final def readWrite( assoc: (RichControlBus, String) )( implicit tx: ProcTxn ) : ControlBusNodeSetter = {
+   final def readWrite( assoc: (RichControlBus, String) )( implicit tx: Txn ) : ControlBusNodeSetter = {
       val (rb, name) = assoc
       val rw = BusNodeSetter.readerWriter( name, rb, this )
       registerSetter( rw )
       rw
    }
 
-   final def map( assoc: (RichAudioBus, String) )( implicit tx: ProcTxn ) : AudioBusNodeSetter = {
+   final def map( assoc: (RichAudioBus, String) )( implicit tx: Txn ) : AudioBusNodeSetter = {
       val (rb, name) = assoc
       val mapper = BusNodeSetter.mapper( name, rb, this )
       registerSetter( mapper )
       mapper
    }
 
-   final def map( assoc: (RichControlBus, String) )( implicit tx: ProcTxn ) : ControlBusNodeSetter = {
+   final def map( assoc: (RichControlBus, String) )( implicit tx: Txn ) : ControlBusNodeSetter = {
       val (rb, name) = assoc
       val mapper = BusNodeSetter.mapper( name, rb, this )
       registerSetter( mapper )
       mapper
    }
 
-   private def registerSetter( bns: BusNodeSetter )( implicit tx: ProcTxn ) {
+   private def registerSetter( bns: BusNodeSetter )( implicit tx: Txn ) {
       bns.add()
       onEndTxn { implicit tx => bns.remove() }
    }
 
-   final def free( audible: Boolean = true )( implicit tx: ProcTxn ) {
-      tx.add( peer.freeMsg, change = Some( (IfChanges, isOnline, false) ), audible = audible,
-              dependencies = Map( isOnline -> true ))
+   final def free( audible: Boolean = true )( implicit tx: Txn ) {
+      tx.addMessage( peer.freeMsg, change = Some( (IfChanges, isOnline, false) ), audible = audible,
+                     dependencies = Map( isOnline -> true ))
    }
 
-   final def set( audible: Boolean, pairs: ControlSetMap* )( implicit tx: ProcTxn ) {
-      tx.add( peer.setMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+   final def set( audible: Boolean, pairs: ControlSetMap* )( implicit tx: Txn ) {
+      tx.addMessage( peer.setMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
-   final def setn( audible: Boolean, pairs: ControlSetMap* )( implicit tx: ProcTxn ) {
-      tx.add( peer.setnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+   final def setn( audible: Boolean, pairs: ControlSetMap* )( implicit tx: Txn ) {
+      tx.addMessage( peer.setnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
-   final def setIfOnline( pairs: ControlSetMap* )( implicit tx: ProcTxn ) {
+   final def setIfOnline( pairs: ControlSetMap* )( implicit tx: Txn ) {
       // XXX eventually this should be like set with different failure resolution
-      if( isOnline.get ) tx.add( peer.setMsg( pairs: _* ), change = None, audible = true, noErrors = true )
+      if( isOnline.get ) {
+         tx.addMessage( peer.setMsg( pairs: _* ), change = None, audible = true, noErrors = true )
+      }
 //      if( isOnline.get ) tx.add( OSCBundle(
 //         OSCMessage( "/error", -1 ), node.setMsg( pairs: _* ), OSCMessage( "/error", -2 )), true )
    }
 
-   final def mapn( audible: Boolean, pairs: ControlKBusMap* )( implicit tx: ProcTxn ) {
-      tx.add( peer.mapnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+   final def mapn( audible: Boolean, pairs: ControlKBusMap* )( implicit tx: Txn ) {
+      tx.addMessage( peer.mapnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
-   final def mapan( audible: Boolean, pairs: ControlABusMap* )( implicit tx: ProcTxn ) {
-      tx.add( peer.mapanMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+   final def mapan( audible: Boolean, pairs: ControlABusMap* )( implicit tx: Txn ) {
+      tx.addMessage( peer.mapanMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
    }
 
-   final def moveToHead( audible: Boolean, group: RichGroup )( implicit tx: ProcTxn ) {
-      tx.add( peer.moveToHeadMsg( group.peer ), change = None, audible = audible,
+   final def moveToHead( audible: Boolean, group: Group )( implicit tx: Txn ) {
+      tx.addMessage( peer.moveToHeadMsg( group.peer ), change = None, audible = audible,
               dependencies = Map( isOnline -> true, group.isOnline -> true ))
    }
 
-   final def moveToHeadIfOnline( group: RichGroup )( implicit tx: ProcTxn ) {
+   final def moveToHeadIfOnline( group: Group )( implicit tx: Txn ) {
       if( isOnline.get ) {
-         tx.add( peer.moveToHeadMsg( group.peer ), change = None, audible = true,
-                 dependencies = Map( group.isOnline -> true ), noErrors = true )
+         tx.addMessage( peer.moveToHeadMsg( group.peer ), change = None, audible = true,
+                        dependencies = Map( group.isOnline -> true ), noErrors = true )
       }
    }
 
-   final def moveToTail( audible: Boolean, group: RichGroup )( implicit tx: ProcTxn ) {
-      tx.add( peer.moveToTailMsg( group.peer ), change = None, audible = audible,
-              dependencies = Map( isOnline -> true, group.isOnline -> true ))
+   final def moveToTail( audible: Boolean, group: Group )( implicit tx: Txn ) {
+      tx.addMessage( peer.moveToTailMsg( group.peer ), change = None, audible = audible,
+                     dependencies = Map( isOnline -> true, group.isOnline -> true ))
    }
 
-   final def moveBefore( audible: Boolean, target: RichNode )( implicit tx: ProcTxn ) {
-      tx.add( peer.moveBeforeMsg( target.peer ), change = None, audible = audible,
-              dependencies = Map( isOnline -> true, target.isOnline -> true ))
+   final def moveBefore( audible: Boolean, target: Node )( implicit tx: Txn ) {
+      tx.addMessage( peer.moveBeforeMsg( target.peer ), change = None, audible = audible,
+                     dependencies = Map( isOnline -> true, target.isOnline -> true ))
    }
 
-   final def moveAfter( audible: Boolean, target: RichNode )( implicit tx: ProcTxn ) {
-      tx.add( peer.moveAfterMsg( target.peer ), change = None, audible = audible,
-              dependencies = Map( isOnline -> true, target.isOnline -> true ))
+   final def moveAfter( audible: Boolean, target: Node )( implicit tx: Txn ) {
+      tx.addMessage( peer.moveAfterMsg( target.peer ), change = None, audible = audible,
+                     dependencies = Map( isOnline -> true, target.isOnline -> true ))
    }
 }

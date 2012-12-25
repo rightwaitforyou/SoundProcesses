@@ -1,5 +1,5 @@
 /*
- *  RichSynth.scala
+ *  Synth.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -23,33 +23,32 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 
 import collection.breakOut
-import ProcTxn.RequiresChange
+import de.sciss.synth.{Synth => SSynth, ControlSetMap, AddAction, addToHead}
 
-object RichSynth {
-   def apply( synthDef: RichSynthDef ) : RichSynth = {
-      new RichSynth( Synth( synthDef.server.peer ), synthDef )
+object Synth {
+   def apply( synthDef: SynthDef ) : Synth = {
+      new Synth( SSynth( synthDef.server.peer ), synthDef )
    }
 }
-final case class RichSynth private( peer: Synth, synthDef: RichSynthDef ) extends RichNode( false ) {
+final case class Synth private( peer: SSynth, synthDef: SynthDef ) extends Node( false ) {
    override def toString = "Synth(id=" + peer.id + ", def=" + synthDef.name + ")"
 
-   def server: RichServer = synthDef.server
+   def server: Server = synthDef.server
 
-   def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil, addAction: AddAction = addToHead,
-             buffers: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) {
+   def play( target: Node, args: Seq[ ControlSetMap ] = Nil, addAction: AddAction = addToHead,
+             buffers: Seq[ Buffer ] = Nil )( implicit tx: Txn ) {
 
       require( target.server == server )
       buffers.foreach( b => require( b.server == server ))
 
       val dependencies: Map[ State, Boolean ] = buffers.map( _.hasContent -> true )( breakOut )
-      tx.add( peer.newMsg( synthDef.name, target.peer, args, addAction ),
-              change = Some( (RequiresChange, isOnline, true) ),
-              audible = true,
-              dependencies = dependencies + (target.isOnline -> true) + (synthDef.isOnline -> true) )
+      tx.addMessage( peer.newMsg( synthDef.name, target.peer, args, addAction ),
+                     change = Some( (RequiresChange, isOnline, true) ),
+                     audible = true,
+                     dependencies = dependencies + (target.isOnline -> true) + (synthDef.isOnline -> true) )
 
 //      peer.register()   // ok to call multiple times
    }

@@ -23,11 +23,11 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 
 import impl.AuralProc
 import concurrent.stm.{TMap, InTxn, TSet, Ref => ScalaRef}
+import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef}
 
 //object ProcWorld {
 //// MMM
@@ -40,18 +40,18 @@ class ProcWorld /* MMM extends TxnModel[ ProcWorld.Update ] */ {
 
 // EEE
 //   private type Topo = Topology[ AuralProc, ProcEdge ]
-   val ugenGraphs = ScalaRef( Map.empty[ ProcDemiurg.GraphEquality, RichSynthDef ])
+   val ugenGraphs = ScalaRef( Map.empty[ ProcDemiurg.GraphEquality, SynthDef ])
 // EEE
 //   private val topologyRef = ScalaRef[ Topo ]( Topology.empty )
 
 // MMM
-//   protected def fullUpdate( implicit tx: ProcTxn ) = Update( topologyRef().vertices.toSet, Set.empty )
+//   protected def fullUpdate( implicit tx: Txn ) = Update( topologyRef().vertices.toSet, Set.empty )
 //   protected def emptyUpdate = Update( Set.empty, Set.empty )
 
 // EEE
-//   def topology( implicit tx: ProcTxn ) = topologyRef()
+//   def topology( implicit tx: Txn ) = topologyRef()
 
-   def addProc( p: AuralProc )( implicit tx: ProcTxn ) {
+   def addProc( p: AuralProc )( implicit tx: Txn ) {
 // MMM
 //      touch()
 
@@ -66,7 +66,7 @@ class ProcWorld /* MMM extends TxnModel[ ProcWorld.Update ] */ {
 //      })
    }
 
-   def removeProc( p: AuralProc )( implicit tx: ProcTxn ) {
+   def removeProc( p: AuralProc )( implicit tx: Txn ) {
 // MMM
 //      touch()
 
@@ -82,13 +82,13 @@ class ProcWorld /* MMM extends TxnModel[ ProcWorld.Update ] */ {
    }
 
 // EEE
-//   def addEdge( e: ProcEdge )( implicit tx: ProcTxn ) : Option[ (Topo, Proc, IIdxSeq[ Proc ])] = {
+//   def addEdge( e: ProcEdge )( implicit tx: Txn ) : Option[ (Topo, Proc, IIdxSeq[ Proc ])] = {
 //      val res = topologyRef().addEdge( e )
 //      res.foreach( tup => topologyRef.set( tup._1 ))
 //      res
 //   }
 //
-//   def removeEdge( e: ProcEdge )( implicit tx: ProcTxn ) {
+//   def removeEdge( e: ProcEdge )( implicit tx: Txn ) {
 //      topologyRef.transform( _.removeEdge( e ))
 //   }
 }
@@ -105,7 +105,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 
    var verbose = false
 
-   private val servers = TSet.empty[ RichServer ]
+   private val servers = TSet.empty[ Server ]
 
    private val uniqueDefID = ScalaRef( 0 )
    private def nextDefID()( implicit tx: InTxn ) : Int = {
@@ -114,32 +114,32 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       res
    }
 
-   def addServer( server: RichServer )( implicit tx: ProcTxn ) {
+   def addServer( server: Server )( implicit tx: Txn ) {
       implicit val itx = tx.peer
       if( servers.contains( server )) return
       servers += server
       worlds  += server -> new ProcWorld
    }
 
-   def removeServer( server: RichServer )( implicit tx: ProcTxn ) {
+   def removeServer( server: Server )( implicit tx: Txn ) {
       implicit val itx = tx.peer
       servers -= server
       worlds  -= server
    }
 
    // commented out for debugging inspection
-   private val worlds = TMap.empty[ RichServer, ProcWorld ]
+   private val worlds = TMap.empty[ Server, ProcWorld ]
 
 // FFF
 //   private val factoriesRef = Ref( Set.empty[ ProcFactory ])
-//   def factories( implicit tx: ProcTxn ) : Set[ ProcFactory ] = factoriesRef()
+//   def factories( implicit tx: Txn ) : Set[ ProcFactory ] = factoriesRef()
 
 // MMM
-//   protected def fullUpdate( implicit tx: ProcTxn ) = ProcDemiurgUpdate( factoriesRef(), Set.empty )
+//   protected def fullUpdate( implicit tx: Txn ) = ProcDemiurgUpdate( factoriesRef(), Set.empty )
 //   protected def emptyUpdate = ProcDemiurgUpdate( Set.empty, Set.empty )
 
 // FFF
-//   def addFactory( pf: ProcFactory )( implicit tx: ProcTxn ) {
+//   def addFactory( pf: ProcFactory )( implicit tx: Txn ) {
 //      touch
 //      factoriesRef.transform( _ + pf )
 //      updateRef.transform( u => if( u.factoriesRemoved.contains( pf )) {
@@ -149,7 +149,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //      })
 //   }
 //
-//   def removeFactory( pf: ProcFactory )( implicit tx: ProcTxn ) {
+//   def removeFactory( pf: ProcFactory )( implicit tx: Txn ) {
 //      touch
 //      factoriesRef.transform( _ - pf )
 //      updateRef.transform( u => if( u.factoriesAdded.contains( pf )) {
@@ -159,18 +159,18 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //      })
 //   }
 
-   def addVertex( e: AuralProc )( implicit tx: ProcTxn ) {
+   def addVertex( e: AuralProc )( implicit tx: Txn ) {
       val world = worlds( e.server )( tx.peer )
       world.addProc( e )
    }
 
-   def removeVertex( e: AuralProc )( implicit tx: ProcTxn ) {
+   def removeVertex( e: AuralProc )( implicit tx: Txn ) {
       val world = worlds( e.server )( tx.peer )
       world.removeProc( e )
    }
 
 // EEE
-//   def addEdge( e: ProcEdge )( implicit tx: ProcTxn ) { syn.synchronized {
+//   def addEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
 //      val world = worlds( e.sourceVertex.server )
 //      val res = world.addEdge( e )
 //      if( res.isEmpty ) error( "Could not add edge" )
@@ -223,7 +223,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 //   }}
 
 // EEE
-//   def removeEdge( e: ProcEdge )( implicit tx: ProcTxn ) { syn.synchronized {
+//   def removeEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
 //      val world = worlds( e.sourceVertex.server )
 //      world.removeEdge( e )
 //   }}
@@ -251,11 +251,11 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       sb.toString
    }
 
-   def getSynthDef( server: RichServer, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
+   def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
       getSynthDef( server, graph.expand, nameHint )
    }
 
-   def getSynthDef( server: RichServer, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: ProcTxn ) : RichSynthDef = {
+   def getSynthDef( server: Server, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
       implicit val itx = tx.peer
       val w = worlds.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
 
@@ -271,8 +271,8 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       w.ugenGraphs.get.get( equ ).getOrElse {
          log( "synth graph " + equ.hashCode + " is new" )
          val name = abbreviate( nameHint.getOrElse( "proc" )) + "_" + nextDefID()
-         val peer = SynthDef( name, graph )
-         val rd   = RichSynthDef( server, peer )
+         val peer = SSynthDef( name, graph )
+         val rd   = SynthDef( server, peer )
          w.ugenGraphs.transform( _ + (equ -> rd) )
          rd
       }

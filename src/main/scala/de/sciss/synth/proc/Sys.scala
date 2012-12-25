@@ -1,32 +1,28 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{stm, confluent}
+import de.sciss.lucre.{stm, confluent, event => evt}
 import confluent.reactive.ConfluentReactiveLike
-import de.sciss.synth.{osc => sosc}
+import de.sciss.synth.{osc => sosc, proc}
 import de.sciss.osc
 
-object SysLike {
-   trait Txn[ S <: SysLike[ S ]] extends ConfluentReactiveLike.Txn[ S ] {
-      private[proc] def addMessage( server: RichServer, msg: osc.Message with sosc.Send,
-                                    change: State.Change, audible: Boolean,
-                                    dependencies: Map[ State, Boolean ] = Map.empty, noErrors: Boolean = false ) : Unit
-   }
-}
-trait SysLike[ S <: SysLike[ S ]] extends ConfluentReactiveLike[ S ] {
-   type Tx <: SysLike.Txn[ S ]
-}
-
 object Sys {
-   type S = Sys
+   trait Txn[ S <: Sys[ S ]] extends evt.Txn[ S ] with proc.Txn
+}
+trait Sys[ S <: Sys[ S ]] extends evt.Sys[ S ] {
+   type Tx <: Sys.Txn[ S ]
+}
 
-   trait Txn extends SysLike.Txn[ S ] {
-      private[proc] def durable  : stm.Durable#Tx
-      private[proc] def inMemory : stm.InMemory#Tx
-   }
-}
-trait Sys extends SysLike[ Sys ] {
-   final protected type S  = Sys
-   final type D            = stm.Durable
-   final type I            = stm.InMemory
-   final type Tx           = Sys.Txn
-}
+//object System {
+//   type S = System
+//
+//   trait Txn extends Sys.Txn[ S ] {
+//      private[proc] def durable  : stm.Durable#Tx
+//      private[proc] def inMemory : stm.InMemory#Tx
+//   }
+//}
+//trait System extends Sys[ System ] {
+//   final protected type S  = System
+//   final type D            = stm.Durable
+//   final type I            = stm.InMemory
+//   final type Tx           = System.Txn
+// }

@@ -30,13 +30,17 @@ import java.util.concurrent.{Executors, ScheduledExecutorService}
 object SoundProcesses {
    var poolSize : Option[ Int ] = None
 
-   private def isPowerOfTwo( i: Int ) = (i & (i-1)) == 0
+   private[proc] def isPowerOfTwo( value: Int ) = (value & (value-1)) == 0
+
+   private[proc] def validateCueBufferSize( value: Int ) {
+      require( isPowerOfTwo( value ) && value >= 8192 && value <= 131072,
+         "Must be a power of two and in (8192, 131072) : " + value )
+   }
 
    private var cueBufSz = 32768
    def cueBufferSize : Int = cueBufSz
    def cueBufferSize_=( value: Int ) {
-      require( isPowerOfTwo( value ) && value >= 8192 && value <= 131072,
-         "Must be a power of two and in (8192, 131072) : " + value )
+      validateCueBufferSize( value )
       cueBufSz = value
    }
 

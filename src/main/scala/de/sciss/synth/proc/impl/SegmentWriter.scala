@@ -32,16 +32,16 @@ import concurrent.stm
 
 final class SegmentWriter( segm: Grapheme.Segment.Curve, val bus: RichAudioBus, aural: AuralProc, sampleRate: Double )
 extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
-   private val synthRef = stm.Ref( Option.empty[ RichSynth ])
+   private val synthRef = stm.Ref( Option.empty[ Synth ])
 
-   protected def synth( implicit tx: ProcTxn ) : Option[ RichSynth ] = synthRef.get( tx.peer )
-   protected def synth_=( rso: Option[ RichSynth ])( implicit tx: ProcTxn ) {
+   protected def synth( implicit tx: Txn ) : Option[ Synth ] = synthRef.get( tx.peer )
+   protected def synth_=( rso: Option[ Synth ])( implicit tx: Txn ) {
       val oldSynth = synthRef.swap( rso )( tx.peer )
       rso.foreach( addMapBusConsumer )
       oldSynth.foreach( _.free( audible = true ))
    }
 
-   protected def addMapBusConsumer( rs: RichSynth )( implicit tx: ProcTxn ) {
+   protected def addMapBusConsumer( rs: Synth )( implicit tx: Txn ) {
 //         val rb = mapBus
 //         rs.write( rb -> "$out" )
       rs.write( bus -> "$out" )
@@ -75,12 +75,12 @@ extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
 
    // ---- TxnPlayer ----
 
-   def play( implicit tx: ProcTxn ) {
+   def play( implicit tx: Txn ) {
       ???
 //         type Ctl = List[ ControlSetMap ]
 //
 //         val g          = graph
-//         val rsd        = RichSynthDef( aural.server, g )
+//         val rsd        = SynthDef( aural.server, g )
 //         val durSecs    = segm.span.length * sampleRate
 //         val ctl0: Ctl  = List( "$start" -> seg.start, "$stop" -> seg.stop, "$dur" -> durSecs )
 //         val shp        = seg.shape
@@ -97,29 +97,29 @@ extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
 ////         }
    }
 
-   def stop( implicit tx: ProcTxn ) {
+   def stop( implicit tx: Txn ) {
       synthRef.swap( None )( tx.peer ).foreach( _.free( audible = true ))
    }
 
-   def isPlaying( implicit tx: ProcTxn ) : Boolean = synth.map( _.isOnline.get ).getOrElse( false )
+   def isPlaying( implicit tx: Txn ) : Boolean = synth.map( _.isOnline.get ).getOrElse( false )
 
    // ---- RichAudioBus.User ----
 
-   def busChanged( bus: AudioBus )( implicit tx: ProcTxn ) {
+   def busChanged( bus: AudioBus )( implicit tx: Txn ) {
       ???
    }
 
    // ---- DynamicAudioBusUser ----
 
-   def add()( implicit tx: ProcTxn ) {
+   def add()( implicit tx: Txn ) {
       bus.addWriter( this )
    }
 
-   def remove()( implicit tx: ProcTxn ) {
+   def remove()( implicit tx: Txn ) {
       bus.removeWriter( this )
    }
 
-   def migrateTo( newBus: RichAudioBus )( implicit tx: ProcTxn ) : DynamicAudioBusUser = {
+   def migrateTo( newBus: RichAudioBus )( implicit tx: Txn ) : DynamicAudioBusUser = {
       ???
    }
 }

@@ -1,5 +1,5 @@
 /*
- *  RichServer.scala
+ *  Server.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -23,22 +23,22 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 
-import impl.{RichServerImpl => Impl}
+import impl.{ServerImpl => Impl}
+import de.sciss.synth.{Server => SServer}
 
-object RichServer {
-   def apply( peer: Server ) : RichServer = Impl( peer )
+object Server {
+   def apply( peer: SServer ) : Server = Impl( peer )
 }
-trait RichServer {
-   def peer: Server
-   def allocControlBus( numChannels: Int )( implicit tx: ProcTxn ) : Int
-   def allocAudioBus(   numChannels: Int )( implicit tx: ProcTxn ) : Int
-   def freeControlBus( index: Int, numChannels: Int )( implicit tx: ProcTxn ) : Unit
-   def freeAudioBus(   index: Int, numChannels: Int )( implicit tx: ProcTxn ) : Unit
-   def allocBuffer( numConsecutive: Int = 1 )( implicit tx: ProcTxn ) : Int
-   def freeBuffer( index: Int, numConsecutive: Int = 1 )( implicit tx: ProcTxn ) : Unit
+trait Server {
+   def peer: SServer
+   def allocControlBus( numChannels: Int )( implicit tx: Txn ) : Int
+   def allocAudioBus(   numChannels: Int )( implicit tx: Txn ) : Int
+   def freeControlBus( index: Int, numChannels: Int )( implicit tx: Txn ) : Unit
+   def freeAudioBus(   index: Int, numChannels: Int )( implicit tx: Txn ) : Unit
+   def allocBuffer( numConsecutive: Int = 1 )( implicit tx: Txn ) : Int
+   def freeBuffer( index: Int, numConsecutive: Int = 1 )( implicit tx: Txn ) : Unit
 
-   def defaultGroup : RichGroup
+   def defaultGroup : Group
 }

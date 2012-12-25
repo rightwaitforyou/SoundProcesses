@@ -38,9 +38,9 @@ import graph.scan
 import java.io.File
 
 object AuralPresentationImpl {
-   def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
-                          ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
-                            artifactStore: ArtifactStore[ S ]) : AuralPresentation[ S ] = {
+   def run[ S <: Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
+                                             ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
+                                               artifactStore: ArtifactStore[ S ]) : AuralPresentation[ S ] = {
 
       val dummy = DummySerializerFactory[ I ]
       import dummy._
@@ -52,16 +52,16 @@ object AuralPresentationImpl {
       c
    }
 
-   private final class Client[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( running: I#Var[ Option[ RunningImpl[ S ]]],
-                                                                      transport: ProcTransport[ S ],
-                                                                      aural: AuralSystem[ S ])
-                                                                    ( implicit /* cursor: Cursor[ S ], */ bridge: S#Tx => I#Tx,
-                                                                      artifactStore: ArtifactStore[ S ])
+   private final class Client[ S <: Sys[ S ], I <: stm.Sys[ I ]]( running: I#Var[ Option[ RunningImpl[ S ]]],
+                                                                  transport: ProcTransport[ S ],
+                                                                  aural: AuralSystem[ S ])
+                                                                ( implicit /* cursor: Cursor[ S ], */ bridge: S#Tx => I#Tx,
+                                                                  artifactStore: ArtifactStore[ S ])
    extends AuralPresentation[ S ] with AuralSystem.Client[ S ] {
 
       override def toString = "AuralPresentation@" + hashCode.toHexString
 
-      private val groupRef = Ref( Option.empty[ RichGroup ])
+      private val groupRef = Ref( Option.empty[ Group ])
 
       def dispose()( implicit tx: S#Tx ) {
          // XXX TODO dispose running
@@ -76,21 +76,21 @@ object AuralPresentationImpl {
          running.set( None )
       }
 
-      def group( implicit tx: S#Tx ) : Option[ RichGroup ] = groupRef.get( tx.peer )
+      def group( implicit tx: S#Tx ) : Option[ Group ] = groupRef.get( tx.peer )
 
-      def started( server: RichServer )( implicit tx: S#Tx ) {
+      def started( server: Server )( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
 
          val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]                           = tx.newInMemoryIDMap
          val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
 
-         val group   = RichGroup( server )
-         group.play( target = server.defaultGroup )( ProcTxn()( tx ))
+         val group   = Group( server )
+         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
          groupRef.set( Some( group ))( tx.peer )
 
          val booted  = new RunningImpl( server, group, viewMap, scanMap, transport.sampleRate )
          log( "started" + " (" + booted.hashCode.toHexString + ")" )
-         ProcDemiurg.addServer( server )( ProcTxn()( tx ))
+         ProcDemiurg.addServer( server ) // ( ProcTxn()( tx ))
 //            transport.react { x => println( "Aural observation: " + x )}
 
          def t_play( time: Long )( implicit tx: S#Tx ) {
@@ -161,10 +161,10 @@ object AuralPresentationImpl {
       override def toString = "OngoingBuild(missingMap = " + missingMap + ", idMap = " + idMap + ", seq = " + seq + ")"
    }
 
-   private final class RunningImpl[ S <: evt.Sys[ S ]]( server: RichServer, group: RichGroup,
-                                                        viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
-                                                        scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ])],
-                                                        sampleRate: Double )( implicit artifactStore: ArtifactStore[ S ])
+   private final class RunningImpl[ S <: Sys[ S ]]( server: Server, group: Group,
+                                                    viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
+                                                    scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ])],
+                                                    sampleRate: Double )( implicit artifactStore: ArtifactStore[ S ])
    extends AuralPresentation.Running[ S ] {
 
       override def toString = "AuralPresentation.Running@" + hashCode.toHexString
@@ -194,7 +194,7 @@ object AuralPresentationImpl {
          val ug            = ugen.finish
          implicit val tx   = ugen.tx
          implicit val itx  = tx.peer
-         implicit val ptx  = ProcTxn()
+//         implicit val ptx  = ProcTxn()
          // get a rich synth def and synth playing just in the default group
          // (we'll have additional messages moving the group into place if needed,
          // as well as setting and mapping controls)
@@ -274,7 +274,7 @@ object AuralPresentationImpl {
 
       // called before the transaction successfully completes.
       // this is the place where we launch completely built procs.
-      private def flush()( ptx: ProcTxn ) {
+      private def flush()( ptx: Txn ) {
          val itx = ptx.peer
          ongoingBuild.get( itx ).seq.foreach { builder =>
             val ugen = builder.ugen
@@ -290,7 +290,7 @@ object AuralPresentationImpl {
       private def getBus( timedID: S#ID, key: String )( implicit tx: S#Tx ) : Option[ RichAudioBus ] = {
          viewMap.get( timedID ) match {
             case Some( aural ) =>
-               implicit val ptx = ProcTxn()( tx )
+//               implicit val ptx = ProcTxn()( tx )
                aural.getBus( key )
             case _ =>
                ongoingBuild.get( tx.peer ).idMap.flatMap { map =>
@@ -332,7 +332,7 @@ object AuralPresentationImpl {
          viewMap.dispose()
       }
 
-      private def addFlush()( implicit ptx: ProcTxn ) {
+      private def addFlush()( implicit ptx: Txn ) {
          ptx.beforeCommit( flush()( _ ))
       }
 
@@ -343,7 +343,7 @@ object AuralPresentationImpl {
          val timedID    = timed.id
          val ugen       = UGenGraphBuilder( this, timed, time )
          val builder    = new AuralProcBuilder( ugen, name )
-         if( !ongoingBuild.isInitialized( tx.peer )) addFlush()( ProcTxn() )   // the next line (`ongoingBuild.get`) will initialise then
+         if( !ongoingBuild.isInitialized( tx.peer )) addFlush() // ( ProcTxn() )   // the next line (`ongoingBuild.get`) will initialise then
          val ongoing    = ongoingBuild.get( tx.peer )
          ongoing.seq  :+= builder
          assert( ongoingBuild.isInitialized( tx.peer ))
@@ -440,7 +440,7 @@ object AuralPresentationImpl {
          viewMap.get( timedID ) match {
             case Some( aural ) =>
                viewMap.remove( timedID )
-               implicit val ptx = ProcTxn()( tx )
+//               implicit val ptx = ProcTxn()( tx )
                log( "removed " + timed + " (" + hashCode.toHexString + ")" ) // + " -- playing? " + aural.playing )
                aural.stop()
 

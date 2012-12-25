@@ -1,5 +1,5 @@
 /*
- *  RichSynthDef.scala
+ *  SynthDef.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2012 Hanns Holger Rutz. All rights reserved.
@@ -23,16 +23,16 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 
-import ProcTxn.IfChanges
+import de.sciss.synth.{SynthDef => SSynthDef, addToHead, AddAction, ControlSetMap, SynthGraph}
 
-object RichSynthDef {
-   def apply( server: RichServer, graph: SynthGraph, nameHint: Option[ String ] = None )( implicit tx: ProcTxn ) : RichSynthDef =
+object SynthDef {
+   def apply( server: Server, graph: SynthGraph, nameHint: Option[ String ] = None )
+              ( implicit tx: Txn ) : SynthDef =
       ProcDemiurg.getSynthDef( server, graph, nameHint )
 }
-final case class RichSynthDef private[proc]( server: RichServer, peer: SynthDef ) /* extends RichObject */ {
+final case class SynthDef private[proc]( server: Server, peer: SSynthDef ) /* extends RichObject */ {
    val isOnline = State( this, "isOnline", init = false )
 
    override def toString = "SynthDef(" + peer.name + ")"
@@ -44,14 +44,14 @@ final case class RichSynthDef private[proc]( server: RichServer, peer: SynthDef 
     *    Only if that is not the case, the receive message
     *    will be queued.
     */
-   def recv()( implicit tx: ProcTxn ) {
-      tx.add( peer.recvMsg, change = Some( (IfChanges, isOnline, true) ), audible = false )
+   def recv()( implicit tx: Txn ) {
+      tx.addMessage( peer.recvMsg, change = Some( (IfChanges, isOnline, true) ), audible = false )
    }
 
-   def play( target: RichNode, args: Seq[ ControlSetMap ] = Nil,
-             addAction: AddAction = addToHead, buffers: Seq[ RichBuffer ] = Nil )( implicit tx: ProcTxn ) : RichSynth = {
+   def play( target: Node, args: Seq[ ControlSetMap ] = Nil,
+             addAction: AddAction = addToHead, buffers: Seq[ Buffer ] = Nil )( implicit tx: Txn ) : Synth = {
       recv()  // make sure it is online
-      val rs      = RichSynth( this )
+      val rs = Synth( this )
       rs.play( target, args, addAction, buffers )
       rs
    }

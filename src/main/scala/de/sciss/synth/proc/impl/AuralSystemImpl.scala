@@ -23,21 +23,21 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 package impl
 
 import de.sciss.osc.Dump
 import concurrent.stm.{Ref, Txn}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.{event => evt, stm}
+import de.sciss.synth.{Server => SServer, ServerLike => SServerLike, ServerConnection, Model}
 
 object AuralSystemImpl {
    import AuralSystem.Client
 
    var dumpOSC = false
 
-   def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = new Impl[ S ]
+   def apply[ S <: Sys[ S ]]( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = new Impl[ S ]
 
 //   private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
 //      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
@@ -47,7 +47,7 @@ object AuralSystemImpl {
 //      def read( in: DataInput, access: stm.InMemory#Acc )( implicit tx: stm.InMemory#Tx ) : Nothing = sys.error( "Operation not supported" )
 //   }
 
-   private final class Impl[ S <: evt.Sys[ S ]]( implicit cursor: stm.Cursor[ S ])
+   private final class Impl[ S <: Sys[ S ]]( implicit cursor: stm.Cursor[ S ])
    extends AuralSystem[ S ] {
       impl =>
 
@@ -55,10 +55,10 @@ object AuralSystemImpl {
 
       private val startStopCnt   = Ref( 0 )
       private val clients        = Ref( IIdxSeq.empty[ Client[ S ]])
-      private val server         = Ref( Option.empty[ RichServer ])
-      private val connection     = Ref( Option.empty[ ServerLike ])
+      private val server         = Ref( Option.empty[ Server ])
+      private val connection     = Ref( Option.empty[ SServerLike ])
 
-      def start( config: Server.Config, connect: Boolean )( implicit tx: S#Tx ) : AuralSystem[ S ] = {
+      def start( config: SServer.Config, connect: Boolean )( implicit tx: S#Tx ) : AuralSystem[ S ] = {
          implicit val itx = tx.peer
          val expected = startStopCnt.get + 1
          startStopCnt.set( expected )
@@ -80,11 +80,11 @@ object AuralSystemImpl {
          this
       }
 
-      private def doStart( config: Server.Config, connect: Boolean ) {
+      private def doStart( config: SServer.Config, connect: Boolean ) {
          val launch: Model.Listener => ServerConnection = if( connect ) {
-            Server.connect( "SoundProcesses", config ) _
+            SServer.connect( "SoundProcesses", config ) _
          } else {
-            Server.boot( "SoundProcesses", config ) _
+            SServer.boot( "SoundProcesses", config ) _
          }
 
          val c = launch {
@@ -98,9 +98,9 @@ object AuralSystemImpl {
                      cursor.step { implicit tx =>
                         implicit val itx = tx.peer
                         connection() = Some( s )
-                        val rich = RichServer( s )
+                        val rich = Server( s )
                         server.set( Some( rich ))
-                        ProcDemiurg.addServer( rich )( ProcTxn()( tx ))
+                        ProcDemiurg.addServer( rich ) // ( ProcTxn()( tx ))
                         val cs = clients.get
       //                  println( "AQUI " + cs )
                         cs.foreach( _.started( rich ))
@@ -118,20 +118,20 @@ object AuralSystemImpl {
 
       private def shutdown() {
          connection.single().foreach {
-            case s: Server => s.quit()
+            case s: SServer => s.quit()
             case _ =>
          }
       }
 
       private def doStop() {
          connection.single.swap( None ).foreach {
-            case c: ServerConnection => c.abort
-            case s: Server =>
+            case c: ServerConnection => c.abort()
+            case s: SServer =>
                cursor.step { implicit tx =>
                   implicit val itx = tx.peer
                   server.get.foreach { rich =>
                      clients.get.foreach( _.stopped() )
-                     ProcDemiurg.removeServer( rich )( ProcTxn()( tx ))
+                     ProcDemiurg.removeServer( rich ) // ( ProcTxn()( tx ))
                   }
                }
                s.quit()
@@ -152,9 +152,9 @@ object AuralSystemImpl {
          clients.transform { _.filterNot( _ == c )}
       }
 
-      def whenStarted( fun: S#Tx => RichServer => Unit)( implicit tx: S#Tx ) {
+      def whenStarted( fun: S#Tx => Server => Unit)( implicit tx: S#Tx ) {
          addClient( new Client[ S ] {
-            def started( s: RichServer )( implicit tx: S#Tx ) {
+            def started( s: Server )( implicit tx: S#Tx ) {
                fun( tx )( s )
             }
 
