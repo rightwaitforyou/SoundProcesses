@@ -9,7 +9,7 @@ trait Txn {
 
    def peer: InTxn
 //   def beforeCommit( fun: Txn => Unit ) : Unit
-   private[proc] def addMessage( resource: Resource, msg: osc.Message with sosc.Send,
+   private[proc] def addMessage( resource: Resource, message: osc.Message with sosc.Send,
                                  audible: Boolean, dependencies: Seq[ Resource ] = Nil, noErrors: Boolean = false ) : Unit
 
 //   def addMessage( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, State, Boolean) ], audible: Boolean,

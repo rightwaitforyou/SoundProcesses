@@ -27,12 +27,8 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.osc
+import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.{osc => sosc}
-import collection.breakOut
-import collection.immutable.{IntMap, Queue => IQueue, IndexedSeq => IIdxSeq}
-import concurrent.stm.InTxn
-import de.sciss.osc.Message
-import de.sciss.synth.osc.Send
 
 private[proc] object ProcTxnImpl {
    private final case class Entry( idx: Int, msg: osc.Message with sosc.Send,
@@ -52,20 +48,30 @@ private[proc] object ProcTxnImpl {
 //   def apply()( implicit tx: InTxn ) : ProcTxn with Flushable = new Impl( tx )
 //
 
+   private final case class Bundles( firstStamp: Int, payload: IIdxSeq[ osc.Bundle ])
+   private final val noBundles = Bundles( 0, IIdxSeq.empty )
 }
 private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
    tx =>
 
+   import ProcTxnImpl._
+
 //   private var bundles = IntMap.empty[ ... ]
 
-   def addMessage( resource: Resource, msg: Message with Send, audible: Boolean, dependencies: Seq[ Resource ],
+   private var bundles : Bundles = noBundles
+
+   def addMessage( resource: Resource, message: osc.Message with sosc.Send, audible: Boolean, dependencies: Seq[ Resource ],
                    noErrors: Boolean ) {
 
       val rsrc = system.resources
 
       val tsOld   = resource.timeStamp( tx )
       require( tsOld >= 0, "Already disposed : " + resource )
-      var dTsMax  = 0
+
+      // calculate the maximum time stamp from the dependencies. this includes
+      // the resource as its own dependency (since we should send out messages
+      // in monotonic order)
+      var dTsMax  = tsOld
       dependencies.foreach { dep =>
          val dts = dep.timeStamp( tx )
          require( dts >= 0, "Dependency already disposed : " + dep )
@@ -73,9 +79,41 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
          dep.addDependent( resource )( tx )
       }
 
-      val dAsync     = (dTsMax & 1) == 1
+//      val dAsync     = (dTsMax & 1) == 1
+      val msgAsync   = !message.isSynchronous
 
-      val msgAsync   = !msg.isSynchronous
+      // if the message is asynchronous, it suffices to ensure that the time stamp's async bit is set.
+      // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
+      // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
+      val tsNew      = if( msgAsync ) dTsMax | 1 else (dTsMax + 1) & ~1
+
+      val bOld       = bundles
+      val bNew       = if( bOld.payload.isEmpty ) {
+         // rsrc.messageTimeStamp
+         Bundles( tsNew, IIdxSeq( osc.Bundle.now( message )))
+      } else {
+         val idxOld  = bOld.firstStamp
+         val idxNew  = tsNew >> 1
+         val payOld  = bOld.payload
+         val szOld   = payOld.size
+         val bNew    = if( idxNew == idxOld - 1 ) {   // prepend to front
+            val payNew = osc.Bundle.now( message ) +: payOld
+            bOld.copy( firstStamp = idxNew, payload = payNew )
+
+         } else if( idxNew == idxOld + szOld ) {      // append to back
+            val payNew  = payOld :+ osc.Bundle.now( message )
+            bOld.copy( payload = payNew )
+
+         } else {
+            // we don't need the assertion, since we are going to call payload.apply which would
+            // through an out of bounds exception if the assertion wouldn't hold
+//            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
+            val payIdx = idxNew - idxOld
+            val payNew = payOld.updated( payIdx, osc.Bundle.now( (payOld( payIdx ).packets :+ message): _* ))
+            bOld.copy( payload = payNew )
+         }
+      }
+
 //      val bndlIdx    = if( msgAsync ) ts & ~1 else ts
 //      val tsNew      = if( msgAsync ) ts | 1 else ts
 
