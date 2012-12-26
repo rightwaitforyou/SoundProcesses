@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt, stm}
+import de.sciss.lucre.stm
 import impl.{InMemoryImpl => Impl}
 
 object InMemory {

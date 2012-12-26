@@ -173,3 +173,55 @@ type TimeStamp = Int
 where
 bit 0         = async?
 bits 1 ... 31 = bundle index
+
+::::::::::::::::::::::::::::
+
+resource management (per server):
+   bundle open   stamp
+   bundle closed stamp
+
+- the open stamp stores the amount of bundles generated _across transactions_
+- when calculating a resource's new time stamp in addMessage, the _minimum value_
+  is thus open-stamp minus bundleMap(s).payload.size
+- whenever the payload is increased, increase also open-stamp
+((- special care needs to be taken of the _one possible_ prepend to payload which
+  happens when.... well, when what? is this actually possible? NO))
+
+the case that needs attention:
+    txn 1 --> send out bundle with stamp X
+    txn n --> 
+
+::::::::::::::::::::::::::::
+
+isortedmap[Int, Bundles]
+
+flush:
+   map.foreach { case (stamp, b) =>
+     synchronized {
+        if( stamp <= lastSeen ) sendOut( stamp, b )
+        else await += await.getOrElse( stamp, Vector.empty ) :+ b
+     }
+   }
+
+sendOut( stamp, b):
+   if( b.forall( _.isSynchronous ) {
+      server ! b
+      seen( stamp + 1 )
+   } else {
+      server !? (TIMEOUT_MILLIS, b :+ syncMsg, {
+         case syncedMsg => seen( stamp + 1 )
+         case TIMEOUT => warn(); seen( stamp + 1 )
+      })
+   }
+
+seen( stamp ):
+   synchronized {
+      if( stamp > lastSeen ) {
+         val from = lastSeen + 1
+         lastSeen = stamp
+         (from to stamp).foreach { seen =>
+            await.get( seen ).foreach { b => await -= seen; sendOut( seen, b )}
+         }
+      }
+   }
+

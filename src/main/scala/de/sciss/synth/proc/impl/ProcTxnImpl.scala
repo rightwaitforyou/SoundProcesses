@@ -48,6 +48,13 @@ private[proc] object ProcTxnImpl {
 //   def apply()( implicit tx: InTxn ) : ProcTxn with Flushable = new Impl( tx )
 //
 
+   /**
+    * A data type encapsulating all the outgoing OSC bundles for this transaction.
+    *
+    * @param firstStamp the time stamp of the first bundle in the payload, shifted 1 bit to the right
+    *                   (i.e. actual bundle index)
+    * @param payload    the succession of bundles, represented as a sequence of a sequence of messages
+    */
    private final case class Bundles( firstStamp: Int, payload: IIdxSeq[ IIdxSeq[ osc.Message ]])
    private final val noBundles = Bundles( 0, IIdxSeq.empty )
 
@@ -66,9 +73,9 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       bundlesMap.foreach { case (server, bundles) =>
          val peer = server.peer
 
-         def loop( pay: List[ IIdxSeq[ osc.Message ]]) {
+         def loop( pay: List[ IIdxSeq[ osc.Message with sosc.Send ]], idx: Int ) {
             pay match {
-               case msgs :: Nil =>
+               case msgs :: Nil if msgs.forall( _.isSynchronous ) =>
                   val p = msgs match {
                      case IIdxSeq( msg )  => msg   // one message, send it out directly
                      case _               => osc.Bundle.now( msgs: _* )
@@ -91,7 +98,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
             }
          }
 
-         loop( bundles.payload.toList )
+         loop( bundles.payload.toList, bundles.firstStamp )
       }
    }
 
