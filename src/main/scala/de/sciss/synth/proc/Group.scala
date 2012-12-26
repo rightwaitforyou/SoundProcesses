@@ -26,36 +26,26 @@
 package de.sciss.synth.proc
 
 import de.sciss.synth.{addToHead, AddAction, Group => SGroup}
+import impl.{GroupImpl => Impl}
 
 object Group {
-   def apply( server: Server ) : Group =
-      new Group( server, SGroup( server.peer ))( initOnline = false )
-
-   def apply( server: Server, peer: SGroup ) : Group = {
-      require( server.peer == peer.server )
-      new Group( server, peer )( initOnline = false )
+   def apply( server: Server )( target: Node = default( server ), addAction: AddAction = addToHead )
+            ( implicit tx: Txn ) : Group = {
+      val g = new Impl( server, SGroup( server.peer ))
+      g.play( target, addAction )
+      g
    }
 
-   def default( server: Server ) : Group =
-      new Group( server, server.peer.defaultGroup )( initOnline = true ) // XXX TODO: should go into RichServer
+//   def wrap( server: Server, peer: SGroup ) : Group = {
+//      require( server.peer == peer.server )
+//      new Group( server, peer )( initOnline = false )
+//   }
+
+   def default( server: Server ) : Group = {
+      val g = new Impl( server, server.peer.defaultGroup )  // XXX TODO: should go into RichServer
+      g
+   }
 }
-final case class Group private( server: Server, peer: SGroup )( initOnline: Boolean )
-extends Node( initOnline ) {
-   override def toString = "Group(" + peer.toString + ")"
-
-   def play( target: Node, addAction: AddAction = addToHead )( implicit tx: Txn ) {
-      require( target.server == server )
-
-      // XXX THERE IS CURRENTLY A PROBLEM EXHIBITED BY TEST3: BASICALLY --
-      // since newMsg is not audible, it might be placed in the first bundle, but then
-      // since moveAfterMsg is audible, the target of this group's newMsg might be
-      // moved, ending up in moveAfterMsg following the g_new message, leaving this
-      // group in the wrong place of the graph.
-      //
-      // We thus try out a workaround by declaring a group's newMsg also audible...
-//      tx.add( group.newMsg( target.node, addAction ), Some( (RequiresChange, isOnline, true) ), false,
-//              Map( target.isOnline -> true ))
-      tx.addMessage( peer.newMsg( target.peer, addAction ), change = Some( (RequiresChange, isOnline, true) ),
-                     audible = true, dependencies = Map( target.isOnline -> true ))
-   }
+trait Group extends Node {
+   def peer: SGroup
 }

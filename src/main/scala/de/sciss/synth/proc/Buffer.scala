@@ -29,8 +29,6 @@ object Buffer {
               ( implicit tx: Txn ) : Unit
    }
 }
-trait Buffer {
+trait Buffer extends Resource {
    def id: Int
-   def server: Server
-   def dispose()( implicit tx: Txn ) : Unit
 }

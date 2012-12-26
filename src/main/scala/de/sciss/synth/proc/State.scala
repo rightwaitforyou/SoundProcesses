@@ -33,16 +33,16 @@ object State {
 
    private final class Impl( val owner: Any, val name: String, init: Boolean ) extends State {
       val value = ScalaRef( init )
-      def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = value.swap( newValue )( tx.peer )
-      def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer )
+      def swap( newValue: Boolean )( implicit tx: Txn ) : Boolean = value.swap( newValue )( tx.peer )
+      def get( implicit tx: Txn ) : Boolean = value.get( tx.peer )
    }
 
    private final class And( that: State, val owner: Any, val name: String, init: Boolean ) extends State {
       val value = ScalaRef( init )
-      def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean = {
+      def swap( newValue: Boolean )( implicit tx: Txn ) : Boolean = {
          value.swap( newValue )( tx.peer ) && that.get
       }
-      def get( implicit tx: ProcTxn ) : Boolean = value.get( tx.peer ) && that.get
+      def get( implicit tx: Txn ) : Boolean = value.get( tx.peer ) && that.get
    }
 
    object IfEqual {
@@ -74,9 +74,9 @@ object State {
 }
 sealed trait State {
    protected def value: ScalaRef[ Boolean ]
-   def swap( newValue: Boolean )( implicit tx: ProcTxn ) : Boolean
-   def get( implicit tx: ProcTxn ) : Boolean
-   final def set( newValue: Boolean )( implicit tx: ProcTxn ) { value.set( newValue )( tx.peer )}
+   def swap( newValue: Boolean )( implicit tx: Txn ) : Boolean
+   def get( implicit tx: Txn ) : Boolean
+   final def set( newValue: Boolean )( implicit tx: Txn ) { value.set( newValue )( tx.peer )}
 
    protected def owner: Any
    def name: String
