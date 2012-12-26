@@ -22,6 +22,7 @@ private[proc] trait ResourceImpl extends Resource {
    }
 
    final def addDependent( dependent: Resource )( implicit tx: Txn ) {
+      require( dependent.server == server, "Dependency uses divergent server : " + dependent )
       dependentsRef.add( dependent )( tx.peer )
    }
 

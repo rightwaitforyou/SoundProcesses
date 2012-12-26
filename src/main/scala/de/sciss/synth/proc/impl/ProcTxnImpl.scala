@@ -31,15 +31,15 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.{osc => sosc}
 
 private[proc] object ProcTxnImpl {
-   private final case class Entry( idx: Int, msg: osc.Message with sosc.Send,
-//                                   change: Option[ (FilterMode, State, Boolean) ],
-                                   audible: Boolean, dependencies: Map[ State, Boolean ],
-                                   noError: Boolean )
+//   private final case class Entry( idx: Int, msg: osc.Message with sosc.Send,
+////                                   change: Option[ (FilterMode, State, Boolean) ],
+//                                   audible: Boolean, dependencies: Map[ State, Boolean ],
+//                                   noError: Boolean )
+//
+//   private final case class EntryEdge( sourceVertex: Entry, targetVertex: Entry ) extends Topology.Edge[ Entry ]
 
-   private final case class EntryEdge( sourceVertex: Entry, targetVertex: Entry ) extends Topology.Edge[ Entry ]
-
-   private val errOffMsg   = osc.Message( "/error", -1 )
-   private val errOnMsg    = osc.Message( "/error", -2 )
+//   private val errOffMsg   = osc.Message( "/error", -1 )
+//   private val errOnMsg    = osc.Message( "/error", -2 )
 
    var timeoutFun : () => Unit = () => ()
 
@@ -48,7 +48,7 @@ private[proc] object ProcTxnImpl {
 //   def apply()( implicit tx: InTxn ) : ProcTxn with Flushable = new Impl( tx )
 //
 
-   private final case class Bundles( firstStamp: Int, payload: IIdxSeq[ osc.Bundle ])
+   private final case class Bundles( firstStamp: Int, payload: IIdxSeq[ IIdxSeq[ osc.Message ]])
    private final val noBundles = Bundles( 0, IIdxSeq.empty )
 }
 private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
@@ -58,13 +58,24 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 
 //   private var bundles = IntMap.empty[ ... ]
 
-   private var bundles : Bundles = noBundles
+   private var bundles = Map.empty[ Server, Bundles ]
+
+   private def flush() {
+      ???
+//      val sqs  = bundles.payload
+//      val last = sqs.last
+//      sqs.foreach { sq =>
+//         val needsSync = sq neq last
+//
+//      }
+   }
 
    def addMessage( resource: Resource, message: osc.Message with sosc.Send, audible: Boolean, dependencies: Seq[ Resource ],
                    noErrors: Boolean ) {
 
-      val rsrc = system.resources
+//      val rsrc = system.resources
 
+      val s       = resource.server
       val tsOld   = resource.timeStamp( tx )
       require( tsOld >= 0, "Already disposed : " + resource )
 
@@ -76,7 +87,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
          val dts = dep.timeStamp( tx )
          require( dts >= 0, "Dependency already disposed : " + dep )
          if( dts > dTsMax ) dTsMax = dts
-         dep.addDependent( resource )( tx )
+         dep.addDependent( resource )( tx )  // validates dep's server
       }
 
 //      val dAsync     = (dTsMax & 1) == 1
@@ -87,21 +98,22 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
       val tsNew      = if( msgAsync ) dTsMax | 1 else (dTsMax + 1) & ~1
 
-      val bOld       = bundles
+      val bOld       = bundles.getOrElse( s, noBundles )
       val bNew       = if( bOld.payload.isEmpty ) {
-         // rsrc.messageTimeStamp
-         Bundles( tsNew, IIdxSeq( osc.Bundle.now( message )))
+         afterCommit( flush() )
+         Bundles( tsNew, IIdxSeq( IIdxSeq( message )))
+
       } else {
          val idxOld  = bOld.firstStamp
          val idxNew  = tsNew >> 1
          val payOld  = bOld.payload
          val szOld   = payOld.size
-         val bNew    = if( idxNew == idxOld - 1 ) {   // prepend to front
-            val payNew = osc.Bundle.now( message ) +: payOld
+         if( idxNew == idxOld - 1 ) {   // prepend to front
+            val payNew = IIdxSeq( message ) +: payOld
             bOld.copy( firstStamp = idxNew, payload = payNew )
 
          } else if( idxNew == idxOld + szOld ) {      // append to back
-            val payNew  = payOld :+ osc.Bundle.now( message )
+            val payNew  = payOld :+ IIdxSeq( message )
             bOld.copy( payload = payNew )
 
          } else {
@@ -109,15 +121,12 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
             // through an out of bounds exception if the assertion wouldn't hold
 //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
             val payIdx = idxNew - idxOld
-            val payNew = payOld.updated( payIdx, osc.Bundle.now( (payOld( payIdx ).packets :+ message): _* ))
+            val payNew = payOld.updated( payIdx, payOld( payIdx ) :+ message )
             bOld.copy( payload = payNew )
          }
       }
 
-//      val bndlIdx    = if( msgAsync ) ts & ~1 else ts
-//      val tsNew      = if( msgAsync ) ts | 1 else ts
-
-      ???
+      bundles += s -> bNew
    }
 
 //   private var entries     = IQueue.empty[ Entry ]
