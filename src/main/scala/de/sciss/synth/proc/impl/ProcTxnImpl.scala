@@ -51,11 +51,36 @@ private[proc] object ProcTxnImpl {
 //
 //   def apply()( implicit tx: InTxn ) : ProcTxn with Flushable = new Impl( tx )
 //
+
 }
 private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
    tx =>
 
-   import ProcTxnImpl._
+//   private var bundles = IntMap.empty[ ... ]
+
+   def addMessage( resource: Resource, msg: Message with Send, audible: Boolean, dependencies: Seq[ Resource ],
+                   noErrors: Boolean ) {
+
+      val rsrc = system.resources
+
+      val tsOld   = resource.timeStamp( tx )
+      require( tsOld >= 0, "Already disposed : " + resource )
+      var dTsMax  = 0
+      dependencies.foreach { dep =>
+         val dts = dep.timeStamp( tx )
+         require( dts >= 0, "Dependency already disposed : " + dep )
+         if( dts > dTsMax ) dTsMax = dts
+         dep.addDependent( resource )( tx )
+      }
+
+      val dAsync     = (dTsMax & 1) == 1
+
+      val msgAsync   = !msg.isSynchronous
+//      val bndlIdx    = if( msgAsync ) ts & ~1 else ts
+//      val tsNew      = if( msgAsync ) ts | 1 else ts
+
+      ???
+   }
 
 //   private var entries     = IQueue.empty[ Entry ]
 //   private var entryMap    = Map.empty[ (State, Boolean), Entry ]
@@ -226,9 +251,4 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 //      }).getOrElse( processDeps )
 //   }
    //   def beforeCommit( fun: Txn => Unit ) : Unit
-
-   def addMessage( resource: Resource, msg: Message with Send, audible: Boolean, dependencies: Seq[ Resource ],
-                   noErrors: Boolean ) {
-      ???
-   }
 }

@@ -151,3 +151,25 @@ b_gen	- copy
 
 ::::::::::::::::::::::::::::
 
+sync  0
+async 0
+sync  1
+async 1
+async 1
+sync  2
+sync  2
+
+ sync -> async +0
+ sync ->  sync +0
+async -> async +0
+async ->  sync +1
+
+basically we need to encode whether a timestamp was produced by an asynchronous message
+
+a simple solution is to allocate the LSB for this
+
+type TimeStamp = Int
+
+where
+bit 0         = async?
+bits 1 ... 31 = bundle index

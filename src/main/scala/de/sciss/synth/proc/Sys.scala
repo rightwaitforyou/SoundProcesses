@@ -10,6 +10,8 @@ object Sys {
 }
 trait Sys[ S <: Sys[ S ]] extends evt.Sys[ S ] {
    type Tx <: Sys.Txn[ S ]
+
+   private[proc] def resources: ResourceManagement
 }
 
 //object System {
