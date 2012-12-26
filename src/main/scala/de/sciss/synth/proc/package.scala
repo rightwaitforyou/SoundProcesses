@@ -57,9 +57,9 @@ package object proc {
       if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
    }
 
-   @elidable(CONFIG) private[proc] def logConfig( what: => String ) {
-      if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
-   }
+//   @elidable(CONFIG) private[proc] def logConfig( what: => String ) {
+//      if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
+//   }
 
    @elidable(CONFIG) private[proc] def logAural( what: => String ) {
       if( showAuralLog ) Console.out.println( logHeader.format( new Date() ) + "aural " + what )

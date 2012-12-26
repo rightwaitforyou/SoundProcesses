@@ -50,6 +50,8 @@ private[proc] object ProcTxnImpl {
 
    private final case class Bundles( firstStamp: Int, payload: IIdxSeq[ IIdxSeq[ osc.Message ]])
    private final val noBundles = Bundles( 0, IIdxSeq.empty )
+
+   var TIMEOUT_MILLIS = 10000L
 }
 private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
    tx =>
@@ -58,16 +60,39 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 
 //   private var bundles = IntMap.empty[ ... ]
 
-   private var bundles = Map.empty[ Server, Bundles ]
+   private var bundlesMap = Map.empty[ Server, Bundles ]
 
    private def flush() {
-      ???
-//      val sqs  = bundles.payload
-//      val last = sqs.last
-//      sqs.foreach { sq =>
-//         val needsSync = sq neq last
-//
-//      }
+      bundlesMap.foreach { case (server, bundles) =>
+         val peer = server.peer
+
+         def loop( pay: List[ IIdxSeq[ osc.Message ]]) {
+            pay match {
+               case msgs :: Nil =>
+                  val p = msgs match {
+                     case IIdxSeq( msg )  => msg   // one message, send it out directly
+                     case _               => osc.Bundle.now( msgs: _* )
+                  }
+                  peer ! p
+
+               case msgs :: tail =>
+                  val syncMsg    = server.peer.syncMsg()
+                  val syncID     = syncMsg.id
+                  val bndl       = osc.Bundle.now( (msgs :+ syncMsg): _* )
+                  peer !? (TIMEOUT_MILLIS, bndl, {
+                     case sosc.SyncedMessage( `syncID` ) =>
+                        loop( tail )
+                     case sosc.TIMEOUT =>
+                        logTxn( "TIMEOUT while sending OSC bundle!" )
+                        loop( tail )
+                  })
+
+               case Nil => sys.error( "Unexpected case - empty bundle" )
+            }
+         }
+
+         loop( bundles.payload.toList )
+      }
    }
 
    def addMessage( resource: Resource, message: osc.Message with sosc.Send, audible: Boolean, dependencies: Seq[ Resource ],
@@ -75,7 +100,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 
 //      val rsrc = system.resources
 
-      val s       = resource.server
+      val server  = resource.server
       val tsOld   = resource.timeStamp( tx )
       require( tsOld >= 0, "Already disposed : " + resource )
 
@@ -98,7 +123,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
       val tsNew      = if( msgAsync ) dTsMax | 1 else (dTsMax + 1) & ~1
 
-      val bOld       = bundles.getOrElse( s, noBundles )
+      val bOld       = bundlesMap.getOrElse( server, noBundles )
       val bNew       = if( bOld.payload.isEmpty ) {
          afterCommit( flush() )
          Bundles( tsNew, IIdxSeq( IIdxSeq( message )))
@@ -126,7 +151,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
          }
       }
 
-      bundles += s -> bNew
+      bundlesMap += server -> bNew
    }
 
 //   private var entries     = IQueue.empty[ Entry ]
