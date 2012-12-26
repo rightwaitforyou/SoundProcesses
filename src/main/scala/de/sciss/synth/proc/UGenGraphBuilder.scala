@@ -29,18 +29,18 @@ private[proc] object UGenGraphBuilder {
     * @param scan    the scan which is the ''source'' of the required input
     */
 //   final case class MissingIn[ S <: evt.Sys[ S ]]( timed: TimedProc[ S ], key: String ) extends ControlThrowable
-   final case class MissingIn[ S <: evt.Sys[ S ]]( scan: Scan[ S ]) extends ControlThrowable
+   final case class MissingIn[ S <: Sys[ S ]]( scan: Scan[ S ]) extends ControlThrowable
 
    /**
     * '''Note''': The resulting object is mutable, therefore must not be shared across threads and also must be
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-   def apply[ S <: evt.Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: TimedProc[ S ], time: Long )
+   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: TimedProc[ S ], time: Long )
                             ( implicit tx: S#Tx ) : UGenGraphBuilder[ S ] =
       Impl( aural, timed, time )
 }
-private[proc] trait UGenGraphBuilder[ S <: evt.Sys[ S ]] extends UGenGraph.Builder {
+private[proc] trait UGenGraphBuilder[ S <: Sys[ S ]] extends UGenGraph.Builder {
    import UGenGraphBuilder._
 
    /**

@@ -73,14 +73,14 @@ object BusNodeSetter {
    private sealed trait AudioSetterLike extends ImplLike {
       final def busChanged( b: AudioBus )( implicit tx: Txn ) {
 //         node.setIfOnline( controlName -> b.index )
-         if( !node.isDisposed ) node.set( audible = true, pairs = controlName -> b.index )
+         if( node.isOnline ) node.set( audible = true, pairs = controlName -> b.index )
       }
    }
 
    private sealed trait ControlSetterLike extends ImplLike {
       final def busChanged( b: ControlBus )( implicit tx: Txn ) {
 //         node.setIfOnline( controlName -> b.index )
-         if( !node.isDisposed ) node.set( audible = true, pairs = controlName -> b.index )
+         if( node.isOnline ) node.set( audible = true, pairs = controlName -> b.index )
       }
    }
 

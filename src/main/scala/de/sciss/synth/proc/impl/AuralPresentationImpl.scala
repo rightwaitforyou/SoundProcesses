@@ -84,8 +84,8 @@ object AuralPresentationImpl {
          val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]                           = tx.newInMemoryIDMap
          val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
 
-         val group   = Group( server )
-         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
+         val group   = Group( server )()
+//         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
          groupRef.set( Some( group ))( tx.peer )
 
          val booted  = new RunningImpl( server, group, viewMap, scanMap, transport.sampleRate )
@@ -130,7 +130,7 @@ object AuralPresentationImpl {
 //      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
 //   }
 
-   private final class AuralProcBuilder[ S <: evt.Sys[ S ]]( val ugen: UGenGraphBuilder[ S ], val name: String ) {
+   private final class AuralProcBuilder[ S <: Sys[ S ]]( val ugen: UGenGraphBuilder[ S ], val name: String ) {
       var outBuses: Map[ String, RichAudioBus ] = Map.empty
 //      def finish : AuralProc = {
 //         val ug = ugen.finish
@@ -153,7 +153,7 @@ object AuralPresentationImpl {
     * @param idMap      map's timed-ids to aural proc builders
     * @param seq        sequence of builders in the current transaction
     */
-   private final class OngoingBuild[ S <: evt.Sys[ S ]](
+   private final class OngoingBuild[ S <: Sys[ S ]](
       var missingMap: Map[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]] = Map.empty[ MissingIn[ S ], Set[ AuralProcBuilder[ S ]]],
       var idMap: Option[ IdentifierMap[ S#ID, S#Tx, AuralProcBuilder[ S ]]] = None,
       var seq: IIdxSeq[ AuralProcBuilder[ S ]] = IIdxSeq.empty
@@ -198,8 +198,10 @@ object AuralPresentationImpl {
          // get a rich synth def and synth playing just in the default group
          // (we'll have additional messages moving the group into place if needed,
          // as well as setting and mapping controls)
-         val df            = ProcDemiurg.getSynthDef( server, ug, nameHint = Some( builder.name )) // RichSynthDef()
-         val synth         = df.play( target = group, addAction = addToHead )
+
+//         val df            = ProcDemiurg.getSynthDef( server, ug, nameHint = Some( builder.name )) // RichSynthDef()
+//         val synth         = df.play( target = group, addAction = addToHead )
+         val synth   = Synth.expanded( ug, nameHint = Some( builder.name ))( target = group, addAction = addToHead )
 
          // ---- handle input buses ----
          val time       = ugen.time
@@ -332,8 +334,12 @@ object AuralPresentationImpl {
          viewMap.dispose()
       }
 
-      private def addFlush()( implicit ptx: Txn ) {
-         ptx.beforeCommit( flush()( _ ))
+//      private def addFlush()( implicit ptx: Txn ) {
+//         ptx.beforeCommit( flush()( _ ))
+//      }
+
+      private def addFlush()( implicit tx: S#Tx ) {
+         tx.beforeCommit( flush()( _ ))
       }
 
       def procAdded( time: Long, timed: TimedProc[ S ])( implicit tx: S#Tx ) {

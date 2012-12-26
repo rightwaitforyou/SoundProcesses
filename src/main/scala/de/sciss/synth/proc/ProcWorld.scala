@@ -251,11 +251,11 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       sb.toString
    }
 
-   def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
+   private[proc] def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
       getSynthDef( server, graph.expand, nameHint )
    }
 
-   def getSynthDef( server: Server, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
+   private[proc] def getSynthDef( server: Server, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
       implicit val itx = tx.peer
       val w = worlds.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
 
@@ -272,7 +272,8 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
          log( "synth graph " + equ.hashCode + " is new" )
          val name = abbreviate( nameHint.getOrElse( "proc" )) + "_" + nextDefID()
          val peer = SSynthDef( name, graph )
-         val rd   = SynthDef( server, peer )
+         val rd   = impl.SynthDefImpl( server, peer )
+         rd.recv()
          w.ugenGraphs.transform( _ + (equ -> rd) )
          rd
       }

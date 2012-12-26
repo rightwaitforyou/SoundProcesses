@@ -25,34 +25,16 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.synth.{SynthDef => SSynthDef, addToHead, AddAction, ControlSetMap, SynthGraph}
+import de.sciss.synth.{SynthDef => SSynthDef, SynthGraph}
 
-object SynthDef {
-   def apply( server: Server, graph: SynthGraph, nameHint: Option[ String ] = None )
-              ( implicit tx: Txn ) : SynthDef =
-      ProcDemiurg.getSynthDef( server, graph, nameHint )
-}
-final case class SynthDef private[proc]( server: Server, peer: SSynthDef ) /* extends RichObject */ {
-   val isOnline = State( this, "isOnline", init = false )
-
-   override def toString = "SynthDef(" + peer.name + ")"
-
-   def name : String = peer.name
-
-   /**
-    *    Actually checks if the def is already online.
-    *    Only if that is not the case, the receive message
-    *    will be queued.
-    */
-   def recv()( implicit tx: Txn ) {
-      tx.addMessage( peer.recvMsg, change = Some( (IfChanges, isOnline, true) ), audible = false )
-   }
-
-   def play( target: Node, args: Seq[ ControlSetMap ] = Nil,
-             addAction: AddAction = addToHead, buffers: Seq[ Buffer ] = Nil )( implicit tx: Txn ) : Synth = {
-      recv()  // make sure it is online
-      val rs = Synth( this )
-      rs.play( target, args, addAction, buffers )
-      rs
-   }
+//object SynthDef {
+//   def apply( server: Server )( graph: SynthGraph, nameHint: Option[ String ] = None )
+//              ( implicit tx: Txn ) : SynthDef = {
+//
+//      ProcDemiurg.getSynthDef( server, graph, nameHint )
+//   }
+//}
+trait SynthDef extends Resource {
+   def peer: SSynthDef
+   def name: String
 }

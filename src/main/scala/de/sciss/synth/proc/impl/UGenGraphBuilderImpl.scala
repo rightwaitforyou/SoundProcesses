@@ -23,14 +23,12 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
-import de.sciss.lucre.{event => evt}
-import evt.Sys
+import de.sciss.synth.{UGenGraph, ControlProxyLike, Lazy, SynthGraph}
 
 //private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 

@@ -102,8 +102,8 @@ object AuralProc {
 
       def group()( implicit tx: Txn ) : Group = {
          groupOption.getOrElse {
-            val res = Group( server )
-            res.play( server.defaultGroup )
+            val res = Group( server )()
+//            res.play( server.defaultGroup )
             group_=( res )
             res
          }
@@ -131,7 +131,6 @@ object AuralProc {
       def preGroup()( implicit tx: Txn ) : Group = {
          implicit val itx = tx.peer
          preGroupOption.getOrElse {
-            val res     = Group( server )
             /* val main = */ group()      // creates group if necessary
             val all     = groupsRef().get
 val target = anchorNode
@@ -143,7 +142,8 @@ val addAction = addBefore
 //            } getOrElse {
 //               main -> addToTail
 //            }}
-            res.play( target, addAction )
+            val res     = Group( server )( target = target, addAction = addAction )
+//            res.play( target, addAction )
             groupsRef.set( Some( all.copy( pre = Some( res ))))
             res
          }
@@ -169,7 +169,9 @@ val addAction = addBefore
 //               all.pre.foreach( _.moveToTail( audible = true, group = newGroup ))
 //            }
 //         }
-         all.back.foreach( _.moveToHeadIfOnline( newGroup )) // ifOnline !
+         all.back.foreach { g =>
+            if( g.isOnline ) g.moveToHead( audible = true, group = newGroup )
+         }
       }
 
 //      def name( implicit tx: Txn ) : String = nameRef.get( tx.peer )

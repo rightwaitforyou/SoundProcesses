@@ -101,7 +101,7 @@ extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
       synthRef.swap( None )( tx.peer ).foreach( _.free( audible = true ))
    }
 
-   def isPlaying( implicit tx: Txn ) : Boolean = synth.map( _.isOnline.get ).getOrElse( false )
+   def isPlaying( implicit tx: Txn ) : Boolean = synth.map( _.isOnline ).getOrElse( false )
 
    // ---- RichAudioBus.User ----
 

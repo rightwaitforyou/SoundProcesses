@@ -11,7 +11,7 @@ object NodeImpl {
       def nonEmpty = direct.nonEmpty || inTxn.nonEmpty
    }
 }
-trait NodeImpl extends Node {
+trait NodeImpl extends ResourceImpl with Node {
    import NodeImpl._
 
    private val onEndFuns   = Ref( EmptyOnEnd )
@@ -115,17 +115,22 @@ trait NodeImpl extends Node {
       onEndTxn { implicit tx => bns.remove() }
    }
 
+   final def dispose()( implicit tx: Txn ) { free( audible = true )}
+
    final def free( audible: Boolean = true )( implicit tx: Txn ) {
-      tx.addMessage( peer.freeMsg, change = Some( (IfChanges, isOnline, false) ), audible = audible,
-                     dependencies = Map( isOnline -> true ))
+      require( isOnline )
+      tx.addMessage( this, peer.freeMsg, audible = audible )
+      disposed()
    }
 
    final def set( audible: Boolean, pairs: ControlSetMap* )( implicit tx: Txn ) {
-      tx.addMessage( peer.setMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+      require( isOnline )
+      tx.addMessage( this, peer.setMsg( pairs: _* ), audible = audible )
    }
 
    final def setn( audible: Boolean, pairs: ControlSetMap* )( implicit tx: Txn ) {
-      tx.addMessage( peer.setnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+      require( isOnline )
+      tx.addMessage( this, peer.setnMsg( pairs: _* ), audible = audible )
    }
 
 //   final def setIfOnline( pairs: ControlSetMap* )( implicit tx: Txn ) {
@@ -138,16 +143,18 @@ trait NodeImpl extends Node {
 //   }
 
    final def mapn( audible: Boolean, pairs: ControlKBusMap* )( implicit tx: Txn ) {
-      tx.addMessage( peer.mapnMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+      require( isOnline )
+      tx.addMessage( this, peer.mapnMsg( pairs: _* ), audible = audible )
    }
 
    final def mapan( audible: Boolean, pairs: ControlABusMap* )( implicit tx: Txn ) {
-      tx.addMessage( peer.mapanMsg( pairs: _* ), change = None, audible = audible, dependencies = Map( isOnline -> true ))
+      require( isOnline )
+      tx.addMessage( this, peer.mapanMsg( pairs: _* ), audible = audible )
    }
 
    final def moveToHead( audible: Boolean, group: Group )( implicit tx: Txn ) {
-      tx.addMessage( peer.moveToHeadMsg( group.peer ), change = None, audible = audible,
-              dependencies = Map( isOnline -> true, group.isOnline -> true ))
+      require( isOnline && group.isOnline )
+      tx.addMessage( this, peer.moveToHeadMsg( group.peer ), audible = audible, dependencies = group :: Nil )
    }
 
 //   final def moveToHeadIfOnline( group: Group )( implicit tx: Txn ) {
@@ -158,17 +165,17 @@ trait NodeImpl extends Node {
 //   }
 
    final def moveToTail( audible: Boolean, group: Group )( implicit tx: Txn ) {
-      tx.addMessage( peer.moveToTailMsg( group.peer ), change = None, audible = audible,
-                     dependencies = Map( isOnline -> true, group.isOnline -> true ))
+      require( isOnline && group.isOnline )
+      tx.addMessage( this, peer.moveToTailMsg( group.peer ), audible = audible, dependencies = group :: Nil )
    }
 
    final def moveBefore( audible: Boolean, target: Node )( implicit tx: Txn ) {
-      tx.addMessage( peer.moveBeforeMsg( target.peer ), change = None, audible = audible,
-                     dependencies = Map( isOnline -> true, target.isOnline -> true ))
+      require( isOnline && target.isOnline )
+      tx.addMessage( this, peer.moveBeforeMsg( target.peer ), audible = audible, dependencies = target :: Nil )
    }
 
    final def moveAfter( audible: Boolean, target: Node )( implicit tx: Txn ) {
-      tx.addMessage( peer.moveAfterMsg( target.peer ), change = None, audible = audible,
-                     dependencies = Map( isOnline -> true, target.isOnline -> true ))
+      require( isOnline && target.isOnline )
+      tx.addMessage( this, peer.moveAfterMsg( target.peer ), audible = audible, dependencies = target :: Nil )
    }
 }

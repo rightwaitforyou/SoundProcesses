@@ -3,11 +3,11 @@ package impl
 
 import de.sciss.synth.{Group => SGroup, addToHead, AddAction}
 
-private[proc] class GroupImpl( server: Server, peer: SGroup ) extends Group with NodeImpl {
+private[proc] case class GroupImpl( server: Server, peer: SGroup ) extends NodeImpl with Group {
    override def toString = "Group(" + peer.toString + ")"
 
    def play( target: Node, addAction: AddAction )( implicit tx: Txn ) {
-      require( target.server == server && target.isDisposed )
+      require( target.server == server && target.isOnline )
 
       // THERE IS CURRENTLY A PROBLEM EXHIBITED BY TEST3: BASICALLY --
       // since newMsg is not audible, it might be placed in the first bundle, but then

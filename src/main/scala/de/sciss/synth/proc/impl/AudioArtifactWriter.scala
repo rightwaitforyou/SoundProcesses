@@ -52,7 +52,7 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
          Out.ar( out, sig )
       }
 
-      val rd         = SynthDef( server, sg, nameHint = Some( "audio-artifact" ))
+//      val rd         = SynthDef( server, sg, nameHint = Some( "audio-artifact" ))
 
       val audioVal   = segm.value
 //      val path       = audioVal.artifact.toFile.getAbsolutePath
@@ -67,7 +67,8 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
       val rb = Buffer.diskIn( server, path, startFrame = fileStart, numChannels = numChannels )
       val args: Seq[ ControlSetMap ] = Seq( "buf" -> rb.id, "dur" -> dur )
 
-      val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
+//      val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
+      val rs = Synth( sg, nameHint = Some( "audio-artifact" ))( target = target, args = args, dependencies = rb :: Nil )
 
       rs.onEndTxn { implicit tx =>
 //         bufPeer.close( bufPeer.freeMsg )
