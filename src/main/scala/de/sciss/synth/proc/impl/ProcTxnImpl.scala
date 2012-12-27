@@ -27,7 +27,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.osc
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => IIdxSeq, SortedMap => ISortedMap}
 import de.sciss.synth.{osc => sosc}
 
 private[proc] object ProcTxnImpl {
@@ -48,15 +48,7 @@ private[proc] object ProcTxnImpl {
 //   def apply()( implicit tx: InTxn ) : ProcTxn with Flushable = new Impl( tx )
 //
 
-   /**
-    * A data type encapsulating all the outgoing OSC bundles for this transaction.
-    *
-    * @param firstStamp the time stamp of the first bundle in the payload, shifted 1 bit to the right
-    *                   (i.e. actual bundle index)
-    * @param payload    the succession of bundles, represented as a sequence of a sequence of messages
-    */
-   private final case class Bundles( firstStamp: Int, payload: IIdxSeq[ IIdxSeq[ osc.Message ]])
-   private final val noBundles = Bundles( 0, IIdxSeq.empty )
+   private final val noBundles = Txn.Bundles( 0, IIdxSeq.empty )
 
    var TIMEOUT_MILLIS = 10000L
 }
@@ -67,38 +59,39 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 
 //   private var bundles = IntMap.empty[ ... ]
 
-   private var bundlesMap = Map.empty[ Server, Bundles ]
+   private var bundlesMap = Map.empty[ Server, Txn.Bundles ] // ISortedMap[ Int, IIdxSeq[ osc.Message ]]]
 
    private def flush() {
       bundlesMap.foreach { case (server, bundles) =>
-         val peer = server.peer
-
-         def loop( pay: List[ IIdxSeq[ osc.Message with sosc.Send ]], idx: Int ) {
-            pay match {
-               case msgs :: Nil if msgs.forall( _.isSynchronous ) =>
-                  val p = msgs match {
-                     case IIdxSeq( msg )  => msg   // one message, send it out directly
-                     case _               => osc.Bundle.now( msgs: _* )
-                  }
-                  peer ! p
-
-               case msgs :: tail =>
-                  val syncMsg    = server.peer.syncMsg()
-                  val syncID     = syncMsg.id
-                  val bndl       = osc.Bundle.now( (msgs :+ syncMsg): _* )
-                  peer !? (TIMEOUT_MILLIS, bndl, {
-                     case sosc.SyncedMessage( `syncID` ) =>
-                        loop( tail )
-                     case sosc.TIMEOUT =>
-                        logTxn( "TIMEOUT while sending OSC bundle!" )
-                        loop( tail )
-                  })
-
-               case Nil => sys.error( "Unexpected case - empty bundle" )
-            }
-         }
-
-         loop( bundles.payload.toList, bundles.firstStamp )
+         ProcDemiurg.send( server, bundles )
+//         val peer = server.peer
+//
+//         def loop( pay: List[ IIdxSeq[ osc.Message with sosc.Send ]]) {
+//            pay match {
+//               case msgs :: Nil if msgs.forall( _.isSynchronous ) =>
+//                  val p = msgs match {
+//                     case IIdxSeq( msg )  => msg   // one message, send it out directly
+//                     case _               => osc.Bundle.now( msgs: _* )
+//                  }
+//                  peer ! p
+//
+//               case msgs :: tail =>
+//                  val syncMsg    = server.peer.syncMsg()
+//                  val syncID     = syncMsg.id
+//                  val bndl       = osc.Bundle.now( (msgs :+ syncMsg): _* )
+//                  peer !? (TIMEOUT_MILLIS, bndl, {
+//                     case sosc.SyncedMessage( `syncID` ) =>
+//                        loop( tail )
+//                     case sosc.TIMEOUT =>
+//                        logTxn( "TIMEOUT while sending OSC bundle!" )
+//                        loop( tail )
+//                  })
+//
+//               case Nil => sys.error( "Unexpected case - empty bundle" )
+//            }
+//         }
+//
+//         loop( bundles.payload.toList )
       }
    }
 
@@ -107,18 +100,24 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 
 //      val rsrc = system.resources
 
-      val server  = resource.server
-      val tsOld   = resource.timeStamp( tx )
-      require( tsOld >= 0, "Already disposed : " + resource )
+      val server        = resource.server
+      val rsrcStampOld  = resource.timeStamp( tx )
+      require( rsrcStampOld >= 0, "Already disposed : " + resource )
+
+      implicit val itx  = peer
+      val txnCnt        = system.resources( server ).messageTimeStamp
+      val txnStopCnt    = txnCnt.get
+      val bOld          = bundlesMap.getOrElse( server, noBundles )
+      val txnStartCnt   = txnStopCnt - bOld.payload.size
 
       // calculate the maximum time stamp from the dependencies. this includes
       // the resource as its own dependency (since we should send out messages
       // in monotonic order)
-      var dTsMax  = tsOld
+      var depStampMax   = math.max( txnStartCnt << 1, rsrcStampOld )
       dependencies.foreach { dep =>
-         val dts = dep.timeStamp( tx )
-         require( dts >= 0, "Dependency already disposed : " + dep )
-         if( dts > dTsMax ) dTsMax = dts
+         val depStamp = dep.timeStamp( tx )
+         require( depStamp >= 0, "Dependency already disposed : " + dep )
+         if( depStamp > depStampMax ) depStampMax = depStamp
          dep.addDependent( resource )( tx )  // validates dep's server
       }
 
@@ -128,31 +127,35 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       // if the message is asynchronous, it suffices to ensure that the time stamp's async bit is set.
       // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
       // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
-      val tsNew      = if( msgAsync ) dTsMax | 1 else (dTsMax + 1) & ~1
+      val rsrcStampNew  = if( msgAsync ) depStampMax | 1 else (depStampMax + 1) & ~1
 
-      val bOld       = bundlesMap.getOrElse( server, noBundles )
       val bNew       = if( bOld.payload.isEmpty ) {
          afterCommit( flush() )
-         Bundles( tsNew, IIdxSeq( IIdxSeq( message )))
+         val txnStartCntNew = rsrcStampNew >> 1
+         assert( txnStartCntNew == txnStartCnt )
+         txnCnt += 1
+         Txn.Bundles( txnStartCntNew, IIdxSeq( IIdxSeq( message )))
 
       } else {
-         val idxOld  = bOld.firstStamp
-         val idxNew  = tsNew >> 1
+         val cntOld  = bOld.firstCnt
+         val rsrcCnt = rsrcStampNew >> 1
          val payOld  = bOld.payload
          val szOld   = payOld.size
-         if( idxNew == idxOld - 1 ) {   // prepend to front
-            val payNew = IIdxSeq( message ) +: payOld
-            bOld.copy( firstStamp = idxNew, payload = payNew )
-
-         } else if( idxNew == idxOld + szOld ) {      // append to back
+//         if( rsrcCnt == cntOld - 1 ) {   // prepend to front
+//            val payNew = IIdxSeq( message ) +: payOld
+//            bOld.copy( firstCnt = rsrcCnt, payload = payNew )
+//
+//         } else
+         if( rsrcCnt == cntOld + szOld ) {      // append to back
             val payNew  = payOld :+ IIdxSeq( message )
+            txnCnt += 1
             bOld.copy( payload = payNew )
 
          } else {
             // we don't need the assertion, since we are going to call payload.apply which would
             // through an out of bounds exception if the assertion wouldn't hold
 //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
-            val payIdx = idxNew - idxOld
+            val payIdx = rsrcCnt - cntOld
             val payNew = payOld.updated( payIdx, payOld( payIdx ) :+ message )
             bOld.copy( payload = payNew )
          }

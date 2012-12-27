@@ -26,8 +26,10 @@
 package de.sciss.synth.proc
 
 import impl.AuralProc
-import concurrent.stm.{TMap, InTxn, TSet, Ref => ScalaRef}
+import concurrent.stm.{Ref, TMap, InTxn, TSet}
 import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef}
+import de.sciss.osc
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 //object ProcWorld {
 //// MMM
@@ -35,14 +37,14 @@ import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGrap
 ////   type Listener = TxnModel.Listener[ Update ]
 //}
 
-class ProcWorld /* MMM extends TxnModel[ ProcWorld.Update ] */ {
+final class ProcWorld( server: Server ) {
 //   import ProcWorld._
 
 // EEE
 //   private type Topo = Topology[ AuralProc, ProcEdge ]
-   val ugenGraphs = ScalaRef( Map.empty[ ProcDemiurg.GraphEquality, SynthDef ])
+   val ugenGraphs = Ref( Map.empty[ ProcDemiurg.GraphEquality, SynthDef ])
 // EEE
-//   private val topologyRef = ScalaRef[ Topo ]( Topology.empty )
+//   private val topologyRef = Ref[ Topo ]( Topology.empty )
 
 // MMM
 //   protected def fullUpdate( implicit tx: Txn ) = Update( topologyRef().vertices.toSet, Set.empty )
@@ -91,6 +93,22 @@ class ProcWorld /* MMM extends TxnModel[ ProcWorld.Update ] */ {
 //   def removeEdge( e: ProcEdge )( implicit tx: Txn ) {
 //      topologyRef.transform( _.removeEdge( e ))
 //   }
+
+   private val sync = new AnyRef
+   private val bundleReplySeen = -1
+
+   def send( bundles: Txn.Bundles ) {
+      // basically:
+      // bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
+      //   val dep = bundles.firstCnt - 1 + idx
+      //   if( seen( dep ) || msgs.forall( _.isSynchronous ) {
+      //     sendOutStraight()
+      //     notifySeen( dep )
+      //   } else {
+      //     addToWaitList()
+      //   }
+      ???
+   }
 }
 
 // MMM
@@ -107,7 +125,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
 
    private val servers = TSet.empty[ Server ]
 
-   private val uniqueDefID = ScalaRef( 0 )
+   private val uniqueDefID = Ref( 0 )
    private def nextDefID()( implicit tx: InTxn ) : Int = {
       val res = uniqueDefID.get
       uniqueDefID += 1
@@ -118,7 +136,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       implicit val itx = tx.peer
       if( servers.contains( server )) return
       servers += server
-      worlds  += server -> new ProcWorld
+      worlds  += server -> new ProcWorld( server )
    }
 
    def removeServer( server: Server )( implicit tx: Txn ) {
@@ -249,6 +267,11 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
          if( ok ) sb.append( c.toChar )
       i += 1 }
       sb.toString
+   }
+
+   private[proc] def send( server: Server, bundles: Txn.Bundles ) {
+      val w = worlds.single.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
+      w.send( bundles )
    }
 
    private[proc] def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {

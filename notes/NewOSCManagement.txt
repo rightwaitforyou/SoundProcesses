@@ -225,3 +225,11 @@ seen( stamp ):
       }
    }
 
+::::::::::::::::::::::::::::
+
+Group( s )()
+   stamp = 0 (init)
+   play --> stamp = 0
+   when sending, looks for hasSeen( -1 ) which is true
+
+a successive transaction will have a bundle index of at least 1 (because txn sent out 1 bundle)
