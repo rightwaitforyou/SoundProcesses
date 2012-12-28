@@ -29,16 +29,18 @@ import impl.AuralProc
 import concurrent.stm.{Ref, TMap, InTxn, TSet}
 import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef}
 import de.sciss.osc
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => IIdxSeq, IntMap}
+import de.sciss.synth.{osc => sosc}
 
-//object ProcWorld {
-//// MMM
-////   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
-////   type Listener = TxnModel.Listener[ Update ]
-//}
+object ProcWorld {
+// MMM
+//   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
+//   type Listener = TxnModel.Listener[ Update ]
+   var TIMEOUT_MILLIS = 10000L
+}
 
 final class ProcWorld( server: Server ) {
-//   import ProcWorld._
+   import ProcWorld._
 
 // EEE
 //   private type Topo = Topology[ AuralProc, ProcEdge ]
@@ -94,8 +96,12 @@ final class ProcWorld( server: Server ) {
 //      topologyRef.transform( _.removeEdge( e ))
 //   }
 
-   private val sync = new AnyRef
-   private val bundleReplySeen = -1
+   private val sync              = new AnyRef
+   private var bundleWaiting     = IntMap.empty[ IIdxSeq[ () => Unit ]]
+   private val bundleReplySeen   = -1
+   private val msgStampRef       = Ref( 0 )
+
+   private[proc] def messageTimeStamp : Ref[ Int ] = msgStampRef
 
    def send( bundles: Txn.Bundles ) {
       // basically:
@@ -107,7 +113,58 @@ final class ProcWorld( server: Server ) {
       //   } else {
       //     addToWaitList()
       //   }
-      ???
+
+      def advance( cnt: Int ) {
+         sync.synchronized {
+            var i = bundleReplySeen + 1
+            while( i <= cnt ) {
+               bundleWaiting.get( i ).foreach { sq =>
+                  bundleWaiting -= i
+                  sq.foreach( _.apply() )
+               }
+            i += 1 }
+         }
+      }
+
+      def sendNow( msgs: IIdxSeq[ osc.Message with sosc.Send ], allSync: Boolean, cnt: Int ) {
+         val peer       = server.peer
+         if( allSync ) {
+            val p = msgs match {
+               case IIdxSeq( msg ) if allSync => msg
+               case _ => osc.Bundle.now( msgs: _* )
+            }
+            peer ! p
+            advance( cnt )
+
+         } else {
+            val syncMsg    = peer.syncMsg()
+            val syncID     = syncMsg.id
+            val bndl       = osc.Bundle.now( (msgs :+ syncMsg): _* )
+            peer !? (TIMEOUT_MILLIS, bndl, {
+               case sosc.SyncedMessage( `syncID` ) =>
+                  advance( cnt )
+               case sosc.TIMEOUT =>
+                  logTxn( "TIMEOUT while sending OSC bundle!" )
+                  advance( cnt )
+            })
+         }
+      }
+
+      val cntOff = bundles.firstCnt
+      bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
+         val cnt     = cntOff + idx
+         val depCnt  = cnt - 1
+         val allSync = msgs.forall( _.isSynchronous )
+         sync.synchronized {
+            if( bundleReplySeen >= depCnt || allSync ) {
+               sendNow( msgs, allSync, cnt )
+            } else {
+               bundleWaiting += depCnt -> (bundleWaiting.getOrElse( depCnt, IIdxSeq.empty ) :+ { () =>
+                  sendNow( msgs, allSync, cnt )
+               })
+            }
+         }
+      }
    }
 }
 
@@ -272,6 +329,11 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
    private[proc] def send( server: Server, bundles: Txn.Bundles ) {
       val w = worlds.single.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
       w.send( bundles )
+   }
+
+   private[proc] def messageTimeStamp( server: Server )( implicit tx: Txn ) : Ref[ Int ] = {
+      val w = worlds.get( server )( tx.peer ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
+      w.messageTimeStamp
    }
 
    private[proc] def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {

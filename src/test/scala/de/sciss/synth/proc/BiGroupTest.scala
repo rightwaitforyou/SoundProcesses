@@ -2,7 +2,6 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.{stm, expr, bitemp, event => evt}
 import stm.Cursor
-import evt.InMemory
 import de.sciss.synth.expr.{SpanLikes, ExprImplicits, Longs}
 import bitemp.{SpanLike, Span, BiGroup}
 import expr.Expr

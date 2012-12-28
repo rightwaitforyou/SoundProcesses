@@ -11,7 +11,7 @@ object Sys {
 trait Sys[ S <: Sys[ S ]] extends evt.Sys[ S ] {
    type Tx <: Sys.Txn[ S ]
 
-   private[proc] def resources( server: Server ): ResourceManagement
+//   private[proc] def resources( server: Server ): ResourceManagement
 }
 
 //object System {

@@ -6,7 +6,6 @@ import expr.ExprImplicits
 import bitemp.Span
 import stm.store.BerkeleyDB
 import java.io.File
-import evt.InMemory
 import de.sciss.lucre.confluent.reactive.ConfluentReactive
 
 object ScansTest extends App {
@@ -18,13 +17,13 @@ object ScansTest extends App {
    args.headOption match {
       case Some( "--prelim" )    => preliminaryTest()
       case Some( "--mem-scan" )  =>
-         implicit val sys = evt.InMemory()
+         implicit val sys = InMemory()
          run[ InMemory, InMemory ]()
-      case Some( "--confluent-scan" ) =>
-         implicit val sys = ConfluentReactive( BerkeleyDB.tmp() )
-         val (_, cursor) = sys.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
-         implicit val _cursor = cursor
-         run[ ConfluentReactive, stm.InMemory ]()
+//      case Some( "--confluent-scan" ) =>
+//         implicit val sys = ConfluentReactive( BerkeleyDB.tmp() )
+//         val (_, cursor) = sys.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
+//         implicit val _cursor = cursor
+//         run[ ConfluentReactive, stm.InMemory ]()
 
       case _ =>
          println(
@@ -74,7 +73,7 @@ object ScansTest extends App {
 ////      }
    }
 
-   def run[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]()( implicit system: S, cursor: stm.Cursor[ S ], bridge: S#Tx => I#Tx ) {
+   def run[ S <: Sys[ S ], I <: stm.Sys[ I ]]()( implicit system: S, cursor: stm.Cursor[ S ], bridge: S#Tx => I#Tx ) {
 //      implicit val sys = makeSys()
 //      val imp  = ExprImplicits[ S ]
 //      import imp._

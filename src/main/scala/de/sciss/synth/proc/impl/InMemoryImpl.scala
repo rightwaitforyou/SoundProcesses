@@ -22,6 +22,6 @@ object InMemoryImpl {
       def wrap( peer: InTxn ) : S#Tx = new TxnImpl( this, peer )
       override def toString = "proc.InMemory@" + hashCode.toHexString
 
-      def resources( server: Server ): ResourceManagement = ???   // XXX TODO: put this in common mixin
+//      def resources( server: Server ): ResourceManagement = ???   // XXX TODO: put this in common mixin
    }
 }

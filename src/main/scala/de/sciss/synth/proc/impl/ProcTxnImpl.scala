@@ -50,7 +50,7 @@ private[proc] object ProcTxnImpl {
 
    private final val noBundles = Txn.Bundles( 0, IIdxSeq.empty )
 
-   var TIMEOUT_MILLIS = 10000L
+//   var TIMEOUT_MILLIS = 10000L
 }
 private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
    tx =>
@@ -63,6 +63,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 
    private def flush() {
       bundlesMap.foreach { case (server, bundles) =>
+         logTxn( "flush " + server + " -> " + bundles.payload.size + " bundles" )
          ProcDemiurg.send( server, bundles )
 //         val peer = server.peer
 //
@@ -105,7 +106,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       require( rsrcStampOld >= 0, "Already disposed : " + resource )
 
       implicit val itx  = peer
-      val txnCnt        = system.resources( server ).messageTimeStamp
+      val txnCnt        = ProcDemiurg.messageTimeStamp( server )( tx )
       val txnStopCnt    = txnCnt.get
       val bOld          = bundlesMap.getOrElse( server, noBundles )
       val txnStartCnt   = txnStopCnt - bOld.payload.size
@@ -129,7 +130,10 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
       val rsrcStampNew  = if( msgAsync ) depStampMax | 1 else (depStampMax + 1) & ~1
 
+      logTxn( "addMessage(" + resource + ", " + message + ") -> stamp = " + rsrcStampNew )
+
       val bNew       = if( bOld.payload.isEmpty ) {
+         logTxn( "registering after commit handler" )
          afterCommit( flush() )
          val txnStartCntNew = rsrcStampNew >> 1
          assert( txnStartCntNew == txnStartCnt )

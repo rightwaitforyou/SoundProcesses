@@ -46,7 +46,7 @@ object Synth {
    private def play( df: SynthDef, target: Node, args: Seq[ ControlSetMap ], addAction: AddAction,
                      dependencies: List[ Resource ])( implicit tx: Txn ) : Synth = {
       val res  = new Impl( SSynth( target.server.peer ), df )
-      res.play( target, args, addAction, dependencies )
+      res.play( target, args, addAction, df :: dependencies )
       res
    }
 }
