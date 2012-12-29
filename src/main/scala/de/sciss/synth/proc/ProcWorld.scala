@@ -37,6 +37,8 @@ object ProcWorld {
 //   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
 //   type Listener = TxnModel.Listener[ Update ]
    var TIMEOUT_MILLIS = 10000L
+
+   var DEBUG = false
 }
 
 final class ProcWorld( server: Server ) {
@@ -98,7 +100,7 @@ final class ProcWorld( server: Server ) {
 
    private val sync              = new AnyRef
    private var bundleWaiting     = IntMap.empty[ IIdxSeq[ () => Unit ]]
-   private val bundleReplySeen   = -1
+   private var bundleReplySeen   = -1
    private val msgStampRef       = Ref( 0 )
 
    private[proc] def messageTimeStamp : Ref[ Int ] = msgStampRef
@@ -115,21 +117,24 @@ final class ProcWorld( server: Server ) {
       //   }
 
       def advance( cnt: Int ) {
-//println( "ADVANCE " + cnt )
+if( DEBUG ) println( "ADVANCE " + cnt )
          sync.synchronized {
             var i = bundleReplySeen + 1
-            while( i <= cnt ) {
-               bundleWaiting.get( i ).foreach { sq =>
-                  bundleWaiting -= i
-                  sq.foreach( _.apply() )
-               }
-            i += 1 }
+            if( i <= cnt ) {
+               bundleReplySeen = cnt
+               while( i <= cnt ) {
+                  bundleWaiting.get( i ).foreach { sq =>
+                     bundleWaiting -= i
+                     sq.foreach( _.apply() )
+                  }
+               i += 1 }
+            }
          }
       }
 
       def sendNow( msgs: IIdxSeq[ osc.Message with sosc.Send ], allSync: Boolean, cnt: Int ) {
          val peer       = server.peer
-//println( "SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt )
+if( DEBUG ) println( "SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt )
          if( allSync ) {
             val p = msgs match {
                case IIdxSeq( msg ) if allSync => msg
@@ -161,6 +166,7 @@ final class ProcWorld( server: Server ) {
             if( bundleReplySeen >= depCnt /* || allSync */) {
                sendNow( msgs, allSync, cnt )
             } else {
+if( DEBUG ) println( "WAIT FOR DEP " + depCnt + " TO SEND " + msgs )
                bundleWaiting += depCnt -> (bundleWaiting.getOrElse( depCnt, IIdxSeq.empty ) :+ { () =>
                   sendNow( msgs, allSync, cnt )
                })
