@@ -29,8 +29,11 @@ import de.sciss.osc
 import de.sciss.synth.{osc => sosc}
 import concurrent.stm.InTxn
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import impl.{ProcTxnPlainImpl => PlainImpl}
 
 object Txn {
+   private[proc] def applyPlain( implicit itx: InTxn ) : Txn = new PlainImpl( itx )
+
    /**
     * A data type encapsulating all the outgoing OSC bundles for this transaction.
     *

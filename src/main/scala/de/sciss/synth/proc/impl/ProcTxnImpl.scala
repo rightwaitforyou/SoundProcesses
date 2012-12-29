@@ -29,6 +29,7 @@ package impl
 import de.sciss.osc
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.{osc => sosc}
+import concurrent.stm.{InTxn, Txn => ScalaTxn}
 
 private[proc] object ProcTxnImpl {
 //   private val errOffMsg   = osc.Message( "/error", -1 )
@@ -40,21 +41,23 @@ private[proc] object ProcTxnImpl {
 
 //   var TIMEOUT_MILLIS = 10000L
 }
-private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
+private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
    tx =>
 
    import ProcTxnImpl._
 
    private var bundlesMap = Map.empty[ Server, Txn.Bundles ]
 
-   private def flush() {
+   final protected def flush() {
       bundlesMap.foreach { case (server, bundles) =>
          logTxn( "flush " + server + " -> " + bundles.payload.size + " bundles" )
          ProcDemiurg.send( server, bundles )
       }
    }
 
-   def addMessage( resource: Resource, message: osc.Message with sosc.Send, audible: Boolean, dependencies: Seq[ Resource ],
+   protected def markBundlesDirty() : Unit
+
+   final def addMessage( resource: Resource, message: osc.Message with sosc.Send, audible: Boolean, dependencies: Seq[ Resource ],
                    noErrors: Boolean ) {
 
 //      val rsrc = system.resources
@@ -92,8 +95,9 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       if( rsrcStampNew != rsrcStampOld ) resource.timeStamp_=( rsrcStampNew )( tx )
 
       val bNew       = if( bOld.payload.isEmpty ) {
-         logTxn( "registering after commit handler" )
-         afterCommit( flush() )
+         markBundlesDirty()
+//         logTxn( "registering after commit handler" )
+//         afterCommit( flush() )
          val txnStartCntNew = rsrcStampNew >> 1
          assert( txnStartCntNew == txnStartCnt )
          txnCnt += 1
@@ -146,4 +150,20 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
 //            clumpMap += targetEntry -> clumpIdx
 //         }
 //      })
+}
+
+private[proc] trait ProcTxnFullImpl[ S <: Sys[ S ]] extends ProcTxnImpl with Sys.Txn[ S ] {
+   final protected def markBundlesDirty() {
+      logTxn( "registering after commit handler" )
+      afterCommit( flush() )
+   }
+}
+
+private[proc] final class ProcTxnPlainImpl( val peer: InTxn ) extends ProcTxnImpl {
+   override def toString = "proc.Txn<plain>@" + hashCode().toHexString
+
+   protected def markBundlesDirty() {
+      logTxn( "registering after commit handler" )
+      ScalaTxn.afterCommit( _ => flush() )( peer )
+   }
 }

@@ -35,7 +35,7 @@ object InMemoryImpl {
 
    private final class TxnImpl( val system: InMemory, val peer: InTxn )
    extends stm.impl.InMemoryImpl.TxnMixin[ InMemory ] with evt.impl.InMemoryImpl.TxnMixin[ InMemory ]
-   with ProcTxnImpl[ InMemory ] {
+   with ProcTxnFullImpl[ InMemory ] {
       override def toString = "proc.InMemory#Tx@" + hashCode.toHexString
 
       def inMemory : InMemory#Tx = this

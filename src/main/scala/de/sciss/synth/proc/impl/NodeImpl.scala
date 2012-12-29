@@ -45,7 +45,7 @@ trait NodeImpl extends ResourceImpl with Node {
       val funs = onEndFuns.single.get
       if( funs.nonEmpty ) {
          spawn { implicit itx =>
-            implicit val ptx: Txn = ??? // = ProcTxn.applyPlain()
+            implicit val ptx: Txn = Txn.applyPlain( itx )
             funs.direct.foreach( _.apply() )
             funs.inTxn.foreach(  _.apply( ptx ))
          }
