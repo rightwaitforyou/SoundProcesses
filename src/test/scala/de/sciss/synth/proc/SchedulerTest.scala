@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import java.util.concurrent.{TimeUnit, Executors}
-import concurrent.stm.{TxnLocal, Txn, TxnExecutor, InTxn, Ref => STMRef}
+import concurrent.stm.{TxnLocal, Txn => ScalaTxn, TxnExecutor, InTxn, Ref => STMRef}
 
 object SchedulerTest extends App {
    val pool    = Executors.newScheduledThreadPool( 1 )
@@ -15,7 +15,7 @@ object SchedulerTest extends App {
       val logical    = txnTime()
       val jitter     = System.currentTimeMillis() - logical
       val effective  = math.max( 0L, delay - jitter )
-      Txn.afterCommit { _ =>
+      ScalaTxn.afterCommit { _ =>
          pool.schedule( new Runnable {
             def run() { t { implicit tx =>
                if( v == valid() ) {
@@ -32,7 +32,7 @@ object SchedulerTest extends App {
    }
 
    def io( code: => Unit )( implicit tx: InTxn ) {
-      Txn.afterCommit( _ => code )
+      ScalaTxn.afterCommit( _ => code )
    }
 
    println( "Run." )

@@ -48,7 +48,7 @@ package object proc {
 
    private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US )
    var showLog          = false
-   var showTxnLog       = true
+   var showTxnLog       = false
    var showAuralLog     = false
    var showTransportLog = false
    var showAllocLog     = false

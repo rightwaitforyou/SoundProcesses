@@ -131,6 +131,7 @@ private[proc] trait ProcTxnImpl[ S <: Sys[ S ]] extends Sys.Txn[ S ] {
       val rsrcStampNew  = if( msgAsync ) depStampMax | 1 else (depStampMax + 1) & ~1
 
       logTxn( "addMessage(" + resource + ", " + message + ") -> stamp = " + rsrcStampNew )
+      if( rsrcStampNew != rsrcStampOld ) resource.timeStamp_=( rsrcStampNew )( tx )
 
       val bNew       = if( bOld.payload.isEmpty ) {
          logTxn( "registering after commit handler" )

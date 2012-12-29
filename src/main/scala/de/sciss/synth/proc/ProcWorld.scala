@@ -115,6 +115,7 @@ final class ProcWorld( server: Server ) {
       //   }
 
       def advance( cnt: Int ) {
+//println( "ADVANCE " + cnt )
          sync.synchronized {
             var i = bundleReplySeen + 1
             while( i <= cnt ) {
@@ -128,6 +129,7 @@ final class ProcWorld( server: Server ) {
 
       def sendNow( msgs: IIdxSeq[ osc.Message with sosc.Send ], allSync: Boolean, cnt: Int ) {
          val peer       = server.peer
+//println( "SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt )
          if( allSync ) {
             val p = msgs match {
                case IIdxSeq( msg ) if allSync => msg
@@ -156,7 +158,7 @@ final class ProcWorld( server: Server ) {
          val depCnt  = cnt - 1
          val allSync = msgs.forall( _.isSynchronous )
          sync.synchronized {
-            if( bundleReplySeen >= depCnt || allSync ) {
+            if( bundleReplySeen >= depCnt /* || allSync */) {
                sendNow( msgs, allSync, cnt )
             } else {
                bundleWaiting += depCnt -> (bundleWaiting.getOrElse( depCnt, IIdxSeq.empty ) :+ { () =>
