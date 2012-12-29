@@ -80,7 +80,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
          val depStamp = dep.timeStamp( tx )
          require( depStamp >= 0, "Dependency already disposed : " + dep )
          if( depStamp > depStampMax ) depStampMax = depStamp
-         dep.addDependent( resource )( tx )  // validates dep's server
+//         dep.addDependent( resource )( tx )  // validates dep's server
       }
 
 //      val dAsync     = (dTsMax & 1) == 1
