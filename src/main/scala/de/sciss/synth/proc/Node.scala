@@ -25,8 +25,7 @@
 
 package de.sciss.synth.proc
 
-import concurrent.stm.{Ref => ScalaRef, InTxn, TxnExecutor}
-import de.sciss.synth.{Node => SNode, ControlSetMap, ControlABusMap, ControlKBusMap, ControlBus, AudioBus}
+import de.sciss.synth.{Node => SNode, ControlSetMap, ControlABusMap, ControlKBusMap}
 
 trait Node extends Resource {
    // ---- abstract ----
