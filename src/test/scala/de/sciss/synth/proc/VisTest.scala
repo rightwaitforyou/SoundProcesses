@@ -73,6 +73,7 @@ extends ExprImplicits[ S ] {
    object Implicits {
 //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
+      private implicit val procSer: stm.Serializer[S#Tx, S#Acc, Proc[S]] = Proc.serializer[ S ]
       implicit val procVarSer: Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
 //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )

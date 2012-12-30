@@ -40,7 +40,7 @@ object scan {
    private[proc] def outControlName( key: String ) : String = "$out_" + key
    private[proc] def inControlName(  key: String ) : String = "$in_" + key
 
-   private final case class In( key: String, default: Double )
+   @SerialVersionUID(7931562747075213666L) private final case class In( key: String, default: Double )
    extends GE.Lazy /* with Elem */ with AudioRated {
       def displayName = "scan.In"
 
