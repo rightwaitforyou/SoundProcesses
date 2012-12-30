@@ -30,7 +30,7 @@ import de.sciss.synth.io.{AudioFileType, SampleFormat}
 import impl.{BufferImpl => Impl}
 
 object Buffer {
-   def diskIn( server: Server, path: String, startFrame: Long = 0L, numFrames: Int = SoundProcesses.cueBufferSize,
+   def diskIn( server: Server )( path: String, startFrame: Long = 0L, numFrames: Int = SoundProcesses.cueBufferSize,
                numChannels: Int = 1 )( implicit tx: Txn ) : Buffer = {
       SoundProcesses.validateCueBufferSize( numFrames )
       val res = create( server, closeOnDisposal = true )
@@ -38,7 +38,7 @@ object Buffer {
       res
    }
 
-   def diskOut( server: Server, path: String, fileType: AudioFileType = AudioFileType.AIFF,
+   def diskOut( server: Server )( path: String, fileType: AudioFileType = AudioFileType.AIFF,
                 sampleFormat: SampleFormat = SampleFormat.Float,
                 numFrames: Int = SoundProcesses.cueBufferSize, numChannels: Int = 1 )( implicit tx: Txn ) : Buffer = {
       SoundProcesses.validateCueBufferSize( numFrames )
@@ -48,14 +48,14 @@ object Buffer {
       res
    }
 
-   def fft( server: Server, size: Int )( implicit tx: Txn ) : Modifiable = {
+   def fft( server: Server )( size: Int )( implicit tx: Txn ) : Modifiable = {
       require( size >= 2 && SoundProcesses.isPowerOfTwo( size ), "Must be a power of two and >= 2 : " + size )
       val res = create( server )
       res.alloc( numFrames = size, numChannels = 1 )
       res
    }
 
-   def apply( server: Server, numFrames: Int, numChannels: Int = 1 )( implicit tx: Txn ) : Modifiable = {
+   def apply( server: Server )( numFrames: Int, numChannels: Int = 1 )( implicit tx: Txn ) : Modifiable = {
       val res = create( server )
       res.alloc( numFrames = numFrames, numChannels = numChannels )
       res

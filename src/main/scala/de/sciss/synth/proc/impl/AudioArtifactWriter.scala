@@ -64,7 +64,7 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
          case _                  => audioVal.spec.numFrames / audioVal.spec.sampleRate
       }
 
-      val rb = Buffer.diskIn( server, path, startFrame = fileStart, numChannels = numChannels )
+      val rb = Buffer.diskIn( server )( path, startFrame = fileStart, numChannels = numChannels )
       val args: Seq[ ControlSetMap ] = Seq( "buf" -> rb.id, "dur" -> dur )
 
 //      val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
