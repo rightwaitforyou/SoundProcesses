@@ -53,7 +53,7 @@ extends DynamicAudioBusUser with RichAudioBus.User with TxnPlayer {
       val start   = "$start".ir
       val stop    = "$stop".ir
       val dur     = "$dur".ir
-      val sig: GE = segm.values.map { case (segmStart, segmStop, segmShape) =>
+      val sig     = segm.values.map { case (segmStart, segmStop, segmShape) =>
          segmShape match {
             case `linShape` =>
                Line.ar( start, stop, dur, doneAction = freeSelf )

@@ -38,7 +38,7 @@ object Spans extends BiTypeImpl[ Span ] {
    /* protected */ def readValue( in: DataInput ) : Span = Span.read( in )
    /* protected */ def writeValue( value: Span, out: DataOutput ) { value.write( out )}
 
-//   def apply[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ]) : Ex[ S ] = sys.error( "TODO" ) // ( start ,stop )
+//   def apply[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ]) : Ex[ S ] = ...
 
    final class Ops[ S <: evt.Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       // ---- unary ----

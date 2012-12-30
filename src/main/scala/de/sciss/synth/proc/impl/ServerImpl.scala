@@ -36,7 +36,7 @@ object ServerImpl {
       private val audioBusAllocator    = BlockAllocator( "audio",   peer.config.audioBusChannels, peer.config.internalBusIndex )
       private val bufferAllocator      = BlockAllocator( "buffer",  peer.config.audioBuffers )
 
-      val defaultGroup : Group = Group.default( this )
+      val defaultGroup : Group = Group.wrap( this, peer.defaultGroup ) // .default( this )
 
       override def toString = peer.toString()
 

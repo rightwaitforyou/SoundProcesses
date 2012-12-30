@@ -29,21 +29,16 @@ import de.sciss.synth.{addToHead, AddAction, Group => SGroup}
 import impl.{GroupImpl => Impl}
 
 object Group {
-   def apply( server: Server )( target: Node = default( server ), addAction: AddAction = addToHead )
+   def apply( server: Server )( target: Node = server.defaultGroup, addAction: AddAction = addToHead )
             ( implicit tx: Txn ) : Group = {
       val g = new Impl( server, SGroup( server.peer ))
       g.play( target, addAction )
       g
    }
 
-//   def wrap( server: Server, peer: SGroup ) : Group = {
-//      require( server.peer == peer.server )
-//      new Group( server, peer )( initOnline = false )
-//   }
-
-   def default( server: Server ) : Group = {
-      val g = new Impl( server, server.peer.defaultGroup )  // XXX TODO: should go into RichServer
-      g
+   private[proc] def wrap( server: Server, peer: SGroup ) : Group = {
+      require( server.peer == peer.server )
+      new Impl( server, peer )
    }
 }
 trait Group extends Node {

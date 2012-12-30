@@ -58,7 +58,7 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
 //      val path       = audioVal.artifact.toFile.getAbsolutePath
       val path       = file.getAbsolutePath
       val fileStart  = audioVal.offset
-      val target     = Group.default( server ) // XXX
+      val target     = server.defaultGroup
       val dur        = segm.span match {
          case sp @ Span( _, _ )  => sp.length / sampleRate
          case _                  => audioVal.spec.numFrames / audioVal.spec.sampleRate
@@ -93,5 +93,5 @@ extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
 //      bus.removeWriter( this )
    }
 
-//   def migrateTo( newBus: RichAudioBus )( implicit tx: ProcTxn ) = sys.error("TODO"): DynamicAudioBusUser
+//   def migrateTo( newBus: RichAudioBus )( implicit tx: ProcTxn ) = ...
 }

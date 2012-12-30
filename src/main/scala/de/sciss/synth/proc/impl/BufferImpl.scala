@@ -27,6 +27,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.{Buffer => SBuffer }
+import de.sciss.synth.io.{SampleFormat, AudioFileType}
 
 private[proc] final case class BufferImpl( server: Server, peer: SBuffer )( closeOnDisposal: Boolean )
 extends ResourceImpl with Buffer.Modifiable {
@@ -36,32 +37,37 @@ extends ResourceImpl with Buffer.Modifiable {
 
    def id: Int = peer.id
 
-//   def alloc( numFrames: Int, numChannels: Int = 1 )( implicit tx: ProcTxn ) {
-//      tx.add( msg          = peer.allocMsg( numFrames, numChannels ),
-//              change       = Some( (RequiresChange, isOnline, true) ),
-//              dependencies = Map( isAlive -> true ),
-//              audible      = false
-//      )
-//   }
-//
+   def alloc( numFrames: Int, numChannels: Int = 1 )( implicit tx: Txn ) {
+      require( isOnline )
+      require( numFrames >= 0 && numChannels >= 0 )
+      tx.addMessage( this, peer.allocMsg( numFrames = numFrames, numChannels = numChannels ), audible = false )
+   }
+
    def allocRead( path: String, startFrame: Long, numFrames: Int )( implicit tx: Txn ) {
       require( isOnline )
       require( startFrame <= 0x7FFFFFFFL, "Cannot encode start frame >32 bit (" + startFrame + ")" )
+      require( numFrames >= 0 )
       val frameI = startFrame.toInt
       tx.addMessage( this, peer.allocReadMsg( path, startFrame = frameI, numFrames = numFrames ), audible = false )
    }
 
-//   def record( path: String, fileType: AudioFileType, sampleFormat: SampleFormat )( implicit tx: ProcTxn ) {
-//      tx.add( msg          = peer.writeMsg( path, fileType, sampleFormat, startFrame = 0, numFrames = 0, leaveOpen = true ),
-//              change       = Some( (Always, hasContent, true) ),
-//              dependencies = Map( isOnline -> true ), // hasContent is a bit misleading...
-//              audible      = false
-//      )
-//   }
+   def record( path: String, fileType: AudioFileType, sampleFormat: SampleFormat )( implicit tx: Txn ) {
+      write( path, fileType, sampleFormat, numFrames = 0, leaveOpen = true )
+   }
+
+   def write( path: String, fileType: AudioFileType, sampleFormat: SampleFormat, numFrames: Int = -1,
+              startFrame: Int = 0, leaveOpen: Boolean = false )( implicit tx: Txn ) {
+      require( isOnline )
+      require( leaveOpen == closeOnDisposal )
+      require( startFrame >= 0 )
+      tx.addMessage( this, peer.writeMsg( path, fileType, sampleFormat, numFrames = numFrames, startFrame = startFrame,
+                     leaveOpen = leaveOpen ), audible = false )
+   }
 
    def read( path: String, fileStartFrame: Long, numFrames: Int, bufStartFrame: Int )( implicit tx: Txn ) {
       require( isOnline )
       require( fileStartFrame <= 0x7FFFFFFFL, "Cannot encode start frame >32 bit (" + fileStartFrame + ")" )
+      require( numFrames >= 0 && bufStartFrame >= 0 )
       val frameI = fileStartFrame.toInt
       tx.addMessage( this, peer.readMsg( path, fileStartFrame = frameI, numFrames = numFrames, leaveOpen = false ),
                      audible = false )

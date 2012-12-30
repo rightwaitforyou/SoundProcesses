@@ -33,31 +33,38 @@ object Buffer {
    def diskIn( server: Server, path: String, startFrame: Long = 0L, numFrames: Int = SoundProcesses.cueBufferSize,
                numChannels: Int = 1 )( implicit tx: Txn ) : Buffer = {
       SoundProcesses.validateCueBufferSize( numFrames )
-      val peer = allocPeer( server )
-      val res  = new Impl( server, peer )( closeOnDisposal = true )
+      val res = create( server, closeOnDisposal = true )
       res.allocRead( path, startFrame = startFrame, numFrames = numFrames )
       res
    }
 
    def diskOut( server: Server, path: String, fileType: AudioFileType = AudioFileType.AIFF,
                 sampleFormat: SampleFormat = SampleFormat.Float,
-                numFrames: Int = SoundProcesses.cueBufferSize, numChannels: Int = 1 ) : Buffer = {
+                numFrames: Int = SoundProcesses.cueBufferSize, numChannels: Int = 1 )( implicit tx: Txn ) : Buffer = {
       SoundProcesses.validateCueBufferSize( numFrames )
-      ???
+      val res = create( server, closeOnDisposal = true )
+      res.alloc( numFrames = numFrames, numChannels = numChannels )
+      res.record( path, fileType, sampleFormat )
+      res
    }
 
-   def fft( server: Server, size: Int ) : Modifiable = {
+   def fft( server: Server, size: Int )( implicit tx: Txn ) : Modifiable = {
       require( size >= 2 && SoundProcesses.isPowerOfTwo( size ), "Must be a power of two and >= 2 : " + size )
-      ???
+      val res = create( server )
+      res.alloc( numFrames = size, numChannels = 1 )
+      res
    }
 
-   def apply( server: Server, numFrames: Int = SoundProcesses.cueBufferSize, numChannels: Int = 1 ) : Modifiable = {
-      ???
+   def apply( server: Server, numFrames: Int, numChannels: Int = 1 )( implicit tx: Txn ) : Modifiable = {
+      val res = create( server )
+      res.alloc( numFrames = numFrames, numChannels = numChannels )
+      res
    }
 
-   private def allocPeer( server: Server )( implicit tx: Txn ) : SBuffer = {
+   private def create( server: Server, closeOnDisposal: Boolean = false )( implicit tx: Txn ) : Impl = {
       val id   = server.allocBuffer()
-      SBuffer( server.peer, id )
+      val peer = SBuffer( server.peer, id )
+      new Impl( server, peer )( closeOnDisposal )
    }
 
    trait Modifiable extends Buffer {
