@@ -289,11 +289,11 @@ object BiGroupImpl {
       }
 
       private object ChangeEvent
-      extends evt.Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup[ S, Elem, U ]]
+      extends evt.Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup.Modifiable[ S, Elem, U ]]
       with evt.InvariantSelector[ S ] {
          protected def reader : evt.Reader[ S, BiGroup[ S, Elem, U ]] = serializer( eventView )
          def slot: Int = opNotSupported
-         def node: BiGroup[ S, Elem, U ] = group
+         def node: BiGroup.Modifiable[ S, Elem, U ] = group
 
          def connect()( implicit tx: S#Tx ) {}
          def disconnect()( implicit tx: S#Tx ) {}
@@ -314,11 +314,11 @@ object BiGroupImpl {
             else None
          }
 
-         def react[ A1 >: BiGroup.Update[ S, Elem, U ]]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiGroup[ S, Elem, U ]] =
+         def react[ A1 >: BiGroup.Update[ S, Elem, U ]]( fun: A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiGroup.Modifiable[ S, Elem, U ]] =
             reactTx[ A1 ]( _ => fun )
 
-         def reactTx[ A1 >: BiGroup.Update[ S, Elem, U ]]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiGroup[ S, Elem, U ]] = {
-            val obs = evt.Observer( serializer( eventView ), fun )
+         def reactTx[ A1 >: BiGroup.Update[ S, Elem, U ]]( fun: S#Tx => A1 => Unit )( implicit tx: S#Tx ) : evt.Observer[ S, A1, BiGroup.Modifiable[ S, Elem, U ]] = {
+            val obs = evt.Observer( modifiableSerializer( eventView ), fun )
             obs.add( CollectionEvent )
             obs.add( ElementEvent )
             obs
@@ -536,7 +536,7 @@ object BiGroupImpl {
 
 //      final def collectionChanged : Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]] = CollectionEvent
 //      final def elementChanged    : Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]] = ElementEvent
-      final def changed           : Event[ S, BiGroup.Update[     S, Elem, U ], BiGroup[ S, Elem, U ]] = ChangeEvent
+      final def changed : Event[ S, BiGroup.Update[ S, Elem, U ], BiGroup.Modifiable[ S, Elem, U ]] = ChangeEvent
    }
 
    def newModifiable[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])(

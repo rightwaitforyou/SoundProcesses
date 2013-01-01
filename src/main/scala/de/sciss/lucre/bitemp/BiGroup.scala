@@ -27,7 +27,7 @@ package de.sciss.lucre
 package bitemp
 
 import de.sciss.lucre.{event => evt}
-import evt.{Event, EventLike, Sys}
+import evt.{EventLike, Sys}
 import impl.{BiGroupImpl => Impl}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import expr.{Expr, Type}
@@ -117,6 +117,8 @@ object BiGroup {
       def add(    span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : TimedElem[ S, Elem ]
       def remove( span: Expr[ S, SpanLike ], elem: Elem )( implicit tx: S#Tx ) : Boolean
       def clear()( implicit tx: S#Tx ) : Unit
+
+      override def changed: EventLike[ S, BiGroup.Update[ S, Elem, U ], BiGroup.Modifiable[ S, Elem, U ]]
    }
 
    def serializer[ S <: Sys[ S ], Elem, U ]( eventView: Elem => EventLike[ S, U, Elem ])
