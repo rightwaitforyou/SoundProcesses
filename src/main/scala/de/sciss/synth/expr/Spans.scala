@@ -30,10 +30,8 @@ import evt.Targets
 import expr.Expr
 import bitemp.Span
 
-// typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
-//           8 = string, 9 = spanlike, 10 = span
 object Spans extends BiTypeImpl[ Span ] {
-   private final val typeID = 10
+   final val typeID = 10
 
    /* protected */ def readValue( in: DataInput ) : Span = Span.read( in )
    /* protected */ def writeValue( value: Span, out: DataOutput ) { value.write( out )}

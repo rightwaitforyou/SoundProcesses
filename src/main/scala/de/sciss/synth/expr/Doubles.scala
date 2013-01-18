@@ -29,10 +29,8 @@ package expr
 import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt}
 import annotation.switch
 
-// typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
-//           8 = string, 9 = spanlike
 object Doubles extends BiTypeImpl[ Double ] {
-   private final val typeID = 5
+   final val typeID = 5
 
    /* protected */ def readValue( in: DataInput ) : Double = in.readDouble()
    /* protected */ def writeValue( value: Double, out: DataOutput ) { out.writeDouble( value )}

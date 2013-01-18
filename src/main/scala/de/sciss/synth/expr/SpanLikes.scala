@@ -31,10 +31,8 @@ import expr.Expr
 import bitemp.{Span, SpanLike}
 import annotation.switch
 
-// typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
-//           8 = string, 9 = spanlike, 10 = span
 object SpanLikes extends BiTypeImpl[ SpanLike ] {
-   private final val typeID = 9
+   final val typeID = 9
 
    /* protected */ def readValue( in: DataInput ) : SpanLike = SpanLike.read( in )
    /* protected */ def writeValue( value: SpanLike, out: DataOutput ) { value.write( out )}

@@ -14,7 +14,7 @@ The following dependency is necessary:
 
     resolvers += "Oracle Repository" at "http://download.oracle.com/maven"
     
-    "de.sciss" %% "soundprocesses" % "1.3.+"
+    "de.sciss" %% "soundprocesses" % "1.4.+"
 
 ### REPL example
 

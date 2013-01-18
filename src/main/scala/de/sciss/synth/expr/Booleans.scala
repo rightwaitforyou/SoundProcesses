@@ -29,6 +29,8 @@ import de.sciss.lucre.{DataInput, DataOutput, event => evt}
 import evt.{Sys, Targets}
 
 object Booleans extends BiTypeImpl[ Boolean ] {
+   final val typeID = 6
+
    /* protected */ def readValue( in: DataInput ) : Boolean = in.readBoolean()
    /* protected */ def writeValue( value: Boolean, out: DataOutput ) { out.writeBoolean( value )}
 

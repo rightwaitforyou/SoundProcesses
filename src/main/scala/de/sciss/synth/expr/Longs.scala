@@ -30,10 +30,8 @@ import evt.{Targets, Sys}
 import annotation.switch
 import expr.Expr
 
-// typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,
-//           8 = string, 9 = spanlike
 object Longs extends BiTypeImpl[ Long ] {
-   private final val typeID = 3
+   final val typeID = 3
 
    /* protected */ def readValue( in: DataInput ) : Long = in.readLong()
    /* protected */ def writeValue( value: Long, out: DataOutput ) { out.writeLong( value )}

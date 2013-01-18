@@ -178,6 +178,8 @@ object Grapheme {
    }
 
    object Elem extends BiType[ Value ] {
+      final val typeID = 11
+
       object Curve {
          def apply[ S <: evt.Sys[ S ]]( values: (Expr[ S, Double ], Env.ConstShape)* )( implicit tx: S#Tx ) : Elem[ S ] = {
             val targets = evt.Targets.partial[ S ] // XXX TODO partial?

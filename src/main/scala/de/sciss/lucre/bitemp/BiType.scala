@@ -33,6 +33,8 @@ import expr.Type
  * Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object.
  */
 trait BiType[ A ] extends Type[ A ] {
+   def typeID: Int
+
    implicit object ValueSer extends ImmutableSerializer[ A ] {
       def write( v: A, out: DataOutput ) { writeValue( v, out )}
       def read( in: DataInput ) : A = readValue( in )

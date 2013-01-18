@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.3.1"
+version := "1.4.0-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -20,6 +20,7 @@ libraryDependencies ++= Seq(
    "de.sciss" %% "scalacollider" % "1.3.+",
    "de.sciss" %% "lucreconfluent-event" % "1.6.+",
    "de.sciss" %% "lucreevent-expr" % "1.6.+",
+//   "de.sciss" %% "lucredata-core" % "1.6.+",
    "de.sciss" % "prefuse-core" % "0.21",
    "de.sciss" %% "lucrestm-bdb" % "1.6.+" % "test",
    ("org.scalatest" %% "scalatest" % "1.8" cross CrossVersion.full) % "test"

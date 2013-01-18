@@ -29,7 +29,7 @@ import de.sciss.lucre.{stm, DataInput, DataOutput, event => evt}
 import evt.{Targets, Sys}
 
 object Strings extends BiTypeImpl[ String ] {
-   private final val typeID = 8
+   final val typeID = 8
 
    /* protected */ def readValue( in: DataInput ) : String = in.readString()
    /* protected */ def writeValue( value: String, out: DataOutput ) { out.writeString( value )}
