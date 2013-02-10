@@ -93,7 +93,7 @@ extends ExprImplicits[ S ] {
    access // initialize !
 
    val (trans, artifactStore) = cursor.step { implicit tx =>
-      val g = access.get
+      val g = access()
       val tr = Transport[ S, I ]( g )
       tr.react { upd =>
          println( "Transport observed: " + upd )
@@ -106,7 +106,7 @@ extends ExprImplicits[ S ] {
 //   val groupAccess:     Source[ S#Tx, ProcGroup.Modifiable[ S ]] = Source.map( access )( _._1 )
 //   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
 
-   def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ] = access.get // ._1
+   def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ] = access() // ._1
 //   def trans( implicit tx: S#Tx ) : ProcTransport[ S ]         = access.get._2
 
    def grapheme( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = Grapheme.Modifiable[ S ]
@@ -281,9 +281,9 @@ extends ExprImplicits[ S ] {
       }
    }
 
-   implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )
+//   implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )
 
-   final class RichDouble private[VisTest]( d: Double ) {
+   implicit final class RichDouble private[VisTest]( d: Double ) {
       def sec : Long = (d * 44100).toLong
    }
 }

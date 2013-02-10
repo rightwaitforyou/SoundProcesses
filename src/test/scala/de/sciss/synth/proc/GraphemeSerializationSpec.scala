@@ -20,12 +20,12 @@ class GraphemeSerializationSpec extends ConfluentEventSpec {
       import imp._
 
       system.step { implicit tx =>
-         val g = gH.get
+         val g = gH()
          g.add( 1234L -> Grapheme.Value.Curve( 5678.9 -> stepShape ))
       }
 
       system.step { implicit tx =>
-         val g = gH.get
+         val g = gH()
          assert( g.segment( 0L ) === None )
          assert( g.segment( 2222L ) === Some( Grapheme.Segment.Const( Span.from( 1234L ), IIdxSeq( 5678.9 ))))
       }

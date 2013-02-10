@@ -29,6 +29,7 @@ package proc
 import de.sciss.lucre.{event => evt, DataInput, data}
 import impl.{ScanImpl => Impl}
 import evt.Event
+import language.implicitConversions
 
 object Scan {
    object Link {

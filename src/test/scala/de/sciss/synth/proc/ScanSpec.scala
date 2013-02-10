@@ -27,7 +27,7 @@ class ScanSpec extends ConfluentEventSpec {
       }
 
       system.step { implicit tx =>
-         val p = ph.get
+         val p = ph()
          p.scans.add( "amp" )
          p.scans.add( "freq" )
          p.scans.remove( "amp" )
@@ -68,7 +68,7 @@ class ScanSpec extends ConfluentEventSpec {
          Grapheme.Elem.Curve( amp -> shape )
 
       system.step { implicit tx =>
-         val p = ph.get
+         val p = ph()
          val Some( Grapheme.Modifiable( gr )) = p.graphemes.get( "gr" )
          val Some( scan ) = p.scans.get( "freq" )
 
@@ -110,7 +110,7 @@ class ScanSpec extends ConfluentEventSpec {
          obs.clear()
 
 //lucre.event.showLog = true
-         timeVar.set( 4000L )                               // ...
+         timeVar() = 4000L                               // ...
 //lucre.event.showLog = false
          obs.assertEquals(
             Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq", Scan.SourceUpdate( scan,
@@ -121,7 +121,7 @@ class ScanSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         ampVar.set( 5432.0 )                             // ...
+         ampVar() = 5432.0                              // ...
          obs.assertEquals(
             Proc.Update( p, IIdxSeq( Proc.ScanChange( "freq", Scan.SourceUpdate( scan,
                Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Curve( Span( 2000L, 4000L ), IIdxSeq( (5678.0, 5432.0, linShape) )),

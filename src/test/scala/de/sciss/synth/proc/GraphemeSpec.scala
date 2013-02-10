@@ -38,7 +38,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 
       // adding constants
       system.step { implicit tx =>
-         val g = gH.get
+         val g = gH()
 
          g.add( e1 )
          obs.assertEquals(
@@ -91,7 +91,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 
       // removals
       system.step { implicit tx =>
-         val g = gH.get
+         val g = gH()
 //         println( g.debugList() )
          assert( g.remove( e3 ))  // assert it was found
          obs.assertEmpty() // ... but it was hidden
@@ -127,7 +127,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 
       // ok, now test with non-constant expressions
       system.step { implicit tx =>
-         val g       = gH.get
+         val g       = gH()
          val time1   = Longs.newVar[ S ](      0L)
          val mag1    = Doubles.newVar[ S ]( 1234.5)
          val value1  = Elem.Curve( mag1 -> linShape )
@@ -162,7 +162,7 @@ class GraphemeSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         time1.set( 2000L )
+         time1() = 2000L
          obs.assertEquals(
             Update( g, IIdxSeq(
                Segment.Undefined( Span( 0L, 2000L )),
@@ -172,7 +172,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 //         obs.print()
          obs.clear()
 
-         mag1.set( 666.6 )
+         mag1() = 666.6
          obs.assertEquals(
             Update( g, IIdxSeq (
                Segment.Curve( Span( 2000L, 10000L ), IIdxSeq( (666.6, 6789.0, linShape) )),
@@ -182,7 +182,7 @@ class GraphemeSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         time2.set( 11000L )
+         time2() = 11000L
          obs.assertEquals(
             Update( g, IIdxSeq (
                Segment.Curve( Span( 2000L, 11000L ), IIdxSeq( (666.6, 6789.0, linShape) )),

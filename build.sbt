@@ -4,31 +4,35 @@ version := "1.4.0-SNAPSHOT"
 
 organization := "de.sciss"
 
-homepage := Some( url( "https://github.com/Sciss/SoundProcesses" ))
+homepage <<= name { n => Some(url("https://github.com/Sciss/" + n)) }
 
 description := "A framework for creating and managing ScalaCollider based sound processes"
 
-licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
+licenses := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion := "2.10.0"
+scalaVersion := "2.10.+"
 
-crossScalaVersions := Seq( "2.10.0", "2.9.2" )
+// crossScalaVersions := Seq( "2.10.0", "2.9.2" )
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-libraryDependencies ++= Seq(
-   "de.sciss" %% "scalacollider" % "1.3.+",
-   "de.sciss" %% "lucreconfluent-event" % "1.6.+",
-   "de.sciss" %% "lucreevent-expr" % "1.6.+",
-//   "de.sciss" %% "lucredata-core" % "1.6.+",
-   "de.sciss" % "prefuse-core" % "0.21",
-   "de.sciss" %% "lucrestm-bdb" % "1.6.+" % "test",
-   ("org.scalatest" %% "scalatest" % "1.8" cross CrossVersion.full) % "test"
-)
+libraryDependencies ++= {
+  val lucre = "1.7.+"
+  Seq(
+    "de.sciss" %% "scalacollider" % "1.3.+",
+    "de.sciss" % "prefuse-core" % "0.21",
+    "de.sciss" %% "lucreconfluent"  % lucre,
+    "de.sciss" %% "lucreevent"      % lucre,
+    "de.sciss" %% "lucrestm-bdb"    % lucre % "test",
+    "org.scalatest" %% "scalatest" % "1.9.1" % "test"
+  )
+}
 
 retrieveManaged := true
 
-scalacOptions ++= Seq( "-deprecation", "-unchecked", "-no-specialization" )   // "-Xelide-below", "INFO"
+scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")   // "-Xelide-below", "INFO"
+
+// scalacOptions += "-no-specialization"
 
 testOptions in Test += Tests.Argument("-oF")
 
@@ -69,9 +73,9 @@ buildInfoSettings
 
 sourceGenerators in Compile <+= buildInfo
 
-buildInfoKeys := Seq( name, organization, version, scalaVersion, description,
-   BuildInfoKey.map( homepage ) { case (k, opt) => k -> opt.get },
-   BuildInfoKey.map( licenses ) { case (_, Seq( (lic, _) )) => "license" -> lic }
+buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
+  BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
+  BuildInfoKey.map(licenses) { case (_, Seq((lic, _))) => "license" -> lic }
 )
 
 buildInfoPackage := "de.sciss.synth.proc"
@@ -81,7 +85,7 @@ buildInfoPackage := "de.sciss.synth.proc"
 publishMavenStyle := true
 
 publishTo <<= version { (v: String) =>
-   Some( if( v.endsWith( "-SNAPSHOT" ))
+   Some(if (v endsWith "-SNAPSHOT")
       "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
    else
       "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
@@ -92,10 +96,10 @@ publishArtifact in Test := false
 
 pomIncludeRepository := { _ => false }
 
-pomExtra :=
+pomExtra <<= name { n =>
 <scm>
-  <url>git@github.com:Sciss/SoundProcesses.git</url>
-  <connection>scm:git:git@github.com:Sciss/SoundProcesses.git</connection>
+  <url>git@github.com:Sciss/{n}.git</url>
+  <connection>scm:git:git@github.com:Sciss/{n}.git</connection>
 </scm>
 <developers>
    <developer>
@@ -104,17 +108,14 @@ pomExtra :=
       <url>http://www.sciss.de</url>
    </developer>
 </developers>
+}
 
 // ---- ls.implicit.ly ----
 
-seq( lsSettings :_* )
+seq(lsSettings :_*)
 
-(LsKeys.tags in LsKeys.lsync) := Seq( "sound", "music", "sound-synthesis", "computer-music" )
+(LsKeys.tags in LsKeys.lsync) := Seq("sound", "music", "sound-synthesis", "computer-music")
 
-(LsKeys.ghUser in LsKeys.lsync) := Some( "Sciss" )
+(LsKeys.ghUser in LsKeys.lsync) := Some("Sciss")
 
-(LsKeys.ghRepo in LsKeys.lsync) := Some( "SoundProcesses" )
-
-// bug in ls -- doesn't find the licenses from global scope
-(licenses in LsKeys.lsync) := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
-
+(LsKeys.ghRepo in LsKeys.lsync) <<= name(Some(_))

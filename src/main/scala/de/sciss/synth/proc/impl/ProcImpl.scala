@@ -96,17 +96,17 @@ object ProcImpl {
       protected def scanMap : SkipList.Map[ S, String, ScanEntry[ S ]]
       protected def graphemeMap : SkipList.Map[ S, String, GraphemeEntry[ S ]]
 
-      final def name( implicit tx: S#Tx ) : Expr[ S, String ] = name_#.get
+      final def name( implicit tx: S#Tx ) : Expr[ S, String ] = name_#()
       final def name_=( s: Expr[ S, String ])( implicit tx: S#Tx ) {
-         name_#.set( s )
+         name_#() = s
       }
 
-      final def graph( implicit tx: S#Tx ) : Code[ SynthGraph ] = graphVar.get
+      final def graph( implicit tx: S#Tx ) : Code[ SynthGraph ] = graphVar()
 
       final def graph_=( g: Code[ SynthGraph ])( implicit tx: S#Tx ) {
-         val old = graphVar.get
+         val old = graphVar()
          if( old != g ) {
-            graphVar.set( g )
+            graphVar() = g
             StateEvent( Proc.Update( proc, IIdxSeq( GraphChange( evt.Change( old.value, g.value )))))
          }
       }

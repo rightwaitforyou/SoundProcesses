@@ -27,12 +27,12 @@ class BiPinSerializationSpec extends ConfluentEventSpec {
       val value: Expr[ S, Int ]  = 5678
 
       system.step { implicit tx =>
-         val bip = bipH.get // tx.refresh( acc, bip0 )
+         val bip = bipH() // tx.refresh( acc, bip0 )
          bip.add( key, value )
       }
 
       system.step { implicit tx =>
-         val bip = bipH.get // tx.refresh( acc, bip0 )
+         val bip = bipH() // tx.refresh( acc, bip0 )
          assert( bip.intersect( key.value - 1 ).isEmpty, "BiPin should be empty before the first pin" )
          val res        = bip.intersect( key.value ).toIndexedSeq
          val expected   = IndexedSeq[ BiExpr[ S, Int ]]( key -> value )

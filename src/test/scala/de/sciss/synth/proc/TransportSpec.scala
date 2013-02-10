@@ -38,7 +38,7 @@ class TransportSpec extends ConfluentEventSpec {
       }
 
       system.step { implicit tx =>
-         val pg   = pgH.get
+         val pg   = pgH()
          val p1   = Proc[ S ]
          val g1   = Grapheme.Modifiable[ S ]
          p1.scans.add( "freq" ).source_=( Some( Scan.Link.Grapheme( g1 )))
@@ -123,7 +123,7 @@ class TransportSpec extends ConfluentEventSpec {
       }
 
       system.step { implicit tx =>
-         val pg   = pgH.get
+         val pg   = pgH()
          val p1   = Proc[ S ]
          val g1   = Grapheme.Modifiable[ S ]
 //         p1.scans.add( "freq" ).source_=( Some( Scan.Link.Grapheme( g1 )))

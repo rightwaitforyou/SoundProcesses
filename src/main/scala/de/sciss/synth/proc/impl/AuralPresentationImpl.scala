@@ -70,10 +70,10 @@ object AuralPresentationImpl {
       def stopped()( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          aural.removeClient( this )
-         running.get.foreach { impl =>
+         running().foreach { impl =>
             // XXX TODO dispose
+           running() = None
          }
-         running.set( None )
       }
 
       def group( implicit tx: S#Tx ) : Option[ Group ] = groupRef.get( tx.peer )
@@ -120,7 +120,7 @@ object AuralPresentationImpl {
 //                  log( "other " + other )
          }}
 
-         running.set( Some( booted ))
+         running() = Some(booted)
       }
    }
 
@@ -248,7 +248,7 @@ object AuralPresentationImpl {
                   }
                case Scan.Link.Scan( peer ) =>
                   scanMap.get( peer.id ).foreach { case (sourceKey, idH) =>
-                     val sourceTimedID = idH.get
+                     val sourceTimedID = idH()
                      val bus = getBus( sourceTimedID, sourceKey ).getOrElse( // ... or could just stick with the default control value
                         sys.error( "Bus disappeared " + sourceTimedID + " -> " + sourceKey ))
                      ensureChannels( bus.numChannels )  // ... or could insert a channel coercing synth
@@ -318,7 +318,7 @@ object AuralPresentationImpl {
             case Some( Scan.Link.Scan( peer )) =>
                val sourceOpt  = scanMap.get( peer.id )
                val busOpt     = sourceOpt.flatMap { case (sourceKey, idH) =>
-                  val sourceTimedID = idH.get
+                  val sourceTimedID = idH()
                   getBus( sourceTimedID, sourceKey )
                }
                busOpt match {

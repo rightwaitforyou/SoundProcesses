@@ -5,6 +5,7 @@ import bitemp.{BiExpr, BiType, SpanLike, Span}
 import evt.Sys
 import expr.Expr
 import de.sciss.synth.proc.Grapheme
+import language.implicitConversions
 
 object ExprImplicits {
 //   implicit def stringConst[   S <: stm.Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )

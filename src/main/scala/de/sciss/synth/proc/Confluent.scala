@@ -29,6 +29,7 @@ import de.sciss.lucre.confluent.reactive.ConfluentReactiveLike
 import de.sciss.lucre.stm
 import stm.{DataStore, DataStoreFactory}
 import impl.{ConfluentImpl => Impl}
+import language.implicitConversions
 
 object Confluent {
    private type S = Confluent

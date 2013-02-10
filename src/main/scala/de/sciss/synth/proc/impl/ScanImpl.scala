@@ -135,7 +135,7 @@ object ScanImpl {
          true
       }
 
-      def source( implicit tx: S#Tx ) : Option[ Link[ S ]] = sourceRef.get
+      def source( implicit tx: S#Tx ) : Option[ Link[ S ]] = sourceRef()
 
       def source_=( link: Option[ Link[ S ]])( implicit tx: S#Tx ) {
          if( setSource( link )) {
@@ -147,11 +147,11 @@ object ScanImpl {
       }
 
       private def setSource( link: Option[ Link[ S ]])( implicit tx: S#Tx ) : Boolean = {
-         val old = sourceRef.get
+         val old = sourceRef()
          if( old == link ) return false
 
          val con = targets.nonEmpty
-         sourceRef.set( link )
+         sourceRef() = link
          old match {
             case Some( Link.Scan( peer )) =>
                peer.removeSink( this )

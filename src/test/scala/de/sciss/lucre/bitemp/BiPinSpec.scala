@@ -34,7 +34,7 @@ class BiPinSpec extends ConfluentEventSpec {
       val tup6 = 15000L -> 6
 
       system.step { implicit tx =>
-         val bip = bipH.get
+         val bip = bipH()
          bip.add( tup1 )
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
@@ -87,7 +87,7 @@ class BiPinSpec extends ConfluentEventSpec {
       }
 
       system.step { implicit tx =>
-         val bip = bipH.get
+         val bip = bipH()
 
          bip.remove( tup5 ) // should not be noticable
          assert( bip.valueAt( tup3._1 ) === Some( tup6._2 ))
@@ -169,7 +169,7 @@ class BiPinSpec extends ConfluentEventSpec {
       val tup2 = 20000L -> 2
 
       system.step { implicit tx =>
-         val bip  = bipH.get
+         val bip  = bipH()
          bip.add( tup1 )
          bip.add( tup2 )
          obs.assertEquals(
@@ -180,8 +180,8 @@ class BiPinSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         val time = timeH.get
-         val expr = exprH.get
+         val time = timeH()
+         val expr = exprH()
          bip.add( time )
          bip.add( expr )
 
@@ -195,13 +195,13 @@ class BiPinSpec extends ConfluentEventSpec {
       }
 
       system.step { implicit tx =>
-         val bip  = bipH.get
-         val time = timeH.get
-         val expr = exprH.get
+         val bip  = bipH()
+         val time = timeH()
+         val expr = exprH()
 
          val Expr.Var( exprVar ) = expr.mag
 
-         exprVar.set( 5 )
+         exprVar() = 5
          obs.assertEquals(
 //            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
             BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( expr, Change( 30000L -> 4, 30000L -> 5 ))))
@@ -209,7 +209,7 @@ class BiPinSpec extends ConfluentEventSpec {
          obs.clear()
 
          val Expr.Var( timeVar ) = time.time
-         timeVar.set( 15000L )
+         timeVar() = 15000L
 //         println( "DEBUG " + bip.debugList() )
 //         println( "DEBUG " + bip.valueAt( 10000L ))
          assert( bip.valueAt( 10000L ) === Some( tup1._2 ))
@@ -221,7 +221,7 @@ class BiPinSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         timeVar.set( -5000L )
+         timeVar() = -5000L
          assert( bip.valueAt(    -1L ) === Some( time.magValue ))
          assert( bip.valueAt( 15001L ) === Some( tup1._2 ))
          obs.assertEquals(
@@ -231,14 +231,14 @@ class BiPinSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         timeVar.set( 25000L ) // the region -5000 ... 0 is 'swallowed' (NO: OBSOLETE)
+         timeVar() = 25000L // the region -5000 ... 0 is 'swallowed' (NO: OBSOLETE)
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
             BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( -5000L -> 3, 25000L -> 3 ))))
          )
          obs.clear()
 
-         timeVar.set( 35000L )
+         timeVar() = 35000L
          obs.assertEquals(
 //            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
 //                                            Span.from( 35000L )    -> (3: IntEx) ))
@@ -246,7 +246,7 @@ class BiPinSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         exprVar.set( 6 )
+         exprVar() = 6
          obs.assertEquals(
 //            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
             BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( expr, Change( 30000L -> 5, 30000L -> 6 ))))

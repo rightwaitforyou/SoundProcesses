@@ -327,7 +327,7 @@ object TransportImpl {
        */
       final protected def eventReached( logicalNow: Long, logicalDelay: Long, expectedValid: Int )( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
-         val info = infoVar.get
+         val info = infoVar()
          if( info.valid != expectedValid ) return  // the scheduled task was invalidated by an intermediate stop or seek command
 
          // this is crucial to eliminate drift: since we reached the scheduled event, do not
@@ -603,7 +603,7 @@ object TransportImpl {
       private def biGroupUpdate( groupUpd: BiGroup.Update[ S, Proc[ S ], Proc.Update[ S ]])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          val state = {
-            val info0      = infoVar.get
+            val info0      = infoVar()
             val newFrame   = calcCurrentTime( info0 )
             // actualize logical time and frame, but do _not_ increment valid counter
             // (call `copy1` instead of `copy`; valid counter is incremented only if
@@ -688,7 +688,7 @@ object TransportImpl {
          if( state.infoChanged ) {   // meaning that either nextProcTime or nextGraphemeTime changed
             val infoNew = state.info.incValid
             val isPly   = infoNew.isRunning
-            infoVar.set( infoNew )
+            infoVar()   = infoNew
             if( isPly ) scheduleNext( infoNew )
          }
       }
@@ -696,7 +696,7 @@ object TransportImpl {
       final def dispose()( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
          groupObs.dispose()
-         infoVar.set( Info.init )   // if there is pending scheduled tasks, they should abort gracefully
+         infoVar() = Info.init  // if there is pending scheduled tasks, they should abort gracefully
 //         infoVar.dispose()
          gMap.dispose()
          gPrio.dispose()
@@ -723,7 +723,7 @@ object TransportImpl {
 
       final def time( implicit tx: S#Tx ) : Long = {
          implicit val itx: I#Tx = tx
-         calcCurrentTime( infoVar.get )
+         calcCurrentTime( infoVar() )
       }
 
 //      def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
@@ -731,24 +731,24 @@ object TransportImpl {
 
       final def play()( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
-         val oldInfo = infoVar.get
+         val oldInfo = infoVar()
          if( oldInfo.isRunning ) return
          val newInfo = oldInfo.copy( cpuTime = logicalTime(),
                                      state   = Playing )
-         infoVar.set( newInfo )
+         infoVar() = newInfo
          fire( Transport.Play( impl, newInfo.frame ))
          scheduleNext( newInfo )
       }
 
       final def stop()( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
-         val oldInfo = infoVar.get
+         val oldInfo = infoVar()
          if( !oldInfo.isRunning ) return
 
          val newInfo = oldInfo.copy( cpuTime = logicalTime(),
                                      frame   = calcCurrentTime( oldInfo ),
                                      state   = Stopped )
-         infoVar.set( newInfo )
+         infoVar() = newInfo
          fire( Transport.Stop( impl, newInfo.frame ))
       }
 
@@ -758,7 +758,7 @@ object TransportImpl {
 
       final def isPlaying( implicit tx: S#Tx ) : Boolean = {
          implicit val itx: I#Tx = tx
-         infoVar.get.isRunning
+         infoVar().isRunning
       } // playingVar.value
 
       private def scheduleNext( info: Info )( implicit tx: S#Tx ) {
@@ -775,11 +775,11 @@ object TransportImpl {
          submit( logicalNow = logicalNow, logicalDelay = logicalDelay, schedValid = schedValid )
       }
 
-      final def group( implicit tx: S#Tx ) : ProcGroup[ S ] = groupHandle.get // tx.refresh( csrPos, groupStale )
+      final def group( implicit tx: S#Tx ) : ProcGroup[ S ] = groupHandle() // tx.refresh( csrPos, groupStale )
 
       private def fire( update: Update[ S ])( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
-         val obs = obsVar.get
+         val obs = obsVar()
          obs.foreach( _.fun( tx )( update ))
       }
 
@@ -901,7 +901,7 @@ object TransportImpl {
        */
       private def advance( newFrame: Long, isSeek: Boolean = false, startPlay: Boolean = false )( implicit tx: S#Tx ) {
          implicit val itx: I#Tx = tx
-         val oldInfo          = infoVar.get
+         val oldInfo          = infoVar()
          val oldFrame         = oldInfo.frame
          log( "advance(newFrame = " + newFrame + ", isSeek = " + isSeek + ", startPlay = " + startPlay + "); oldInfo = " + oldInfo )
          // do not short cut and return; because we may want to enforce play and call `scheduleNext`
@@ -1195,7 +1195,7 @@ object TransportImpl {
                                      state            = newState,
                                      nextProcTime     = nextProcTime,
                                      nextGraphemeTime = nextGraphemeTime )
-         infoVar.set( newInfo )
+         infoVar() = newInfo
          log( "advance - newInfo = " + newInfo )
 
          if( procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty ) {
