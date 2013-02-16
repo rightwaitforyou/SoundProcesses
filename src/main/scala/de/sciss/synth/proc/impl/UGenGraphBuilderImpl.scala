@@ -28,7 +28,8 @@ package impl
 
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
-import de.sciss.synth.{UGenGraph, ControlProxyLike, Lazy, SynthGraph}
+import de.sciss.synth.{UGenGraph, Lazy, SynthGraph}
+import de.sciss.synth.ugen.ControlProxyLike
 
 //private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
 

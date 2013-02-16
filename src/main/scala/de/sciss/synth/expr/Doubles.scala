@@ -28,6 +28,7 @@ package expr
 
 import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt}
 import annotation.switch
+import de.sciss.synth
 
 object Doubles extends BiTypeImpl[ Double ] {
    final val typeID = 5
@@ -145,7 +146,7 @@ object Doubles extends BiTypeImpl[ Double ] {
    }
 
    private object UnaryOp {
-      import RichDouble._
+      import synth.{DoubleFun => rd}
 
       sealed abstract class Op( val id: Int ) extends Tuple1Op[ Double ] {
          final def make[ S <: evt.Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
@@ -164,100 +165,100 @@ object Doubles extends BiTypeImpl[ Double ] {
       }
       
       case object Neg extends Op( 0 ) {
-         def value( a: Double ) : Double = rd_neg( a )
+         def value( a: Double ) : Double = rd.neg( a )
          override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
       }
       case object Abs         extends Op(  5 ) {
-         def value( a: Double ) : Double = rd_abs( a )
+         def value( a: Double ) : Double = rd.abs( a )
       }
    // case object ToDouble     extends Op(  6 )
    // case object ToInt       extends Op(  7 )
       case object Ceil        extends Op(  8 ) {
-         def value( a: Double ) : Double = rd_ceil( a )
+         def value( a: Double ) : Double = rd.ceil( a )
       }
       case object Floor       extends Op(  9 ) {
-         def value( a: Double ) : Double = rd_floor( a )
+         def value( a: Double ) : Double = rd.floor( a )
       }
       case object Frac        extends Op( 10 ) {
-         def value( a: Double ) : Double = rd_frac( a )
+         def value( a: Double ) : Double = rd.frac( a )
       }
       case object Signum      extends Op( 11 ) {
-         def value( a: Double ) : Double = rd_signum( a )
+         def value( a: Double ) : Double = rd.signum( a )
       }
       case object Squared     extends Op( 12 ) {
-         def value( a: Double ) : Double = rd_squared( a )
+         def value( a: Double ) : Double = rd.squared( a )
       }
       case object Cubed       extends Op( 13 ) {
-         def value( a: Double ) : Double = rd_cubed( a )
+         def value( a: Double ) : Double = rd.cubed( a )
       }
       case object Sqrt        extends Op( 14 ) {
-         def value( a: Double ) : Double = rd_sqrt( a )
+         def value( a: Double ) : Double = rd.sqrt( a )
       }
       case object Exp         extends Op( 15 ) {
-         def value( a: Double ) : Double = rd_exp( a )
+         def value( a: Double ) : Double = rd.exp( a )
       }
       case object Reciprocal  extends Op( 16 ) {
-         def value( a: Double ) : Double = rd_reciprocal( a )
+         def value( a: Double ) : Double = rd.reciprocal( a )
       }
       case object Midicps     extends Op( 17 ) {
-         def value( a: Double ) : Double = rd_midicps( a )
+         def value( a: Double ) : Double = rd.midicps( a )
       }
       case object Cpsmidi     extends Op( 18 ) {
-         def value( a: Double ) : Double = rd_cpsmidi( a )
+         def value( a: Double ) : Double = rd.cpsmidi( a )
       }
       case object Midiratio   extends Op( 19 ) {
-         def value( a: Double ) : Double = rd_midiratio( a )
+         def value( a: Double ) : Double = rd.midiratio( a )
       }
       case object Ratiomidi   extends Op( 20 ) {
-         def value( a: Double ) : Double = rd_ratiomidi( a )
+         def value( a: Double ) : Double = rd.ratiomidi( a )
       }
       case object Dbamp       extends Op( 21 ) {
-         def value( a: Double ) : Double = rd_dbamp( a )
+         def value( a: Double ) : Double = rd.dbamp( a )
       }
       case object Ampdb       extends Op( 22 ) {
-         def value( a: Double ) : Double = rd_ampdb( a )
+         def value( a: Double ) : Double = rd.ampdb( a )
       }
       case object Octcps      extends Op( 23 ) {
-         def value( a: Double ) : Double = rd_octcps( a )
+         def value( a: Double ) : Double = rd.octcps( a )
       }
       case object Cpsoct      extends Op( 24 ) {
-         def value( a: Double ) : Double = rd_cpsoct( a )
+         def value( a: Double ) : Double = rd.cpsoct( a )
       }
       case object Log         extends Op( 25 ) {
-         def value( a: Double ) : Double = rd_log( a )
+         def value( a: Double ) : Double = rd.log( a )
       }
       case object Log2        extends Op( 26 ) {
-         def value( a: Double ) : Double = rd_log2( a )
+         def value( a: Double ) : Double = rd.log2( a )
       }
       case object Log10       extends Op( 27 ) {
-         def value( a: Double ) : Double = rd_log10( a )
+         def value( a: Double ) : Double = rd.log10( a )
       }
       case object Sin         extends Op( 28 ) {
-         def value( a: Double ) : Double = rd_sin( a )
+         def value( a: Double ) : Double = rd.sin( a )
       }
       case object Cos         extends Op( 29 ) {
-         def value( a: Double ) : Double = rd_cos( a )
+         def value( a: Double ) : Double = rd.cos( a )
       }
       case object Tan         extends Op( 30 ) {
-         def value( a: Double ) : Double = rd_tan( a )
+         def value( a: Double ) : Double = rd.tan( a )
       }
       case object Asin        extends Op( 31 ) {
-         def value( a: Double ) : Double = rd_asin( a )
+         def value( a: Double ) : Double = rd.asin( a )
       }
       case object Acos        extends Op( 32 ) {
-         def value( a: Double ) : Double = rd_acos( a )
+         def value( a: Double ) : Double = rd.acos( a )
       }
       case object Atan        extends Op( 33 ) {
-         def value( a: Double ) : Double = rd_atan( a )
+         def value( a: Double ) : Double = rd.atan( a )
       }
       case object Sinh        extends Op( 34 ) {
-         def value( a: Double ) : Double = rd_sinh( a )
+         def value( a: Double ) : Double = rd.sinh( a )
       }
       case object Cosh        extends Op( 35 ) {
-         def value( a: Double ) : Double = rd_cosh( a )
+         def value( a: Double ) : Double = rd.cosh( a )
       }
       case object Tanh        extends Op( 36 ) {
-         def value( a: Double ) : Double = rd_tanh( a )
+         def value( a: Double ) : Double = rd.tanh( a )
       }
    // class Rand              extends Op( 37 )
    // class Rand2             extends Op( 38 )
@@ -279,7 +280,7 @@ object Doubles extends BiTypeImpl[ Double ] {
    }
 
    private object BinaryOp {
-      import RichDouble._
+      import synth.{DoubleFun => rd}
 
       sealed abstract class Op( val id: Int ) extends Tuple2Op[ Double, Double ] {
          final def make[ S <: evt.Sys[ S ]]( a: Ex[ S ], b: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
@@ -311,27 +312,27 @@ object Doubles extends BiTypeImpl[ Double ] {
 
       case object Plus           extends Op(  0 ) with Infix {
          override val name = "+"
-         def value( a: Double, b: Double ) : Double = rd_+( a, b )
+         def value( a: Double, b: Double ) : Double = rd.+( a, b )
       }
       case object Minus          extends Op(  1 ) with Infix {
          override val name = "-"
-         def value( a: Double, b: Double ) : Double = rd_-( a, b )
+         def value( a: Double, b: Double ) : Double = rd.-( a, b )
       }
       case object Times          extends Op(  2 ) with Infix {
          override val name = "*"
-         def value( a: Double, b: Double ) : Double = rd_*( a, b )
+         def value( a: Double, b: Double ) : Double = rd.*( a, b )
       }
 //      case object IDiv           extends Op(  3 ) {
 //         override val name = "div"
-//         protected def make1( a: Double, b: Double ) : Int = rd_div( a, b )
+//         protected def make1( a: Double, b: Double ) : Int = rd.div( a, b )
 //      }
       case object Div            extends Op(  4 ) with Infix {
          override val name = "/"
-         def value( a: Double, b: Double ) : Double = rd_/( a, b )
+         def value( a: Double, b: Double ) : Double = rd./( a, b )
       }
       case object Mod            extends Op(  5 ) with Infix {
          override val name = "%"
-         def value( a: Double, b: Double ) : Double = rd_%( a, b )
+         def value( a: Double, b: Double ) : Double = rd.%( a, b )
       }
 //      case object Eq             extends Op(  6 )
 //      case object Neq            extends Op(  7 )
@@ -340,10 +341,10 @@ object Doubles extends BiTypeImpl[ Double ] {
 //      case object Leq            extends Op( 10 )
 //      case object Geq            extends Op( 11 )
       case object Min            extends Op( 12 ) {
-         def value( a: Double, b: Double ) : Double = rd_min( a, b )
+         def value( a: Double, b: Double ) : Double = rd.min( a, b )
       }
       case object Max            extends Op( 13 ) {
-         def value( a: Double, b: Double ) : Double = rd_max( a, b )
+         def value( a: Double, b: Double ) : Double = rd.max( a, b )
       }
 //      case object BitAnd         extends Op( 14 )
 //      case object BitOr          extends Op( 15 )
@@ -351,25 +352,25 @@ object Doubles extends BiTypeImpl[ Double ] {
    // case object Lcm            extends Op( 17 )
    // case object Gcd            extends Op( 18 )
       case object Round          extends Op( 19 ) {
-         def value( a: Double, b: Double ) : Double = rd_round( a, b )
+         def value( a: Double, b: Double ) : Double = rd.round( a, b )
       }
       case object Roundup        extends Op( 20 ) {
-         def value( a: Double, b: Double ) : Double = rd_roundup( a, b )
+         def value( a: Double, b: Double ) : Double = rd.roundup( a, b )
       }
       case object Trunc          extends Op( 21 ) {
-         def value( a: Double, b: Double ) : Double = rd_trunc( a, b )
+         def value( a: Double, b: Double ) : Double = rd.trunc( a, b )
       }
       case object Atan2          extends Op( 22 ) {
-         def value( a: Double, b: Double ) : Double = rd_atan2( a, b )
+         def value( a: Double, b: Double ) : Double = rd.atan2( a, b )
       }
       case object Hypot          extends Op( 23 ) {
-         def value( a: Double, b: Double ) : Double = rd_hypot( a, b )
+         def value( a: Double, b: Double ) : Double = rd.hypot( a, b )
       }
       case object Hypotx         extends Op( 24 ) {
-         def value( a: Double, b: Double ) : Double = rd_hypotx( a, b )
+         def value( a: Double, b: Double ) : Double = rd.hypotx( a, b )
       }
       case object Pow            extends Op( 25 ) {
-         def value( a: Double, b: Double ) : Double = rd_pow( a, b )
+         def value( a: Double, b: Double ) : Double = rd.pow( a, b )
       }
    // case object <<             extends Op( 26 )
    // case object >>             extends Op( 27 )
@@ -380,34 +381,34 @@ object Doubles extends BiTypeImpl[ Double ] {
 //      case object Ring3          extends Op( 32 )
 //      case object Ring4          extends Op( 33 )
       case object Difsqr         extends Op( 34 ) {
-         def value( a: Double, b: Double ) : Double = rd_difsqr( a, b )
+         def value( a: Double, b: Double ) : Double = rd.difsqr( a, b )
       }
       case object Sumsqr         extends Op( 35 ) {
-         def value( a: Double, b: Double ) : Double = rd_sumsqr( a, b )
+         def value( a: Double, b: Double ) : Double = rd.sumsqr( a, b )
       }
       case object Sqrsum         extends Op( 36 ) {
-         def value( a: Double, b: Double ) : Double = rd_sqrsum( a, b )
+         def value( a: Double, b: Double ) : Double = rd.sqrsum( a, b )
       }
       case object Sqrdif         extends Op( 37 ) {
-         def value( a: Double, b: Double ) : Double = rd_sqrdif( a, b )
+         def value( a: Double, b: Double ) : Double = rd.sqrdif( a, b )
       }
       case object Absdif         extends Op( 38 ) {
-         def value( a: Double, b: Double ) : Double = rd_absdif( a, b )
+         def value( a: Double, b: Double ) : Double = rd.absdif( a, b )
       }
       case object Thresh         extends Op( 39 ) {
-         def value( a: Double, b: Double ) : Double = rd_thresh( a, b )
+         def value( a: Double, b: Double ) : Double = rd.thresh( a, b )
       }
 //      case object Amclip         extends Op( 40 )
 //      case object Scaleneg       extends Op( 41 )
       case object Clip2          extends Op( 42 ) {
-         def value( a: Double, b: Double ) : Double = rd_clip2( a, b )
+         def value( a: Double, b: Double ) : Double = rd.clip2( a, b )
       }
 //      case object Excess         extends Op( 43 )
       case object Fold2          extends Op( 44 ) {
-         def value( a: Double, b: Double ) : Double = rd_fold2( a, b )
+         def value( a: Double, b: Double ) : Double = rd.fold2( a, b )
       }
       case object Wrap2          extends Op( 45 ) {
-         def value( a: Double, b: Double ) : Double = rd_wrap2( a, b )
+         def value( a: Double, b: Double ) : Double = rd.wrap2( a, b )
       }
 //      case object Firstarg       extends Op( 46 )
    }
@@ -515,9 +516,9 @@ object Doubles extends BiTypeImpl[ Double ] {
    // def firstarg( b: Double ) : Double  = d
 
 //      def linlin( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
-//         rd_linlin( d, srcLo, srcHi, dstLo, dstHi )
+//         rd.linlin( d, srcLo, srcHi, dstLo, dstHi )
 //
 //      def linexp( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
-//         rd_linexp( d, srcLo, srcHi, dstLo, dstHi )
+//         rd.linexp( d, srcLo, srcHi, dstLo, dstHi )
    }
 }

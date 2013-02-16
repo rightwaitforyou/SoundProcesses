@@ -40,9 +40,9 @@ object scan {
    private[proc] def outControlName( key: String ) : String = "$out_" + key
    private[proc] def inControlName(  key: String ) : String = "$in_" + key
 
-   @SerialVersionUID(7931562747075213666L) private final case class In( key: String, default: Double )
+   @SerialVersionUID(7931562747075213666L) private final case class ScanIn( key: String, default: Double )
    extends GE.Lazy /* with Elem */ with AudioRated {
-      def displayName = "scan.In"
+      def displayName = "ScanIn"
 
       override def toString = displayName + "(\"" + key + "\")"
 
@@ -77,11 +77,11 @@ object scan {
 //      protected def makeUGens {}
 //   }
 
-   private final case class Out( key: String, in: GE )
-   extends UGenSource.ZeroOut( "Out" ) /* Lazy.Expander[ Unit ] */ /* with Elem */ with WritesBus {
+   private final case class ScanOut( key: String, in: GE )
+   extends UGenSource.ZeroOut /* Lazy.Expander[ Unit ] */ /* with Elem */ with WritesBus {
 //      def displayName = "scan.Out"
 
-      override def toString = "scan.Out(\"" + key + "\")"
+      override def toString = "ScanOut(\"" + key + "\")"
 
 //      protected def makeUGens {
 //         val bus  = ("$out_" + key).kr
@@ -118,7 +118,7 @@ final case class scan( key: String ) {
 //      ProcGraph.builder.addScan( key, direction )
 //   }
 
-   def ar( default: Double ) : GE = scan.In( key, default )
+   def ar( default: Double ) : GE = scan.ScanIn( key, default )
 
 //   def ar( default: Double ) : GE = {
 //      val ctl = ("$in_" + key).ar( default )
@@ -127,7 +127,7 @@ final case class scan( key: String ) {
 //   }
 
    def :=( in: GE ) {
-      scan.Out( key, in )
+      scan.ScanOut( key, in )
    }
 
 //   def :=( in: GE ) {

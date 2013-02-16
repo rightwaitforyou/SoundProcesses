@@ -81,7 +81,7 @@ object AuralSystemImpl {
       }
 
       private def doStart( config: SServer.Config, connect: Boolean ) {
-         val launch: Model.Listener => ServerConnection = if( connect ) {
+         val launch: ServerConnection.Listener => ServerConnection = if( connect ) {
             SServer.connect( "SoundProcesses", config ) _
          } else {
             SServer.boot( "SoundProcesses", config ) _

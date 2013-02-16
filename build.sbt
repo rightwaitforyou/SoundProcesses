@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.4.0-SNAPSHOT"
+version := "1.4.0"
 
 organization := "de.sciss"
 
@@ -10,7 +10,7 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion := "2.10.+"
+scalaVersion := "2.10.0"
 
 // crossScalaVersions := Seq( "2.10.0", "2.9.2" )
 
@@ -19,7 +19,7 @@ resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/mav
 libraryDependencies ++= {
   val lucre = "1.7.+"
   Seq(
-    "de.sciss" %% "scalacollider" % "1.3.+",
+    "de.sciss" %% "scalacollider" % "1.4.+",
     "de.sciss" % "prefuse-core" % "0.21",
     "de.sciss" %% "lucreconfluent"  % lucre,
     "de.sciss" %% "lucreevent"      % lucre,
@@ -32,7 +32,7 @@ retrieveManaged := true
 
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")   // "-Xelide-below", "INFO"
 
-// scalacOptions += "-no-specialization"
+scalacOptions += "-no-specialization"
 
 testOptions in Test += Tests.Argument("-oF")
 
