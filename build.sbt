@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.4.0"
+version := "1.5.0-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -19,7 +19,7 @@ resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/mav
 libraryDependencies ++= {
   val lucre = "1.7.+"
   Seq(
-    "de.sciss" %% "scalacollider" % "1.4.+",
+    "de.sciss" %% "scalacollider" % "1.5.+",
     "de.sciss" % "prefuse-core" % "0.21",
     "de.sciss" %% "lucreconfluent"  % lucre,
     "de.sciss" %% "lucreevent"      % lucre,

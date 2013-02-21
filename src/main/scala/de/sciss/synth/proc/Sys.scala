@@ -1,9 +1,7 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{stm, confluent, event => evt}
-import confluent.reactive.ConfluentReactiveLike
-import de.sciss.synth.{osc => sosc, proc}
-import de.sciss.osc
+import de.sciss.lucre.{event => evt}
+import de.sciss.synth.proc
 
 object Sys {
    trait Txn[ S <: Sys[ S ]] extends evt.Txn[ S ] with proc.Txn

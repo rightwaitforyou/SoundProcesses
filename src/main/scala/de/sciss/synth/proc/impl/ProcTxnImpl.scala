@@ -28,18 +28,18 @@ package impl
 
 import de.sciss.osc
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.synth.{osc => sosc}
 import concurrent.stm.{InTxn, Txn => ScalaTxn}
+import de.sciss.synth.message
 
 private[proc] object ProcTxnImpl {
 //   private val errOffMsg   = osc.Message( "/error", -1 )
 //   private val errOnMsg    = osc.Message( "/error", -2 )
 
-   var timeoutFun : () => Unit = () => ()
+  var timeoutFun: () => Unit = () => ()
 
-   private final val noBundles = Txn.Bundles( 0, IIdxSeq.empty )
+  private final val noBundles = Txn.Bundles(0, Vector.empty)
 
-//   var TIMEOUT_MILLIS = 10000L
+  //   var TIMEOUT_MILLIS = 10000L
 }
 private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
    tx =>
@@ -57,7 +57,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
 
    protected def markBundlesDirty() : Unit
 
-   final def addMessage( resource: Resource, message: osc.Message with sosc.Send, audible: Boolean, dependencies: Seq[ Resource ],
+   final def addMessage( resource: Resource, m: osc.Message with message.Send, audible: Boolean, dependencies: Seq[ Resource ],
                    noErrors: Boolean ) {
 
 //      val rsrc = system.resources
@@ -84,14 +84,14 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
       }
 
 //      val dAsync     = (dTsMax & 1) == 1
-      val msgAsync   = !message.isSynchronous
+      val msgAsync   = !m.isSynchronous
 
       // if the message is asynchronous, it suffices to ensure that the time stamp's async bit is set.
       // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
       // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
       val rsrcStampNew  = if( msgAsync ) depStampMax | 1 else (depStampMax + 1) & ~1
 
-      logTxn( "addMessage(" + resource + ", " + message + ") -> stamp = " + rsrcStampNew )
+      logTxn( "addMessage(" + resource + ", " + m + ") -> stamp = " + rsrcStampNew )
       if( rsrcStampNew != rsrcStampOld ) resource.timeStamp_=( rsrcStampNew )( tx )
 
       val bNew       = if( bOld.payload.isEmpty ) {
@@ -101,7 +101,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
          val txnStartCntNew = rsrcStampNew >> 1
          assert( txnStartCntNew == txnStartCnt )
          txnCnt += 1
-         Txn.Bundles( txnStartCntNew, IIdxSeq( IIdxSeq( message )))
+         Txn.Bundles( txnStartCntNew, Vector(Vector(m)))
 
       } else {
          val cntOld  = bOld.firstCnt
@@ -114,7 +114,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
 //
 //         } else
          if( rsrcCnt == cntOld + szOld ) {      // append to back
-            val payNew  = payOld :+ IIdxSeq( message )
+            val payNew  = payOld :+ Vector(m)
             txnCnt += 1
             bOld.copy( payload = payNew )
 
@@ -123,7 +123,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
             // through an out of bounds exception if the assertion wouldn't hold
 //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
             val payIdx = rsrcCnt - cntOld
-            val payNew = payOld.updated( payIdx, payOld( payIdx ) :+ message )
+            val payNew = payOld.updated( payIdx, payOld( payIdx ) :+ m )
             bOld.copy( payload = payNew )
          }
       }
@@ -152,18 +152,18 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
 //      })
 }
 
-private[proc] trait ProcTxnFullImpl[ S <: Sys[ S ]] extends ProcTxnImpl with Sys.Txn[ S ] {
-   final protected def markBundlesDirty() {
-      logTxn( "registering after commit handler" )
-      afterCommit( flush() )
-   }
+private[proc] trait ProcTxnFullImpl[S <: Sys[S]] extends ProcTxnImpl with Sys.Txn[S] {
+  final protected def markBundlesDirty() {
+    logTxn("registering after commit handler")
+    afterCommit(flush())
+  }
 }
 
-private[proc] final class ProcTxnPlainImpl( val peer: InTxn ) extends ProcTxnImpl {
-   override def toString = "proc.Txn<plain>@" + hashCode().toHexString
+private[proc] final class ProcTxnPlainImpl(val peer: InTxn) extends ProcTxnImpl {
+  override def toString = "proc.Txn<plain>@" + hashCode().toHexString
 
-   protected def markBundlesDirty() {
-      logTxn( "registering after commit handler" )
-      ScalaTxn.afterCommit( _ => flush() )( peer )
-   }
+  protected def markBundlesDirty() {
+    logTxn("registering after commit handler")
+    ScalaTxn.afterCommit(_ => flush())(peer)
+  }
 }

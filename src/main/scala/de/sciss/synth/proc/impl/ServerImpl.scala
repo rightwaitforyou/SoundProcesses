@@ -26,7 +26,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.synth.{AllocatorExhaustedException, Server => SServer}
+import de.sciss.synth.{AllocatorExhausted, Server => SServer}
 
 object ServerImpl {
    def apply( peer: SServer ) : Server = new Impl( peer )
@@ -42,12 +42,12 @@ object ServerImpl {
 
       def allocControlBus( numChannels: Int )( implicit tx: Txn ) : Int = {
          val res = controlBusAllocator.alloc( numChannels )( tx.peer )
-         if( res < 0 ) throw new AllocatorExhaustedException( "Control buses exhausted for " + this )
+         if( res < 0 ) throw AllocatorExhausted( "Control buses exhausted for " + this )
          res
       }
       def allocAudioBus( numChannels: Int )( implicit tx: Txn ) : Int = {
          val res = audioBusAllocator.alloc( numChannels )( tx.peer )
-         if( res < 0 ) throw new AllocatorExhaustedException( "Audio buses exhausted for " + this )
+         if( res < 0 ) throw AllocatorExhausted( "Audio buses exhausted for " + this )
          res
       }
 
@@ -61,7 +61,7 @@ object ServerImpl {
 
       def allocBuffer( numConsecutive: Int )( implicit tx: Txn ) : Int = {
          val res = bufferAllocator.alloc( numConsecutive )( tx.peer )
-         if( res < 0 ) throw new AllocatorExhaustedException( "Buffers exhausted for " + this )
+         if( res < 0 ) throw AllocatorExhausted( "Buffers exhausted for " + this )
          res
       }
 

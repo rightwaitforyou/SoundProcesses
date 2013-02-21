@@ -27,10 +27,9 @@ package de.sciss.synth.proc
 
 import impl.AuralProc
 import concurrent.stm.{Ref, TMap, InTxn, TSet}
-import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef}
-import de.sciss.osc
+import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef, message}
+import de.sciss.{synth, osc}
 import collection.immutable.{IndexedSeq => IIdxSeq, IntMap}
-import de.sciss.synth.{osc => sosc}
 
 object ProcWorld {
 // MMM
@@ -41,7 +40,7 @@ object ProcWorld {
    var DEBUG = false
 }
 
-final class ProcWorld( server: Server ) {
+final class ProcWorld(val server: Server) {
    import ProcWorld._
 
 // EEE
@@ -132,7 +131,7 @@ if( DEBUG ) println( "ADVANCE " + cnt )
          }
       }
 
-      def sendNow( msgs: IIdxSeq[ osc.Message with sosc.Send ], allSync: Boolean, cnt: Int ) {
+      def sendNow( msgs: IIdxSeq[ osc.Message with message.Send ], allSync: Boolean, cnt: Int ) {
          val peer       = server.peer
 if( DEBUG ) println( "SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt )
          if( allSync ) {
@@ -147,13 +146,13 @@ if( DEBUG ) println( "SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " 
             val syncMsg    = peer.syncMsg()
             val syncID     = syncMsg.id
             val bndl       = osc.Bundle.now( (msgs :+ syncMsg): _* )
-            peer !? (TIMEOUT_MILLIS, bndl, {
-               case sosc.SyncedMessage( `syncID` ) =>
-                  advance( cnt )
-               case sosc.TIMEOUT =>
+            peer.!? (bndl, TIMEOUT_MILLIS) {
+               case message.Synced(`syncID` ) =>
+                 advance(cnt)
+               case message.TIMEOUT =>
                   logTxn( "TIMEOUT while sending OSC bundle!" )
-                  advance( cnt )
-            })
+                  advance(cnt)
+            }
          }
       }
 
@@ -345,7 +344,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
    }
 
    private[proc] def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
-      getSynthDef( server, graph.expand, nameHint )
+      getSynthDef( server, graph.expand(synth.impl.DefaultUGenGraphBuilderFactory), nameHint )
    }
 
    private[proc] def getSynthDef( server: Server, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
