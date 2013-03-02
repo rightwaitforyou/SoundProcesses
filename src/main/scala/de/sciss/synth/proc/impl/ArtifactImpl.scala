@@ -29,8 +29,7 @@ package proc
 package impl
 
 import java.io.File
-import lucre.{DataOutput, stm, DataInput}
-import stm.ImmutableSerializer
+import lucre.io.{DataOutput, ImmutableSerializer, DataInput}
 
 object ArtifactImpl {
    private final val SER_VERSION = 1
@@ -39,7 +38,7 @@ object ArtifactImpl {
    def read( in: DataInput ) : Artifact = {
       val cookie = in.readUnsignedByte()
       require( cookie == SER_VERSION, "Version mismatch. Expected " + SER_VERSION + " but found " + cookie )
-      val path = in.readString()
+      val path = in.readUTF()
       ArtifactImpl( path )
    }
 
@@ -57,8 +56,8 @@ object ArtifactImpl {
       }
 
       def write( out: DataOutput ) {
-         out.writeUnsignedByte( SER_VERSION )
-         out.writeString( path )
+         out.writeByte( SER_VERSION )
+         out.writeUTF( path )
       }
    }
 }

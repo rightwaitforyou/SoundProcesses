@@ -25,11 +25,12 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt, expr, bitemp}
+import de.sciss.lucre.{io, stm, event => evt, expr, bitemp}
 import evt.{Targets, Sys}
 import expr.Expr
-import bitemp.{Span, SpanLike}
 import annotation.switch
+import io.{DataOutput, DataInput}
+import de.sciss.span.{Span, SpanLike}
 
 object SpanLikes extends BiTypeImpl[ SpanLike ] {
    final val typeID = 9

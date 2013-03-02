@@ -26,10 +26,11 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, expr, DataInput}
+import de.sciss.lucre.{event => evt, expr, io}
 import expr.Expr
 import impl.{ProcImpl => Impl}
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import io.DataInput
 
 object Proc {
    // ---- implementation forwards ----

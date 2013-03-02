@@ -25,32 +25,32 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{stm, DataOutput, DataInput, event => evt}
-import stm.Serializer
+import de.sciss.lucre.{io, event => evt}
 import annotation.switch
+import io.{DataInput, DataOutput}
 import language.implicitConversions
 
 object Code {
-   implicit def serializer[ S <: evt.Sys[ S ], A ]( implicit peerSer: Serializer[ S#Tx, S#Acc, A ]) : Serializer[ S#Tx, S#Acc, Code[ A ]] =
+   implicit def serializer[ S <: evt.Sys[ S ], A ]( implicit peerSer: io.Serializer[ S#Tx, S#Acc, A ]) : io.Serializer[ S#Tx, S#Acc, Code[ A ]] =
       new Ser[ S, A ]( peerSer )
 
    implicit def withoutSource[ A ]( value: A ) : Code[ A ] = Code( value, None )
 
-   private final class Ser[ S <: evt.Sys[ S ], A ]( peerSer: Serializer[ S#Tx, S#Acc, A ])
-   extends Serializer[ S#Tx, S#Acc, Code[ A ]] {
+   private final class Ser[ S <: evt.Sys[ S ], A ]( peerSer: io.Serializer[ S#Tx, S#Acc, A ])
+   extends io.Serializer[ S#Tx, S#Acc, Code[ A ]] {
       def write( code: Code[ A ], out: DataOutput ) {
 //         code.write( out )
          peerSer.write( code.value, out )
          code.source match {
-            case Some( text ) => out.writeUnsignedByte( 1 ); out.writeString( text )
-            case _            => out.writeUnsignedByte( 0 )
+            case Some( text ) => out.writeByte( 1 ); out.writeUTF( text )
+            case _            => out.writeByte( 0 )
          }
       }
 
       def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Code[ A ] = {
          val value   = peerSer.read( in, access )
          val source  = (in.readUnsignedByte(): @switch) match {
-            case 1 => Some( in.readString() )
+            case 1 => Some( in.readUTF() )
             case 0 => None
          }
          Code( value, source )

@@ -4,8 +4,8 @@ package proc
 import de.sciss.lucre.stm
 import stm.store.BerkeleyDB
 import ugen._
-import de.sciss.lucre.bitemp.Span
 import expr.ExprImplicits
+import de.sciss.span.Span
 
 object PatchTest extends App {
 

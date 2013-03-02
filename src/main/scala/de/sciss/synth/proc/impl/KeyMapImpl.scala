@@ -27,15 +27,16 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data}
+import de.sciss.lucre.{event => evt, io, stm, data}
 import data.SkipList
 import evt.{EventLike, impl => evti, Sys}
+import io.{DataOutput, DataInput}
 
 object KeyMapImpl {
    trait ValueInfo[ S <: Sys[ S ], Key, Value, ValueUpd ] {
       def valueEvent( value: Value ) : EventLike[ S, ValueUpd, Value ]
-      def keySerializer : stm.Serializer[ S#Tx, S#Acc, Key ]
-      def valueSerializer : stm.Serializer[ S#Tx, S#Acc, Value ]
+      def keySerializer : io.Serializer[ S#Tx, S#Acc, Key ]
+      def valueSerializer : io.Serializer[ S#Tx, S#Acc, Value ]
    }
 
    implicit def entrySerializer[ S <: Sys[ S ], Key, Value, ValueUpd ]( implicit info: ValueInfo[ S, Key, Value, ValueUpd ])

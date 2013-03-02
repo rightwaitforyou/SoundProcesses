@@ -25,14 +25,15 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{stm, DataInput, DataOutput, event => evt}
+import de.sciss.lucre.{io, stm, event => evt}
 import evt.{Targets, Sys}
+import io.{DataOutput, DataInput}
 
 object Strings extends BiTypeImpl[ String ] {
    final val typeID = 8
 
-   /* protected */ def readValue( in: DataInput ) : String = in.readString()
-   /* protected */ def writeValue( value: String, out: DataOutput ) { out.writeString( value )}
+   /* protected */ def readValue( in: DataInput ) : String = in.readUTF()
+   /* protected */ def writeValue( value: String, out: DataOutput ) { out.writeUTF( value )}
 
    final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
       private type E = Ex[ S ]

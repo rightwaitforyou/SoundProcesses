@@ -26,9 +26,10 @@
 package de.sciss.synth
 package expr
 
-import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt}
+import de.sciss.lucre.{io, stm, event => evt}
 import annotation.switch
 import de.sciss.synth
+import io.{DataOutput, DataInput}
 
 object Doubles extends BiTypeImpl[ Double ] {
    final val typeID = 5

@@ -25,12 +25,13 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{stm, bitemp, expr, event => evt, DataInput}
-import bitemp.{SpanLike, BiGroup}
+import de.sciss.lucre.{bitemp, expr, event => evt, io}
+import bitemp.BiGroup
 import expr.Type
-import stm.Serializer
 import de.sciss.synth.expr.SpanLikes
 import evt.EventLike
+import io.DataInput
+import de.sciss.span.SpanLike
 
 // scalac 2.9.2 crashes if we name this ProcGroup$ :-(
 object ProcGroup_ {
@@ -43,7 +44,7 @@ object ProcGroup_ {
    private def eventView[ S <: evt.Sys[ S ]]( proc: Proc[ S ]) : EventLike[ S, Proc.Update[ S ], Proc[ S ]] = proc.changed
 
    object Modifiable {
-      def serializer[ S <: evt.Sys[ S ]] : Serializer[ S#Tx, S#Acc, ProcGroup_.Modifiable[ S ]] = {
+      def serializer[ S <: evt.Sys[ S ]] : io.Serializer[ S#Tx, S#Acc, ProcGroup_.Modifiable[ S ]] = {
          BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
       }
 
@@ -57,7 +58,7 @@ object ProcGroup_ {
    def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ProcGroup[ S ] =
       BiGroup.Modifiable.read[ S, Proc[ S ], Proc.Update[ S ]]( in, access, eventView )
 
-   implicit def serializer[ S <: evt.Sys[ S ]] : Serializer[ S#Tx, S#Acc, ProcGroup[ S ]] = {
+   implicit def serializer[ S <: evt.Sys[ S ]] : io.Serializer[ S#Tx, S#Acc, ProcGroup[ S ]] = {
       BiGroup.serializer[ S, Proc[ S ], Proc.Update[ S ]]( eventView )
    }
 }

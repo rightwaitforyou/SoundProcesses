@@ -27,10 +27,11 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{DataOutput, DataInput, stm, bitemp, data, event => evt}
+import de.sciss.lucre.{io, stm, bitemp, data, event => evt}
+import io.{DataOutput, DataInput}
 import stm.{Disposable, IdentifierMap, Cursor}
 import evt.Sys
-import bitemp.{BiGroup, SpanLike, Span}
+import bitemp.BiGroup
 import data.SkipList
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -38,6 +39,7 @@ import concurrent.stm.{Ref, Txn, TxnLocal}
 import java.util.concurrent.TimeUnit
 import java.text.SimpleDateFormat
 import proc.{logTransport => log}
+import de.sciss.span.{Span, SpanLike}
 
 object TransportImpl {
    import Grapheme.Segment
@@ -169,10 +171,10 @@ object TransportImpl {
 
    private val emptySeq = IIdxSeq.empty[ Nothing ]
 
-   private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
-      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
+   private def dummySerializer[ A, I <: stm.Sys[ I ]] : io.Serializer[ I#Tx, I#Acc, A ] =
+      DummySerializer.asInstanceOf[ io.Serializer[ I#Tx, I#Acc, A ]]
 
-   private object DummySerializer extends stm.Serializer[ stm.InMemory#Tx, stm.InMemory#Acc, Nothing ] {
+   private object DummySerializer extends io.Serializer[ stm.InMemory#Tx, stm.InMemory#Acc, Nothing ] {
       def write( v: Nothing, out: DataOutput) {}
       def read( in: DataInput, access: stm.InMemory#Acc )( implicit tx: stm.InMemory#Tx ) : Nothing = sys.error( "Operation not supported" )
    }

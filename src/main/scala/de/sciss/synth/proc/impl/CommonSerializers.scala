@@ -27,11 +27,10 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{DataOutput, DataInput, stm}
-import stm.ImmutableSerializer
 import io.{SampleFormat, AudioFileType, AudioFileSpec => AFS }
 import java.nio.ByteOrder
 import annotation.switch
+import de.sciss.lucre.io.{DataInput, DataOutput, ImmutableSerializer}
 
 object CommonSerializers {
    implicit object AudioFileSpec extends ImmutableSerializer[ AFS ] {
@@ -44,7 +43,7 @@ object CommonSerializers {
             case AudioFileType.NeXT    => 4
             case other                 => sys.error( "Unexpected audio file type " + other )
          }
-         out.writeUnsignedByte( fid )
+         out.writeByte( fid )
          val sid = spec.sampleFormat match {
             case SampleFormat.Int16    => 0
             case SampleFormat.Int24    => 1
@@ -55,7 +54,7 @@ object CommonSerializers {
             case SampleFormat.Int8     => 6
             case other                 => sys.error( "Unexpected sample format " + other )
          }
-         out.writeUnsignedByte( sid )
+         out.writeByte( sid )
          out.writeInt( spec.numChannels )
          out.writeDouble( spec.sampleRate )
          val bid = spec.byteOrder match {
@@ -64,12 +63,12 @@ object CommonSerializers {
             case Some( ByteOrder.BIG_ENDIAN )      => 2
             case other                             => sys.error( "Unexpected byte order " + other )
          }
-         out.writeUnsignedByte( bid )
+         out.writeByte( bid )
          out.writeLong( spec.numFrames )
       }
 
       def read( in: DataInput ) : AFS = {
-         val fileType = (in.readUnsignedByte(): @switch) match {
+         val fileType = (in.readByte(): @switch) match {
             case 0   => AudioFileType.AIFF
             case 1   => AudioFileType.Wave
 //            case 2   => AudioFileType.Wave64
@@ -77,7 +76,7 @@ object CommonSerializers {
             case 4   => AudioFileType.NeXT
             case other => sys.error( "Unexpected audio file type ID " + other )
          }
-         val sampleFormat = (in.readUnsignedByte(): @switch) match {
+         val sampleFormat = (in.readByte(): @switch) match {
             case 0   => SampleFormat.Int16
             case 1   => SampleFormat.Int24
             case 2   => SampleFormat.Float
@@ -89,7 +88,7 @@ object CommonSerializers {
          }
          val numChannels   = in.readInt()
          val sampleRate    = in.readDouble()
-         val byteOrder     = (in.readUnsignedByte(): @switch) match {
+         val byteOrder     = (in.readByte(): @switch) match {
             case 0   => None
             case 1   => Some( ByteOrder.LITTLE_ENDIAN )
             case 2   => Some( ByteOrder.BIG_ENDIAN )

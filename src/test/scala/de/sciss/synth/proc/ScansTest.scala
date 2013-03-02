@@ -3,10 +3,10 @@ package proc
 
 import de.sciss.lucre.{event => evt, bitemp, stm}
 import expr.ExprImplicits
-import bitemp.Span
 import stm.store.BerkeleyDB
 import java.io.File
 import de.sciss.lucre.confluent.reactive.ConfluentReactive
+import de.sciss.span.Span
 
 object ScansTest extends App {
    val AURAL = false

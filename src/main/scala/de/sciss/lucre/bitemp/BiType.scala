@@ -26,8 +26,9 @@
 package de.sciss.lucre
 package bitemp
 
-import stm.ImmutableSerializer
 import expr.Type
+import io.{DataInput, DataOutput, ImmutableSerializer}
+import de.sciss.span.SpanLike
 
 /**
  * Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object.

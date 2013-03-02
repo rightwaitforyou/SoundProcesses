@@ -27,11 +27,12 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.{bitemp, stm, data, event => evt}
-import bitemp.{SpanLike, BiGroup, Chronos}
+import bitemp.{BiGroup, Chronos}
 import stm.{Disposable, Cursor}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import data.Iterator
 import impl.{TransportImpl => Impl}
+import de.sciss.span.SpanLike
 
 object Transport {
    def apply[ S <: evt.Sys[ S ], I <: stm.Sys[ I ]]( group: ProcGroup[ S ], sampleRate: Double = 44100 )

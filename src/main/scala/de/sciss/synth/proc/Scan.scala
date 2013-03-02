@@ -26,9 +26,10 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, DataInput, data}
+import de.sciss.lucre.{event => evt, io, data}
 import impl.{ScanImpl => Impl}
 import evt.Event
+import io.DataInput
 import language.implicitConversions
 
 object Scan {

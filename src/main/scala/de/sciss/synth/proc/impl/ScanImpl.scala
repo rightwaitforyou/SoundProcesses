@@ -27,7 +27,8 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, DataInput, DataOutput, stm, data, expr}
+import de.sciss.lucre.{event => evt, io, stm, data, expr}
+import io.{DataOutput, DataInput}
 import stm.IdentifierMap
 import evt.{impl => evti, Event, Sys}
 import annotation.switch
@@ -69,19 +70,19 @@ object ScanImpl {
       }
    }
 
-   implicit def linkSerializer[ S <: Sys[ S ]] : stm.Serializer[ S#Tx, S#Acc, Link[ S ]] =
-      anyLinkSer.asInstanceOf[ stm.Serializer[ S#Tx, S#Acc, Link[ S ]]]
+   implicit def linkSerializer[ S <: Sys[ S ]] : io.Serializer[ S#Tx, S#Acc, Link[ S ]] =
+      anyLinkSer.asInstanceOf[ io.Serializer[ S#Tx, S#Acc, Link[ S ]]]
 
-   private val anyLinkSer : stm.Serializer[ I#Tx, I#Acc, Link[ I ]] = new LinkSer[ I ]
+   private val anyLinkSer : io.Serializer[ I#Tx, I#Acc, Link[ I ]] = new LinkSer[ I ]
 
-   private final class LinkSer[ S <: Sys[ S ]] extends stm.Serializer[ S#Tx, S#Acc, Link[ S ]] {
+   private final class LinkSer[ S <: Sys[ S ]] extends io.Serializer[ S#Tx, S#Acc, Link[ S ]] {
       def write( link: Link[ S ], out: DataOutput) {
          link match {
             case Link.Grapheme( peer ) =>
-               out.writeUnsignedByte( 0 )
+               out.writeByte( 0 )
                peer.write( out )
             case Link.Scan( peer ) =>
-               out.writeUnsignedByte( 1 )
+               out.writeByte( 1 )
                peer.write( out )
          }
       }

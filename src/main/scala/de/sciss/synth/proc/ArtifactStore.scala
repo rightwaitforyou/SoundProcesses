@@ -25,47 +25,49 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt, DataInput, Writable, stm, data}
+import de.sciss.lucre.{event => evt, io, stm, data}
+import io.{Writable, DataInput}
 import java.io.File
 import impl.{ArtifactStoreImpl => Impl}
 
 object ArtifactStore {
-   def tmp[ S <: evt.Sys[ S ]]()( implicit tx: S#Tx ) : ArtifactStore[ S ] = {
-      val dir = File.createTempFile( "artifacts", "tmp" )
-      dir.delete()
-      dir.mkdir()
-      dir.deleteOnExit()
-      apply( dir )
-   }
+  def tmp[S <: evt.Sys[S]]()(implicit tx: S#Tx): ArtifactStore[S] = {
+    val dir = File.createTempFile("artifacts", "tmp")
+    dir.delete()
+    dir.mkdir()
+    dir.deleteOnExit()
+    apply(dir)
+  }
 
-   def apply[ S <: evt.Sys[ S ]]( baseDirectory: File )( implicit tx: S#Tx ) : ArtifactStore[ S ] = Impl[ S ]( baseDirectory )
+  def apply[S <: evt.Sys[S]](baseDirectory: File)(implicit tx: S#Tx): ArtifactStore[S] = Impl[S](baseDirectory)
 
-   def serializer[ S <: evt.Sys[ S ]] : stm.Serializer[ S#Tx, S#Acc, ArtifactStore[ S ]] = Impl.serializer[ S ]
+  def serializer[S <: evt.Sys[S]]: io.Serializer[S#Tx, S#Acc, ArtifactStore[S]] = Impl.serializer[S]
 
-   def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : ArtifactStore[ S ] = Impl.read[ S ]( in, access )
+  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] = Impl.read[S](in, access)
 }
-trait ArtifactStore[ S <: stm.Sys[ S ]] extends Writable {
-   /**
-    * Creates a new artifact. This is a side-effect and
-    * thus should be called outside of a transaction.
-    * The artifact is not in any way registered with the system.
-    * Once the artifact has meaningful content, it may be
-    * registered by calling the `register` method.
-    *
-    * @return  the new artifact.
-    */
-   def create() : Artifact
 
-   /**
-    * Registers a significant artifact with the system. That is,
-    * stores the artifact, which should have a real resource
-    * association, as belonging to the system.
-    *
-    * @param artifact   the artifact to register
-    */
-   def register( artifact: Artifact )( implicit tx: S#Tx ) : Unit
+trait ArtifactStore[S <: stm.Sys[S]] extends Writable {
+  /**
+   * Creates a new artifact. This is a side-effect and
+   * thus should be called outside of a transaction.
+   * The artifact is not in any way registered with the system.
+   * Once the artifact has meaningful content, it may be
+   * registered by calling the `register` method.
+   *
+   * @return  the new artifact.
+   */
+  def create(): Artifact
 
-   def iterator( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Artifact ]
+  /**
+   * Registers a significant artifact with the system. That is,
+   * stores the artifact, which should have a real resource
+   * association, as belonging to the system.
+   *
+   * @param artifact   the artifact to register
+   */
+  def register(artifact: Artifact)(implicit tx: S#Tx): Unit
 
-   def baseDirectory : File
+  def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Artifact]
+
+  def baseDirectory: File
 }

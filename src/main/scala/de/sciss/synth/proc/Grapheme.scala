@@ -26,18 +26,19 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, Writable, DataOutput, bitemp, stm, expr, DataInput}
+import de.sciss.lucre.{event => evt, io, bitemp, stm, expr}
 import impl.CommonSerializers
-import stm.{ImmutableSerializer, Serializer}
 import expr.Expr
-import bitemp.{SpanLike, BiType, BiExpr, Span}
+import bitemp.{BiType, BiExpr}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 
 import impl.{GraphemeImpl => Impl}
-import io.AudioFileSpec
+import de.sciss.synth.io.AudioFileSpec
 import evt.Event
+import io.{Writable, DataInput, DataOutput, ImmutableSerializer}
+import de.sciss.span.{SpanLike, Span}
 
 object Grapheme {
    // If necessary for some views, we could eventually add the Elems, too,
@@ -46,7 +47,7 @@ object Grapheme {
    // where `trait StoredElem[ S <: evt.Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
    final case class Update[ S <: evt.Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Segment ])
 
-   implicit def serializer[ S <: evt.Sys[ S ]] : Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
+   implicit def serializer[ S <: evt.Sys[ S ]] : io.Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
       Impl.serializer[ S ]
 
    // 0 reserved for variables
@@ -59,7 +60,7 @@ object Grapheme {
       implicit object Serializer extends ImmutableSerializer[ Value ] {
          def write( v: Value, out: DataOutput ) { v.write( out )}
          def read( in: DataInput ) : Value = {
-            (in.readUnsignedByte() : @switch) match {
+            (in.readByte().toInt: @switch) match {
                case `curveCookie` =>
                   val sz = in.readInt()
                   val values = IIdxSeq.fill( sz ) {
@@ -87,7 +88,7 @@ object Grapheme {
       final case class Curve( values: (Double, Env.ConstShape)* ) extends Value {
          def numChannels = values.size
          def write( out: DataOutput ) {
-            out.writeUnsignedByte( curveCookie )
+            out.writeByte( curveCookie )
             val sz = values.size
             out.writeInt( sz )
             values.foreach { case (mag, shape) =>
@@ -131,7 +132,7 @@ object Grapheme {
          def numChannels = spec.numChannels
 
          def write( out: DataOutput ) {
-            out.writeUnsignedByte( audioCookie )
+            out.writeByte( audioCookie )
             artifact.write( out )
             CommonSerializers.AudioFileSpec.write( spec, out )
             out.writeLong( offset )
@@ -258,7 +259,7 @@ object Grapheme {
          protected def reader = serializer[ S ]
 
          protected def writeData( out: DataOutput ) {
-            out.writeUnsignedByte( curveCookie )
+            out.writeByte( curveCookie )
             val sz = values.size
             out.writeInt( sz )
             values.foreach { tup =>
@@ -312,7 +313,7 @@ object Grapheme {
          protected def reader = serializer[ S ]
 
          protected def writeData( out: DataOutput ) {
-            out.writeUnsignedByte( audioCookie )
+            out.writeByte( audioCookie )
             artifact.write( out )
             CommonSerializers.AudioFileSpec.write( spec, out )
             offset.write( out )
@@ -369,7 +370,7 @@ object Grapheme {
       def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Modifiable[ S ] =
          Impl.readModifiable( in, access )
 
-      implicit def serializer[ S <: evt.Sys[ S ]] : Serializer[ S#Tx, S#Acc, Modifiable[ S ]] =
+      implicit def serializer[ S <: evt.Sys[ S ]] : io.Serializer[ S#Tx, S#Acc, Modifiable[ S ]] =
          Impl.modifiableSerializer[ S ]
 
       /**

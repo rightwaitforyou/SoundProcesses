@@ -1,6 +1,7 @@
 package de.sciss.synth.expr
 
-import de.sciss.lucre.bitemp.{SpanLike, BiType}
+import de.sciss.lucre.bitemp.BiType
+import de.sciss.span.SpanLike
 
 /**
   * typeIDs : 0 = byte, 1 = short, 2 = int, 3 = long, 4 = float, 5 = double, 6 = boolean, 7 = char,

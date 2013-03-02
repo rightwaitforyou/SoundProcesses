@@ -25,10 +25,11 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{DataInput, DataOutput, stm, event => evt, expr, bitemp}
+import de.sciss.lucre.{io, stm, event => evt, expr, bitemp}
 import evt.Targets
 import expr.Expr
-import bitemp.Span
+import io.{DataOutput, DataInput}
+import de.sciss.span.Span
 
 object Spans extends BiTypeImpl[ Span ] {
    final val typeID = 10

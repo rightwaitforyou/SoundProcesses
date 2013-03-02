@@ -33,6 +33,7 @@ import data.SkipList
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 import annotation.switch
+import io.{DataInput, DataOutput}
 
 object BiPinImpl {
    import BiPin.{Leaf, Modifiable}
@@ -41,10 +42,10 @@ object BiPinImpl {
 
    private def opNotSupported : Nothing = sys.error( "Operation not supported" )
 
-   private implicit def leafSerializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : stm.Serializer[ S#Tx, S#Acc, Leaf[ S, A ]] =
+   private implicit def leafSerializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : io.Serializer[ S#Tx, S#Acc, Leaf[ S, A ]] =
       new LeafSer
 
-   private final class LeafSer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) extends stm.Serializer[ S#Tx, S#Acc, Leaf[ S, A ]] {
+   private final class LeafSer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) extends io.Serializer[ S#Tx, S#Acc, Leaf[ S, A ]] {
       def write( leaf: BiPin.Leaf[ S, A ], out: DataOutput ) {
          val sz = leaf.size
          out.writeInt( sz )
@@ -87,7 +88,7 @@ object BiPinImpl {
    }
 
    private class Ser[ S <: Sys[ S ], A, Repr >: Impl[ S, A ] <: BiPin[ S, A ]]( implicit biType: BiType[ A ])
-   extends stm.Serializer[ S#Tx, S#Acc, Repr ] with evt.Reader[ S, Repr ] {
+   extends io.Serializer[ S#Tx, S#Acc, Repr ] with evt.Reader[ S, Repr ] {
       def write( v: Repr, out: DataOutput ) { v.write( out )}
 
       def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Repr with evt.Node[ S ] = {

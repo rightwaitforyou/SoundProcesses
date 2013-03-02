@@ -6,7 +6,7 @@ import expr.{Doubles, Longs}
 import lucre.bitemp
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import lucre.expr.Expr
-import bitemp.Span
+import span.Span
 
 /**
  * To run only this suite:

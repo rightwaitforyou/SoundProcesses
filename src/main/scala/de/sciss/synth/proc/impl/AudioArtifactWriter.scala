@@ -30,7 +30,7 @@ package impl
 
 import concurrent.stm.Ref
 import java.io.File
-import lucre.bitemp.Span
+import span.Span
 
 final class AudioArtifactWriter( segm: Grapheme.Segment.Audio, file: File, server: Server, sampleRate: Double )
 extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {

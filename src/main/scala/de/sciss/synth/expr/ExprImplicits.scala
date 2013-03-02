@@ -1,11 +1,12 @@
 package de.sciss.synth.expr
 
 import de.sciss.lucre.{stm, expr, bitemp, event => evt}
-import bitemp.{BiExpr, BiType, SpanLike, Span}
+import bitemp.{BiExpr, BiType}
 import evt.Sys
 import expr.Expr
 import de.sciss.synth.proc.Grapheme
 import language.implicitConversions
+import de.sciss.span.{Span, SpanLike}
 
 object ExprImplicits {
 //   implicit def stringConst[   S <: stm.Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )

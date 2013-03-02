@@ -2,8 +2,8 @@ package de.sciss
 package synth
 package proc
 
-import lucre.bitemp.Span
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import span.Span
 
 /**
  * To test only this suite:

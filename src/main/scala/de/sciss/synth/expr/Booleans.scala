@@ -25,8 +25,9 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{DataInput, DataOutput, event => evt}
+import de.sciss.lucre.{event => evt, io}
 import evt.{Sys, Targets}
+import io.{DataOutput, DataInput}
 
 object Booleans extends BiTypeImpl[ Boolean ] {
    final val typeID = 6

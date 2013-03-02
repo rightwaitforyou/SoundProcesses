@@ -1,12 +1,13 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{stm, bitemp, expr, event => evt}
-import stm.{Serializer, Cursor}
-import bitemp.{BiExpr, BiType, BiGroup, Chronos, Span, SpanLike}
+import de.sciss.lucre.{stm, bitemp, expr, event => evt, io}
+import stm.Cursor
+import bitemp.{BiExpr, BiType, BiGroup, Chronos}
 import expr.Expr
 import java.awt.EventQueue
-import io.AudioFile
+import de.sciss.synth.io.AudioFile
+import de.sciss.span.{Span, SpanLike}
 
 //import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
@@ -73,8 +74,8 @@ extends ExprImplicits[ S ] {
    object Implicits {
 //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
       implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
-      private implicit val procSer: stm.Serializer[S#Tx, S#Acc, Proc[S]] = Proc.serializer[ S ]
-      implicit val procVarSer: Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
+      private implicit val procSer: io.Serializer[S#Tx, S#Acc, Proc[S]] = Proc.serializer[ S ]
+      implicit val procVarSer: io.Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
 //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
 //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
    }

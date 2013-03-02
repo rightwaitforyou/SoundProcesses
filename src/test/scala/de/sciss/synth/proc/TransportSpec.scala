@@ -3,9 +3,10 @@ package synth
 package proc
 
 import lucre.{bitemp, stm, expr}
-import bitemp.{BiExpr, Span}
+import bitemp.BiExpr
 import expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import span.Span
 
 /**
  * To run only this suite:
