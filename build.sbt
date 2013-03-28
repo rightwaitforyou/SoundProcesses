@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.5.0"
+version := "1.6.0-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -10,9 +10,7 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion := "2.10.0"
-
-// crossScalaVersions := Seq( "2.10.0", "2.9.2" )
+scalaVersion := "2.10.1"
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 

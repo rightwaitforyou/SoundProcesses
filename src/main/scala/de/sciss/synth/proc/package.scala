@@ -33,49 +33,35 @@ import annotation.elidable
 import annotation.elidable._
 
 package object proc {
-//   private[proc] type I = evt.InMemory
+  type ProcGroup[S <: evt.Sys[S]] = BiGroup[S, Proc[S], Proc.Update[S]]
+  type TimedProc[S <: evt.Sys[S]] = BiGroup.TimedElem[S, Proc[S]]
+  type ProcTransport[S <: evt.Sys[S]] = Transport[S, Proc[S], Transport.Proc.Update[S]]  // Proc.Update[ S ]
+  type Param = Double
 
-   type ProcGroup[ S <: evt.Sys[ S ]] = BiGroup[ S, Proc[ S ], Proc.Update[ S ]]
-   type TimedProc[ S <: evt.Sys[ S ]] = BiGroup.TimedElem[ S, Proc[ S ]]
-   type ProcTransport[ S <: evt.Sys[ S ]] = Transport[ S, Proc[ S ], Transport.Proc.Update[ S ]] // Proc.Update[ S ]
-   type Param = Double
+  private lazy val logHeader = new SimpleDateFormat("[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US)
+  var showLog          = false
+  var showTxnLog       = false
+  var showAuralLog     = false
+  var showTransportLog = false
+  var showAllocLog     = false
 
-//   type ScanElem[ S <: evt.Sys[ S ]] = de.sciss.synth.proc.Scan.Elem
+  @elidable(CONFIG) private[proc] def log(what: => String) {
+    if (showLog) Console.out.println(logHeader.format(new Date()) + what)
+  }
 
-//   type Scan[ S <: evt.Sys[ S ]] = BiPin.Expr[ S, Scan_.Elem[ S ]]
+  @elidable(CONFIG) private[proc] def logAural(what: => String) {
+    if (showAuralLog) Console.out.println(logHeader.format(new Date()) + "aural " + what)
+  }
 
-//   type Grapheme[ S <: evt.Sys[ S ]] = BiPin[ S, Scan_.Elem[ S ], Scan_.Elem.Update[ S ]]
+  @elidable(CONFIG) private[proc] def logTransport(what: => String) {
+    if (showTransportLog) Console.out.println(logHeader.format(new Date()) + "transport " + what)
+  }
 
-   private lazy val logHeader = new SimpleDateFormat( "[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US )
-   var showLog          = false
-   var showTxnLog       = false
-   var showAuralLog     = false
-   var showTransportLog = false
-   var showAllocLog     = false
+  @elidable(CONFIG) private[proc] def logTxn(what: => String) {
+    if (showTxnLog) Console.out.println(logHeader.format(new Date()) + "txn " + what)
+  }
 
-   @elidable(CONFIG) private[proc] def log( what: => String ) {
-      if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
-   }
-
-//   @elidable(CONFIG) private[proc] def logConfig( what: => String ) {
-//      if( showLog ) Console.out.println( logHeader.format( new Date() ) + what )
-//   }
-
-   @elidable(CONFIG) private[proc] def logAural( what: => String ) {
-      if( showAuralLog ) Console.out.println( logHeader.format( new Date() ) + "aural " + what )
-   }
-
-   @elidable(CONFIG) private[proc] def logTransport( what: => String ) {
-      if( showTransportLog ) Console.out.println( logHeader.format( new Date() ) + "transport " + what )
-   }
-
-   @elidable(CONFIG) private[proc] def logTxn( what: => String ) {
-      if( showTxnLog ) Console.out.println( logHeader.format( new Date() ) + "txn " + what )
-   }
-
-   @elidable(CONFIG) private[proc] def logAlloc( what: => String ) {
-      if( showAllocLog ) Console.out.println( logHeader.format( new Date() ) + "block " + what )
-   }
-
-   def ??? : Nothing = sys.error( "TODO" )
+  @elidable(CONFIG) private[proc] def logAlloc(what: => String) {
+    if (showAllocLog) Console.out.println(logHeader.format(new Date()) + "block " + what)
+  }
 }

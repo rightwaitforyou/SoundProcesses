@@ -25,36 +25,36 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{stm, event => evt}
+import de.sciss.lucre.stm
 import stm.Disposable
 import impl.{AuralPresentationImpl => Impl}
 
 object AuralPresentation {
-   // ---- implementation forwards ----
+  // ---- implementation forwards ----
 
-   def run[ S <: Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
-                                             ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
-                                               artifactStore: ArtifactStore[ S ]) : AuralPresentation[ S ] =
-      Impl.run[ S, I ]( transport, aural )
+  def run[S <: Sys[S], I <: stm.Sys[I]](transport: ProcTransport[S], aural: AuralSystem[S])
+                                       (implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
+                                        artifactStore: ArtifactStore[S]): AuralPresentation[S] =
+    Impl.run[S, I](transport, aural)
 
-   private[proc] trait Running[ S <: Sys[ S ]] {
-      /**
-       * Queries the number of channel associated with a scanned input.
-       * Throws a control throwable when no value can be determined, making
-       * the ugen graph builder mark the querying graph element as incomplete
-       * (missing information).
-       *
-       * @param timed   the process whose graph is currently built
-       * @param time    the time at which to query the scan
-       * @param key     the scan key
-       * @param tx      the current transaction
-       * @return        the number of channels for the scan input at the given time
-       */
-      def scanInNumChannels( timed: TimedProc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int // Scan_.Value[ S ]
+  private[proc] trait Running[S <: Sys[S]] {
+    /**
+     * Queries the number of channel associated with a scanned input.
+     * Throws a control throwable when no value can be determined, making
+     * the ugen graph builder mark the querying graph element as incomplete
+     * (missing information).
+     *
+     * @param timed   the process whose graph is currently built
+     * @param time    the time at which to query the scan
+     * @param key     the scan key
+     * @param tx      the current transaction
+     * @return        the number of channels for the scan input at the given time
+     */
+    def scanInNumChannels(timed: TimedProc[S], time: Long, key: String)(implicit tx: S#Tx): Int // Scan_.Value[ S ]
+  }
 
-      final case class MissingInfo( source: TimedProc[ S ], key: String ) extends Throwable
-   }
+  final private[proc] case class MissingInfo[S <: Sys[S]](source: TimedProc[S], key: String) extends Throwable
 }
-trait AuralPresentation[ S <: Sys[ S ]] extends Disposable[ S#Tx ] {
-   def group( implicit tx: S#Tx ) : Option[ Group ]
+trait AuralPresentation[S <: Sys[S]] extends Disposable[S#Tx] {
+  def group(implicit tx: S#Tx): Option[Group]
 }

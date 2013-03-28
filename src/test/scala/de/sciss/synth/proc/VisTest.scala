@@ -17,44 +17,44 @@ import synth.expr.{SpanLikes, Longs, ExprImplicits}
 import synth.{Env, linShape, SynthGraph}
 
 object VisTest {
-   def apply() : VisTest[ InMemory, InMemory ] = {
-      implicit val system = InMemory()
-      new VisTest( system )
-   }
+  def apply(): VisTest[InMemory, InMemory] = {
+    implicit val system = InMemory()
+    new VisTest(system)
+  }
 
-   def baseDir    = new File( sys.props( "user.home" ), "sound_processes" )
-   def dataDir    = new File( baseDir, "db" )
-   def audioDir   = new File( baseDir, "artifacts" )
+  def baseDir   = new File(sys.props("user.home"), "sound_processes")
+  def dataDir   = new File(baseDir, "db")
+  def audioDir  = new File(baseDir, "artifacts")
 
-   def inMem() : VisTest[ InMemory, InMemory ] = {
-      implicit val system  = InMemory()
-      new VisTest( system )
-   }
+  def inMem(): VisTest[InMemory, InMemory] = {
+    implicit val system = InMemory()
+    new VisTest(system)
+  }
 
-//   def conf() : VisTest[ Confluent ] = {
-//      val dir              = dataDir
-//      dir.mkdirs()
-//      val store            = BerkeleyDB.factory( dir )
-//      implicit val system  = Confluent( store )
-//      new VisTest( system )
-//   }
+  //   def conf() : VisTest[ Confluent ] = {
+  //      val dir              = dataDir
+  //      dir.mkdirs()
+  //      val store            = BerkeleyDB.factory( dir )
+  //      implicit val system  = Confluent( store )
+  //      new VisTest( system )
+  //   }
 
-   def wipe( sure: Boolean = false ) {
-      if( !sure ) return
-      dataDir.listFiles().foreach( _.delete() )
-      dataDir.delete()
-   }
+  def wipe(sure: Boolean = false) {
+    if (!sure) return
+    dataDir.listFiles().foreach(_.delete())
+    dataDir.delete()
+  }
 
-   def main( args: Array[ String ]) {
-//      TemporalObjects.showConfluentLog = true
-//val vis = VisTest.conf()
-      val vis = VisTest.inMem()
-      import vis._
-      add()
-      aural()
-      Thread.sleep(8000L)
-      play()
-   }
+  def main(args: Array[String]) {
+    //      TemporalObjects.showConfluentLog = true
+    //val vis = VisTest.conf()
+    val vis = VisTest.inMem()
+    import vis._
+    add()
+    aural()
+    Thread.sleep(8000L)
+    play()
+  }
 }
 final class VisTest[ S <: Sys[ S ], I <: evt.Sys[ I ]]( system: S )( implicit cursor: Cursor[ S ], bridge: S#Tx => I#Tx )
 extends ExprImplicits[ S ] {
