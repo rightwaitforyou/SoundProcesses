@@ -30,10 +30,10 @@ class TransportSpec extends ConfluentEventSpec {
    "Transport" should "notify observers about all relevant events" in { system =>
       val obs  = new Observation[ S ]
       val (pgH, t) = system.step { implicit tx =>
-         val pg   = ProcGroup_.Modifiable[ S ]
+         val pg   = ProcGroup.Modifiable[ S ]
          val _t   = Transport.Offline[ S, I ]( pg, 10000.0 ) // ( tx, inMemory )
          _t.reactTx( obs.register )
-         val res = tx.newHandle( pg )( ProcGroup_.Modifiable.serializer[ S ])
+         val res = tx.newHandle( pg )( ProcGroup.Modifiable.serializer[ S ])
          obs.assertEmpty()
          (res, _t)
       }
@@ -115,10 +115,10 @@ class TransportSpec extends ConfluentEventSpec {
    it should "handle process updates in a sensible way" in { system =>
       val obs  = new Observation[ S ]
       val (pgH, t) = system.step { implicit tx =>
-         val pg   = ProcGroup_.Modifiable[ S ]
+         val pg   = ProcGroup.Modifiable[ S ]
          val _t   = Transport.Offline[ S, I ]( pg, 10000.0 ) // ( tx, inMemory )
          _t.reactTx( obs.register )
-         val res = tx.newHandle( pg )( ProcGroup_.Modifiable.serializer[ S ])
+         val res = tx.newHandle( pg )( ProcGroup.Modifiable.serializer[ S ])
          obs.assertEmpty()
          (res, _t)
       }

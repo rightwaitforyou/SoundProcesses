@@ -84,7 +84,7 @@ extends ExprImplicits[ S ] {
 
    lazy val access: S#Entry[ Acc ] = system.root { implicit tx =>
       implicit def longType = Longs
-      val g = ProcGroup_.Modifiable[ S ]
+      val g = ProcGroup.Modifiable[ S ]
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
@@ -107,7 +107,7 @@ extends ExprImplicits[ S ] {
 //   val groupAccess:     Source[ S#Tx, ProcGroup.Modifiable[ S ]] = Source.map( access )( _._1 )
 //   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
 
-   def group( implicit tx: S#Tx ) : ProcGroup_.Modifiable[ S ] = access() // ._1
+   def group( implicit tx: S#Tx ) : ProcGroup.Modifiable[ S ] = access() // ._1
 //   def trans( implicit tx: S#Tx ) : ProcTransport[ S ]         = access.get._2
 
    def grapheme( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = Grapheme.Modifiable[ S ]

@@ -41,20 +41,21 @@ import io.{Writable, DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.span.{SpanLike, Span}
 
 object Grapheme {
-   // If necessary for some views, we could eventually add the Elems, too,
-   // like `changes: IIdxSeq[ (Elem[ S ], Value) ]`. Then the question would be
-   // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
-   // where `trait StoredElem[ S <: evt.Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
-   final case class Update[ S <: evt.Sys[ S ]]( grapheme: Grapheme[ S ], changes: IIdxSeq[ Segment ])
 
-   implicit def serializer[ S <: evt.Sys[ S ]] : io.Serializer[ S#Tx, S#Acc, Grapheme[ S ]] =
-      Impl.serializer[ S ]
+  // If necessary for some views, we could eventually add the Elems, too,
+  // like `changes: IIdxSeq[ (Elem[ S ], Value) ]`. Then the question would be
+  // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
+  // where `trait StoredElem[ S <: evt.Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
+  final case class Update[S <: evt.Sys[S]](grapheme: Grapheme[S], changes: IIdxSeq[Segment])
 
-   // 0 reserved for variables
-   private final val curveCookie = 1
-   private final val audioCookie = 2
+  implicit def serializer[S <: evt.Sys[S]]: io.Serializer[S#Tx, S#Acc, Grapheme[S]] =
+    Impl.serializer[S]
 
-   object Value {
+  // 0 reserved for variables
+  private final val curveCookie = 1
+  private final val audioCookie = 2
+
+  object Value {
       implicit val biType : BiType[ Value ] = Elem
 
       implicit object Serializer extends ImmutableSerializer[ Value ] {
@@ -211,6 +212,7 @@ object Grapheme {
             }
          }
       }
+     sealed trait Audio[S <: evt.Sys[S]] extends Elem[S]
 
       private final class CurveImpl[ S <: evt.Sys[ S ]]( protected val targets: evt.Targets[ S ],
                                                      val values: IIdxSeq[ (Expr[ S, Double ], Env.ConstShape) ])
@@ -354,7 +356,8 @@ object Grapheme {
          }
       }
    }
-//   sealed trait Elem[ S ] { def numChannels: Int }
+
+//  sealed trait Elem[S <: evt.Sys[S]] extends Expr[S, Value]
    type Elem[ S <: evt.Sys[ S ]]        = Expr[ S, Value ]
    type TimedElem[ S <: evt.Sys[ S ]]   = BiExpr[ S, Value ]
 
