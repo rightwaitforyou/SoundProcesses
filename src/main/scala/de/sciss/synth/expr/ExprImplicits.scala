@@ -75,5 +75,6 @@ class ExprImplicits[ S <: Sys[ S ]] protected /* extends ExprImplicits.LowPriori
 
    // ---- XXX TODO ...making package synth.expr a bad choice... ----
 
-   implicit def graphemeConst( v: Grapheme.Value ) : Grapheme.Elem[ S ] = Grapheme.Elem.newConst( v )
+//  implicit def graphemeConst(v: Grapheme.Value): Grapheme.Elem[S] = Grapheme.Elem.newConst(v)
+  implicit def graphemeConst(v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Elem.newConst(v)
 }
