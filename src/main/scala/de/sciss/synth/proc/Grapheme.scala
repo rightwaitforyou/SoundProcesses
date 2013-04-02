@@ -206,7 +206,7 @@ object Grapheme {
     final val typeID = 11
 
     object Curve extends expr.Type[Value.Curve] {
-      def apply[S <: evt.Sys[S]](values: (Expr[S, Double], Env.ConstShape)*)(implicit tx: S#Tx): Elem[S] = {
+      def apply[S <: evt.Sys[S]](values: (Expr[S, Double], Env.ConstShape)*)(implicit tx: S#Tx): Curve[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new CurveImpl(targets, values.toIndexedSeq)
       }
@@ -244,7 +244,7 @@ object Grapheme {
 
     object Audio extends expr.Type[Value.Audio]{
       def apply[S <: evt.Sys[S]](artifact: Artifact, spec: AudioFileSpec, offset: Expr[S, Long], gain: Expr[S, Double])
-                                (implicit tx: S#Tx): Elem[S] = {
+                                (implicit tx: S#Tx): Audio[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new AudioImpl(targets, artifact, spec, offset, gain)
       }
