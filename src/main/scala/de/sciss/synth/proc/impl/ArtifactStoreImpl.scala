@@ -74,7 +74,7 @@ object ArtifactStoreImpl {
     def create(): Artifact = {
       baseDirectory.mkdirs()
       val f = File.createTempFile("artifact", ".bin", baseDirectory)
-      Artifact(f.getName)
+      Artifact(Nil, f.getName)
     }
 
     /**
@@ -92,5 +92,4 @@ object ArtifactStoreImpl {
       out.writeUTF(baseDirectory.getPath)
     }
   }
-
 }

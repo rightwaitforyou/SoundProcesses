@@ -46,7 +46,7 @@ object ArtifactStore {
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] = Impl.read[S](in, access)
 }
 
-trait ArtifactStore[S <: stm.Sys[S]] extends Writable {
+sealed trait ArtifactStoreLike {
   /**
    * Creates a new artifact. This is a side-effect and
    * thus should be called outside of a transaction.
@@ -58,6 +58,10 @@ trait ArtifactStore[S <: stm.Sys[S]] extends Writable {
    */
   def create(): Artifact
 
+  def baseDirectory: File
+}
+
+trait ArtifactStore[S <: stm.Sys[S]] extends ArtifactStoreLike with Writable {
   /**
    * Registers a significant artifact with the system. That is,
    * stores the artifact, which should have a real resource
@@ -68,6 +72,4 @@ trait ArtifactStore[S <: stm.Sys[S]] extends Writable {
   def register(artifact: Artifact)(implicit tx: S#Tx): Unit
 
   def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Artifact]
-
-  def baseDirectory: File
 }

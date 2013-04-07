@@ -241,7 +241,7 @@ extends ExprImplicits[ S ] {
 
    def audioFile( path: String ) : Grapheme.Value.Audio = {
       implicit val _artifactStore = artifactStore
-      val artifact   = Artifact( path )
+      val artifact   = Artifact(Nil, path)
       val spec       = AudioFile.readSpec( artifact.toFile )
       val offset     = 0L
       val gain       = 1.0
