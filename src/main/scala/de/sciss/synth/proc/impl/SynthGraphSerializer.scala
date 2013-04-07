@@ -34,15 +34,18 @@ import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
  * A serializer using plain old java (object output) serialization
  */
 object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
-  //   private final val SER_VERSION = 1
+  private final val SER_VERSION = 0x5347
 
   def write(v: SynthGraph, out: DataOutput) {
+    out.writeShort(SER_VERSION)
     val oos = new ObjectOutputStream(out.asOutputStream)
     oos.writeObject(v)
     oos.close()
   }
 
   def read(in: DataInput): SynthGraph = {
+    val cookie = in.readShort()
+    require(cookie == SER_VERSION, s"Unexpected cookie $cookie")
     val ois = new ObjectInputStream(in.asInputStream)
     val res = ois.readObject().asInstanceOf[SynthGraph]
     ois.close()

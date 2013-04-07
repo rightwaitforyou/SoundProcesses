@@ -34,7 +34,7 @@ import expr.LinkedList
 import de.sciss.serial.{DataOutput, Serializer, DataInput}
 
 object ArtifactStoreImpl {
-  private final val SER_VERSION = 1
+  private final val SER_VERSION = 0x4153
 
   def apply[S <: evt.Sys[S]](baseDirectory: File)(implicit tx: S#Tx): ArtifactStore[S] = {
     val ll = LinkedList.Modifiable[S, Artifact]
@@ -44,8 +44,8 @@ object ArtifactStoreImpl {
   def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] = new Ser[S]
 
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] = {
-    val cookie = in.readUnsignedByte()
-    require(cookie == SER_VERSION, "Version mismatch. Expected " + SER_VERSION + " but found " + cookie)
+    val cookie = in.readShort()
+    require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
 
     val ll = LinkedList.Modifiable.read[S, Artifact](in, access)
     val baseDirectory = new File(in.readUTF())
@@ -87,7 +87,7 @@ object ArtifactStoreImpl {
     def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Artifact] = ll.iterator
 
     def write(out: DataOutput) {
-      out.writeByte(SER_VERSION)
+      out.writeShort(SER_VERSION)
       ll.write(out)
       out.writeUTF(baseDirectory.getPath)
     }

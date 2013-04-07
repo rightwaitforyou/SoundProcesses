@@ -49,7 +49,7 @@ object Code {
 
     def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Code[A] = {
       val value = peerSer.read(in, access)
-      val source = (in.readUnsignedByte(): @switch) match {
+      val source = (in.readByte(): @switch) match {
         case 1 => Some(in.readUTF())
         case 0 => None
       }

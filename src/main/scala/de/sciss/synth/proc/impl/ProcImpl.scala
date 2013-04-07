@@ -40,7 +40,7 @@ import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import de.sciss.serial
 
 object ProcImpl {
-  private final val SER_VERSION = 0
+  private final val SER_VERSION = 0x5072
 
   implicit val paramType: BiType[Param] = Doubles
 
@@ -259,15 +259,15 @@ object ProcImpl {
 //      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
       final def changed :      evt.Event[ S, Update[      S ], Proc[ S ]] = ChangeEvent
 
-      final protected def writeData( out: DataOutput ) {
-         out.writeByte( SER_VERSION )
-         name_#.write( out )
-         graphVar.write( out )
-         scanMap.write( out )
-         graphemeMap.write( out )
-      }
+    final protected def writeData(out: DataOutput) {
+      out.writeShort(SER_VERSION)
+      name_#.write(out)
+      graphVar.write(out)
+      scanMap.write(out)
+      graphemeMap.write(out)
+    }
 
-      final protected def disposeData()( implicit tx: S#Tx ) {
+    final protected def disposeData()( implicit tx: S#Tx ) {
          name_#.dispose()
          graphVar.dispose()
          scanMap.dispose()
@@ -301,31 +301,32 @@ object ProcImpl {
       }
    }
 
-   private final class Read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, protected val targets: evt.Targets[ S ],
-                                             tx0: S#Tx )
-   extends Impl[ S ] {
+  private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S],
+                                        tx0: S#Tx)
+    extends Impl[S] {
 
-      {
-         val serVer = in.readUnsignedByte()
-         require( serVer == SER_VERSION, "Incompatible serialized  (found " + serVer + ", required " + SER_VERSION + ")" )
-      }
+    {
+      val serVer = in.readShort()
+      require(serVer == SER_VERSION, s"Incompatible serialized (found $serVer, required $SER_VERSION)")
+    }
 
-      protected val name_#    = Strings.readVar[  S ]( in, access )( tx0 )
-      protected val graphVar  = {
-         implicit val peerSer = SynthGraphSerializer
-         tx0.readVar[ Code[ SynthGraph ]]( id, in )
-      }
+    protected val name_# = Strings.readVar[S](in, access)(tx0)
+    protected val graphVar = {
+      implicit val peerSer = SynthGraphSerializer
+      tx0.readVar[Code[SynthGraph]](id, in)
+    }
 
-      protected val scanMap = {
-         implicit val tx = tx0
-         implicit val _screwYou : serial.Serializer[ S#Tx, S#Acc, ScanEntry[ S ]] = KeyMapImpl.entrySerializer
-         SkipList.Map.read[ S, String, ScanEntry[ S ]]( in, access )
-      }
+    protected val scanMap = {
+      implicit val tx = tx0
+      implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, ScanEntry[S]] = KeyMapImpl.entrySerializer
+      SkipList.Map.read[S, String, ScanEntry[S]](in, access)
+    }
 
-      protected val graphemeMap = {
-         implicit val tx = tx0
-         implicit val _screwYou : serial.Serializer[ S#Tx, S#Acc, GraphemeEntry[ S ]] = KeyMapImpl.entrySerializer
-         SkipList.Map.read[ S, String, GraphemeEntry[ S ]]( in, access )
-      }
-   }
+    protected val graphemeMap = {
+      implicit val tx = tx0
+      implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, GraphemeEntry[S]] = KeyMapImpl.entrySerializer
+      SkipList.Map.read[S, String, GraphemeEntry[S]](in, access)
+    }
+  }
+
 }

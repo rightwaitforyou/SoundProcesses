@@ -36,187 +36,187 @@ import proc.Scan
 import de.sciss.serial.{DataOutput, Serializer, DataInput}
 
 object ScanImpl {
-   import Scan.Link
+  import Scan.Link
 
-   sealed trait Update[ S ]
+  sealed trait Update[S]
 
-   def apply[ S <: Sys[ S ]]( implicit tx: S#Tx ) : Scan[ S ] = {
-      val targets    = evt.Targets[ S ]   // XXX TODO: partial?
-      val id         = targets.id
-      val sourceRef  = tx.newVar[ Option[ Link[ S ]]]( id, None )
-      val sinkMap    = tx.newDurableIDMap[ Link[ S ]]
-      val sinkList   = LinkedList.Modifiable[ S, Link[ S ]]
-      new Impl( targets, sourceRef, sinkMap, sinkList )
-   }
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = {
+    val targets   = evt.Targets[S] // XXX TODO: partial?
+    val id        = targets.id
+    val sourceRef = tx.newVar[Option[Link[S]]](id, None)
+    val sinkMap   = tx.newDurableIDMap[Link[S]]
+    val sinkList  = LinkedList.Modifiable[S, Link[S]]
+    new Impl(targets, sourceRef, sinkMap, sinkList)
+  }
 
-   def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Scan[ S ] = {
-      serializer[ S ].read( in, access )
-   }
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = {
+    serializer[S].read(in, access)
+  }
 
-   implicit def serializer[ S <: Sys[ S ]] : evt.NodeSerializer[ S, Scan[ S ]] =
-      anySer.asInstanceOf[ evt.NodeSerializer[ S, Scan[ S ]]]
+  implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Scan[S]] =
+    anySer.asInstanceOf[evt.NodeSerializer[S, Scan[S]]]
 
-   private type I = evt.InMemory
+  private type I = evt.InMemory
 
-   private val anySer : evt.NodeSerializer[ I, Scan[ I ]] = new Ser[ I ]
+  private val anySer: evt.NodeSerializer[I, Scan[I]] = new Ser[I]
 
-   private final class Ser[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Scan[ S ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Scan[ S ] = {
-         val id         = targets.id
-         val sourceRef  = tx.readVar[ Option[ Link[ S ]]]( id, in )
-         val sinkMap    = tx.readDurableIDMap[ Link[ S ]]( in )
-         val sinkList   = LinkedList.Modifiable.read[ S, Link[ S ]]( in, access )
-         new Impl( targets, sourceRef, sinkMap, sinkList )
+  private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Scan[S]] {
+    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Scan[S] = {
+      val id        = targets.id
+      val sourceRef = tx.readVar[Option[Link[S]]](id, in)
+      val sinkMap   = tx.readDurableIDMap[Link[S]](in)
+      val sinkList  = LinkedList.Modifiable.read[S, Link[S]](in, access)
+      new Impl(targets, sourceRef, sinkMap, sinkList)
+    }
+  }
+
+  implicit def linkSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Link[S]] =
+    anyLinkSer.asInstanceOf[Serializer[S#Tx, S#Acc, Link[S]]]
+
+  private val anyLinkSer: Serializer[I#Tx, I#Acc, Link[I]] = new LinkSer[I]
+
+  private final class LinkSer[S <: Sys[S]] extends Serializer[S#Tx, S#Acc, Link[S]] {
+    def write(link: Link[S], out: DataOutput) {
+      link match {
+        case Link.Grapheme(peer) =>
+          out.writeByte(0)
+          peer.write(out)
+        case Link.Scan(peer) =>
+          out.writeByte(1)
+          peer.write(out)
       }
-   }
+    }
 
-   implicit def linkSerializer[ S <: Sys[ S ]] : Serializer[ S#Tx, S#Acc, Link[ S ]] =
-      anyLinkSer.asInstanceOf[ Serializer[ S#Tx, S#Acc, Link[ S ]]]
-
-   private val anyLinkSer : Serializer[ I#Tx, I#Acc, Link[ I ]] = new LinkSer[ I ]
-
-   private final class LinkSer[ S <: Sys[ S ]] extends Serializer[ S#Tx, S#Acc, Link[ S ]] {
-      def write( link: Link[ S ], out: DataOutput) {
-         link match {
-            case Link.Grapheme( peer ) =>
-               out.writeByte( 0 )
-               peer.write( out )
-            case Link.Scan( peer ) =>
-               out.writeByte( 1 )
-               peer.write( out )
-         }
+    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Link[S] = {
+      (in.readByte(): @switch) match {
+        case 0 =>
+          val peer = Grapheme.read[S](in, access)
+          Link.Grapheme(peer)
+        case 1 =>
+          val peer = Scan.read[S](in, access)
+          Link.Scan(peer)
+        case cookie => sys.error("Unexpected cookie " + cookie)
       }
+    }
+  }
 
-      def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Link[ S ] = {
-         (in.readUnsignedByte(): @switch) match {
-            case 0 =>
-               val peer = Grapheme.read[ S ]( in, access )
-               Link.Grapheme( peer )
-            case 1 =>
-               val peer = Scan.read[ S ]( in, access )
-               Link.Scan( peer )
-            case cookie => sys.error( "Unexpected cookie " + cookie )
-         }
+  // TODO: the crappy sinkList is only needed because the id map does not have an iterator...
+  // we should really figure out how to add iterator functionality to the id map!!!
+  private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
+                                        protected val sourceRef: S#Var[Option[Link[S]]],
+                                        protected val sinkMap: IdentifierMap[S#ID, S#Tx, Link[S]],
+                                        protected val sinkList: LinkedList.Modifiable[S, Link[S], Unit])
+    extends Scan[S]
+    with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
+    with evti.Generator[S, Scan.Update[S], Scan[S]] {
+    override def toString = "Scan" + id
+
+    def sinks(implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkList.iterator
+
+    def addSink(sink: Link[S])(implicit tx: S#Tx): Boolean = {
+      val sinkID = sink.id
+      if (sinkMap.contains(sinkID)) return false
+
+      sinkMap.put(sinkID, sink)
+      sinkList.addHead(sink) // faster than addLast; but perhaps we should use addLast to have a better iterator order?
+      sink match {
+        case Link.Scan(peer) => peer.setScanSource(this) // source_= would create loop!
+        case _ =>
       }
-   }
+      fire(Scan.SinkAdded(this, sink))
+      true
+    }
 
-   // TODO: the crappy sinkList is only needed because the id map does not have an iterator...
-   // we should really figure out how to add iterator functionality to the id map!!!
-   private final class Impl[ S <: Sys[ S ]]( protected val targets: evt.Targets[ S ],
-                                             protected val sourceRef: S#Var[ Option[ Link[ S ]]],
-                                             protected val sinkMap: IdentifierMap[ S#ID, S#Tx, Link[ S ]],
-                                             protected val sinkList: LinkedList.Modifiable[ S, Link[ S ], Unit ])
-   extends Scan[ S ]
-   with evti.StandaloneLike[ S, Scan.Update[ S ], Scan[ S ]]
-   with evti.Generator[ S, Scan.Update[ S ], Scan[ S ]] {
-      override def toString = "Scan" + id
+    def removeSink(sink: Link[S])(implicit tx: S#Tx): Boolean = {
+      val sinkID = sink.id
+      if (!sinkMap.contains(sinkID)) return false
+      sinkMap.remove(sinkID)
+      sinkList.remove(sink)
+      fire(Scan.SinkRemoved(this, sink))
+      true
+    }
 
-      def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkList.iterator
+    def source(implicit tx: S#Tx): Option[Link[S]] = sourceRef()
 
-      def addSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean = {
-         val sinkID  = sink.id
-         if( sinkMap.contains( sinkID )) return false
-
-         sinkMap.put( sinkID, sink )
-         sinkList.addHead( sink )   // faster than addLast; but perhaps we should use addLast to have a better iterator order?
-         sink match {
-            case Link.Scan( peer ) => peer.setScanSource( this )  // source_= would create loop!
-            case _ =>
-         }
-         fire( Scan.SinkAdded( this, sink ))
-         true
+    def source_=(link: Option[Link[S]])(implicit tx: S#Tx) {
+      if (setSource(link)) {
+        link match {
+          case Some(Link.Scan(peer)) => peer.addSink(this)
+          case _ =>
+        }
       }
+    }
 
-      def removeSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean = {
-         val sinkID  = sink.id
-         if( !sinkMap.contains( sinkID )) return false
-         sinkMap.remove( sinkID )
-         sinkList.remove( sink )
-         fire( Scan.SinkRemoved( this, sink ))
-         true
+    private def setSource(link: Option[Link[S]])(implicit tx: S#Tx): Boolean = {
+      val old = sourceRef()
+      if (old == link) return false
+
+      val con = targets.nonEmpty
+      sourceRef() = link
+      old match {
+        case Some(Link.Scan(peer)) =>
+          peer.removeSink(this)
+        case Some(Link.Grapheme(peer)) if (con) =>
+          peer.changed -/-> this
+        case _ =>
       }
-
-      def source( implicit tx: S#Tx ) : Option[ Link[ S ]] = sourceRef()
-
-      def source_=( link: Option[ Link[ S ]])( implicit tx: S#Tx ) {
-         if( setSource( link )) {
-            link match {
-               case Some( Link.Scan( peer )) => peer.addSink( this )
-               case _ =>
-            }
-         }
+      if (con) link match {
+        case Some(Link.Grapheme(peer)) =>
+          peer.changed ---> this
+        case _ =>
       }
+      fire(Scan.SourceChanged(this, link))
+      true
+    }
 
-      private def setSource( link: Option[ Link[ S ]])( implicit tx: S#Tx ) : Boolean = {
-         val old = sourceRef()
-         if( old == link ) return false
+    def changed: Event[S, Scan.Update[S], Scan[S]] = this
 
-         val con = targets.nonEmpty
-         sourceRef() = link
-         old match {
-            case Some( Link.Scan( peer )) =>
-               peer.removeSink( this )
-            case Some( Link.Grapheme( peer )) if( con ) =>
-               peer.changed -/-> this
-            case _ =>
-         }
-         if( con ) link match {
-            case Some( Link.Grapheme( peer )) =>
-               peer.changed ---> this
-            case _ =>
-         }
-         fire( Scan.SourceChanged( this, link ))
-         true
+    def connect()(implicit tx: S#Tx) {
+      source match {
+        case Some(Scan.Link.Grapheme(peer)) => peer.changed ---> this
+        case _ =>
       }
+    }
 
-      def changed: Event[ S, Scan.Update[ S ], Scan[ S ]] = this
-
-      def connect()( implicit tx: S#Tx ) {
-         source match {
-            case Some( Scan.Link.Grapheme( peer )) => peer.changed ---> this
-            case _ =>
-         }
+    def disconnect()(implicit tx: S#Tx) {
+      source match {
+        case Some(Scan.Link.Grapheme(peer)) => peer.changed -/-> this
+        case _ =>
       }
+    }
 
-      def disconnect()(implicit tx: S#Tx) {
-         source match {
-            case Some( Scan.Link.Grapheme( peer )) => peer.changed -/-> this
-            case _ =>
-         }
+    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
+      if (pull.parents(this).isEmpty) {
+        pull.resolve[Scan.Update[S]]
+      } else {
+        source.flatMap {
+          case Scan.Link.Grapheme(peer) =>
+            peer.changed.pullUpdate(pull).map(Scan.SourceUpdate(this, _))
+          case _ => None
+        }
       }
+    }
 
-      def pullUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Option[ Scan.Update[ S ]] = {
-         if( pull.parents( this ).isEmpty ) {
-            pull.resolve[ Scan.Update[ S ]]
-         } else {
-            source.flatMap {
-               case Scan.Link.Grapheme( peer ) =>
-                  peer.changed.pullUpdate( pull ).map( Scan.SourceUpdate( this, _ ))
-               case _ => None
-            }
-         }
-      }
+    // called in the implementation from addSink( Link.Scan( _ )). the difference
+    // to source_= is that this method should not establish the opposite connection
+    // by calling addSink on the source, as this would result in an infinite feedback.
+    // still, this method should fire an Scan.SourceChanged event.
+    private[proc] def setScanSource(source: Scan[S])(implicit tx: S#Tx) {
+      setSource(Some(source: Link[S]))
+    }
 
-      // called in the implementation from addSink( Link.Scan( _ )). the difference
-      // to source_= is that this method should not establish the opposite connection
-      // by calling addSink on the source, as this would result in an infinite feedback.
-      // still, this method should fire an Scan.SourceChanged event.
-      private[proc] def setScanSource( source: Scan[ S ])( implicit tx: S#Tx ) {
-         setSource( Some( source: Link[ S ]) )
-      }
+    protected def writeData(out: DataOutput) {
+      sourceRef.write(out)
+      sinkMap.write(out)
+      sinkList.write(out)
+    }
 
-      protected def writeData( out: DataOutput ) {
-         sourceRef.write( out )
-         sinkMap.write( out )
-         sinkList.write( out )
-      }
+    protected def disposeData()(implicit tx: S#Tx) {
+      sourceRef.dispose()
+      sinkMap.dispose()
+      sinkList.dispose()
+    }
 
-      protected def disposeData()(implicit tx: S#Tx) {
-         sourceRef.dispose()
-         sinkMap.dispose()
-         sinkList.dispose()
-      }
-
-      protected def reader: evt.Reader[ S, Scan[ S ]] = serializer
-   }
+    protected def reader: evt.Reader[S, Scan[S]] = serializer
+  }
 }
