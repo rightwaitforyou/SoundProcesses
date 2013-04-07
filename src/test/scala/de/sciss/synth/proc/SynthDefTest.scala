@@ -3,7 +3,7 @@ package proc
 
 import impl.SynthGraphSerializer
 import ugen._
-import de.sciss.lucre.io.DataOutput
+import de.sciss.serial.DataOutput
 
 object SynthDefTest extends App {
   val graph = SynthGraph {

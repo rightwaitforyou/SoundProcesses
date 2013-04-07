@@ -27,10 +27,8 @@ package de.sciss.synth
 package proc
 package impl
 
-import io.{SampleFormat, AudioFileType, AudioFileSpec => AFS }
-import java.nio.ByteOrder
 import annotation.switch
-import de.sciss.lucre.io.{DataInput, DataOutput, ImmutableSerializer}
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 
 object CommonSerializers {
    implicit object EnvConstShape extends ImmutableSerializer[ Env.ConstShape ] {

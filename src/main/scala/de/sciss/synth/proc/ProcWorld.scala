@@ -32,147 +32,154 @@ import de.sciss.{synth, osc}
 import collection.immutable.{IndexedSeq => IIdxSeq, IntMap}
 
 object ProcWorld {
-// MMM
-//   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
-//   type Listener = TxnModel.Listener[ Update ]
-   var TIMEOUT_MILLIS = 10000L
+  // MMM
+  //   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
+  //   type Listener = TxnModel.Listener[ Update ]
+  //   var TIMEOUT_MILLIS = 10000L
 
-   var DEBUG = false
+  var DEBUG = false
 }
 
 final class ProcWorld(val server: Server) {
-   import ProcWorld._
 
-// EEE
-//   private type Topo = Topology[ AuralProc, ProcEdge ]
-   val ugenGraphs = Ref( Map.empty[ ProcDemiurg.GraphEquality, SynthDef ])
-// EEE
-//   private val topologyRef = Ref[ Topo ]( Topology.empty )
+  import ProcWorld._
 
-// MMM
-//   protected def fullUpdate( implicit tx: Txn ) = Update( topologyRef().vertices.toSet, Set.empty )
-//   protected def emptyUpdate = Update( Set.empty, Set.empty )
+  // EEE
+  //   private type Topo = Topology[ AuralProc, ProcEdge ]
+  val ugenGraphs = Ref(Map.empty[ProcDemiurg.GraphEquality, SynthDef])
+  // EEE
+  //   private val topologyRef = Ref[ Topo ]( Topology.empty )
 
-// EEE
-//   def topology( implicit tx: Txn ) = topologyRef()
+  // MMM
+  //   protected def fullUpdate( implicit tx: Txn ) = Update( topologyRef().vertices.toSet, Set.empty )
+  //   protected def emptyUpdate = Update( Set.empty, Set.empty )
 
-   def addProc( p: AuralProc )( implicit tx: Txn ) {
-// MMM
-//      touch()
+  // EEE
+  //   def topology( implicit tx: Txn ) = topologyRef()
 
-// EEE
-//      topologyRef.transform( _.addVertex( p ))
+  def addProc(p: AuralProc)(implicit tx: Txn) {
+    // MMM
+    //      touch()
 
-// MMM
-//      updateRef.transform( u => if( u.procsRemoved.contains( p )) {
-//          u.copy( procsRemoved = u.procsRemoved - p )
-//      } else {
-//          u.copy( procsAdded   = u.procsAdded   + p )
-//      })
-   }
+    // EEE
+    //      topologyRef.transform( _.addVertex( p ))
 
-   def removeProc( p: AuralProc )( implicit tx: Txn ) {
-// MMM
-//      touch()
+    // MMM
+    //      updateRef.transform( u => if( u.procsRemoved.contains( p )) {
+    //          u.copy( procsRemoved = u.procsRemoved - p )
+    //      } else {
+    //          u.copy( procsAdded   = u.procsAdded   + p )
+    //      })
+  }
 
-// EEE
-//      topologyRef.transform( _ removeVertex p )
+  def removeProc(p: AuralProc)(implicit tx: Txn) {
+    // MMM
+    //      touch()
 
-// MMM
-//      updateRef.transform( u => if( u.procsAdded.contains( p )) {
-//          u.copy( procsAdded = u.procsAdded - p )
-//      } else {
-//          u.copy( procsRemoved = u.procsRemoved + p )
-//      })
-   }
+    // EEE
+    //      topologyRef.transform( _ removeVertex p )
 
-// EEE
-//   def addEdge( e: ProcEdge )( implicit tx: Txn ) : Option[ (Topo, Proc, IIdxSeq[ Proc ])] = {
-//      val res = topologyRef().addEdge( e )
-//      res.foreach( tup => topologyRef.set( tup._1 ))
-//      res
-//   }
-//
-//   def removeEdge( e: ProcEdge )( implicit tx: Txn ) {
-//      topologyRef.transform( _.removeEdge( e ))
-//   }
+    // MMM
+    //      updateRef.transform( u => if( u.procsAdded.contains( p )) {
+    //          u.copy( procsAdded = u.procsAdded - p )
+    //      } else {
+    //          u.copy( procsRemoved = u.procsRemoved + p )
+    //      })
+  }
 
-   private val sync              = new AnyRef
-   private var bundleWaiting     = IntMap.empty[ IIdxSeq[ () => Unit ]]
-   private var bundleReplySeen   = -1
-   private val msgStampRef       = Ref( 0 )
+  // EEE
+  //   def addEdge( e: ProcEdge )( implicit tx: Txn ) : Option[ (Topo, Proc, IIdxSeq[ Proc ])] = {
+  //      val res = topologyRef().addEdge( e )
+  //      res.foreach( tup => topologyRef.set( tup._1 ))
+  //      res
+  //   }
+  //
+  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ) {
+  //      topologyRef.transform( _.removeEdge( e ))
+  //   }
 
-   private[proc] def messageTimeStamp : Ref[ Int ] = msgStampRef
+  private val sync = new AnyRef
+  private var bundleWaiting = IntMap.empty[IIdxSeq[() => Unit]]
+  private var bundleReplySeen = -1
+  private val msgStampRef = Ref(0)
 
-   def send( bundles: Txn.Bundles ) {
-      // basically:
-      // bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
-      //   val dep = bundles.firstCnt - 1 + idx
-      //   if( seen( dep ) || msgs.forall( _.isSynchronous ) {
-      //     sendOutStraight()
-      //     notifySeen( dep )
-      //   } else {
-      //     addToWaitList()
-      //   }
+  private[proc] def messageTimeStamp: Ref[Int] = msgStampRef
 
-      def advance( cnt: Int ) {
-if( DEBUG ) println( "ADVANCE " + cnt )
-         sync.synchronized {
-            var i = bundleReplySeen + 1
-            if( i <= cnt ) {
-               bundleReplySeen = cnt
-               while( i <= cnt ) {
-                  bundleWaiting.get( i ).foreach { sq =>
-                     bundleWaiting -= i
-                     sq.foreach( _.apply() )
-                  }
-               i += 1 }
+  def send(bundles: Txn.Bundles) {
+    // basically:
+    // bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
+    //   val dep = bundles.firstCnt - 1 + idx
+    //   if( seen( dep ) || msgs.forall( _.isSynchronous ) {
+    //     sendOutStraight()
+    //     notifySeen( dep )
+    //   } else {
+    //     addToWaitList()
+    //   }
+
+    def advance(cnt: Int) {
+      if (DEBUG) println("ADVANCE " + cnt)
+      sync.synchronized {
+        var i = bundleReplySeen + 1
+        if (i <= cnt) {
+          bundleReplySeen = cnt
+          while (i <= cnt) {
+            bundleWaiting.get(i).foreach {
+              sq =>
+                bundleWaiting -= i
+                sq.foreach(_.apply())
             }
-         }
+            i += 1
+          }
+        }
       }
+    }
 
-      def sendNow( msgs: IIdxSeq[ osc.Message with message.Send ], allSync: Boolean, cnt: Int ) {
-         val peer       = server.peer
-if( DEBUG ) println( "SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt )
-         if( allSync ) {
-            val p = msgs match {
-               case IIdxSeq( msg ) if allSync => msg
-               case _ => osc.Bundle.now( msgs: _* )
-            }
-            peer ! p
-            advance( cnt )
+    def sendNow(msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int) {
+      val peer = server.peer
+      if (DEBUG) println("SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt)
+      if (allSync) {
+        val p = msgs match {
+          case IIdxSeq(msg) if allSync => msg
+          case _ => osc.Bundle.now(msgs: _*)
+        }
+        peer ! p
+        advance(cnt)
 
-         } else {
-            val syncMsg    = peer.syncMsg()
-            val syncID     = syncMsg.id
-            val bndl       = osc.Bundle.now( (msgs :+ syncMsg): _* )
-            peer.!? (bndl, TIMEOUT_MILLIS) {
-               case message.Synced(`syncID` ) =>
-                 advance(cnt)
-               case message.TIMEOUT =>
-                  logTxn( "TIMEOUT while sending OSC bundle!" )
-                  advance(cnt)
-            }
-         }
+      } else {
+        val syncMsg = peer.syncMsg()
+        val syncID = syncMsg.id
+        val bndl = osc.Bundle.now((msgs :+ syncMsg): _*)
+        val fut = peer.!!(bndl) {
+          case message.Synced(`syncID`) =>
+            advance(cnt)
+        }
+        fut.onFailure({
+          case message.Timeout() =>
+            logTxn("TIMEOUT while sending OSC bundle!")
+            advance(cnt)
+
+        })(peer.clientConfig.executionContext)
       }
+    }
 
-      val cntOff = bundles.firstCnt
-      bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
-         val cnt     = cntOff + idx
-         val depCnt  = cnt - 1
-         val allSync = msgs.forall( _.isSynchronous )
-         sync.synchronized {
-            if( bundleReplySeen >= depCnt /* || allSync */) {
-               sendNow( msgs, allSync, cnt )
-            } else {
-if( DEBUG ) println( "WAIT FOR DEP " + depCnt + " TO SEND " + msgs )
-               bundleWaiting += depCnt -> (bundleWaiting.getOrElse( depCnt, IIdxSeq.empty ) :+ { () =>
-                  sendNow( msgs, allSync, cnt )
-               })
-            }
-         }
-      }
-   }
+    val cntOff = bundles.firstCnt
+    bundles.payload.zipWithIndex.foreach {
+      case (msgs, idx) =>
+        val cnt     = cntOff + idx
+        val depCnt  = cnt - 1
+        val allSync = msgs.forall(_.isSynchronous)
+        sync.synchronized {
+          if (bundleReplySeen >= depCnt /* || allSync */ ) {
+            sendNow(msgs, allSync, cnt)
+          } else {
+            if (DEBUG) println("WAIT FOR DEP " + depCnt + " TO SEND " + msgs)
+            bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, IIdxSeq.empty) :+ { () =>
+              sendNow(msgs, allSync, cnt)
+            })
+          }
+        }
+    }
+  }
 }
 
 // MMM

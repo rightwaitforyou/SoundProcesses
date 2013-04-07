@@ -25,23 +25,26 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{io, stm, event => evt, expr}
+import de.sciss.lucre.{stm, event => evt, expr}
 import evt.{Targets, Sys}
 import annotation.switch
 import expr.Expr
-import io.{DataOutput, DataInput}
+import de.sciss.serial.{DataOutput, DataInput}
 
-object Longs extends BiTypeImpl[ Long ] {
-   final val typeID = 3
+object Longs extends BiTypeImpl[Long] {
+  final val typeID = 3
 
-   /* protected */ def readValue( in: DataInput ) : Long = in.readLong()
-   /* protected */ def writeValue( value: Long, out: DataOutput ) { out.writeLong( value )}
+  /* protected */ def readValue(in: DataInput): Long = in.readLong()
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                ( implicit tx: S#Tx ) : ExN[ S ] = {
-      (cookie: @switch) match {
-         case 1 =>
-            val tpe  = in.readInt()
+  /* protected */ def writeValue(value: Long, out: DataOutput) {
+    out.writeLong(value)
+  }
+
+  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                            (implicit tx: S#Tx): ExN[S] = {
+    (cookie: @switch) match {
+      case 1 =>
+        val tpe  = in.readInt()
             require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
             val opID = in.readInt()
             import UnaryOp._

@@ -27,19 +27,20 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, io, stm, data}
+import de.sciss.lucre.{event => evt, data}
 import data.SkipList
 import evt.{EventLike, impl => evti, Sys}
-import io.{DataOutput, DataInput}
+import de.sciss.serial.{DataOutput, DataInput, Serializer}
 
 object KeyMapImpl {
-   trait ValueInfo[ S <: Sys[ S ], Key, Value, ValueUpd ] {
-      def valueEvent( value: Value ) : EventLike[ S, ValueUpd, Value ]
-      def keySerializer : io.Serializer[ S#Tx, S#Acc, Key ]
-      def valueSerializer : io.Serializer[ S#Tx, S#Acc, Value ]
-   }
+  trait ValueInfo[S <: Sys[S], Key, Value, ValueUpd] {
+    def valueEvent(value: Value): EventLike[S, ValueUpd, Value]
 
-   implicit def entrySerializer[ S <: Sys[ S ], Key, Value, ValueUpd ]( implicit info: ValueInfo[ S, Key, Value, ValueUpd ])
+    def keySerializer  : Serializer[S#Tx, S#Acc, Key]
+    def valueSerializer: Serializer[S#Tx, S#Acc, Value]
+  }
+
+  implicit def entrySerializer[ S <: Sys[ S ], Key, Value, ValueUpd ]( implicit info: ValueInfo[ S, Key, Value, ValueUpd ])
    : evt.Serializer[ S, Entry[ S, Key, Value, ValueUpd ]] = new EntrySer
 
    private final class EntrySer[ S <: Sys[ S ], Key, Value, ValueUpd ]( implicit info: ValueInfo[ S, Key, Value, ValueUpd ])

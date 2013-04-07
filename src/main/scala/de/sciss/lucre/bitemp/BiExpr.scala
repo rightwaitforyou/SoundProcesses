@@ -29,7 +29,7 @@ package bitemp
 import expr.Expr
 import de.sciss.lucre.{event => evt}
 import evt.Targets
-import io.{DataInput, DataOutput}
+import de.sciss.serial.{DataOutput, DataInput}
 
 object BiExpr {
    def apply[ S <: evt.Sys[ S ], A ]( time: Expr[ S, Long ], mag: Expr[ S, A ])

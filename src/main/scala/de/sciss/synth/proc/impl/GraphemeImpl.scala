@@ -27,16 +27,16 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, bitemp, io}
+import de.sciss.lucre.{event => evt, bitemp}
 import bitemp.BiPin
 import de.sciss.synth.expr.Longs
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.{Event, impl => evti, Sys}
-import io.{DataOutput, DataInput}
 import proc.Grapheme.Segment
 import annotation.tailrec
 import de.sciss.span.Span
+import de.sciss.serial.{DataOutput, DataInput}
 
 object GraphemeImpl {
    import Grapheme.{Elem, TimedElem, Value, Modifiable}

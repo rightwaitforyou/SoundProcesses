@@ -15,17 +15,18 @@ scalaVersion := "2.10.1"
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= {
-  val confluentVersion = "1.9.+"
-  val eventVersion     = "1.9.+"
-  val stmVersion       = "1.8.+"
+  val confluentVersion = "2.0.+"
+  val eventVersion     = "2.0.+"
+  val stmVersion       = "2.0.+"
   Seq(
-    "de.sciss" %% "scalacollider" % "1.5.+",
-    "de.sciss" % "prefuse-core" % "0.21",
+    "de.sciss" %% "scalacollider"   % "1.6.+",
+    "de.sciss" %  "prefuse-core"    % "0.21",
     "de.sciss" %% "lucreconfluent"  % confluentVersion,
     "de.sciss" %% "lucreevent-expr" % eventVersion,
-    "de.sciss" %% "lucrestm-bdb"    % stmVersion % "test",
-    "de.sciss" %% "span"            % "1.1.+",
-    "org.scalatest" %% "scalatest" % "1.9.1" % "test"
+    "de.sciss" %% "span"            % "1.2.+",
+
+    "de.sciss"      %% "lucrestm-bdb" % stmVersion % "test",
+    "org.scalatest" %% "scalatest"    % "1.9.1"    % "test"
   )
 }
 

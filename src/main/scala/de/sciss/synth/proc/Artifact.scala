@@ -26,9 +26,8 @@
 package de.sciss.synth.proc
 
 import java.io.File
-import de.sciss.lucre.{stm, io}
 import impl.{ArtifactImpl => Impl}
-import io.{Writable, ImmutableSerializer, DataInput}
+import de.sciss.serial.{Writable, ImmutableSerializer, DataInput}
 
 object Artifact {
    def apply( path: String ) : Artifact = Impl( path )

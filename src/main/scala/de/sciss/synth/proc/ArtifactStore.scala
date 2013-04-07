@@ -25,10 +25,10 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt, io, stm, data}
-import io.{Writable, DataInput}
+import de.sciss.lucre.{event => evt, stm, data}
 import java.io.File
 import impl.{ArtifactStoreImpl => Impl}
+import de.sciss.serial.{Writable, Serializer, DataInput}
 
 object ArtifactStore {
   def tmp[S <: evt.Sys[S]]()(implicit tx: S#Tx): ArtifactStore[S] = {
@@ -41,7 +41,7 @@ object ArtifactStore {
 
   def apply[S <: evt.Sys[S]](baseDirectory: File)(implicit tx: S#Tx): ArtifactStore[S] = Impl[S](baseDirectory)
 
-  def serializer[S <: evt.Sys[S]]: io.Serializer[S#Tx, S#Acc, ArtifactStore[S]] = Impl.serializer[S]
+  def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] = Impl.serializer[S]
 
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] = Impl.read[S](in, access)
 }

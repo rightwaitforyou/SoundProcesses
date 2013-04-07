@@ -1,13 +1,14 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{stm, bitemp, expr, event => evt, io}
+import de.sciss.lucre.{stm, bitemp, expr, event => evt}
 import stm.Cursor
 import bitemp.{BiExpr, BiType, BiGroup, Chronos}
 import expr.Expr
 import java.awt.EventQueue
 import de.sciss.synth.io.AudioFile
 import de.sciss.span.{Span, SpanLike}
+import de.sciss.serial.Serializer
 
 //import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
@@ -71,16 +72,16 @@ extends ExprImplicits[ S ] {
    private type PG = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
    type Acc = PG // (PG, ProcTransport[ S ])
 
-   object Implicits {
-//      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
-      implicit val spanLikes: BiType[ SpanLike ] = SpanLikes
-      private implicit val procSer: io.Serializer[S#Tx, S#Acc, Proc[S]] = Proc.serializer[ S ]
-      implicit val procVarSer: io.Serializer[ S#Tx, S#Acc, PG ] = BiGroup.Modifiable.serializer[ S, Proc[ S ], Proc.Update[ S ]]( _.changed )
-//      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-//      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
-   }
+  object Implicits {
+    //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
+    implicit val spanLikes: BiType[SpanLike] = SpanLikes
+    private implicit val procSer: Serializer[S#Tx, S#Acc, Proc[S]] = Proc.serializer[S]
+    implicit val procVarSer: Serializer[S#Tx, S#Acc, PG] = BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](_.changed)
+    //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
+    //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
+  }
 
-   import Implicits._
+  import Implicits._
 
    lazy val access: S#Entry[ Acc ] = system.root { implicit tx =>
       implicit def longType = Longs

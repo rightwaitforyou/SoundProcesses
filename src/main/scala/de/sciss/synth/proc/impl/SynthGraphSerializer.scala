@@ -28,13 +28,13 @@ package proc
 package impl
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
-import de.sciss.lucre.io.{DataInput, DataOutput, ImmutableSerializer}
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 
 /**
  * A serializer using plain old java (object output) serialization
  */
-object SynthGraphSerializer extends ImmutableSerializer[ SynthGraph ] {
-//   private final val SER_VERSION = 1
+object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
+  //   private final val SER_VERSION = 1
 
   def write(v: SynthGraph, out: DataOutput) {
     val oos = new ObjectOutputStream(out.asOutputStream)

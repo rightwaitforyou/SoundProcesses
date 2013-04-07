@@ -31,7 +31,7 @@ import de.sciss.lucre.{event => evt}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import evt.{EventLike, Sys}
 import stm.Disposable
-import io.{DataInput, Writable}
+import de.sciss.serial.{Writable, Serializer, DataInput}
 
 object BiPin {
   final case class Update[S <: Sys[S], A](pin: BiPin[S, A], changes: IIdxSeq[Change[S, A]])
@@ -51,37 +51,38 @@ object BiPin {
   type Leaf[S <: Sys[S], A] = IIdxSeq[BiExpr[S, A]]
 
   object Modifiable {
-      /**
-       * Extractor to check if a `BiPin` is actually a `BiPin.Modifiable`
-       */
-      def unapply[ S <: Sys[ S ], A ]( v: BiPin[ S, A ]) : Option[ Modifiable[ S, A ]] = {
-         if( v.isInstanceOf[ Modifiable[ _, _ ]]) Some( v.asInstanceOf[ Modifiable[ S, A ]]) else None
-      }
+    /**
+     * Extractor to check if a `BiPin` is actually a `BiPin.Modifiable`
+     */
+    def unapply[S <: Sys[S], A](v: BiPin[S, A]): Option[Modifiable[S, A]] = {
+      if (v.isInstanceOf[Modifiable[_, _]]) Some(v.asInstanceOf[Modifiable[S, A]]) else None
+    }
 
-      def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                                  ( implicit tx: S#Tx, biType: BiType[ A ]) : Modifiable[ S, A ] = {
-         Impl.readModifiable[ S, A ]( in, access )
-      }
+    def read[S <: Sys[S], A](in: DataInput, access: S#Acc)
+                            (implicit tx: S#Tx, biType: BiType[A]): Modifiable[S, A] = {
+      Impl.readModifiable[S, A](in, access)
+    }
 
-      def apply[ S <: Sys[ S ], A ]( implicit tx: S#Tx, biType: BiType[ A ]) : Modifiable[ S, A ] =
-         Impl.newModifiable[ S, A ]
+    def apply[S <: Sys[S], A](implicit tx: S#Tx, biType: BiType[A]): Modifiable[S, A] =
+      Impl.newModifiable[S, A]
 
-      def serializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : io.Serializer[ S#Tx, S#Acc, BiPin.Modifiable[ S, A ]] =
-         Impl.modifiableSerializer[ S, A ]
-   }
-   trait Modifiable[ S <: Sys[ S ], A ] extends BiPin[ S, A ] {
-      def add(    elem: BiExpr[ S, A ])( implicit tx: S#Tx ) : Unit
-      def remove( elem: BiExpr[ S, A ])( implicit tx: S#Tx ) : Boolean
-      def clear()( implicit tx: S#Tx ) : Unit
-   }
+    def serializer[S <: Sys[S], A](implicit biType: BiType[A]): Serializer[S#Tx, S#Acc, BiPin.Modifiable[S, A]] =
+      Impl.modifiableSerializer[S, A]
+  }
 
-   def read[ S <: Sys[ S ], A ]( in: DataInput, access: S#Acc )
-                               ( implicit tx: S#Tx, biType: BiType[ A ]) : BiPin[ S, A ] = {
-      Impl.read[ S, A ]( in, access )
-   }
+  trait Modifiable[S <: Sys[S], A] extends BiPin[S, A] {
+    def add(elem: BiExpr[S, A])(implicit tx: S#Tx): Unit
+    def remove(elem: BiExpr[S, A])(implicit tx: S#Tx): Boolean
+    def clear()(implicit tx: S#Tx): Unit
+  }
 
-   def serializer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ]) : io.Serializer[ S#Tx, S#Acc, BiPin[ S, A ]] =
-      Impl.serializer[ S, A ]
+  def read[S <: Sys[S], A](in: DataInput, access: S#Acc)
+                          (implicit tx: S#Tx, biType: BiType[A]): BiPin[S, A] = {
+    Impl.read[S, A](in, access)
+  }
+
+  def serializer[S <: Sys[S], A](implicit biType: BiType[A]): Serializer[S#Tx, S#Acc, BiPin[S, A]] =
+    Impl.serializer[S, A]
 }
 
 sealed trait BiPin[S <: Sys[S], A] extends Writable with Disposable[S#Tx] {

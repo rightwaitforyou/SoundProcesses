@@ -25,19 +25,22 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{io, stm, event => evt, expr}
+import de.sciss.lucre.{stm, event => evt, expr}
 import evt.{Targets, Sys}
 import annotation.switch
 import expr.Expr
-import io.{DataOutput, DataInput}
+import de.sciss.serial.{DataOutput, DataInput}
 
-object Ints extends BiTypeImpl[ Int ] {
-   final val typeID = 2
+object Ints extends BiTypeImpl[Int] {
+  final val typeID = 2
 
-   /* protected */ def readValue( in: DataInput ) : Int = in.readInt()
-   /* protected */ def writeValue( value: Int, out: DataOutput ) { out.writeInt( value )}
+  /* protected */ def readValue(in: DataInput): Int = in.readInt()
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
+  /* protected */ def writeValue(value: Int, out: DataOutput) {
+    out.writeInt(value)
+  }
+
+  def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
                                 ( implicit tx: S#Tx ) : ExN[ S ] = {
       (cookie: @switch) match {
          case 1 =>

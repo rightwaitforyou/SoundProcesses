@@ -26,11 +26,11 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, io, data}
+import de.sciss.lucre.{event => evt, data}
 import impl.{ScanImpl => Impl}
 import evt.Event
-import io.DataInput
 import language.implicitConversions
+import de.sciss.serial.DataInput
 
 object Scan {
    object Link {
@@ -39,11 +39,11 @@ object Scan {
 
       final case class Grapheme[ S <: evt.Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] {
          def id = peer.id
-         override def toString = peer.toString
+         override def toString = peer.toString()
       }
       final case class Scan[     S <: evt.Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] {
          def id = peer.id
-         override def toString = peer.toString
+         override def toString = peer.toString()
       }
    }
    sealed trait Link[ S <: evt.Sys[ S ]] { def id: S#ID }

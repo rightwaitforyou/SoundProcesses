@@ -26,7 +26,7 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, io, bitemp, expr}
+import de.sciss.lucre.{event => evt, bitemp, expr}
 import impl.CommonSerializers
 import expr.Expr
 import bitemp.{BiType, BiExpr}
@@ -37,8 +37,8 @@ import annotation.switch
 import impl.{GraphemeImpl => Impl}
 import de.sciss.synth.io.AudioFileSpec
 import de.sciss.lucre.event.{Targets, Event}
-import io.{Writable, DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.span.{SpanLike, Span}
+import de.sciss.serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 
 object Grapheme {
   // If necessary for some views, we could eventually add the Elems, too,
@@ -47,7 +47,7 @@ object Grapheme {
   // where `trait StoredElem[ S <: evt.Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
   final case class Update[S <: evt.Sys[S]](grapheme: Grapheme[S], changes: IIdxSeq[Segment])
 
-  implicit def serializer[S <: evt.Sys[S]]: io.Serializer[S#Tx, S#Acc, Grapheme[S]] = Impl.serializer[S]
+  implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Grapheme[S]] = Impl.serializer[S]
 
   // 0 reserved for variables
   private final val curveCookie = 1
@@ -146,7 +146,7 @@ object Grapheme {
       }
       private[Value] def readIdentified(in: DataInput): Audio = {
         val artifact  = Artifact.read(in)
-        val spec      = CommonSerializers.AudioFileSpec.read(in)
+        val spec      = AudioFileSpec.Serializer.read(in)
         val offset    = in.readLong()
         val gain      = in.readDouble()
         Audio(artifact, spec, offset, gain)
@@ -159,7 +159,7 @@ object Grapheme {
       def write(out: DataOutput) {
         out.writeByte(audioCookie)
         artifact.write(out)
-        CommonSerializers.AudioFileSpec.write(spec, out)
+        AudioFileSpec.Serializer.write(spec, out)
         out.writeLong(offset)
         out.writeDouble(gain)
       }
@@ -270,7 +270,7 @@ object Grapheme {
       private[Grapheme] def readIdentifiedTuple[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                                 (implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
         val artifact  = Artifact.read(in)
-        val spec      = CommonSerializers.AudioFileSpec.read(in)
+        val spec      = AudioFileSpec.Serializer.read(in)
         val offset    = Longs.readExpr(in, access)
         val gain      = Doubles.readExpr(in, access)
         new AudioImpl(targets, artifact, spec, offset, gain)
@@ -384,7 +384,7 @@ object Grapheme {
       protected def writeData(out: DataOutput) {
         out.writeByte(audioCookie)
         artifact.write(out)
-        CommonSerializers.AudioFileSpec.write(spec, out)
+        AudioFileSpec.Serializer.write(spec, out)
         offset.write(out)
         gain.write(out)
       }
@@ -429,7 +429,7 @@ object Grapheme {
     def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
       Impl.readModifiable(in, access)
 
-    implicit def serializer[S <: evt.Sys[S]]: io.Serializer[S#Tx, S#Acc, Modifiable[S]] =
+    implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] =
       Impl.modifiableSerializer[S]
 
     /**

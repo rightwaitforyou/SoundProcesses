@@ -25,30 +25,34 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{io, stm, event => evt, expr, bitemp}
+import de.sciss.lucre.{stm, event => evt, expr}
 import evt.Targets
 import expr.Expr
-import io.{DataOutput, DataInput}
 import de.sciss.span.Span
+import de.sciss.serial.{DataOutput, DataInput}
 
-object Spans extends BiTypeImpl[ Span ] {
-   final val typeID = 10
+object Spans extends BiTypeImpl[Span] {
+  final val typeID = 10
 
-   /* protected */ def readValue( in: DataInput ) : Span = Span.read( in )
-   /* protected */ def writeValue( value: Span, out: DataOutput ) { value.write( out )}
+  /* protected */ def readValue(in: DataInput): Span = Span.read(in)
 
-//   def apply[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ]) : Ex[ S ] = ...
+  /* protected */ def writeValue(value: Span, out: DataOutput) {
+    value.write(out)
+  }
 
-   final class Ops[ S <: evt.Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
-      // ---- unary ----
-      def start  : Expr[ S, Long ] = UnaryOp.Start.make(  ex )
-      def stop   : Expr[ S, Long ] = UnaryOp.Stop.make(   ex )
-      def length : Expr[ S, Long ] = UnaryOp.Length.make( ex )
-      // ---- binary ----
-      def shift( delta: Expr[ S, Long ]) : Ex[ S ] = BinaryOp.Shift.make( ex, delta )
-   }
+  //   def apply[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ]) : Ex[ S ] = ...
 
-   // ---- protected ----
+  final class Ops[S <: evt.Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+    // ---- unary ----
+    def start : Expr[S, Long] = UnaryOp.Start.make(ex)
+    def stop  : Expr[S, Long] = UnaryOp.Stop.make(ex)
+    def length: Expr[S, Long] = UnaryOp.Length.make(ex)
+
+    // ---- binary ----
+    def shift(delta: Expr[S, Long]): Ex[S] = BinaryOp.Shift.make(ex, delta)
+  }
+
+  // ---- protected ----
 
    def readTuple[ S <: stm.Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : ExN[ S ] =
 //   case 3 =>

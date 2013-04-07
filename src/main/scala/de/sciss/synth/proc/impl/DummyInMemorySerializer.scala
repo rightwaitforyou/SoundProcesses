@@ -25,24 +25,27 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.{io, stm}
-import io.{DataInput, DataOutput}
+import de.sciss.lucre.stm
+import de.sciss.serial.{DataOutput, DataInput, Serializer}
 
 object DummySerializerFactory {
-   def apply[ I <: stm.Sys[ I ]] : DummySerializerFactory[ I ] = anySer.asInstanceOf[ DummySerializerFactory[ I ]]
+  def apply[I <: stm.Sys[I]]: DummySerializerFactory[I] = anySer.asInstanceOf[DummySerializerFactory[I]]
 
-   private val anySer = new Impl[ stm.InMemory, Nothing ]
+  private val anySer = new Impl[stm.InMemory, Nothing]
 
-   private class Impl[ I <: stm.Sys[ I ], A ]
-   extends io.Serializer[ I#Tx, I#Acc, A ] with DummySerializerFactory[ I ] {
-      implicit def dummySerializer[ A1 ] : io.Serializer[ I#Tx, I#Acc, A1 ] =
-         this.asInstanceOf[ io.Serializer[ I#Tx, I#Acc, A1 ]]
+  private class Impl[I <: stm.Sys[I], A]
+    extends Serializer[I#Tx, I#Acc, A] with DummySerializerFactory[I] {
 
-      def write( v: A, out: DataOutput) {}
-      def read( in: DataInput, access: I#Acc )( implicit tx: I#Tx ) : A =
-         sys.error( "Operation not supported" )
-   }
+    implicit def dummySerializer[A1]: Serializer[I#Tx, I#Acc, A1] =
+      this.asInstanceOf[Serializer[I#Tx, I#Acc, A1]]
+
+    def write(v: A, out: DataOutput) {}
+
+    def read(in: DataInput, access: I#Acc)(implicit tx: I#Tx): A =
+      sys.error("Operation not supported")
+  }
 }
-trait DummySerializerFactory[ I <: stm.Sys[ I ]] {
-   implicit def dummySerializer[ A ] : io.Serializer[ I#Tx, I#Acc, A ]
+
+trait DummySerializerFactory[I <: stm.Sys[I]] {
+  implicit def dummySerializer[A]: Serializer[I#Tx, I#Acc, A]
 }

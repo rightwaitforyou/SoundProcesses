@@ -29,7 +29,7 @@ package proc
 package impl
 
 import java.io.File
-import lucre.io.{DataOutput, ImmutableSerializer, DataInput}
+import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 
 object ArtifactImpl {
    private final val SER_VERSION = 1

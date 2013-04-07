@@ -29,9 +29,9 @@ package proc
 package impl
 
 import java.io.File
-import lucre.{io, stm, expr, data, event => evt}
+import lucre.{stm, expr, data, event => evt}
 import expr.LinkedList
-import io.{DataOutput, DataInput}
+import de.sciss.serial.{DataOutput, Serializer, DataInput}
 
 object ArtifactStoreImpl {
   private final val SER_VERSION = 1
@@ -41,7 +41,7 @@ object ArtifactStoreImpl {
     new Impl[S](ll, baseDirectory)
   }
 
-  def serializer[S <: evt.Sys[S]]: io.Serializer[S#Tx, S#Acc, ArtifactStore[S]] = new Ser[S]
+  def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] = new Ser[S]
 
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] = {
     val cookie = in.readUnsignedByte()
@@ -53,7 +53,7 @@ object ArtifactStoreImpl {
   }
 
   private final class Ser[S <: evt.Sys[S]]
-    extends io.Serializer[S#Tx, S#Acc, ArtifactStore[S]] {
+    extends Serializer[S#Tx, S#Acc, ArtifactStore[S]] {
     def write(v: ArtifactStore[S], out: DataOutput) {
       v.write(out)
     }

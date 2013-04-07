@@ -26,10 +26,10 @@
 package de.sciss.synth
 package expr
 
-import de.sciss.lucre.{io, stm, event => evt}
+import de.sciss.lucre.{stm, event => evt}
 import annotation.switch
 import de.sciss.synth
-import io.{DataOutput, DataInput}
+import de.sciss.serial.{DataInput, DataOutput}
 
 object Doubles extends BiTypeImpl[ Double ] {
    final val typeID = 5
@@ -516,10 +516,10 @@ object Doubles extends BiTypeImpl[ Double ] {
       def wrap2( b: E ) : E     = Wrap2.make( ex, b )
    // def firstarg( b: Double ) : Double  = d
 
-//      def linlin( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
-//         rd.linlin( d, srcLo, srcHi, dstLo, dstHi )
-//
-//      def linexp( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
-//         rd.linexp( d, srcLo, srcHi, dstLo, dstHi )
+     //      def linlin( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
+     //         rd.linlin( d, srcLo, srcHi, dstLo, dstHi )
+     //
+     //      def linexp( srcLo: Double, srcHi: Double, dstLo: Double, dstHi: Double ) : Double =
+     //         rd.linexp( d, srcLo, srcHi, dstLo, dstHi )
    }
 }

@@ -27,8 +27,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, io, stm}
-import io.{DataOutput, DataInput}
+import de.sciss.lucre.{event => evt, stm}
 import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -37,6 +36,7 @@ import proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
 import java.io.File
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 object AuralPresentationImpl {
    def run[ S <: Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
@@ -142,9 +142,9 @@ object AuralPresentationImpl {
    }
 
    // this is plain stupid... another reason why the scan should reproduce the proc and key
-   private def idSerializer[ S <: stm.Sys[ S ]] : io.Serializer[ S#Tx, S#Acc, S#ID ] = anyIDSer.asInstanceOf[ io.Serializer[ S#Tx, S#Acc, S#ID ]]
+   private def idSerializer[ S <: stm.Sys[ S ]] : Serializer[ S#Tx, S#Acc, S#ID ] = anyIDSer.asInstanceOf[ Serializer[ S#Tx, S#Acc, S#ID ]]
    private val anyIDSer = new IDSer[ stm.InMemory ]
-   private final class IDSer[ S <: stm.Sys[ S ]] extends io.Serializer[ S#Tx, S#Acc, S#ID ] {
+   private final class IDSer[ S <: stm.Sys[ S ]] extends Serializer[ S#Tx, S#Acc, S#ID ] {
       def write( id: S#ID, out: DataOutput ) { id.write( out )}
       def read( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : S#ID = tx.readID( in, access )
    }

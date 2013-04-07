@@ -25,20 +25,23 @@
 
 package de.sciss.synth.expr
 
-import de.sciss.lucre.{io, stm, event => evt, expr, bitemp}
+import de.sciss.lucre.{stm, event => evt, expr, bitemp}
 import evt.{Targets, Sys}
 import expr.Expr
 import annotation.switch
-import io.{DataOutput, DataInput}
 import de.sciss.span.{Span, SpanLike}
+import de.sciss.serial.{DataOutput, DataInput}
 
-object SpanLikes extends BiTypeImpl[ SpanLike ] {
-   final val typeID = 9
+object SpanLikes extends BiTypeImpl[SpanLike] {
+  final val typeID = 9
 
-   /* protected */ def readValue( in: DataInput ) : SpanLike = SpanLike.read( in )
-   /* protected */ def writeValue( value: SpanLike, out: DataOutput ) { value.write( out )}
+  /* protected */ def readValue(in: DataInput): SpanLike = SpanLike.read(in)
 
-   def newExpr[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] =
+  /* protected */ def writeValue(value: SpanLike, out: DataOutput) {
+    value.write(out)
+  }
+
+  def newExpr[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] =
       BinaryOp.Apply.make( start, stop )
 
    def from[ S <: Sys[ S ]]( start: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] =
