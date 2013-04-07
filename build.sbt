@@ -24,7 +24,6 @@ libraryDependencies ++= {
     "de.sciss" %% "lucreconfluent"  % confluentVersion,
     "de.sciss" %% "lucreevent-expr" % eventVersion,
     "de.sciss" %% "span"            % "1.2.+",
-
     "de.sciss"      %% "lucrestm-bdb" % stmVersion % "test",
     "org.scalatest" %% "scalatest"    % "1.9.1"    % "test"
   )
