@@ -39,93 +39,106 @@ import java.io.File
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 object AuralPresentationImpl {
-   def run[ S <: Sys[ S ], I <: stm.Sys[ I ]]( transport: ProcTransport[ S ], aural: AuralSystem[ S ])
-                                             ( implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
-                                               artifactStore: ArtifactStore[ S ]) : AuralPresentation[ S ] = {
+  def run[S <: Sys[S], I <: stm.Sys[I]](transport: ProcTransport[S], aural: AuralSystem[S])
+                                       (implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
+                                        artifactStore: ArtifactStore[S]): AuralPresentation[S] = {
 
-      val dummy = DummySerializerFactory[ I ]
-      import dummy._
-      implicit val itx: I#Tx  = tx
-      val id                  = itx.newID()
-      val running             = itx.newVar[ Option[ RunningImpl[ S ]]]( id, None )
-      val c                   = new Client[ S, I ]( running, transport, aural )
-      aural.addClient( c )
-      c
-   }
+    val dummy = DummySerializerFactory[I]
+    import dummy._
+    implicit val itx: I#Tx  = tx
+    val id                  = itx.newID()
+    val running             = itx.newVar[Option[RunningImpl[S]]](id, None)
+    val storeHolder         = tx.newHandle(artifactStore)
+    val c                   = new Client[S, I](running, transport, aural, storeHolder)
+    aural.addClient(c)
+    c
+  }
 
-   private final class Client[ S <: Sys[ S ], I <: stm.Sys[ I ]]( running: I#Var[ Option[ RunningImpl[ S ]]],
-                                                                  transport: ProcTransport[ S ],
-                                                                  aural: AuralSystem[ S ])
-                                                                ( implicit /* cursor: Cursor[ S ], */ bridge: S#Tx => I#Tx,
-                                                                  artifactStore: ArtifactStore[ S ])
-   extends AuralPresentation[ S ] with AuralSystem.Client[ S ] {
+  private final class Client[S <: Sys[S], I <: stm.Sys[I]](running: I#Var[Option[RunningImpl[S]]],
+                                                           transport: ProcTransport[S],
+                                                           aural: AuralSystem[S],
+                                                           artifactStore: stm.Source[S#Tx, ArtifactStore[S]])
+                                                          (implicit /* cursor: Cursor[ S ], */ bridge: S#Tx => I#Tx)
+    extends AuralPresentation[S] with AuralSystem.Client[S] {
 
-      override def toString = "AuralPresentation@" + hashCode.toHexString
+    override def toString = "AuralPresentation@" + hashCode.toHexString
 
-      private val groupRef = Ref( Option.empty[ Group ])
+    private val groupRef = Ref(Option.empty[Group])
 
-      def dispose()( implicit tx: S#Tx ) {
-         // XXX TODO dispose running
+    def dispose()(implicit tx: S#Tx) {
+      // XXX TODO dispose running
+    }
+
+    def stopped()(implicit tx: S#Tx) {
+      implicit val itx: I#Tx = tx
+      aural.removeClient(this)
+      running().foreach { impl =>
+        // XXX TODO dispose
+        running() = None
+      }
+    }
+
+    def group(implicit tx: S#Tx): Option[Group] = groupRef.get(tx.peer)
+
+    def started(server: Server)(implicit tx: S#Tx) {
+      implicit val itx: I#Tx = tx
+
+      val viewMap: IdentifierMap[S#ID, S#Tx, AuralProc] = tx.newInMemoryIDMap
+      val scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])] = tx.newInMemoryIDMap
+
+      val group = Group(server)()
+      //         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
+      groupRef.set(Some(group))(tx.peer)
+
+      val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate, artifactStore)
+      log("started" + " (" + booted.hashCode.toHexString + ")")
+      ProcDemiurg.addServer(server) // ( ProcTxn()( tx ))
+      //            transport.react { x => println( "Aural observation: " + x )}
+
+      def t_play(time: Long)(implicit tx: S#Tx) {
+        transport.iterator.foreach {
+          case (_, timed) => booted.procAdded(time, timed)
+        }
       }
 
-      def stopped()( implicit tx: S#Tx ) {
-         implicit val itx: I#Tx = tx
-         aural.removeClient( this )
-         running().foreach { impl =>
-            // XXX TODO dispose
-           running() = None
-         }
+      def t_stop(time: Long)(implicit tx: S#Tx) {
+        transport.iterator.foreach {
+          case (_, timed) => booted.procRemoved(timed)
+        }
       }
 
-      def group( implicit tx: S#Tx ) : Option[ Group ] = groupRef.get( tx.peer )
+      if (transport.isPlaying) t_play(transport.time)
 
-      def started( server: Server )( implicit tx: S#Tx ) {
-         implicit val itx: I#Tx = tx
+      transport.reactTx {
+        implicit tx => {
+          // only when playing
+          case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
+            log("at " + time + " added " + added.mkString("[", ", ", "]") +
+              "; removed " + removed.mkString("[", ", ", "]") +
+              "; changes? " + changes.nonEmpty + " (" + booted.hashCode.toHexString + ")")
+            removed.foreach {
+              timed => booted.procRemoved(timed)
+            }
+            changes.foreach {
+              case (timed, m) => booted.procUpdated(timed, m)
+            }
+            added.foreach {
+              timed => booted.procAdded(time, timed)
+            }
 
-         val viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ]                           = tx.newInMemoryIDMap
-         val scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ]) ]  = tx.newInMemoryIDMap
+          case Transport.Play(tr, time) => t_play(time)
+          case Transport.Stop(tr, time) => t_stop(time)
 
-         val group   = Group( server )()
-//         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
-         groupRef.set( Some( group ))( tx.peer )
-
-         val booted  = new RunningImpl( server, group, viewMap, scanMap, transport.sampleRate )
-         log( "started" + " (" + booted.hashCode.toHexString + ")" )
-         ProcDemiurg.addServer( server ) // ( ProcTxn()( tx ))
-//            transport.react { x => println( "Aural observation: " + x )}
-
-         def t_play( time: Long )( implicit tx: S#Tx ) {
-            transport.iterator.foreach { case (_, timed) => booted.procAdded( time, timed )}
-         }
-
-         def t_stop( time: Long )( implicit tx: S#Tx ) {
-            transport.iterator.foreach { case (_, timed) => booted.procRemoved( timed )}
-         }
-
-         if( transport.isPlaying ) t_play( transport.time )
-
-         transport.reactTx { implicit tx => {
-            // only when playing
-            case Transport.Advance( tr, time, isSeek, true, added, removed, changes ) =>
-               log( "at " + time + " added " + added.mkString(   "[", ", ", "]" ) +
-                                "; removed " + removed.mkString( "[", ", ", "]" ) +
-                                "; changes? " + changes.nonEmpty + " (" + booted.hashCode.toHexString + ")" )
-               removed.foreach { timed             => booted.procRemoved( timed )}
-               changes.foreach { case (timed, m)   => booted.procUpdated( timed, m )}
-               added.foreach   { timed             => booted.procAdded( time, timed )}
-
-            case Transport.Play( tr, time ) => t_play( time )
-            case Transport.Stop( tr, time ) => t_stop( time )
-
-            case _ =>
-//                  log( "other " + other )
-         }}
-
-         running() = Some(booted)
+          case _ =>
+          //                  log( "other " + other )
+        }
       }
-   }
 
-//   sealed trait Running[ S <: Sys[ S ]] {
+      running() = Some(booted)
+    }
+  }
+
+  //   sealed trait Running[ S <: Sys[ S ]] {
 ////      def addScanIn(  proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int
 ////      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
 //      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
@@ -162,11 +175,12 @@ object AuralPresentationImpl {
       override def toString = "OngoingBuild(missingMap = " + missingMap + ", idMap = " + idMap + ", seq = " + seq + ")"
    }
 
-   private final class RunningImpl[ S <: Sys[ S ]]( server: Server, group: Group,
-                                                    viewMap: IdentifierMap[ S#ID, S#Tx, AuralProc ],
-                                                    scanMap: IdentifierMap[ S#ID, S#Tx, (String, stm.Source[ S#Tx, S#ID ])],
-                                                    sampleRate: Double )( implicit artifactStore: ArtifactStore[ S ])
-   extends AuralPresentation.Running[ S ] {
+  private final class RunningImpl[S <: Sys[S]](server: Server, group: Group,
+                                               viewMap: IdentifierMap[S#ID, S#Tx, AuralProc],
+                                               scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])],
+                                               sampleRate: Double,
+                                               artifactStore: stm.Source[S#Tx, ArtifactStore[S]])
+  extends AuralPresentation.Running[ S ] {
 
       override def toString = "AuralPresentation.Running@" + hashCode.toHexString
 
@@ -242,7 +256,7 @@ object AuralPresentationImpl {
                      case audio: Segment.Audio =>
                         ensureChannels( audio.numChannels )
                         val artifact  = audio.value.artifact
-                        val file      = artifactStore.resolve(artifact)
+                        val file      = artifactStore().resolve(artifact)
                         val aaw       = new AudioArtifactWriter( audio, file, server, sampleRate )
                         busUsers    :+= aaw
                         val bm        = BusNodeSetter.mapper( inCtlName, aaw.bus, synth )

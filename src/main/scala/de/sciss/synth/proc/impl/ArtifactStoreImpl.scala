@@ -41,7 +41,7 @@ import de.sciss.synth.proc.ArtifactStore.{Location, Update, ArtifactAdded, Artif
 object ArtifactStoreImpl {
   private final val SER_VERSION = 0x4153
 
-  def apply[S <: evt.Sys[S]](baseDirectory: File)(implicit tx: S#Tx): ArtifactStore[S] = {
+  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): ArtifactStore.Modifiable[S] = {
     val targets = evt.Targets[S]
     val _locKey = tx.newIntVar(targets.id, 0)
     new NewImpl[S](targets, _locKey)
@@ -50,8 +50,16 @@ object ArtifactStoreImpl {
   def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] with evt.Reader[S, ArtifactStore[S]] =
     anySer.asInstanceOf[Ser[S]]
 
+
+  type ModSer[S <: evt.Sys[S]] = Serializer[S#Tx, S#Acc, ArtifactStore.Modifiable[S]] with evt.Reader[S, ArtifactStore.Modifiable[S]]
+
+  def modSerializer[S <: evt.Sys[S]]: ModSer[S] = anySer.asInstanceOf[ModSer[S]]
+
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] =
     serializer[S].read(in, access)
+
+  def modRead[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore.Modifiable[S] =
+    modSerializer[S].read(in, access)
 
   private[ArtifactStoreImpl] def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                       (implicit tx: S#Tx): Impl[S] = {
@@ -69,22 +77,40 @@ object ArtifactStoreImpl {
       v.write(out)
     }
 
-    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] = {
+    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore.Modifiable[S] = {
       val targets = evt.Targets.read(in, access)
       read(in, access, targets)
     }
 
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
-            (implicit tx: S#Tx): ArtifactStore[S] with evt.Node[S] = ArtifactStoreImpl.read(in, access, targets)
+            (implicit tx: S#Tx): ArtifactStore.Modifiable[S] with evt.Node[S] =
+      ArtifactStoreImpl.read(in, access, targets)
   }
+
+//  private final class ModSer[S <: evt.Sys[S]]
+//    extends Serializer[S#Tx, S#Acc, ArtifactStore.Modifiable[S]] with evt.Reader[S, ArtifactStore.Modifiable[S]] {
+//    def write(v: ArtifactStore.Modifiable[S], out: DataOutput) {
+//      v.write(out)
+//    }
+//
+//    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore.Modifiable[S] = {
+//      val targets = evt.Targets.read(in, access)
+//      read(in, access, targets)
+//    }
+//
+//    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
+//            (implicit tx: S#Tx): ArtifactStore.Modifiable[S] with evt.Node[S] = ArtifactStoreImpl.modRead(in, access, targets)
+//  }
 
   private final class LocationImpl[S <: evt.Sys[S]](store: Impl[S], val key: Int, count: S#Var[Int],
                                                     _directory: S#Var[File],
                                                     artifacts: LinkedList.Modifiable[S, Artifact, Unit])
-    extends ArtifactStore.Location.Modifiable[S] {
+    extends Location.Modifiable[S] {
     loc =>
 
     def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Artifact] = artifacts.iterator
+
+    def modifiableOption: Option[Location.Modifiable[S]] = Some(this)
 
     def directory(implicit tx: S#Tx): File = _directory()
     def directory_=(value: File)(implicit tx: S#Tx) {
@@ -169,21 +195,23 @@ object ArtifactStoreImpl {
 
     implicit final protected def locationSerializer: Serializer[S#Tx, S#Acc, LocationImpl[S]] = LocationSerializer
 
-    def changed: EventLike[S, Update[S], ArtifactStore[S]] = this
+    final def changed: EventLike[S, Update[S], ArtifactStore[S]] = this
+
+    final def modifiableOption: Option[ArtifactStore.Modifiable[S]] = Some(this)
 
     private def getLocation(artifact: Artifact)(implicit tx: S#Tx): LocationImpl[S] =
       _locations.get(artifact.key).getOrElse(
         throw new NoSuchElementException(s"Artifact $artifact not found in store")
       )
 
-    def resolve(artifact: Artifact)(implicit tx: S#Tx): File = {
+    final def resolve(artifact: Artifact)(implicit tx: S#Tx): File = {
       val loc = getLocation(artifact)
       (loc.directory /: artifact.path)((res, sub) => new File(res, sub))
     }
 
-    protected def reader: evt.Reader[S, ArtifactStore[S]] = ArtifactStoreImpl.serializer[S]
+    final protected def reader: evt.Reader[S, ArtifactStore[S]] = ArtifactStoreImpl.serializer[S]
 
-    def dispatch(update: Update[S])(implicit tx: S#Tx) { fire(update) }
+    final def dispatch(update: Update[S])(implicit tx: S#Tx) { fire(update) }
 
     private object LocationSerializer extends Serializer[S#Tx, S#Acc, LocationImpl[S]] {
       def write(location: LocationImpl[S], out: DataOutput) { location.write(out) }
@@ -198,12 +226,12 @@ object ArtifactStoreImpl {
 
     final def locations(implicit tx: S#Tx): data.Iterator[S#Tx, ArtifactStore.Location[S]] = _locations.valuesIterator
 
-    def remove(artifact: Artifact)(implicit tx: S#Tx) {
+    final def remove(artifact: Artifact)(implicit tx: S#Tx) {
       val loc = getLocation(artifact)
       loc.remove(artifact)
     }
 
-    def addLocation(directory: File)(implicit tx: S#Tx): Location.Modifiable[S] = {
+    final def addLocation(directory: File)(implicit tx: S#Tx): Location.Modifiable[S] = {
       val key       = _locKey()
       _locKey()     = key + 1
       val count     = tx.newIntVar(id, 0)
@@ -215,7 +243,7 @@ object ArtifactStoreImpl {
       loc
     }
 
-    def removeLocation(location: Location[S])(implicit tx: S#Tx) {
+    final def removeLocation(location: Location[S])(implicit tx: S#Tx) {
       if (_locations.remove(location.key).isEmpty)
         throw new NoSuchElementException(s"Location $location was not part of this store")
       fire(LocationRemoved(store, location))

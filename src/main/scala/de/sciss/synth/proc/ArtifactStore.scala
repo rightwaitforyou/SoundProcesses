@@ -36,16 +36,20 @@ import de.sciss.lucre.stm.Disposable
 
 object ArtifactStore {
   def tmp[S <: evt.Sys[S]]()(implicit tx: S#Tx): (ArtifactStore.Modifiable[S], Location.Modifiable[S]) = {
-    val store = apply[S]
     val dir   = File.createTempFile("artifacts", "tmp")
     dir.delete()
     dir.mkdir()
     dir.deleteOnExit()
-    val loc   = store.addLocation(dir)
-    (store, loc)
+    apply(dir)
   }
 
-  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): ArtifactStore.Modifiable[S] = ??? // Impl[S]
+  def empty[S <: evt.Sys[S]](implicit tx: S#Tx): ArtifactStore.Modifiable[S] = Impl[S]
+
+  def apply[S <: evt.Sys[S]](folder: File)(implicit tx: S#Tx): (ArtifactStore.Modifiable[S], Location.Modifiable[S]) = {
+      val store = empty[S]
+      val loc   = store.addLocation(folder)
+      (store, loc)
+    }
 
   implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] = Impl.serializer[S]
 
@@ -53,6 +57,9 @@ object ArtifactStore {
     Impl.read[S](in, access)
 
   object Location {
+    // object Modifiable {
+    //   implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Location.Modifiable[S]] = ...
+    // }
     trait Modifiable[S <: evt.Sys[S]] extends Location[S] {
       //      /**
       //       * Creates a new artifact. This is a side-effect and
@@ -75,14 +82,21 @@ object ArtifactStore {
       def add(file: File)(implicit tx: S#Tx): Artifact
 
       def directory_=(value: File)(implicit tx: S#Tx): Unit
+
+      // implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = ...
     }
   }
   trait Location[S <: evt.Sys[S]] {
     def key: Int
     def directory(implicit tx: S#Tx): File
     def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Artifact]
+
+    def modifiableOption: Option[Location.Modifiable[S]]
   }
 
+  object Modifiable {
+    implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] = Impl.modSerializer[S]
+  }
   trait Modifiable[S <: evt.Sys[S]] extends ArtifactStore[S] {
     def remove(artifact: Artifact)(implicit tx: S#Tx): Unit
     def addLocation(directory: File)(implicit tx: S#Tx): Location.Modifiable[S]
@@ -113,4 +127,6 @@ trait ArtifactStore[S <: evt.Sys[S]] extends Writable with Disposable[S#Tx] {
   def locations(implicit tx: S#Tx): data.Iterator[S#Tx, ArtifactStore.Location[S]]
   def changed: EventLike[S, ArtifactStore.Update[S], ArtifactStore[S]]
   def resolve(artifact: Artifact)(implicit tx: S#Tx): File
+
+  def modifiableOption: Option[ArtifactStore.Modifiable[S]]
 }

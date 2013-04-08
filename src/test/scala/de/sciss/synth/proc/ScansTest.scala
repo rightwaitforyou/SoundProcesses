@@ -84,7 +84,7 @@ object ScansTest extends App {
 //            transp.playing_=( true )
 val transp  = Transport[ S, I ]( group )
          auralSystem.foreach { as =>
-            implicit val artifactStore = ArtifactStore.tmp[ S ]()
+            implicit val (artifactStore, loc) = ArtifactStore.tmp[ S ]()
             AuralPresentation.run[ S, I ]( transp, as )
          }
          transp.play()

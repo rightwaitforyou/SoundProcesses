@@ -70,7 +70,7 @@ extends ExprImplicits[ S ] {
 
 //   private type PG = ProcGroup.Modifiable[ S ]
    private type PG = BiGroup.Modifiable[ S, Proc[ S ], Proc.Update[ S ]]
-   type Acc = PG // (PG, ProcTransport[ S ])
+   type Acc = (PG, ArtifactStore[S]) // , ArtifactStore.Location.Modifiable[S]))  // (PG, ProcTransport[ S ])
 
   object Implicits {
     //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
@@ -89,18 +89,19 @@ extends ExprImplicits[ S ] {
       g.changed.react { upd =>
          println( "Group observed: " + upd )
       }
-      g // (g, tr)
+      val (store, _) = ArtifactStore[ S ]( VisTest.audioDir )
+      g -> store
    }
 
    access // initialize !
 
-   val (trans, artifactStore) = cursor.step { implicit tx =>
-      val g = access()
+   val (trans) = cursor.step { implicit tx =>
+      val g = group
       val tr = Transport[ S, I ]( g )
       tr.react { upd =>
          println( "Transport observed: " + upd )
       }
-      tr -> ArtifactStore[ S ]( VisTest.audioDir )
+      tr // -> ArtifactStore[ S ]( VisTest.audioDir )
    }
 //      val trv  = tx.newVar[ Transport[ S, Proc[ S ]]]( tr.id, tr )
 
@@ -108,8 +109,9 @@ extends ExprImplicits[ S ] {
 //   val groupAccess:     Source[ S#Tx, ProcGroup.Modifiable[ S ]] = Source.map( access )( _._1 )
 //   val transportAccess: Source[ S#Tx, Transport[ S, Proc[ S ]]]   = Source.map( access )( _._2 )
 
-   def group( implicit tx: S#Tx ) : ProcGroup.Modifiable[ S ] = access() // ._1
-//   def trans( implicit tx: S#Tx ) : ProcTransport[ S ]         = access.get._2
+   def group( implicit tx: S#Tx ) : ProcGroup.Modifiable[ S ] = access()._1
+  def artifactStore( implicit tx: S#Tx )  = access()._2 // ._1
+  // def loc( implicit tx: S#Tx )  = access()._2._2
 
    def grapheme( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = Grapheme.Modifiable[ S ]
 
@@ -239,13 +241,16 @@ extends ExprImplicits[ S ] {
       }
    }
 
-   def audioFile( path: String ) : Grapheme.Value.Audio = {
-      implicit val _artifactStore = artifactStore
-      val artifact   = Artifact(Nil, path)
-      val spec       = AudioFile.readSpec( artifact.toFile )
-      val offset     = 0L
-      val gain       = 1.0
-      Grapheme.Value.Audio( artifact, spec, offset, gain )
+   def audioFile( path: String )(implicit tx: S#Tx) : Grapheme.Value.Audio = {
+     // implicit val _artifactStore = artifactStore
+     val f        = new File(path)
+     val store    = artifactStore
+     val Some(loc) = store.locations.next().modifiableOption
+     val artifact = loc.add(f) // Artifact(Nil, path)
+     val spec     = AudioFile.readSpec(f) // artifact.toFile )
+     val offset   = 0L
+     val gain     = 1.0
+     Grapheme.Value.Audio(artifact, spec, offset, gain)
    }
 
    def addAudio( time: Expr[ S, Long ] = 0, freq: Grapheme.Value.Audio ) {
@@ -254,7 +259,7 @@ extends ExprImplicits[ S ] {
       }
    }
 
-   def audioTest() : Proc[ S ] = {
+   def audioTest()(implicit tx: S#Tx) : Proc[ S ] = {
       val af = audioFile( "283_7WTConWhiteCCRsmpLp.aif" )
 
       t { implicit tx =>
