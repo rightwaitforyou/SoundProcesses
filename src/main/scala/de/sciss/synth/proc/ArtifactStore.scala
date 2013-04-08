@@ -35,8 +35,8 @@ import de.sciss.lucre.event.{EventLike, Event}
 import de.sciss.lucre.stm.Disposable
 
 object ArtifactStore {
-  def tmp[S <: evt.Sys[S]]()(implicit tx: S#Tx): (ArtifactStore.Modifiable[S], Location.Modifiable[S]) = {
-    val store = apply[S]
+  def tmp[S <: evt.Sys[S], D <: evt.Sys[D]]()(implicit tx: S#Tx, bridge: S#Tx => D#Tx): (ArtifactStore.Modifiable[S], Location.Modifiable[S]) = {
+    val store = apply[S, D]
     val dir   = File.createTempFile("artifacts", "tmp")
     dir.delete()
     dir.mkdir()
@@ -45,12 +45,14 @@ object ArtifactStore {
     (store, loc)
   }
 
-  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): ArtifactStore.Modifiable[S] = ??? // Impl[S]
+  def apply[S <: evt.Sys[S], D <: evt.Sys[D]](implicit tx: S#Tx, bridge: S#Tx => D#Tx): ArtifactStore.Modifiable[S] =
+    Impl[S, D]
 
   implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] = Impl.serializer[S]
 
-  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] =
-    Impl.read[S](in, access)
+  def read[S <: evt.Sys[S], D <: evt.Sys[D]](in: DataInput, access: S#Acc)
+                                            (implicit tx: S#Tx, bridge: S#Tx => D#Tx): ArtifactStore[S] =
+    Impl.read[S, D](in, access)
 
   object Location {
     trait Modifiable[S <: evt.Sys[S]] extends Location[S] {
