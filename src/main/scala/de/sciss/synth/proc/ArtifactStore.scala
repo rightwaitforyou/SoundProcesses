@@ -23,53 +23,94 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss
+package synth
+package proc
 
-import de.sciss.lucre.{event => evt, stm, data}
+import lucre.{event => evt, data}
 import java.io.File
 import impl.{ArtifactStoreImpl => Impl}
-import de.sciss.serial.{Writable, Serializer, DataInput}
+import serial.{Writable, Serializer, DataInput}
+import de.sciss.lucre.event.{EventLike, Event}
+import de.sciss.lucre.stm.Disposable
 
 object ArtifactStore {
-  def tmp[S <: evt.Sys[S]]()(implicit tx: S#Tx): ArtifactStore[S] = {
-    val dir = File.createTempFile("artifacts", "tmp")
+  def tmp[S <: evt.Sys[S]]()(implicit tx: S#Tx): (ArtifactStore.Modifiable[S], Location.Modifiable[S]) = {
+    val store = apply[S]
+    val dir   = File.createTempFile("artifacts", "tmp")
     dir.delete()
     dir.mkdir()
     dir.deleteOnExit()
-    apply(dir)
+    val loc   = store.addLocation(dir)
+    (store, loc)
   }
 
-  def apply[S <: evt.Sys[S]](baseDirectory: File)(implicit tx: S#Tx): ArtifactStore[S] = Impl[S](baseDirectory)
+  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): ArtifactStore.Modifiable[S] = ??? // Impl[S]
 
-  def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] = Impl.serializer[S]
+  implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactStore[S]] = Impl.serializer[S]
 
-  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] = Impl.read[S](in, access)
+  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ArtifactStore[S] =
+    Impl.read[S](in, access)
+
+  object Location {
+    trait Modifiable[S <: evt.Sys[S]] extends Location[S] {
+      //      /**
+      //       * Creates a new artifact. This is a side-effect and
+      //       * thus should be called outside of a transaction.
+      //       * The artifact is not in any way registered with the system.
+      //       * Once the artifact has meaningful content, it may be
+      //       * registered by calling the `register` method.
+      //       *
+      //       * @return  the new file.
+      //       */
+      //      def createFile(): File
+
+      /**
+       * Registers a significant artifact with the system. That is,
+       * stores the artifact, which should have a real resource
+       * association, as belonging to the system.
+       *
+       * @param file   the file to turn into a registered artifact
+       */
+      def add(file: File)(implicit tx: S#Tx): Artifact
+
+      def directory_=(value: File)(implicit tx: S#Tx): Unit
+    }
+  }
+  trait Location[S <: evt.Sys[S]] {
+    def key: Int
+    def directory(implicit tx: S#Tx): File
+    def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Artifact]
+  }
+
+  trait Modifiable[S <: evt.Sys[S]] extends ArtifactStore[S] {
+    def remove(artifact: Artifact)(implicit tx: S#Tx): Unit
+    def addLocation(directory: File)(implicit tx: S#Tx): Location.Modifiable[S]
+    def removeLocation(location: Location[S])(implicit tx: S#Tx): Unit
+  }
+
+  sealed trait Update[S <: evt.Sys[S]] {
+    def store: ArtifactStore[S]
+    def location: Location[S]
+  }
+  sealed trait ArtifactUpdate {
+    def artifact: Artifact
+  }
+  final case class ArtifactAdded[S <: evt.Sys[S]](store: ArtifactStore[S], location: Location[S], artifact: Artifact)
+    extends Update[S] with ArtifactUpdate
+
+  final case class ArtifactRemoved[S <: evt.Sys[S]](store: ArtifactStore[S], location: Location[S], artifact: Artifact)
+    extends Update[S] with ArtifactUpdate
+
+  final case class LocationAdded  [S <: evt.Sys[S]](store: ArtifactStore[S], location: Location[S]) extends Update[S]
+  final case class LocationRemoved[S <: evt.Sys[S]](store: ArtifactStore[S], location: Location[S]) extends Update[S]
+
+  final case class LocationMoved[S <: evt.Sys[S]](store: ArtifactStore[S], location: Location[S],
+                                                  change: evt.Change[File]) extends Update[S]
 }
 
-sealed trait ArtifactStoreLike {
-  /**
-   * Creates a new artifact. This is a side-effect and
-   * thus should be called outside of a transaction.
-   * The artifact is not in any way registered with the system.
-   * Once the artifact has meaningful content, it may be
-   * registered by calling the `register` method.
-   *
-   * @return  the new artifact.
-   */
-  def create(): Artifact
-
-  def baseDirectory: File
-}
-
-trait ArtifactStore[S <: stm.Sys[S]] extends ArtifactStoreLike with Writable {
-  /**
-   * Registers a significant artifact with the system. That is,
-   * stores the artifact, which should have a real resource
-   * association, as belonging to the system.
-   *
-   * @param artifact   the artifact to register
-   */
-  def register(artifact: Artifact)(implicit tx: S#Tx): Unit
-
-  def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Artifact]
+trait ArtifactStore[S <: evt.Sys[S]] extends Writable with Disposable[S#Tx] {
+  def locations(implicit tx: S#Tx): data.Iterator[S#Tx, ArtifactStore.Location[S]]
+  def changed: EventLike[S, ArtifactStore.Update[S], ArtifactStore[S]]
+  def resolve(artifact: Artifact)(implicit tx: S#Tx): File
 }

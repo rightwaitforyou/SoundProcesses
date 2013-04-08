@@ -241,11 +241,12 @@ object AuralPresentationImpl {
 
                      case audio: Segment.Audio =>
                         ensureChannels( audio.numChannels )
-                        val file: File = audio.value.artifact.toFile( artifactStore )
-                        val aaw = new AudioArtifactWriter( audio, file, server, sampleRate )
-                        busUsers :+= aaw
-                        val bm = BusNodeSetter.mapper( inCtlName, aaw.bus, synth )
-                        busUsers :+= bm
+                        val artifact  = audio.value.artifact
+                        val file      = artifactStore.resolve(artifact)
+                        val aaw       = new AudioArtifactWriter( audio, file, server, sampleRate )
+                        busUsers    :+= aaw
+                        val bm        = BusNodeSetter.mapper( inCtlName, aaw.bus, synth )
+                        busUsers    :+= bm
                   }
                case Scan.Link.Scan( peer ) =>
                   scanMap.get( peer.id ).foreach { case (sourceKey, idH) =>

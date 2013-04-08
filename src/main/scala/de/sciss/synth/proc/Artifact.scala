@@ -31,35 +31,38 @@ import de.sciss.serial.{Writable, ImmutableSerializer, DataInput}
 import scala.annotation.tailrec
 
 object Artifact {
-  def apply(path: List[String], name: String): Artifact = Impl(path, name)
+  // def apply(path: List[String], name: String): Artifact = Impl(path, name)
 
   def read(in: DataInput): Artifact = Impl.read(in)
 
-  def fromFile(file: File)(implicit store: ArtifactStoreLike): Artifact = {
-    val can     = file.getCanonicalFile
-    val name    = can.getName
-    val base    = store.baseDirectory.getCanonicalFile
-    val folder  = can.getParentFile
-
-    @tailrec def loop(res: List[String], left: File): List[String] = {
-      if (left == null)
-        throw new IllegalArgumentException(s"File $file is not inside artifact store's base directory $base")
-
-      if (left == base) res
-      else {
-        val last  = left.getName
-        val init  = left.getParentFile
-        loop(last :: res, init)
-      }
-    }
-
-    val path    = loop(Nil, folder)
-    Impl(path, name)
-  }
+  //  def fromFile(file: File)(implicit store: ArtifactStoreLike): Artifact = {
+  //    val can     = file.getCanonicalFile
+  //    val name    = can.getName
+  //    val base    = store.baseDirectory.getCanonicalFile
+  //    val folder  = can.getParentFile
+  //
+  //    @tailrec def loop(res: List[String], left: File): List[String] = {
+  //      if (left == null)
+  //        throw new IllegalArgumentException(s"File $file is not inside artifact store's base directory $base")
+  //
+  //      if (left == base) res
+  //      else {
+  //        val last  = left.getName
+  //        val init  = left.getParentFile
+  //        loop(last :: res, init)
+  //      }
+  //    }
+  //
+  //    val path    = loop(Nil, folder)
+  //    Impl(path, name)
+  //  }
 
   implicit def serializer: ImmutableSerializer[Artifact] = Impl.serializer
 }
 
 trait Artifact extends Writable {
-  def toFile(implicit store: ArtifactStoreLike): File
+  def key: Int
+  def name: String
+  def path: List[String]
+  // def toFile[S <: evt.Sys[S]](implicit store: ArtifactStoreLike): File
 }

@@ -34,15 +34,16 @@ import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 object ArtifactImpl {
   private final val SER_VERSION = 0x4172
 
-  def apply(path: List[String], name: String): Artifact = new Impl(path, name)
+  def apply(key: Int, path: List[String], name: String): Artifact = new Impl(key, path, name)
 
   def read(in: DataInput): Artifact = {
     val cookie = in.readShort()
     require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
+    val key     = in.readInt()
     val pathSz  = in.readShort()
     val path    = if (pathSz == 0) Nil else List.fill(pathSz)(in.readUTF)
     val name    = in.readUTF()
-    ArtifactImpl(path, name)
+    ArtifactImpl(key, path, name)
   }
 
   implicit object serializer extends ImmutableSerializer[Artifact] {
@@ -52,18 +53,19 @@ object ArtifactImpl {
     def read(in: DataInput): Artifact = ArtifactImpl.read(in)
   }
 
-  private final case class Impl(path: List[String], name: String) extends Artifact {
+  private final case class Impl(key: Int, path: List[String], name: String) extends Artifact {
     override def toString = s"Artifact(${if (path.isEmpty) "" else path.mkString("", "/", "/")}$name)"
 
-    def toFile(implicit store: ArtifactStoreLike): File = {
-      // XXX TODO: in the future we could have a better resolution scheme
-      val base   = store.baseDirectory
-      val folder = if (path.isEmpty) base else (base /: path)( (res, sub) => new File(res, sub))
-      new File(folder, name)
-    }
+    //    def toFile(implicit store: ArtifactStoreLike): File = {
+    //      // XXX TODO: in the future we could have a better resolution scheme
+    //      val base   = store.baseDirectory
+    //      val folder = if (path.isEmpty) base else (base /: path)( (res, sub) => new File(res, sub))
+    //      new File(folder, name)
+    //    }
 
     def write(out: DataOutput) {
       out.writeShort(SER_VERSION)
+      out.writeInt(key)
       if (path.isEmpty) out.writeShort(0) else {
         out.writeShort(path.size)
         path.foreach(out.writeUTF _)

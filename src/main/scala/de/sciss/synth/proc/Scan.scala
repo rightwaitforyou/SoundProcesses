@@ -75,29 +75,30 @@ object Scan {
  * known as key. A scan can write to any number of targets, but may only be synchronised to one
  * source. If not synchronised to a source, the owner process' graph may feed a signal into it.
  */
-trait Scan[ S <: evt.Sys[ S ]] extends evt.Node[ S ] {
-   import Scan._
+trait Scan[S <: evt.Sys[S]] extends evt.Node[S] {
+  import Scan._
 
-   def sinks( implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]]
-   // for now, links are not in t_p; this is probably fine, because
-   // we have graphemes for such a 'declarative' view, and the scan as needle is really
-   // more the 'procedural' approach
-   def addSink(    sink: Link[ S ])( implicit tx: S#Tx ) : Boolean
-   def removeSink( sink: Link[ S ])( implicit tx: S#Tx ) : Boolean
+  def sinks(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]]
 
-//   private[proc] def wasRemoved()( implicit tx: S#Tx ) : Unit
+  // for now, links are not in t_p; this is probably fine, because
+  // we have graphemes for such a 'declarative' view, and the scan as needle is really
+  // more the 'procedural' approach
+  def addSink   (sink: Link[S])(implicit tx: S#Tx): Boolean
+  def removeSink(sink: Link[S])(implicit tx: S#Tx): Boolean
 
-   def source( implicit tx: S#Tx ) : Option[ Link[ S ]]
-   def source_=( link: Option[ Link[ S ]])( implicit tx: S#Tx ) : Unit
+  //   private[proc] def wasRemoved()( implicit tx: S#Tx ) : Unit
 
-   def changed: Event[ S, Scan.Update[ S ], Scan[ S ]]
+  def source(implicit tx: S#Tx): Option[Link[S]]
+  def source_=(link: Option[Link[S]])(implicit tx: S#Tx): Unit
 
-   // called in the implementation from addSink( Link.Scan( _ )). the difference
-   // to source_= is that this method should not establish the opposite connection
-   // by calling addSink on the source, as this would result in an infinite feedback.
-   // still, this method should fire an Scan.SourceChanged event.
-   private[proc] def setScanSource( source: Scan[ S ])( implicit tx: S#Tx ) : Unit
+  def changed: Event[S, Scan.Update[S], Scan[S]]
 
-//   def key: String
-//   def proc: Proc[ S ]
+  // called in the implementation from addSink( Link.Scan( _ )). the difference
+  // to source_= is that this method should not establish the opposite connection
+  // by calling addSink on the source, as this would result in an infinite feedback.
+  // still, this method should fire an Scan.SourceChanged event.
+  private[proc] def setScanSource(source: Scan[S])(implicit tx: S#Tx): Unit
+
+  //   def key: String
+  //   def proc: Proc[ S ]
 }

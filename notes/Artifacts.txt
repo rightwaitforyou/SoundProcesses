@@ -1,0 +1,58 @@
+- an artifact is really just a Proxy or Key for an I/O resource
+- it's representation is immutable
+- however it goes through a translation (a managing store)
+
+- artifacts are relative to a managed base directory
+- they are the "same problem" as cursors and transports,
+  because their resolvers/store must be ephemeral
+
+- they appear embedded in S types (e.g. grapheme)
+
+:::::::::::::::::::::
+
+there are three options
+
+(1) keep artifact stores decentralised (as it is currently)
+(2) move them to system level, e.g. proc.Sys or proc.Txn
+(3) elevate them to separate entities, e.g. ArtifactSystem (in analogy to AuralSystem)
+
+- they are annoying because I/O should happen outside of Txn
+
+- they are annoying because ideally:
+
+trait ArtifactStore {
+  type Artifact
+}
+
+which means grapheme etc. pp. will need an artifact store type and evidence to do serialization
+
+:::::::::::::::::::::
+
+first let's remove the 1:1 relationship between store and base directory. so
+
+trait ArtifactStore {
+  def locations: Iterator[Location]
+}
+
+trait Location {
+  def create(): Artifact
+  def iterator: Iterator[Artifact]
+}
+
+:::::::::::::::::::::
+
+the main question is how to resolve the files
+
+- imagine for a moment that artifact stores are seldomly deserialised, perhaps only once a document is loaded
+- they could cache the locations iterator in memory, along with a Map[Key, Location], and Key being part of
+  artifact
+- then given an artifact and a store, the look up of the location is fast
+
+- the constructore of the store could take two systems, S and D, where the public interface will use S,
+  although storage is translated to D
+- that way an AuralPresentation[S] could just take an ArtifactStore[S] and everyone is happy
+- that is, AuralStore will be generated siimilarily to an AuralPresentation with apply[S, D]
+
+- a model-view problem remains, if the artifact is displayed, because
+  the view will need to monitor the artifact store and not the artifact
+  (but this is doable; the store could emit an event with corresponding key)
