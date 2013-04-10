@@ -23,28 +23,30 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
+package de.sciss
+package synth
 package proc
 
-import de.sciss.lucre.{event => evt, bitemp, expr}
+import lucre.{event => evt, stm, bitemp, expr}
 import impl.CommonSerializers
 import expr.Expr
 import bitemp.{BiType, BiExpr}
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.synth.expr.{Doubles, SpanLikes, Longs}
+import synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 
 import impl.{GraphemeImpl => Impl}
-import de.sciss.synth.io.AudioFileSpec
-import de.sciss.lucre.event.{Targets, Event}
-import de.sciss.span.{SpanLike, Span}
-import de.sciss.serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
+import synth.io.AudioFileSpec
+import evt.Event
+import span.{SpanLike, Span}
+import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
+import java.io.File
 
 object Grapheme {
   // If necessary for some views, we could eventually add the Elems, too,
   // like `changes: IIdxSeq[ (Elem[ S ], Value) ]`. Then the question would be
   // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
-  // where `trait StoredElem[ S <: evt.Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
+  // where `trait StoredElem[ S <: Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
   final case class Update[S <: evt.Sys[S]](grapheme: Grapheme[S], changes: IIdxSeq[Segment])
 
   implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Grapheme[S]] = Impl.serializer[S]
@@ -54,9 +56,7 @@ object Grapheme {
   private final val audioCookie = 2
 
   object Value {
-    implicit val biType: BiType[Value] = Elem
-
-    implicit object Serializer extends ImmutableSerializer[Value] {
+    implicit object serializer extends ImmutableSerializer[Value] {
       def write(v: Value, out: DataOutput) {
         v.write(out)
       }
@@ -71,7 +71,7 @@ object Grapheme {
     }
 
     object Curve {
-      implicit object Serializer extends ImmutableSerializer[Curve] {
+      implicit object serializer extends ImmutableSerializer[Curve] {
         def write(v: Curve, out: DataOutput) { v.write(out) }
         def read(in: DataInput): Curve = {
           val cookie = in.readByte()
@@ -81,7 +81,7 @@ object Grapheme {
       }
       private[Value] def readIdentified(in: DataInput): Curve = {
         val sz      = in.readInt()
-        val values  = IIdxSeq.fill(sz) {
+        val values  = Vector.fill(sz) {
           val mag = in.readDouble()
           val env = CommonSerializers.EnvConstShape.read(in)
           (mag, env)
@@ -136,7 +136,7 @@ object Grapheme {
     //      }
 
     object Audio {
-      implicit object Serializer extends ImmutableSerializer[Audio] {
+      implicit object serializer extends ImmutableSerializer[Audio] {
         def write(v: Audio, out: DataOutput) { v.write(out) }
         def read(in: DataInput): Audio = {
           val cookie = in.readByte()
@@ -145,20 +145,21 @@ object Grapheme {
         }
       }
       private[Value] def readIdentified(in: DataInput): Audio = {
-        val artifact  = Artifact.read(in)
+        val artifact  = new File(in.readUTF()) // Artifact.read(in, access)
         val spec      = AudioFileSpec.Serializer.read(in)
         val offset    = in.readLong()
         val gain      = in.readDouble()
         Audio(artifact, spec, offset, gain)
       }
     }
-    final case class Audio(artifact: Artifact, spec: AudioFileSpec, offset: Long, gain: Double)
+    final case class Audio(artifact: Artifact.Value, spec: AudioFileSpec, offset: Long, gain: Double)
       extends Value {
+
       def numChannels = spec.numChannels
 
       def write(out: DataOutput) {
         out.writeByte(audioCookie)
-        artifact.write(out)
+        out.writeUTF(artifact.getPath) // artifact.write(out)
         AudioFileSpec.Serializer.write(spec, out)
         out.writeLong(offset)
         out.writeDouble(gain)
@@ -178,7 +179,6 @@ object Grapheme {
   }
 
   object Segment {
-
     sealed trait Defined extends Segment {
       def numChannels: Int
       final def isDefined = true
@@ -206,12 +206,12 @@ object Grapheme {
     final val typeID = 11
 
     object Curve extends expr.Type[Value.Curve] {
-      def apply[S <: evt.Sys[S]](values: (Expr[S, Double], Env.ConstShape)*)(implicit tx: S#Tx): Curve[S] = {
+      def apply[S <: Sys[S]](values: (Expr[S, Double], Env.ConstShape)*)(implicit tx: S#Tx): Curve[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new CurveImpl(targets, values.toIndexedSeq)
       }
 
-      def unapplySeq[S <: evt.Sys[S]](expr: Elem[S]): Option[Seq[(Expr[S, Double], Env.ConstShape)]] = {
+      def unapplySeq[S <: Sys[S]](expr: Elem[S]): Option[Seq[(Expr[S, Double], Env.ConstShape)]] = {
         if (expr.isInstanceOf[CurveImpl[_]]) {
           val c = expr.asInstanceOf[CurveImpl[S]]
           Some(c.values)
@@ -220,11 +220,12 @@ object Grapheme {
         }
       }
 
-      def readValue(in: DataInput): Value.Curve       = Value.Curve.Serializer.read(in)
-      def writeValue(v: Value.Curve, out: DataOutput) { Value.Curve.Serializer.write(v, out) }
+      def readValue(in: DataInput): Value.Curve = Value.Curve.serializer.read(in)
+
+      def writeValue(v: Value.Curve, out: DataOutput) { v.write(out) }
 
       protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
-                                               targets: Targets[S])(implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
+                                               targets: evt.Targets[S])(implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
         require(cookie == curveCookie, s"Unexpected cookie $cookie")
         readIdentifiedTuple(in, access, targets)
       }
@@ -242,14 +243,14 @@ object Grapheme {
     }
     sealed trait Curve[S <: evt.Sys[S]] extends Elem[S] with Expr[S, Value.Curve]
 
-    object Audio extends expr.Type[Value.Audio]{
-      def apply[S <: evt.Sys[S]](artifact: Artifact, spec: AudioFileSpec, offset: Expr[S, Long], gain: Expr[S, Double])
+    object Audio extends expr.Type[Value.Audio] {
+      def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: Expr[S, Long], gain: Expr[S, Double])
                                 (implicit tx: S#Tx): Audio[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new AudioImpl(targets, artifact, spec, offset, gain)
       }
 
-      def unapply[S <: evt.Sys[S]](expr: Elem[S]): Option[(Artifact, AudioFileSpec, Expr[S, Long], Expr[S, Double])] = {
+      def unapply[S <: Sys[S]](expr: Elem[S]): Option[(Artifact[S], AudioFileSpec, Expr[S, Long], Expr[S, Double])] = {
         if (expr.isInstanceOf[AudioImpl[_]]) {
           val a = expr.asInstanceOf[AudioImpl[S]]
           Some((a.artifact, a.spec, a.offset, a.gain))
@@ -258,18 +259,19 @@ object Grapheme {
         }
       }
 
-      def readValue(in: DataInput): Value.Audio       = Value.Audio.Serializer.read(in)
-      def writeValue(v: Value.Audio, out: DataOutput) { Value.Audio.Serializer.write(v, out) }
+      def readValue(in: DataInput): Value.Audio = Value.Audio.serializer.read(in)
+
+      def writeValue(v: Value.Audio, out: DataOutput) { v.write(out) }
 
       protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
-                                               targets: Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
+                                           targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
         require(cookie == audioCookie, s"Unexpected cookie $cookie")
         readIdentifiedTuple(in, access, targets)
       }
 
       private[Grapheme] def readIdentifiedTuple[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                                                (implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
-        val artifact  = Artifact.read(in)
+                                                             (implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
+        val artifact  = Artifact.read(in, access)
         val spec      = AudioFileSpec.Serializer.read(in)
         val offset    = Longs.readExpr(in, access)
         val gain      = Doubles.readExpr(in, access)
@@ -340,14 +342,15 @@ object Grapheme {
       override def toString() = "Elem.Curve" + id
     }
 
-    private final class AudioImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact,
+    private final class AudioImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
                                                    val spec: AudioFileSpec, val offset: Expr[S, Long],
                                                    val gain: Expr[S, Double])
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
       def value(implicit tx: S#Tx): Value.Audio = {
+        val artVal    = artifact.value
         val offsetVal = offset.value
         val gainVal   = gain.value
-        Value.Audio(artifact, spec, offsetVal, gainVal)
+        Value.Audio(artVal, spec, offsetVal, gainVal)
       }
 
       def connect()(implicit tx: S#Tx) {
@@ -375,8 +378,9 @@ object Grapheme {
           (gv, gv)
         }
 
-        Audio.change(Value.Audio(artifact, spec, offsetBefore, gainBefore),
-                     Value.Audio(artifact, spec, offsetNow,    gainNow   ))
+        ???
+//        Audio.change(Value.Audio(artifact, spec, offsetBefore, gainBefore),
+//                     Value.Audio(artifact, spec, offsetNow,    gainNow   ))
       }
 
       protected def reader = Audio.serializer[S]
@@ -397,7 +401,7 @@ object Grapheme {
     def longType: BiType[Long] = Longs
     def spanLikeType: BiType[SpanLike] = SpanLikes
 
-    def readValue(in: DataInput): Value = Value.Serializer.read(in)
+    def readValue(in: DataInput): Value = Value.serializer.read(in)
     def writeValue(value: Value, out: DataOutput) {
       value.write(out)
     }
@@ -412,7 +416,7 @@ object Grapheme {
     }
   }
 
-  //  type Elem[S <: evt.Sys[S]] = Expr[S, Value]
+  //  type Elem[S <: Sys[S]] = Expr[S, Value]
   sealed trait Elem[S <: evt.Sys[S]] extends Expr[S, Value]
 
   type TimedElem[S <: evt.Sys[S]] = BiExpr[S, Value]
@@ -424,12 +428,12 @@ object Grapheme {
   }
 
   object Modifiable {
-    def apply[S <: evt.Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S]
+    def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S]
 
-    def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
+    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
       Impl.readModifiable(in, access)
 
-    implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] =
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] =
       Impl.modifiableSerializer[S]
 
     /**

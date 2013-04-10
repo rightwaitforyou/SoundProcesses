@@ -40,24 +40,22 @@ import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 object AuralPresentationImpl {
   def run[S <: Sys[S], I <: stm.Sys[I]](transport: ProcTransport[S], aural: AuralSystem[S])
-                                       (implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
-                                        artifactStore: ArtifactStore[S]): AuralPresentation[S] = {
+                                       (implicit tx: S#Tx, bridge: S#Tx => I#Tx): AuralPresentation[S] = {
 
     val dummy = DummySerializerFactory[I]
     import dummy._
     implicit val itx: I#Tx  = tx
     val id                  = itx.newID()
     val running             = itx.newVar[Option[RunningImpl[S]]](id, None)
-    val storeHolder         = tx.newHandle(artifactStore)
-    val c                   = new Client[S, I](running, transport, aural, storeHolder)
+//    val storeHolder         = tx.newHandle(artifactStore)
+    val c                   = new Client[S, I](running, transport, aural /* , storeHolder */)
     aural.addClient(c)
     c
   }
 
   private final class Client[S <: Sys[S], I <: stm.Sys[I]](running: I#Var[Option[RunningImpl[S]]],
                                                            transport: ProcTransport[S],
-                                                           aural: AuralSystem[S],
-                                                           artifactStore: stm.Source[S#Tx, ArtifactStore[S]])
+                                                           aural: AuralSystem[S])
                                                           (implicit /* cursor: Cursor[ S ], */ bridge: S#Tx => I#Tx)
     extends AuralPresentation[S] with AuralSystem.Client[S] {
 
@@ -90,7 +88,7 @@ object AuralPresentationImpl {
       //         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
       groupRef.set(Some(group))(tx.peer)
 
-      val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate, artifactStore)
+      val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
       log("started" + " (" + booted.hashCode.toHexString + ")")
       ProcDemiurg.addServer(server) // ( ProcTxn()( tx ))
       //            transport.react { x => println( "Aural observation: " + x )}
@@ -178,8 +176,8 @@ object AuralPresentationImpl {
   private final class RunningImpl[S <: Sys[S]](server: Server, group: Group,
                                                viewMap: IdentifierMap[S#ID, S#Tx, AuralProc],
                                                scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])],
-                                               sampleRate: Double,
-                                               artifactStore: stm.Source[S#Tx, ArtifactStore[S]])
+                                               sampleRate: Double)
+  //                                               artifactStore: stm.Source[S#Tx, ArtifactStore[S]]
   extends AuralPresentation.Running[ S ] {
 
       override def toString = "AuralPresentation.Running@" + hashCode.toHexString
@@ -255,8 +253,8 @@ object AuralPresentationImpl {
 
                      case audio: Segment.Audio =>
                         ensureChannels( audio.numChannels )
-                        val artifact  = audio.value.artifact
-                        val file      = artifactStore().resolve(artifact)
+                        val file      = audio.value.artifact
+                        // val file      =  artifactStore().resolve(artifact)
                         val aaw       = new AudioArtifactWriter( audio, file, server, sampleRate )
                         busUsers    :+= aaw
                         val bm        = BusNodeSetter.mapper( inCtlName, aaw.bus, synth )

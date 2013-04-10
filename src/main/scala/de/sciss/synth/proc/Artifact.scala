@@ -23,46 +23,83 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss
+package synth
+package proc
 
-import java.io.File
 import impl.{ArtifactImpl => Impl}
-import de.sciss.serial.{Writable, ImmutableSerializer, DataInput}
-import scala.annotation.tailrec
+import serial.{Writable, Serializer, DataInput}
+import lucre.{stm, event => evt, data, expr}
+import stm.{Disposable, Mutable}
+import java.io.File
+import evt.EventLike
+import expr.Expr
 
 object Artifact {
-  // def apply(path: List[String], name: String): Artifact = Impl(path, name)
+  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = Impl.read(in, access)
 
-  def read(in: DataInput): Artifact = Impl.read(in)
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] = Impl.serializer
 
-  //  def fromFile(file: File)(implicit store: ArtifactStoreLike): Artifact = {
-  //    val can     = file.getCanonicalFile
-  //    val name    = can.getName
-  //    val base    = store.baseDirectory.getCanonicalFile
-  //    val folder  = can.getParentFile
-  //
-  //    @tailrec def loop(res: List[String], left: File): List[String] = {
-  //      if (left == null)
-  //        throw new IllegalArgumentException(s"File $file is not inside artifact store's base directory $base")
-  //
-  //      if (left == base) res
-  //      else {
-  //        val last  = left.getName
-  //        val init  = left.getParentFile
-  //        loop(last :: res, init)
-  //      }
-  //    }
-  //
-  //    val path    = loop(Nil, folder)
-  //    Impl(path, name)
-  //  }
+  object Location {
+    object Modifiable {
+      def tmp[S <: Sys[S]]()(implicit tx: S#Tx): Location.Modifiable[S] = {
+        val dir   = File.createTempFile("artifacts", "tmp")
+        dir.delete()
+        dir.mkdir()
+        dir.deleteOnExit()
+        apply(dir)
+      }
+      def apply[S <: Sys[S]](init: File): Location.Modifiable[S] = ???
+    }
+    trait Modifiable[S <: evt.Sys[S]] extends Location[S] {
+      /**
+       * Registers a significant artifact with the system. That is,
+       * stores the artifact, which should have a real resource
+       * association, as belonging to the system.
+       *
+       * @param file   the file to turn into a registered artifact
+       */
+      def add(file: File)(implicit tx: S#Tx): Artifact[S]
+      def remove(artifact: Artifact[S])(implicit tx: S#Tx): Unit
 
-  implicit def serializer: ImmutableSerializer[Artifact] = Impl.serializer
+      def directory_=(value: File)(implicit tx: S#Tx): Unit
+    }
+
+    sealed trait Update[S <: evt.Sys[S]] {
+      def location: Location[S]
+    }
+    final case class Added[S <: Sys[S]](location: Location[S], artifact: Artifact[S])
+      extends Update[S]
+
+    final case class Removed[S <: Sys[S]](location: Location[S], artifact: Artifact[S])
+      extends Update[S]
+
+    final case class Moved[S <: Sys[S]](location: Location[S], change: evt.Change[File]) extends Update[S]
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = ??? // Impl.locSerializer
+
+    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] =
+        ??? // Impl.locRead[S](in, access)
+  }
+  trait Location[S <: evt.Sys[S]] extends /* Writable with Disposable[S#Tx] */ Mutable[S#ID, S#Tx] {
+    def directory(implicit tx: S#Tx): File
+    def iterator (implicit tx: S#Tx): data.Iterator[S#Tx, Artifact[S]]
+
+    def modifiableOption: Option[Location.Modifiable[S]]
+
+    def changed: EventLike[S, Location.Update[S], Location[S]]
+  }
+
+  // final case class Value(file: File)
+  type Value = File
 }
 
-trait Artifact extends Writable {
-  def key: Int
-  def name: String
-  def path: List[String]
-  // def toFile[S <: evt.Sys[S]](implicit store: ArtifactStoreLike): File
+trait Artifact[S <: evt.Sys[S]] extends Expr[S, Artifact.Value] /* Mutable[S#ID, S#Tx] */ {
+  import Artifact._
+  def location: Location[S]
+  // def value(implicit tx: S#Tx): Value
+  // def changed: EventLike[S, Update[S], Artifact[S]]
+  // def name: String
+  // def path: List[String]
+  // def toFile[S <: Sys[S]](implicit store: ArtifactStoreLike): File
 }

@@ -33,8 +33,7 @@ object AuralPresentation {
   // ---- implementation forwards ----
 
   def run[S <: Sys[S], I <: stm.Sys[I]](transport: ProcTransport[S], aural: AuralSystem[S])
-                                       (implicit tx: S#Tx, bridge: S#Tx => I#Tx, /* cursor: Cursor[ S ], */
-                                        artifactStore: ArtifactStore[S]): AuralPresentation[S] =
+                                       (implicit tx: S#Tx, bridge: S#Tx => I#Tx): AuralPresentation[S] =
     Impl.run[S, I](transport, aural)
 
   private[proc] trait Running[S <: Sys[S]] {
