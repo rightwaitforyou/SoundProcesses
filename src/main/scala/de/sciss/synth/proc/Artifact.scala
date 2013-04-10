@@ -34,11 +34,31 @@ import stm.Mutable
 import java.io.File
 import evt.EventLike
 import expr.Expr
+import scala.annotation.tailrec
 
 object Artifact {
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = Impl.read(in, access)
 
   implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] = Impl.serializer
+
+  def relativize(parent: File, sub: File): File = {
+    val can     = sub.getCanonicalFile
+    val base    = parent.getCanonicalFile
+
+    @tailrec def loop(res: File, left: File): File = {
+      if (left == null)
+        throw new IllegalArgumentException(s"File $sub is not in a subdirectory of $parent")
+
+      if (left == base) res
+      else {
+        val last  = left.getName
+        val init  = left.getParentFile
+        loop(new File(last, res.getPath), init)
+      }
+    }
+
+    loop(new File(can.getName), can.getParentFile)
+  }
 
   object Location {
     object Modifiable {
@@ -59,7 +79,7 @@ object Artifact {
        *
        * @param file   the file to turn into a registered artifact
        */
-      def add(file: File)(implicit tx: S#Tx): Artifact[S]
+      def add(file: File)(implicit tx: S#Tx): Artifact.Modifiable[S]
       def remove(artifact: Artifact[S])(implicit tx: S#Tx): Unit
 
       def directory_=(value: File)(implicit tx: S#Tx): Unit
@@ -91,6 +111,14 @@ object Artifact {
   }
 
   type Value = File
+
+  // sealed trait Update[S <: evt.Sys[S]]
+  // final case class
+
+  trait Modifiable[S <: evt.Sys[S]] extends Artifact[S] {
+    def child(implicit tx: S#Tx): File
+    def child_=(value: File)(implicit tx: S#Tx): Unit
+  }
 }
 
 trait Artifact[S <: evt.Sys[S]] extends Expr[S, Artifact.Value] /* Mutable[S#ID, S#Tx] */ {

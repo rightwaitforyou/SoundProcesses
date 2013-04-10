@@ -34,7 +34,8 @@ import java.io.File
 import scala.annotation.tailrec
 import expr.{Expr, LinkedList}
 import proc.Artifact.Location.Update
-import evt.{Change, EventLike}
+import de.sciss.lucre.event.{Pull, Change, EventLike}
+import de.sciss.lucre.event.impl.MultiEventImpl
 
 object ArtifactImpl {
   import Artifact.Location
@@ -43,28 +44,36 @@ object ArtifactImpl {
 
   // ---- artifact ----
 
-  def apply[S <: evt.Sys[S]](location: Location[S], path: List[String], name: String): Artifact[S] =
-    new Impl(location, path, name)
-
-  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = {
-    val cookie = in.readShort()
-    require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
-    val location  = readLocation(in, access)
-    val pathSz    = in.readShort()
-    val path      = if (pathSz == 0) Nil else List.fill(pathSz)(in.readUTF)
-    val name      = in.readUTF()
-    ArtifactImpl(location, path, name)
+  def apply[S <: evt.Sys[S]](location: Location[S], child: File)(implicit tx: S#Tx): Artifact.Modifiable[S] = {
+    val targets = evt.Targets[S]
+    val _child  = tx.newVar(targets.id, child)
+    new Impl(targets, location, _child)
   }
 
-  def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] = anySer.asInstanceOf[Ser[S]]
+  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] =
+    serializer[S].read(in, access)
+
+  def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] with evt.Reader[S, Artifact[S]] =
+    anySer.asInstanceOf[Ser[S]]
 
   private val anySer = new Ser[evt.InMemory]
 
-  private final class Ser[S <: evt.Sys[S]] extends Serializer[S#Tx, S#Acc, Artifact[S]] {
+  private final class Ser[S <: evt.Sys[S]] extends Serializer[S#Tx, S#Acc, Artifact[S]] with evt.Reader[S, Artifact[S]] {
     def write(v: Artifact[S], out: DataOutput) {
       v.write(out)
     }
-    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = ArtifactImpl.read(in, access)
+    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = {
+      val targets = evt.Targets.read(in, access)
+      read(in, access, targets)
+    }
+
+    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Artifact[S] with evt.Node[S] = {
+      val cookie    = in.readShort()
+      require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
+      val location  = readLocation(in, access)
+      val _child    = tx.readVar[File](targets.id, in)
+      new Impl(targets, location, _child)
+    }
   }
 
   // ---- location ----
@@ -105,26 +114,10 @@ object ArtifactImpl {
       ??? // store.dispatch(ArtifactRemoved(store, loc, artifact))
     }
 
-    def add(file: File)(implicit tx: S#Tx): Artifact[S] = {
-      val can     = file.getCanonicalFile
-      val name    = can.getName
-      val base    = _directory().getCanonicalFile
-      val folder  = can.getParentFile
-
-      @tailrec def loop(res: List[String], left: File): List[String] = {
-        if (left == null)
-          throw new IllegalArgumentException(s"File $file is not inside artifact store's base directory $base")
-
-        if (left == base) res
-        else {
-          val last  = left.getName
-          val init  = left.getParentFile
-          loop(last :: res, init)
-        }
-      }
-
-      val path      = loop(Nil, folder)
-      val artifact: Artifact[S] = ??? //  = ArtifactImpl(id, path, name)
+    def add(file: File)(implicit tx: S#Tx): Artifact.Modifiable[S] = {
+      val base      = _directory()
+      val child     = Artifact.relativize(base, file)
+      val artifact  = ArtifactImpl.apply(loc, child)
       ??? // store.dispatch(ArtifactAdded(store, loc, artifact))
       artifact
     }
@@ -150,34 +143,59 @@ object ArtifactImpl {
     }
   }
 
-  private final case class Impl[S <: evt.Sys[S]](location: Location[S], path: List[String], name: String)
-    extends Artifact[S] {
+  private final class Impl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
+                                            val location: Location[S], _child: S#Var[File])
+    extends Artifact.Modifiable[S] with evt.impl.StandaloneLike[S, Change[File], Artifact[S]] {
 
-    override def toString = s"Artifact(${if (path.isEmpty) "" else path.mkString("", "/", "/")}$name)"
+    // override def toString = s"Artifact(${if (path.isEmpty) "" else path.mkString("", "/", "/")}$name)"
+    override def toString() = s"Artifact@${hashCode().toHexString}"
 
-    //    def toFile(implicit store: ArtifactStoreLike): File = {
-    //    }
+    def child(implicit tx: S#Tx): File = _child()
 
-    def changed: EventLike[S, Change[Artifact.Value], Expr[S, Artifact.Value]] = ???
+    def child_=(value: File)(implicit tx: S#Tx) {
+      val old = _child()
+      if (old != value) {
+        _child() = value
+        ??? // dispatch change
+      }
+    }
+
+    def changed: EventLike[S, Change[Artifact.Value], Expr[S, Artifact.Value]] = this
+
+    def connect()(implicit tx: S#Tx) {
+      location.changed ---> this
+    }
+
+    def disconnect()(implicit tx: S#Tx) {
+      location.changed -/-> this
+    }
+
+    def pullUpdate(pull: Pull[S])(implicit tx: S#Tx): Option[Change[File]] = {
+      ???
+    }
+
+    protected def reader: evt.Reader[S, Artifact[S]] = ArtifactImpl.serializer
 
     def value(implicit tx: S#Tx): Artifact.Value = {
       val base   = location.directory
-      val folder = if (path.isEmpty) base else (base /: path)( (res, sub) => new File(res, sub))
-      new File(folder, name)
+      val child  = _child()
+      new File(base, child.getPath)
     }
 
-    def dispose()(implicit tx: S#Tx) {
-      location.dispose()
+    protected def disposeData()(implicit tx: S#Tx) {
+      // location.dispose()
+      _child.dispose()
     }
 
-    def write(out: DataOutput) {
+    protected def writeData(out: DataOutput) {
       out.writeShort(SER_VERSION)
       location.write(out)
-      if (path.isEmpty) out.writeShort(0) else {
-        out.writeShort(path.size)
-        path.foreach(out.writeUTF _)
-      }
-      out.writeUTF(name)
+      _child.write(out)
+      //      if (path.isEmpty) out.writeShort(0) else {
+      //        out.writeShort(path.size)
+      //        path.foreach(out.writeUTF _)
+      //      }
+      //      out.writeUTF(name)
     }
   }
 }
