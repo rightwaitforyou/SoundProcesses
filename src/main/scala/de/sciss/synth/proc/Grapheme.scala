@@ -27,7 +27,7 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{event => evt, stm, bitemp, expr}
+import lucre.{event => evt, bitemp, expr}
 import impl.CommonSerializers
 import expr.Expr
 import bitemp.{BiType, BiExpr}
@@ -354,16 +354,25 @@ object Grapheme {
       }
 
       def connect()(implicit tx: S#Tx) {
-        offset.changed ---> this
-        gain  .changed ---> this
+        artifact.changed ---> this
+        offset  .changed ---> this
+        gain    .changed ---> this
       }
 
       def disconnect()(implicit tx: S#Tx) {
-        offset.changed -/-> this
-        gain  .changed -/-> this
+        artifact.changed -/-> this
+        offset  .changed -/-> this
+        gain    .changed -/-> this
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value.Audio]] = {
+        val artEvt = artifact.changed
+        val artOpt = if (artEvt.isSource(pull)) artEvt.pullUpdate(pull) else None
+        val (artBefore, artNow) = artOpt.map(_.toTuple).getOrElse {
+          val art = artifact.value
+          (art, art)
+        }
+
         val offsetEvt = offset.changed
         val offsetOpt = if (offsetEvt.isSource(pull)) offsetEvt.pullUpdate(pull) else None
         val (offsetBefore, offsetNow) = offsetOpt.map(_.toTuple).getOrElse {
@@ -378,9 +387,8 @@ object Grapheme {
           (gv, gv)
         }
 
-        ???
-//        Audio.change(Value.Audio(artifact, spec, offsetBefore, gainBefore),
-//                     Value.Audio(artifact, spec, offsetNow,    gainNow   ))
+        Audio.change(Value.Audio(artBefore, spec, offsetBefore, gainBefore),
+                     Value.Audio(artNow   , spec, offsetNow   , gainNow   ))
       }
 
       protected def reader = Audio.serializer[S]

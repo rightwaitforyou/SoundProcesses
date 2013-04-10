@@ -28,9 +28,9 @@ package synth
 package proc
 
 import impl.{ArtifactImpl => Impl}
-import serial.{Writable, Serializer, DataInput}
+import serial.{Serializer, DataInput}
 import lucre.{stm, event => evt, data, expr}
-import stm.{Disposable, Mutable}
+import stm.Mutable
 import java.io.File
 import evt.EventLike
 import expr.Expr
@@ -49,7 +49,7 @@ object Artifact {
         dir.deleteOnExit()
         apply(dir)
       }
-      def apply[S <: Sys[S]](init: File): Location.Modifiable[S] = ???
+      def apply[S <: Sys[S]](init: File)(implicit tx: S#Tx): Location.Modifiable[S] = Impl.newLocation(init)
     }
     trait Modifiable[S <: evt.Sys[S]] extends Location[S] {
       /**
@@ -76,10 +76,10 @@ object Artifact {
 
     final case class Moved[S <: Sys[S]](location: Location[S], change: evt.Change[File]) extends Update[S]
 
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = ??? // Impl.locSerializer
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = Impl.locationSerializer
 
     def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] =
-        ??? // Impl.locRead[S](in, access)
+      Impl.readLocation[S](in, access)
   }
   trait Location[S <: evt.Sys[S]] extends /* Writable with Disposable[S#Tx] */ Mutable[S#ID, S#Tx] {
     def directory(implicit tx: S#Tx): File
@@ -90,16 +90,10 @@ object Artifact {
     def changed: EventLike[S, Location.Update[S], Location[S]]
   }
 
-  // final case class Value(file: File)
   type Value = File
 }
 
 trait Artifact[S <: evt.Sys[S]] extends Expr[S, Artifact.Value] /* Mutable[S#ID, S#Tx] */ {
   import Artifact._
   def location: Location[S]
-  // def value(implicit tx: S#Tx): Value
-  // def changed: EventLike[S, Update[S], Artifact[S]]
-  // def name: String
-  // def path: List[String]
-  // def toFile[S <: Sys[S]](implicit store: ArtifactStoreLike): File
 }

@@ -41,13 +41,15 @@ object ArtifactImpl {
 
   private final val SER_VERSION = 0x4172
 
+  // ---- artifact ----
+
   def apply[S <: evt.Sys[S]](location: Location[S], path: List[String], name: String): Artifact[S] =
     new Impl(location, path, name)
 
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = {
     val cookie = in.readShort()
     require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
-    val location: Location[S] = ??? //  = tx.readID(in, access)
+    val location  = readLocation(in, access)
     val pathSz    = in.readShort()
     val path      = if (pathSz == 0) Nil else List.fill(pathSz)(in.readUTF)
     val name      = in.readUTF()
@@ -64,6 +66,14 @@ object ArtifactImpl {
     }
     def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = ArtifactImpl.read(in, access)
   }
+
+  // ---- location ----
+
+  def newLocation[S <: evt.Sys[S]](init: File)(implicit tx: S#Tx): Location.Modifiable[S] = ???
+
+  def readLocation[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] = ???
+
+  def locationSerializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = ??? // anySer.asInstanceOf[ModSer[S]]
 
   private final class LocationImpl[S <: Sys[S]](protected val targets: evt.Targets[S],
                                                     _directory: S#Var[File],
@@ -146,15 +156,15 @@ object ArtifactImpl {
     override def toString = s"Artifact(${if (path.isEmpty) "" else path.mkString("", "/", "/")}$name)"
 
     //    def toFile(implicit store: ArtifactStoreLike): File = {
-    //      // XXX TODO: in the future we could have a better resolution scheme
-    //      val base   = store.baseDirectory
-    //      val folder = if (path.isEmpty) base else (base /: path)( (res, sub) => new File(res, sub))
-    //      new File(folder, name)
     //    }
 
     def changed: EventLike[S, Change[Artifact.Value], Expr[S, Artifact.Value]] = ???
 
-    def value(implicit tx: S#Tx): Artifact.Value = ???
+    def value(implicit tx: S#Tx): Artifact.Value = {
+      val base   = location.directory
+      val folder = if (path.isEmpty) base else (base /: path)( (res, sub) => new File(res, sub))
+      new File(folder, name)
+    }
 
     def dispose()(implicit tx: S#Tx) {
       location.dispose()
