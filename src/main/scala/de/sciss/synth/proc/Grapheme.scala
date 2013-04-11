@@ -56,6 +56,8 @@ object Grapheme {
   private final val audioCookie = 2
 
   object Value {
+    implicit val biType: BiType[Value] = Elem
+
     implicit object serializer extends ImmutableSerializer[Value] {
       def write(v: Value, out: DataOutput) {
         v.write(out)
@@ -206,12 +208,12 @@ object Grapheme {
     final val typeID = 11
 
     object Curve extends expr.Type[Value.Curve] {
-      def apply[S <: Sys[S]](values: (Expr[S, Double], Env.ConstShape)*)(implicit tx: S#Tx): Curve[S] = {
+      def apply[S <: evt.Sys[S]](values: (Expr[S, Double], Env.ConstShape)*)(implicit tx: S#Tx): Curve[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new CurveImpl(targets, values.toIndexedSeq)
       }
 
-      def unapplySeq[S <: Sys[S]](expr: Elem[S]): Option[Seq[(Expr[S, Double], Env.ConstShape)]] = {
+      def unapplySeq[S <: evt.Sys[S]](expr: Elem[S]): Option[Seq[(Expr[S, Double], Env.ConstShape)]] = {
         if (expr.isInstanceOf[CurveImpl[_]]) {
           val c = expr.asInstanceOf[CurveImpl[S]]
           Some(c.values)
@@ -436,12 +438,12 @@ object Grapheme {
   }
 
   object Modifiable {
-    def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S]
+    def apply[S <: evt.Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S]
 
-    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
+    def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
       Impl.readModifiable(in, access)
 
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] =
+    implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] =
       Impl.modifiableSerializer[S]
 
     /**

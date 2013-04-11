@@ -39,7 +39,7 @@ import scala.annotation.tailrec
 object Artifact {
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = Impl.read(in, access)
 
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] = Impl.serializer
+  implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] = Impl.serializer
 
   def relativize(parent: File, sub: File): File = {
     val can     = sub.getCanonicalFile
@@ -69,7 +69,14 @@ object Artifact {
         dir.deleteOnExit()
         apply(dir)
       }
+
       def apply[S <: Sys[S]](init: File)(implicit tx: S#Tx): Location.Modifiable[S] = Impl.newLocation(init)
+
+      implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Location.Modifiable[S]] =
+        Impl.modLocationSerializer
+
+      def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location.Modifiable[S] =
+        Impl.readModLocation[S](in, access)
     }
     trait Modifiable[S <: evt.Sys[S]] extends Location[S] {
       /**
@@ -88,17 +95,17 @@ object Artifact {
     sealed trait Update[S <: evt.Sys[S]] {
       def location: Location[S]
     }
-    final case class Added[S <: Sys[S]](location: Location[S], artifact: Artifact[S])
+    final case class Added[S <: evt.Sys[S]](location: Location[S], artifact: Artifact[S])
       extends Update[S]
 
-    final case class Removed[S <: Sys[S]](location: Location[S], artifact: Artifact[S])
+    final case class Removed[S <: evt.Sys[S]](location: Location[S], artifact: Artifact[S])
       extends Update[S]
 
-    final case class Moved[S <: Sys[S]](location: Location[S], change: evt.Change[File]) extends Update[S]
+    final case class Moved[S <: evt.Sys[S]](location: Location[S], change: evt.Change[File]) extends Update[S]
 
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = Impl.locationSerializer
+    implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = Impl.locationSerializer
 
-    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] =
+    def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] =
       Impl.readLocation[S](in, access)
   }
   trait Location[S <: evt.Sys[S]] extends /* Writable with Disposable[S#Tx] */ Mutable[S#ID, S#Tx] {
