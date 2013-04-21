@@ -135,15 +135,18 @@ object ArtifactImpl {
     // def createFile(): File = File.createTempFile("artifact", ".bin", directory())
 
     def remove(artifact: Artifact[S])(implicit tx: S#Tx) {
+      val idx = artifacts.indexOf(artifact)
       if (!artifacts.remove(artifact)) throw new NoSuchElementException(s"Artifact $artifact was not found in the store")
-      fire(Location.Removed(loc, artifact))
+      fire(Location.Removed(loc, idx, artifact))
     }
 
     def add(file: File)(implicit tx: S#Tx): Artifact.Modifiable[S] = {
       val base      = _directory()
       val child     = Artifact.relativize(base, file)
       val artifact  = ArtifactImpl.apply(loc, child)
-      fire(Location.Added(loc, artifact))
+      val idx       = artifacts.size
+      artifacts.addLast(artifact)
+      fire(Location.Added(loc, idx, artifact))
       artifact
     }
 

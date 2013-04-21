@@ -95,10 +95,10 @@ object Artifact {
     sealed trait Update[S <: evt.Sys[S]] {
       def location: Location[S]
     }
-    final case class Added[S <: evt.Sys[S]](location: Location[S], artifact: Artifact[S])
+    final case class Added[S <: evt.Sys[S]](location: Location[S], idx: Int, artifact: Artifact[S])
       extends Update[S]
 
-    final case class Removed[S <: evt.Sys[S]](location: Location[S], artifact: Artifact[S])
+    final case class Removed[S <: evt.Sys[S]](location: Location[S], idx: Int, artifact: Artifact[S])
       extends Update[S]
 
     final case class Moved[S <: evt.Sys[S]](location: Location[S], change: evt.Change[File]) extends Update[S]
