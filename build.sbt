@@ -19,7 +19,7 @@ libraryDependencies ++= {
   val eventVersion     = "2.1.+"
   val stmVersion       = "2.0.+"
   Seq(
-    "de.sciss" %% "scalacollider"   % "1.6.+",
+    "de.sciss" %% "scalacollider"   % "1.7.+",
     "de.sciss" %  "prefuse-core"    % "0.21",
     "de.sciss" %% "lucreconfluent"  % confluentVersion,
     "de.sciss" %% "lucreevent-expr" % eventVersion,
