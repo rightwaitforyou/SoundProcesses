@@ -29,7 +29,7 @@ package impl
 
 import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike, impl => evti, Sys}
-import data.{SpaceSerializers, SkipOctree, Iterator}
+import data.{SkipOctree, Iterator}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import collection.breakOut
 import annotation.switch
@@ -37,7 +37,7 @@ import geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D,
 import LongSpace.TwoDim
 import expr.{Expr, Type}
 import de.sciss.span.{SpanLike, Span}
-import de.sciss.serial.{ImmutableSerializer, DataOutput, DataInput, Serializer}
+import de.sciss.serial.{DataOutput, DataInput, Serializer}
 
 object BiGroupImpl {
 
@@ -194,7 +194,7 @@ object BiGroupImpl {
 
     implicit def pointView: (Leaf[S, Elem], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint(tup._1)
 
-    implicit def hyperSer: ImmutableSerializer[LongSquare] = SpaceSerializers.LongSquareSerializer
+    // implicit def hyperSer: ImmutableSerializer[LongSquare] = SpaceSerializers.LongSquareSerializer
 
     protected def tree: Tree[S, Elem, U]
 
@@ -529,7 +529,7 @@ object BiGroupImpl {
           if (start >= time) {
             Some(start)
           } else {
-            assert(stop >= time, sp);
+            assert(stop >= time, sp)
             Some(stop)
           }
         case _ => None // All or Void
@@ -546,7 +546,7 @@ object BiGroupImpl {
           if (stop <= time) {
             Some(stop)
           } else {
-            assert(start <= time, sp);
+            assert(start <= time, sp)
             Some(start)
           }
         case _ => None // All or Void
