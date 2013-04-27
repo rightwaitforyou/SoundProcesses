@@ -33,103 +33,65 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.serial.DataInput
 
 object Proc {
-   // ---- implementation forwards ----
+  // ---- implementation forwards ----
 
-   def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx /*, store: ArtifactStore[ S ] */ ) : Proc[ S ] = Impl[ S ]
+  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): Proc[S] = Impl[S]
 
-   def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Proc[ S ] = Impl.read( in, access )
+  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] = Impl.read(in, access)
 
-   implicit def serializer[ S <: evt.Sys[ S ]] : evt.NodeSerializer[ S, Proc[ S ]] = Impl.serializer[ S ]
+  implicit def serializer[S <: evt.Sys[S]]: evt.NodeSerializer[S, Proc[S]] = Impl.serializer[S]
 
-   // ---- event types ----
+  // ---- event types ----
 
-   final case class Update[ S <: evt.Sys[ S ]]( proc: Proc[ S ], changes: IIdxSeq[ Change[ S ]])
+  /** An update is a sequence of changes */
+  final case class Update[S <: evt.Sys[S]](proc: Proc[S], changes: IIdxSeq[Change[S]])
 
-   sealed trait Change[ +S ]
+  /** A change is either a state change, or a scan or a grapheme change */
+  sealed trait Change[+S]
 
-   sealed trait StateChange extends Change[ Nothing ]
-   final case class Rename( change: evt.Change[ String ]) extends StateChange
-   final case class GraphChange( change: evt.Change[ SynthGraph ]) extends StateChange
-//   final case class PlayingChange[ S <: evt.Sys[ S ]]( proc: Proc[ S ], change: BiPin.Expr.Update[ S, Boolean ])  extends StateChange[ S ]
-//   final case class FreqChange[ S <: evt.Sys[ S ]](    proc: Proc[ S ], change: BiPin.ExprUpdate[ S, Double ])    extends Update[ S ]
+  /** A state change is either a renaming, a change of graph, or a change of association (map) */
+  sealed trait StateChange extends Change[ Nothing ]
+  final case class Rename     (change: evt.Change[String    ]) extends StateChange
+  final case class GraphChange(change: evt.Change[SynthGraph]) extends StateChange
 
-   sealed trait AssociativeChange extends StateChange { def key: AssociativeKey  }
-   final case class AssociationAdded( key: AssociativeKey ) extends AssociativeChange
-   final case class AssociationRemoved( key: AssociativeKey ) extends AssociativeChange
-//   final case class GraphemeAdded( name: String ) extends AssociativeChange
-//   final case class GraphemeRemoved( name: String ) extends AssociativeChange
+  /** An associative change is either adding or removing an association */
+  sealed trait AssociativeChange extends StateChange {
+    def key: AssociativeKey
+  }
+  final case class AssociationAdded  (key: AssociativeKey) extends AssociativeChange
+  final case class AssociationRemoved(key: AssociativeKey) extends AssociativeChange
 
-//   final case class AssociativeChange[ S <: evt.Sys[ S ]]( proc: Proc[ S ], added:   Set[ AssociativeKey ],
-//                                                                        removed: Set[ AssociativeKey ]) extends StateChange[ S ] {
-//      override def toString = "AssociativeChange(" + proc +
-//         (if( added.isEmpty ) "" else ", added = " + added.mkString( ", " )) +
-//         (if( removed.isEmpty) "" else ", removed = " + removed.mkString( ", " )) + ")"
-//   }
-   sealed trait AssociativeKey { def name: String }
-   final case class ScanKey(     name: String ) extends AssociativeKey {
-      override def toString = "[scan: " + name + "]"
-   }
-   final case class GraphemeKey( name: String ) extends AssociativeKey {
-      override def toString = "[grapheme: " + name + "]"
-   }
+  /** An associative key is either a grapheme or a scan key */
+  sealed trait AssociativeKey { def name: String }
+  final case class ScanKey(name: String) extends AssociativeKey {
+    override def toString = "[scan: " + name + "]"
+  }
+  final case class GraphemeKey(name: String) extends AssociativeKey {
+    override def toString = "[grapheme: " + name + "]"
+  }
 
-//   final case class ParamChange[ S <: evt.Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ BiPin.Expr.Update[ S, Param ]]]) extends Update[ S ]
+  final case class ScanChange[S <: evt.Sys[S]](key: String, scanUpdate: Scan.Update[S]) extends Change[S] {
+    override def toString = "ScanChange(" + key + ", " + scanUpdate + ")"
+  }
 
-//   final case class ScanChange[     S <: evt.Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Scan.Update[     S ]]]) extends Update[ S ] {
-//      override def toString = "ScanChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
-//   }
-//   final case class GraphemeChange[ S <: evt.Sys[ S ]]( proc: Proc[ S ], changes: Map[ String, IIdxSeq[ Grapheme.Update[ S ]]]) extends Update[ S ] {
-//      override def toString = "GraphemeChange(" + proc + ", change = " + changes.map( e => e._1 + " -> " + e._2.mkString( ", " )).mkString( "(" + ", " + ")" ) + ")"
-//   }
-
-   final case class ScanChange[ S <: evt.Sys[ S ]]( key: String, scanUpdate: Scan.Update[ S ]) extends Change[ S ] {
-      override def toString = "ScanChange(" + key + ", " + scanUpdate + ")"
-   }
-   final case class GraphemeChange[ S <: evt.Sys[ S ]]( key: String, graphemeUpdate: Grapheme.Update[ S ]) extends Change[ S ] {
-      override def toString = "GraphemeChange(" + key + ", " + graphemeUpdate + ")"
-   }
+  final case class GraphemeChange[S <: evt.Sys[S]](key: String, graphemeUpdate: Grapheme.Update[S]) extends Change[S] {
+    override def toString = "GraphemeChange(" + key + ", " + graphemeUpdate + ")"
+  }
 }
-trait Proc[ S <: evt.Sys[ S ]] extends evt.Node[ S ] {
-   import Proc._
 
-   // ---- "fields" ----
+trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
+  import Proc._
 
-// OOO
-//   def name_# : Expr.Var[ S, String ]
-   def name( implicit tx: S#Tx ) : Expr[ S, String ]
-   def name_=( expr: Expr[ S, String ])( implicit tx: S#Tx ) : Unit
+  def name(implicit tx: S#Tx): Expr[S, String]
+  def name_=(expr: Expr[S, String])(implicit tx: S#Tx): Unit
 
-   def graph( implicit tx: S#Tx ) : Code[ SynthGraph ]
-   def graph_=( g: Code[ SynthGraph ])( implicit tx: S#Tx ) : Unit
-//   def graph_=( block: => Any )( implicit tx: S#Tx ) : Unit
+  def graph(implicit tx: S#Tx): Code[SynthGraph]
+  def graph_=(g: Code[SynthGraph])(implicit tx: S#Tx): Unit
 
-//// OOO
-////   def playing_# : Expr.Var[ S, Boolean ]
-//   def playing( implicit tx: S#Tx, chr: Chronos[ S ]) : Expr[ S, Boolean ]
-//   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
+  // ---- controls preview demo ----
 
-   // ---- controls preview demo ----
+  def scans    : Scans    .Modifiable[S]
+  def graphemes: Graphemes.Modifiable[S]
 
-//   def par: ParamMap[ S ]
-   def scans: Scans.Modifiable[ S ]
-   def graphemes: Graphemes.Modifiable[ S ]
-
-//   /**
-//    * Same as `playing = true`
-//    */
-//   def play()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
-//   /**
-//    * Same as `playing = false`
-//    */
-//   def stop()( implicit tx: S#Tx, chr: Chronos[ S ]) : Unit
-
-   // ---- events ----
-
-//   def stateChanged:    evt.Event[ S, StateChange[ S ],  Proc[ S ]]
-//   def graphChanged:    evt.Event[ S, GraphChange[ S ],    Proc[ S ]]
-//   def playingChanged:  evt.Event[ S, PlayingChange[ S ],  Proc[ S ]]
-//   def paramChanged:    evt.Event[ S, ParamChange[ S ],    Proc[ S ]]
-//   def freqChanged:     evt.Event[ S, FreqChange[ S ],     Proc[ S ]]
-
-   def changed:         evt.Event[ S, Update[ S ],         Proc[ S ]]
+  def changed: evt.Event[S, Update[S], Proc[S]]
 }

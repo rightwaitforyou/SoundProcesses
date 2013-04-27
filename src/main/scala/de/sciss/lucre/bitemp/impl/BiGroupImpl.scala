@@ -472,6 +472,8 @@ object BiGroupImpl {
     //      final def iterator( implicit tx: S#Tx, chr: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]  =
     //         intersect( chr.time.value )
 
+    final def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Leaf[S, Elem]] = tree.iterator
+
     final def intersect(time: Long)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] = {
       val start = time
       val stop = time + 1
