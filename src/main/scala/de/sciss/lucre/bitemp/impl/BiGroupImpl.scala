@@ -53,7 +53,7 @@ object BiGroupImpl {
   //   private final case class Entry[ Elem ]( )
 
   private type LeafImpl[S <: Sys[S], Elem, U] = (SpanLike, IIdxSeq[TimedElemImpl[S, Elem, U]])
-  private type Tree[S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
+  private type Tree    [S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
 
   private def opNotSupported: Nothing = sys.error("Operation not supported")
 
@@ -148,12 +148,12 @@ object BiGroupImpl {
     protected def disposeData()(implicit tx: S#Tx) {}
 
     /* private[lucre] */ def connect()(implicit tx: S#Tx) {
-      span.changed ---> this
+      span.changed     ---> this
       eventView(value) ---> this
     }
 
     /* private[lucre] */ def disconnect()(implicit tx: S#Tx) {
-      span.changed -/-> this
+      span.changed     -/-> this
       eventView(value) -/-> this
     }
 
@@ -258,8 +258,7 @@ object BiGroupImpl {
 
       def node: BiGroup[S, Elem, U] = group
 
-      def connect()(implicit tx: S#Tx) {}
-
+      def connect   ()(implicit tx: S#Tx) {}
       def disconnect()(implicit tx: S#Tx) {}
 
       def +=(elem: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx) {
@@ -308,8 +307,7 @@ object BiGroupImpl {
 
       def node: BiGroup.Modifiable[S, Elem, U] = group
 
-      def connect()(implicit tx: S#Tx) {}
-
+      def connect   ()(implicit tx: S#Tx) {}
       def disconnect()(implicit tx: S#Tx) {}
 
       def --->(r: evt.Selector[S])(implicit tx: S#Tx) {
@@ -499,7 +497,7 @@ object BiGroupImpl {
           val shape = LongRectangle(MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_SIDE)
           rangeSearch(shape)
 
-        case Span.All => tree.iterator
+        case Span.All  => tree.iterator
         case Span.Void => Iterator.empty
       }
     }
@@ -508,8 +506,8 @@ object BiGroupImpl {
       if (start == Span.Void || stop == Span.Void) return Iterator.empty
 
       val startP = searchSpanToPoint(start)
-      val stopP = searchSpanToPoint(stop)
-      val shape = LongRectangle(startP.x, stopP.x, startP.y - startP.x /* + 1 */ , stopP.y - stopP.x /* + 1 */)
+      val stopP  = searchSpanToPoint(stop)
+      val shape  = LongRectangle(startP.x, stopP.x, startP.y - startP.x /* + 1 */ , stopP.y - stopP.x /* + 1 */)
       //println( "RANGE " + shape )
       rangeSearch(shape)
     }
@@ -517,17 +515,17 @@ object BiGroupImpl {
     // this can be easily implemented with two rectangular range searches
     final def eventsAt(time: Long)(implicit tx: S#Tx): (Iterator[S#Tx, Leaf[S, Elem]], Iterator[S#Tx, Leaf[S, Elem]]) = {
       val startShape = LongRectangle(time, MIN_COORD, 1, MAX_SIDE)
-      val stopShape = LongRectangle(MIN_COORD, time, MAX_SIDE, 1)
+      val stopShape  = LongRectangle(MIN_COORD, time, MAX_SIDE, 1)
       (rangeSearch(startShape), rangeSearch(stopShape))
     }
 
     final def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long] = {
       val point = LongPoint2D(time, time) // + 1
-      val span = tree.nearestNeighborOption(point, advanceNNMetric).map(_._1).getOrElse(Span.Void)
+      val span  = tree.nearestNeighborOption(point, advanceNNMetric).map(_._1).getOrElse(Span.Void)
       span match {
-        case sp@Span.From(start) => assert(start >= time, sp); Some(start) // else None
-        case sp@Span.Until(stop) => assert(stop >= time, sp); Some(stop) // else None
-        case sp@Span(start, stop) =>
+        case sp @ Span.From(start) => assert(start >= time, sp); Some(start) // else None
+        case sp @ Span.Until(stop) => assert(stop  >= time, sp); Some(stop ) // else None
+        case sp @ Span(start, stop) =>
           if (start >= time) {
             Some(start)
           } else {
@@ -542,9 +540,9 @@ object BiGroupImpl {
       val point = LongPoint2D(time, time)
       val span = tree.nearestNeighborOption(point, regressNNMetric).map(_._1).getOrElse(Span.Void)
       span match {
-        case sp@Span.From(start) => assert(start <= time, sp); Some(start) // else None
-        case sp@Span.Until(stop) => assert(stop <= time, sp); Some(stop) // else None
-        case sp@Span(start, stop) =>
+        case sp @ Span.From(start) => assert(start <= time, sp); Some(start) // else None
+        case sp @ Span.Until(stop) => assert(stop  <= time, sp); Some(stop ) // else None
+        case sp @ Span(start, stop) =>
           if (stop <= time) {
             Some(stop)
           } else {
