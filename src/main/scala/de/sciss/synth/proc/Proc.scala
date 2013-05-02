@@ -51,7 +51,7 @@ object Proc {
 
   /** A state change is either a renaming, a change of graph, or a change of association (map) */
   sealed trait StateChange extends Change[ Nothing ]
-  final case class Rename     (change: evt.Change[String    ]) extends StateChange
+  // final case class Rename     (change: evt.Change[String    ]) extends StateChange
   final case class GraphChange(change: evt.Change[SynthGraph]) extends StateChange
 
   /** An associative change is either adding or removing an association */
@@ -82,8 +82,8 @@ object Proc {
 trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
   import Proc._
 
-  def name(implicit tx: S#Tx): Expr[S, String]
-  def name_=(expr: Expr[S, String])(implicit tx: S#Tx): Unit
+  // def name(implicit tx: S#Tx): Expr[S, String]
+  // def name_=(expr: Expr[S, String])(implicit tx: S#Tx): Unit
 
   def graph(implicit tx: S#Tx): Code[SynthGraph]
   def graph_=(g: Code[SynthGraph])(implicit tx: S#Tx): Unit
@@ -91,7 +91,7 @@ trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
   // ---- controls preview demo ----
 
   def scans    : Scans    .Modifiable[S]
-  def graphemes: Graphemes.Modifiable[S]
+  // def graphemes: Graphemes.Modifiable[S]
 
   def changed: evt.Event[S, Update[S], Proc[S]]
 }
