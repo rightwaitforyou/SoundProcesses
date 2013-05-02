@@ -305,16 +305,18 @@ object ProcImpl {
     final protected def writeData(out: DataOutput) {
       out.writeShort(SER_VERSION)
       // name_#     .write(out)
-      graphVar   .write(out)
-      scanMap    .write(out)
-      // graphemeMap.write(out)
+      graphVar    .write(out)
+      scanMap     .write(out)
+      // graphemeMap .write(out)
+      attributeMap.write(out)
     }
 
     final protected def disposeData()(implicit tx: S#Tx) {
       // name_#     .dispose()
-      graphVar   .dispose()
-      scanMap    .dispose()
+      graphVar    .dispose()
+      scanMap     .dispose()
       // graphemeMap.dispose()
+      attributeMap.dispose()
     }
 
     override def toString() = "Proc" + id

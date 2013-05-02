@@ -172,12 +172,12 @@ class TransportSpec extends ConfluentEventSpec {
          )
          obs.clear()
 
-         p1.graphemes.add( "graph", g1 )
-         obs.assertEquals(
-            a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
-               Proc.AssociationAdded( Proc.GraphemeKey( "graph" )))))
-         )
-         obs.clear()
+         // p1.graphemes.add( "graph", g1 )
+         // obs.assertEquals(
+         //    a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
+         //       Proc.AssociationAdded( Proc.GraphemeKey( "graph" )))))
+         // )
+         // obs.clear()
 
 // FIXED: ( the following causes p1.scans to disconnect )
 //lucre.event.showLog = true
@@ -203,21 +203,21 @@ class TransportSpec extends ConfluentEventSpec {
          val segm = Segment.Curve( Span( 1000L, 6000L ), IIdxSeq( (441.0, 882.0, linShape) ))
          obs.assertEquals(
             a0.copy( changes = IIdxSeq(
-               pt1 -> ProcChanged(
-                  Proc.GraphemeChange( "graph", Grapheme.Update( g1, IIdxSeq( segm )))
-               ),
+               // pt1 -> ProcChanged(
+               //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, IIdxSeq( segm )))
+               // ),
                pt1 -> GraphemesChanged(
                   Map( "freq" -> segm )
                )
             ))
          )
          obs.clear()
-         p1.graphemes.remove( "graph" )
-         obs.assertEquals(
-            a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
-               Proc.AssociationRemoved( Proc.GraphemeKey( "graph" )))))
-         )
-         obs.clear()
+         // p1.graphemes.remove( "graph" )
+         // obs.assertEquals(
+         //    a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
+         //       Proc.AssociationRemoved( Proc.GraphemeKey( "graph" )))))
+         // )
+         // obs.clear()
       }
    }
 }

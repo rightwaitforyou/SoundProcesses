@@ -26,42 +26,34 @@ class ScanSpec extends ConfluentEventSpec {
          res
       }
 
-      system.step { implicit tx =>
+      val grH = system.step { implicit tx =>
          val p = ph()
          p.scans.add( "amp" )
          p.scans.add( "freq" )
          p.scans.remove( "amp" )
          val gr = Grapheme.Modifiable[ S ]
-         p.graphemes.add( "test", gr )
-         p.graphemes.remove( "test" )
-         p.graphemes.add( "gr", gr )
+         // p.graphemes.add( "test", gr )
+         // p.graphemes.remove( "test" )
+         // p.graphemes.add( "gr", gr )
          val gr2 = Grapheme.Modifiable[ S ]
-//         p.graphemes.add( "gr", gr2 )
-//         gr.dispose()
          obs.assertEquals(
             Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.ScanKey( "amp" )))),
-//            Proc.AssociativeChange( p, added = Set( Proc.ScanKey( "amp"  )), removed = Set.empty ),
             Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.ScanKey( "freq" )))),
-//            Proc.AssociativeChange( p, added = Set( Proc.ScanKey( "freq" )), removed = Set.empty ),
-            Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.ScanKey( "amp" )))),
-//            Proc.AssociativeChange( p, added = Set.empty, removed = Set( Proc.ScanKey( "amp" ))),
-            Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "test" )))),
-//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "test"  )), removed = Set.empty ),
-            Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "test" )))),
-//            Proc.AssociativeChange( p, added = Set.empty, removed = Set( Proc.GraphemeKey( "test" ))),
-            Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "gr" ))))
-//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set.empty ),
-//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set( Proc.GraphemeKey( "gr" )))
+            Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.ScanKey( "amp" ))))
+            // Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "test" )))),
+            // Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "test" )))),
+            // Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "gr" ))))
          )
          obs.clear()
 
-         p.graphemes.add( "gr", gr2 )
-         gr.dispose()
-         obs.assertEquals(
-            Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "gr" )),
-                                     Proc.AssociationAdded(   Proc.GraphemeKey( "gr" ))))
-//            Proc.AssociativeChange( p, added = Set( Proc.GraphemeKey( "gr" )), removed = Set( Proc.GraphemeKey( "gr" )))
-         )
+         // p.graphemes.add( "gr", gr2 )
+         // gr.dispose()
+         // obs.assertEquals(
+         //    Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "gr" )),
+         //                             Proc.AssociationAdded(   Proc.GraphemeKey( "gr" ))))
+         // )
+
+        tx.newHandle(gr)
       }
 
       def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape )( implicit tx: S#Tx ) =
@@ -69,15 +61,16 @@ class ScanSpec extends ConfluentEventSpec {
 
       system.step { implicit tx =>
          val p = ph()
-         val Some( Grapheme.Modifiable( gr )) = p.graphemes.get( "gr" )
+         // val Some( Grapheme.Modifiable( gr )) = p.graphemes.get( "gr" )
+         val gr = grH()
          val Some( scan ) = p.scans.get( "freq" )
 
          gr.add( 0L, curve( 1234.0 ))                       // should be observed only directly through proc (but not scan)
-         obs.assertEquals(
-            Proc.Update( p, IIdxSeq( Proc.GraphemeChange( "gr",
-               Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Const( Span.from( 0L ), IIdxSeq( 1234.0 ))))
-            )))
-         )
+         obs.assertEquals()
+         //    Proc.Update( p, IIdxSeq( Proc.GraphemeChange( "gr",
+         //       Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Const( Span.from( 0L ), IIdxSeq( 1234.0 ))))
+         //    )))
+         // )
          obs.clear()
 
          scan.source_=( Some( Scan.Link.Grapheme( gr )))    // should be observed

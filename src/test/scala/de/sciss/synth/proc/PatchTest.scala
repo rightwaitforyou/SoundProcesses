@@ -41,9 +41,9 @@ proc.showAuralLog = true
 ap.group.foreach { _.server.peer.dumpOSC() }
 
       val p1         = Proc[ S ]
-      p1.name_=( "p1" )
+      // p1.name_=( "p1" )
       val p2         = Proc[ S ]
-      p2.name_=( "p2" )
+      // p2.name_=( "p2" )
 
       val p1out      = p1.scans.add( "out" )
       val p2in       = p2.scans.add( "freq" )

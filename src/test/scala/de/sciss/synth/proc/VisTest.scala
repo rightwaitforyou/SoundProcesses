@@ -121,7 +121,7 @@ extends ExprImplicits[ S ] {
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)
       val p = Proc[ S ]
-      p.name_=( name )
+      // p.name_=( name )
       p.graph_=( SynthGraph {
          import synth._
          import ugen._
@@ -264,7 +264,7 @@ extends ExprImplicits[ S ] {
 
       t { implicit tx =>
          val p    = Proc[ S ]
-         p.name_=( "AudioFilePlayer" )
+         // p.name_=( "AudioFilePlayer" )
          p.graph_=( SynthGraph {
             import synth._
             import ugen._
