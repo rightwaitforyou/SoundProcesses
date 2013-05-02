@@ -41,136 +41,145 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
     value.write(out)
   }
 
-  def newExpr[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] =
-      BinaryOp.Apply.make( start, stop )
+  def newExpr[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
+    BinaryOp.Apply.make(start, stop)
 
-   def from[ S <: Sys[ S ]]( start: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] =
-      UnaryOp.From.make( start )
+  def from[S <: Sys[S]](start: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
+    UnaryOp.From.make(start)
 
-   def until[ S <: Sys[ S ]]( stop: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] =
-      UnaryOp.Until.make( stop )
+  def until[S <: Sys[S]](stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
+    UnaryOp.Until.make(stop)
 
-   final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
-      // ---- binary ----
-      def shift( delta: Expr[ S, Long ]) : Ex[ S ] = BinaryOp.Shift.make( ex, delta )
-   }
+  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+    // ---- binary ----
+    def shift(delta: Expr[S, Long]): Ex[S] = BinaryOp.Shift.make(ex, delta)
+  }
 
-   private object UnaryOp {
-      sealed trait Op[ T1 ] {
-         def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                 ( implicit tx: S#Tx ) : Tuple1[ S, T1 ]
+  private object UnaryOp {
 
-         def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, T1 ]) : String = name + "(" + _1 + ")"
+    sealed trait Op[T1] {
+      def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                           (implicit tx: S#Tx): Tuple1[S, T1]
 
-         def name: String = { val cn = getClass.getName
-            val sz   = cn.length
-            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
-            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
-         }
+      def toString[S <: stm.Sys[S]](_1: Expr[S, T1]): String = name + "(" + _1 + ")"
+
+      def name: String = {
+        val cn  = getClass.getName
+        val sz  = cn.length
+        val i   = cn.lastIndexOf('$', sz - 2) + 1
+        "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
+      }
+    }
+
+    sealed abstract class LongOp(val id: Int) extends Tuple1Op[Long] with Op[Long] {
+      final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                                 (implicit tx: S#Tx): Tuple1[S, Long] = {
+        val _1 = Longs.readExpr(in, access)
+        new Tuple1(typeID, this, targets, _1)
       }
 
-      sealed abstract class LongOp( val id: Int ) extends Tuple1Op[ Long ] with Op[ Long ] {
-         final def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                       ( implicit tx: S#Tx ) : Tuple1[ S, Long ] = {
-            val _1 = Longs.readExpr( in, access )
-            new Tuple1( typeID, this, targets, _1 )
-         }
+      final def make[S <: Sys[S]](a: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
+        new Tuple1(typeID, this, Targets.partial[S], a)
+      }
+    }
 
-         final def make[ S <: Sys[ S ]]( a: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple1( typeID, this, Targets.partial[ S ], a )
-         }
+    case object From extends LongOp(0) {
+      def value(a: Long): SpanLike = Span.from(a)
+
+      override def toString[S <: stm.Sys[S]](_1: Expr[S, Long]): String = "Span.from(" + _1 + ")"
+    }
+
+    case object Until extends LongOp(1) {
+      def value(a: Long): SpanLike = Span.until(a)
+
+      override def toString[S <: stm.Sys[S]](_1: Expr[S, Long]): String = "Span.until(" + _1 + ")"
+    }
+  }
+
+  private object BinaryOp {
+    sealed trait Op[T1, T2] {
+      def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                           (implicit tx: S#Tx): Tuple2[S, T1, T2]
+
+      def toString[S <: stm.Sys[S]](_1: Expr[S, T1], _2: Expr[S, T2]): String =
+        _1.toString + "." + name + "(" + _2 + ")"
+
+      def name: String = {
+        val cn = getClass.getName
+        val sz = cn.length
+        val i = cn.lastIndexOf('$', sz - 2) + 1
+        "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
+      }
+    }
+
+    sealed abstract class LongSpanOp(val id: Int) extends Tuple2Op[SpanLike, Long] with Op[SpanLike, Long] {
+      final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                                 (implicit tx: S#Tx): Tuple2[S, SpanLike, Long] = {
+        val _1 = readExpr(in, access)
+        val _2 = Longs.readExpr(in, access)
+        new Tuple2(typeID, this, targets, _1, _2)
       }
 
-      case object From extends LongOp( 0 ) {
-         def value( a: Long ) : SpanLike = Span.from( a )
-         override def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, Long ]) : String = "Span.from(" + _1 + ")"
+      final def make[S <: Sys[S]](a: Ex[S], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
+        new Tuple2(typeID, this, Targets.partial[S], a, b)
+      }
+    }
+
+    sealed abstract class LongLongOp(val id: Int) extends Tuple2Op[Long, Long] with Op[Long, Long] {
+      final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                                 (implicit tx: S#Tx): Tuple2[S, Long, Long] = {
+        val _1 = Longs.readExpr(in, access)
+        val _2 = Longs.readExpr(in, access)
+        new Tuple2(typeID, this, targets, _1, _2)
       }
 
-      case object Until extends LongOp( 1 ) {
-         def value( a: Long ) : SpanLike = Span.until( a )
-         override def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, Long ]) : String = "Span.until(" + _1 + ")"
+      final def make[S <: Sys[S]](a: Expr[S, Long], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
+        new Tuple2(typeID, this, Targets.partial[S], a, b)
       }
-   }
+    }
 
-   private object BinaryOp {
-      sealed trait Op[ T1, T2 ] {
-         def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                 ( implicit tx: S#Tx ) : Tuple2[ S, T1, T2 ]
+    case object Apply extends LongLongOp(0) {
+      override def toString[S <: stm.Sys[S]](_1: Expr[S, Long], _2: Expr[S, Long]): String =
+        "Span(" + _1 + ", " + _2 + ")"
 
-         def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, T1 ], _2: Expr[ S, T2 ]) : String = _1.toString + "." + name + "(" + _2 + ")"
+      def value(a: Long, b: Long): SpanLike = Span(a, b)
+    }
 
-         def name: String = { val cn = getClass.getName
-            val sz   = cn.length
-            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
-            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
-         }
-      }
+    case object Shift extends LongSpanOp(1) {
+      def value(a: SpanLike, b: Long): SpanLike = a.shift(b)
+    }
+  }
 
-      sealed abstract class LongSpanOp( val id: Int ) extends Tuple2Op[ SpanLike, Long ] with Op[ SpanLike, Long ] {
-         final def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                       ( implicit tx: S#Tx ) : Tuple2[ S, SpanLike, Long ] = {
-            val _1 = readExpr( in, access )
-            val _2 = Longs.readExpr( in, access )
-            new Tuple2( typeID, this, targets, _1, _2 )
-         }
+  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                            (implicit tx: S#Tx): ExN[S] =
+    (cookie: @switch) match {
+      case 1 =>
+        val tpe = in.readInt()
+        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
+        val opID = in.readInt()
+        import UnaryOp._
+        val op: Op[_] = (opID: @switch) match {
+          case 0 => From
+          case 1 => Until
+          case _ => sys.error("Invalid operation id " + opID)
+        }
+        op.read(in, access, targets)
 
-         final def make[ S <: Sys[ S ]]( a: Ex[ S ], b: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple2( typeID, this, Targets.partial[ S ], a, b )
-         }
-      }
+      case 2 =>
+        val tpe = in.readInt()
+        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
+        val opID = in.readInt()
+        import BinaryOp._
+        val op: Op[_, _] = (opID: @switch) match {
+          case 0 => Apply
+          case 1 => Shift
+          case _ => sys.error("Invalid operation id " + opID)
+        }
+        op.read(in, access, targets)
 
-      sealed abstract class LongLongOp( val id: Int ) extends Tuple2Op[ Long, Long ] with Op[ Long, Long ] {
-         final def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                       ( implicit tx: S#Tx ) : Tuple2[ S, Long, Long ] = {
-            val _1 = Longs.readExpr( in, access )
-            val _2 = Longs.readExpr( in, access )
-            new Tuple2( typeID, this, targets, _1, _2 )
-         }
+      //         case 3 =>
+      //            readProjection[ S ]( in, access, targets )
 
-         final def make[ S <: Sys[ S ]]( a: Expr[ S, Long ], b: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple2( typeID, this, Targets.partial[ S ], a, b )
-         }
-      }
-
-      case object Apply extends LongLongOp( 0 ) {
-         override def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, Long ], _2: Expr[ S, Long ]) : String = "Span(" + _1 + ", " + _2 + ")"
-         def value( a: Long, b: Long ) : SpanLike = Span( a, b )
-      }
-
-      case object Shift extends LongSpanOp( 1 ) {
-         def value( a: SpanLike, b: Long ) : SpanLike = a.shift( b )
-      }
-   }
-
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : ExN[ S ] =
-      (cookie: @switch) match {
-         case 1 =>
-            val tpe  = in.readInt()
-            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
-            val opID = in.readInt()
-            import UnaryOp._
-            val op: Op[ _ ] = (opID: @switch) match {
-               case 0  => From
-               case 1  => Until
-               case _  => sys.error( "Invalid operation id " + opID )
-            }
-            op.read( in, access, targets )
-
-         case 2 =>
-            val tpe = in.readInt()
-            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
-            val opID = in.readInt()
-            import BinaryOp._
-            val op: Op[ _, _ ] = (opID: @switch) match {
-               case 0   => Apply
-               case 1   => Shift
-               case _   => sys.error( "Invalid operation id " + opID )
-            }
-            op.read( in, access, targets )
-
-//         case 3 =>
-//            readProjection[ S ]( in, access, targets )
-
-         case _ => sys.error( "Invalid cookie " + cookie )
-      }
+      case _ => sys.error("Invalid cookie " + cookie)
+    }
 }

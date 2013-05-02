@@ -31,25 +31,26 @@ import annotation.switch
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 
 object CommonSerializers {
-   implicit object EnvConstShape extends ImmutableSerializer[ Env.ConstShape ] {
-      def write( shape: Env.ConstShape, out: DataOutput ) {
-         val sid = shape.id
-         out.writeInt( sid )
-         if( sid == curveShape.id ) out.writeFloat( shape.curvature )
-      }
+  implicit object EnvConstShape extends ImmutableSerializer[Env.ConstShape] {
+    def write(shape: Env.ConstShape, out: DataOutput) {
+      val sid = shape.id
+      out.writeInt(sid)
+      if (sid == curveShape.id) out.writeFloat(shape.curvature)
+    }
 
-      def read( in: DataInput ) : Env.ConstShape = {
-         (in.readInt(): @switch) match {
-            case stepShape.id    => stepShape
-            case linShape.id     => linShape
-            case expShape.id     => expShape
-            case sinShape.id     => sinShape
-            case welchShape.id   => welchShape
-            case curveShape.id   => curveShape( in.readFloat() )
-            case sqrShape.id     => sqrShape
-            case cubShape.id     => cubShape
-            case other           => sys.error( "Unexpected envelope shape ID " + other )
-         }
+    def read(in: DataInput): Env.ConstShape = {
+      (in.readInt(): @switch) match {
+        case stepShape  .id => stepShape
+        case linShape   .id => linShape
+        case expShape   .id => expShape
+        case sinShape   .id => sinShape
+        case welchShape .id => welchShape
+        case curveShape .id => curveShape(in.readFloat())
+        case sqrShape   .id => sqrShape
+        case cubShape   .id => cubShape
+        case other          => sys.error("Unexpected envelope shape ID " + other)
       }
-   }
+    }
+  }
+
 }
