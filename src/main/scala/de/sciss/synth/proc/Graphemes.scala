@@ -32,7 +32,6 @@ object Graphemes {
     def add   (key: String, grapheme: Grapheme[S])(implicit tx: S#Tx): Unit
     def remove(key: String)(implicit tx: S#Tx): Boolean
   }
-
 }
 
 trait Graphemes[S <: evt.Sys[S]] {

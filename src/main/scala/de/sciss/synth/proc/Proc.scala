@@ -50,7 +50,7 @@ object Proc {
   sealed trait Change[+S]
 
   /** A state change is either a renaming, a change of graph, or a change of association (map) */
-  sealed trait StateChange extends Change[ Nothing ]
+  sealed trait StateChange extends Change[Nothing]
   // final case class Rename     (change: evt.Change[String    ]) extends StateChange
   final case class GraphChange(change: evt.Change[SynthGraph]) extends StateChange
 
@@ -64,18 +64,27 @@ object Proc {
   /** An associative key is either a grapheme or a scan key */
   sealed trait AssociativeKey { def name: String }
   final case class ScanKey(name: String) extends AssociativeKey {
-    override def toString = "[scan: " + name + "]"
+    override def toString = s"[scan: $name]"
   }
-  final case class GraphemeKey(name: String) extends AssociativeKey {
-    override def toString = "[grapheme: " + name + "]"
+
+  //  final case class GraphemeKey(name: String) extends AssociativeKey {
+  //    override def toString = "[grapheme: " + name + "]"
+  //  }
+
+  final case class AttributeKey(name: String) extends AssociativeKey {
+    override def toString = s"[attribute: $name]"
   }
 
   final case class ScanChange[S <: evt.Sys[S]](key: String, scanUpdate: Scan.Update[S]) extends Change[S] {
-    override def toString = "ScanChange(" + key + ", " + scanUpdate + ")"
+    override def toString = s"ScanChange($key, $scanUpdate)"
   }
 
-  final case class GraphemeChange[S <: evt.Sys[S]](key: String, graphemeUpdate: Grapheme.Update[S]) extends Change[S] {
-    override def toString = "GraphemeChange(" + key + ", " + graphemeUpdate + ")"
+  //  final case class GraphemeChange[S <: evt.Sys[S]](key: String, graphemeUpdate: Grapheme.Update[S]) extends Change[S] {
+  //    override def toString = s"GraphemeChange($key, $graphemeUpdate)"
+  //  }
+
+  final case class AttributeChange[S <: evt.Sys[S]](key: String, attributeUpdate: Attribute.Update[S]) extends Change[S] {
+    override def toString = s"AttributeChange($key, $attributeUpdate)"
   }
 }
 
@@ -90,8 +99,9 @@ trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
 
   // ---- controls preview demo ----
 
-  def scans    : Scans    .Modifiable[S]
-  // def graphemes: Graphemes.Modifiable[S]
+  def scans     : Scans     .Modifiable[S]
+  // def graphemes : Graphemes .Modifiable[S]
+  def attributes: Attributes.Modifiable[S]
 
   def changed: evt.Event[S, Update[S], Proc[S]]
 }
