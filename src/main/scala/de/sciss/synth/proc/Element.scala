@@ -4,13 +4,12 @@ package proc
 
 import lucre.{event => evt, stm}
 import lucre.expr.Expr
-import de.sciss.lucre.stm.{Disposable, Mutable}
-import de.sciss.lucre.event.{Event, EventLikeSerializer, EventLike}
+import stm.{Disposable, Mutable}
+import evt.{Event, EventLikeSerializer, EventLike}
 import serial.{DataOutput, DataInput, Writable}
 import expr.{Ints, Doubles, Strings}
 import scala.annotation.switch
 import language.higherKinds
-import scala.collection.immutable.{IndexedSeq => IIdxSeq}
 
 object Element {
   import scala.{Int => _Int, Double => _Double}
@@ -50,21 +49,21 @@ object Element {
 
     protected[Element] def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                              (implicit tx: S#Tx): Int[S] with evt.Node[S] = {
-      val peer = Ints.readVar(in, access)
+      val peer = Ints.readExpr(in, access)
       new Impl(targets, peer)
     }
 
-    def apply[S <: Sys[S]](init: Expr[S, _Int])(implicit tx: S#Tx): Int[S] = {
-      new Impl(evt.Targets[S], Ints.newVar(init))
+    def apply[S <: Sys[S]](peer: Expr[S, _Int])(implicit tx: S#Tx): Int[S] = {
+      new Impl(evt.Targets[S], peer)
     }
 
-    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr.Var[S, _Int])
+    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr[S, _Int])
       extends ExprImpl[S, _Int] with Int[S] {
       def prefix = "Int"
       def typeID = Int.typeID
     }
   }
-  sealed trait Int[S <: Sys[S]] extends Element[S] { type A = Expr.Var[S, _Int] }
+  sealed trait Int[S <: Sys[S]] extends Element[S] { type A = Expr[S, _Int] }
 
   // ----------------- Double -----------------
 
@@ -73,21 +72,21 @@ object Element {
 
     protected[Element] def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                       (implicit tx: S#Tx): Double[S] with evt.Node[S] = {
-      val peer = Doubles.readVar(in, access)
+      val peer = Doubles.readExpr(in, access)
       new Impl(targets, peer)
     }
 
-    def apply[S <: Sys[S]](init: Expr[S, _Double])(implicit tx: S#Tx): Double[S] = {
-      new Impl(evt.Targets[S], Doubles.newVar(init))
+    def apply[S <: Sys[S]](peer: Expr[S, _Double])(implicit tx: S#Tx): Double[S] = {
+      new Impl(evt.Targets[S], peer)
     }
 
-    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr.Var[S, _Double])
+    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr[S, _Double])
       extends ExprImpl[S, _Double] with Double[S] {
       def typeID = Double.typeID
       def prefix = "Double"
     }
   }
-  sealed trait Double[S <: Sys[S]] extends Element[S] { type A = Expr.Var[S, _Double] }
+  sealed trait Double[S <: Sys[S]] extends Element[S] { type A = Expr[S, _Double] }
 
   // ----------------- String -----------------
 
@@ -96,21 +95,21 @@ object Element {
 
     protected[Element] def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                       (implicit tx: S#Tx): String[S] with evt.Node[S] = {
-      val peer = Strings.readVar(in, access)
+      val peer = Strings.readExpr(in, access)
       new Impl(targets, peer)
     }
 
-    def apply[S <: Sys[S]](init: Expr[S, _String])(implicit tx: S#Tx): String[S] = {
-      new Impl(evt.Targets[S], Strings.newVar(init))
+    def apply[S <: Sys[S]](peer: Expr[S, _String])(implicit tx: S#Tx): String[S] = {
+      new Impl(evt.Targets[S], peer)
     }
 
-    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr.Var[S, _String])
+    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr[S, _String])
       extends ExprImpl[S, _String] with String[S] {
       def typeID = String.typeID
       def prefix = "String"
     }
   }
-  sealed trait String[S <: Sys[S]] extends Element[S] { type A = Expr.Var[S, _String] }
+  sealed trait String[S <: Sys[S]] extends Element[S] { type A = Expr[S, _String] }
 
   // ----------------- Double -----------------
 
@@ -119,21 +118,21 @@ object Element {
 
     protected[Element] def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                       (implicit tx: S#Tx): FadeSpec[S] with evt.Node[S] = {
-      val peer = _FadeSpec.Elem.readVar(in, access)
+      val peer = _FadeSpec.Elem.readExpr(in, access)
       new Impl(targets, peer)
     }
 
-    def apply[S <: Sys[S]](init: Expr[S, _FadeSpec.Value])(implicit tx: S#Tx): FadeSpec[S] = {
-      new Impl(evt.Targets[S], _FadeSpec.Elem.newVar(init))
+    def apply[S <: Sys[S]](peer: Expr[S, _FadeSpec.Value])(implicit tx: S#Tx): FadeSpec[S] = {
+      new Impl(evt.Targets[S], peer)
     }
 
-    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr.Var[S, _FadeSpec.Value])
+    private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], val peer: Expr[S, _FadeSpec.Value])
       extends ExprImpl[S, _FadeSpec.Value] with FadeSpec[S] {
       def typeID = FadeSpec.typeID
       def prefix = "FadeSpec"
     }
   }
-  sealed trait FadeSpec[S <: Sys[S]] extends Element[S] { type A = Expr.Var[S, _FadeSpec.Value] }
+  sealed trait FadeSpec[S <: Sys[S]] extends Element[S] { type A = Expr[S, _FadeSpec.Value] }
 
   // ----------------- Serializer -----------------
 
