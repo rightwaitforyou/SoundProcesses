@@ -12,6 +12,7 @@ object Attributes {
 }
 
 trait Attributes[S <: evt.Sys[S]] {
+  // def apply[A1](key: String)(implicit tx: S#Tx): Option[Attribute[S] { type A = A1 }]
   def get(key: String)(implicit tx: S#Tx): Option[Attribute[S]]
   def contains(key: String)(implicit tx: S#Tx): Boolean
   def keys(implicit tx: S#Tx): Set[String]
