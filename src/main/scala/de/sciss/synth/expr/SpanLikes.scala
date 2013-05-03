@@ -42,17 +42,17 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
   }
 
   def newExpr[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
-    BinaryOp.Apply.make(start, stop)
+    BinaryOp.Apply(start, stop)
 
   def from[S <: Sys[S]](start: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
-    UnaryOp.From.make(start)
+    UnaryOp.From(start)
 
   def until[S <: Sys[S]](stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
-    UnaryOp.Until.make(stop)
+    UnaryOp.Until(stop)
 
   final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     // ---- binary ----
-    def shift(delta: Expr[S, Long]): Ex[S] = BinaryOp.Shift.make(ex, delta)
+    def shift(delta: Expr[S, Long]): Ex[S] = BinaryOp.Shift(ex, delta)
   }
 
   private object UnaryOp {
@@ -78,9 +78,11 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
         new Tuple1(typeID, this, targets, _1)
       }
 
-      final def make[S <: Sys[S]](a: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
+      final def apply[S <: Sys[S]](a: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
         new Tuple1(typeID, this, Targets.partial[S], a)
       }
+
+      // final def unapply[S <: Sys[S]](tup: Tuple1[S, Long]): Option[Expr[S, Long]] = Some(???)
     }
 
     case object From extends LongOp(0) {
@@ -120,9 +122,11 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
         new Tuple2(typeID, this, targets, _1, _2)
       }
 
-      final def make[S <: Sys[S]](a: Ex[S], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
+      final def apply[S <: Sys[S]](a: Ex[S], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
         new Tuple2(typeID, this, Targets.partial[S], a, b)
       }
+
+      // final def unapply[S <: Sys[S]](tup: Tuple2[S, SpanLike, Long]): Option[(Ex[S], Expr[S, Long])] = Some(???)
     }
 
     sealed abstract class LongLongOp(val id: Int) extends Tuple2Op[Long, Long] with Op[Long, Long] {
@@ -133,7 +137,7 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
         new Tuple2(typeID, this, targets, _1, _2)
       }
 
-      final def make[S <: Sys[S]](a: Expr[S, Long], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
+      final def apply[S <: Sys[S]](a: Expr[S, Long], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = {
         new Tuple2(typeID, this, Targets.partial[S], a, b)
       }
     }
