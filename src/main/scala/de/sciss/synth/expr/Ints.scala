@@ -40,74 +40,74 @@ object Ints extends BiTypeImpl[Int] {
     out.writeInt(value)
   }
 
-  def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                ( implicit tx: S#Tx ) : ExN[ S ] = {
-      (cookie: @switch) match {
-         case 1 =>
-            val tpe  = in.readInt()
-            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
-            val opID = in.readInt()
-            import UnaryOp._
-            val op: Op[ _ ] = (opID: @switch) match {
-               // ---- Int ----
-               case 0  => Neg
-               case 4  => BitNot
-               case 5  => Abs
-               case 11 => Signum
-               case 12 => Squared
-               case 13 => Cubed
+  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                            (implicit tx: S#Tx): ExN[S] = {
+    (cookie: @switch) match {
+      case 1 =>
+        val tpe = in.readInt()
+        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
+        val opID = in.readInt()
+        import UnaryOp._
+        val op: Op[_] = (opID: @switch) match {
+          // ---- Int ----
+          case Neg    .id => Neg
+          case BitNot .id => BitNot
+          case Abs    .id => Abs
+          case Signum .id => Signum
+          case Squared.id => Squared
+          case Cubed  .id => Cubed
 
-               case _  => sys.error( "Invalid operation id " + opID )
-            }
-            op.read( in, access, targets )
-//            val _1 = readExpr( in, access )
-//            new Tuple1( typeID, op, targets, _1 )
+          case _ => sys.error("Invalid operation id " + opID)
+        }
+        op.read(in, access, targets)
+      //            val _1 = readExpr( in, access )
+      //            new Tuple1( typeID, op, targets, _1 )
 
-         case 2 =>
-            val tpe = in.readInt()
-            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
-            val opID = in.readInt()
-            import BinaryOp._
-            val op: Op = (opID: @switch) match {
-               case 0 => Plus
-               case 1 => Minus
-               case 2 => Times
-               case 3 => IDiv
-//               case 4 => Div
-//               case 5 => Mod
-         //      case 6 => Eq
-         //      case 7 => Neq
-         //      case 8 => Lt
-         //      case 9 => Gt
-         //      case 10 => Leq
-         //      case 11 => Geq
-               case 12 => Min
-               case 13 => Max
-               case 14 => BitAnd
-               case 15 => BitOr
-               case 16 => BitXor
-            // case 17 => Lcm
-            // case 18 => Gcd
-//               case 19 => Round
-//               case 20 => Roundup
-               case 26 => ShiftLeft
-               case 27 => ShiftRight
-               case 28 => UnsignedShiftRight
-               case 38 => Absdif
-//               case 42 => Clip2
-//               case 44 => Fold2
-//               case 45 => Wrap2
-            }
-            val _1 = readExpr( in, access )
-            val _2 = readExpr( in, access )
-            new Tuple2( typeID, op, targets, _1, _2 )
+      case 2 =>
+        val tpe = in.readInt()
+        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
+        val opID = in.readInt()
+        import BinaryOp._
+        val op: Op = (opID: @switch) match {
+          case Plus               .id => Plus
+          case Minus              .id => Minus
+          case Times              .id => Times
+          case IDiv               .id => IDiv
+          //               case 4 => Div
+          //               case 5 => Mod
+          //      case 6 => Eq
+          //      case 7 => Neq
+          //      case 8 => Lt
+          //      case 9 => Gt
+          //      case 10 => Leq
+          //      case 11 => Geq
+          case Min                .id => Min
+          case Max                .id => Max
+          case BitAnd             .id => BitAnd
+          case BitOr              .id => BitOr
+          case BitXor             .id => BitXor
+          // case 17 => Lcm
+          // case 18 => Gcd
+          //               case 19 => Round
+          //               case 20 => Roundup
+          case ShiftLeft          .id => ShiftLeft
+          case ShiftRight         .id => ShiftRight
+          case UnsignedShiftRight .id => UnsignedShiftRight
+          case Absdif             .id => Absdif
+          //               case 42 => Clip2
+          //               case 44 => Fold2
+          //               case 45 => Wrap2
+        }
+        val _1 = readExpr(in, access)
+        val _2 = readExpr(in, access)
+        new Tuple2(typeID, op, targets, _1, _2)
 
-//         case 3 =>
-//            readProjection[ S ]( in, access, targets )
+      //         case 3 =>
+      //            readProjection[ S ]( in, access, targets )
 
-         case _ => sys.error( "Invalid cookie " + cookie )
-      }
-   }
+      case _ => sys.error("Invalid cookie " + cookie)
+    }
+  }
 
   object UnaryOp {
     /* sealed */ trait Op[T1] extends Tuple1Op[T1] {
@@ -116,8 +116,10 @@ object Ints extends BiTypeImpl[Int] {
 
       def toString[S <: stm.Sys[S]](_1: Expr[S, T1]): String = _1.toString + "." + name
 
-      final def apply[S <: Sys[S]](a: Expr[S, T1])(implicit tx: S#Tx): Ex[S] =
-          new Tuple1(typeID, this, Targets.partial[S], a)
+      def apply[S <: Sys[S]](a: Expr[S, T1])(implicit tx: S#Tx): Ex[S] = a match {
+        case Expr.Const(c)  => newConst(value(c))
+        case _              => new Tuple1(typeID, this, Targets.partial[S], a)
+      }
 
       def name: String = {
         val cn  = getClass.getName
@@ -127,7 +129,8 @@ object Ints extends BiTypeImpl[Int] {
       }
     }
 
-    sealed abstract class IntOp(val id: Int) extends Op[Int] {
+    sealed abstract class IntOp extends Op[Int] {
+      def id: Int
       final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                                  (implicit tx: S#Tx): Tuple1[S, Int] = {
         val _1 = readExpr(in, access)
@@ -135,39 +138,49 @@ object Ints extends BiTypeImpl[Int] {
       }
     }
 
-    case object Neg extends IntOp(0) {
+    case object Neg extends IntOp {
+      final val id = 0
       def value(a: Int): Int = -a
       override def toString[S <: stm.Sys[S]](_1: Ex[S]): String = "-" + _1
     }
 
-    case object Abs extends IntOp(5) {
+    case object Abs extends IntOp {
+      final val id = 5
       def value(a: Int): Int = math.abs(a)
     }
 
-    case object BitNot extends IntOp(4) {
+    case object BitNot extends IntOp {
+      final val id = 4
       def value(a: Int): Int = ~a
       override def toString[S <: stm.Sys[S]](_1: Ex[S]): String = "~" + _1
     }
 
     // case object ToLong     extends Op(  6 )
     // case object ToInt       extends Op(  7 )
-    case object Signum extends IntOp(11) {
+    case object Signum extends IntOp {
+      final val id = 11
       def value(a: Int): Int = math.signum(a)
     }
 
-    case object Squared extends IntOp(12) {
+    case object Squared extends IntOp {
+      final val id = 12
       def value(a: Int): Int = a * a
     }
 
-    case object Cubed extends IntOp(13) {
+    case object Cubed extends IntOp {
+      final val id = 13
       def value(a: Int): Int = a * a * a
     }
   }
 
   object BinaryOp {
-    sealed abstract class Op(val id: Int) extends Tuple2Op[Int, Int] {
-      final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] =
-        new Tuple2(typeID, this, Targets.partial[S], a, b)
+    sealed abstract class Op extends Tuple2Op[Int, Int] {
+      def id: Int
+
+      final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
+        case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
+        case _                                => new Tuple2(typeID, this, Targets.partial[S], a, b)
+      }
 
       def value(a: Int, b: Int): Int
 
@@ -194,74 +207,88 @@ object Ints extends BiTypeImpl[Int] {
     //            "(" + _1 + " " + name + " " + _2 + ")"
     //      }
 
-    case object Plus extends Op(0) with Infix {
+    case object Plus extends Op with Infix {
+      final val id = 0
       override val name = "+"
       def value(a: Int, b: Int): Int = a + b
     }
 
-    case object Minus extends Op(1) with Infix {
+    case object Minus extends Op with Infix {
+      final val id = 1
       override val name = "-"
       def value(a: Int, b: Int): Int = a - b
     }
 
-    case object Times extends Op(2) with Infix {
+    case object Times extends Op with Infix {
+      final val id = 2
       override val name = "*"
       def value(a: Int, b: Int): Int = a * b
     }
 
-    case object IDiv extends Op(3) {
+    case object IDiv extends Op {
+      final val id = 3
       override val name = "div"
       def value(a: Int, b: Int): Int = a / b
     }
 
-    case object Min extends Op(12) {
+    case object Min extends Op {
+      final val id = 12
       def value(a: Int, b: Int): Int = math.min(a, b)
     }
 
-    case object Max extends Op(13) {
+    case object Max extends Op {
+      final val id = 13
       def value(a: Int, b: Int): Int = math.max(a, b)
     }
 
-    case object BitAnd extends Op(14) {
+    case object BitAnd extends Op {
+      final val id = 14
       def value(a: Int, b: Int): Int = a & b
     }
 
-    case object BitOr extends Op(15) {
+    case object BitOr extends Op {
+      final val id = 15
       def value(a: Int, b: Int): Int = a | b
     }
 
-    case object BitXor extends Op(16) {
+    case object BitXor extends Op {
+      final val id = 16
       def value(a: Int, b: Int): Int = a ^ b
     }
 
-    case object ShiftLeft extends Op(26) {
+    case object ShiftLeft extends Op {
+      final val id = 26
       override val name = "<<"
       def value(a: Int, b: Int): Int = a << b
     }
 
-    case object ShiftRight extends Op(27) {
+    case object ShiftRight extends Op {
+      final val id = 27
       override val name = ">>"
       def value(a: Int, b: Int): Int = a >> b
     }
 
-    case object UnsignedShiftRight extends Op(28) {
+    case object UnsignedShiftRight extends Op {
+      final val id = 28
       override val name = ">>>"
       def value(a: Int, b: Int): Int = a >>> b
     }
 
-    case object Absdif extends Op(38) {
+    case object Absdif extends Op {
+      final val id = 38
       def value(a: Int, b: Int): Int = math.abs(a - b)
     }
-//      case object Clip2          extends Op( 42 ) {
-//         def value( a: Int, b: Int ) : Int = ri_clip2( a, b )
-//      }
-//      case object Fold2          extends Op( 44 ) {
-//         def value( a: Int, b: Int ) : Int = ri_fold2( a, b )
-//      }
-//      case object Wrap2          extends Op( 45 ) {
-//         def value( a: Int, b: Int ) : Int = ri_wrap2( a, b )
-//      }
-   }
+
+    //      case object Clip2          extends Op( 42 ) {
+    //         def value( a: Int, b: Int ) : Int = ri_clip2( a, b )
+    //      }
+    //      case object Fold2          extends Op( 44 ) {
+    //         def value( a: Int, b: Int ) : Int = ri_fold2( a, b )
+    //      }
+    //      case object Wrap2          extends Op( 45 ) {
+    //         def value( a: Int, b: Int ) : Int = ri_wrap2( a, b )
+    //      }
+  }
 
   final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     private type E = Ex[S]

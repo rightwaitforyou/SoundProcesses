@@ -3,6 +3,7 @@ package synth
 package proc
 
 import lucre.{data, event => evt}
+import scala.reflect.ClassTag
 
 object Attributes {
   trait Modifiable[S <: evt.Sys[S]] extends Attributes[S] {
@@ -12,7 +13,7 @@ object Attributes {
 }
 
 trait Attributes[S <: evt.Sys[S]] {
-  // def apply[A1](key: String)(implicit tx: S#Tx): Option[Attribute[S] { type A = A1 }]
+  def apply[Attr <: Attribute[S]](key: String)(implicit tx: S#Tx, tag: ClassTag[Attr]): Option[Attr#Peer]
   def get(key: String)(implicit tx: S#Tx): Option[Attribute[S]]
   def contains(key: String)(implicit tx: S#Tx): Boolean
   def keys(implicit tx: S#Tx): Set[String]

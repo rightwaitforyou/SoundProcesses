@@ -38,6 +38,7 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import de.sciss.serial
+import scala.reflect.ClassTag
 
 object ProcImpl {
   private final val SER_VERSION = 0x5072
@@ -107,9 +108,9 @@ object ProcImpl {
 
     protected def graphVar    : S#Var[Code[SynthGraph]]
     // protected def name_#     : Expr.Var    [S, String]
-    protected def scanMap     : SkipList.Map[S, String, ScanEntry[S]]
     // protected def graphemeMap : SkipList.Map[S, String, GraphemeEntry[S]]
     protected def attributeMap: SkipList.Map[S, String, AttributeEntry[S]]
+    protected def scanMap     : SkipList.Map[S, String, ScanEntry[S]]
 
     // final def name(implicit tx: S#Tx): Expr[S, String] = name_#()
     // final def name_=(s: Expr[S, String])(implicit tx: S#Tx) {
@@ -175,6 +176,37 @@ object ProcImpl {
     //      protected def valueInfo = graphemeEntryInfo[S]
     //    }
 
+    object attributes extends Attributes.Modifiable[S] with KeyMap[Attribute[S], Attribute.Update[S], Proc.Update[S]] {
+      final val slot = 1
+
+      protected def wrapKey(key: String) = AttributeKey(key)
+
+      def put(key: String, value: Attribute[S])(implicit tx: S#Tx) {
+        add(key, value)
+      }
+
+      def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
+
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
+        val changes = foldUpdate(pull)
+        if (changes.isEmpty) None
+        else Some(Proc.Update(proc,
+          changes.map({
+            case (key, u) => Proc.AttributeChange(key, u)
+          })(breakOut)))
+      }
+
+      protected def map: SkipList.Map[S, String, Entry] = attributeMap
+
+      protected def valueInfo = attributeEntryInfo[S]
+
+      def apply[Attr <: Attribute[S]](key: String)(implicit tx: S#Tx, tag: ClassTag[Attr]): Option[Attr#Peer] =
+        get(key) match {
+          case Some(attr: Attr) => Some(attr.peer)
+          case _                => None
+        }
+    }
+
     object scans extends Scans.Modifiable[S] with KeyMap[Scan[S], Scan.Update[S], Proc.Update[S]] {
       final val slot = 2
 
@@ -200,35 +232,10 @@ object ProcImpl {
       protected def valueInfo = scanEntryInfo[S]
     }
 
-    object attributes extends Attributes.Modifiable[S] with KeyMap[Attribute[S], Attribute.Update[S], Proc.Update[S]] {
-      final val slot = 2
-
-      protected def wrapKey(key: String) = AttributeKey(key)
-
-      def put(key: String, value: Attribute[S])(implicit tx: S#Tx) {
-        add(key, value)
-      }
-
-      def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
-
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
-        val changes = foldUpdate(pull)
-        if (changes.isEmpty) None
-        else Some(Proc.Update(proc,
-          changes.map({
-            case (key, u) => Proc.AttributeChange(key, u)
-          })(breakOut)))
-      }
-
-      protected def map: SkipList.Map[S, String, Entry] = attributeMap
-
-      protected def valueInfo = attributeEntryInfo[S]
-    }
-
     private object StateEvent
       extends evti.TriggerImpl[S, Proc.Update[S], Proc[S]]
-      with evt.InvariantEvent[S, Proc.Update[S], Proc[S]]
-      with evti.Root[S, Proc.Update[S]]
+      with evt.InvariantEvent [S, Proc.Update[S], Proc[S]]
+      with evti.Root          [S, Proc.Update[S]]
       with ProcEvent {
       final val slot = 4
     }
@@ -245,26 +252,33 @@ object ProcImpl {
 
       def --->(r: evt.Selector[S])(implicit tx: S#Tx) {
         // graphemes  ---> r
+        attributes ---> r
         scans      ---> r
         StateEvent ---> r
       }
 
       def -/->(r: evt.Selector[S])(implicit tx: S#Tx) {
         // graphemes  -/-> r
+        attributes -/-> r
         scans      -/-> r
         StateEvent -/-> r
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
+        val attrOpt  = if (attributes.isSource(pull)) pull(attributes) else None
         val scansOpt = if (scans     .isSource(pull)) pull(scans     ) else None
         val stateOpt = if (StateEvent.isSource(pull)) pull(StateEvent) else None
 
-        val seq0 = Vector.empty
+        val seq0 =
         //        graphOpt match {
         //          case Some(u) => u.changes
         //          case _ => IIdxSeq.empty
         //        }
+        attrOpt match {
+          case Some(u) => u.changes
+          case _ => Vector.empty
+        }
         val seq1 = scansOpt match {
           case Some(u) => if (seq0.isEmpty) u.changes else seq0 ++ u.changes
           case _ => seq0
@@ -282,6 +296,7 @@ object ProcImpl {
       def reactTx[A1 >: Proc.Update[S]](fun: S#Tx => A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, Proc[S]] = {
         val obs = evt.Observer(ProcImpl.serializer[S], fun)
         // obs.add(graphemes)
+        obs.add(attributes)
         obs.add(scans)
         obs.add(StateEvent)
         obs
@@ -295,6 +310,7 @@ object ProcImpl {
 
     final def select(slot: Int, invariant: Boolean): Event[S, Any, Any] = (slot: @switch) match {
       // case graphemes .slot => graphemes
+      case attributes.slot => attributes
       case scans     .slot => scans
       case StateEvent.slot => StateEvent
     }
@@ -306,16 +322,18 @@ object ProcImpl {
       out.writeShort(SER_VERSION)
       // name_#     .write(out)
       graphVar    .write(out)
-      scanMap     .write(out)
       // graphemeMap .write(out)
+      attributeMap.write(out)
+      scanMap     .write(out)
       attributeMap.write(out)
     }
 
     final protected def disposeData()(implicit tx: S#Tx) {
       // name_#     .dispose()
       graphVar    .dispose()
-      scanMap     .dispose()
       // graphemeMap.dispose()
+      attributeMap.dispose()
+      scanMap     .dispose()
       attributeMap.dispose()
     }
 

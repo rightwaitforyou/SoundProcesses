@@ -63,7 +63,7 @@ object Attribute {
       def typeID = Int.typeID
     }
   }
-  sealed trait Int[S <: ESys[S]] extends Attribute[S] { type A = Expr[S, _Int] }
+  sealed trait Int[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _Int] }
 
   // ----------------- Double -----------------
 
@@ -86,7 +86,7 @@ object Attribute {
       def prefix = "Double"
     }
   }
-  sealed trait Double[S <: ESys[S]] extends Attribute[S] { type A = Expr[S, _Double] }
+  sealed trait Double[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _Double] }
 
   // ----------------- String -----------------
 
@@ -109,7 +109,7 @@ object Attribute {
       def prefix = "String"
     }
   }
-  sealed trait String[S <: ESys[S]] extends Attribute[S] { type A = Expr[S, _String] }
+  sealed trait String[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _String] }
 
   // ----------------- Double -----------------
 
@@ -132,7 +132,7 @@ object Attribute {
       def prefix = "FadeSpec"
     }
   }
-  sealed trait FadeSpec[S <: ESys[S]] extends Attribute[S] { type A = Expr[S, _FadeSpec.Value] }
+  sealed trait FadeSpec[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _FadeSpec.Value] }
 
   // ----------------- Serializer -----------------
 
@@ -162,9 +162,9 @@ object Attribute {
 
   // ---- impl ----
 
-  private sealed trait ExprImpl[S <: ESys[S], A1] extends ActiveImpl[S] {
+  private sealed trait ExprImpl[S <: ESys[S], A] extends ActiveImpl[S] {
     self =>
-    type A <: Expr[S, A1]
+    type Peer <: Expr[S, A]
     final protected def peerEvent = peer.changed
   }
 
@@ -172,7 +172,7 @@ object Attribute {
     extends Attribute[S] with evt.Node[S] {
     self =>
 
-    type A <: Writable with Disposable[S#Tx]
+    type Peer <: Writable with Disposable[S#Tx]
 
     protected def typeID: _Int
 
@@ -240,10 +240,10 @@ object Attribute {
 sealed trait Attribute[S <: ESys[S]] extends Mutable[S#ID, S#Tx] {
   import Attribute.Update
 
-  type A
+  type Peer
 
   /** The actual object wrapped by the element. */
-  def peer: A
+  def peer: Peer
 
   /** An event for tracking element changes, which can be renaming
     * the element or forwarding changes from the underlying entity.
