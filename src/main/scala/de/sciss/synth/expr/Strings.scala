@@ -28,13 +28,14 @@ package de.sciss.synth.expr
 import de.sciss.lucre.{stm, event => evt}
 import evt.{Targets, Sys}
 import de.sciss.serial.{DataInput, DataOutput}
+import de.sciss.lucre.expr.Expr
 
 object Strings extends BiTypeImpl[String] {
   final val typeID = 8
 
-  /* protected */ def readValue(in: DataInput): String = in.readUTF()
+  def readValue(in: DataInput): String = in.readUTF()
 
-  /* protected */ def writeValue(value: String, out: DataOutput) {
+  def writeValue(value: String, out: DataOutput) {
     out.writeUTF(value)
   }
 
@@ -43,18 +44,20 @@ object Strings extends BiTypeImpl[String] {
 
     import BinaryOp._
 
-    def ++(b: E): E = Append.make(ex, b)
+    def ++(b: E): E = Append(ex, b)
   }
 
   private object BinaryOp {
-    sealed abstract class Op(val id: Int) extends Tuple2Op[String, String] {
-      final def make[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = {
-        new Tuple2(typeID, this, Targets.partial[S], a, b)
+    sealed abstract class Op extends Tuple2Op[String, String] {
+      def id: Int
+      final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
+        case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
+        case _                                => new Tuple2(typeID, this, Targets.partial[S], a, b)
       }
 
       def value(a: String, b: String): String
 
-      def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = _1.toString + "." + name + "(" + _2 + ")"
+      def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
 
       def name: String = {
         val cn = getClass.getName
@@ -64,7 +67,8 @@ object Strings extends BiTypeImpl[String] {
       }
     }
 
-    case object Append extends Op(0) {
+    case object Append extends Op {
+      final val id = 0
       def value(a: String, b: String): String = a + b
     }
   }
@@ -91,7 +95,7 @@ object Strings extends BiTypeImpl[String] {
         val opID = in.readInt()
         import BinaryOp._
         val op: Op = (opID /*: @switch */) match {
-          case 0 => Append
+          case Append.id => Append
         }
         val _1 = readExpr(in, access)
         val _2 = readExpr(in, access)

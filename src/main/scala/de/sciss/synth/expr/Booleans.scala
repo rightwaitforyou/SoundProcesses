@@ -29,20 +29,23 @@ import de.sciss.lucre.{event => evt}
 import evt.{Sys, Targets}
 import de.sciss.serial.{DataOutput, DataInput}
 
-object Booleans extends BiTypeImpl[ Boolean ] {
-   final val typeID = 6
+object Booleans extends BiTypeImpl[Boolean] {
+  final val typeID = 6
 
-   /* protected */ def readValue( in: DataInput ) : Boolean = in.readBoolean()
-   /* protected */ def writeValue( value: Boolean, out: DataOutput ) { out.writeBoolean( value )}
+  def readValue(in: DataInput): Boolean = in.readBoolean()
 
-   final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ]) {
+  def writeValue(value: Boolean, out: DataOutput) {
+    out.writeBoolean(value)
+  }
 
-   }
+  final class Ops[S <: Sys[S]](ex: Ex[S]) {
 
-   // ---- protected ----
+  }
 
-   def readTuple[ S <: Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : ExN[ S ] =
-//   case 3 =>
-//      readCursor[ S ]( in, access, targets )
-      sys.error( "Invalid cookie " + cookie )
+  // ---- protected ----
+
+  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])(implicit tx: S#Tx): ExN[S] =
+  //   case 3 =>
+  //      readCursor[ S ]( in, access, targets )
+    sys.error("Invalid cookie " + cookie)
 }

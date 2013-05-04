@@ -34,93 +34,95 @@ import de.sciss.serial.{DataOutput, DataInput}
 object Spans extends BiTypeImpl[Span] {
   final val typeID = 10
 
-  /* protected */ def readValue(in: DataInput): Span = Span.read(in)
+  def readValue(in: DataInput): Span = Span.read(in)
 
-  /* protected */ def writeValue(value: Span, out: DataOutput) {
+  def writeValue(value: Span, out: DataOutput) {
     value.write(out)
   }
 
-  //   def apply[ S <: Sys[ S ]]( start: Expr[ S, Long ], stop: Expr[ S, Long ]) : Ex[ S ] = ...
-
   final class Ops[S <: evt.Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     // ---- unary ----
-    def start : Expr[S, Long] = UnaryOp.Start.make(ex)
-    def stop  : Expr[S, Long] = UnaryOp.Stop.make(ex)
-    def length: Expr[S, Long] = UnaryOp.Length.make(ex)
+    def start : Expr[S, Long] = UnaryOp.Start(ex)
+    def stop  : Expr[S, Long] = UnaryOp.Stop(ex)
+    def length: Expr[S, Long] = UnaryOp.Length(ex)
 
     // ---- binary ----
-    def shift(delta: Expr[S, Long]): Ex[S] = BinaryOp.Shift.make(ex, delta)
+    def shift(delta: Expr[S, Long]): Ex[S] = BinaryOp.Shift(ex, delta)
   }
 
   // ---- protected ----
 
-   def readTuple[ S <: stm.Sys[ S ]]( cookie: Int, in: DataInput, access: S#Acc, targets: Targets[ S ])( implicit tx: S#Tx ) : ExN[ S ] =
-//   case 3 =>
-//      readCursor[ S ]( in, access, targets )
-      sys.error( "Invalid cookie " + cookie )
+  def readTuple[S <: stm.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])(implicit tx: S#Tx): ExN[S] =
+    sys.error("Invalid cookie " + cookie)
 
-   object UnaryOp {
-//      sealed trait OpLike[ T1 ] {
-//         def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ]) : String = _1.toString + "." + name
-//
-//         def name: String = { val cn = getClass.getName
-//            val sz   = cn.length
-//            val i    = cn.indexOf( '$' ) + 1
-//            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
-//         }
-//      }
+  object UnaryOp {
+    //      sealed trait OpLike[ T1 ] {
+    //         def toString[ S <: Sys[ S ]]( _1: Expr[ S, T1 ]) : String = _1.toString + "." + name
+    //
+    //         def name: String = { val cn = getClass.getName
+    //            val sz   = cn.length
+    //            val i    = cn.indexOf( '$' ) + 1
+    //            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
+    //         }
+    //      }
 
-      sealed abstract class LongOp( val id: Int ) extends Longs.UnaryOp.Op[ Span ] {
-         final def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                       ( implicit tx: S#Tx ) : Longs.Tuple1[ S, Span ] = {
-            val _1 = readExpr( in, access )
-            new Longs.Tuple1( typeID, this, targets, _1 )
-         }
-
-//         final def make[ S <: Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Expr[ S, Long ] = {
-//            new Longs.Tuple1( typeID, this, Targets.partial[ S ], a )
-//         }
+    sealed abstract class LongOp extends Longs.UnaryOp.Op[Span] {
+      def id: Int
+      final def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                                     (implicit tx: S#Tx): Longs.Tuple1[S, Span] = {
+        val _1 = readExpr(in, access)
+        new Longs.Tuple1(typeID, this, targets, _1)
       }
 
-      case object Start extends LongOp( 0x1000 ) {
-         def value( a: Span ) : Long = a.start
+      //         final def make[ S <: Sys[ S ]]( a: Ex[ S ])( implicit tx: S#Tx ) : Expr[ S, Long ] = {
+      //            new Longs.Tuple1( typeID, this, Targets.partial[ S ], a )
+      //         }
+    }
+
+    case object Start extends LongOp {
+      final val id = 0x1000
+      def value(a: Span): Long = a.start
+    }
+
+    case object Stop extends LongOp {
+      final val id = 0x1001
+      def value(a: Span): Long = a.stop
+    }
+
+    case object Length extends LongOp {
+      final val id = 0x1002
+      def value(a: Span): Long = a.length
+    }
+  }
+
+  private object BinaryOp {
+    sealed trait OpLike[T1, T2] {
+      def toString[S <: stm.Sys[S]](_1: Expr[S, T1], _2: Expr[S, T2]): String = s"${_1}.$name(${_2})"
+
+      def name: String = {
+        val cn = getClass.getName
+        val sz = cn.length
+        val i = cn.lastIndexOf('$', sz - 2) + 1
+        "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
+      }
+    }
+
+    sealed abstract class LongSpanOp(val id: Int) extends Tuple2Op[Span, Long] with OpLike[Span, Long] {
+      final def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                                     (implicit tx: S#Tx): Tuple2[S, Span, Long] = {
+        val _1 = readExpr(in, access)
+        val _2 = Longs.readExpr(in, access)
+        new Tuple2(typeID, this, targets, _1, _2)
       }
 
-      case object Stop extends LongOp( 0x1001 ) {
-         def value( a: Span ) : Long = a.stop
+      final def apply[S <: evt.Sys[S]](a: Ex[S], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = (a, b) match {
+        case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
+        case _                                => new Tuple2(typeID, this, Targets.partial[S], a, b)
       }
+    }
 
-      case object Length extends LongOp( 0x1002 ) {
-         def value( a: Span ) : Long = a.length
-      }
-   }
-
-   private object BinaryOp {
-      sealed trait OpLike[ T1, T2 ] {
-         def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, T1 ], _2: Expr[ S, T2 ]) : String = _1.toString + "." + name + "(" + _2 + ")"
-
-         def name: String = { val cn = getClass.getName
-            val sz   = cn.length
-            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
-            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
-         }
-      }
-
-      sealed abstract class LongSpanOp( val id: Int ) extends Tuple2Op[ Span, Long ] with OpLike[ Span, Long ] {
-         final def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                       ( implicit tx: S#Tx ) : Tuple2[ S, Span, Long ] = {
-            val _1 = readExpr( in, access )
-            val _2 = Longs.readExpr( in, access )
-            new Tuple2( typeID, this, targets, _1, _2 )
-         }
-
-         final def make[ S <: evt.Sys[ S ]]( a: Ex[ S ], b: Expr[ S, Long ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple2( typeID, this, Targets.partial[ S ], a, b )
-         }
-      }
-
-      case object Shift extends LongSpanOp( 0x1100 ) {
-         def value( a: Span, b: Long ) : Span = a.shift( b )
-      }
-   }
+    case object Shift extends LongSpanOp(0x1100) {
+      def value(a: Span, b: Long): Span = a.shift(b)
+    }
+  }
 }
