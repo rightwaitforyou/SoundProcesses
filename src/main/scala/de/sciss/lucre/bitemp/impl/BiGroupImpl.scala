@@ -212,7 +212,7 @@ object BiGroupImpl {
       protected def reader: evt.Reader[S, BiGroup[S, Elem, U]] = serializer(eventView)
 
       override def toString = node.toString + ".CollectionEvent"
-      def slot: Int = 1
+      final val slot = 0
       def node: BiGroup[S, Elem, U] = group
     }
 
@@ -223,7 +223,7 @@ object BiGroupImpl {
       protected def reader: evt.Reader[S, BiGroup[S, Elem, U]] = serializer(eventView)
 
       override def toString = node.toString + ".ElementEvent"
-      def slot: Int = 2
+      final val slot = 1
       def node: BiGroup[S, Elem, U] = group
 
       //      def connect   ()(implicit tx: S#Tx) {}
@@ -289,49 +289,58 @@ object BiGroupImpl {
     }
 
     private object ChangeEvent
-      extends evt.Event[S, BiGroup.Update[S, Elem, U], BiGroup.Modifiable[S, Elem, U]]
-      with evt.InvariantSelector[S] {
+      extends evt.impl.EventImpl[S, BiGroup.Update[S, Elem, U], BiGroup.Modifiable[S, Elem, U]]
+      with evt.InvariantEvent   [S, BiGroup.Update[S, Elem, U], BiGroup.Modifiable[S, Elem, U]] {
 
-      protected def reader: evt.Reader[S, BiGroup[S, Elem, U]] = serializer(eventView)
+      protected def reader: evt.Reader[S, BiGroup.Modifiable[S, Elem, U]] = modifiableSerializer(eventView)
 
       override def toString = node.toString + ".ChangeEvent"  // default toString invokes `slot`!
-      def slot: Int = opNotSupported
+      final val slot = 2
 
       def node: BiGroup.Modifiable[S, Elem, U] = group
 
-      def connect   ()(implicit tx: S#Tx) {}
-      def disconnect()(implicit tx: S#Tx) {}
-
-      def --->(r: evt.Selector[S])(implicit tx: S#Tx) {
-        log(s"$this.--->($r)")
-        CollectionEvent ---> r
-        ElementEvent    ---> r
+      def connect()(implicit tx: S#Tx) {
+        log(s"$this.connect")
+        CollectionEvent ---> this
+        ElementEvent    ---> this
       }
 
-      def -/->(r: evt.Selector[S])(implicit tx: S#Tx) {
-        log(s"$this.-/->($r)")
-        CollectionEvent -/-> r
-        ElementEvent    -/-> r
+      def disconnect()(implicit tx: S#Tx) {
+        log(s"$this.disconnect()")
+        CollectionEvent -/-> this
+        ElementEvent    -/-> this
       }
+
+      //      def --->(r: evt.Selector[S])(implicit tx: S#Tx) {
+      //      }
+      //
+      //      def -/->(r: evt.Selector[S])(implicit tx: S#Tx) {
+      //      }
 
       // XXX TODO: potential problem with event collapsing
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
-        if      (CollectionEvent.isSource(pull)) pull(CollectionEvent)
-        else if (ElementEvent   .isSource(pull)) pull(ElementEvent   )
-        else None
+        val collOpt = if (CollectionEvent.isSource(pull)) pull(CollectionEvent) else None
+        val elemOpt = if (ElementEvent   .isSource(pull)) pull(ElementEvent   ) else None
+
+        (collOpt, elemOpt) match {
+          case (Some(_), None)      => collOpt
+          case (None, Some(_))      => elemOpt
+          case (Some(coll), Some(elem)) => Some(coll.copy(changes = coll.changes ++ elem.changes))
+          case _                    => None
+        }
       }
 
-      def react[A1 >: BiGroup.Update[S, Elem, U]](fun: A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiGroup.Modifiable[S, Elem, U]] =
-        reactTx[A1](_ => fun)
+      //      def react[A1 >: BiGroup.Update[S, Elem, U]](fun: A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiGroup.Modifiable[S, Elem, U]] =
+      //        reactTx[A1](_ => fun)
+      //
+      //      def reactTx[A1 >: BiGroup.Update[S, Elem, U]](fun: S#Tx => A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiGroup.Modifiable[S, Elem, U]] = {
+      //        val obs = evt.Observer(modifiableSerializer(eventView), fun)
+      //        obs.add(CollectionEvent)
+      //        obs.add(ElementEvent)
+      //        obs
+      //      }
 
-      def reactTx[A1 >: BiGroup.Update[S, Elem, U]](fun: S#Tx => A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiGroup.Modifiable[S, Elem, U]] = {
-        val obs = evt.Observer(modifiableSerializer(eventView), fun)
-        obs.add(CollectionEvent)
-        obs.add(ElementEvent)
-        obs
-      }
-
-      def isSource(pull: evt.Pull[S]): Boolean = CollectionEvent.isSource(pull) || ElementEvent.isSource(pull)
+      // def isSource(pull: evt.Pull[S]): Boolean = CollectionEvent.isSource(pull) || ElementEvent.isSource(pull)
     }
 
     final protected def disposeData()(implicit tx: S#Tx) {
@@ -359,8 +368,9 @@ object BiGroupImpl {
     //    }
 
     final def select(slot: Int, invariant: Boolean): evt.Event[S, Any, Any] = (slot: @switch) match {
-      case 1 => CollectionEvent
-      case 2 => ElementEvent
+      case ChangeEvent.slot     => ChangeEvent
+      case CollectionEvent.slot => CollectionEvent
+      case ElementEvent.slot    => ElementEvent
     }
 
     // ---- collection behaviour ----

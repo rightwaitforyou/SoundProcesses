@@ -62,7 +62,7 @@ object ProcImpl {
       new Read(in, access, targets, tx)
   }
 
-  private def opNotSupported: Nothing = sys.error("Operation not supported")
+  // private def opNotSupported: Nothing = sys.error("Operation not supported")
 
   // private type GraphemeEntry [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Grapheme [S], Grapheme .Update[S]]
   private type ScanEntry     [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan     [S], Scan     .Update[S]]
@@ -177,7 +177,7 @@ object ProcImpl {
     //    }
 
     object attributes extends Attributes.Modifiable[S] with KeyMap[Attribute[S], Attribute.Update[S], Proc.Update[S]] {
-      final val slot = 1
+      final val slot = 0
 
       protected def wrapKey(key: String) = AttributeKey(key)
 
@@ -208,7 +208,7 @@ object ProcImpl {
     }
 
     object scans extends Scans.Modifiable[S] with KeyMap[Scan[S], Scan.Update[S], Proc.Update[S]] {
-      final val slot = 2
+      final val slot = 1
 
       protected def wrapKey(key: String) = ScanKey(key)
 
@@ -237,7 +237,7 @@ object ProcImpl {
       with evt.InvariantEvent [S, Proc.Update[S], Proc[S]]
       with evti.Root          [S, Proc.Update[S]]
       with ProcEvent {
-      final val slot = 4
+      final val slot = 2
     }
 
     private object ChangeEvent
@@ -245,7 +245,7 @@ object ProcImpl {
       with evt.InvariantSelector[S]
       with ProcEvent {
 
-      def slot: Int = opNotSupported
+      final val slot = 3
 
       def connect   ()(implicit tx: S#Tx) {}
       def disconnect()(implicit tx: S#Tx) {}
@@ -309,6 +309,7 @@ object ProcImpl {
     }
 
     final def select(slot: Int, invariant: Boolean): Event[S, Any, Any] = (slot: @switch) match {
+      case ChangeEvent.slot => ChangeEvent
       // case graphemes .slot => graphemes
       case attributes.slot => attributes
       case scans     .slot => scans
