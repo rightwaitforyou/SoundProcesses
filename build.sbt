@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.6.0-SNAPSHOT"
+version := "1.6.0"
 
 organization := "de.sciss"
 
@@ -15,7 +15,7 @@ scalaVersion := "2.10.1"
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= {
-  val confluentVersion = "2.1.+"
+  val confluentVersion = "2.2.+"
   val eventVersion     = "2.1.+"
   val stmVersion       = "2.0.+"
   Seq(
