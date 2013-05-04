@@ -94,9 +94,9 @@ object BiExpr {
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[(Long, A)]] = {
       val timeEvt = time.changed
-      val timeCh  = if (timeEvt.isSource(pull)) timeEvt.pullUpdate(pull) else None
+      val timeCh  = if (timeEvt.isSource(pull)) pull(timeEvt) else None
       val magEvt  = mag.changed
-      val magCh   = if (magEvt.isSource(pull)) magEvt.pullUpdate(pull) else None
+      val magCh   = if (magEvt .isSource(pull)) pull(magEvt ) else None
 
       (timeCh, magCh) match {
         case (Some(tch), Some(mch)) =>

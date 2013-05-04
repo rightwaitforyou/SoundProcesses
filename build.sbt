@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.6.0"
+version := "1.7.0-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -15,8 +15,8 @@ scalaVersion := "2.10.1"
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= {
-  val confluentVersion = "2.2.+"
-  val eventVersion     = "2.1.+"
+  val confluentVersion = "2.3.+"
+  val eventVersion     = "2.2.+"
   val stmVersion       = "2.0.+"
   Seq(
     "de.sciss" %% "scalacollider"   % "1.7.+",
@@ -53,7 +53,7 @@ initialCommands in console :=
      |import de.sciss.synth._; import ugen._; import proc._
      |import de.sciss.lucre.stm.InMemory
      |import de.sciss.lucre.expr.{Expr, LinkedList}
-     |import de.sciss.lucre.bitemp.Span
+     |import de.sciss.span.Span
      |import de.sciss.lucre.{event => evt}
      |import expr.{Ints, Longs, Doubles, Spans}
      |println( "To disable result types:\n :power\n :wrap shortresults\n: silent" )""".stripMargin +

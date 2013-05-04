@@ -109,131 +109,149 @@ object Ints extends BiTypeImpl[Int] {
       }
    }
 
-   object UnaryOp {
-      /* sealed */ trait Op[ T1 ] extends Tuple1Op[ T1 ] {
-         def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                 ( implicit tx: S#Tx ) : Tuple1[ S, T1 ]
+  object UnaryOp {
+    /* sealed */ trait Op[T1] extends Tuple1Op[T1] {
+      def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                           (implicit tx: S#Tx): Tuple1[S, T1]
 
-         def toString[ S <: stm.Sys[ S ]]( _1: Expr[ S, T1 ]) : String = _1.toString + "." + name
+      def toString[S <: stm.Sys[S]](_1: Expr[S, T1]): String = _1.toString + "." + name
 
-         def make[ S <: Sys[ S ]]( a: Expr[ S, T1 ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple1( typeID, this, Targets.partial[ S ], a )
-         }
+      final def apply[S <: Sys[S]](a: Expr[S, T1])(implicit tx: S#Tx): Ex[S] =
+          new Tuple1(typeID, this, Targets.partial[S], a)
 
-         def name: String = { val cn = getClass.getName
-            val sz   = cn.length
-            val i    = cn.lastIndexOf( '$', sz - 2 ) + 1
-            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
-         }
+      def name: String = {
+        val cn  = getClass.getName
+        val sz  = cn.length
+        val i   = cn.lastIndexOf('$', sz - 2) + 1
+        "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
       }
+    }
 
-      sealed abstract class IntOp( val id: Int ) extends Op[ Int ] {
-         final def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-                                       ( implicit tx: S#Tx ) : Tuple1[ S, Int ] = {
-            val _1 = readExpr( in, access )
-            new Tuple1( typeID, this, targets, _1 )
-         }
+    sealed abstract class IntOp(val id: Int) extends Op[Int] {
+      final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                                 (implicit tx: S#Tx): Tuple1[S, Int] = {
+        val _1 = readExpr(in, access)
+        new Tuple1(typeID, this, targets, _1)
       }
+    }
 
-      case object Neg extends IntOp( 0 ) {
-         def value( a: Int ) : Int = -a
-         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ]) : String = "-" + _1
-      }
-      case object Abs         extends IntOp(  5 ) {
-         def value( a: Int ) : Int = math.abs( a )
-      }
-      case object BitNot extends IntOp( 4 ) {
-         def value( a: Int ) : Int = ~a
-         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ]) : String = "~" + _1
-      }
-   // case object ToLong     extends Op(  6 )
-   // case object ToInt       extends Op(  7 )
-      case object Signum      extends IntOp( 11 ) {
-         def value( a: Int ) : Int = math.signum( a )
-      }
-      case object Squared     extends IntOp( 12 ) {
-         def value( a: Int ) : Int = a * a
-      }
-      case object Cubed       extends IntOp( 13 ) {
-         def value( a: Int ) : Int = a * a * a
-      }
-   }
+    case object Neg extends IntOp(0) {
+      def value(a: Int): Int = -a
+      override def toString[S <: stm.Sys[S]](_1: Ex[S]): String = "-" + _1
+    }
 
-   private object BinaryOp {
-      sealed abstract class Op( val id: Int ) extends Tuple2Op[ Int, Int ] {
-         final def make[ S <: Sys[ S ]]( a: Ex[ S ], b: Ex[ S ])( implicit tx: S#Tx ) : Ex[ S ] = {
-            new Tuple2( typeID, this, Targets.partial[ S ], a, b )
-         }
-         def value( a: Int, b: Int ) : Int
+    case object Abs extends IntOp(5) {
+      def value(a: Int): Int = math.abs(a)
+    }
 
-         def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = _1.toString + "." + name + "(" + _2 + ")"
+    case object BitNot extends IntOp(4) {
+      def value(a: Int): Int = ~a
+      override def toString[S <: stm.Sys[S]](_1: Ex[S]): String = "~" + _1
+    }
 
-         def name: String = { val cn = getClass.getName
-            val sz   = cn.length
-            val i    = cn.indexOf( '$' ) + 1
-            "" + cn.charAt( i ).toLower + cn.substring( i + 1, if( cn.charAt( sz - 1 ) == '$' ) sz - 1 else sz )
-         }
-      }
+    // case object ToLong     extends Op(  6 )
+    // case object ToInt       extends Op(  7 )
+    case object Signum extends IntOp(11) {
+      def value(a: Int): Int = math.signum(a)
+    }
 
-      trait Infix {
-         _: Op =>
+    case object Squared extends IntOp(12) {
+      def value(a: Int): Int = a * a
+    }
 
-         override def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
-            "(" + _1 + " " + name + " " + _2 + ")"
-      }
+    case object Cubed extends IntOp(13) {
+      def value(a: Int): Int = a * a * a
+    }
+  }
 
-//      sealed trait MathStyle {
-//         def name: String
-//         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
-//            "(" + _1 + " " + name + " " + _2 + ")"
-//      }
+  object BinaryOp {
+    sealed abstract class Op(val id: Int) extends Tuple2Op[Int, Int] {
+      final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] =
+        new Tuple2(typeID, this, Targets.partial[S], a, b)
 
-      case object Plus           extends Op(  0 ) with Infix {
-         override val name = "+"
-         def value( a: Int, b: Int ) : Int = a + b
+      def value(a: Int, b: Int): Int
+
+      def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
+
+      def name: String = {
+        val cn = getClass.getName
+        val sz = cn.length
+        val i  = cn.indexOf('$') + 1
+        "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
       }
-      case object Minus          extends Op(  1 ) with Infix {
-         override val name = "-"
-         def value( a: Int, b: Int ) : Int = a - b
-      }
-      case object Times          extends Op(  2 ) with Infix {
-         override val name = "*"
-         def value( a: Int, b: Int ) : Int = a * b
-      }
-      case object IDiv           extends Op(  3 ) {
-         override val name = "div"
-         def value( a: Int, b: Int ) : Int = a / b
-      }
-      case object Min            extends Op( 12 ) {
-         def value( a: Int, b: Int ) : Int = math.min( a, b )
-      }
-      case object Max            extends Op( 13 ) {
-         def value( a: Int, b: Int ) : Int = math.max( a, b )
-      }
-      case object BitAnd         extends Op( 14 ) {
-         def value( a: Int, b: Int ) : Int = a & b
-      }
-      case object BitOr          extends Op( 15 ) {
-         def value( a: Int, b: Int ) : Int = a | b
-      }
-      case object BitXor         extends Op( 16 ) {
-         def value( a: Int, b: Int ) : Int = a ^ b
-      }
-      case object ShiftLeft      extends Op( 26 ) {
-         override val name = "<<"
-         def value( a: Int, b: Int ) : Int = a << b
-      }
-      case object ShiftRight     extends Op( 27 ) {
-         override val name = ">>"
-         def value( a: Int, b: Int ) : Int = a >> b
-      }
-      case object UnsignedShiftRight extends Op( 28 ) {
-         override val name = ">>>"
-         def value( a: Int, b: Int ) : Int = a >>> b
-      }
-      case object Absdif         extends Op( 38 ) {
-         def value( a: Int, b: Int ) : Int = math.abs( a - b )
-      }
+    }
+
+    trait Infix {
+      _: Op =>
+
+      override def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String =
+        "(" + _1 + " " + name + " " + _2 + ")"
+    }
+
+    //      sealed trait MathStyle {
+    //         def name: String
+    //         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
+    //            "(" + _1 + " " + name + " " + _2 + ")"
+    //      }
+
+    case object Plus extends Op(0) with Infix {
+      override val name = "+"
+      def value(a: Int, b: Int): Int = a + b
+    }
+
+    case object Minus extends Op(1) with Infix {
+      override val name = "-"
+      def value(a: Int, b: Int): Int = a - b
+    }
+
+    case object Times extends Op(2) with Infix {
+      override val name = "*"
+      def value(a: Int, b: Int): Int = a * b
+    }
+
+    case object IDiv extends Op(3) {
+      override val name = "div"
+      def value(a: Int, b: Int): Int = a / b
+    }
+
+    case object Min extends Op(12) {
+      def value(a: Int, b: Int): Int = math.min(a, b)
+    }
+
+    case object Max extends Op(13) {
+      def value(a: Int, b: Int): Int = math.max(a, b)
+    }
+
+    case object BitAnd extends Op(14) {
+      def value(a: Int, b: Int): Int = a & b
+    }
+
+    case object BitOr extends Op(15) {
+      def value(a: Int, b: Int): Int = a | b
+    }
+
+    case object BitXor extends Op(16) {
+      def value(a: Int, b: Int): Int = a ^ b
+    }
+
+    case object ShiftLeft extends Op(26) {
+      override val name = "<<"
+      def value(a: Int, b: Int): Int = a << b
+    }
+
+    case object ShiftRight extends Op(27) {
+      override val name = ">>"
+      def value(a: Int, b: Int): Int = a >> b
+    }
+
+    case object UnsignedShiftRight extends Op(28) {
+      override val name = ">>>"
+      def value(a: Int, b: Int): Int = a >>> b
+    }
+
+    case object Absdif extends Op(38) {
+      def value(a: Int, b: Int): Int = math.abs(a - b)
+    }
 //      case object Clip2          extends Op( 42 ) {
 //         def value( a: Int, b: Int ) : Int = ri_clip2( a, b )
 //      }
@@ -245,44 +263,49 @@ object Ints extends BiTypeImpl[Int] {
 //      }
    }
 
-   final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
-      private type E = Ex[ S ]
+  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+    private type E = Ex[S]
 
-      import UnaryOp._
-      def unary_- : E            = Neg.make( ex )
-      def unary_~ : E	         = BitNot.make( ex )
+    import UnaryOp._
 
-      import BinaryOp._
-      def +( b: E ) : E          = Plus.make( ex, b )
-      def -( b: E ) : E          = Minus.make( ex, b )
-      def *( b: E ) : E          = Times.make( ex, b )
-      def /( b: E ) : E          = IDiv.make( ex, b )
-      def &( b: E ) : E          = BitAnd.make( ex, b )
-      def |( b: E ) : E          = BitOr.make( ex, b )
-      def ^( b: E ) : E          = BitXor.make( ex, b )
+    def unary_- : E = Neg   (ex)
+    def unary_~ : E = BitNot(ex)
 
-      def <<( b: E ) : E         = ShiftLeft.make( ex, b )
-      def >>( b: E ) : E         = ShiftRight.make( ex, b )
-      def >>>( b: E ) : E        = UnsignedShiftRight.make( ex, b )
-   }
+    import BinaryOp._
 
-   final class RichOps[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
-      private type E = Ex[ S ]
-      
-      import UnaryOp._
-      def abs : E                = Abs.make( ex )
-   // def toLong : E	         = UnOp.make( 'asLong, ex )
-   // def toInteger : E	      = UnOp.make( 'asInteger, ex )
-      def signum : E             = Signum.make( ex )
-      def squared : E            = Squared.make( ex )
-      def cubed : E              = Cubed.make( ex )
+    def +   (b: E): E = Plus              (ex, b)
+    def -   (b: E): E = Minus             (ex, b)
+    def *   (b: E): E = Times             (ex, b)
+    def /   (b: E): E = IDiv              (ex, b)
+    def &   (b: E): E = BitAnd            (ex, b)
+    def |   (b: E): E = BitOr             (ex, b)
+    def ^   (b: E): E = BitXor            (ex, b)
+    def <<  (b: E): E = ShiftLeft         (ex, b)
+    def >>  (b: E): E = ShiftRight        (ex, b)
+    def >>> (b: E): E = UnsignedShiftRight(ex, b)
+  }
 
-      import BinaryOp._
-      def min( b: E ) : E        = Min.make( ex, b )
-      def max( b: E ) : E        = Max.make( ex, b )
-      def absdif( b: E ) : E     = Absdif.make( ex, b )
-//      def clip2( b: E ) : E      = Clip2.make( ex, b )
-//      def fold2( b: E ) : E      = Fold2.make( ex, b )
-//      def wrap2( b: E ) : E      = Wrap2.make( ex, b )
-   }
+  final class RichOps[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+    private type E = Ex[S]
+
+    import UnaryOp._
+
+    def abs     : E = Abs     (ex)
+    // def toLong : E	         = UnOp.make( 'asLong, ex )
+    // def toInteger : E	      = UnOp.make( 'asInteger, ex )
+    def signum  : E = Signum  (ex)
+    def squared : E = Squared (ex)
+    def cubed   : E = Cubed   (ex)
+
+    import BinaryOp._
+
+    def min   (b: E): E = Min   (ex, b)
+    def max   (b: E): E = Max   (ex, b)
+    def absdif(b: E): E = Absdif(ex, b)
+
+    //      def clip2( b: E ) : E      = Clip2.make( ex, b )
+    //      def fold2( b: E ) : E      = Fold2.make( ex, b )
+    //      def wrap2( b: E ) : E      = Wrap2.make( ex, b )
+  }
+
 }

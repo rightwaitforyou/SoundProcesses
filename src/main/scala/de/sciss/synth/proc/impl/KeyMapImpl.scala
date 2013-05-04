@@ -73,7 +73,7 @@ object KeyMapImpl {
     protected def disposeData()(implicit tx: S#Tx) {}
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[(Key, ValueUpd)] =
-      info.valueEvent(value).pullUpdate(pull).map(key -> _)
+      pull(info.valueEvent(value)).map(key -> _)
   }
 }
 
@@ -179,7 +179,7 @@ trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
   //   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, IIdxSeq[ ValueUpd ]] = {
   //      pull.parents( this ).foldLeft( Map.empty[ Key, IIdxSeq[ ValueUpd ]]) { case (map, sel) =>
   //         val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer )
-  //         entryEvt.pullUpdate( pull ) match {
+  //         pull(entryEvt) match {
   //            case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, IIdxSeq.empty ) :+ upd))
   //            case None => map
   //         }
@@ -190,7 +190,7 @@ trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
     pull.parents(this).foldLeft(Map.empty[Key, ValueUpd]) {
       case (map, sel) =>
         val entryEvt = sel.devirtualize[(Key, ValueUpd), Entry](KeyMapImpl.entrySerializer)
-        entryEvt.pullUpdate(pull) match {
+        pull(entryEvt) match {
           case Some((key, upd)) =>
             assert(!map.contains(key))
             map + (key -> upd)

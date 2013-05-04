@@ -257,8 +257,8 @@ object ProcImpl {
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
-        val scansOpt = if (scans     .isSource(pull)) scans     .pullUpdate(pull) else None
-        val stateOpt = if (StateEvent.isSource(pull)) StateEvent.pullUpdate(pull) else None
+        val scansOpt = if (scans     .isSource(pull)) pull(scans     ) else None
+        val stateOpt = if (StateEvent.isSource(pull)) pull(StateEvent) else None
 
         val seq0 = Vector.empty
         //        graphOpt match {

@@ -186,7 +186,7 @@ object BiPinImpl {
           // --> fix: evt needs type ascription!!!
           val e = sel.devirtualize[ElemChange, Elem](BiExpr.serializer[S, A])
           val elem = e.node
-          val opt: Option[BiPin.Element[S, A]] = e.pullUpdate(pull).map(BiPin.Element(elem, _))
+          val opt: Option[BiPin.Element[S, A]] = pull(e).map(BiPin.Element(elem, _))
           opt
         })(breakOut)
 
@@ -229,8 +229,8 @@ object BiPinImpl {
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiPin.Update[S, A]] = {
-        val collOpt = if (CollChanged.isSource(pull)) CollChanged.pullUpdate(pull) else None
-        val elemOpt = if (ElemChanged.isSource(pull)) ElemChanged.pullUpdate(pull) else None
+        val collOpt = if (CollChanged.isSource(pull)) pull(CollChanged) else None
+        val elemOpt = if (ElemChanged.isSource(pull)) pull(ElemChanged) else None
 
         (collOpt, elemOpt) match {
           case (coll@Some(_), None) => coll

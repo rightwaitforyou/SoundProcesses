@@ -235,7 +235,7 @@ object GraphemeImpl {
     }
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Grapheme.Update[S]] = {
-      pin.changed.pullUpdate(pull).flatMap { upd =>
+      pull(pin.changed).flatMap { upd =>
         val segm: IIdxSeq[Segment] = upd.changes.foldLeft(IIdxSeq.empty[Segment]) {
           case (res, ch) =>
             val seq = ch match {

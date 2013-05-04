@@ -191,7 +191,7 @@ object ScanImpl {
       } else {
         source.flatMap {
           case Scan.Link.Grapheme(peer) =>
-            peer.changed.pullUpdate(pull).map(Scan.SourceUpdate(this, _))
+            pull(peer.changed).map(Scan.SourceUpdate(this, _))
           case _ => None
         }
       }

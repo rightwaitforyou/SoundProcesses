@@ -224,7 +224,7 @@ object Attribute {
       final val slot = 0
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Update[S]] = {
-        peerEvent.pullUpdate(pull).map(ch => Update(self, ch))
+        pull(peerEvent).map(ch => Update(self, ch))
       }
 
       def connect()(implicit tx: S#Tx) {

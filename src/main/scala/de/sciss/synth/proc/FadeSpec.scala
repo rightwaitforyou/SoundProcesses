@@ -77,11 +77,11 @@ object FadeSpec {
 
       def pullUpdate(pull: Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value]] = {
         val framesEvt = numFrames.changed
-        val framesChO = if (framesEvt.isSource(pull)) framesEvt.pullUpdate(pull) else None
+        val framesChO = if (framesEvt.isSource(pull)) pull(framesEvt) else None
         val shapeEvt  = shape.changed
-        val shapeChO  = if (shapeEvt .isSource(pull)) shapeEvt .pullUpdate(pull) else None
+        val shapeChO  = if (shapeEvt .isSource(pull)) pull(shapeEvt ) else None
         val floorEvt  = floor.changed
-        val floorChO  = if (floorEvt .isSource(pull)) floorEvt .pullUpdate(pull) else None
+        val floorChO  = if (floorEvt .isSource(pull)) pull(floorEvt ) else None
 
         if (framesChO.isEmpty && shapeChO.isEmpty && floorChO.isEmpty) return None
 
