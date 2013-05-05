@@ -326,7 +326,6 @@ object ProcImpl {
       // graphemeMap .write(out)
       attributeMap.write(out)
       scanMap     .write(out)
-      attributeMap.write(out)
     }
 
     final protected def disposeData()(implicit tx: S#Tx) {
@@ -335,7 +334,6 @@ object ProcImpl {
       // graphemeMap.dispose()
       attributeMap.dispose()
       scanMap     .dispose()
-      attributeMap.dispose()
     }
 
     override def toString() = "Proc" + id
@@ -386,16 +384,16 @@ object ProcImpl {
       tx0.readVar[Code[SynthGraph]](id, in)
     }
 
-    protected val scanMap = {
-      implicit val tx = tx0
-      // implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, ScanEntry[S]] = KeyMapImpl.entrySerializer
-      SkipList.Map.read[S, String, ScanEntry[S]](in, access)
-    }
-
     protected val attributeMap = {
       implicit val tx = tx0
       // implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, AttributeEntry[S]] = KeyMapImpl.entrySerializer
       SkipList.Map.read[S, String, AttributeEntry[S]](in, access)
+    }
+
+    protected val scanMap = {
+      implicit val tx = tx0
+      // implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, ScanEntry[S]] = KeyMapImpl.entrySerializer
+      SkipList.Map.read[S, String, ScanEntry[S]](in, access)
     }
 
     //    protected val graphemeMap = {
