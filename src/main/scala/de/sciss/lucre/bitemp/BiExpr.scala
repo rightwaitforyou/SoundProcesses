@@ -30,6 +30,7 @@ import expr.Expr
 import de.sciss.lucre.{event => evt}
 import evt.Targets
 import de.sciss.serial.{DataOutput, DataInput}
+import language.implicitConversions
 
 object BiExpr {
   def apply[S <: evt.Sys[S], A](time: Expr[S, Long], mag: Expr[S, A])
@@ -49,6 +50,9 @@ object BiExpr {
   //                                                          timeView: T => Expr[ S, Long ],
   //                                                          magView: A1 => Expr[ S, A ]) : BiExpr[ S, A ] =
   //      apply[ S, A ]( timeView( tuple._1 ), magView( tuple._2 ))
+
+  //  implicit def fromTuple[S <: evt.Sys[S], T, A](tuple: (T, A))(implicit tx: S#Tx, timeView: T => Expr[S, Long],
+  //    magView: A => Expr[S, A], magType: BiType[A]): BiExpr[S, A] = apply(tuple._1, tuple._2)
 
   implicit def serializer[S <: evt.Sys[S], A](implicit magType: BiType[A]): evt.Serializer[S, BiExpr[S, A]] =
     new Ser
