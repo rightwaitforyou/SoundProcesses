@@ -310,7 +310,7 @@ object Grapheme {
         values.foreach {
           case (mag, shape) =>
             val magEvt = mag.changed
-            if (magEvt.isSource(pull)) {
+            if (pull.contains(magEvt)) {
               pull(magEvt) match {
                 case Some(evt.Change(magBefore, magNow)) =>
                   beforeVals += magBefore -> shape
@@ -369,21 +369,21 @@ object Grapheme {
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value.Audio]] = {
         val artEvt = artifact.changed
-        val artOpt = if (artEvt.isSource(pull)) pull(artEvt) else None
+        val artOpt = if (pull.contains(artEvt)) pull(artEvt) else None
         val (artBefore, artNow) = artOpt.map(_.toTuple).getOrElse {
           val art = artifact.value
           (art, art)
         }
 
         val offsetEvt = offset.changed
-        val offsetOpt = if (offsetEvt.isSource(pull)) pull(offsetEvt) else None
+        val offsetOpt = if (pull.contains(offsetEvt)) pull(offsetEvt) else None
         val (offsetBefore, offsetNow) = offsetOpt.map(_.toTuple).getOrElse {
           val ov = offset.value
           (ov, ov)
         }
 
         val gainEvt = gain.changed
-        val gainOpt = if (gainEvt.isSource(pull)) pull(gainEvt) else None
+        val gainOpt = if (pull.contains(gainEvt)) pull(gainEvt) else None
         val (gainBefore, gainNow) = gainOpt.map(_.toTuple).getOrElse {
           val gv = gain.value
           (gv, gv)

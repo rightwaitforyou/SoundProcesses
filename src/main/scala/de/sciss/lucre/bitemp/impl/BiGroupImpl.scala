@@ -127,14 +127,14 @@ object BiGroupImpl {
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
       var res     = Vector.empty[BiGroup.Change[S, Elem, U]]
       val spanEvt = span.changed
-      if (spanEvt.isSource(pull)) {
+      if (pull.contains(spanEvt)) {
         pull(spanEvt).foreach { ch =>
           log(s"$this.pullUpdate -> ElementMoved")
           res :+= BiGroup.ElementMoved(this, ch)
         }
       }
       val valueEvt = eventView(value)
-      if (valueEvt.isSource(pull)) {
+      if (pull.contains(valueEvt)) {
         pull(valueEvt).foreach {
           ch => res :+= BiGroup.ElementMutated(this, ch)
         }
@@ -319,8 +319,8 @@ object BiGroupImpl {
 
       // XXX TODO: potential problem with event collapsing
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
-        val collOpt = if (CollectionEvent.isSource(pull)) pull(CollectionEvent) else None
-        val elemOpt = if (ElementEvent   .isSource(pull)) pull(ElementEvent   ) else None
+        val collOpt = if (pull.contains(CollectionEvent)) pull(CollectionEvent) else None
+        val elemOpt = if (pull.contains(ElementEvent   )) pull(ElementEvent   ) else None
 
         (collOpt, elemOpt) match {
           case (Some(_), None)      => collOpt

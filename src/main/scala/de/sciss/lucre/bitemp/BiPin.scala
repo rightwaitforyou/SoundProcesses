@@ -146,7 +146,7 @@ sealed trait BiPin[S <: Sys[S], A] extends Writable with Disposable[S#Tx] {
   def changed: EventLike[S, BiPin.Update[S, A], BiPin[S, A]]
 
   /**
-   * Finds the entry with the smallest time which is greater than or equal to the query time.
+   * Finds the entry with the smallest time which is greater than _or equal_ to the query time.
    *
    * @param time the query time
    * @return     the time corresponding to the next entry, or `None` if there is no entry

@@ -266,9 +266,9 @@ object ProcImpl {
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
-        val attrOpt  = if (attributes.isSource(pull)) pull(attributes) else None
-        val scansOpt = if (scans     .isSource(pull)) pull(scans     ) else None
-        val stateOpt = if (StateEvent.isSource(pull)) pull(StateEvent) else None
+        val attrOpt  = if (pull.contains(attributes)) pull(attributes) else None
+        val scansOpt = if (pull.contains(scans     )) pull(scans     ) else None
+        val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
 
         val seq0 =
         //        graphOpt match {
@@ -302,10 +302,10 @@ object ProcImpl {
         obs
       }
 
-      def isSource(pull: evt.Pull[S]): Boolean = {
-        // I don't know why this method is actually called? But it _is_, so we need to correctly handle the case
-        /* graphemes.isSource(pull) || */ scans.isSource(pull) || StateEvent.isSource(pull)
-      }
+      //      def isSource(pull: evt.Pull[S]): Boolean = {
+      //        // I don't know why this method is actually called? But it _is_, so we need to correctly handle the case
+      //        /* graphemes.isSource(pull) || */ scans.isSource(pull) || StateEvent.isSource(pull)
+      //      }
     }
 
     final def select(slot: Int, invariant: Boolean): Event[S, Any, Any] = (slot: @switch) match {

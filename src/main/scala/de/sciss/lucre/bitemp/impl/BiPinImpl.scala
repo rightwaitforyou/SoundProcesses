@@ -199,7 +199,7 @@ object BiPinImpl {
               val (timeChange, _) = change.unzip
               if (timeChange.isSignificant) {
                 removeNoFire(timeChange.before, elem)
-                addNoFire(timeChange.now, elem)
+                addNoFire   (timeChange.now   , elem)
               }
           }
           Some(BiPin.Update(pin, changes))
@@ -239,8 +239,8 @@ object BiPinImpl {
       //      }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiPin.Update[S, A]] = {
-        val collOpt = if (CollChanged.isSource(pull)) pull(CollChanged) else None
-        val elemOpt = if (ElemChanged.isSource(pull)) pull(ElemChanged) else None
+        val collOpt = if (pull.contains(CollChanged)) pull(CollChanged) else None
+        val elemOpt = if (pull.contains(ElemChanged)) pull(ElemChanged) else None
 
         (collOpt, elemOpt) match {
           case (Some(_), None) => collOpt

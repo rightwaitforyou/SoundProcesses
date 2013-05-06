@@ -41,6 +41,9 @@ object BiExpr {
       new EventImpl(targets, time, mag)
   }
 
+  def unapply[S <: evt.Sys[S], A](expr: BiExpr[S, A]): Option[(Expr[S, Long], Expr[S, A])] =
+    Some((expr.time, expr.mag))
+
   //   implicit def fromTuple[ S <: evt.Sys[ S ], A, A1, T ]( tuple: (T, A1) )
   //                                                        ( implicit tx: S#Tx, magType: BiType[ A ],
   //                                                          timeView: T => Expr[ S, Long ],
@@ -94,9 +97,9 @@ object BiExpr {
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[(Long, A)]] = {
       val timeEvt = time.changed
-      val timeCh  = if (timeEvt.isSource(pull)) pull(timeEvt) else None
+      val timeCh  = if (pull.contains(timeEvt)) pull(timeEvt) else None
       val magEvt  = mag.changed
-      val magCh   = if (magEvt .isSource(pull)) pull(magEvt ) else None
+      val magCh   = if (pull.contains(magEvt )) pull(magEvt ) else None
 
       (timeCh, magCh) match {
         case (Some(tch), Some(mch)) =>

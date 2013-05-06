@@ -126,15 +126,14 @@ object GraphemeImpl {
       loop(Long.MaxValue - 1, Nil)
     }
 
-    def valueAt( time: Long )( implicit tx: S#Tx ) : Option[ Value ] = {
+    def valueAt(time: Long)(implicit tx: S#Tx): Option[Value] = {
       pin.floor(time).map(_.magValue)
     }
 
     def segment(time: Long)(implicit tx: S#Tx): Option[Segment.Defined] = {
-      pin.floor(time).map {
-        elem =>
-          val (floorTime, floorVal) = elem.value
-          segmentFromFloor(floorTime, floorVal)
+      pin.floor(time).map { elem =>
+        val (floorTime, floorVal) = elem.value
+        segmentFromFloor(floorTime, floorVal)
       }
     }
 
