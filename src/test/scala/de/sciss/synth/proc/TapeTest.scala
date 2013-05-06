@@ -27,9 +27,9 @@ object TapeTest extends App {
     val scan      = proc.scans.add("sig")
     val file      = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
     val spec      = AudioFile.readSpec(file)
-    val audio     = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 1.0)
+    val audio     = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
     val grapheme  = Grapheme.Modifiable[S]
-    grapheme.add(1.seconds -> audio)
+    grapheme.add((1 - 4.5).seconds -> audio)  // ... çoit trop complexe ...
     scan.source_=(Some(Scan.Link.Grapheme(grapheme)))
     proc.graph_=(SynthGraph {
       import ugen._
@@ -37,7 +37,7 @@ object TapeTest extends App {
       Out.ar(0, sig)
     })
     val group     = ProcGroup.Modifiable[S]
-    group.add(Span(1.seconds, 8.seconds), proc)
+    group.add(Span(1.seconds, 4.seconds), proc)
 
     import Durable.inMemory
     val transp  = Transport[S, I](group)
@@ -47,7 +47,7 @@ object TapeTest extends App {
     val t = new Thread {
       override def run() {
         this.synchronized(this.wait())
-        Thread.sleep(10 * 1000L)
+        Thread.sleep(5 * 1000L)
         sys.exit()
       }
       start() // bug in ScalaCollider's server boot - we have to make sure a thread is started before aural.start

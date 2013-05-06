@@ -260,7 +260,7 @@ object AuralPresentationImpl {
                   ensureChannels(audio.numChannels)
                   val file = audio.value.artifact
                   // val file      =  artifactStore().resolve(artifact)
-                  val aaw = new AudioArtifactWriter(audio, file, server, sampleRate)
+                  val aaw = new AudioArtifactWriter(audio, time, file, server, sampleRate)
                   busUsers :+= aaw
                   val bm = BusNodeSetter.mapper(inCtlName, aaw.bus, synth)
                   busUsers :+= bm

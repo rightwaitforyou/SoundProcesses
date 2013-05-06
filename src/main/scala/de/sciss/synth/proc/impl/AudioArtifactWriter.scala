@@ -32,66 +32,69 @@ import concurrent.stm.Ref
 import java.io.File
 import span.Span
 
-final class AudioArtifactWriter( segm: Grapheme.Segment.Audio, file: File, server: Server, sampleRate: Double )
-extends DynamicBusUser /* DynamicAudioBusUser */ /* with RichAudioBus.User */ {
-   private val synthRef = Ref( Option.empty[ Synth ])
-   val bus              = RichBus.audio( server, segm.numChannels )
+final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, file: File, server: Server, sampleRate: Double)
+  extends DynamicBusUser /* DynamicAudioBusUser */
+  /* with RichAudioBus.User */ {
 
-   def add()( implicit tx: Txn ) {
-//      val bufPeer       = Buffer( server )
-      val numChannels   = bus.numChannels
-//      val rb            = Buffer( server )
+  private val synthRef  = Ref(Option.empty[Synth])
+  val bus               = RichBus.audio(server, segm.numChannels)
 
-      val sg = SynthGraph {
-         import ugen._
-         val buf  = "buf".ir
-         val dur  = "dur".ir( 1 )
-         val out  = "out".kr
-         val sig  = DiskIn.ar( numChannels, buf )
-         Line.kr( start = 0, end = 0, dur = dur, doneAction = freeSelf )
-         Out.ar( out, sig )
-      }
+  def add()(implicit tx: Txn) {
+    // val bufPeer       = Buffer( server )
+    val numChannels = bus.numChannels
+    // val rb            = Buffer( server )
 
-//      val rd         = SynthDef( server, sg, nameHint = Some( "audio-artifact" ))
+    val sg = SynthGraph {
+      import ugen._
+      val buf = "buf".ir
+      val dur = "dur".ir(1)
+      val out = "out".kr
+      val amp = "amp".kr(1)
+      val sig = DiskIn.ar(numChannels, buf) * amp
+      Line.kr(start = 0, end = 0, dur = dur, doneAction = freeSelf)
+      Out.ar(out, sig)
+    }
 
-      val audioVal   = segm.value
-//      val path       = audioVal.artifact.toFile.getAbsolutePath
-      val path       = file.getAbsolutePath
-      val fileStart  = audioVal.offset
-      val target     = server.defaultGroup
-      val dur        = segm.span match {
-         case sp @ Span( _, _ )  => sp.length / sampleRate
-         case _                  => audioVal.spec.numFrames / audioVal.spec.sampleRate
-      }
+    // val rd         = SynthDef( server, sg, nameHint = Some( "audio-artifact" ))
 
-      val rb = Buffer.diskIn( server )( path, startFrame = fileStart, numChannels = numChannels )
-      val args: Seq[ ControlSetMap ] = Seq( "buf" -> rb.id, "dur" -> dur )
+    val audioVal  = segm.value
+    // val path       = audioVal.artifact.toFile.getAbsolutePath
+    val path      = file.getAbsolutePath
+    val fileFrames= audioVal.spec.numFrames
+    val target    = server.defaultGroup
+    val fStart    = math.max(0L, math.min(fileFrames, audioVal.offset + (time - segm.span.start)))
+    val fStop     = math.min(fileFrames, segm.span match {
+      case Span.HasStop(stop) => fStart + (stop - time)
+      case _ => Long.MaxValue
+    })
+    val dur       = (fStop - fStart) / sampleRate // XXX TODO: could use SRC at some point
+    println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
+    val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = numChannels)
+    val args: Seq[ControlSetMap] = Seq("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
 
-//      val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
-      val rs = Synth( sg, nameHint = Some( "audio-artifact" ))( target = target, args = args, dependencies = rb :: Nil )
+    // val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
+    val rs = Synth(sg, nameHint = Some("audio-artifact"))(target = target, args = args, dependencies = rb :: Nil)
 
-      rs.onEndTxn { implicit tx =>
-//         bufPeer.close( bufPeer.freeMsg )
-         rb.dispose()
-      }
+    rs.onEndTxn { implicit tx =>
+      // bufPeer.close( bufPeer.freeMsg )
+      rb.dispose()
+    }
 
-//      rs.play( target = target, args = args, buffers = rb :: Nil )
-      rs.write( bus -> "out" )
+    // rs.play( target = target, args = args, buffers = rb :: Nil )
+    rs.write(bus -> "out")
 
-      val oldSynth = synthRef.swap( Some( rs ))( tx.peer )
-//      bus.addWriter( this )
+    val oldSynth = synthRef.swap(Some(rs))(tx.peer)
+    // bus.addWriter( this )
 
-      require( oldSynth.isEmpty, "AudioArtifactWriter.add() : old synth still playing" )
-   }
+    require(oldSynth.isEmpty, "AudioArtifactWriter.add() : old synth still playing")
+  }
 
-   def remove()( implicit tx: Txn ) {
-      val rs = synthRef.swap( None )( tx.peer ).getOrElse(
-         sys.error( "AudioArtifactWriter.remove() : there was no synth playing" )
-      )
-      rs.free()
+  def remove()(implicit tx: Txn) {
+    val rs = synthRef.swap(None)(tx.peer).getOrElse(
+      sys.error("AudioArtifactWriter.remove() : there was no synth playing")
+    )
+    rs.free()
 
-//      bus.removeWriter( this )
-   }
-
-//   def migrateTo( newBus: RichAudioBus )( implicit tx: ProcTxn ) = ...
+    // bus.removeWriter( this )
+  }
 }

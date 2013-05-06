@@ -154,6 +154,14 @@ object Grapheme {
         Audio(artifact, spec, offset, gain)
       }
     }
+
+    /** An audio region segment.
+      *
+      * @param  artifact  the audio file
+      * @param  spec      the audio file specification, e.g. retrieved via `AudioFile.readSpec`
+      * @param  offset    the file offset in sample frames
+      * @param  gain      the gain factor (linear, where 1.0 is original volume)
+      */
     final case class Audio(artifact: Artifact.Value, spec: AudioFileSpec, offset: Long, gain: Double)
       extends Value {
 
