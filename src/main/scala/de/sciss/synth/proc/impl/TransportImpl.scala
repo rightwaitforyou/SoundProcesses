@@ -446,7 +446,7 @@ object TransportImpl {
 
     final def init()(implicit tx: S#Tx) {
       // we can use groupStale because init is called straight away after instantiating Impl
-      groupObs = group.changed.reactTx[ProcGroup.Update[S]] { implicit tx =>
+      groupObs = group.changed.react{ implicit tx =>
         biGroupUpdate(_)(tx)
       }
       seek(0L)

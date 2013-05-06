@@ -106,30 +106,28 @@ object AuralPresentationImpl {
 
       if (transport.isPlaying) t_play(transport.time)
 
-      transport.reactTx {
-        implicit tx => {
-          // only when playing
-          case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
-            log("at " + time + " added " + added.mkString("[", ", ", "]") +
-              "; removed " + removed.mkString("[", ", ", "]") +
-              "; changes? " + changes.nonEmpty + " (" + booted.hashCode.toHexString + ")")
-            removed.foreach {
-              timed => booted.procRemoved(timed)
-            }
-            changes.foreach {
-              case (timed, m) => booted.procUpdated(timed, m)
-            }
-            added.foreach {
-              timed => booted.procAdded(time, timed)
-            }
+      transport.reactTx { implicit tx => {
+        // only when playing
+        case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
+          log("at " + time + " added " + added.mkString("[", ", ", "]") +
+            "; removed " + removed.mkString("[", ", ", "]") +
+            "; changes? " + changes.nonEmpty + " (" + booted.hashCode.toHexString + ")")
+          removed.foreach {
+            timed => booted.procRemoved(timed)
+          }
+          changes.foreach {
+            case (timed, m) => booted.procUpdated(timed, m)
+          }
+          added.foreach {
+            timed => booted.procAdded(time, timed)
+          }
 
-          case Transport.Play(tr, time) => t_play(time)
-          case Transport.Stop(tr, time) => t_stop(time)
+        case Transport.Play(tr, time) => t_play(time)
+        case Transport.Stop(tr, time) => t_stop(time)
 
-          case _ =>
-          //                  log( "other " + other )
-        }
-      }
+        case _ =>
+        //                  log( "other " + other )
+      }}
 
       running() = Some(booted)
     }

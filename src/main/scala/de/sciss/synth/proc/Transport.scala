@@ -93,36 +93,39 @@ object Transport {
       final case class GraphemesChanged( map: Map[ String, Grapheme.Segment ]) extends Update[ Nothing ]
    }
 }
-trait Transport[ S <: evt.Sys[ S ], Elem, U ] extends Disposable[ S#Tx ] /* evt.Node[ S ] */ with Chronos[ S ] {
-//   def id: S#ID
 
-   def play()( implicit tx: S#Tx ) : Unit
-   def stop()( implicit tx: S#Tx ) : Unit
+trait Transport[S <: evt.Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ S ] */ with Chronos[S] {
+  //   def id: S#ID
 
-   def seek( time: Long )( implicit tx: S#Tx ) : Unit
-//   def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
-//   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
+  def play()(implicit tx: S#Tx): Unit
+  def stop()(implicit tx: S#Tx): Unit
 
-   def isPlaying( implicit tx: S#Tx ) : Boolean
+  def seek(time: Long)(implicit tx: S#Tx): Unit
 
-   def sampleRate: Double
+  //   def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
+  //   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
 
-   /**
-    * Iterator over all processes which intersect with the current time.
-    */
-   def iterator( implicit tx: S#Tx ) : Iterator[ S#Tx, (SpanLike, BiGroup.TimedElem[ S, Elem ])]
-//
-//   def group: BiGroup[ S, Elem, U ]
+  def isPlaying(implicit tx: S#Tx): Boolean
 
-//   def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
+  def sampleRate: Double
 
-   def react( fun: Transport.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ]
-   def reactTx( fun: S#Tx => Transport.Update[ S, Elem, U ] => Unit )( implicit tx: S#Tx ) : Disposable[ S#Tx ]
+  /**
+   * Iterator over all processes which intersect with the current time.
+   */
+  def iterator(implicit tx: S#Tx): Iterator[S#Tx, (SpanLike, BiGroup.TimedElem[S, Elem])]
 
-//   // unfortunately this needs to go in the API because of the self-access problem
-//   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
-//                                   hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) : Unit
+  //
+  //   def group: BiGroup[ S, Elem, U ]
 
-//   def play()( implicit time: Chronos[ S ]) : Unit
-//   def stop()( implicit time: Chronos[ S ]) : Unit
+  //   def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
+
+  def react  (fun:         Transport.Update[S, Elem, U] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
+  def reactTx(fun: S#Tx => Transport.Update[S, Elem, U] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
+
+  //   // unfortunately this needs to go in the API because of the self-access problem
+  //   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
+  //                                   hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) : Unit
+
+  //   def play()( implicit time: Chronos[ S ]) : Unit
+  //   def stop()( implicit time: Chronos[ S ]) : Unit
 }

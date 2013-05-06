@@ -113,10 +113,10 @@ object ScansTest extends App {
       val p1 = Proc[ S ]
       val p2 = Proc[ S ]
 
-      p1.changed.react( upd => println( "OBSERVED p1 : " + upd ))
-      p2.changed.react( upd => println( "OBSERVED p1 : " + upd ))
+     p1.changed.react(_ => upd => println("OBSERVED p1 : " + upd))
+     p2.changed.react(_ => upd => println("OBSERVED p1 : " + upd))
 
-      val t1 = 1 /* 4 */ * 44100L   // XXX TODO eventually should appear later
+     val t1 = 1 /* 4 */ * 44100L   // XXX TODO eventually should appear later
       val t2 = 1 * 44100L // XXX TODO must currently be greater than current transport position
 
       group.add( Span.from( t1 ), p1 )

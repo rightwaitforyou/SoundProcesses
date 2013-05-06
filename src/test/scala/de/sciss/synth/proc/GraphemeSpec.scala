@@ -13,28 +13,28 @@ import span.Span
  * test-only de.sciss.synth.proc.GraphemeSpec
  */
 class GraphemeSpec extends ConfluentEventSpec {
-   import imp._
+  import imp._
 
-   import Grapheme.{Value, Modifiable, Update, Segment, Elem, TimedElem}
+  import Grapheme.{Value, Modifiable, Update, Segment, Elem, TimedElem}
 
-   "Grapheme" should "notify observers about all relevant events" in { system =>
-      val obs  = new Observation[ S ]
-      val gH   = system.step { implicit tx =>
-         val g = Modifiable[ S ]
-         g.changed.reactTx( obs.register )
-         val res = tx.newHandle( g )( Modifiable.serializer[ S ])
-         obs.assertEmpty()
-         res
-      }
+  "Grapheme" should "notify observers about all relevant events" in { system =>
+    val obs = new Observation[S]
+    val gH  = system.step { implicit tx =>
+      val g   = Modifiable[S]
+      g.changed.react(obs.register)
+      val res = tx.newHandle(g)(Modifiable.serializer[S])
+      obs.assertEmpty()
+      res
+    }
 
-      val (e1, e2, e3, e4, e5) = system.step { implicit tx =>
-         ((    0L -> Value.Curve( 441.0 -> linShape ))                       : TimedElem[ S ],
-          (10000L -> Value.Curve( 882.0 -> expShape ))                       : TimedElem[ S ],
-          (20000L -> Value.Curve( 123.4 -> sinShape, 567.8 -> sinShape ))    : TimedElem[ S ],
-          (30000L -> Value.Curve( 987.6 -> welchShape, 543.2 -> stepShape )) : TimedElem[ S ],
-          (20000L -> Value.Curve( 500.0 -> curveShape( -4f )))               : TimedElem[ S ]
-         )
-      }
+    val (e1, e2, e3, e4, e5) = system.step { implicit tx =>
+       ((    0L -> Value.Curve( 441.0 -> linShape ))                       : TimedElem[ S ],
+        (10000L -> Value.Curve( 882.0 -> expShape ))                       : TimedElem[ S ],
+        (20000L -> Value.Curve( 123.4 -> sinShape, 567.8 -> sinShape ))    : TimedElem[ S ],
+        (30000L -> Value.Curve( 987.6 -> welchShape, 543.2 -> stepShape )) : TimedElem[ S ],
+        (20000L -> Value.Curve( 500.0 -> curveShape( -4f )))               : TimedElem[ S ]
+       )
+    }
 
       // adding constants
       system.step { implicit tx =>

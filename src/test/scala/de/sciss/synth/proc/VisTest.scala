@@ -87,7 +87,7 @@ extends ExprImplicits[ S ] {
     implicit tx =>
       implicit def longType = Longs
       val g = ProcGroup.Modifiable[S]
-      g.changed.react { upd =>
+      g.changed.react { _ => upd =>
         println("Group observed: " + upd)
       }
       val loc = Artifact.Location.Modifiable[S](VisTest.audioDir)

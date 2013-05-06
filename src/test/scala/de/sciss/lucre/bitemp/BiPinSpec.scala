@@ -13,138 +13,139 @@ import event.Change
  * test-only de.sciss.lucre.bitemp.BiPinSpec
  */
 class BiPinSpec extends ConfluentEventSpec {
-   type IntEx = Expr[ S, Int ]
-   import imp._
+  type IntEx = Expr[S, Int]
 
-   "BiPin" should "notify observers about all relevant collection events" in { system =>
-      val obs  = new Observation[ S ]
+  import imp._
+
+  "BiPin" should "notify observers about all relevant collection events" in { system =>
+    val obs = new Observation[S]
+    val bipH = system.step { implicit tx =>
+      val bip = BiPin.Modifiable[S, Int]
+      bip.changed.react(obs.register)
+      val res = tx.newHandle(bip)(BiPin.Modifiable.serializer[S, Int])
+      obs.assertEmpty()
+      res
+    }
+
+    val tup1 = 10000L -> 1
+    val tup2 =  5000L -> 2
+    val tup3 = 15000L -> 3
+    val tup4 = 20000L -> 4
+    val tup5 = 15000L -> 5
+    val tup6 = 15000L -> 6
+
+    system.step { implicit tx =>
+      val bip = bipH()
+      bip.add(tup1)
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup1, tup1)))
+      )
+      obs.clear()
+      assert(bip.valueAt(tup1._1 - 1) === None)
+      assert(bip.valueAt(tup1._1    ) === Some(tup1._2))
+      assert(bip.valueAt(tup1._1 + 1) === Some(tup1._2))
+
+      bip.add(tup2)
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( Span( 5000L, 10000L ) -> (2: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup2, tup2)))
+      )
+      obs.clear()
+
+      bip.add(tup3)
+      //         println( "at 10000 : " + bip.at( 10000L ))
+      // note: the shrunken regions are _not_ fired!
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
+        //                                            Span.from( 15000L ) -> (3: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup3, tup3)))
+      )
+      obs.clear()
+
+      bip.add(tup4)
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (4: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup4, tup4)))
+      )
+      obs.clear()
+
+      assert(bip.valueAt(tup3._1) === Some(tup3._2))
+      bip.add(tup5) // should override the `3`
+      assert(bip.valueAt(tup3._1) === Some(tup5._2))
+      bip.add(tup6) // should override the `5`
+      assert(bip.valueAt(tup3._1) === Some(tup6._2))
+
+      assert(bip.intersect(tup3._1) === IIdxSeq[BiExpr[S, Int]](tup6, tup5, tup3)) // recent values first
+
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (5: IntEx) )),
+        //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (6: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup5, tup5))),
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup6, tup6)))
+      )
+      obs.clear()
+    }
+
+    system.step { implicit tx =>
+      val bip = bipH()
+
+      bip.remove(tup5) // should not be noticable
+      assert(bip.valueAt  (tup3._1) === Some(tup6._2))
+      assert(bip.intersect(tup3._1) === IIdxSeq[BiExpr[S, Int]](tup6, tup3))
+
+      bip.remove(tup6) // should fall back to `3`
+      assert(bip.valueAt  (tup3._1) === Some(tup3._2))
+      assert(bip.intersect(tup3._1) === IIdxSeq[BiExpr[S, Int]](tup3))
+
+      // tup5 removal not noticable!
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (3: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup6, tup6)))
+      )
+      obs.clear()
+
+      bip.remove(15000L -> 11) // should be ignored
+      bip.remove(15001L -> 3) // should be ignored
+      obs.assertEmpty()
+      assert(bip.valueAt(tup3._1) === Some(tup3._2))
+
+      bip.remove(tup3)
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (1: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup3, tup3)))
+      )
+      obs.clear()
+      assert(bip.valueAt(tup3._1) === Some(tup1._2))
+
+      bip.remove(tup4)
+      obs.assertEquals(
+        //            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup4, tup4)))
+      )
+      obs.clear()
+
+      bip.remove(tup2)
+      bip.remove(tup1)
+      //         obs.assertEmpty()
+      obs.assertEquals(
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup2, tup2))),
+        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup1, tup1)))
+      )
+      obs.clear()
+
+      assert(bip.intersect(0L).isEmpty && bip.intersect(20000L).isEmpty)
+    }
+  }
+
+  "BiPin" should "notify observers about all relevant element events" in { system =>
+      val obs = new Observation[S]
       val bipH = system.step { implicit tx =>
-         val bip = BiPin.Modifiable[ S, Int ]
-         bip.changed.reactTx( obs.register )
-         val res = tx.newHandle( bip )( BiPin.Modifiable.serializer[ S, Int ])
-         obs.assertEmpty()
-         res
-      }
-
-      val tup1 = 10000L -> 1
-      val tup2 =  5000L -> 2
-      val tup3 = 15000L -> 3
-      val tup4 = 20000L -> 4
-      val tup5 = 15000L -> 5
-      val tup6 = 15000L -> 6
-
-      system.step { implicit tx =>
-         val bip = bipH()
-         bip.add( tup1 )
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup1, tup1 )))
-         )
-         obs.clear()
-         assert( bip.valueAt( tup1._1 - 1 ) === None )
-         assert( bip.valueAt( tup1._1     ) === Some( tup1._2 ))
-         assert( bip.valueAt( tup1._1 + 1 ) === Some( tup1._2 ))
-
-         bip.add( tup2 )
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span( 5000L, 10000L ) -> (2: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup2, tup2 )))
-         )
-         obs.clear()
-
-         bip.add( tup3 )
-//         println( "at 10000 : " + bip.at( 10000L ))
-         // note: the shrunken regions are _not_ fired!
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
-//                                            Span.from( 15000L ) -> (3: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup3, tup3 )))
-         )
-         obs.clear()
-
-         bip.add( tup4 )
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (4: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup4, tup4 )))
-         )
-         obs.clear()
-
-         assert( bip.valueAt( tup3._1 ) === Some( tup3._2 ))
-         bip.add( tup5 ) // should override the `3`
-         assert( bip.valueAt( tup3._1 ) === Some( tup5._2 ))
-         bip.add( tup6 ) // should override the `5`
-         assert( bip.valueAt( tup3._1 ) === Some( tup6._2 ))
-
-         assert( bip.intersect( tup3._1 ) === IIdxSeq[ BiExpr[ S, Int ]]( tup6, tup5, tup3 )) // recent values first
-
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (5: IntEx) )),
-//            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (6: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup5, tup5 ))),
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup6, tup6 )))
-         )
-         obs.clear()
-      }
-
-      system.step { implicit tx =>
-         val bip = bipH()
-
-         bip.remove( tup5 ) // should not be noticable
-         assert( bip.valueAt( tup3._1 ) === Some( tup6._2 ))
-         assert( bip.intersect( tup3._1 ) === IIdxSeq[ BiExpr[ S, Int ]]( tup6, tup3 ))
-
-         bip.remove( tup6 ) // should fall back to `3`
-         assert( bip.valueAt( tup3._1 ) === Some( tup3._2 ))
-         assert( bip.intersect( tup3._1 ) === IIdxSeq[ BiExpr[ S, Int ]]( tup3 ))
-
-         // tup5 removal not noticable!
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (3: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup6, tup6 )))
-         )
-         obs.clear()
-
-         bip.remove( 15000L -> 11 )   // should be ignored
-         bip.remove( 15001L -> 3 )   // should be ignored
-         obs.assertEmpty()
-         assert( bip.valueAt( tup3._1 ) === Some( tup3._2 ))
-
-         bip.remove( tup3 )
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (1: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup3, tup3 )))
-         )
-         obs.clear()
-         assert( bip.valueAt( tup3._1 ) === Some( tup1._2 ))
-
-         bip.remove( tup4 )
-         obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup4, tup4 )))
-         )
-         obs.clear()
-
-         bip.remove( tup2 )
-         bip.remove( tup1 )
-//         obs.assertEmpty()
-         obs.assertEquals(
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup2, tup2 ))),
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Removed( tup1, tup1 )))
-         )
-         obs.clear()
-
-         assert( bip.intersect( 0L ).isEmpty && bip.intersect( 20000L ).isEmpty )
-      }
-   }
-
-   "BiPin" should "notify observers about all relevant element events" in { system =>
-      val obs  = new Observation[ S ]
-      val bipH = system.step { implicit tx =>
-         val bip = BiPin.Modifiable[ S, Int ]
-         bip.changed.reactTx( obs.register )
-         val res = tx.newHandle( bip )( BiPin.Modifiable.serializer[ S, Int ])
-         obs.assertEmpty()
-         res
+        val bip = BiPin.Modifiable[S, Int]
+        bip.changed.react(obs.register)
+        val res = tx.newHandle(bip)(BiPin.Modifiable.serializer[S, Int])
+        obs.assertEmpty()
+        res
       }
 
       implicit val intVarSer  = Ints.varSerializer[ S ]

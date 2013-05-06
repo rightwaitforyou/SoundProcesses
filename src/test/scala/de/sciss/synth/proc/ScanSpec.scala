@@ -14,17 +14,17 @@ import span.Span
  * test-only de.sciss.synth.proc.ScanSpec
  */
 class ScanSpec extends ConfluentEventSpec {
-   import imp._
+  import imp._
 
-   "Proc" should "notify observers about all relevant events" in { system =>
-      val obs  = new Observation[ S ]
-      val ph   = system.step { implicit tx =>
-         val p = Proc[ S ]
-         p.changed.reactTx( obs.register )
-         val res = tx.newHandle( p )( Proc.serializer[ S ])
-         obs.assertEmpty()
-         res
-      }
+  "Proc" should "notify observers about all relevant events" in { system =>
+    val obs = new Observation[S]
+    val ph = system.step { implicit tx =>
+      val p = Proc[S]
+      p.changed.react(obs.register)
+      val res = tx.newHandle(p)(Proc.serializer[S])
+      obs.assertEmpty()
+      res
+    }
 
       val grH = system.step { implicit tx =>
          val p = ph()

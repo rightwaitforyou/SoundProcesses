@@ -131,12 +131,11 @@ object ProcImpl {
 
     sealed trait ProcEvent {
       final protected def reader: evt.Reader[S, Proc[S]] = ProcImpl.serializer
-
       final def node: Proc[S] with evt.Node[S] = proc
     }
 
     sealed trait KeyMap[Value, ValueUpd, OuterUpd]
-      extends evti.EventImpl[S, OuterUpd, Proc[S]]
+      extends evti.EventImpl [S, OuterUpd, Proc[S]]
       with evt.InvariantEvent[S, OuterUpd, Proc[S]]
       with ProcEvent
       with impl.KeyMapImpl[S, String, Value, ValueUpd] {
@@ -241,27 +240,21 @@ object ProcImpl {
     }
 
     private object ChangeEvent
-      extends evt.Event[S, Proc.Update[S], Proc[S]]
-      with evt.InvariantSelector[S]
+      extends evt.impl.EventImpl[S, Proc.Update[S], Proc[S]]
+      with evt.InvariantEvent   [S, Proc.Update[S], Proc[S]]
       with ProcEvent {
 
       final val slot = 3
 
-      def connect   ()(implicit tx: S#Tx) {}
-      def disconnect()(implicit tx: S#Tx) {}
-
-      def --->(r: evt.Selector[S])(implicit tx: S#Tx) {
-        // graphemes  ---> r
-        attributes ---> r
-        scans      ---> r
-        StateEvent ---> r
+      def connect   ()(implicit tx: S#Tx) {
+        attributes ---> this
+        scans      ---> this
+        StateEvent ---> this
       }
-
-      def -/->(r: evt.Selector[S])(implicit tx: S#Tx) {
-        // graphemes  -/-> r
-        attributes -/-> r
-        scans      -/-> r
-        StateEvent -/-> r
+      def disconnect()(implicit tx: S#Tx) {
+        attributes -/-> this
+        scans      -/-> this
+        StateEvent -/-> this
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
@@ -289,23 +282,6 @@ object ProcImpl {
         }
         if (seq2.isEmpty) None else Some(Proc.Update(proc, seq2))
       }
-
-      def react[A1 >: Proc.Update[S]](fun: A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, Proc[S]] =
-        reactTx((_: S#Tx) => fun)
-
-      def reactTx[A1 >: Proc.Update[S]](fun: S#Tx => A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, Proc[S]] = {
-        val obs = evt.Observer(ProcImpl.serializer[S], fun)
-        // obs.add(graphemes)
-        obs.add(attributes)
-        obs.add(scans)
-        obs.add(StateEvent)
-        obs
-      }
-
-      //      def isSource(pull: evt.Pull[S]): Boolean = {
-      //        // I don't know why this method is actually called? But it _is_, so we need to correctly handle the case
-      //        /* graphemes.isSource(pull) || */ scans.isSource(pull) || StateEvent.isSource(pull)
-      //      }
     }
 
     final def select(slot: Int, invariant: Boolean): Event[S, Any, Any] = (slot: @switch) match {

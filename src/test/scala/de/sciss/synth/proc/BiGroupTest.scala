@@ -10,17 +10,17 @@ import de.sciss.span.{Span, SpanLike}
 object BiGroupTest {
    def apply() : BiGroupTest[ InMemory ] = new BiGroupTest( InMemory() )
 }
-class BiGroupTest[ S <: evt.Sys[ S ]]( cursor: Cursor[ S ]) extends ExprImplicits[ S ] {
-   def t[ A ]( fun: S#Tx => A ) : A = cursor.step( fun )
+class BiGroupTest[S <: evt.Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
+  def t[A](fun: S#Tx => A): A = cursor.step(fun)
 
-   val bi = t { implicit tx =>
-      implicit def longType = Longs
-      val res = BiGroup.Expr.Modifiable[ S, Long ]
-      res.changed.react { upd =>
-         println( "Observed: " + upd )
-      }
-      res
-   }
+  val bi = t { implicit tx =>
+    implicit def longType = Longs
+    val res = BiGroup.Expr.Modifiable[S, Long]
+    res.changed.react { _ => upd =>
+      println("Observed: " + upd)
+    }
+    res
+  }
 
    def add( span: SpanLike = Span( 33, 44 ), elem: Long = 55 ) {
       t { implicit tx => bi.add( span, elem )}
