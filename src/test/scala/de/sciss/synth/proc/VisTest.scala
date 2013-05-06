@@ -99,7 +99,7 @@ extends ExprImplicits[ S ] {
    val (trans) = cursor.step { implicit tx =>
       val g = group
       val tr = Transport[ S, I ]( g )
-      tr.react { upd =>
+      tr.react { _ => upd =>
          println( "Transport observed: " + upd )
       }
       tr // -> ArtifactStore[ S ]( VisTest.audioDir )

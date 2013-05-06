@@ -806,10 +806,10 @@ object TransportImpl {
       obsVar.transform(_.filterNot(_ == obs))
     }
 
-    final def react(fun: Update[S] => Unit)(implicit tx: S#Tx): Disposable[S#Tx] =
-      reactTx(_ => fun)
+    //    final def react(fun: Update[S] => Unit)(implicit tx: S#Tx): Disposable[S#Tx] =
+    //      reactTx(_ => fun)
 
-    final def reactTx(fun: S#Tx => Update[S] => Unit)(implicit tx: S#Tx): Disposable[S#Tx] = {
+    final def react(fun: S#Tx => Update[S] => Unit)(implicit tx: S#Tx): Disposable[S#Tx] = {
       implicit val itx: I#Tx = tx
       val obs = new Observation[S, I](this, fun)
       obsVar.transform(_ :+ obs)

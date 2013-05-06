@@ -106,7 +106,7 @@ object AuralPresentationImpl {
 
       if (transport.isPlaying) t_play(transport.time)
 
-      transport.reactTx { implicit tx => {
+      transport.react { implicit tx => {
         // only when playing
         case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
           log("at " + time + " added " + added.mkString("[", ", ", "]") +
