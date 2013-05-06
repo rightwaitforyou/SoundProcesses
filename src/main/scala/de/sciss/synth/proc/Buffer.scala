@@ -30,50 +30,54 @@ import de.sciss.synth.io.{AudioFileType, SampleFormat}
 import impl.{BufferImpl => Impl}
 
 object Buffer {
-   def diskIn( server: Server )( path: String, startFrame: Long = 0L, numFrames: Int = SoundProcesses.cueBufferSize,
-               numChannels: Int = 1 )( implicit tx: Txn ) : Buffer = {
-      SoundProcesses.validateCueBufferSize( numFrames )
-      val res = create( server, closeOnDisposal = true )
-      res.allocRead( path, startFrame = startFrame, numFrames = numFrames )
-      res
-   }
+  def diskIn(server: Server)(path: String, startFrame: Long = 0L, numFrames: Int = SoundProcesses.cueBufferSize,
+                             numChannels: Int = 1)(implicit tx: Txn): Buffer = {
+    SoundProcesses.validateCueBufferSize(numFrames)
+    val res = create(server, closeOnDisposal = true)
+    // res.allocRead(path, startFrame = startFrame, numFrames = numFrames)
+    res.alloc(numFrames = numFrames, numChannels = numChannels)
+    res.cue(path, fileStartFrame = startFrame)
+    res
+  }
 
-   def diskOut( server: Server )( path: String, fileType: AudioFileType = AudioFileType.AIFF,
-                sampleFormat: SampleFormat = SampleFormat.Float,
-                numFrames: Int = SoundProcesses.cueBufferSize, numChannels: Int = 1 )( implicit tx: Txn ) : Buffer = {
-      SoundProcesses.validateCueBufferSize( numFrames )
-      val res = create( server, closeOnDisposal = true )
-      res.alloc( numFrames = numFrames, numChannels = numChannels )
-      res.record( path, fileType, sampleFormat )
-      res
-   }
+  def diskOut(server: Server)(path: String, fileType: AudioFileType = AudioFileType.AIFF,
+                              sampleFormat: SampleFormat = SampleFormat.Float,
+                              numFrames: Int = SoundProcesses.cueBufferSize, numChannels: Int = 1)(implicit tx: Txn): Buffer = {
+    SoundProcesses.validateCueBufferSize(numFrames)
+    val res = create(server, closeOnDisposal = true)
+    res.alloc(numFrames = numFrames, numChannels = numChannels)
+    res.record(path, fileType, sampleFormat)
+    res
+  }
 
-   def fft( server: Server )( size: Int )( implicit tx: Txn ) : Modifiable = {
-      require( size >= 2 && SoundProcesses.isPowerOfTwo( size ), "Must be a power of two and >= 2 : " + size )
-      val res = create( server )
-      res.alloc( numFrames = size, numChannels = 1 )
-      res
-   }
+  def fft(server: Server)(size: Int)(implicit tx: Txn): Modifiable = {
+    require(size >= 2 && SoundProcesses.isPowerOfTwo(size), "Must be a power of two and >= 2 : " + size)
+    val res = create(server)
+    res.alloc(numFrames = size, numChannels = 1)
+    res
+  }
 
-   def apply( server: Server )( numFrames: Int, numChannels: Int = 1 )( implicit tx: Txn ) : Modifiable = {
-      val res = create( server )
-      res.alloc( numFrames = numFrames, numChannels = numChannels )
-      res
-   }
+  def apply(server: Server)(numFrames: Int, numChannels: Int = 1)(implicit tx: Txn): Modifiable = {
+    val res = create(server)
+    res.alloc(numFrames = numFrames, numChannels = numChannels)
+    res
+  }
 
-   private def create( server: Server, closeOnDisposal: Boolean = false )( implicit tx: Txn ) : Impl = {
-      val id   = server.allocBuffer()
-      val peer = SBuffer( server.peer, id )
-      new Impl( server, peer )( closeOnDisposal )
-   }
+  private def create(server: Server, closeOnDisposal: Boolean = false)(implicit tx: Txn): Impl = {
+    val id    = server.allocBuffer()
+    val peer  = SBuffer(server.peer, id)
+    new Impl(server, peer)(closeOnDisposal)
+  }
 
-   trait Modifiable extends Buffer {
-      def zero()( implicit tx: Txn ) : Unit
-      def read( path: String, fileStartFrame: Long = 0L, numFrames: Int = -1, bufStartFrame: Int = 0 )
-              ( implicit tx: Txn ) : Unit
-   }
+  trait Modifiable extends Buffer {
+    def zero()(implicit tx: Txn): Unit
+
+    def read(path: String, fileStartFrame: Long = 0L, numFrames: Int = -1, bufStartFrame: Int = 0)
+            (implicit tx: Txn): Unit
+  }
 }
+
 trait Buffer extends Resource {
-   def peer: SBuffer
-   def id: Int
+  def peer: SBuffer
+  def id: Int
 }

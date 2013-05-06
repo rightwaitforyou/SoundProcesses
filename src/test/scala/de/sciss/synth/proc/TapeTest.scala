@@ -37,7 +37,7 @@ object TapeTest extends App {
       Out.ar(0, sig)
     })
     val group     = ProcGroup.Modifiable[S]
-    group.add(Span(1.seconds, 3.seconds), proc)
+    group.add(Span(1.seconds, 8.seconds), proc)
 
     import Durable.inMemory
     val transp  = Transport[S, I](group)
@@ -47,14 +47,15 @@ object TapeTest extends App {
     val t = new Thread {
       override def run() {
         this.synchronized(this.wait())
-        Thread.sleep(4000L)
+        Thread.sleep(10 * 1000L)
         sys.exit()
       }
       start() // bug in ScalaCollider's server boot - we have to make sure a thread is started before aural.start
     }
 
-    aural.whenStarted { implicit tx => _ =>
+    aural.whenStarted { implicit tx => s =>
       showTransportLog = true
+      // s.peer.dumpOSC()
       transp.play()
       t.synchronized { t.notifyAll() }
     }
