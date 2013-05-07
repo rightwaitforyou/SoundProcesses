@@ -32,7 +32,7 @@ import concurrent.stm.Ref
 import java.io.File
 import span.Span
 
-final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, file: File, server: Server, sampleRate: Double)
+final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, server: Server, sampleRate: Double)
   extends DynamicBusUser /* DynamicAudioBusUser */
   /* with RichAudioBus.User */ {
 
@@ -58,17 +58,17 @@ final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, file: 
     // val rd         = SynthDef( server, sg, nameHint = Some( "audio-artifact" ))
 
     val audioVal  = segm.value
-    // val path       = audioVal.artifact.toFile.getAbsolutePath
+    val file      = audioVal.artifact
     val path      = file.getAbsolutePath
     val fileFrames= audioVal.spec.numFrames
-    val target    = server.defaultGroup
+    val target    = server.defaultGroup // XXX
     val fStart    = math.max(0L, math.min(fileFrames, audioVal.offset + (time - segm.span.start)))
     val fStop     = math.min(fileFrames, segm.span match {
       case Span.HasStop(stop) => fStart + (stop - time)
       case _ => Long.MaxValue
     })
     val dur       = (fStop - fStart) / sampleRate // XXX TODO: could use SRC at some point
-    println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
+    // println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
     val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = numChannels)
     val args: Seq[ControlSetMap] = Seq("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
 

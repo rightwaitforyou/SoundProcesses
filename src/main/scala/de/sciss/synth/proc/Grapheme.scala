@@ -91,9 +91,11 @@ object Grapheme {
         Curve(values: _*)
       }
     }
-    /**
-     * A mono- or polyphonic constant value
-     */
+
+    /** A mono- or polyphonic constant value.
+      *
+      * @param values  pairs interpreted as target values and target shapes.
+      */
     final case class Curve(values: (Double, Env.ConstShape)*) extends Value {
       def numChannels = values.size
 

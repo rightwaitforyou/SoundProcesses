@@ -2,12 +2,10 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.bitemp.BiExpr
 import de.sciss.synth.expr.ExprImplicits
 import de.sciss.synth.io.AudioFile
 import java.io.File
 import de.sciss.span.Span
-import de.sciss.lucre.stm
 
 object TapeTest extends App {
   type S = Durable
@@ -23,18 +21,31 @@ object TapeTest extends App {
     val expr      = ExprImplicits[S]
     import expr._
 
+    // val spat = Proc[S]
+    // val spatIn = spat.scans.add("in")
+    // spatIn.addSink()
+
     val proc      = Proc[S]
-    val scan      = proc.scans.add("sig")
+    val sAudio    = proc.scans.add("sig")
     val file      = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
     val spec      = AudioFile.readSpec(file)
-    val audio     = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
-    val grapheme  = Grapheme.Modifiable[S]
-    grapheme.add((1 - 4.5).seconds -> audio)  // ... çoit trop complexe ...
-    scan.source_=(Some(Scan.Link.Grapheme(grapheme)))
+    val vAudio    = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
+    val gAudio    = Grapheme.Modifiable[S]
+    gAudio.add((1 - 4.5).seconds -> vAudio)  // ... çoit trop complexe ...
+    sAudio.source_=(Some(Scan.Link.Grapheme(gAudio)))
+
+    val gSpat     = Grapheme.Modifiable[S]
+    val sSpat     = proc.scans.add("spat")
+    sSpat.source_=(Some(Scan.Link.Grapheme(gSpat)))
+    gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, stepShape)))
+    gSpat.add(4.seconds -> Grapheme.Value.Curve(( 1.0,  linShape)))
+
     proc.graph_=(SynthGraph {
       import ugen._
-      val sig = graph.scan("sig").ar(0.0)
-      Out.ar(0, sig)
+      val sig0  = graph.scan("sig").ar(0.0)
+      val sig   = Mix.mono(sig0)
+      val spat  = graph.scan("spat").ar(0.0)
+      Out.ar(0, Pan2.ar(sig, spat))
     })
     val group     = ProcGroup.Modifiable[S]
     group.add(Span(1.seconds, 4.seconds), proc)
@@ -54,8 +65,8 @@ object TapeTest extends App {
     }
 
     aural.whenStarted { implicit tx => s =>
-      showTransportLog = true
-      // s.peer.dumpOSC()
+      // showTransportLog = true
+      s.peer.dumpOSC()
       transp.play()
       t.synchronized { t.notifyAll() }
     }

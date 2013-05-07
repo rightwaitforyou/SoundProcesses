@@ -254,13 +254,19 @@ object AuralPresentationImpl {
 
                 case segm: Segment.Curve =>
                   ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-                  ??? // SegmentWriter
+                  // println(s"segment : ${segm.span}")
+                  val sw = new SegmentWriter(segm, time, server, sampleRate)
+                  busUsers :+= sw
+                  val bm = BusNodeSetter.mapper(inCtlName, sw.bus, synth)
+                  busUsers :+= bm
 
                 case audio: Segment.Audio =>
                   ensureChannels(audio.numChannels)
-                  val file = audio.value.artifact
+                  // val file = audio.value.artifact
                   // val file      =  artifactStore().resolve(artifact)
-                  val aaw = new AudioArtifactWriter(audio, time, file, server, sampleRate)
+                  val aaw = new AudioArtifactWriter(audio, time, server, sampleRate)
+
+                  // XXX TODO: DRY (see Segment.Curve above)
                   busUsers :+= aaw
                   val bm = BusNodeSetter.mapper(inCtlName, aaw.bus, synth)
                   busUsers :+= bm
