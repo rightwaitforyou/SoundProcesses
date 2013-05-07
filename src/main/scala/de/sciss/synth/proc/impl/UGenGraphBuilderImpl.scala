@@ -34,7 +34,7 @@ import de.sciss.synth.ugen.ControlProxyLike
 private[proc] object UGenGraphBuilderImpl {
   def apply[S <: Sys[S]](aural: AuralPresentation.Running[S], timed: TimedProc[S], time: Long)
                         (implicit tx: S#Tx): UGenGraphBuilder[S] =
-    new Impl(aural, timed, time, timed.value.graph.value, tx)
+    new Impl(aural, timed, time, timed.value.graph /*.value */, tx)
 
   private final class Impl[S <: Sys[S]](aural: AuralPresentation.Running[S],
                                         val timed: TimedProc[S], val time: Long, g: SynthGraph, val tx: S#Tx)

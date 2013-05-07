@@ -106,7 +106,7 @@ object ProcImpl {
 
     import Proc._
 
-    protected def graphVar    : S#Var[Code[SynthGraph]]
+    protected def _graph    : S#Var[SynthGraph] // Code[SynthGraph]]
     // protected def name_#     : Expr.Var    [S, String]
     // protected def graphemeMap : SkipList.Map[S, String, GraphemeEntry[S]]
     protected def attributeMap: SkipList.Map[S, String, AttributeEntry[S]]
@@ -117,13 +117,13 @@ object ProcImpl {
     //   name_#() = s
     // }
 
-    final def graph(implicit tx: S#Tx): Code[SynthGraph] = graphVar()
+    final def graph(implicit tx: S#Tx): /*Code[*/ SynthGraph /*]*/ = _graph()
 
-    final def graph_=(g: Code[SynthGraph])(implicit tx: S#Tx) {
-      val old = graphVar()
+    final def graph_=(g: /* Code[*/ SynthGraph /*]*/)(implicit tx: S#Tx) {
+      val old = _graph()
       if (old != g) {
-        graphVar() = g
-        StateEvent(Proc.Update(proc, IIdxSeq(GraphChange(evt.Change(old.value, g.value)))))
+        _graph() = g
+        StateEvent(Proc.Update(proc, Vector(GraphChange(evt.Change(old /* .value */, g /* .value */ )))))
       }
     }
 
@@ -298,7 +298,7 @@ object ProcImpl {
     final protected def writeData(out: DataOutput) {
       out.writeShort(SER_VERSION)
       // name_#     .write(out)
-      graphVar    .write(out)
+      _graph    .write(out)
       // graphemeMap .write(out)
       attributeMap.write(out)
       scanMap     .write(out)
@@ -306,7 +306,7 @@ object ProcImpl {
 
     final protected def disposeData()(implicit tx: S#Tx) {
       // name_#     .dispose()
-      graphVar    .dispose()
+      _graph    .dispose()
       // graphemeMap.dispose()
       attributeMap.dispose()
       scanMap     .dispose()
@@ -319,9 +319,9 @@ object ProcImpl {
     protected val targets = evt.Targets[S](tx0)
 
     // protected val name_# = Strings.newVar[S](Strings.newConst("unnamed"))(tx0)
-    protected val graphVar = {
+    protected val _graph = {
       implicit val peerSer = SynthGraphSerializer
-      tx0.newVar[Code[SynthGraph]](id, emptyGraph)
+      tx0.newVar[/*Code[ */ SynthGraph /*]*/ ](id, emptyGraph)
     }
 
     protected val scanMap = {
@@ -355,9 +355,9 @@ object ProcImpl {
     }
 
     // protected val name_# = Strings.readVar[S](in, access)(tx0)
-    protected val graphVar = {
+    protected val _graph = {
       implicit val peerSer = SynthGraphSerializer
-      tx0.readVar[Code[SynthGraph]](id, in)
+      tx0.readVar[/* Code[ */ SynthGraph /* ]*/ ](id, in)
     }
 
     protected val attributeMap = {
