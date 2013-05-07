@@ -221,9 +221,25 @@ object AuralPresentationImpl {
       // ---- handle input buses ----
       val time      = ugen.time
       val timed     = ugen.timed
-      var setMap    = IIdxSeq.empty[ControlSetMap]
-      var busUsers  = IIdxSeq.empty[DynamicBusUser]
+      var busUsers  = Vector.empty[DynamicBusUser]
       val p         = timed.value
+      var setMap    = Vector.empty[ControlSetMap]
+
+      val attrNames = ugen.attributeIns
+      if (attrNames.nonEmpty) {
+        // println(s"Attributes used: ${attrNames.mkString(", ")}")
+        attrNames.foreach { n =>
+          val valOpt  = p.attributes.get(n).map {
+            case a: Attribute.Int   [S] => a.peer.value.toFloat
+            case a: Attribute.Double[S] => a.peer.value.toFloat
+            case a => sys.error(s"Cannot cast attribute $a to a scalar value")
+          }
+          valOpt.foreach { f =>
+            val ctl  = graph.attribute.controlName(n)
+            setMap :+= ((ctl, f): ControlSetMap)
+          }
+        }
+      }
 
       import Grapheme.Segment
 

@@ -30,109 +30,68 @@ package graph
 import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object scan {
-   private def outsideOfContext() = sys.error( "Expansion out of context" )
+  private[proc] def outControlName(key: String): String = "$out_" + key
+  private[proc] def inControlName (key: String): String = "$in_"  + key
 
-//   private[proc] sealed trait Elem {
-//      def key: String
-//      def dir: ProcGraph.Direction
-//   }
+  @SerialVersionUID(7931562747075213666L) private final case class ScanIn(key: String, default: Double)
+    extends GE.Lazy /* with Elem */ with AudioRated {
 
-   private[proc] def outControlName( key: String ) : String = "$out_" + key
-   private[proc] def inControlName(  key: String ) : String = "$in_" + key
+    def displayName = "ScanIn"
 
-   @SerialVersionUID(7931562747075213666L) private final case class ScanIn( key: String, default: Double )
-   extends GE.Lazy /* with Elem */ with AudioRated {
-      def displayName = "ScanIn"
+    override def toString = displayName + "(\"" + key + "\")"
 
-      override def toString = displayName + "(\"" + key + "\")"
+    def makeUGens: UGenInLike = {
+      UGenGraph.builder match {
+        case b: UGenGraphBuilder[_] =>
+          val numChannels = b.addScanIn(key)
+          val ctlName = inControlName(key)
+          if (numChannels == 1) {
+            ctlName.ar(default).expand
+          } else if (numChannels > 1) {
+            ctlName.ar(default, Vector.fill(numChannels - 1)(default): _*).expand
+          } else {
+            UGenInGroup.empty
+          }
 
-      def makeUGens: UGenInLike = {
-         UGenGraph.builder match {
-            case b: UGenGraphBuilder[ _ ] =>
-               val numChannels = b.addScanIn( key )
-               val ctlName = inControlName( key )
-               if( numChannels == 1 ) {
-                  ctlName.ar( default ).expand
-               } else if( numChannels > 1 ) {
-                  ctlName.ar( default, IIdxSeq.fill( numChannels - 1 )( default ): _* ).expand
-               } else {
-                  UGenInGroup.empty
-               }
-
-            case other => outsideOfContext()
-         }
+        case other => UGenGraphBuilder.outsideOfContext()
       }
+    }
+  }
 
-//      def dir: ProcGraph.Direction = ProcGraph.In
-   }
+  private final case class ScanOut(key: String, in: GE)
+    extends UGenSource.ZeroOut with WritesBus {
 
-//   private final case class Out( key: String, signal: GE )
-//   extends UGenSource.ZeroOut( "scan.Out" ) with Elem with WritesBus {
-////      def displayName = "scan.Out"
-//
-//      override def toString = displayName + "(\"" + key + "\")"
-//
-//      protected def makeUGen(args: IndexedSeq[ UGenIn ]) {}
-//
-//      protected def makeUGens {}
-//   }
+    override def toString = "ScanOut(\"" + key + "\")"
 
-   private final case class ScanOut( key: String, in: GE )
-   extends UGenSource.ZeroOut /* Lazy.Expander[ Unit ] */ /* with Elem */ with WritesBus {
-//      def displayName = "scan.Out"
+    protected def makeUGens {
+      val bus = outControlName(key).kr
+      unwrap(IIdxSeq(bus.expand) ++ in.expand.outputs)
+    }
 
-      override def toString = "ScanOut(\"" + key + "\")"
-
-//      protected def makeUGens {
-//         val bus  = ("$out_" + key).kr
-//         val out  = ugen.Out.ar( bus, in )
-//         val inEx = in.expand
-//      }
-
-      protected def makeUGens {
-         val bus = outControlName( key ).kr
-         unwrap( IIdxSeq( bus.expand ) ++ in.expand.outputs )
+    // first arg: bus control, remaining args: signal to write; thus numChannels = _args.size - 1
+    protected def makeUGen(_args: IIdxSeq[UGenIn]) {
+      val busArg = _args.head
+      val sigArg = _args.tail
+      val numChannels = sigArg.size
+      UGenGraph.builder match {
+        case b: UGenGraphBuilder[_] =>
+          b.addScanOut(key, numChannels)
+        case other => UGenGraphBuilder.outsideOfContext()
       }
-
-      // first arg: bus control, remaining args: signal to write; thus numChannels = _args.size - 1
-      protected def makeUGen( _args: IIdxSeq[ UGenIn ]) {
-         val busArg        = _args.head
-         val sigArg        = _args.tail
-         val numChannels   = sigArg.size
-         UGenGraph.builder match {
-            case b: UGenGraphBuilder[ _ ] =>
-               b.addScanOut( key, numChannels )
-            case other => outsideOfContext()
-         }
-         val sigArgAr = sigArg.map { ui =>
-            if( ui.rate == audio ) ui else new UGen.SingleOut( "K2A", audio, IIdxSeq( ui ))
-         }
-         new UGen.ZeroOut( name, audio, busArg +: sigArgAr, isIndividual = true )
+      val sigArgAr = sigArg.map {
+        ui =>
+          if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, IIdxSeq(ui))
       }
-
-//      def dir: ProcGraph.Direction = ProcGraph.Out
-   }
+      new UGen.ZeroOut(name, audio, busArg +: sigArgAr, isIndividual = true)
+    }
+  }
 }
-final case class scan( key: String ) {
-//   private def add( direction: ProcGraph.Direction ) {
-//      ProcGraph.builder.addScan( key, direction )
-//   }
 
-   def ar( default: Double ) : GE = scan.ScanIn( key, default )
+final case class scan(key: String) {
+  def ar: GE = ar(0.0)
+  def ar(default: Double): GE = scan.ScanIn(key, default)
 
-//   def ar( default: Double ) : GE = {
-//      val ctl = ("$in_" + key).ar( default )
-//      add( ProcGraph.In )
-//      ctl
-//   }
-
-   def :=( in: GE ) {
-      scan.ScanOut( key, in )
-   }
-
-//   def :=( in: GE ) {
-//      val bus = ("$out_" + key).kr
-//      Out.ar( bus, in )
-//      add( ProcGraph.Out )
-//   }
+  def :=(in: GE) {
+    scan.ScanOut(key, in)
+  }
 }

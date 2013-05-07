@@ -31,100 +31,99 @@ import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
 import de.sciss.synth.{UGenGraph, Lazy, SynthGraph}
 import de.sciss.synth.ugen.ControlProxyLike
 
-//private[proc] final case class MissingInfo( key: String ) extends ControlThrowable
-
 private[proc] object UGenGraphBuilderImpl {
-   def apply[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ], timed: TimedProc[ S ], time: Long )
-                            ( implicit tx: S#Tx ) : UGenGraphBuilder[ S ] =
-      new Impl( aural, timed, time, timed.value.graph.value, tx )
+  def apply[S <: Sys[S]](aural: AuralPresentation.Running[S], timed: TimedProc[S], time: Long)
+                        (implicit tx: S#Tx): UGenGraphBuilder[S] =
+    new Impl(aural, timed, time, timed.value.graph.value, tx)
 
-   private final class Impl[ S <: Sys[ S ]]( aural: AuralPresentation.Running[ S ],
-                                             val timed: TimedProc[ S ], val time: Long, g: SynthGraph, val tx: S#Tx )
-   extends BasicUGenGraphBuilder with UGenGraphBuilder[ S ] {
-      builder =>
+  private final class Impl[S <: Sys[S]](aural: AuralPresentation.Running[S],
+                                        val timed: TimedProc[S], val time: Long, g: SynthGraph, val tx: S#Tx)
+    extends BasicUGenGraphBuilder with UGenGraphBuilder[S] {
+    builder =>
 
-      import UGenGraphBuilder._
+    import UGenGraphBuilder._
 
-      override def toString = "proc.UGenGraph.Builder@" + hashCode.toHexString
+    override def toString = "proc.UGenGraph.Builder@" + hashCode.toHexString
 
-      private var remaining: IIdxSeq[ Lazy ]                   = g.sources
-      private var controlProxies: ISet[ ControlProxyLike[ _ ]] = g.controlProxies
-      var scanOuts                                             = Map.empty[ String, Int ]
-      var scanIns                                              = Map.empty[ String, Int ]
-//      private var missingScanIns                               = Set.empty[ String ]
-      var missingIns                                           = Set.empty[ MissingIn[ S ]]
+    private var remaining: IIdxSeq[Lazy]                  = g.sources
+    private var controlProxies: ISet[ControlProxyLike[_]] = g.controlProxies
 
-//      @inline private def getTxn : ProcTxn = ProcTxn()( Txn.findCurrent.getOrElse( sys.error( "Cannot find transaction" )))
+    var scanOuts    = Map.empty[String, Int]
+    var scanIns     = Map.empty[String, Int]
+    var missingIns  = Set.empty[MissingIn[S]]
+    var attributeIns= Set.empty[String]
 
-      def addScanIn( key: String ) : Int = {
-         val res = aural.scanInNumChannels( timed, time, key )( tx )
-         scanIns += key -> res
-         res
+    def addScanIn(key: String): Int = {
+      val res = aural.scanInNumChannels(timed, time, key)(tx)
+      scanIns += key -> res
+      res
+    }
+
+    def addScanOut(key: String, numChannels: Int) {
+      scanOuts.get(key) match {
+        case Some(prevChans) =>
+          require(numChannels == prevChans, "Cannot write multiple times to the same scan (" + key +
+            ") using different number of channels (" + prevChans + ", " + numChannels + ")")
+        case _ =>
+          scanOuts += key -> numChannels
       }
+    }
 
-      def addScanOut( key: String, numChannels: Int ) {
-//         aural.addScanOut( proc, time, key, numChannels )( tx )
-         scanOuts.get( key ) match {
-            case Some( prevChans ) =>
-               require( numChannels == prevChans, "Cannot write multiple times to the same scan (" + key +
-                  ") using different number of channels (" + prevChans + ", " + numChannels + ")" )
-            case _ =>
-               scanOuts += key -> numChannels
-         }
-      }
+    def addAttributeIn(key: String) { attributeIns += key }
 
-      def tryBuild() : Boolean = UGenGraph.use( this ) {
-         var missingElems  = IIdxSeq.empty[ Lazy ]
-//         var missingIns    = Set.empty[ MissingIn[ S ]]
-         missingIns = Set.empty
-         var someSucceeded = false
-         while( remaining.nonEmpty ) {
-            val g = SynthGraph {
-               remaining.foreach { elem =>
-                  // save rollback information -- not very elegant; should figure out how scala-stm nesting works
-                  val savedSourceMap      = sourceMap
-                  val savedControlNames   = controlNames
-                  val savedControlValues  = controlValues
-                  val savedUGens          = ugens
-                  val savedScanOuts       = scanOuts
-                  val savedScanIns        = scanIns
-                  try {
-                     elem.force( builder )
-                     someSucceeded        = true
-                  } catch {
-                     case miss @ MissingIn( _ ) =>
-                        sourceMap         = savedSourceMap
-                        controlNames      = savedControlNames
-                        controlValues     = savedControlValues
-                        ugens             = savedUGens
-                        scanOuts          = savedScanOuts
-                        scanIns           = savedScanIns
-                        missingElems     :+= elem
-                        missingIns        += miss.asInstanceOf[ MissingIn[ S ]]  // XXX TODO yukk
-                  }
-               }
+    def tryBuild(): Boolean = UGenGraph.use(this) {
+      var missingElems  = Vector.empty[Lazy]
+      missingIns        = Set.empty
+      var someSucceeded = false
+      while (remaining.nonEmpty) {
+        val g = SynthGraph {
+          remaining.foreach { elem =>
+            // save rollback information -- not very elegant; should figure out how scala-stm nesting works
+            val savedSourceMap      = sourceMap
+            val savedControlNames   = controlNames
+            val savedControlValues  = controlValues
+            val savedUGens          = ugens
+            val savedScanOuts       = scanOuts
+            val savedScanIns        = scanIns
+            val savedAttrs          = attributeIns
+            try {
+              elem.force(builder)
+              someSucceeded = true
+            } catch {
+              case miss @ MissingIn(_) =>
+                sourceMap           = savedSourceMap
+                controlNames        = savedControlNames
+                controlValues       = savedControlValues
+                ugens               = savedUGens
+                scanOuts            = savedScanOuts
+                scanIns             = savedScanIns
+                attributeIns        = savedAttrs
+                missingElems      :+= elem
+                missingIns         += miss.asInstanceOf[MissingIn[S]] // XXX TODO yukk
             }
-            if( g.nonEmpty ) {
-               remaining = g.sources
-               controlProxies ++= g.controlProxies
-            } else {
-               remaining = IIdxSeq.empty
-            }
-         }
-
-         if( missingElems.isEmpty ) {
-            true // Finished // ( build( controlProxies ))
-         } else {
-            remaining = missingElems
-            false // Partial // ( missingIns, advanced = someSucceeded )
-         }
+          }
+        }
+        if (g.nonEmpty) {
+          remaining        = g.sources
+          controlProxies ++= g.controlProxies
+        } else {
+          remaining = Vector.empty
+        }
       }
 
-      def isComplete = remaining.isEmpty
-
-      def finish : UGenGraph = UGenGraph.use( this ) {
-         require( isComplete )
-         build( controlProxies )
+      if (missingElems.isEmpty) {
+        true // Finished // ( build( controlProxies ))
+      } else {
+        remaining = missingElems
+        false // Partial // ( missingIns, advanced = someSucceeded )
       }
-   }
+    }
+
+    def isComplete = remaining.isEmpty
+
+    def finish: UGenGraph = UGenGraph.use(this) {
+      require(isComplete)
+      build(controlProxies)
+    }
+  }
 }

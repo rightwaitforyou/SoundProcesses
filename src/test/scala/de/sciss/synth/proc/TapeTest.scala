@@ -40,10 +40,14 @@ object TapeTest extends App {
     gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, stepShape)))
     gSpat.add(4.seconds -> Grapheme.Value.Curve(( 1.0,  linShape)))
 
+    proc.attributes.put("freq", Attribute.Double(200.0))
+
     proc.graph_=(SynthGraph {
       import ugen._
+      val freq  = graph.attribute("freq").ir
       val sig0  = graph.scan("sig").ar(0.0)
-      val sig   = Mix.mono(sig0)
+      val sig1  = Mix.mono(sig0)
+      val sig   = FreqShift.ar(sig1, freq)
       val spat  = graph.scan("spat").ar(0.0)
       Out.ar(0, Pan2.ar(sig, spat))
     })
@@ -66,7 +70,7 @@ object TapeTest extends App {
 
     aural.whenStarted { implicit tx => s =>
       // showTransportLog = true
-      s.peer.dumpOSC()
+      // s.peer.dumpOSC()
       transp.play()
       t.synchronized { t.notifyAll() }
     }
