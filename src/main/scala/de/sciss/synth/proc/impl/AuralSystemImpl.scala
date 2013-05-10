@@ -33,11 +33,11 @@ import de.sciss.lucre.stm
 import de.sciss.synth.{Server => SServer, ServerLike => SServerLike, ServerConnection}
 
 object AuralSystemImpl {
-   import AuralSystem.Client
+  import AuralSystem.Client
 
-   var dumpOSC = false
+  var dumpOSC = false
 
-   def apply[ S <: Sys[ S ]]( implicit tx: S#Tx, cursor: stm.Cursor[ S ]) : AuralSystem[ S ] = new Impl[ S ]
+  def apply[S <: Sys[S]](implicit cursor: stm.Cursor[S]): AuralSystem[S] = new Impl[S]
 
   //   private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
   //      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]

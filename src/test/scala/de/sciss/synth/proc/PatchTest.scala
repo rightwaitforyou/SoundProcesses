@@ -11,7 +11,7 @@ object PatchTest extends App {
 
   {
     type S  = Confluent
-    type I  = stm.InMemory
+    type I  = S#I
     val sys = Confluent(BerkeleyDB.tmp())
     val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val _cursor: stm.Cursor[S] = cursor

@@ -30,7 +30,7 @@ import de.sciss.lucre.{event => evt, stm}
 import de.sciss.synth.{Server => SServer}
 
 object AuralSystem {
-  def apply[S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] = Impl[S]
+  def apply[S <: Sys[S]](implicit cursor: stm.Cursor[S]): AuralSystem[S] = Impl[S]
 
   def start[S <: Sys[S]](config: SServer.Config = SServer.Config(), connect: Boolean = false)
                         (implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] =

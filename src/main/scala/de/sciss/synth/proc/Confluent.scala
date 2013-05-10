@@ -23,29 +23,32 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc
+package de.sciss
+package synth
+package proc
 
-import de.sciss.lucre.confluent.reactive.ConfluentReactiveLike
-import de.sciss.lucre.stm
+import lucre.{stm, confluent, event => evt}
+import confluent.reactive.ConfluentReactiveLike
 import stm.{DataStore, DataStoreFactory}
 import impl.{ConfluentImpl => Impl}
 import language.implicitConversions
 
 object Confluent {
-   private type S = Confluent
+  private type S = Confluent
 
-   def apply( storeFactory: DataStoreFactory[ DataStore ]) : S = Impl( storeFactory )
+  def apply(storeFactory: DataStoreFactory[DataStore]): S = Impl(storeFactory)
 
-   trait Txn extends ConfluentReactiveLike.Txn[ S ] with Sys.Txn[ S ] {
-      private[proc] def durable  : stm.Durable#Tx
-      private[proc] def inMemory : stm.InMemory#Tx
-   }
+  trait Txn extends ConfluentReactiveLike.Txn[S] with Sys.Txn[S] {
+    private[proc] def durable : evt.Durable#Tx
+    private[proc] def inMemory: evt.InMemory#Tx
+  }
 
-   implicit def inMemory( tx: S#Tx ) : stm.InMemory#Tx = tx.inMemory
+  implicit def inMemory(tx: S#Tx): evt.InMemory#Tx = tx.inMemory
 }
-trait Confluent extends ConfluentReactiveLike[ Confluent ] with Sys[ Confluent ] {
-   final protected type S  = Confluent
-   final type D            = stm.Durable
-   final type I            = stm.InMemory
-   final type Tx           = Confluent.Txn // Sys.Txn[ S ] with ConfluentReactiveLike.Txn[ S ]
+
+trait Confluent extends ConfluentReactiveLike[Confluent] with Sys[Confluent] {
+  protected type S  = Confluent
+  type D            = evt.Durable
+  type I            = evt.InMemory
+  type Tx           = Confluent.Txn // Sys.Txn[ S ] with ConfluentReactiveLike.Txn[ S ]
 }
