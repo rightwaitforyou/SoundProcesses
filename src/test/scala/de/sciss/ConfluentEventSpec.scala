@@ -10,45 +10,48 @@ import collection.immutable.{IndexedSeq => IIdxSeq}
 import stm.store.BerkeleyDB
 
 trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
-   final type S = ConfluentReactive
-   final type FixtureParam = lucre.confluent.Cursor[ S ]
+  type S = ConfluentReactive
+  type D = S#D
+  type FixtureParam = lucre.confluent.Cursor[S, D]
 
-   implicit final protected val IntType   = Ints
-   implicit final protected val LongType  = Longs
-   final protected val imp = ExprImplicits[ S ]
+  implicit final protected val IntType   = Ints
+  implicit final protected val LongType = Longs
+  final protected val imp = ExprImplicits[S]
 
-   final def withFixture( test: OneArgTest ) {
-      val system = ConfluentReactive( BerkeleyDB.tmp() )
-      try {
-         val (_, cursor) = system.cursorRoot( _ => () )( tx => _ => tx.newCursor() )
-         test( cursor )
-      }
-      finally {
-         system.close()
-      }
-   }
+  final def withFixture(test: OneArgTest) {
+    val system = ConfluentReactive(BerkeleyDB.tmp())
+    try {
+      val (_, cursor) = system.cursorRoot(_ => ())(implicit tx => _ => system.newCursor())
+      test(cursor)
+    }
+    finally {
+      system.close()
+    }
+  }
 
-   final class Observation[ S <: stm.Sys[ S ]] {
-      private val seqRef = TxnLocal( init = IIdxSeq.empty[ Any ])
+  final class Observation[S <: stm.Sys[S]] {
+    private val seqRef = TxnLocal(init = IIdxSeq.empty[Any])
 
-      def register( tx: S#Tx )( upd: Any ) {
-         seqRef.transform( _ :+ upd )( tx.peer )
-      }
+    def register(tx: S#Tx)(upd: Any) {
+      seqRef.transform(_ :+ upd)(tx.peer)
+    }
 
-      def assertEquals( expected: Any* )( implicit tx: S#Tx ) {
-         val ob = seqRef.get( tx.peer )
-         assert( ob === expected.toIndexedSeq, "Expected\n   " + expected.mkString( "[", ", ", "]" )
-            + "\n...but observed\n   " + ob.mkString( "[", ", ", "]" ))
-      }
+    def assertEquals(expected: Any*)(implicit tx: S#Tx) {
+      val ob = seqRef.get(tx.peer)
+      assert(ob === expected.toIndexedSeq, "Expected\n   " + expected.mkString("[", ", ", "]")
+        + "\n...but observed\n   " + ob.mkString("[", ", ", "]"))
+    }
 
-      def clear()( implicit tx: S#Tx ) {
-         seqRef.set( IIdxSeq.empty )( tx.peer )
-      }
+    def clear()(implicit tx: S#Tx) {
+      seqRef.set(Vector.empty)(tx.peer)
+    }
 
-      def assertEmpty()( implicit tx: S#Tx ) { assertEquals() }
+    def assertEmpty()(implicit tx: S#Tx) {
+      assertEquals()
+    }
 
-      def print()( implicit tx: S#Tx ) {
-         println( seqRef.get( tx.peer ).mkString( "[", ", ", "]" ))
-      }
-   }
+    def print()(implicit tx: S#Tx) {
+      println(seqRef.get(tx.peer).mkString("[", ", ", "]"))
+    }
+  }
 }
