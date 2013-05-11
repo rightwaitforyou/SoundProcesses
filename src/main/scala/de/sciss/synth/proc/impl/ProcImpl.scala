@@ -284,7 +284,7 @@ object ProcImpl {
       }
     }
 
-    final def select(slot: Int, invariant: Boolean): Event[S, Any, Any] = (slot: @switch) match {
+    final def select(slot: Int /*, invariant: Boolean */): Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
       // case graphemes .slot => graphemes
       case attributes.slot => attributes

@@ -212,7 +212,7 @@ object Attribute {
 
     protected def peerEvent: evt.EventLike[S, Any, _]
 
-    def select(slot: _Int, invariant: Boolean): Event[S, Any, Any] = changed
+    def select(slot: _Int /*, invariant: Boolean */): Event[S, Any, Any] = changed
 
     object changed
       extends evt.impl.EventImpl[S, Update[S], Attribute[S]]

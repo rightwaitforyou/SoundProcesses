@@ -367,7 +367,7 @@ object BiGroupImpl {
     //      foreach(ElementEvent -= _)
     //    }
 
-    final def select(slot: Int, invariant: Boolean): evt.Event[S, Any, Any] = (slot: @switch) match {
+    final def select(slot: Int /*, invariant: Boolean */): evt.Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot     => ChangeEvent
       case CollectionEvent.slot => CollectionEvent
       case ElementEvent.slot    => ElementEvent

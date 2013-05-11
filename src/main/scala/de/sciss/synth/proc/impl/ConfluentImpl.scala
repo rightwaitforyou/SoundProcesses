@@ -69,19 +69,13 @@ private[proc] object ConfluentImpl {
   }
 
   private final class System(protected val storeFactory: DataStoreFactory[DataStore],
-                             eventStore: DataStore, val durable: evt.Durable)
-    extends confluent.impl.ConfluentImpl.Mixin[S]
-    with evt.impl.ReactionMapImpl.Mixin[S]
+                             protected val eventStore: DataStore, val durable: evt.Durable)
+    extends confluent.reactive.impl.ConfluentReactiveImpl.Mixin[S]
     with Confluent {
 
     def inMemory              = durable.inMemory
     def durableTx (tx: S#Tx)  = tx.durable
     def inMemoryTx(tx: S#Tx)  = tx.inMemory
-
-    // private val eventStore  = durable.eventStore // storeFactory.open("cf-evt", overwrite = true)
-    private val eventVarMap = confluent.DurablePersistentMap.newConfluentIntMap[S](eventStore, this, isOblivious = true)
-    val eventCache: confluent.CacheMap.Durable[S, Int, confluent.DurablePersistentMap[S, Int]] =
-      confluent.impl.DurableCacheMapImpl.newIntCache(eventVarMap)
 
     protected def wrapRegular(dtx: evt.Durable#Tx, inputAccess: S#Acc, cursorCache: confluent.Cache[S#Tx]) =
       new RegularTxn(this, dtx, inputAccess, cursorCache)

@@ -272,7 +272,7 @@ object BiPinImpl {
       tree.write(out)
     }
 
-    def select(slot: Int, invariant: Boolean): Event[S, Any, Any] = (slot: @switch) match {
+    def select(slot: Int /*, invariant: Boolean */): Event[S, Any, Any] = (slot: @switch) match {
       case Changed.slot     => Changed
       case CollChanged.slot => CollChanged
       case ElemChanged.slot => ElemChanged
