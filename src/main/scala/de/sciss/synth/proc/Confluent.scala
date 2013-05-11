@@ -44,6 +44,7 @@ object Confluent {
   }
 
   implicit def inMemory(tx: S#Tx): evt.InMemory#Tx = tx.inMemory
+  implicit def durable (tx: S#Tx): evt.Durable #Tx = tx.durable
 }
 
 trait Confluent extends ConfluentReactiveLike[Confluent] with Sys[Confluent] {
