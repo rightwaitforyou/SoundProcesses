@@ -38,8 +38,16 @@ private[proc] object ConfluentImpl {
   private type S = Confluent
 
   def apply(storeFactory: DataStoreFactory[DataStore]): S = {
-    val durable = evt.Durable(storeFactory)
-    new System(storeFactory, durable)
+    // We can share the event store between confluent and durable, because there are
+    // no key collisions. Durable uses 32-bit ints exclusively, and confluent maintains
+    // a DurablePersistentMap, which uses 32 + 64 bit keys.
+
+    // val durable = evt.Durable(storeFactory, eventName = "d-evt")
+    val mainStoreD  = storeFactory.open("d-main")
+    val eventStore  = storeFactory.open("event", overwrite = true)  // shared between durable + confluent
+
+    val durable     = evt.Durable(mainStore = mainStoreD, eventStore = eventStore)
+    new System(storeFactory, eventStore, durable)
   }
 
   private sealed trait TxnImpl extends Confluent.Txn with ConfluentReactiveImpl.TxnMixin[S] with ProcTxnFullImpl[S] {
@@ -60,7 +68,8 @@ private[proc] object ConfluentImpl {
     }
   }
 
-  private final class System(protected val storeFactory: DataStoreFactory[DataStore], val durable: evt.Durable)
+  private final class System(protected val storeFactory: DataStoreFactory[DataStore],
+                             eventStore: DataStore, val durable: evt.Durable)
     extends confluent.impl.ConfluentImpl.Mixin[S]
     with evt.impl.ReactionMapImpl.Mixin[S]
     with Confluent {
@@ -69,7 +78,7 @@ private[proc] object ConfluentImpl {
     def durableTx (tx: S#Tx)  = tx.durable
     def inMemoryTx(tx: S#Tx)  = tx.inMemory
 
-    private val eventStore  = storeFactory.open("event", overwrite = true)
+    // private val eventStore  = durable.eventStore // storeFactory.open("cf-evt", overwrite = true)
     private val eventVarMap = confluent.DurablePersistentMap.newConfluentIntMap[S](eventStore, this, isOblivious = true)
     val eventCache: confluent.CacheMap.Durable[S, Int, confluent.DurablePersistentMap[S, Int]] =
       confluent.impl.DurableCacheMapImpl.newIntCache(eventVarMap)
