@@ -30,6 +30,7 @@ import concurrent.stm.{Ref, TMap, InTxn, TSet}
 import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef, message}
 import de.sciss.{synth, osc}
 import collection.immutable.{IndexedSeq => IIdxSeq, IntMap}
+import scala.concurrent.{Promise, Future}
 
 object ProcWorld {
   // MMM
@@ -97,14 +98,73 @@ final class ProcWorld(val server: Server) {
   //      topologyRef.transform( _.removeEdge( e ))
   //   }
 
-  private val sync            = new AnyRef
-  private var bundleWaiting   = IntMap.empty[IIdxSeq[() => Unit]]
-  private var bundleReplySeen = -1
   private val msgStampRef     = Ref(0)
 
   private[proc] def messageTimeStamp: Ref[Int] = msgStampRef
 
-  def send(bundles: Txn.Bundles) {
+  private val sync            = new AnyRef
+  private var bundleWaiting   = Map.empty[Int, IIdxSeq[Scheduled]]
+  private var bundleReplySeen = -1
+
+  import server.executionContext
+
+  private final class Scheduled(val msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int,
+                                promise: Promise[Unit]) {
+    def apply(): Future[Unit] = {
+      val fut = sendNow(msgs, allSync, cnt)
+      promise.completeWith(fut)
+      fut
+    }
+  }
+
+  private def sendAdvance(cnt: Int): Future[Unit] = {
+    if (DEBUG) println("ADVANCE " + cnt)
+    val futs: IIdxSeq[Future[Unit]] = sync.synchronized {
+      val i = bundleReplySeen + 1
+      if (i <= cnt) {
+        bundleReplySeen = cnt
+        val funs = (i to cnt).flatMap { j =>
+          bundleWaiting.get(j) match {
+            case Some(_funs)  => bundleWaiting -= j; _funs
+            case _            => Vector.empty
+          }
+        }
+        funs.map(_.apply())
+      }
+      else Vector.empty
+    }
+    reduce(futs)
+  }
+
+  private def sendNow(msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int): Future[Unit] = {
+    // val peer = server.peer
+    if (DEBUG) println("SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt)
+    if (allSync) {
+      val p = msgs match {
+        case IIdxSeq(msg) if allSync  => msg
+        case _                        => osc.Bundle.now(msgs: _*)
+      }
+      server ! p
+      sendAdvance(cnt)
+
+    } else {
+      val bndl  = osc.Bundle.now(msgs: _*)
+      val fut   = server.!!(bndl)
+      val futR  = fut.recover {
+        case message.Timeout() =>
+          logTxn("TIMEOUT while sending OSC bundle!")
+      }
+      futR.flatMap(_ => sendAdvance(cnt))
+    }
+  }
+
+  private def reduce(futs: IIdxSeq[Future[Unit]]): Future[Unit] = futs match {
+    case IIdxSeq()        => Future.successful()
+    case IIdxSeq(single)  => single
+    case more             => Future.reduce(futs)((_, _) => ())
+  }
+
+  def send(bundles: Txn.Bundles): Future[Unit] = {
     // basically:
     // bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
     //   val dep = bundles.firstCnt - 1 + idx
@@ -115,64 +175,41 @@ final class ProcWorld(val server: Server) {
     //     addToWaitList()
     //   }
 
-    import server.executionContext
-
-    def advance(cnt: Int) {
-      if (DEBUG) println("ADVANCE " + cnt)
-      sync.synchronized {
-        var i = bundleReplySeen + 1
-        if (i <= cnt) {
-          bundleReplySeen = cnt
-          while (i <= cnt) {
-            bundleWaiting.get(i).foreach { sq =>
-              bundleWaiting -= i
-              sq.foreach(_.apply())
-            }
-            i += 1
-          }
-        }
-      }
-    }
-
-    def sendNow(msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int) {
-      // val peer = server.peer
-      if (DEBUG) println("SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt)
-      if (allSync) {
-        val p = msgs match {
-          case IIdxSeq(msg) if allSync => msg
-          case _ => osc.Bundle.now(msgs: _*)
-        }
-        server ! p
-        advance(cnt)
-
-      } else {
-        val bndl  = osc.Bundle.now(msgs: _*)
-        val fut   = server.!!(bndl)
-        val futR  = fut.recover {
-          case message.Timeout() =>
-            logTxn("TIMEOUT while sending OSC bundle!")
-        }
-        futR.onSuccess { case _ => advance(cnt) }
-      }
-    }
-
     val cntOff = bundles.firstCnt
-    bundles.payload.zipWithIndex.foreach {
-      case (msgs, idx) =>
-        val cnt     = cntOff + idx
-        val depCnt  = cnt - 1
-        val allSync = msgs.forall(_.isSynchronous)
-        sync.synchronized {
-          if (bundleReplySeen >= depCnt /* || allSync */ ) {
-            sendNow(msgs, allSync, cnt)
-          } else {
-            if (DEBUG) println("WAIT FOR DEP " + depCnt + " TO SEND " + msgs)
-            bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, IIdxSeq.empty) :+ { () =>
-              sendNow(msgs, allSync, cnt)
-            })
-          }
-        }
+    val mapped = bundles.payload.zipWithIndex.map { case (msgs, idx) =>
+      val cnt     = cntOff + idx
+      val depCnt  = cnt - 1
+      val allSync = msgs.forall(_.isSynchronous)
+      (depCnt, msgs, allSync, cnt)
     }
+    sync.synchronized {
+      val (now, later) = mapped.partition(bundleReplySeen >= _._1)
+      val futsNow   = now.map   { case (_     , msgs, allSync, cnt) => sendNow(msgs, allSync, cnt) }
+      val futsLater = later.map { case (depCnt, msgs, allSync, cnt) =>
+        val p   = Promise[Unit]()
+        val sch = new Scheduled(msgs, allSync, cnt, p)
+        bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vector.empty) :+ sch)
+        p.future
+      }
+      reduce(futsNow ++ futsLater)
+    }
+
+    //    bundles.payload.zipWithIndex.foreach {
+    //      case (msgs, idx) =>
+    //        val cnt     = cntOff + idx
+    //        val depCnt  = cnt - 1
+    //        val allSync = msgs.forall(_.isSynchronous)
+    //        sync.synchronized {
+    //          if (bundleReplySeen >= depCnt /* || allSync */ ) {
+    //            sendNow(msgs, allSync, cnt)
+    //          } else {
+    //            if (DEBUG) println("WAIT FOR DEP " + depCnt + " TO SEND " + msgs)
+    //            bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vector.empty) :+ { () =>
+    //              sendNow(msgs, allSync, cnt)
+    //            })
+    //          }
+    //        }
+    //    }
   }
 }
 

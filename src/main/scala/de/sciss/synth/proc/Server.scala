@@ -29,9 +29,12 @@ import impl.{ServerImpl => Impl}
 import de.sciss.synth.{Server => SServer}
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
+import language.implicitConversions
 
 object Server {
   def apply(peer: SServer): Server = Impl(peer)
+
+  implicit def defaultGroup(server: Server): Group = server.defaultGroup
 }
 
 trait Server {

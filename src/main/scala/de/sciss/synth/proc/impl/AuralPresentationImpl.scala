@@ -83,7 +83,7 @@ object AuralPresentationImpl {
       val viewMap: IdentifierMap[S#ID, S#Tx, AuralProc] = tx.newInMemoryIDMap
       val scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])] = tx.newInMemoryIDMap
 
-      val group = Group(server)()
+      val group = Group(server)
       //         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
       groupRef.set(Some(group))(tx.peer)
 
