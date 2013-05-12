@@ -2,11 +2,9 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.synth.expr.ExprImplicits
-import java.io.File
-import de.sciss.synth.io.AudioFile
-import de.sciss.synth.{ugen, SynthGraph, linShape, stepShape}
-import de.sciss.synth.ugen.{Pan2, Out, FreqShift, Mix}
+import de.sciss.synth.{ugen, SynthGraph}
 import de.sciss.span.Span
+import scala.concurrent.ExecutionContext
 
 object BounceTest extends App {
   type S = Durable
@@ -26,7 +24,19 @@ object BounceTest extends App {
     val group     = ProcGroup.Modifiable[S]
     group.add(Span(4410, 8820), proc)
 
-    val bounce  = Bounce[S, I]
-    val bCfg    = bounce.Config()
+    val bounce              = Bounce[S, I]
+    val bCfg                = bounce.Config()
+    bCfg.group              = group
+    bCfg.span               = Span(0, 4410 * 3)
+    val sCfg                = bCfg.server
+    sCfg.inputBusChannels   = 0
+    sCfg.outputBusChannels  = 1
+    sCfg.sampleRate         = 44100
+
+    val process             = bounce(bCfg)
+    import ExecutionContext.Implicits.global
+    process.start()
+
+    new Thread { override def run() { Thread.sleep(1000) }} .start()  // process.start() only creates daemon threads, it seems
   }
 }

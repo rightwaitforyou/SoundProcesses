@@ -95,21 +95,24 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
     protected def body(): File = {
       val needsOSCFile  = config.server.nrtCommandPath    == "" // we need to generate that file
       val needsDummyOut = config.server.outputBusChannels == 0  // scsynth doesn't allow this. must have 1 dummy channel
+      val needsOutFile  = config.server.nrtOutputPath     == ""  && !needsDummyOut // we need to generate
       val sampleRate    = config.server.sampleRate.toDouble
 
       // the server config (either directly from input, or updated according to the necessary changes)
-      val sCfg  = if (needsOSCFile || needsDummyOut) {
+      val sCfg  = if (needsOSCFile || needsDummyOut || needsOutFile) {
         val b = Server.ConfigBuilder(config.server)
         if (needsOSCFile) {
           val f               = File.createTempFile("bounce", ".osc")
           b.nrtCommandPath    = f.getCanonicalPath
         }
         if (needsDummyOut) {
-          val f               = File.createTempFile("bounce", ".aif")
-          b.nrtOutputPath     = f.getCanonicalPath
           b.nrtHeaderFormat   = AudioFileType.AIFF
           b.nrtSampleFormat   = SampleFormat.Int16
           b.outputBusChannels = 1
+        }
+        if (needsDummyOut || needsOutFile) {
+          val f               = File.createTempFile("bounce", "." + b.nrtHeaderFormat.extension)
+          b.nrtOutputPath     = f.getCanonicalPath
         }
         b.build
       } else {
@@ -167,6 +170,8 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       loop()
       Await.result(server.committed(), Duration.Inf)
       val bundles = server.bundles()
+
+      println("---- BOUNCE ----")
       bundles.foreach(println)
 
       // XXX TODO: clean up
