@@ -197,6 +197,10 @@ object TransportImpl {
 
   private final val dummySegment = Segment.Undefined(Span.from(Long.MaxValue))
 
+  // see `submit` docs for argument descriptions
+  private final class OfflineStep(val logicalNow: Long, val logicalDelay: Long, val schedValid: Int)
+  private final val offlineEmptyStep = new OfflineStep(0L, 0L, -1)
+
   private final class Offline[S <: Sys[S], I <: stm.Sys[I]](protected val groupHandle: stm.Source[S#Tx, ProcGroup[S]],
                                                             val sampleRate: Double,
                                                             protected val infoVar: I#Var[Info],
@@ -206,7 +210,7 @@ object TransportImpl {
                                                             protected val obsVar: I#Var[IIdxSeq[Observation[S, I]]])
                                                            (implicit protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] with Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] {
-    private val submitRef = Ref((0L, 0L, -1))
+    private val submitRef = Ref(offlineEmptyStep)
     private val timeRef   = Ref(0L)
 
     protected def logicalTime()(implicit tx: S#Tx): Long = timeRef.get(tx.peer)
@@ -216,14 +220,21 @@ object TransportImpl {
 
     protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx) {
       log("scheduled: logicalDelay = " + logicalDelay)
-      submitRef.set((logicalNow, logicalDelay, schedValid))(tx.peer)
+      submitRef.set(new OfflineStep(logicalNow, logicalDelay, schedValid))(tx.peer)
     }
 
     def step()(implicit tx: S#Tx) {
-      val (logicalNow, logicalDelay, schedValid) = submitRef.swap((0L, 0L, -1))(tx.peer)
+      val subm = submitRef.swap(offlineEmptyStep)(tx.peer)
+      import subm._
       if (schedValid >= 0) {
         eventReached(logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid)
       }
+    }
+
+    def stepTarget(implicit tx: S#Tx): Long = {
+      val subm = submitRef()(tx.peer)
+      import subm._
+      if (schedValid >= 0) logicalNow + logicalDelay else -1L
     }
 
     def elapse(seconds: Double)(implicit tx: S#Tx) {
@@ -328,6 +339,7 @@ object TransportImpl {
      *
      * @param logicalNow       the logical now time at the time the event was scheduled
      * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
+     *                         (the event `happens` at `logicalNow + logicalDelay`)
      * @param schedValid       the valid counter at the time of scheduling
      */
     protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit

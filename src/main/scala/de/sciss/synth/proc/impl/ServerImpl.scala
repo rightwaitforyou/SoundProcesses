@@ -30,11 +30,41 @@ import de.sciss.synth.{Server => SServer, message, AllocatorExhausted}
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
 import de.sciss.osc.Packet
+import java.io.File
 
 object ServerImpl {
-  def apply(peer: SServer): Server = new Impl(peer)
+  def apply  (peer: SServer): Server          = new OnlineImpl (peer)
+  def offline(peer: SServer): Server.Offline  = new OfflineImpl(peer)
 
-  private case class Impl(peer: SServer) extends Server {
+  private final case class OnlineImpl(peer: SServer) extends Impl {
+    override def toString = peer.toString()
+
+    // ---- side effects ----
+
+    def !(p: Packet) { peer ! p }
+
+    def !!(bndl: osc.Bundle): Future[Unit] = {
+      val syncMsg = peer.syncMsg()
+      val syncID  = syncMsg.id
+      val bndlS   = osc.Bundle(bndl.timetag, (bndl :+ syncMsg): _*)
+      peer.!!(bndlS) {
+        case message.Synced(`syncID`) =>
+      }
+    }
+  }
+
+  private final case class OfflineImpl(peer: SServer) extends Impl with Server.Offline {
+    override def toString = s"$peer @offline"
+
+    // ---- side effects ----
+
+    def !(p: Packet) { ??? }
+
+    def !!(bndl: osc.Bundle): Future[Unit] = ???
+  }
+
+  private abstract class Impl extends Server {
+
     def executionContext: ExecutionContext = peer.clientConfig.executionContext
 
     private val controlBusAllocator = BlockAllocator("control", peer.config.controlBusChannels)
@@ -43,8 +73,6 @@ object ServerImpl {
     private val nodeAllocator       = NodeIDAllocator(peer.clientConfig.clientID, peer.clientConfig.nodeIDOffset)
 
     val defaultGroup: Group = Group.wrap(this, peer.defaultGroup) // .default( this )
-
-    override def toString = peer.toString()
 
     def allocControlBus(numChannels: Int)(implicit tx: Txn): Int = {
       val res = controlBusAllocator.alloc(numChannels)(tx.peer)
@@ -77,18 +105,5 @@ object ServerImpl {
     }
 
     def nextNodeID()(implicit tx: Txn): Int = nodeAllocator.alloc()(tx.peer)
-
-    // ---- side effects ----
-
-    def !(p: Packet) { peer ! p }
-
-    def !!(bndl: osc.Bundle): Future[Unit] = {
-      val syncMsg = peer.syncMsg()
-      val syncID  = syncMsg.id
-      val bndlS   = osc.Bundle(bndl.timetag, (bndl :+ syncMsg): _*)
-      peer.!!(bndlS) {
-        case message.Synced(`syncID`) =>
-      }
-    }
   }
 }

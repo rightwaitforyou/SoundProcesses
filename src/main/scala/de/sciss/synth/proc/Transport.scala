@@ -58,17 +58,26 @@ object Transport {
   /**
    * A transport sub-type which does not automatically advance in accordance
    * to a real-time clock, but awaits manually stepping through. This can be
-   * used for debugging or unit testing purposes.
+   * used for offline-bouncing, debugging or unit testing purposes.
    */
   trait Offline[S <: evt.Sys[S], Elem, U] extends Transport[S, Elem, U] {
-    /**
-     * Advances the transport to the next position (if there is any)
-     */
+    /** Advances the transport to the next position (if there is any) */
     def step()(implicit tx: S#Tx): Unit
 
-    /**
-     * Advances the offline logical clock by a given amount of seconds.
-     */
+    /** Queries the logical time target of the next step.
+      *
+      * @return the logical time in sample frames at which the next event occurs, or `-1` if there
+      *         are no further events. If the offline logical clock has never been elapsed
+      *         (by calling `elapse`), its base is zero, and therefore the number of frames returned
+      *         by this method are the number of frames from the beginning of the timeline.
+      */
+    def stepTarget(implicit tx: S#Tx): Long
+
+    /** Advances the offline logical clock by a given amount of seconds.
+      * This is important if the objects of the group being transported change,
+      * as their change will be associated with the offline logical clock.
+      * For a bouncing operation, this method should not be used.
+      */
     def elapse(seconds: Double)(implicit tx: S#Tx): Unit
   }
 

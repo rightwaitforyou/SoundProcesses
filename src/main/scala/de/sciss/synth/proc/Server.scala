@@ -35,6 +35,10 @@ object Server {
   def apply(peer: SServer): Server = Impl(peer)
 
   implicit def defaultGroup(server: Server): Group = server.defaultGroup
+
+  trait Offline extends Server {
+    // def
+  }
 }
 
 trait Server {
