@@ -58,7 +58,7 @@ object AuralSystemImpl {
     private val server        = Ref(Option.empty[Server])
     private val connection    = Ref(Option.empty[SServerLike])
 
-    def start(config: SServer.Config, connect: Boolean)(implicit tx: S#Tx): AuralSystem[S] = {
+    def start(config: Server.Config, connect: Boolean)(implicit tx: S#Tx): AuralSystem[S] = {
       implicit val itx = tx.peer
       val expected = startStopCnt.get + 1
       startStopCnt.set(expected)
@@ -67,6 +67,10 @@ object AuralSystemImpl {
         if (startStopCnt.get == expected) doStart(config, connect = connect)
       })(tx.peer)
       this
+    }
+
+    def offline(config: Server.Config)(implicit tx: S#Tx) {
+      ???
     }
 
     def stop()(implicit tx: S#Tx): AuralSystem[S] = {
@@ -80,7 +84,7 @@ object AuralSystemImpl {
       this
     }
 
-    private def doStart(config: SServer.Config, connect: Boolean) {
+    private def doStart(config: Server.Config, connect: Boolean) {
       val launch: ServerConnection.Listener => ServerConnection = if (connect) {
         SServer.connect("SoundProcesses", config) _
       } else {

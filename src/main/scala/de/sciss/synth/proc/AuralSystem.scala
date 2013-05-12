@@ -26,15 +26,21 @@
 package de.sciss.synth.proc
 
 import impl.{AuralSystemImpl => Impl}
-import de.sciss.lucre.{event => evt, stm}
-import de.sciss.synth.{Server => SServer}
+import de.sciss.lucre.stm
 
 object AuralSystem {
   def apply[S <: Sys[S]](implicit cursor: stm.Cursor[S]): AuralSystem[S] = Impl[S]
 
-  def start[S <: Sys[S]](config: SServer.Config = SServer.Config(), connect: Boolean = false)
+  def start[S <: Sys[S]](config: Server.Config = Server.Config(), connect: Boolean = false)
                         (implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] =
     apply[S].start(config, connect = connect)
+
+  def offline[S <: Sys[S]](config: Server.Config = Server.Config())
+                          (implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] = {
+    val res = apply[S]
+    res.offline(config)
+    res
+  }
 
   trait Client[S <: Sys[S]] {
     def started(s: Server)(implicit tx: S#Tx): Unit
@@ -45,7 +51,9 @@ object AuralSystem {
 trait AuralSystem[S <: Sys[S]] {
   import AuralSystem.Client
 
-  def start(config: SServer.Config = SServer.Config(), connect: Boolean = false)(implicit tx: S#Tx): AuralSystem[S]
+  def start  (config: Server.Config = Server.Config(), connect: Boolean = false)(implicit tx: S#Tx): AuralSystem[S]
+  private[proc] def offline(config: Server.Config)(implicit tx: S#Tx): Unit
+
   def stop()(implicit tx: S#Tx): AuralSystem[S]
 
   def addClient   (c: Client[S])(implicit tx: S#Tx): Unit

@@ -30,7 +30,7 @@ import de.sciss.synth.{Server => SServer, message, AllocatorExhausted}
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
 import de.sciss.osc.Packet
-import java.io.File
+import collection.immutable.{IndexedSeq => IIdxSeq}
 
 object ServerImpl {
   def apply  (peer: SServer): Server          = new OnlineImpl (peer)
@@ -51,16 +51,57 @@ object ServerImpl {
         case message.Synced(`syncID`) =>
       }
     }
+
+    def commit(future: Future[Unit]) {}   // we don't use these
   }
 
   private final case class OfflineImpl(peer: SServer) extends Impl with Server.Offline {
     override def toString = s"$peer @offline"
 
-    // ---- side effects ----
+    private val sync = new AnyRef
 
-    def !(p: Packet) { ??? }
+    var position  = 0L
 
-    def !!(bndl: osc.Bundle): Future[Unit] = ???
+    private var _bundles      = Vector.empty[osc.Bundle]
+    private var _commits      = Vector.empty[Future[Unit]]
+
+    private val sampleRate    = peer.sampleRate
+    private def time: Double  = position / sampleRate
+
+    def consume(): Future[IIdxSeq[osc.Bundle]] = sync.synchronized {
+      val futs  = filteredCommits
+      _commits  = Vector.empty
+      implicit val exec = peer.clientConfig.executionContext
+      val red   = ProcWorld.reduceFutures(futs)
+      red.map(_ => sync.synchronized {
+        val res   = _bundles
+        _bundles  = Vector.empty
+        res
+      })
+    }
+
+    private def addBundle(b: osc.Bundle) {
+      sync.synchronized(_bundles :+= b)
+    }
+
+    def !(p: Packet) {
+      val b = osc.Bundle.secs(time)
+      addBundle(b)
+    }
+
+    def !!(bndl: osc.Bundle): Future[Unit] = {
+      addBundle(bndl)
+      Future.successful()
+    }
+
+    // caller must have `sync`
+    private def filteredCommits = _commits.filterNot(_.isCompleted)
+
+    def commit(future: Future[Unit]) {
+      sync.synchronized {
+        _commits = filteredCommits :+ future
+      }
+    }
   }
 
   private abstract class Impl extends Server {

@@ -30,7 +30,7 @@ import concurrent.stm.{Ref, TMap, InTxn, TSet}
 import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef, message}
 import de.sciss.{synth, osc}
 import collection.immutable.{IndexedSeq => IIdxSeq, IntMap}
-import scala.concurrent.{Promise, Future}
+import scala.concurrent.{ExecutionContext, Promise, Future}
 
 object ProcWorld {
   // MMM
@@ -39,6 +39,13 @@ object ProcWorld {
   //   var TIMEOUT_MILLIS = 10000L
 
   var DEBUG = false
+
+  def reduceFutures(futs: IIdxSeq[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
+    futs match {
+      case IIdxSeq()        => Future.successful()
+      case IIdxSeq(single)  => single
+      case more             => Future.reduce(futs)((_, _) => ())
+    }
 }
 
 final class ProcWorld(val server: Server) {
@@ -133,7 +140,7 @@ final class ProcWorld(val server: Server) {
       }
       else Vector.empty
     }
-    reduce(futs)
+    reduceFutures(futs)
   }
 
   private def sendNow(msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int): Future[Unit] = {
@@ -158,12 +165,6 @@ final class ProcWorld(val server: Server) {
     }
   }
 
-  private def reduce(futs: IIdxSeq[Future[Unit]]): Future[Unit] = futs match {
-    case IIdxSeq()        => Future.successful()
-    case IIdxSeq(single)  => single
-    case more             => Future.reduce(futs)((_, _) => ())
-  }
-
   def send(bundles: Txn.Bundles): Future[Unit] = {
     // basically:
     // bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
@@ -182,7 +183,7 @@ final class ProcWorld(val server: Server) {
       val allSync = msgs.forall(_.isSynchronous)
       (depCnt, msgs, allSync, cnt)
     }
-    sync.synchronized {
+    val res = sync.synchronized {
       val (now, later) = mapped.partition(bundleReplySeen >= _._1)
       val futsNow   = now.map   { case (_     , msgs, allSync, cnt) => sendNow(msgs, allSync, cnt) }
       val futsLater = later.map { case (depCnt, msgs, allSync, cnt) =>
@@ -191,8 +192,11 @@ final class ProcWorld(val server: Server) {
         bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vector.empty) :+ sch)
         p.future
       }
-      reduce(futsNow ++ futsLater)
+      reduceFutures(futsNow ++ futsLater)
     }
+
+    server.commit(res)
+    res
 
     //    bundles.payload.zipWithIndex.foreach {
     //      case (msgs, idx) =>

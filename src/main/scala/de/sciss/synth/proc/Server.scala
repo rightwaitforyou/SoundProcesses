@@ -26,19 +26,39 @@
 package de.sciss.synth.proc
 
 import impl.{ServerImpl => Impl}
-import de.sciss.synth.{Server => SServer}
+import de.sciss.synth.{Server => SServer, Client => SClient}
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
+import collection.immutable.{IndexedSeq => IIdxSeq}
 import language.implicitConversions
 
 object Server {
   def apply(peer: SServer): Server = Impl(peer)
 
+  def offline(config: Config, client: SClient.Config = SClient.Config()): Offline = {
+    val peer = SServer.dummy(name = "offline", config = config, clientConfig = client)
+    Impl.offline(peer)
+  }
+
   implicit def defaultGroup(server: Server): Group = server.defaultGroup
 
   trait Offline extends Server {
-    // def
+    /** Logically closes the offline server and returns a list of all the bundles collected so far.
+      * __Note__: Calling this method will clear the information held by the server.
+      */
+    def consume(): Future[IIdxSeq[osc.Bundle]]
+
+    /** The current frame position in the OSC file. The user should
+      * increment this according to a reference transport, so that
+      * messages are queued in the correct position. */
+    var position: Long
   }
+
+  val  Config         = SServer.Config
+  type Config         = SServer.Config
+  val  ConfigBuilder  = SServer.ConfigBuilder
+  type ConfigBuilder  = SServer.ConfigBuilder
+  type ConfigLike     = SServer.ConfigLike
 }
 
 trait Server {
@@ -68,4 +88,11 @@ trait Server {
   /** Sends out a packet with an added sync message. The returned future is completed with the
     * sync message's reply having arrived. */
   def !!(b: osc.Bundle): Future[Unit]
+
+  /** Signalizes that no more messages are sent from the currently committing transaction.
+    * The offline server collects these futures, in order to allow an outside process
+    * to eventually wait for these to be completed, before closing the OSC file and carrying on.
+    * The realtime server just ignores these futures.
+    */
+  def commit(future: Future[Unit]): Unit
 }
