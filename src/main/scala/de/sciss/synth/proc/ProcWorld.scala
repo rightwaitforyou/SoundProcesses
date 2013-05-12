@@ -41,7 +41,6 @@ object ProcWorld {
 }
 
 final class ProcWorld(val server: Server) {
-
   import ProcWorld._
 
   // EEE
@@ -98,10 +97,10 @@ final class ProcWorld(val server: Server) {
   //      topologyRef.transform( _.removeEdge( e ))
   //   }
 
-  private val sync = new AnyRef
-  private var bundleWaiting = IntMap.empty[IIdxSeq[() => Unit]]
+  private val sync            = new AnyRef
+  private var bundleWaiting   = IntMap.empty[IIdxSeq[() => Unit]]
   private var bundleReplySeen = -1
-  private val msgStampRef = Ref(0)
+  private val msgStampRef     = Ref(0)
 
   private[proc] def messageTimeStamp: Ref[Int] = msgStampRef
 
@@ -123,10 +122,9 @@ final class ProcWorld(val server: Server) {
         if (i <= cnt) {
           bundleReplySeen = cnt
           while (i <= cnt) {
-            bundleWaiting.get(i).foreach {
-              sq =>
-                bundleWaiting -= i
-                sq.foreach(_.apply())
+            bundleWaiting.get(i).foreach { sq =>
+              bundleWaiting -= i
+              sq.foreach(_.apply())
             }
             i += 1
           }
@@ -186,218 +184,222 @@ final class ProcWorld(val server: Server) {
 //case class ProcDemiurgUpdate( factoriesAdded: ISet[ ProcFactory ], factoriesRemoved: ISet[ ProcFactory ])
 
 object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
-   demi =>
+  demi =>
 
-// MMM
-//   type Update    = ProcDemiurgUpdate
-//   type Listener  = TxnModel.Listener[ Update ]
+  // MMM
+  //   type Update    = ProcDemiurgUpdate
+  //   type Listener  = TxnModel.Listener[ Update ]
 
-   var verbose = false
+  var verbose = false
 
-   private val servers = TSet.empty[ Server ]
+  private val servers     = TSet.empty[Server]
+  private val uniqueDefID = Ref(0)
 
-   private val uniqueDefID = Ref( 0 )
-   private def nextDefID()( implicit tx: InTxn ) : Int = {
-      val res = uniqueDefID.get
-      uniqueDefID += 1
-      res
-   }
+  private def nextDefID()(implicit tx: InTxn): Int = {
+    val res = uniqueDefID.get
+    uniqueDefID += 1
+    res
+  }
 
-   def addServer( server: Server )( implicit tx: Txn ) {
-      implicit val itx = tx.peer
-      if( servers.contains( server )) return
-      servers += server
-      worlds  += server -> new ProcWorld( server )
-   }
+  def addServer(server: Server)(implicit tx: Txn) {
+    implicit val itx = tx.peer
+    if (servers.contains(server)) return
+    servers += server
+    worlds  += server -> new ProcWorld(server)
+  }
 
-   def removeServer( server: Server )( implicit tx: Txn ) {
-      implicit val itx = tx.peer
-      servers -= server
-      worlds  -= server
-   }
+  def removeServer(server: Server)(implicit tx: Txn) {
+    implicit val itx = tx.peer
+    servers -= server
+    worlds -= server
+  }
 
-   // commented out for debugging inspection
-   private val worlds = TMap.empty[ Server, ProcWorld ]
+  // commented out for debugging inspection
+  private val worlds = TMap.empty[Server, ProcWorld]
 
-// FFF
-//   private val factoriesRef = Ref( Set.empty[ ProcFactory ])
-//   def factories( implicit tx: Txn ) : Set[ ProcFactory ] = factoriesRef()
+  // FFF
+  //   private val factoriesRef = Ref( Set.empty[ ProcFactory ])
+  //   def factories( implicit tx: Txn ) : Set[ ProcFactory ] = factoriesRef()
 
-// MMM
-//   protected def fullUpdate( implicit tx: Txn ) = ProcDemiurgUpdate( factoriesRef(), Set.empty )
-//   protected def emptyUpdate = ProcDemiurgUpdate( Set.empty, Set.empty )
+  // MMM
+  //   protected def fullUpdate( implicit tx: Txn ) = ProcDemiurgUpdate( factoriesRef(), Set.empty )
+  //   protected def emptyUpdate = ProcDemiurgUpdate( Set.empty, Set.empty )
 
-// FFF
-//   def addFactory( pf: ProcFactory )( implicit tx: Txn ) {
-//      touch
-//      factoriesRef.transform( _ + pf )
-//      updateRef.transform( u => if( u.factoriesRemoved.contains( pf )) {
-//          u.copy( factoriesRemoved = u.factoriesRemoved - pf )
-//      } else {
-//          u.copy( factoriesAdded = u.factoriesAdded + pf )
-//      })
-//   }
-//
-//   def removeFactory( pf: ProcFactory )( implicit tx: Txn ) {
-//      touch
-//      factoriesRef.transform( _ - pf )
-//      updateRef.transform( u => if( u.factoriesAdded.contains( pf )) {
-//          u.copy( factoriesAdded = u.factoriesAdded - pf )
-//      } else {
-//          u.copy( factoriesRemoved = u.factoriesRemoved + pf )
-//      })
-//   }
+  // FFF
+  //   def addFactory( pf: ProcFactory )( implicit tx: Txn ) {
+  //      touch
+  //      factoriesRef.transform( _ + pf )
+  //      updateRef.transform( u => if( u.factoriesRemoved.contains( pf )) {
+  //          u.copy( factoriesRemoved = u.factoriesRemoved - pf )
+  //      } else {
+  //          u.copy( factoriesAdded = u.factoriesAdded + pf )
+  //      })
+  //   }
+  //
+  //   def removeFactory( pf: ProcFactory )( implicit tx: Txn ) {
+  //      touch
+  //      factoriesRef.transform( _ - pf )
+  //      updateRef.transform( u => if( u.factoriesAdded.contains( pf )) {
+  //          u.copy( factoriesAdded = u.factoriesAdded - pf )
+  //      } else {
+  //          u.copy( factoriesRemoved = u.factoriesRemoved + pf )
+  //      })
+  //   }
 
-   def addVertex( e: AuralProc )( implicit tx: Txn ) {
-      val world = worlds( e.server )( tx.peer )
-      world.addProc( e )
-   }
+  def addVertex(e: AuralProc)(implicit tx: Txn) {
+    val world = worlds(e.server)(tx.peer)
+    world.addProc(e)
+  }
 
-   def removeVertex( e: AuralProc )( implicit tx: Txn ) {
-      val world = worlds( e.server )( tx.peer )
-      world.removeProc( e )
-   }
+  def removeVertex(e: AuralProc)(implicit tx: Txn) {
+    val world = worlds(e.server)(tx.peer)
+    world.removeProc(e)
+  }
 
-// EEE
-//   def addEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
-//      val world = worlds( e.sourceVertex.server )
-//      val res = world.addEdge( e )
-//      if( res.isEmpty ) error( "Could not add edge" )
-//
-//      val Some( (newTopo, source, affected) ) = res
-//      if( verbose ) println( "NEW TOPO = " + newTopo + "; SOURCE = " + source + "; AFFECTED = " + affected )
-//      if( affected.isEmpty ) {
-//         return
-//      }
-//
-//      val srcGroup   = source.groupOption
-//      val tgtGroups  = affected.map( p => (p, p.groupOption) )
-//      val isAfter    = source == e.sourceVertex
-//
-//      def startMoving( g: RichGroup ) {
-//         var succ                = g
-//         var pred : RichGroup    = null
-//         val iter                = tgtGroups.iterator
-//         while( iter.hasNext ) {
-//            pred = succ
-//            val (target, tgtGroup) = iter.next()
-//            tgtGroup match {
-//               case Some( g2 ) => {
-//                  if( isAfter ) {
-//                     g2.moveAfter( true, pred )
-//                  } else {
-//                     g2.moveBefore( true, pred )
-//                  }
-//                  succ = g2
-//               }
-//               case None => {
-//                  val g2 = RichGroup( Group( target.server ))
-//                  g2.play( pred, if( isAfter ) addAfter else addBefore )
-//                  target.group = g2
-//                  succ = g2
-//               }
-//            }
-//         }
-//      }
-//
-//      srcGroup match {
-//         case None => {
-//            val g = RichGroup( Group( source.server ))
-//            g.play( RichGroup.default( g.server ))
-//            source.group = g
-//            startMoving( g )
-//         }
-//         case Some( g ) => startMoving( g )
-//      }
-//   }}
+  // EEE
+  //   def addEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
+  //      val world = worlds( e.sourceVertex.server )
+  //      val res = world.addEdge( e )
+  //      if( res.isEmpty ) error( "Could not add edge" )
+  //
+  //      val Some( (newTopo, source, affected) ) = res
+  //      if( verbose ) println( "NEW TOPO = " + newTopo + "; SOURCE = " + source + "; AFFECTED = " + affected )
+  //      if( affected.isEmpty ) {
+  //         return
+  //      }
+  //
+  //      val srcGroup   = source.groupOption
+  //      val tgtGroups  = affected.map( p => (p, p.groupOption) )
+  //      val isAfter    = source == e.sourceVertex
+  //
+  //      def startMoving( g: RichGroup ) {
+  //         var succ                = g
+  //         var pred : RichGroup    = null
+  //         val iter                = tgtGroups.iterator
+  //         while( iter.hasNext ) {
+  //            pred = succ
+  //            val (target, tgtGroup) = iter.next()
+  //            tgtGroup match {
+  //               case Some( g2 ) => {
+  //                  if( isAfter ) {
+  //                     g2.moveAfter( true, pred )
+  //                  } else {
+  //                     g2.moveBefore( true, pred )
+  //                  }
+  //                  succ = g2
+  //               }
+  //               case None => {
+  //                  val g2 = RichGroup( Group( target.server ))
+  //                  g2.play( pred, if( isAfter ) addAfter else addBefore )
+  //                  target.group = g2
+  //                  succ = g2
+  //               }
+  //            }
+  //         }
+  //      }
+  //
+  //      srcGroup match {
+  //         case None => {
+  //            val g = RichGroup( Group( source.server ))
+  //            g.play( RichGroup.default( g.server ))
+  //            source.group = g
+  //            startMoving( g )
+  //         }
+  //         case Some( g ) => startMoving( g )
+  //      }
+  //   }}
 
-// EEE
-//   def removeEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
-//      val world = worlds( e.sourceVertex.server )
-//      world.removeEdge( e )
-//   }}
+  // EEE
+  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
+  //      val world = worlds( e.sourceVertex.server )
+  //      world.removeEdge( e )
+  //   }}
 
-   private def allCharsOk( name: String ) : Boolean = {
-      val len = name.length
-      var i = 0; while( i < len ) {
-         val c    = name.charAt( i ).toInt
-         val ok   = c > 36 && c < 123 || c != 95   // in particular, disallow underscore
-         if( !ok ) return false
-      i += 1 }
-      true
-   }
+  private def allCharsOk(name: String): Boolean = {
+    val len = name.length
+    var i   = 0
+    while (i < len) {
+      val c   = name.charAt(i).toInt
+      val ok  = c > 36 && c < 123 || c != 95 // in particular, disallow underscore
+      if (!ok) return false
+      i += 1
+    }
+    true
+  }
 
-   protected def abbreviate( name: String ) : String = {
-      val len = name.length
-      if( (len <= 16) && allCharsOk( name )) return name
+  protected def abbreviate(name: String): String = {
+    val len = name.length
+    if ((len <= 16) && allCharsOk(name)) return name
 
-      val sb = new StringBuffer( 16 )
-      var i = 0; while( i < len && sb.length() < 16 ) {
-         val c    = name.charAt( i ).toInt
-         val ok   = c > 36 && c < 123 || c != 95   // in particular, disallow underscore
-         if( ok ) sb.append( c.toChar )
-      i += 1 }
-      sb.toString
-   }
+    val sb  = new StringBuffer(16)
+    var i   = 0
+    while (i < len && sb.length() < 16) {
+      val c = name.charAt(i).toInt
+      val ok = c > 36 && c < 123 || c != 95 // in particular, disallow underscore
+      if (ok) sb.append(c.toChar)
+      i += 1
+    }
+    sb.toString
+  }
 
-   private[proc] def send( server: Server, bundles: Txn.Bundles ) {
-      val w = worlds.single.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
-      w.send( bundles )
-   }
+  private[proc] def send(server: Server, bundles: Txn.Bundles) {
+    val w = worlds.single.get(server).getOrElse(sys.error("Trying to access unregistered server " + server))
+    w.send(bundles)
+  }
 
-   private[proc] def messageTimeStamp( server: Server )( implicit tx: Txn ) : Ref[ Int ] = {
-      val w = worlds.get( server )( tx.peer ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
-      w.messageTimeStamp
-   }
+  private[proc] def messageTimeStamp(server: Server)(implicit tx: Txn): Ref[Int] = {
+    val w = worlds.get(server)(tx.peer).getOrElse(sys.error("Trying to access unregistered server " + server))
+    w.messageTimeStamp
+  }
 
-   private[proc] def getSynthDef( server: Server, graph: SynthGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
-      getSynthDef( server, graph.expand(synth.impl.DefaultUGenGraphBuilderFactory), nameHint )
-   }
+  private[proc] def getSynthDef(server: Server, graph: SynthGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef = {
+    getSynthDef(server, graph.expand(synth.impl.DefaultUGenGraphBuilderFactory), nameHint)
+  }
 
-   private[proc] def getSynthDef( server: Server, graph: UGenGraph, nameHint: Option[ String ])( implicit tx: Txn ) : SynthDef = {
-      implicit val itx = tx.peer
-      val w = worlds.get( server ).getOrElse( sys.error( "Trying to access unregistered server " + server ))
+  private[proc] def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef = {
+    implicit val itx = tx.peer
+    val w = worlds.get(server).getOrElse(sys.error("Trying to access unregistered server " + server))
 
-      // XXX note: unfortunately we have sideeffects in the expansion, such as
-      // includeParam for ProcAudioOutput ... And anyways, we might allow for
-      // indeterminate GE.Lazies, thus we need to check for UGenGraph equality,
-      // not SynthGraph equality
-//      val u = graph.expand
+    // XXX note: unfortunately we have sideeffects in the expansion, such as
+    // includeParam for ProcAudioOutput ... And anyways, we might allow for
+    // indeterminate GE.Lazies, thus we need to check for UGenGraph equality,
+    // not SynthGraph equality
+    //      val u = graph.expand
 
-      val equ = new GraphEquality( graph )
-      log( "request for synth graph " + equ.hashCode )
+    val equ = new GraphEquality(graph)
+    log("request for synth graph " + equ.hashCode)
 
-      w.ugenGraphs.get.get( equ ).getOrElse {
-         log( "synth graph " + equ.hashCode + " is new" )
-         val name = abbreviate( nameHint.getOrElse( "proc" )) + "_" + nextDefID()
-         val peer = SSynthDef( name, graph )
-         val rd   = impl.SynthDefImpl( server, peer )
-         rd.recv()
-         w.ugenGraphs.transform( _ + (equ -> rd) )
-         rd
+    w.ugenGraphs.get.get(equ).getOrElse {
+      log("synth graph " + equ.hashCode + " is new")
+      val name = abbreviate(nameHint.getOrElse("proc")) + "_" + nextDefID()
+      val peer = SSynthDef(name, graph)
+      val rd = impl.SynthDefImpl(server, peer)
+      rd.recv()
+      w.ugenGraphs.transform(_ + (equ -> rd))
+      rd
+    }
+  }
+
+  final class GraphEquality(val graph: UGenGraph) extends Proxy {
+    private def mapUGen(ugen: UGen): Any = {
+      val inStruct = ugen.inputs.map {
+        //         case up: UGenProxy => mapUGen( up.source )
+        case ugen: UGen.SingleOut => mapUGen(ugen)
+        case UGen.OutProxy(source, outputIndex: Int) => (mapUGen(source), outputIndex)
+        case ctl: ControlUGenOutProxy => ctl
+        case c: Constant => c
       }
-   }
+      (ugen.name, ugen.rate, ugen.specialIndex, inStruct, ugen.outputRates)
+    }
 
-   final class GraphEquality( val graph: UGenGraph ) extends Proxy {
-      private def mapUGen( ugen: UGen ) : Any = {
-         val inStruct = ugen.inputs.map {
-            //         case up: UGenProxy => mapUGen( up.source )
-            case ugen: UGen.SingleOut                       => mapUGen( ugen )
-            case UGen.OutProxy( source, outputIndex: Int )  => (mapUGen( source ), outputIndex)
-            case ctl: ControlUGenOutProxy                   => ctl
-            case c: Constant                                => c
-         }
-         (ugen.name, ugen.rate, ugen.specialIndex, inStruct, ugen.outputRates)
+    val self: Any = {
+      val uStructs = graph.ugens.map { rich =>
+        (mapUGen(rich.ugen), rich.inputSpecs)
       }
 
-      val self : Any = {
-         val uStructs = graph.ugens.map { rich =>
-            (mapUGen( rich.ugen ), rich.inputSpecs)
-         }
+      (graph.constants, graph.controlValues, graph.controlNames, uStructs)
+    }
 
-         (graph.constants, graph.controlValues, graph.controlNames, uStructs)
-      }
-
-      override val hashCode: Int = self.hashCode   // make it a val
-   }
+    override val hashCode: Int = self.hashCode // make it a val
+  }
 }

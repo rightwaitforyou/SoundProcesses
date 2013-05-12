@@ -29,28 +29,30 @@ import de.sciss.synth.{Synth => SSynth, UGenGraph, SynthGraph, ControlSetMap, Ad
 import impl.{SynthImpl => Impl}
 
 object Synth {
-   def apply( graph: SynthGraph, nameHint: Option[ String ] = None )
-            ( target: Node, args: Seq[ ControlSetMap ] = Nil, addAction: AddAction = addToHead,
-              dependencies: List[ Resource ] = Nil )( implicit tx: Txn ) : Synth = {
-      val df   = ProcDemiurg.getSynthDef( target.server, graph, nameHint )
-      play( df, target, args, addAction, dependencies )
-   }
+  def apply(graph: SynthGraph, nameHint: Option[String] = None)
+           (target: Node, args: Seq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
+            dependencies: List[Resource] = Nil)(implicit tx: Txn): Synth = {
+    val df = ProcDemiurg.getSynthDef(target.server, graph, nameHint)
+    play(df, target, args, addAction, dependencies)
+  }
 
-   private[proc] def expanded( graph: UGenGraph, nameHint: Option[ String ] = None )
-                             ( target: Node, args: Seq[ ControlSetMap ] = Nil, addAction: AddAction = addToHead,
-                               dependencies: List[ Resource ] = Nil )( implicit tx: Txn ) : Synth = {
-      val df = ProcDemiurg.getSynthDef( target.server, graph, nameHint )
-      play( df, target, args, addAction, dependencies )
-   }
+  private[proc] def expanded(graph: UGenGraph, nameHint: Option[String] = None)
+                            (target: Node, args: Seq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
+                             dependencies: List[Resource] = Nil)(implicit tx: Txn): Synth = {
+    val df = ProcDemiurg.getSynthDef(target.server, graph, nameHint)
+    play(df, target, args, addAction, dependencies)
+  }
 
-   private def play( df: SynthDef, target: Node, args: Seq[ ControlSetMap ], addAction: AddAction,
-                     dependencies: List[ Resource ])( implicit tx: Txn ) : Synth = {
-      val res  = new Impl( SSynth( target.server.peer ), df )
-      res.play( target, args, addAction, df :: dependencies )
-      res
-   }
+  private def play(df: SynthDef, target: Node, args: Seq[ControlSetMap], addAction: AddAction,
+                   dependencies: List[Resource])(implicit tx: Txn): Synth = {
+    val res = new Impl(SSynth(target.server.peer), df)
+    res.play(target, args, addAction, df :: dependencies)
+    res
+  }
 }
+
 trait Synth extends Node {
-   def peer: SSynth
-   def definition: SynthDef
+  def peer: SSynth
+
+  def definition: SynthDef
 }

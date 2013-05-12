@@ -27,13 +27,12 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.osc
-import collection.immutable.{IndexedSeq => IIdxSeq}
 import concurrent.stm.{InTxn, Txn => ScalaTxn}
 import de.sciss.synth.message
 
 private[proc] object ProcTxnImpl {
-//   private val errOffMsg   = osc.Message( "/error", -1 )
-//   private val errOnMsg    = osc.Message( "/error", -2 )
+  //   private val errOffMsg   = osc.Message( "/error", -1 )
+  //   private val errOnMsg    = osc.Message( "/error", -2 )
 
   var timeoutFun: () => Unit = () => ()
 
@@ -41,115 +40,117 @@ private[proc] object ProcTxnImpl {
 
   //   var TIMEOUT_MILLIS = 10000L
 }
+
 private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
-   tx =>
+  tx =>
 
-   import ProcTxnImpl._
+  import ProcTxnImpl._
 
-   private var bundlesMap = Map.empty[ Server, Txn.Bundles ]
+  private var bundlesMap = Map.empty[Server, Txn.Bundles]
 
-   final protected def flush() {
-      bundlesMap.foreach { case (server, bundles) =>
-         logTxn( "flush " + server + " -> " + bundles.payload.size + " bundles" )
-         ProcDemiurg.send( server, bundles )
-      }
-   }
+  final protected def flush() {
+    bundlesMap.foreach { case (server, bundles) =>
+      logTxn("flush " + server + " -> " + bundles.payload.size + " bundles")
+      ProcDemiurg.send(server, bundles)
+    }
+  }
 
-   protected def markBundlesDirty() : Unit
+  protected def markBundlesDirty(): Unit
 
-   final def addMessage( resource: Resource, m: osc.Message with message.Send, audible: Boolean, dependencies: Seq[ Resource ],
-                   noErrors: Boolean ) {
+  final def addMessage(resource: Resource, m: osc.Message with message.Send, audible: Boolean, dependencies: Seq[Resource],
+                       noErrors: Boolean) {
 
-//      val rsrc = system.resources
+    //      val rsrc = system.resources
 
-      val server        = resource.server
-      val rsrcStampOld  = resource.timeStamp( tx )
-      require( rsrcStampOld >= 0, "Already disposed : " + resource )
+    val server        = resource.server
+    val rsrcStampOld  = resource.timeStamp(tx)
+    require(rsrcStampOld >= 0, "Already disposed : " + resource)
 
-      implicit val itx  = peer
-      val txnCnt        = ProcDemiurg.messageTimeStamp( server )( tx )
-      val txnStopCnt    = txnCnt.get
-      val bOld          = bundlesMap.getOrElse( server, noBundles )
-      val txnStartCnt   = txnStopCnt - bOld.payload.size
+    implicit val itx  = peer
+    val txnCnt        = ProcDemiurg.messageTimeStamp(server)(tx)
+    val txnStopCnt    = txnCnt.get
+    val bOld          = bundlesMap.getOrElse(server, noBundles)
+    val txnStartCnt   = txnStopCnt - bOld.payload.size
 
-      // calculate the maximum time stamp from the dependencies. this includes
-      // the resource as its own dependency (since we should send out messages
-      // in monotonic order)
-      var depStampMax   = math.max( txnStartCnt << 1, rsrcStampOld )
-      dependencies.foreach { dep =>
-         val depStamp = dep.timeStamp( tx )
-         require( depStamp >= 0, "Dependency already disposed : " + dep )
-         if( depStamp > depStampMax ) depStampMax = depStamp
-//         dep.addDependent( resource )( tx )  // validates dep's server
-      }
+    // calculate the maximum time stamp from the dependencies. this includes
+    // the resource as its own dependency (since we should send out messages
+    // in monotonic order)
+    var depStampMax = math.max(txnStartCnt << 1, rsrcStampOld)
+    dependencies.foreach { dep =>
+      val depStamp = dep.timeStamp(tx)
+      require(depStamp >= 0, "Dependency already disposed : " + dep)
+      if (depStamp > depStampMax) depStampMax = depStamp
+      //         dep.addDependent( resource )( tx )  // validates dep's server
+    }
 
-//      val dAsync     = (dTsMax & 1) == 1
-      val msgAsync   = !m.isSynchronous
+    //      val dAsync     = (dTsMax & 1) == 1
+    val msgAsync = !m.isSynchronous
 
-      // if the message is asynchronous, it suffices to ensure that the time stamp's async bit is set.
-      // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
-      // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
-      val rsrcStampNew  = if( msgAsync ) depStampMax | 1 else (depStampMax + 1) & ~1
+    // if the message is asynchronous, it suffices to ensure that the time stamp's async bit is set.
+    // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
+    // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
+    val rsrcStampNew = if (msgAsync) depStampMax | 1 else (depStampMax + 1) & ~1
 
-      logTxn( "addMessage(" + resource + ", " + m + ") -> stamp = " + rsrcStampNew )
-      if( rsrcStampNew != rsrcStampOld ) resource.timeStamp_=( rsrcStampNew )( tx )
+    logTxn("addMessage(" + resource + ", " + m + ") -> stamp = " + rsrcStampNew)
+    if (rsrcStampNew != rsrcStampOld) resource.timeStamp_=(rsrcStampNew)(tx)
 
-      val bNew       = if( bOld.payload.isEmpty ) {
-         markBundlesDirty()
-//         logTxn( "registering after commit handler" )
-//         afterCommit( flush() )
-         val txnStartCntNew = rsrcStampNew >> 1
-         assert( txnStartCntNew == txnStartCnt )
-         txnCnt += 1
-         Txn.Bundles( txnStartCntNew, Vector(Vector(m)))
+    val bNew = if (bOld.payload.isEmpty) {
+      markBundlesDirty()
+      //         logTxn( "registering after commit handler" )
+      //         afterCommit( flush() )
+      val txnStartCntNew = rsrcStampNew >> 1
+      assert(txnStartCntNew == txnStartCnt)
+      txnCnt += 1
+      Txn.Bundles(txnStartCntNew, Vector(Vector(m)))
+
+    } else {
+      val cntOld = bOld.firstCnt
+      val rsrcCnt = rsrcStampNew >> 1
+      val payOld = bOld.payload
+      val szOld = payOld.size
+      //         if( rsrcCnt == cntOld - 1 ) {   // prepend to front
+      //            val payNew = IIdxSeq( message ) +: payOld
+      //            bOld.copy( firstCnt = rsrcCnt, payload = payNew )
+      //
+      //         } else
+      if (rsrcCnt == cntOld + szOld) {
+        // append to back
+        val payNew = payOld :+ Vector(m)
+        txnCnt += 1
+        bOld.copy(payload = payNew)
 
       } else {
-         val cntOld  = bOld.firstCnt
-         val rsrcCnt = rsrcStampNew >> 1
-         val payOld  = bOld.payload
-         val szOld   = payOld.size
-//         if( rsrcCnt == cntOld - 1 ) {   // prepend to front
-//            val payNew = IIdxSeq( message ) +: payOld
-//            bOld.copy( firstCnt = rsrcCnt, payload = payNew )
-//
-//         } else
-         if( rsrcCnt == cntOld + szOld ) {      // append to back
-            val payNew  = payOld :+ Vector(m)
-            txnCnt += 1
-            bOld.copy( payload = payNew )
-
-         } else {
-            // we don't need the assertion, since we are going to call payload.apply which would
-            // through an out of bounds exception if the assertion wouldn't hold
-//            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
-            val payIdx = rsrcCnt - cntOld
-            val payNew = payOld.updated( payIdx, payOld( payIdx ) :+ m )
-            bOld.copy( payload = payNew )
-         }
+        // we don't need the assertion, since we are going to call payload.apply which would
+        // through an out of bounds exception if the assertion wouldn't hold
+        //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
+        val payIdx = rsrcCnt - cntOld
+        val payNew = payOld.updated(payIdx, payOld(payIdx) :+ m)
+        bOld.copy(payload = payNew)
       }
+    }
 
-      bundlesMap += server -> bNew
-   }
+    bundlesMap += server -> bNew
+  }
 
-//      // clumping
-//      var clumpIdx   = 0
-//      var clumpMap   = Map.empty[ Entry, Int ]
-//      var clumps     = IntMap.empty[ List[ Entry ]]
-//      val audibleIdx = Int.MaxValue
-//      topo.vertices.foreach( targetEntry => {
-//         if( targetEntry.audible ) {
-//            clumps += audibleIdx -> (targetEntry :: clumps.getOrElse( audibleIdx, Nil ))
-//            clumpMap += targetEntry -> audibleIdx
-//         } else {
-//            val depIdx = clumpEdges.get( targetEntry ).map( set => {
-//               set.map( clumpMap.getOrElse( _, sys.error( "Unsatisfied dependancy " + targetEntry ))).max
-//            }).getOrElse( -1 )
-//            if( depIdx > clumpIdx ) sys.error( "Unsatisfied dependancy " + targetEntry )
-//            if( depIdx == clumpIdx ) clumpIdx += 1
-//            clumps += clumpIdx -> (targetEntry :: clumps.getOrElse( clumpIdx, Nil ))
-//            clumpMap += targetEntry -> clumpIdx
-//         }
-//      })
+  //      // clumping
+  //      var clumpIdx   = 0
+  //      var clumpMap   = Map.empty[ Entry, Int ]
+  //      var clumps     = IntMap.empty[ List[ Entry ]]
+  //      val audibleIdx = Int.MaxValue
+  //      topo.vertices.foreach( targetEntry => {
+  //         if( targetEntry.audible ) {
+  //            clumps += audibleIdx -> (targetEntry :: clumps.getOrElse( audibleIdx, Nil ))
+  //            clumpMap += targetEntry -> audibleIdx
+  //         } else {
+  //            val depIdx = clumpEdges.get( targetEntry ).map( set => {
+  //               set.map( clumpMap.getOrElse( _, sys.error( "Unsatisfied dependancy " + targetEntry ))).max
+  //            }).getOrElse( -1 )
+  //            if( depIdx > clumpIdx ) sys.error( "Unsatisfied dependancy " + targetEntry )
+  //            if( depIdx == clumpIdx ) clumpIdx += 1
+  //            clumps += clumpIdx -> (targetEntry :: clumps.getOrElse( clumpIdx, Nil ))
+  //            clumpMap += targetEntry -> clumpIdx
+  //         }
+  //      })
 }
 
 private[proc] trait ProcTxnFullImpl[S <: Sys[S]] extends ProcTxnImpl with Sys.Txn[S] {
