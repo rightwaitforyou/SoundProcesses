@@ -22,7 +22,7 @@ class AttributesSpec extends ConfluentEventSpec {
     system.step { implicit tx =>
       val p     = pH()
       // println(s"Keys found: ${p.attributes.keys.mkString(", ")}")
-      val expr  = p.attributes[Attribute.Int[S]]("foo")
+      val expr  = p.attributes[Attribute.Int]("foo")
       val v     = expr match {
         case Some(Expr.Var(vr)) => vr().value
         case _ => -1

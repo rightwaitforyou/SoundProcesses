@@ -28,20 +28,18 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, expr, data, bitemp}
-import de.sciss.synth.expr.{Strings, Doubles}
+import de.sciss.synth.expr.Doubles
 import evt.{Event, impl => evti, Sys}
 import bitemp.BiType
-import expr.Expr
 import data.SkipList
 import annotation.switch
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
-import de.sciss.serial
-import scala.reflect.ClassTag
+import language.higherKinds
 
 object ProcImpl {
-  private final val SER_VERSION = 0x5072
+  private final val SER_VERSION = 0x5072  // "Pr"
 
   implicit val paramType: BiType[Param] = Doubles
 
@@ -199,10 +197,12 @@ object ProcImpl {
 
       protected def valueInfo = attributeEntryInfo[S]
 
-      def apply[Attr <: Attribute[S]](key: String)(implicit tx: S#Tx, tag: ClassTag[Attr]): Option[Attr#Peer] =
+      def apply[Attr[~ <: evt.Sys[~]] <: Attribute[_]](key: String)(implicit tx: S#Tx,
+                                                      tag: reflect.ClassTag[Attr[S]]): Option[Attr[S]#Peer] =
         get(key) match {
-          case Some(attr: Attr) => Some(attr.peer)
-          case _                => None
+          // cf. stackoverflow #16377741
+          case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
+          case _          => None
         }
     }
 
