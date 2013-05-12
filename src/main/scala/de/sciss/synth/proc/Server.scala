@@ -27,18 +27,38 @@ package de.sciss.synth.proc
 
 import impl.{ServerImpl => Impl}
 import de.sciss.synth.{Server => SServer}
+import de.sciss.osc
+import scala.concurrent.{ExecutionContext, Future}
 
 object Server {
-   def apply( peer: SServer ) : Server = Impl( peer )
+  def apply(peer: SServer): Server = Impl(peer)
 }
-trait Server {
-   def peer: SServer
-   def allocControlBus( numChannels: Int )( implicit tx: Txn ) : Int
-   def allocAudioBus(   numChannels: Int )( implicit tx: Txn ) : Int
-   def freeControlBus( index: Int, numChannels: Int )( implicit tx: Txn ) : Unit
-   def freeAudioBus(   index: Int, numChannels: Int )( implicit tx: Txn ) : Unit
-   def allocBuffer( numConsecutive: Int = 1 )( implicit tx: Txn ) : Int
-   def freeBuffer( index: Int, numConsecutive: Int = 1 )( implicit tx: Txn ) : Unit
 
-   def defaultGroup : Group
+trait Server {
+  def peer: SServer
+
+  implicit def executionContext: ExecutionContext
+
+  // ---- transactional methods ----
+
+  def nextNodeID()(implicit tx: Txn): Int
+
+  def allocControlBus(numChannels   : Int    )(implicit tx: Txn): Int
+  def allocAudioBus  (numChannels   : Int    )(implicit tx: Txn): Int
+  def allocBuffer    (numConsecutive: Int = 1)(implicit tx: Txn): Int
+
+  def freeControlBus(index: Int, numChannels   : Int    )(implicit tx: Txn): Unit
+  def freeAudioBus  (index: Int, numChannels   : Int    )(implicit tx: Txn): Unit
+  def freeBuffer    (index: Int, numConsecutive: Int = 1)(implicit tx: Txn): Unit
+
+  def defaultGroup: Group
+
+  // ---- side effects methods ----
+
+  /** Sends out a packet immediately without synchronization */
+  def ! (p: osc.Packet): Unit
+
+  /** Sends out a packet with an added sync message. The returned future is completed with the
+    * sync message's reply having arrived. */
+  def !!(b: osc.Bundle): Future[Unit]
 }

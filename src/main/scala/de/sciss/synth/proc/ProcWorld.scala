@@ -115,6 +115,8 @@ final class ProcWorld(val server: Server) {
     //     addToWaitList()
     //   }
 
+    import server.executionContext
+
     def advance(cnt: Int) {
       if (DEBUG) println("ADVANCE " + cnt)
       sync.synchronized {
@@ -133,30 +135,24 @@ final class ProcWorld(val server: Server) {
     }
 
     def sendNow(msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int) {
-      val peer = server.peer
+      // val peer = server.peer
       if (DEBUG) println("SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt)
       if (allSync) {
         val p = msgs match {
           case IIdxSeq(msg) if allSync => msg
           case _ => osc.Bundle.now(msgs: _*)
         }
-        peer ! p
+        server ! p
         advance(cnt)
 
       } else {
-        val syncMsg = peer.syncMsg()
-        val syncID = syncMsg.id
-        val bndl = osc.Bundle.now((msgs :+ syncMsg): _*)
-        val fut = peer.!!(bndl) {
-          case message.Synced(`syncID`) =>
-            advance(cnt)
-        }
-        fut.onFailure({
+        val bndl  = osc.Bundle.now(msgs: _*)
+        val fut   = server.!!(bndl)
+        val futR  = fut.recover {
           case message.Timeout() =>
             logTxn("TIMEOUT while sending OSC bundle!")
-            advance(cnt)
-
-        })(peer.clientConfig.executionContext)
+        }
+        futR.onSuccess { case _ => advance(cnt) }
       }
     }
 

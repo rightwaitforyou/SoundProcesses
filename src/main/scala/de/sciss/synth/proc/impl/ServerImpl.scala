@@ -26,47 +26,69 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.synth.{AllocatorExhausted, Server => SServer}
+import de.sciss.synth.{Server => SServer, message, AllocatorExhausted}
+import de.sciss.osc
+import scala.concurrent.{ExecutionContext, Future}
+import de.sciss.osc.Packet
 
 object ServerImpl {
-   def apply( peer: SServer ) : Server = new Impl( peer )
+  def apply(peer: SServer): Server = new Impl(peer)
 
-   private case class Impl( peer: SServer ) extends Server {
-      private val controlBusAllocator  = BlockAllocator( "control", peer.config.controlBusChannels )
-      private val audioBusAllocator    = BlockAllocator( "audio",   peer.config.audioBusChannels, peer.config.internalBusIndex )
-      private val bufferAllocator      = BlockAllocator( "buffer",  peer.config.audioBuffers )
+  private case class Impl(peer: SServer) extends Server {
+    def executionContext: ExecutionContext = peer.clientConfig.executionContext
 
-      val defaultGroup : Group = Group.wrap( this, peer.defaultGroup ) // .default( this )
+    private val controlBusAllocator = BlockAllocator("control", peer.config.controlBusChannels)
+    private val audioBusAllocator   = BlockAllocator("audio"  , peer.config.audioBusChannels, peer.config.internalBusIndex)
+    private val bufferAllocator     = BlockAllocator("buffer" , peer.config.audioBuffers)
+    private val nodeAllocator       = NodeIDAllocator(peer.clientConfig.clientID, peer.clientConfig.nodeIDOffset)
 
-      override def toString = peer.toString()
+    val defaultGroup: Group = Group.wrap(this, peer.defaultGroup) // .default( this )
 
-      def allocControlBus( numChannels: Int )( implicit tx: Txn ) : Int = {
-         val res = controlBusAllocator.alloc( numChannels )( tx.peer )
-         if( res < 0 ) throw AllocatorExhausted( "Control buses exhausted for " + this )
-         res
+    override def toString = peer.toString()
+
+    def allocControlBus(numChannels: Int)(implicit tx: Txn): Int = {
+      val res = controlBusAllocator.alloc(numChannels)(tx.peer)
+      if (res < 0) throw AllocatorExhausted("Control buses exhausted for " + this)
+      res
+    }
+
+    def allocAudioBus(numChannels: Int)(implicit tx: Txn): Int = {
+      val res = audioBusAllocator.alloc(numChannels)(tx.peer)
+      if (res < 0) throw AllocatorExhausted("Audio buses exhausted for " + this)
+      res
+    }
+
+    def freeControlBus(index: Int, numChannels: Int)(implicit tx: Txn) {
+      controlBusAllocator.free(index, numChannels)(tx.peer)
+    }
+
+    def freeAudioBus(index: Int, numChannels: Int)(implicit tx: Txn) {
+      audioBusAllocator.free(index, numChannels)(tx.peer)
+    }
+
+    def allocBuffer(numConsecutive: Int)(implicit tx: Txn): Int = {
+      val res = bufferAllocator.alloc(numConsecutive)(tx.peer)
+      if (res < 0) throw AllocatorExhausted("Buffers exhausted for " + this)
+      res
+    }
+
+    def freeBuffer(index: Int, numConsecutive: Int)(implicit tx: Txn) {
+      bufferAllocator.free(index, numConsecutive)(tx.peer)
+    }
+
+    def nextNodeID()(implicit tx: Txn): Int = nodeAllocator.alloc()(tx.peer)
+
+    // ---- side effects ----
+
+    def !(p: Packet) { peer ! p }
+
+    def !!(bndl: osc.Bundle): Future[Unit] = {
+      val syncMsg = peer.syncMsg()
+      val syncID  = syncMsg.id
+      val bndlS   = osc.Bundle(bndl.timetag, (bndl :+ syncMsg): _*)
+      peer.!!(bndlS) {
+        case message.Synced(`syncID`) =>
       }
-      def allocAudioBus( numChannels: Int )( implicit tx: Txn ) : Int = {
-         val res = audioBusAllocator.alloc( numChannels )( tx.peer )
-         if( res < 0 ) throw AllocatorExhausted( "Audio buses exhausted for " + this )
-         res
-      }
-
-      def freeControlBus( index: Int, numChannels: Int )( implicit tx: Txn ) {
-         controlBusAllocator.free( index, numChannels )( tx.peer )
-      }
-
-      def freeAudioBus( index: Int, numChannels: Int )( implicit tx: Txn ) {
-         audioBusAllocator.free( index, numChannels )( tx.peer )
-      }
-
-      def allocBuffer( numConsecutive: Int )( implicit tx: Txn ) : Int = {
-         val res = bufferAllocator.alloc( numConsecutive )( tx.peer )
-         if( res < 0 ) throw AllocatorExhausted( "Buffers exhausted for " + this )
-         res
-      }
-
-      def freeBuffer( index: Int, numConsecutive: Int )( implicit tx: Txn ) {
-         bufferAllocator.free( index, numConsecutive )( tx.peer )
-      }
-   }
+    }
+  }
 }
