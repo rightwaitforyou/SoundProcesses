@@ -69,8 +69,8 @@ object AuralSystemImpl {
       this
     }
 
-    def offline(config: Server.Config)(implicit tx: S#Tx) {
-      ???
+    def offline(server: Server.Offline)(implicit tx: S#Tx) {
+      serverStarted(server)
     }
 
     def stop()(implicit tx: S#Tx): AuralSystem[S] = {
@@ -82,6 +82,16 @@ object AuralSystemImpl {
         if (startStopCnt.get == expected) doStop()
       })(tx.peer)
       this
+    }
+
+    private def serverStarted(rich: Server)(implicit tx: S#Tx) {
+      implicit val itx = tx.peer
+      connection() = Some(rich.peer)
+      server.set(Some(rich))
+      ProcDemiurg.addServer(rich) // ( ProcTxn()( tx ))
+      val cs = clients.get
+      //                  println( "AQUI " + cs )
+      cs.foreach(_.started(rich))
     }
 
     private def doStart(config: Server.Config, connect: Boolean) {
@@ -100,14 +110,7 @@ object AuralSystemImpl {
           SoundProcesses.pool.submit(new Runnable() {
             def run() {
               cursor.step { implicit tx =>
-                implicit val itx = tx.peer
-                connection() = Some(s)
-                val rich = Server(s)
-                server.set(Some(rich))
-                ProcDemiurg.addServer(rich) // ( ProcTxn()( tx ))
-                val cs = clients.get
-                //                  println( "AQUI " + cs )
-                cs.foreach(_.started(rich))
+                serverStarted(Server(s))
               }
             }
           })

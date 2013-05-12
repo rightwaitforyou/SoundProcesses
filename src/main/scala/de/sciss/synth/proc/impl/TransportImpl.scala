@@ -231,10 +231,10 @@ object TransportImpl {
       }
     }
 
-    def stepTarget(implicit tx: S#Tx): Long = {
+    def stepTarget(implicit tx: S#Tx): Option[Long] = {
       val subm = submitRef()(tx.peer)
       import subm._
-      if (schedValid >= 0) logicalNow + logicalDelay else -1L
+      if (schedValid >= 0) Some(logicalNow + logicalDelay) else None
     }
 
     def elapse(seconds: Double)(implicit tx: S#Tx) {

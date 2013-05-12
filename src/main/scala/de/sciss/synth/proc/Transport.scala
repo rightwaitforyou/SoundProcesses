@@ -66,12 +66,12 @@ object Transport {
 
     /** Queries the logical time target of the next step.
       *
-      * @return the logical time in sample frames at which the next event occurs, or `-1` if there
+      * @return the logical time in sample frames at which the next event occurs, or `None` if there
       *         are no further events. If the offline logical clock has never been elapsed
       *         (by calling `elapse`), its base is zero, and therefore the number of frames returned
       *         by this method are the number of frames from the beginning of the timeline.
       */
-    def stepTarget(implicit tx: S#Tx): Long
+    def stepTarget(implicit tx: S#Tx): Option[Long]
 
     /** Advances the offline logical clock by a given amount of seconds.
       * This is important if the objects of the group being transported change,

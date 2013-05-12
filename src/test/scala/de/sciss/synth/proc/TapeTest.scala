@@ -59,20 +59,22 @@ object TapeTest extends App {
     val aural   = AuralSystem.start()
     AuralPresentation.run[S, I](transp, aural)
 
-    val t = new Thread {
-      override def run() {
-        this.synchronized(this.wait())
-        Thread.sleep(5 * 1000L)
-        sys.exit()
-      }
-      start() // bug in ScalaCollider's server boot - we have to make sure a thread is started before aural.start
-    }
+    //    val t = new Thread {
+    //      override def run() {
+    //        this.synchronized(this.wait())
+    //        Thread.sleep(5 * 1000L)
+    //        sys.exit()
+    //      }
+    //      start() // bug in ScalaCollider's server boot - we have to make sure a thread is started before aural.start
+    //    }
 
     aural.whenStarted { implicit tx => s =>
       // showTransportLog = true
       // s.peer.dumpOSC()
       transp.play()
-      t.synchronized { t.notifyAll() }
+      Thread.sleep(5 * 1000L)
+      sys.exit()
+      // t.synchronized { t.notifyAll() }
     }
   }
 }

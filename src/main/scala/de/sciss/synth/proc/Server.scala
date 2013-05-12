@@ -43,15 +43,20 @@ object Server {
   implicit def defaultGroup(server: Server): Group = server.defaultGroup
 
   trait Offline extends Server {
-    /** Logically closes the offline server and returns a list of all the bundles collected so far.
-      * __Note__: Calling this method will clear the information held by the server.
+    /** Returns a future of ongoing message sending.
+      * __Note__: Calling this method will clear the futures held by the server.
       */
-    def consume(): Future[IIdxSeq[osc.Bundle]]
+    def committed(): Future[Unit]
 
     /** The current frame position in the OSC file. The user should
       * increment this according to a reference transport, so that
       * messages are queued in the correct position. */
     var position: Long
+
+    /** Logically closes the offline server and returns a list of all the bundles collected so far.
+      * __Note__: Calling this method will clear the bundles held by the server.
+      */
+    def bundles(): IIdxSeq[osc.Bundle]
   }
 
   val  Config         = SServer.Config

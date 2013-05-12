@@ -35,10 +35,10 @@ object AuralSystem {
                         (implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] =
     apply[S].start(config, connect = connect)
 
-  def offline[S <: Sys[S]](config: Server.Config = Server.Config())
+  def offline[S <: Sys[S]](server: Server.Offline)
                           (implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] = {
     val res = apply[S]
-    res.offline(config)
+    res.offline(server)
     res
   }
 
@@ -52,7 +52,7 @@ trait AuralSystem[S <: Sys[S]] {
   import AuralSystem.Client
 
   def start  (config: Server.Config = Server.Config(), connect: Boolean = false)(implicit tx: S#Tx): AuralSystem[S]
-  private[proc] def offline(config: Server.Config)(implicit tx: S#Tx): Unit
+  private[proc] def offline(server: Server.Offline)(implicit tx: S#Tx): Unit
 
   def stop()(implicit tx: S#Tx): AuralSystem[S]
 

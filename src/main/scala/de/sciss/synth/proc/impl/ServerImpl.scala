@@ -68,16 +68,17 @@ object ServerImpl {
     private val sampleRate    = peer.sampleRate
     private def time: Double  = position / sampleRate
 
-    def consume(): Future[IIdxSeq[osc.Bundle]] = sync.synchronized {
+    def committed(): Future[Unit] = sync.synchronized {
       val futs  = filteredCommits
       _commits  = Vector.empty
       implicit val exec = peer.clientConfig.executionContext
-      val red   = ProcWorld.reduceFutures(futs)
-      red.map(_ => sync.synchronized {
-        val res   = _bundles
-        _bundles  = Vector.empty
-        res
-      })
+      ProcWorld.reduceFutures(futs)
+    }
+
+    def bundles(): IIdxSeq[osc.Bundle] = sync.synchronized {
+      val res   = _bundles
+      _bundles  = Vector.empty
+      res
     }
 
     private def addBundle(b: osc.Bundle) {

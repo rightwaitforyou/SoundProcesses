@@ -8,12 +8,17 @@ import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.synth.io.{SampleFormat, AudioFileType}
 import de.sciss.synth.{Server => SServer}
 import de.sciss.lucre.stm
-import concurrent.blocking
+import scala.concurrent.{Await, blocking}
+import scala.annotation.tailrec
+import scala.concurrent.duration.Duration
 
 object Bounce {
-  def apply[S <: Sys[S]](implicit cursor: stm.Cursor[S]): Bounce[S] = new Bounce[S]
+  def apply[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx): Bounce[S, I] =
+    new Bounce[S, I]
 }
-final class Bounce[S <: Sys[S]] private (implicit cursor: stm.Cursor[S]) extends ProcessorFactory {
+final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx)
+  extends ProcessorFactory {
+
   type Product = File
 
   sealed trait ConfigLike {
@@ -48,7 +53,7 @@ final class Bounce[S <: Sys[S]] private (implicit cursor: stm.Cursor[S]) extends
     def init: (S#Tx, Server) => Unit
   }
   object Config {
-    def apply: ConfigBuilder = new ConfigBuilder
+    def apply(): ConfigBuilder = new ConfigBuilder
 
     implicit def build(b: ConfigBuilder): Config = b.build
   }
@@ -111,14 +116,13 @@ final class Bounce[S <: Sys[S]] private (implicit cursor: stm.Cursor[S]) extends
         config.server
       }
 
-      val s = Server.offline(sCfg)
-      blocking {
+      val (view, span, transp, server) = blocking {
         cursor.step { implicit tx =>
           import ProcGroup.serializer
           val groupH  = tx.newHandle(config.group)
           val group   = groupH()
 
-          val span    = config.span match {
+          val _span   = config.span match {
             case defined: Span    => defined
             case Span.From(start) =>
               val stop  = group.nearestEventBefore(Long.MaxValue).getOrElse(0L)
@@ -129,13 +133,45 @@ final class Bounce[S <: Sys[S]] private (implicit cursor: stm.Cursor[S]) extends
               Span(start, stop)
           }
 
-          val transp  = ??? // Transport.Offline(group, sampleRate)
-          // val aural   =
-          // val view    = AuralPresentation.run(transp, aural)
-          ??? // transp.seek(span.start)
+          val _transp = Transport.Offline[S, I](group, sampleRate)
+          val _s      = Server.offline(sCfg)
+          val aural   = AuralSystem.offline[S](_s)
+          val _view   = AuralPresentation.run[S, I](_transp, aural)
+
+          config.init(tx, _s)
+
+          _transp.seek(_span.start)
+          _transp.play()
+
+          (_view, _span, _transp, _s)
         }
       }
-      ???
+
+      @tailrec def loop() {
+        Await.result(server.committed(), Duration.Inf)
+        val keepPlaying = blocking {
+          cursor.step { implicit tx =>
+            transp.stepTarget match {
+              case _posO @ Some(pos) if (pos <= span.stop) =>
+                server.position = pos - span.start
+                transp.step()
+                true
+
+              case _ => false
+            }
+          }
+        }
+        if (keepPlaying) loop()
+      }
+
+      loop()
+      Await.result(server.committed(), Duration.Inf)
+      val bundles = server.bundles()
+      bundles.foreach(println)
+
+      // XXX TODO: clean up
+
+      new File("no-way-jose")
     }
   }
 }
