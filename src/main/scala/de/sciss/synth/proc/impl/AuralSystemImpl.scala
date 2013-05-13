@@ -27,17 +27,18 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.osc.Dump
-import concurrent.stm.{Ref, Txn}
+import scala.concurrent.stm.{Txn => ScalaTxn, TxnExecutor, Ref}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.lucre.stm
 import de.sciss.synth.{Server => SServer, ServerLike => SServerLike, ServerConnection}
+import TxnExecutor.{defaultAtomic => atomic}
 
 object AuralSystemImpl {
   import AuralSystem.Client
 
   var dumpOSC = false
 
-  def apply[S <: Sys[S]](implicit cursor: stm.Cursor[S]): AuralSystem[S] = new Impl[S]
+  def apply(): AuralSystem = new Impl
 
   //   private def dummySerializer[ A, I <: stm.Sys[ I ]] : stm.Serializer[ I#Tx, I#Acc, A ] =
   //      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
@@ -47,50 +48,37 @@ object AuralSystemImpl {
   //      def read( in: DataInput, access: stm.InMemory#Acc )( implicit tx: stm.InMemory#Tx ) : Nothing = sys.error( "Operation not supported" )
   //   }
 
-  private final class Impl[S <: Sys[S]](implicit cursor: stm.Cursor[S])
-    extends AuralSystem[S] {
+  private final class Impl extends AuralSystem {
     impl =>
 
     override def toString = "AuralSystem@" + hashCode.toHexString
 
-    private val startStopCnt  = Ref(0)
-    private val clients       = Ref(IIdxSeq.empty[Client[S]])
+    private val clients       = Ref(IIdxSeq.empty[Client])
     private val server        = Ref(Option.empty[Server])
     private val connection    = Ref(Option.empty[SServerLike])
 
-    def start(config: Server.Config, connect: Boolean)(implicit tx: S#Tx): AuralSystem[S] = {
-      implicit val itx = tx.peer
-      val expected = startStopCnt.get + 1
-      startStopCnt.set(expected)
-
-      Txn.beforeCommit(_ => {
-        if (startStopCnt.get == expected) doStart(config, connect = connect)
-      })(tx.peer)
+    def start(config: Server.Config, connect: Boolean, schoko: Int): AuralSystem = {
+      doStart(config, connect = connect)
       this
     }
 
-    def offline(server: Server.Offline)(implicit tx: S#Tx) {
+    def offline(server: Server.Offline, schoko: Int) {
       serverStarted(server)
     }
 
-    def stop()(implicit tx: S#Tx): AuralSystem[S] = {
-      implicit val itx = tx.peer
-      val expected = startStopCnt.get + 1
-      startStopCnt.set(expected)
-
-      Txn.beforeCommit(_ => {
-        if (startStopCnt.get == expected) doStop()
-      })(tx.peer)
+    def stop(schoko: Int): AuralSystem = {
+      doStop()
       this
     }
 
-    private def serverStarted(rich: Server)(implicit tx: S#Tx) {
-      implicit val itx = tx.peer
-      connection() = Some(rich.peer)
-      server.set(Some(rich))
-      ProcDemiurg.addServer(rich) // ( ProcTxn()( tx ))
-      val cs = clients.get
-      //                  println( "AQUI " + cs )
+    private def serverStarted(rich: Server) {
+      val cs = atomic { implicit itx =>
+        implicit val ptx = Txn.applyPlain(itx)
+        connection() = Some(rich.peer)
+        server.set(Some(rich))
+        ProcDemiurg.addServer(rich) // ( ProcTxn()( tx ))
+        clients()
+      }
       cs.foreach(_.started(rich))
     }
 
@@ -109,9 +97,7 @@ object AuralSystemImpl {
           if (dumpOSC) s.dumpOSC(Dump.Text)
           SoundProcesses.pool.submit(new Runnable() {
             def run() {
-              cursor.step { implicit tx =>
-                serverStarted(Server(s))
-              }
+              serverStarted(Server(s))
             }
           })
       }
@@ -122,7 +108,7 @@ object AuralSystemImpl {
         }
       }))
 
-      connection.single() = Some(c)
+      connection.single() = Some(c)   // XXX TODO: not good
     }
 
     private def shutdown() {
@@ -133,44 +119,47 @@ object AuralSystemImpl {
     }
 
     private def doStop() {
-      connection.single.swap(None).foreach {
-        case c: ServerConnection => c.abort()
-        case s: SServer =>
-          cursor.step {
-            implicit tx =>
-              implicit val itx = tx.peer
-              server.get.foreach { rich =>
-                clients.get.foreach(_.stopped())
-                ProcDemiurg.removeServer(rich) // ( ProcTxn()( tx ))
-              }
-          }
-          s.quit()
+      val opt = atomic { implicit itx =>
+        connection.single.swap(None) match {
+          case Some(c: ServerConnection) => c.abort(); None
+          case Some(s: SServer) =>
+            val so = server.swap(None)
+            so.foreach { rich =>
+              implicit val ptx = Txn.applyPlain(itx)
+              ProcDemiurg.removeServer(rich) // ( ProcTxn()( tx ))
+            }
+            so.map(_ -> clients())
+          case _ => None
+        }
+      }
+      opt.foreach { case (rich, cs) =>
+        cs.foreach(_.stopped())
+        rich.peer.quit()
       }
     }
 
-    def addClient(c: Client[S])(implicit tx: S#Tx) {
-      implicit val itx = tx.peer
-      clients.transform(_ :+ c)
-      val sOpt = server.get
-      sOpt.foreach { s =>
-        c.started(s)
-      }
+    def addClient(c: Client) {
+      clients.single.transform(_ :+ c)
+      //      val sOpt = atomic { implicit itx =>
+      //        clients.transform(_ :+ c)
+      //        server()
+      //      }
+      //      sOpt.foreach(c.started(_))
     }
 
-    def removeClient(c: Client[S])(implicit tx: S#Tx) {
-      implicit val itx = tx.peer
-      clients.transform {
-        _.filterNot(_ == c)
-      }
+    def serverOption(implicit tx: Txn): Option[Server] = server()(tx.peer)
+
+    def removeClient(c: Client) {
+      clients.single.transform { _.filterNot(_ == c) }
     }
 
-    def whenStarted(fun: S#Tx => Server => Unit)(implicit tx: S#Tx) {
-      addClient(new Client[S] {
-        def started(s: Server)(implicit tx: S#Tx) {
-          fun(tx)(s)
+    def whenStarted(fun: Server => Unit) {
+      addClient(new Client {
+        def started(s: Server) {
+          fun(s)    // XXX TODO: should we remove the client?
         }
 
-        def stopped()(implicit tx: S#Tx) {}
+        def stopped() {}
       })
     }
   }

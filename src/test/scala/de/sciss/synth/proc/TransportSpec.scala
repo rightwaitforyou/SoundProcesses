@@ -28,7 +28,7 @@ class TransportSpec extends ConfluentEventSpec {
   def curve(amp: Expr[S, Double], shape: Env.ConstShape = linShape)(implicit tx: S#Tx) =
     Grapheme.Elem.Curve(amp -> shape)
 
-  "Transport" should "notify observers about all relevant events" in { system =>
+  "Transport" should "notify observers about all relevant events" in { implicit system =>
     val obs = new Observation[S]
     val (pgH, t) = system.step { implicit tx =>
       val pg  = ProcGroup.Modifiable[S]
@@ -114,7 +114,7 @@ class TransportSpec extends ConfluentEventSpec {
     }
   }
 
-  it should "handle process updates in a sensible way" in { system =>
+  it should "handle process updates in a sensible way" in { implicit system =>
     val obs = new Observation[S]
     val (pgH, t) = system.step { implicit tx =>
       val pg = ProcGroup.Modifiable[S]

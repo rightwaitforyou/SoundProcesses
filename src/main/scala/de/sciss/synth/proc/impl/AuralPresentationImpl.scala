@@ -31,54 +31,62 @@ import de.sciss.lucre.{event => evt, stm}
 import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
-import concurrent.stm.{Ref, TxnLocal}
+import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal, Txn => ScalaTxn}
 import proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
+import TxnExecutor.{defaultAtomic => atomic}
 
 object AuralPresentationImpl {
-  def run[S <: Sys[S], I <: stm.Sys[I]](transport: ProcTransport[S], aural: AuralSystem[S])
-                                       (implicit tx: S#Tx, bridge: S#Tx => I#Tx): AuralPresentation[S] = {
-
-    val dummy = DummySerializerFactory[I]
-    import dummy._
-    implicit val itx: I#Tx  = tx
-    val id                  = itx.newID()
-    val running             = itx.newVar[Option[RunningImpl[S]]](id, None)
-    //    val storeHolder         = tx.newHandle(artifactStore)
-    val c                   = new Client[S, I](running, transport, aural /* , storeHolder */)
+  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, schoko: Int): AuralPresentation[S] = {
+    val c = new Client[S](transport, aural)
     aural.addClient(c)
+    atomic { implicit itx =>
+      implicit val ptx = Txn.applyPlain(itx)
+      aural.serverOption.foreach { s =>
+        ScalaTxn.afterCommit(_ => c.started(s))
+      }
+    }
     c
   }
 
-  private final class Client[S <: Sys[S], I <: stm.Sys[I]](running: I#Var[Option[RunningImpl[S]]],
-                                                           transport: ProcTransport[S],
-                                                           aural: AuralSystem[S])
-                                                          (implicit /* cursor: Cursor[ S ], */ bridge: S#Tx => I#Tx)
-    extends AuralPresentation[S] with AuralSystem.Client[S] {
+  def runTx[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] = {
+    val c = new Client[S](transport, aural)
+    aural.addClient(c)
+    aural.serverOption.foreach(c.startedTx(_))
+    c
+  }
+
+  private final class Client[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)
+    extends AuralPresentation[S] with AuralSystem.Client {
 
     override def toString = "AuralPresentation@" + hashCode.toHexString
 
-    private val groupRef = Ref(Option.empty[Group])
+    private val running   = Ref(Option.empty[RunningImpl[S]])
+    private val groupRef  = Ref(Option.empty[Group])
 
     def dispose()(implicit tx: S#Tx) {
       // XXX TODO dispose running
     }
 
-    def stopped()(implicit tx: S#Tx) {
-      implicit val itx: I#Tx = tx
+    def stopped() {
+      // implicit val itx: I#Tx = tx
       aural.removeClient(this)
-      running().foreach { impl =>
-        // XXX TODO dispose
-        running() = None
-      }
+      running.single() = None // XXX TODO dispose
     }
 
     def group(implicit tx: S#Tx): Option[Group] = groupRef.get(tx.peer)
 
-    def started(server: Server)(implicit tx: S#Tx) {
-      implicit val itx: I#Tx = tx
+    def started(server: Server) {
+      transport.cursor.step { implicit tx =>
+        startedTx(server)
+      }
+    }
+
+    def startedTx(server: Server)(implicit tx: S#Tx) {
+      // implicit val itx: I#Tx = tx
+      println("startedTx")
 
       val viewMap: IdentifierMap[S#ID, S#Tx, AuralProc] = tx.newInMemoryIDMap
       val scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])] = tx.newInMemoryIDMap
@@ -129,6 +137,7 @@ object AuralPresentationImpl {
         //                  log( "other " + other )
       }}
 
+      implicit val itx = tx.peer
       running() = Some(booted)
     }
   }

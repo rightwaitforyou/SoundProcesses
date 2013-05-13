@@ -57,7 +57,7 @@ object TransportImpl {
   }
 
   def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double)(
-    implicit tx: S#Tx, bridge: S#Tx => I#Tx): Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] = {
+    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] = {
 
     val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[S, I](group)
     val t = new Offline[S, I](groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar)
@@ -209,7 +209,7 @@ object TransportImpl {
                                                             protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
                                                             protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
                                                             protected val obsVar: I#Var[IIdxSeq[Observation[S, I]]])
-                                                           (implicit protected val trans: S#Tx => I#Tx)
+                                                           (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] with Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] {
     private val submitRef = Ref(offlineEmptyStep)
     private val timeRef   = Ref(0L)
@@ -266,7 +266,7 @@ object TransportImpl {
                                                              protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
                                                              protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
                                                              protected val obsVar: I#Var[IIdxSeq[Observation[S, I]]])
-                                                            (implicit cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
+                                                            (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] {
 
     protected def logicalTime()(implicit tx: S#Tx): Long = rt_cpuTime.get(tx.peer)
@@ -279,8 +279,10 @@ object TransportImpl {
       val actualDelay = math.max(0L, logicalDelay - jitter)
       log("scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay)
       Txn.afterCommit(_ => {
+        // log("(after commit)")
         SoundProcesses.pool.schedule(new Runnable {
           def run() {
+            log("scheduled: execute")
             cursor.step { implicit tx =>
               eventReached(logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid)
             }

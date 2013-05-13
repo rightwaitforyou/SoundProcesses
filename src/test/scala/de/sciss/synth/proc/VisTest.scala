@@ -223,20 +223,22 @@ extends ExprImplicits[ S ] {
 //      }
 //   }}
 
-   private val auralVar = STMRef( Option.empty[ AuralPresentation[ S ]])
+  private val auralVar = STMRef(Option.empty[AuralPresentation[S]])
 
-   def aural() { t { implicit tx =>
-      implicit val itx = tx.peer
-      if( auralVar().isEmpty ) {
-         val as = AuralSystem.start[ S ]()
-         implicit val _artifactStore = artifactStore
-         auralVar.set( Some( AuralPresentation.run[ S, I ]( trans, as )))
-      }
-   }}
+   def aural() {
+     if (auralVar.single().isDefined) return
 
-   def pr( time: Long = 4 * 44100 )( implicit tx: S#Tx ) = group.intersect( time ).next._2.head.value
+     val as = AuralSystem.start(schoko = 33)
+     t { implicit tx =>
+       implicit val itx = tx.peer
+       implicit val _artifactStore = artifactStore
+       auralVar() = Some(AuralPresentation.runTx[S](trans, as))
+     }
+   }
 
-   def addFreq( time: Expr[ S, Long ] = 0, freq: Expr[ S, Param ]) {
+  def pr(time: Long = 4 * 44100)(implicit tx: S#Tx) = group.intersect(time).next._2.head.value
+
+  def addFreq( time: Expr[ S, Long ] = 0, freq: Expr[ S, Param ]) {
       t { implicit tx =>
          addFreq2( time -> curve( freq ))
       }

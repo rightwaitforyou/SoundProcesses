@@ -15,16 +15,14 @@ object PatchTest extends App {
     val sys = Confluent(BerkeleyDB.tmp())
     val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val _cursor: stm.Cursor[S] = cursor
-    cursor.step { implicit tx =>
-      val auralSys = AuralSystem.start[S]()
-      auralSys.whenStarted(implicit tx => { _ =>
-        println("Aural System started.")
-        run[S, I](auralSys)
-      })
-    }
+    val auralSys = AuralSystem.start(schoko = 33)
+    auralSys.whenStarted(_ => cursor.step { implicit tx =>
+      println("Aural System started.")
+      run[S, I](auralSys)
+    })
   }
 
-  def run[S <: Sys[S], I <: stm.Sys[I]](auralSys: AuralSystem[S])
+  def run[S <: Sys[S], I <: stm.Sys[I]](auralSys: AuralSystem)
                                        (implicit tx: S#Tx, cursor: stm.Cursor[S], bridge: S#Tx => I#Tx) {
 
     val imp = ExprImplicits[S]
@@ -37,7 +35,7 @@ object PatchTest extends App {
     val group         = ProcGroup.Modifiable[S]
     val trans         = Transport[S, I](group)
     implicit val loc  = Artifact.Location.Modifiable.tmp[S]()
-    val ap            = AuralPresentation.run[S, I](trans, auralSys)
+    val ap            = AuralPresentation.runTx[S](trans, auralSys)
     ap.group.foreach {
       _.server.peer.dumpOSC()
     }

@@ -138,7 +138,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
 
       // ---- run transport and gather OSC ----
 
-      val (view, span, transp, server) = blocking {
+      val (span, transp) = blocking {
         cursor.step { implicit tx =>
           import ProcGroup.serializer
           val groupH  = tx.newHandle(config.group)
@@ -156,16 +156,20 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
           }
 
           val _transp = Transport.offline[S, I](group, sampleRate)
-          val _s      = Server.offline(sCfg)
-          val aural   = AuralSystem.offline[S](_s)
-          val _view   = AuralPresentation.run[S, I](_transp, aural)
+          (_span, _transp)
+        }
+      }
 
-          config.init(tx, _s)
+      val server  = Server.offline(sCfg)
+      val aural   = AuralSystem.offline(server, schoko = 33)
 
-          _transp.seek(_span.start)
-          _transp.play()
-
-          (_view, _span, _transp, _s)
+      val view = blocking {
+        cursor.step { implicit tx =>
+          val _view   = AuralPresentation.runTx[S](transp, aural)
+          config.init(tx, server)
+          transp.seek(span.start)
+          transp.play()
+          _view
         }
       }
 
@@ -241,7 +245,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       lazy val log: ProcessLogger = new ProcessLogger {
         def buffer[T](f: => T): T = f
 
-        // ???
+        // ??
         def out(line: => String) {
           if (line.startsWith("nextOSCPacket")) {
             val time = line.substring(14).toFloat

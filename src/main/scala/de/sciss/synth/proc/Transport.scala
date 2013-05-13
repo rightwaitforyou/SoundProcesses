@@ -52,7 +52,7 @@ object Transport {
 
   /** Creates a new offline transport. The transport is not positioned. */
   def offline[S <: evt.Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
-    implicit tx: S#Tx, bridge: S#Tx => I#Tx): Offline[S, Proc[S], Transport.Proc.Update[S]] =
+    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Offline[S, Proc[S], Transport.Proc.Update[S]] =
     Impl.offline[S, I](group, sampleRate)
 
   /**
@@ -145,4 +145,6 @@ trait Transport[S <: evt.Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ 
 
   //   def play()( implicit time: Chronos[ S ]) : Unit
   //   def stop()( implicit time: Chronos[ S ]) : Unit
+
+  def cursor: stm.Cursor[S]
 }

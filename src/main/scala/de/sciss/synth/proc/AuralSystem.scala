@@ -29,35 +29,35 @@ import impl.{AuralSystemImpl => Impl}
 import de.sciss.lucre.stm
 
 object AuralSystem {
-  def apply[S <: Sys[S]](implicit cursor: stm.Cursor[S]): AuralSystem[S] = Impl[S]
+  def apply(): AuralSystem = Impl()
 
-  def start[S <: Sys[S]](config: Server.Config = Server.Config(), connect: Boolean = false)
-                        (implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] =
-    apply[S].start(config, connect = connect)
+  def start(config: Server.Config = Server.Config(), connect: Boolean = false, schoko: Int): AuralSystem =
+    apply().start(config, connect = connect, schoko = schoko)
 
-  def offline[S <: Sys[S]](server: Server.Offline)
-                          (implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralSystem[S] = {
-    val res = apply[S]
-    res.offline(server)
+  def offline(server: Server.Offline, schoko: Int): AuralSystem = {
+    val res = apply()
+    res.offline(server, schoko = schoko)
     res
   }
 
-  trait Client[S <: Sys[S]] {
-    def started(s: Server)(implicit tx: S#Tx): Unit
-    def stopped()         (implicit tx: S#Tx): Unit
+  trait Client {
+    def started(s: Server): Unit
+    def stopped()         : Unit
   }
 }
 
-trait AuralSystem[S <: Sys[S]] {
+trait AuralSystem {
   import AuralSystem.Client
 
-  def start  (config: Server.Config = Server.Config(), connect: Boolean = false)(implicit tx: S#Tx): AuralSystem[S]
-  private[proc] def offline(server: Server.Offline)(implicit tx: S#Tx): Unit
+  def start  (config: Server.Config = Server.Config(), connect: Boolean = false, schoko: Int): AuralSystem
+  private[proc] def offline(server: Server.Offline, schoko: Int): Unit
 
-  def stop()(implicit tx: S#Tx): AuralSystem[S]
+  def stop(schoko: Int): AuralSystem
 
-  def addClient   (c: Client[S])(implicit tx: S#Tx): Unit
-  def removeClient(c: Client[S])(implicit tx: S#Tx): Unit
+  def addClient   (c: Client): Unit
+  def removeClient(c: Client): Unit
 
-  def whenStarted(fun: S#Tx => Server => Unit)(implicit tx: S#Tx): Unit
+  def whenStarted(fun: Server => Unit): Unit
+
+  def serverOption(implicit tx: Txn): Option[Server]
 }

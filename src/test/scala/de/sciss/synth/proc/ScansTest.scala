@@ -78,31 +78,26 @@ object ScansTest extends App {
     //      val imp  = ExprImplicits[ S ]
     //      import imp._
 
-    def body(auralSystem: Option[AuralSystem[S]])(implicit tx: S#Tx) {
+    def body(auralSystem: Option[AuralSystem])(implicit tx: S#Tx) {
       val group = ProcGroup.Modifiable[S]
       test(group)
       //            transp.playing_=( true )
       val transp = Transport[S, I](group)
       auralSystem.foreach { as =>
         implicit val loc = Artifact.Location.Modifiable.tmp[S]()
-        AuralPresentation.run[S, I](transp, as)
+        AuralPresentation.runTx[S](transp, as)
       }
       transp.play()
     }
 
-    cursor.step { implicit tx =>
-      if (AURAL) {
-        val as = AuralSystem.start[S]()
-        as.whenStarted {
-          implicit tx => {
-            _ =>
-              body(Some(as))
-          }
+    if (AURAL) {
+      val as = AuralSystem.start(schoko = 33)
+      as.whenStarted { _ =>
+        cursor.step { implicit tx =>
+          body(Some(as))
         }
-      } else {
-        body(None)
       }
-    }
+    } else cursor.step { implicit tx => body(None) }
 
     //      Thread.sleep( 1000 )
   }

@@ -17,7 +17,9 @@ object TapeTest extends App {
     def seconds = (d * 44100).toLong
   }
 
-  system.step { implicit tx =>
+  val aural = AuralSystem()
+
+  val transp = system.step { implicit tx =>
     val expr      = ExprImplicits[S]
     import expr._
 
@@ -55,9 +57,7 @@ object TapeTest extends App {
     group.add(Span(1.seconds, 4.seconds), proc)
 
     import Durable.inMemory
-    val transp  = Transport[S, I](group)
-    val aural   = AuralSystem.start()
-    AuralPresentation.run[S, I](transp, aural)
+    val _transp  = Transport[S, I](group)
 
     //    val t = new Thread {
     //      override def run() {
@@ -67,14 +67,25 @@ object TapeTest extends App {
     //      }
     //      start() // bug in ScalaCollider's server boot - we have to make sure a thread is started before aural.start
     //    }
-
-    aural.whenStarted { implicit tx => s =>
-      // showTransportLog = true
-      // s.peer.dumpOSC()
-      transp.play()
-      Thread.sleep(5 * 1000L)
-      sys.exit()
-      // t.synchronized { t.notifyAll() }
-    }
+    _transp
   }
+
+  aural.whenStarted { s =>
+    // showTransportLog = true
+    // s.peer.dumpOSC()
+    system.step { implicit tx =>
+      AuralPresentation.runTx[S](transp, aural)
+      transp.react(tx => upd => println(s"Observed: $upd"))
+      transp.play()
+    }
+    new Thread {
+      override def run() {
+        Thread.sleep(5 * 1000L)
+        sys.exit()
+      }
+    } .start()
+    // t.synchronized { t.notifyAll() }
+  }
+
+  aural.start(schoko = 33)
 }
