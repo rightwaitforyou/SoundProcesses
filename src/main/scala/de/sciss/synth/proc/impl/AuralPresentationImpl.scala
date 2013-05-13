@@ -39,7 +39,7 @@ import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import TxnExecutor.{defaultAtomic => atomic}
 
 object AuralPresentationImpl {
-  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, schoko: Int): AuralPresentation[S] = {
+  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
     val c = new Client[S](transport, aural)
     aural.addClient(c)
     atomic { implicit itx =>

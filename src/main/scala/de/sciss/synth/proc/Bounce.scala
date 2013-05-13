@@ -161,7 +161,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       }
 
       val server  = Server.offline(sCfg)
-      val aural   = AuralSystem.offline(server, schoko = 33)
+      val aural   = AuralSystem.offline(server)
 
       val view = blocking {
         cursor.step { implicit tx =>

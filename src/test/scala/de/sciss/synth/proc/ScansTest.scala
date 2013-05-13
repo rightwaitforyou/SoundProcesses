@@ -91,12 +91,14 @@ object ScansTest extends App {
     }
 
     if (AURAL) {
-      val as = AuralSystem.start(schoko = 33)
+      val as = AuralSystem()
       as.whenStarted { _ =>
         cursor.step { implicit tx =>
           body(Some(as))
         }
       }
+      as.start()
+
     } else cursor.step { implicit tx => body(None) }
 
     //      Thread.sleep( 1000 )

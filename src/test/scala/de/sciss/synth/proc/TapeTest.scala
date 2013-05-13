@@ -87,5 +87,5 @@ object TapeTest extends App {
     // t.synchronized { t.notifyAll() }
   }
 
-  aural.start(schoko = 33)
+  aural.start()
 }

@@ -228,7 +228,7 @@ extends ExprImplicits[ S ] {
    def aural() {
      if (auralVar.single().isDefined) return
 
-     val as = AuralSystem.start(schoko = 33)
+     val as = AuralSystem.start()
      t { implicit tx =>
        implicit val itx = tx.peer
        implicit val _artifactStore = artifactStore

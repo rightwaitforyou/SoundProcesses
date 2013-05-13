@@ -57,16 +57,16 @@ object AuralSystemImpl {
     private val server        = Ref(Option.empty[Server])
     private val connection    = Ref(Option.empty[SServerLike])
 
-    def start(config: Server.Config, connect: Boolean, schoko: Int): AuralSystem = {
+    def start(config: Server.Config, connect: Boolean): AuralSystem = {
       doStart(config, connect = connect)
       this
     }
 
-    def offline(server: Server.Offline, schoko: Int) {
+    def offline(server: Server.Offline) {
       serverStarted(server)
     }
 
-    def stop(schoko: Int): AuralSystem = {
+    def stop(): AuralSystem = {
       doStop()
       this
     }

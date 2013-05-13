@@ -15,11 +15,12 @@ object PatchTest extends App {
     val sys = Confluent(BerkeleyDB.tmp())
     val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val _cursor: stm.Cursor[S] = cursor
-    val auralSys = AuralSystem.start(schoko = 33)
+    val auralSys = AuralSystem()
     auralSys.whenStarted(_ => cursor.step { implicit tx =>
       println("Aural System started.")
       run[S, I](auralSys)
     })
+    auralSys.start()
   }
 
   def run[S <: Sys[S], I <: stm.Sys[I]](auralSys: AuralSystem)

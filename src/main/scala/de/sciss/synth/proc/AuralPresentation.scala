@@ -32,8 +32,8 @@ import impl.{AuralPresentationImpl => Impl}
 object AuralPresentation {
   // ---- implementation forwards ----
 
-  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, schoko: Int): AuralPresentation[S] =
-    Impl.run[S](transport, aural, schoko = schoko)
+  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] =
+    Impl.run[S](transport, aural)
 
   def runTx[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] =
     Impl.runTx[S](transport, aural)

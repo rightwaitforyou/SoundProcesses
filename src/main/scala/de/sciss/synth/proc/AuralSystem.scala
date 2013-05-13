@@ -31,12 +31,12 @@ import de.sciss.lucre.stm
 object AuralSystem {
   def apply(): AuralSystem = Impl()
 
-  def start(config: Server.Config = Server.Config(), connect: Boolean = false, schoko: Int): AuralSystem =
-    apply().start(config, connect = connect, schoko = schoko)
+  def start(config: Server.Config = Server.Config(), connect: Boolean = false): AuralSystem =
+    apply().start(config, connect = connect)
 
-  def offline(server: Server.Offline, schoko: Int): AuralSystem = {
+  def offline(server: Server.Offline): AuralSystem = {
     val res = apply()
-    res.offline(server, schoko = schoko)
+    res.offline(server)
     res
   }
 
@@ -49,10 +49,10 @@ object AuralSystem {
 trait AuralSystem {
   import AuralSystem.Client
 
-  def start  (config: Server.Config = Server.Config(), connect: Boolean = false, schoko: Int): AuralSystem
-  private[proc] def offline(server: Server.Offline, schoko: Int): Unit
+  def start  (config: Server.Config = Server.Config(), connect: Boolean = false): AuralSystem
+  private[proc] def offline(server: Server.Offline): Unit
 
-  def stop(schoko: Int): AuralSystem
+  def stop(): AuralSystem
 
   def addClient   (c: Client): Unit
   def removeClient(c: Client): Unit
