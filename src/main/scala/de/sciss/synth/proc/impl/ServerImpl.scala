@@ -26,7 +26,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.synth.{Server => SServer, proc, message, AllocatorExhausted}
+import de.sciss.synth.{Server => SServer, addToHead, proc, message, AllocatorExhausted}
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
 import de.sciss.osc.Packet
@@ -77,10 +77,14 @@ object ServerImpl {
       ProcWorld.reduceFutures(futs)
     }
 
-    def bundles(): IIdxSeq[osc.Bundle] = sync.synchronized {
+    def bundles(addDefaultGroup: Boolean): IIdxSeq[osc.Bundle] = sync.synchronized {
       val res   = _bundles
       _bundles  = Vector.empty
-      res
+      val res1  = if (res.isEmpty || !addDefaultGroup) res else {
+        val b   = osc.Bundle(res.head.timetag, message.GroupNew(message.GroupNew.Info(1, addToHead.id, 0)))
+        b +: res
+      }
+      res1
     }
 
     private def addBundle(b: osc.Bundle) {

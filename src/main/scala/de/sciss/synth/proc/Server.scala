@@ -55,8 +55,11 @@ object Server {
 
     /** Logically closes the offline server and returns a list of all the bundles collected so far.
       * __Note__: Calling this method will clear the bundles held by the server.
+      *
+      * @param  addDefaultGroup if `true`, prepends a `/g_new` message for the standard default group
+        *                       (node id 1) to the returned bundles
       */
-    def bundles(): IIdxSeq[osc.Bundle]
+    def bundles(addDefaultGroup: Boolean = true): IIdxSeq[osc.Bundle]
   }
 
   val  Config         = SServer.Config

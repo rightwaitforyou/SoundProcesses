@@ -79,6 +79,9 @@ object Transport {
       * For a bouncing operation, this method should not be used.
       */
     def elapse(seconds: Double)(implicit tx: S#Tx): Unit
+
+    /** Last frame position at which the transport stopped to evaluate an event. */
+    def position(implicit tx: S#Tx): Long
   }
 
   final case class Advance[S <: evt.Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long,

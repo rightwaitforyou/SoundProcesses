@@ -3,21 +3,27 @@ package de.sciss.synth.proc
 import de.sciss.span.Span
 import language.implicitConversions
 import de.sciss.processor.{Processor, ProcessorFactory}
-import java.io.File
+import java.io.{RandomAccessFile, File}
 import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.synth.io.{SampleFormat, AudioFileType}
-import de.sciss.synth.{Server => SServer}
 import de.sciss.lucre.stm
 import scala.concurrent.{Await, blocking}
 import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
+import de.sciss.osc
+import java.nio.ByteBuffer
+import scala.sys.process.{Process, ProcessLogger}
 
 object Bounce {
+  var DEBUG = false
+
   def apply[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx): Bounce[S, I] =
     new Bounce[S, I]
 }
 final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx)
   extends ProcessorFactory {
+
+  import Bounce.DEBUG
 
   type Product = File
 
@@ -74,6 +80,11 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
     val server: Server.ConfigBuilder    = Server.Config()
     var init  : (S#Tx, Server) => Unit  = (_, _) => ()
 
+    // some sensible defaults
+    server.blockSize          = 1
+    server.inputBusChannels   = 0
+    server.outputBusChannels  = 1
+
     def build: Config = ConfigImpl(group = group, span = span, server = server, init = init)
   }
 
@@ -92,11 +103,17 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
   }
 
   private final class Impl(config: Config) extends ProcessorImpl[Product, Repr] {
+    // XXX TODO: due to a bug in Processor, this is currently not called:
+    // override protected def cleanUp() {
+    // }
+
     protected def body(): File = {
       val needsOSCFile  = config.server.nrtCommandPath    == "" // we need to generate that file
       val needsDummyOut = config.server.outputBusChannels == 0  // scsynth doesn't allow this. must have 1 dummy channel
       val needsOutFile  = config.server.nrtOutputPath     == ""  && !needsDummyOut // we need to generate
       val sampleRate    = config.server.sampleRate.toDouble
+
+      // ---- configuration ----
 
       // the server config (either directly from input, or updated according to the necessary changes)
       val sCfg  = if (needsOSCFile || needsDummyOut || needsOutFile) {
@@ -118,6 +135,8 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       } else {
         config.server
       }
+
+      // ---- run transport and gather OSC ----
 
       val (view, span, transp, server) = blocking {
         cursor.step { implicit tx =>
@@ -161,7 +180,12 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
                 transp.step()
                 true
 
-              case _ => false
+              case _ =>
+                if (transp.position < span.stop) {
+                  server.position = span.stop
+                  server !! osc.Bundle.now() // dummy bundle to terminate the OSC file at the right position
+                }
+                false
             }
           }
         }
@@ -172,12 +196,84 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       Await.result(server.committed(), Duration.Inf)
       val bundles = server.bundles()
 
-      println("---- BOUNCE ----")
-      bundles.foreach(println)
+      if (DEBUG) {
+        println("---- BOUNCE: bundles ----")
+        bundles.foreach(println)
+      }
+
+      // ---- write OSC file ----
+
+      val oscFile = new File(sCfg.nrtCommandPath)
+      if (oscFile.exists()) require(oscFile.delete(), s"Could not delete existing OSC file $oscFile")
+
+      // XXX TODO: this should be factored out, probably go into ScalaOSC or ScalaCollider
+      blocking {
+        val c   = osc.PacketCodec().scsynth().build
+        val sz  = bundles.map(_.encodedSize(c)).max
+        val raf = new RandomAccessFile(oscFile, "rw")
+        try {
+          val bb  = ByteBuffer.allocate(sz)
+          val fch = raf.getChannel
+          bundles.foreach { bndl =>
+            bndl.encode(c, bb)
+            bb.flip()
+            raf.writeInt(bb.limit)
+            fch.write(bb)
+            bb.clear()
+          }
+        } finally {
+          raf.close()
+        }
+      }
+
+      // ---- run scsynth ----
+
+      val dur = span.length / sampleRate
+
+      val procArgs    = sCfg.toNonRealtimeArgs
+      val procBuilder = Process(procArgs, Some(new File(sCfg.programPath).getParentFile))
+
+      if (DEBUG) {
+        println("---- BOUNCE: scsynth ----")
+        println(procArgs.mkString(" "))
+      }
+
+      lazy val log: ProcessLogger = new ProcessLogger {
+        def buffer[T](f: => T): T = f
+
+        // ???
+        def out(line: => String) {
+          if (line.startsWith("nextOSCPacket")) {
+            val time = line.substring(14).toFloat
+            val prog = time / dur
+            progress(prog.toFloat)
+            try {
+              checkAborted()
+            } catch {
+              case Processor.Aborted() =>
+                proc.destroy()
+            }
+          } else if (line != "start time 0") {
+            Console.out.println(line)
+          }
+        }
+
+        def err(line: => String) {
+          Console.err.println(line)
+        }
+      }
+      lazy val proc: Process = procBuilder.run(log)
+
+      val res = blocking(proc.exitValue()) // blocks
+      if (needsOSCFile) oscFile.delete()
+      val outputFile = new File(sCfg.nrtOutputPath)
+      if (needsDummyOut) outputFile.delete()
+      checkAborted()
+      if (res != 0) throw new RuntimeException("scsynth failed with exit code " + res)
 
       // XXX TODO: clean up
 
-      new File("no-way-jose")
+      outputFile
     }
   }
 }

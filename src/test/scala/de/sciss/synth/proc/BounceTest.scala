@@ -5,14 +5,17 @@ import de.sciss.synth.expr.ExprImplicits
 import de.sciss.synth.{ugen, SynthGraph}
 import de.sciss.span.Span
 import scala.concurrent.ExecutionContext
+import de.sciss.processor.Processor
 
+// XXX TODO: this should be a ScalaTest spec, opening the file after bouncing, and
+// verifying the contents (easy with a sine).
 object BounceTest extends App {
   type S = Durable
   type I = S#I
 
   implicit val system = Durable(BerkeleyDB.tmp())
 
-  showTransportLog  = true
+  // showTransportLog  = true
 
   system.step { implicit tx =>
     val expr      = ExprImplicits[S]
@@ -29,16 +32,44 @@ object BounceTest extends App {
     val bounce              = Bounce[S, I]
     val bCfg                = bounce.Config()
     bCfg.group              = group
-    bCfg.span               = Span(0, 4410 * 3)
+    bCfg.span               = Span(4410 + 2205, 4410 * 3) // start in the middle of the proc span
     val sCfg                = bCfg.server
-    sCfg.inputBusChannels   = 0
+//sCfg.nrtCommandPath = "/Users/hhrutz/Desktop/test.osc"
+// sCfg.nrtOutputPath  = "/Users/hhrutz/Desktop/test.aif"
+//sCfg.programPath    = "/Applications/SuperCollider_3.6.5/SuperCollider.app/Contents/Resources/scsynth"
+
+    // this is default now:
+    // sCfg.inputBusChannels   = 0
     sCfg.outputBusChannels  = 1
     sCfg.sampleRate         = 44100
 
+    // this is default now:
+    // sCfg.blockSize          = 1       // sample accurate placement of synths
+
     val process             = bounce(bCfg)
     import ExecutionContext.Implicits.global
-    process.start()
 
-    new Thread { override def run() { Thread.sleep(1000) }} .start()  // process.start() only creates daemon threads, it seems
+    val t = new Thread {
+      override def run() {
+        this.synchronized(this.wait())
+      }
+    }
+    t.start()
+
+    var lastProg = 0
+    process.addListener {
+      case prog @ Processor.Progress(_, _) =>
+        val p = prog.toInt
+        while (lastProg < p) {
+          print('#')
+          lastProg += 2
+        }
+
+      case Processor.Result(_, res) =>
+        println(s" $lastProg%")
+        println(res)
+        t.synchronized(t.notifyAll())
+    }
+    process.start()
   }
 }

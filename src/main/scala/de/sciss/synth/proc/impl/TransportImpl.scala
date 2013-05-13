@@ -243,6 +243,12 @@ object TransportImpl {
       } else None
     }
 
+    def position(implicit tx: S#Tx): Long = {
+      implicit val itx: I#Tx = tx
+      val info = infoVar()
+      info.frame
+    }
+
     def elapse(seconds: Double)(implicit tx: S#Tx) {
       val micros = (seconds * 1e6).toLong
       timeRef.transform(_ + micros)(tx.peer)
