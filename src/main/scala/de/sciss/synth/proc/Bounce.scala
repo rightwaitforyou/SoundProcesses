@@ -136,7 +136,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
               Span(start, stop)
           }
 
-          val _transp = Transport.Offline[S, I](group, sampleRate)
+          val _transp = Transport.offline[S, I](group, sampleRate)
           val _s      = Server.offline(sCfg)
           val aural   = AuralSystem.offline[S](_s)
           val _view   = AuralPresentation.run[S, I](_transp, aural)
@@ -156,6 +156,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
           cursor.step { implicit tx =>
             transp.stepTarget match {
               case _posO @ Some(pos) if (pos <= span.stop) =>
+                logTransport(s"stepTarget = $pos")
                 server.position = pos - span.start
                 transp.step()
                 true

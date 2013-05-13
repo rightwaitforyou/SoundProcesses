@@ -52,6 +52,7 @@ object TransportImpl {
     val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[S, I](group)
     val t = new Realtime[S, I](groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar)
     t.init()
+    t.seek(0L)
     t
   }
 
@@ -234,7 +235,12 @@ object TransportImpl {
     def stepTarget(implicit tx: S#Tx): Option[Long] = {
       val subm = submitRef()(tx.peer)
       import subm._
-      if (schedValid >= 0) Some(logicalNow + logicalDelay) else None
+      // if (schedValid >= 0) Some(logicalNow + logicalDelay) else None
+      if (schedValid >= 0) {
+        implicit val itx: I#Tx = tx
+        val info = infoVar()
+        if (info.valid == schedValid) Some(info.nextTime) else None
+      } else None
     }
 
     def elapse(seconds: Double)(implicit tx: S#Tx) {
@@ -458,10 +464,10 @@ object TransportImpl {
 
     final def init()(implicit tx: S#Tx) {
       // we can use groupStale because init is called straight away after instantiating Impl
-      groupObs = group.changed.react{ implicit tx =>
+      groupObs = group.changed.react { implicit tx =>
         biGroupUpdate(_)(tx)
       }
-      seek(0L)
+      // seek(0L)
     }
 
     // adds a segment to the update to be fired (does not update the structure)

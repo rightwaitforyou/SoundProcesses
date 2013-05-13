@@ -12,6 +12,8 @@ object BounceTest extends App {
 
   implicit val system = Durable(BerkeleyDB.tmp())
 
+  showTransportLog  = true
+
   system.step { implicit tx =>
     val expr      = ExprImplicits[S]
     import expr._

@@ -26,7 +26,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.synth.{Server => SServer, message, AllocatorExhausted}
+import de.sciss.synth.{Server => SServer, proc, message, AllocatorExhausted}
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
 import de.sciss.osc.Packet
@@ -58,6 +58,8 @@ object ServerImpl {
   private final case class OfflineImpl(peer: SServer) extends Impl with Server.Offline {
     override def toString = s"$peer @offline"
 
+    import proc.{logTransport => log}
+
     private val sync = new AnyRef
 
     var position  = 0L
@@ -82,11 +84,16 @@ object ServerImpl {
     }
 
     private def addBundle(b: osc.Bundle) {
-      sync.synchronized(_bundles :+= b)
+      val b1 = if (b.timetag == osc.Timetag.now) osc.Bundle.secs(time, b: _*) else b
+      log(s"addBundle $b1")
+      sync.synchronized(_bundles :+= b1)
     }
 
     def !(p: Packet) {
-      val b = osc.Bundle.secs(time)
+      val b = p match {
+        case m : osc.Message  => osc.Bundle.secs(time, m)
+        case b0: osc.Bundle   => b0
+      }
       addBundle(b)
     }
 

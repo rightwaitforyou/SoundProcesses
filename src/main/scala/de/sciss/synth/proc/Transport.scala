@@ -35,6 +35,7 @@ import impl.{TransportImpl => Impl}
 import de.sciss.span.SpanLike
 
 object Transport {
+  /** Creates a new realtime transport. The transport is positioned at time zero. */
   def apply[S <: evt.Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)
                                              (implicit tx: S#Tx, cursor: Cursor[S],
                                               bridge: S#Tx => I#Tx): ProcTransport[S] =
@@ -49,11 +50,10 @@ object Transport {
     def time: Long
   }
 
-  object Offline {
-    def apply[S <: evt.Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
-      implicit tx: S#Tx, bridge: S#Tx => I#Tx): Offline[S, Proc[S], Transport.Proc.Update[S]] =
-      Impl.offline[S, I](group, sampleRate)
-  }
+  /** Creates a new offline transport. The transport is not positioned. */
+  def offline[S <: evt.Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
+    implicit tx: S#Tx, bridge: S#Tx => I#Tx): Offline[S, Proc[S], Transport.Proc.Update[S]] =
+    Impl.offline[S, I](group, sampleRate)
 
   /**
    * A transport sub-type which does not automatically advance in accordance
