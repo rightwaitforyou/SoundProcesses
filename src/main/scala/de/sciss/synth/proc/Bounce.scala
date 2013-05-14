@@ -27,12 +27,14 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
 
   type Product = File
 
+  private type GroupH[S <: Sys[S]] = stm.Source[S#Tx, ProcGroup[S]]
+
   sealed trait ConfigLike {
     /** The group to transport through the bounce.
       * This parameter is initially unspecified in the builder, and calling the getter will throw an error.
       * This parameter must be specified before generating a `Config` instance.
       */
-    def group: ProcGroup[S]
+    def group: GroupH[S]
 
     /** The span of the timeline to bounce. This is either a given interval,
       * or a one-sided open interval (`Span.From`), in which case the stopping point is determined by
@@ -67,12 +69,12 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
     def server: Server.Config
   }
   final class ConfigBuilder private[Bounce] () extends ConfigLike {
-    private var _group: ProcGroup[S] = null
-    def group: ProcGroup[S] = {
+    private var _group: GroupH[S] = null
+    def group: GroupH[S] = {
       if (_group == null) throw new IllegalStateException("A group has not yet been assigned")
       _group
     }
-    def group_=(value: ProcGroup[S]) {
+    def group_=(value: GroupH[S]) {
       _group = value
     }
 
@@ -88,7 +90,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
     def build: Config = ConfigImpl(group = group, span = span, server = server, init = init)
   }
 
-  private final case class ConfigImpl(group: ProcGroup[S], span: Span.HasStartOrVoid,
+  private final case class ConfigImpl(group: GroupH[S], span: Span.HasStartOrVoid,
                                       server: Server.Config, init: (S#Tx, Server) => Unit)
     extends Config {
 
@@ -140,9 +142,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
 
       val (span, transp) = blocking {
         cursor.step { implicit tx =>
-          import ProcGroup.serializer
-          val groupH  = tx.newHandle(config.group)
-          val group   = groupH()
+          val group   = config.group()
 
           val _span   = config.span match {
             case defined: Span    => defined
