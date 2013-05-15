@@ -7,12 +7,12 @@ import lucre.expr.Expr
 import stm.{Disposable, Mutable}
 import evt.{Sys => ESys, Event, EventLikeSerializer, EventLike}
 import serial.{DataOutput, DataInput, Writable}
-import expr.{Ints, Doubles, Strings}
+import expr.{Ints, Doubles, Booleans, Strings}
 import scala.annotation.switch
 import language.higherKinds
 
 object Attribute {
-  import scala.{Int => _Int, Double => _Double}
+  import scala.{Int => _Int, Double => _Double, Boolean => _Boolean}
   import java.lang.{String => _String}
   import proc.{FadeSpec => _FadeSpec}
   // import mellite.{Folder => _Folder}
@@ -88,6 +88,29 @@ object Attribute {
   }
   sealed trait Double[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _Double] }
 
+  // ----------------- Double -----------------
+
+  object Boolean extends Companion[Boolean] {
+    protected[Attribute] final val typeID = Booleans.typeID
+
+    protected[Attribute] def readIdentified[S <: ESys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                                      (implicit tx: S#Tx): Boolean[S] with evt.Node[S] = {
+      val peer = Booleans.readExpr(in, access)
+      new Impl(targets, peer)
+    }
+
+    def apply[S <: ESys[S]](peer: Expr[S, _Boolean])(implicit tx: S#Tx): Boolean[S] = {
+      new Impl(evt.Targets[S], peer)
+    }
+
+    private final class Impl[S <: ESys[S]](val targets: evt.Targets[S], val peer: Expr[S, _Boolean])
+      extends ExprImpl[S, _Boolean] with Boolean[S] {
+      def typeID = Boolean.typeID
+      def prefix = "Boolean"
+    }
+  }
+  sealed trait Boolean[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _Boolean] }
+
   // ----------------- String -----------------
 
   object String extends Companion[String] {
@@ -150,6 +173,7 @@ object Attribute {
       (typeID: @switch) match {
         case Int             .typeID => Int             .readIdentified(in, access, targets)
         case Double          .typeID => Double          .readIdentified(in, access, targets)
+        case Boolean         .typeID => Boolean         .readIdentified(in, access, targets)
         case String          .typeID => String          .readIdentified(in, access, targets)
         // case Folder          .typeID => Folder          .readIdentified(in, access, targets)
         // case ProcGroup       .typeID => ProcGroup       .readIdentified(in, access, targets)
@@ -212,7 +236,7 @@ object Attribute {
 
     protected def peerEvent: evt.EventLike[S, Any, _]
 
-    def select(slot: _Int /*, invariant: Boolean */): Event[S, Any, Any] = changed
+    def select(slot: _Int /*, invariant: _Boolean */): Event[S, Any, Any] = changed
 
     object changed
       extends evt.impl.EventImpl[S, Update[S], Attribute[S]]

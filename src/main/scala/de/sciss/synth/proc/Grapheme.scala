@@ -290,7 +290,10 @@ object Grapheme {
         new AudioImpl(targets, artifact, spec, offset, gain)
       }
     }
-    sealed trait Audio[S <: evt.Sys[S]] extends Elem[S] with Expr[S, Value.Audio]
+    sealed trait Audio[S <: evt.Sys[S]] extends Elem[S] with Expr[S, Value.Audio] {
+      def offset: Expr[S, Long  ]
+      def gain  : Expr[S, Double]
+    }
 
     private final class CurveImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
                                                    val values: IIdxSeq[(Expr[S, Double], Env.ConstShape)])
@@ -351,7 +354,7 @@ object Grapheme {
         }
       }
 
-      override def toString() = "Elem.Curve" + id
+      override def toString = "Elem.Curve" + id
     }
 
     private final class AudioImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
@@ -413,7 +416,7 @@ object Grapheme {
         gain.write(out)
       }
 
-      override def toString() = "Elem.Audio" + id
+      override def toString = "Elem.Audio" + id
     }
 
     // ---- bitype ----

@@ -239,8 +239,9 @@ object AuralPresentationImpl {
         // println(s"Attributes used: ${attrNames.mkString(", ")}")
         attrNames.foreach { n =>
           val valOpt  = p.attributes.get(n).map {
-            case a: Attribute.Int   [S] => a.peer.value.toFloat
-            case a: Attribute.Double[S] => a.peer.value.toFloat
+            case a: Attribute.Int    [S] => a.peer.value.toFloat
+            case a: Attribute.Double [S] => a.peer.value.toFloat
+            case a: Attribute.Boolean[S] => if (a.peer.value) 1f else 0f
             case a => sys.error(s"Cannot cast attribute $a to a scalar value")
           }
           valOpt.foreach { f =>
