@@ -86,7 +86,7 @@ object AuralPresentationImpl {
 
     def startedTx(server: Server)(implicit tx: S#Tx) {
       // implicit val itx: I#Tx = tx
-      println("startedTx")
+      // println("startedTx")
 
       val viewMap: IdentifierMap[S#ID, S#Tx, AuralProc] = tx.newInMemoryIDMap
       val scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])] = tx.newInMemoryIDMap
