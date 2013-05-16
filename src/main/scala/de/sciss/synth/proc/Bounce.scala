@@ -186,7 +186,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
 
               case _ =>
                 if (transp.position < span.stop) {
-                  server.position = span.stop
+                  server.position = span.length
                   server !! osc.Bundle.now() // dummy bundle to terminate the OSC file at the right position
                 }
                 false
