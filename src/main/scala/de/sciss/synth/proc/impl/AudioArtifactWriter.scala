@@ -29,8 +29,8 @@ package proc
 package impl
 
 import concurrent.stm.Ref
-import java.io.File
 import span.Span
+import collection.immutable.{Seq => ISeq}
 
 final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, server: Server, sampleRate: Double)
   extends DynamicBusUser /* DynamicAudioBusUser */
@@ -38,6 +38,8 @@ final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, server
 
   private val synthRef  = Ref(Option.empty[Synth])
   val bus               = RichBus.audio(server, segm.numChannels)
+
+  def synth(implicit tx: Txn): Option[Synth] = synthRef()(tx.peer)
 
   def add()(implicit tx: Txn) {
     // val bufPeer       = Buffer( server )
@@ -70,7 +72,7 @@ final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, server
     val dur       = (fStop - fStart) / sampleRate // XXX TODO: could use SRC at some point
     // println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
     val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = numChannels)
-    val args: Seq[ControlSetMap] = Seq("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
+    val args: ISeq[ControlSetMap] = ISeq("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
 
     // val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
     val rs = Synth(sg, nameHint = Some("audio-artifact"))(target = target, args = args, dependencies = rb :: Nil)

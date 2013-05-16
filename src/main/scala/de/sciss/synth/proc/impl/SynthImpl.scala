@@ -27,13 +27,14 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.{ControlSetMap, AddAction, Synth => SSynth}
+import scala.collection.immutable.{Seq => ISeq}
 
 private[proc] final case class SynthImpl(peer: SSynth, definition: SynthDef) extends NodeImpl with Synth {
   override def toString = s"Synth(id${peer.id}, def=${definition.name})"
 
   def server: Server = definition.server
 
-  def play(target: Node, args: Seq[ControlSetMap], addAction: AddAction, dependencies: List[Resource])
+  def play(target: Node, args: ISeq[ControlSetMap], addAction: AddAction, dependencies: List[Resource])
           (implicit tx: Txn) {
 
     val s = server

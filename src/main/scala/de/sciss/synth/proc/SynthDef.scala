@@ -25,16 +25,9 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.synth.{SynthDef => SSynthDef, SynthGraph}
+import de.sciss.synth.{SynthDef => SSynthDef}
 
-//object SynthDef {
-//   def apply( server: Server )( graph: SynthGraph, nameHint: Option[ String ] = None )
-//              ( implicit tx: Txn ) : SynthDef = {
-//
-//      ProcDemiurg.getSynthDef( server, graph, nameHint )
-//   }
-//}
 trait SynthDef extends Resource {
-   def peer: SSynthDef
-   def name: String
+  def peer: SSynthDef
+  def name: String
 }

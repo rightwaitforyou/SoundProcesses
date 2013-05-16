@@ -19,6 +19,8 @@ object TapeTest extends App {
 
   val aural = AuralSystem()
 
+  def twice = true
+
   val transp = system.step { implicit tx =>
     val expr      = ExprImplicits[S]
     import expr._
@@ -72,7 +74,7 @@ object TapeTest extends App {
 
   aural.whenStarted { s =>
     // showTransportLog = true
-    // s.peer.dumpOSC()
+    s.peer.dumpOSC()
     system.step { implicit tx =>
       AuralPresentation.runTx[S](transp, aural)
       transp.react(tx => upd => println(s"Observed: $upd"))
@@ -81,6 +83,15 @@ object TapeTest extends App {
     new Thread {
       override def run() {
         Thread.sleep(5 * 1000L)
+        if (twice) {
+          println("\nSecond iteration\n")
+          system.step { implicit tx =>
+            transp.stop()
+            transp.seek(0L)
+            transp.play()
+          }
+          Thread.sleep(5 * 1000L)
+        }
         sys.exit()
       }
     } .start()

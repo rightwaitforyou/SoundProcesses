@@ -27,29 +27,29 @@ package de.sciss.synth.proc
 
 import de.sciss.synth.{Synth => SSynth, UGenGraph, SynthGraph, ControlSetMap, AddAction, addToHead}
 import impl.{SynthImpl => Impl}
+import collection.immutable.{Seq => ISeq}
 
 object Synth {
   def apply(graph: SynthGraph, nameHint: Option[String] = None)
-           (target: Node, args: Seq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
+           (target: Node, args: ISeq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
             dependencies: List[Resource] = Nil)(implicit tx: Txn): Synth = {
-    val df = ProcDemiurg.getSynthDef(target.server, graph, nameHint)
-    play(df, target, args, addAction, dependencies)
-  }
-
-  private[proc] def expanded(graph: UGenGraph, nameHint: Option[String] = None)
-                            (target: Node, args: Seq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
-                             dependencies: List[Resource] = Nil)(implicit tx: Txn): Synth = {
-    val df = ProcDemiurg.getSynthDef(target.server, graph, nameHint)
-    play(df, target, args, addAction, dependencies)
-  }
-
-  private def play(df: SynthDef, target: Node, args: Seq[ControlSetMap], addAction: AddAction,
-                   dependencies: List[Resource])(implicit tx: Txn): Synth = {
     val server  = target.server
-    val nodeID  = server.nextNodeID()
-    val res     = new Impl(SSynth(server.peer, nodeID), df)
-    res.play(target, args, addAction, df :: dependencies)
+    val df      = ProcDemiurg.getSynthDef(server, graph, nameHint)
+    val res     = create(df)
+    res.play(target, args, addAction, dependencies)
     res
+  }
+
+  private[proc] def expanded(server: Server, graph: UGenGraph, nameHint: Option[String] = None)
+                            (implicit tx: Txn): Synth = {
+    val df = ProcDemiurg.getSynthDef(server, graph, nameHint)
+    create(df)
+  }
+
+  private def create(df: SynthDef)(implicit tx: Txn): Synth = {
+    val server  = df.server
+    val nodeID  = server.nextNodeID()
+    new Impl(SSynth(server.peer, nodeID), df)
   }
 }
 
@@ -57,4 +57,7 @@ trait Synth extends Node {
   def peer: SSynth
 
   def definition: SynthDef
+
+  private[proc] def play(target: Node, args: ISeq[ControlSetMap], addAction: AddAction, dependencies: List[Resource])
+                        (implicit tx: Txn): Unit
 }

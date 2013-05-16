@@ -126,8 +126,9 @@ object AuralPresentationImpl {
           changes.foreach {
             case (timed, m) => booted.procUpdated(timed, m)
           }
-          added.foreach {
-            timed => booted.procAdded(time, timed)
+          added.foreach { timed =>
+            val mute = timed.value.attributes[Attribute.Boolean]("mute").map(_.value).getOrElse(false)
+            if (!mute) booted.procAdded(time, timed)
           }
 
         case Transport.Play(tr, time) => t_play(time)
@@ -225,7 +226,7 @@ object AuralPresentationImpl {
 
       //         val df            = ProcDemiurg.getSynthDef( server, ug, nameHint = Some( builder.name )) // RichSynthDef()
       //         val synth         = df.play( target = group, addAction = addToHead )
-      val synth = Synth.expanded(ug /*, nameHint = Some(builder.name) */)(target = group, addAction = addToHead)
+      val synth = Synth.expanded(server, ug /*, nameHint = Some(builder.name) */)
 
       // ---- handle input buses ----
       val time      = ugen.time
@@ -233,6 +234,7 @@ object AuralPresentationImpl {
       var busUsers  = Vector.empty[DynamicBusUser]
       val p         = timed.value
       var setMap    = Vector.empty[ControlSetMap]
+      var deps      = Nil: List[AudioArtifactWriter]
 
       val attrNames = ugen.attributeIns
       if (attrNames.nonEmpty) {
@@ -291,6 +293,7 @@ object AuralPresentationImpl {
                   // val file = audio.value.artifact
                   // val file      =  artifactStore().resolve(artifact)
                   val aaw = new AudioArtifactWriter(audio, time, server, sampleRate)
+                  deps  ::= aaw
 
                   // XXX TODO: DRY (see Segment.Curve above)
                   busUsers :+= aaw
@@ -310,18 +313,22 @@ object AuralPresentationImpl {
           }
       }
 
-      // ---- handle output buses ----
       val outBuses = builder.outBuses
+
+      // wrap as AuralProc and save it in the identifier map for later lookup
+      val deps1 = deps.flatMap(_.synth)
+      synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
+      val aural = AuralProc(synth, outBuses, busUsers)
+
+      // ---- handle output buses ----
       builder.outBuses.foreach {
         case (key, bus) =>
           val bw = BusNodeSetter.writer(scan.outControlName(key), bus, synth)
           busUsers :+= bw
       }
-
-      // wrap as AuralProc and save it in the identifier map for later lookup
       busUsers.foreach(_.add())
-      val aural = AuralProc(synth, outBuses, busUsers)
-      if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
+
+      // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
       log("launched " + aural + " (" + hashCode.toHexString + ")")
       viewMap.put(timed.id, aural)
     }
@@ -513,7 +520,8 @@ object AuralPresentationImpl {
 
         case _ =>
           def warn() {
-            println("WARNING: could not find view for " + timed)
+            val mute = timed.value.attributes[Attribute.Boolean]("mute").map(_.value).getOrElse(false)
+            if (!mute) println("WARNING: could not find view for " + timed)
           }
 
           val ongoing = ongoingBuild.get(tx.peer)
