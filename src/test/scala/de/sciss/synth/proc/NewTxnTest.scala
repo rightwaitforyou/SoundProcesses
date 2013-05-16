@@ -17,7 +17,7 @@ object NewTxnTest extends App {
 //            import Ops._
             Out.ar( 0, SinOsc.ar( SinOsc.kr( 0.1 ).linexp( -1, 1, 300, 600 )) * 0.1 )
          }
-         Synth( g )( s.defaultGroup )
+        Synth.play(g)(s.defaultGroup)
       }
 
       println( "Aqui. " + x )

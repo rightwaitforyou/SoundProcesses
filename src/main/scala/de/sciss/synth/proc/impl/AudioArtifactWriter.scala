@@ -28,25 +28,15 @@ package synth
 package proc
 package impl
 
-import concurrent.stm.Ref
 import span.Span
 import collection.immutable.{Seq => ISeq}
 
-final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, server: Server, sampleRate: Double)
-  extends DynamicBusUser /* DynamicAudioBusUser */
-  /* with RichAudioBus.User */ {
-
-  private val synthRef  = Ref(Option.empty[Synth])
-  val bus               = RichBus.audio(server, segm.numChannels)
-
-  def synth(implicit tx: Txn): Option[Synth] = synthRef()(tx.peer)
-
-  def add()(implicit tx: Txn) {
-    // val bufPeer       = Buffer( server )
-    val numChannels = bus.numChannels
-    // val rb            = Buffer( server )
-
-    val sg = SynthGraph {
+object AudioArtifactWriter {
+  def apply(segm: Grapheme.Segment.Audio, time: Long, server: Server, sampleRate: Double)
+           (implicit tx: Txn): AudioArtifactWriter = {
+    val numChannels = segm.numChannels
+    val bus         = RichBus.audio(server, numChannels)
+    val sg  = SynthGraph {
       import ugen._
       val buf = "buf".ir
       val dur = "dur".ir(1)
@@ -56,9 +46,28 @@ final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, server
       Line.kr(start = 0, end = 0, dur = dur, doneAction = freeSelf)
       Out.ar(out, sig)
     }
+    val synth = Synth(server, sg, nameHint = Some("audio-artifact"))
+    val res = new AudioArtifactWriter(synth, bus, segm, time, sampleRate)
+    res.britzelAdd()
+    res
+  }
+}
+final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, segm: Grapheme.Segment.Audio, time: Long,
+                                         sampleRate: Double)
+  extends DynamicBusUser /* DynamicAudioBusUser */
+  /* with RichAudioBus.User */ with Resource.Source {
 
-    // val rd         = SynthDef( server, sg, nameHint = Some( "audio-artifact" ))
+  // private val synthRef  = Ref(Option.empty[Synth])
 
+  // def synth(implicit tx: Txn): Option[Synth] = synthRef()(tx.peer)
+
+  def resource(implicit tx: Txn) = synth
+
+  def server = synth.server
+
+  def add()(implicit tx: Txn) {}
+
+  def britzelAdd()(implicit tx: Txn) {
     val audioVal  = segm.value
     val file      = audioVal.artifact
     val path      = file.getAbsolutePath
@@ -71,31 +80,30 @@ final class AudioArtifactWriter(segm: Grapheme.Segment.Audio, time: Long, server
     })
     val dur       = (fStop - fStart) / sampleRate // XXX TODO: could use SRC at some point
     // println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
-    val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = numChannels)
+    val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = bus.numChannels)
     val args: ISeq[ControlSetMap] = ISeq("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
 
     // val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
-    val rs = Synth(sg, nameHint = Some("audio-artifact"))(target = target, args = args, dependencies = rb :: Nil)
+    synth.play(target = target, args = args, addAction = addToHead, dependencies = rb :: Nil)
 
-    rs.onEndTxn { implicit tx =>
+    synth.onEndTxn { implicit tx =>
       // bufPeer.close( bufPeer.freeMsg )
-      rb.dispose()
+      synth.dispose()
     }
 
     // rs.play( target = target, args = args, buffers = rb :: Nil )
-    rs.write(bus -> "out")
+    synth.write(bus -> "out")
 
-    val oldSynth = synthRef.swap(Some(rs))(tx.peer)
-    // bus.addWriter( this )
-
-    require(oldSynth.isEmpty, "AudioArtifactWriter.add() : old synth still playing")
+    // val oldSynth = synthRef.swap(Some(rs))(tx.peer)
+    // require(oldSynth.isEmpty, "AudioArtifactWriter.add() : old synth still playing")
   }
 
   def remove()(implicit tx: Txn) {
-    val rs = synthRef.swap(None)(tx.peer).getOrElse(
-      sys.error("AudioArtifactWriter.remove() : there was no synth playing")
-    )
-    rs.free()
+    //    val rs = synthRef.swap(None)(tx.peer).getOrElse(
+    //      sys.error("AudioArtifactWriter.remove() : there was no synth playing")
+    //    )
+    //    rs.free()
+    if (synth.isOnline) synth.free()
 
     // bus.removeWriter( this )
   }

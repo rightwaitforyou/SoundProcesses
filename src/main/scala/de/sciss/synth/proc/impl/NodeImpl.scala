@@ -182,7 +182,7 @@ trait NodeImpl extends ResourceImpl with Node {
 
   final def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn) {
     require(isOnline)
-    tx.addMessage(this, peer.mapanMsg(pairs: _*), audible = audible, dependencies = this :: Nil /* ?! */)
+    tx.addMessage(this, peer.mapanMsg(pairs: _*), audible = audible) // , dependencies = this :: Nil /* ?! */)
   }
 
   final def moveToHead(audible: Boolean, group: Group)(implicit tx: Txn) {

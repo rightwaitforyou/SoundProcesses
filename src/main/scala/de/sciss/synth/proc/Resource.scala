@@ -29,6 +29,8 @@ import de.sciss.lucre.stm.Disposable
 
 object Resource {
   type TimeStamp = Int
+
+  trait Source { def resource(implicit tx: Txn): Resource }
 }
 
 trait Resource extends Disposable[Txn] {

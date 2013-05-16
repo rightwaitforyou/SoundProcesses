@@ -30,12 +30,15 @@ import impl.{SynthImpl => Impl}
 import collection.immutable.{Seq => ISeq}
 
 object Synth {
-  def apply(graph: SynthGraph, nameHint: Option[String] = None)
-           (target: Node, args: ISeq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
+  def apply(server: Server, graph: SynthGraph, nameHint: Option[String] = None)(implicit tx: Txn): Synth = {
+    val df = ProcDemiurg.getSynthDef(server, graph, nameHint)
+    create(df)
+  }
+
+  def play(graph: SynthGraph, nameHint: Option[String] = None)
+          (target: Node, args: ISeq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
             dependencies: List[Resource] = Nil)(implicit tx: Txn): Synth = {
-    val server  = target.server
-    val df      = ProcDemiurg.getSynthDef(server, graph, nameHint)
-    val res     = create(df)
+    val res = apply(target.server, graph, nameHint)
     res.play(target, args, addAction, dependencies)
     res
   }

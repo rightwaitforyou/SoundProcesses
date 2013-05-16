@@ -234,7 +234,7 @@ object AuralPresentationImpl {
       var busUsers  = Vector.empty[DynamicBusUser]
       val p         = timed.value
       var setMap    = Vector.empty[ControlSetMap]
-      var deps      = Nil: List[AudioArtifactWriter]
+      var deps      = Nil: List[Resource.Source]
 
       val attrNames = ugen.attributeIns
       if (attrNames.nonEmpty) {
@@ -283,7 +283,8 @@ object AuralPresentationImpl {
                 case segm: Segment.Curve =>
                   ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
                   // println(s"segment : ${segm.span}")
-                  val sw = new SegmentWriter(segm, time, server, sampleRate)
+                  val sw = SegmentWriter(segm, time, server, sampleRate)
+                  deps  ::= sw
                   busUsers :+= sw
                   val bm = BusNodeSetter.mapper(inCtlName, sw.bus, synth)
                   busUsers :+= bm
@@ -292,7 +293,7 @@ object AuralPresentationImpl {
                   ensureChannels(audio.numChannels)
                   // val file = audio.value.artifact
                   // val file      =  artifactStore().resolve(artifact)
-                  val aaw = new AudioArtifactWriter(audio, time, server, sampleRate)
+                  val aaw = AudioArtifactWriter(audio, time, server, sampleRate)
                   deps  ::= aaw
 
                   // XXX TODO: DRY (see Segment.Curve above)
@@ -315,17 +316,18 @@ object AuralPresentationImpl {
 
       val outBuses = builder.outBuses
 
-      // wrap as AuralProc and save it in the identifier map for later lookup
-      val deps1 = deps.flatMap(_.synth)
-      synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
-      val aural = AuralProc(synth, outBuses, busUsers)
-
       // ---- handle output buses ----
       builder.outBuses.foreach {
         case (key, bus) =>
           val bw = BusNodeSetter.writer(scan.outControlName(key), bus, synth)
           busUsers :+= bw
       }
+
+      // wrap as AuralProc and save it in the identifier map for later lookup
+      val deps1 = deps.map(_.resource)
+      synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
+      val aural = AuralProc(synth, outBuses, busUsers)
+
       busUsers.foreach(_.add())
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)

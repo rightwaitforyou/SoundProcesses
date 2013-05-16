@@ -89,6 +89,7 @@ object TapeTest extends App {
             transp.stop()
             transp.seek(0L)
             transp.play()
+            showTxnLog = true
           }
           Thread.sleep(5 * 1000L)
         }

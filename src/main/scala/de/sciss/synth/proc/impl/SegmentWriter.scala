@@ -28,13 +28,73 @@ package synth
 package proc
 package impl
 
-import scala.concurrent.stm.Ref
+object SegmentWriter {
+  def apply(segm: Grapheme.Segment.Curve, time: Long, server: Server, sampleRate: Double)
+           (implicit tx: Txn): SegmentWriter = {
 
-final class SegmentWriter(segm: Grapheme.Segment.Curve, time: Long, server: Server, sampleRate: Double)
-  extends DynamicBusUser /* DynamicAudioBusUser with RichAudioBus.User with TxnPlayer */ {
+    val (usesShape, sg) = graph(segm)
+    val synth = Synth(server, sg, nameHint = Some("grapheme-segm"))
+    val bus   = RichBus.audio(server, segm.numChannels)
+    val res = new SegmentWriter(synth, usesShape, bus, segm, time, sampleRate)
+    res.britzelAdd()
+    res
+  }
 
-  private val synthRef  = Ref(Option.empty[Synth])
-  val bus               = RichBus.audio(server, segm.numChannels)
+  // ... until ScalaCollider has better methods in ControlProxyFactory
+  @inline private def mkMultiCtl(segm: Grapheme.Segment.Curve, name: String): GE = {
+    // import ugen._
+    // ControlProxy(scalar, Vector.fill(segm.numChannels)(0f), Some(name))(ControlProxyFactory.controlIrFactory)
+    name.ir(0f, Vector.fill(segm.numChannels - 1)(0f): _*)
+  }
+
+  private def graph(segm: Grapheme.Segment.Curve) = {
+    var usesShape = false // XXX TODO dirty variable
+    val sg = SynthGraph {
+      import ugen._
+
+      // val start       = "start".ir
+      val start       = mkMultiCtl(segm, "start")
+      // val stop        = "stop".ir
+      val stop        = mkMultiCtl(segm, "stop")
+      val dur         = "dur".ir
+
+      lazy val shape  = mkMultiCtl(segm, "shape")
+      lazy val curve  = mkMultiCtl(segm, "curve")
+
+      val sig: GE = segm.values.zipWithIndex.map {
+        case ((segmStart, segmStop, segmShape), ch) =>
+          val doneAction = if (ch == 0) freeSelf else doNothing
+          segmShape match {
+            case `linShape` =>
+              Line.ar(start, stop, dur, doneAction = doneAction)
+            case `expShape` =>
+              if (segmStart != 0f && segmStop != 0f && segmStart * segmStop > 0f) {
+                XLine.ar(start, stop, dur, doneAction = doneAction)
+              } else {
+                Line.ar(0, 0, dur, doneAction = doneAction)
+              }
+            case _ =>
+              usesShape = true
+              val env = Env(start, Env.Seg(dur = dur, targetLevel = stop,
+                shape = varShape(shape \ ch, curve \ ch)) :: Nil)
+              EnvGen.ar(env, doneAction = doneAction)
+
+          }
+      }
+      // sig.poll(4)
+      Out.ar("out".kr, sig)
+    }
+    (usesShape, sg)
+  }
+}
+final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: RichAudioBus,
+                                   segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
+  extends DynamicBusUser /* DynamicAudioBusUser with RichAudioBus.User with TxnPlayer */ with Resource.Source {
+
+  // private val synthRef  = Ref(Option.empty[Synth])
+  // val bus               = RichBus.audio(server, segm.numChannels)
+
+  def resource(implicit tx: Txn) = synth
 
   //  protected def synth(implicit tx: Txn): Option[Synth] = synthRef.get(tx.peer)
   //  protected def synth_=(value: Option[Synth])(implicit tx: Txn) {
@@ -49,55 +109,13 @@ final class SegmentWriter(segm: Grapheme.Segment.Curve, time: Long, server: Serv
   //    rs.write(bus -> "$out")
   //  }
 
-  // ... until ScalaCollider has better methods in ControlProxyFactory
-  @inline private def mkMultiCtl(name: String): GE = {
-    // import ugen._
-    // ControlProxy(scalar, Vector.fill(segm.numChannels)(0f), Some(name))(ControlProxyFactory.controlIrFactory)
-    name.ir(0f, Vector.fill(segm.numChannels - 1)(0f): _*)
-  }
+  def server = synth.server
 
-  private var usesShape = false // XXX TODO dirty variable
+  def add()(implicit tx: Txn) {}
 
-  protected def graph = SynthGraph {
-    import ugen._
-
-    // val start       = "start".ir
-    val start       = mkMultiCtl("start")
-    // val stop        = "stop".ir
-    val stop        = mkMultiCtl("stop")
-    val dur         = "dur".ir
-
-    lazy val shape  = mkMultiCtl("shape")
-    lazy val curve  = mkMultiCtl("curve")
-
-    val sig: GE = segm.values.zipWithIndex.map {
-      case ((segmStart, segmStop, segmShape), ch) =>
-        val doneAction = if (ch == 0) freeSelf else doNothing
-        segmShape match {
-          case `linShape` =>
-            Line.ar(start, stop, dur, doneAction = doneAction)
-          case `expShape` =>
-            if (segmStart != 0f && segmStop != 0f && segmStart * segmStop > 0f) {
-              XLine.ar(start, stop, dur, doneAction = doneAction)
-            } else {
-              Line.ar(0, 0, dur, doneAction = doneAction)
-            }
-          case _ =>
-            usesShape = true
-            val env = Env(start, Env.Seg(dur = dur, targetLevel = stop,
-              shape = varShape(shape \ ch, curve \ ch)) :: Nil)
-            EnvGen.ar(env, doneAction = doneAction)
-
-        }
-    }
-    // sig.poll(4)
-    Out.ar("out".kr, sig)
-  }
-
-  def add()(implicit tx: Txn) {
+  def britzelAdd()(implicit tx: Txn) {
     type Ctl = List[ControlSetMap]
 
-    val sg        = graph
     // val rsd       = SynthDef(aural.server, g)
     val target    = server.defaultGroup // XXX
     val durSecs   = segm.span.length / sampleRate
@@ -107,25 +125,24 @@ final class SegmentWriter(segm: Grapheme.Segment.Curve, time: Long, server: Serv
     val args: Ctl = if (usesShape) ("curve" -> vShape.map(_.curvature )) :: ctl1 else ctl1
 
     // val rs        = rsd.play(aural.preGroup, ctl)
-    val rs = Synth(sg, nameHint = Some("grapheme-segm"))(target = target, args = args /* , dependencies = rb :: Nil */)
+    synth.play(target = target, args = args, addAction = addToHead, dependencies = Nil)
 
     // rs.onEndTxn { implicit tx =>
     //   synth.foreach { rs2 => if (rs == rs2) ctrl.glidingDone() }
     // }
 
-    rs.write(bus -> "out")
+    synth.write(bus -> "out")
 
-    val oldSynth = synthRef.swap(Some(rs))(tx.peer)
-    // bus.addWriter( this )
-
-    require(oldSynth.isEmpty, "SegmentWriter.add() : old synth still playing")
+    // val oldSynth = synthRef.swap(Some(rs))(tx.peer)
+    // require(oldSynth.isEmpty, "SegmentWriter.add() : old synth still playing")
   }
 
   def remove()(implicit tx: Txn) {
-    val rs = synthRef.swap(None)(tx.peer).getOrElse(
-      sys.error("SegmentWriter.remove() : there was no synth playing")
-    )
-    rs.free()
+    //    val rs = synthRef.swap(None)(tx.peer).getOrElse(
+    //      sys.error("SegmentWriter.remove() : there was no synth playing")
+    //    )
+    //    rs.free()
+    synth.free()
   }
 
   //  def stop(implicit tx: Txn) {
