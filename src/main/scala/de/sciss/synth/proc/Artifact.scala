@@ -126,7 +126,7 @@ object Artifact {
     def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
       Impl.readMod(in, access)
 
-    def apply[S <: evt.Sys[S]](from: Artifact[S])(implicit tx: S#Tx): Modifiable[S] =
+    def copy[S <: evt.Sys[S]](from: Artifact[S])(implicit tx: S#Tx): Modifiable[S] =
       Impl.copy(from)
 
     implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] = Impl.modSerializer
