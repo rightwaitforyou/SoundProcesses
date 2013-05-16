@@ -27,14 +27,14 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
 
   type Product = File
 
-  private type GroupH[S <: Sys[S]] = stm.Source[S#Tx, ProcGroup[S]]
+  private type GroupH = stm.Source[S#Tx, ProcGroup[S]]
 
   sealed trait ConfigLike {
     /** The group to transport through the bounce.
       * This parameter is initially unspecified in the builder, and calling the getter will throw an error.
       * This parameter must be specified before generating a `Config` instance.
       */
-    def group: GroupH[S]
+    def group: GroupH
 
     /** The span of the timeline to bounce. This is either a given interval,
       * or a one-sided open interval (`Span.From`), in which case the stopping point is determined by
@@ -69,12 +69,12 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
     def server: Server.Config
   }
   final class ConfigBuilder private[Bounce] () extends ConfigLike {
-    private var _group: GroupH[S] = null
-    def group: GroupH[S] = {
+    private var _group: GroupH = null
+    def group: GroupH = {
       if (_group == null) throw new IllegalStateException("A group has not yet been assigned")
       _group
     }
-    def group_=(value: GroupH[S]) {
+    def group_=(value: GroupH) {
       _group = value
     }
 
@@ -90,7 +90,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
     def build: Config = ConfigImpl(group = group, span = span, server = server, init = init)
   }
 
-  private final case class ConfigImpl(group: GroupH[S], span: Span.HasStartOrVoid,
+  private final case class ConfigImpl(group: GroupH, span: Span.HasStartOrVoid,
                                       server: Server.Config, init: (S#Tx, Server) => Unit)
     extends Config {
 
@@ -276,6 +276,8 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       if (res != 0) throw new RuntimeException("scsynth failed with exit code " + res)
 
       // XXX TODO: clean up
+
+      cursor.step(implicit tx => view.dispose())
 
       outputFile
     }

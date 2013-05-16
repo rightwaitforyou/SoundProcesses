@@ -34,6 +34,7 @@ import java.io.File
 import expr.LinkedList
 import proc.Artifact.Location.Update
 import evt.{Change, EventLike, NodeSerializer}
+import de.sciss.synth.proc.Artifact.Modifiable
 
 object ArtifactImpl {
   import Artifact.Location
@@ -51,12 +52,28 @@ object ArtifactImpl {
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] =
     serializer[S].read(in, access)
 
+  def readMod[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact.Modifiable[S] =
+    modSerializer[S].read(in, access)
+
   def serializer[S <: evt.Sys[S]]: NodeSerializer[S, Artifact[S]] = anySer.asInstanceOf[Ser[S]]
 
-  private val anySer = new Ser[evt.InMemory]
+  def modSerializer[S <: evt.Sys[S]]: NodeSerializer[S, Artifact.Modifiable[S]] = anyModSer.asInstanceOf[ModSer[S]]
+
+  private val anySer    = new Ser   [evt.InMemory]
+  private val anyModSer = new ModSer[evt.InMemory]
 
   private final class Ser[S <: evt.Sys[S]] extends NodeSerializer[S, Artifact[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Artifact[S] with evt.Node[S] = {
+      val cookie    = in.readShort()
+      require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
+      val location  = readLocation(in, access)
+      val _child    = tx.readVar[File](targets.id, in)
+      new Impl(targets, location, _child)
+    }
+  }
+
+  private final class ModSer[S <: evt.Sys[S]] extends NodeSerializer[S, Artifact.Modifiable[S]] {
+    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Artifact.Modifiable[S] with evt.Node[S] = {
       val cookie    = in.readShort()
       require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
       val location  = readLocation(in, access)
@@ -171,6 +188,8 @@ object ArtifactImpl {
 
     // override def toString = s"Artifact(${if (path.isEmpty) "" else path.mkString("", "/", "/")}$name)"
     override def toString() = s"Artifact@${hashCode().toHexString}"
+
+    def modifiableOption: Option[Modifiable[S]] = Some(this)
 
     def child(implicit tx: S#Tx): File = _child()
 

@@ -122,6 +122,15 @@ object Artifact {
   // sealed trait Update[S <: evt.Sys[S]]
   // final case class
 
+  object Modifiable {
+    def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
+      Impl.readMod(in, access)
+
+    def apply[S <: evt.Sys[S]](location: Location[S], child: File)(implicit tx: S#Tx): Modifiable[S] =
+      Impl(location, child)
+
+    implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] = Impl.modSerializer
+  }
   trait Modifiable[S <: evt.Sys[S]] extends Artifact[S] {
     def child(implicit tx: S#Tx): File
     def child_=(value: File)(implicit tx: S#Tx): Unit
@@ -131,4 +140,5 @@ object Artifact {
 trait Artifact[S <: evt.Sys[S]] extends Expr[S, Artifact.Value] /* Mutable[S#ID, S#Tx] */ {
   import Artifact._
   def location: Location[S]
+  def modifiableOption: Option[Modifiable[S]]
 }
