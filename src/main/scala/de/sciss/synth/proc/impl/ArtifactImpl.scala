@@ -49,6 +49,10 @@ object ArtifactImpl {
     new Impl(targets, location, _child)
   }
 
+  def copy[S <: evt.Sys[S]](from: Artifact[S])(implicit tx: S#Tx): Artifact.Modifiable[S] = {
+    apply(from.location, from.child)
+  }
+
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] =
     serializer[S].read(in, access)
 
