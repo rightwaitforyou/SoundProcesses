@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.span.Span
+import de.sciss.span.{SpanLike, Span}
 import language.implicitConversions
 import de.sciss.processor.{Processor, ProcessorFactory}
 import java.io.{RandomAccessFile, File}
@@ -40,7 +40,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       * or a one-sided open interval (`Span.From`), in which case the stopping point is determined by
       * the processes found in the group, or `Span.Void`, in which case both the starting and stopping
       * points are determined by the processes found in the group. */
-    def span: Span.HasStartOrVoid
+    def span: SpanLike
 
     /** Configuration of the offline server.
       * It is crucial to specify the NRT bits, i.e.
@@ -78,7 +78,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       _group = value
     }
 
-    var span  : Span.HasStartOrVoid     = Span.Void
+    var span  : SpanLike                = Span.Void
     val server: Server.ConfigBuilder    = Server.Config()
     var init  : (S#Tx, Server) => Unit  = (_, _) => ()
 
@@ -90,7 +90,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
     def build: Config = ConfigImpl(group = group, span = span, server = server, init = init)
   }
 
-  private final case class ConfigImpl(group: GroupH, span: Span.HasStartOrVoid,
+  private final case class ConfigImpl(group: GroupH, span: SpanLike,
                                       server: Server.Config, init: (S#Tx, Server) => Unit)
     extends Config {
 
@@ -149,7 +149,10 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
             case Span.From(start) =>
               val stop  = group.nearestEventBefore(Long.MaxValue).getOrElse(0L)
               Span(start, stop)
-            case Span.Void =>
+            case Span.Until(stop) =>
+              val start = group.nearestEventAfter (Long.MinValue).getOrElse(0L)
+              Span(start, stop)
+            case _ =>
               val start = group.nearestEventAfter (Long.MinValue).getOrElse(0L)
               val stop  = group.nearestEventBefore(Long.MaxValue).getOrElse(0L)
               Span(start, stop)
