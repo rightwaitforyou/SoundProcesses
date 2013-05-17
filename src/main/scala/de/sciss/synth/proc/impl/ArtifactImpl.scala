@@ -37,15 +37,15 @@ import evt.{Change, EventLike, NodeSerializer}
 import de.sciss.synth.proc.Artifact.Modifiable
 
 object ArtifactImpl {
-  import Artifact.Location
+  import Artifact.{Child, Location}
 
   private final val SER_VERSION = 0x4172
 
   // ---- artifact ----
 
-  def apply[S <: evt.Sys[S]](location: Location[S], child: File)(implicit tx: S#Tx): Artifact.Modifiable[S] = {
+  def apply[S <: evt.Sys[S]](location: Location[S], child: Child)(implicit tx: S#Tx): Artifact.Modifiable[S] = {
     val targets = evt.Targets[S]
-    val _child  = tx.newVar(targets.id, child)
+    val _child  = tx.newVar(targets.id, child.path)
     new Impl(targets, location, _child)
   }
 
@@ -59,8 +59,7 @@ object ArtifactImpl {
   def readMod[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact.Modifiable[S] =
     modSerializer[S].read(in, access)
 
-  def serializer[S <: evt.Sys[S]]: NodeSerializer[S, Artifact[S]] = anySer.asInstanceOf[Ser[S]]
-
+  def serializer   [S <: evt.Sys[S]]: NodeSerializer[S, Artifact           [S]] = anySer  .asInstanceOf[Ser[S]]
   def modSerializer[S <: evt.Sys[S]]: NodeSerializer[S, Artifact.Modifiable[S]] = anyModSer.asInstanceOf[ModSer[S]]
 
   private val anySer    = new Ser   [evt.InMemory]
@@ -71,7 +70,7 @@ object ArtifactImpl {
       val cookie    = in.readShort()
       require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
       val location  = readLocation(in, access)
-      val _child    = tx.readVar[File](targets.id, in)
+      val _child    = tx.readVar[String](targets.id, in)
       new Impl(targets, location, _child)
     }
   }
@@ -81,7 +80,7 @@ object ArtifactImpl {
       val cookie    = in.readShort()
       require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
       val location  = readLocation(in, access)
-      val _child    = tx.readVar[File](targets.id, in)
+      val _child    = tx.readVar[String](targets.id, in)
       new Impl(targets, location, _child)
     }
   }
@@ -186,7 +185,7 @@ object ArtifactImpl {
   }
 
   private final class Impl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
-                                            val location: Location[S], _child: S#Var[File])
+                                            val location: Location[S], _child: S#Var[String])
     extends Artifact.Modifiable[S]
     with evt.impl.MappingGenerator[S, Change[File], Location.Update[S], Artifact[S]] {
 
@@ -195,14 +194,15 @@ object ArtifactImpl {
 
     def modifiableOption: Option[Modifiable[S]] = Some(this)
 
-    def child(implicit tx: S#Tx): File = _child()
+    def child(implicit tx: S#Tx): Child = Child(_child())
 
-    def child_=(value: File)(implicit tx: S#Tx) {
-      val old = _child()
-      if (old != value) {
+    def child_=(value: Child)(implicit tx: S#Tx) {
+      val oldP  = _child()
+      val newP  = value.path
+      if (oldP != newP) {
         val base    = location.directory
-        _child()    = value
-        val change  = Change(new File(base, old.getPath), new File(base, value.getPath))
+        _child()    = newP
+        val change  = Change(new File(base, oldP), new File(base, newP))
         fire(change)
       }
     }
@@ -214,7 +214,7 @@ object ArtifactImpl {
       generated.orElse {
         input match {
           case Location.Moved(_, Change(oldBase, newBase)) =>
-            val path    = _child().getPath
+            val path    = _child()
             val change  = Change(new File(oldBase, path), new File(newBase, path))
             Some(change)
           case _ => None
@@ -226,7 +226,7 @@ object ArtifactImpl {
     def value(implicit tx: S#Tx): Artifact.Value = {
       val base   = location.directory
       val child  = _child()
-      new File(base, child.getPath)
+      new File(base, child)
     }
 
     protected def disposeData()(implicit tx: S#Tx) {
@@ -237,7 +237,7 @@ object ArtifactImpl {
     protected def writeData(out: DataOutput) {
       out.writeShort(SER_VERSION)
       location.write(out)
-      _child.write(out)
+      _child  .write(out)
       //      if (path.isEmpty) out.writeShort(0) else {
       //        out.writeShort(path.size)
       //        path.foreach(out.writeUTF _)

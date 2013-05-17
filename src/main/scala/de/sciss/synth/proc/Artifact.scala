@@ -41,8 +41,8 @@ object Artifact {
 
   implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] = Impl.serializer
 
-  def relativize(parent: File, sub: File): File = {
-    val can     = sub.getCanonicalFile
+  def relativize(parent: File, sub: File): Child = {
+    val can     = sub   .getCanonicalFile
     val base    = parent.getCanonicalFile
 
     @tailrec def loop(res: File, left: File): File = {
@@ -57,7 +57,8 @@ object Artifact {
       }
     }
 
-    loop(new File(can.getName), can.getParentFile)
+    val cf = loop(new File(can.getName), can.getParentFile)
+    Child(cf.getPath)
   }
 
   object Location {
@@ -132,13 +133,15 @@ object Artifact {
     implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] = Impl.modSerializer
   }
   trait Modifiable[S <: evt.Sys[S]] extends Artifact[S] {
-    def child_=(value: File)(implicit tx: S#Tx): Unit
+    def child_=(value: Child)(implicit tx: S#Tx): Unit
   }
+
+  final case class Child(path: String)
 }
 
 trait Artifact[S <: evt.Sys[S]] extends Expr[S, Artifact.Value] /* Mutable[S#ID, S#Tx] */ {
   import Artifact._
   def location: Location[S]
   def modifiableOption: Option[Modifiable[S]]
-  def child(implicit tx: S#Tx): File
+  def child(implicit tx: S#Tx): Child
 }
