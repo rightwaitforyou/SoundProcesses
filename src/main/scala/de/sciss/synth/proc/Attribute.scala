@@ -61,9 +61,20 @@ object Attribute {
       extends ExprImpl[S, _Int] with Int[S] {
       def prefix = "Int"
       def typeID = Int.typeID
+
+      def mkCopy()(implicit tx: S#Tx): Int[S] = {
+        val newPeer = peer match {
+          case Expr.Var(vr) => Ints.newVar(vr())
+          case _ => peer
+        }
+        Int(newPeer)
+      }
     }
   }
-  sealed trait Int[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _Int] }
+  sealed trait Int[S <: ESys[S]] extends Attribute[S] {
+    type Peer = Expr[S, _Int]
+    def mkCopy()(implicit tx: S#Tx): Int[S]
+  }
 
   // ----------------- Double -----------------
 
@@ -84,9 +95,20 @@ object Attribute {
       extends ExprImpl[S, _Double] with Double[S] {
       def typeID = Double.typeID
       def prefix = "Double"
+
+      def mkCopy()(implicit tx: S#Tx): Double[S] = {
+        val newPeer = peer match {
+          case Expr.Var(vr) => Doubles.newVar(vr())
+          case _ => peer
+        }
+        Double(newPeer)
+      }
     }
   }
-  sealed trait Double[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _Double] }
+  sealed trait Double[S <: ESys[S]] extends Attribute[S] {
+    type Peer = Expr[S, _Double]
+    def mkCopy()(implicit tx: S#Tx): Double[S]
+  }
 
   // ----------------- Double -----------------
 
@@ -107,9 +129,20 @@ object Attribute {
       extends ExprImpl[S, _Boolean] with Boolean[S] {
       def typeID = Boolean.typeID
       def prefix = "Boolean"
+
+      def mkCopy()(implicit tx: S#Tx): Boolean[S] = {
+        val newPeer = peer match {
+          case Expr.Var(vr) => Booleans.newVar(vr())
+          case _ => peer
+        }
+        Boolean(newPeer)
+      }
     }
   }
-  sealed trait Boolean[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _Boolean] }
+  sealed trait Boolean[S <: ESys[S]] extends Attribute[S] {
+    type Peer = Expr[S, _Boolean]
+    def mkCopy()(implicit tx: S#Tx): Boolean[S]
+  }
 
   // ----------------- String -----------------
 
@@ -130,9 +163,20 @@ object Attribute {
       extends ExprImpl[S, _String] with String[S] {
       def typeID = String.typeID
       def prefix = "String"
+
+      def mkCopy()(implicit tx: S#Tx): String[S] = {
+        val newPeer = peer match {
+          case Expr.Var(vr) => Strings.newVar(vr())
+          case _ => peer
+        }
+        String(newPeer)
+      }
     }
   }
-  sealed trait String[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _String] }
+  sealed trait String[S <: ESys[S]] extends Attribute[S] {
+    type Peer = Expr[S, _String]
+    def mkCopy()(implicit tx: S#Tx): String[S]
+  }
 
   // ----------------- Double -----------------
 
@@ -153,9 +197,20 @@ object Attribute {
       extends ExprImpl[S, _FadeSpec.Value] with FadeSpec[S] {
       def typeID = FadeSpec.typeID
       def prefix = "FadeSpec"
+
+      def mkCopy()(implicit tx: S#Tx): FadeSpec[S] = {
+        val newPeer = peer match {
+          case Expr.Var(vr) => _FadeSpec.Elem.newVar(vr())
+          case _ => peer
+        }
+        FadeSpec(newPeer)
+      }
     }
   }
-  sealed trait FadeSpec[S <: ESys[S]] extends Attribute[S] { type Peer = Expr[S, _FadeSpec.Value] }
+  sealed trait FadeSpec[S <: ESys[S]] extends Attribute[S] {
+    type Peer = Expr[S, _FadeSpec.Value]
+    def mkCopy()(implicit tx: S#Tx): FadeSpec[S]
+  }
 
   // ----------------- Serializer -----------------
 
@@ -262,6 +317,8 @@ object Attribute {
   }
 }
 sealed trait Attribute[S <: ESys[S]] extends Mutable[S#ID, S#Tx] {
+  attr =>
+
   import Attribute.Update
 
   type Peer
@@ -273,4 +330,6 @@ sealed trait Attribute[S <: ESys[S]] extends Mutable[S#ID, S#Tx] {
     * the element or forwarding changes from the underlying entity.
     */
   def changed: EventLike[S, Update[S], Attribute[S]]
+
+  def mkCopy()(implicit tx: S#Tx): Attribute[S] // { type Peer = attr.Peer }
 }
