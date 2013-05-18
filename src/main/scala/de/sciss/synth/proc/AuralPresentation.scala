@@ -58,4 +58,6 @@ object AuralPresentation {
 }
 trait AuralPresentation[S <: Sys[S]] extends Disposable[S#Tx] {
   def group(implicit tx: S#Tx): Option[Group]
+
+  def stopAll(implicit tx: S#Tx): Unit
 }

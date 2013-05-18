@@ -84,6 +84,10 @@ object AuralPresentationImpl {
       }
     }
 
+    def stopAll(implicit tx: S#Tx) {
+      group.foreach(_.freeAll())
+    }
+
     def startedTx(server: Server)(implicit tx: S#Tx) {
       // implicit val itx: I#Tx = tx
       // println("startedTx")
