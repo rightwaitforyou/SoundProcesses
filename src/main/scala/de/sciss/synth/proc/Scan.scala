@@ -33,39 +33,47 @@ import language.implicitConversions
 import de.sciss.serial.DataInput
 
 object Scan {
-   object Link {
-      implicit def grapheme[ S <: evt.Sys[ S ]]( link: proc.Grapheme[ S ]) : Grapheme[ S ] = Grapheme( link )
-      implicit def scan[     S <: evt.Sys[ S ]]( link: proc.Scan[     S ]) : Scan[     S ] = Scan(     link )
+  object Link {
+    implicit def grapheme[S <: evt.Sys[S]](link: proc.Grapheme[S]): Grapheme[S] = Grapheme(link)
+    implicit def scan    [S <: evt.Sys[S]](link: proc.Scan    [S]): Scan    [S] = Scan    (link)
 
-      final case class Grapheme[ S <: evt.Sys[ S ]]( peer: proc.Grapheme[ S ]) extends Link[ S ] {
-         def id = peer.id
-         override def toString = peer.toString()
-      }
-      final case class Scan[     S <: evt.Sys[ S ]]( peer: proc.Scan[     S ]) extends Link[ S ] {
-         def id = peer.id
-         override def toString = peer.toString()
-      }
-   }
-   sealed trait Link[ S <: evt.Sys[ S ]] { def id: S#ID }
+    final case class Grapheme[S <: evt.Sys[S]](peer: proc.Grapheme[S]) extends Link[S] {
+      def id = peer.id
+      override def toString = peer.toString()
+    }
 
-   def apply[ S <: evt.Sys[ S ]]( implicit tx: S#Tx ) : Scan[ S ] = Impl.apply
+    final case class Scan[S <: evt.Sys[S]](peer: proc.Scan[S]) extends Link[S] {
+      def id = peer.id
+      override def toString = peer.toString()
+    }
+  }
 
-   def read[ S <: evt.Sys[ S ]]( in: DataInput, access: S#Acc )( implicit tx: S#Tx ) : Scan[ S ] = Impl.read( in, access )
+  sealed trait Link[S <: evt.Sys[S]] {
+    def id: S#ID
+  }
 
-   implicit def serializer[ S <: evt.Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
+  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): Scan[S] = Impl.apply
 
-   sealed trait Update[ S <: evt.Sys[ S ]] { def scan: Scan[ S ]}
-   sealed trait SinkUpdate[ S <: evt.Sys[ S ]] extends Update[ S ] { def sink: Link[ S ]}
-   final case class SinkAdded[     S <: evt.Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
-      override def toString = "[" + scan + " ---> " + sink + "]"
-   }
-   final case class SinkRemoved[   S <: evt.Sys[ S ]]( scan: Scan[ S ], sink: Link[ S ]) extends SinkUpdate[ S ] {
-      override def toString = "[" + scan + " -/-> " + sink + "]"
-   }
-   final case class SourceChanged[ S <: evt.Sys[ S ]]( scan: Scan[ S ], source: Option[ Link[ S ]]) extends Update[ S ] {
-      override def toString = "[" + scan + " <--- " + source + "]"
-   }
-   final case class SourceUpdate[ S <: evt.Sys[ S ]]( scan: Scan[ S ], source: Grapheme.Update[ S ]) extends Update[ S ]
+  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = Impl.read(in, access)
+
+  implicit def serializer[ S <: evt.Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
+
+  sealed trait Update    [S <: evt.Sys[S]]                   { def scan: Scan[S] }
+  sealed trait SinkUpdate[S <: evt.Sys[S]] extends Update[S] { def sink: Link[S] }
+
+  final case class SinkAdded[S <: evt.Sys[S]](scan: Scan[S], sink: Link[S]) extends SinkUpdate[S] {
+    override def toString = "[" + scan + " ---> " + sink + "]"
+  }
+
+  final case class SinkRemoved[S <: evt.Sys[S]](scan: Scan[S], sink: Link[S]) extends SinkUpdate[S] {
+    override def toString = "[" + scan + " -/-> " + sink + "]"
+  }
+
+  final case class SourceChanged[S <: evt.Sys[S]](scan: Scan[S], source: Option[Link[S]]) extends Update[S] {
+    override def toString = "[" + scan + " <--- " + source + "]"
+  }
+
+  final case class SourceUpdate[S <: evt.Sys[S]](scan: Scan[S], source: Grapheme.Update[S]) extends Update[S]
 }
 
 /**

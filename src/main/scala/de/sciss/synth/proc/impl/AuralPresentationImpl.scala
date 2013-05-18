@@ -244,16 +244,20 @@ object AuralPresentationImpl {
       if (attrNames.nonEmpty) {
         // println(s"Attributes used: ${attrNames.mkString(", ")}")
         attrNames.foreach { n =>
-          val valOpt  = p.attributes.get(n).map {
-            case a: Attribute.Int    [S] => a.peer.value.toFloat
-            case a: Attribute.Double [S] => a.peer.value.toFloat
-            case a: Attribute.Boolean[S] => if (a.peer.value) 1f else 0f
+          val ctlName = graph.attribute.controlName(n)
+          val csm: Option[ControlSetMap] = p.attributes.get(n).map {
+            case a: Attribute.Int     [S] => ctlName -> a.peer.value.toFloat
+            case a: Attribute.Double  [S] => ctlName -> a.peer.value.toFloat
+            case a: Attribute.Boolean [S] => ctlName -> (if (a.peer.value) 1f else 0f)
+            case a: Attribute.FadeSpec[S] =>
+              val spec = a.peer.value
+              // dur, shape-id, shape-curvature, floor
+              ctlName -> Vector(
+                (spec.numFrames / sampleRate).toFloat, spec.shape.id.toFloat, spec.shape.curvature, spec.floor
+              )
             case a => sys.error(s"Cannot cast attribute $a to a scalar value")
           }
-          valOpt.foreach { f =>
-            val ctl  = graph.attribute.controlName(n)
-            setMap :+= ((ctl, f): ControlSetMap)
-          }
+          csm.foreach(setMap :+= _)
         }
       }
 

@@ -230,6 +230,7 @@ object Attribute {
         case Double          .typeID => Double          .readIdentified(in, access, targets)
         case Boolean         .typeID => Boolean         .readIdentified(in, access, targets)
         case String          .typeID => String          .readIdentified(in, access, targets)
+        case FadeSpec        .typeID => FadeSpec        .readIdentified(in, access, targets)
         // case Folder          .typeID => Folder          .readIdentified(in, access, targets)
         // case ProcGroup       .typeID => ProcGroup       .readIdentified(in, access, targets)
         // case AudioGrapheme   .typeID => AudioGrapheme   .readIdentified(in, access, targets)

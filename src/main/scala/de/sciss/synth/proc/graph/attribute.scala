@@ -3,14 +3,14 @@ package proc
 package graph
 
 object attribute {
-  private[proc] def controlName (key: String): String = "$attr_"  + key
+  private[proc] def controlName(key: String): String = "$attr_"  + key
 
   @SerialVersionUID(6793156274707521366L) private final case class AttributeIn(key: String, default: Double)
     extends GE.Lazy /* with Elem */ with ScalarRated {
 
     def displayName = "AttributeIn"
 
-    override def toString = s"""$displayName("${key}")"""
+    override def toString = s"""$displayName("$key")"""
 
     def makeUGens: UGenInLike = {
       UGenGraph.builder match {

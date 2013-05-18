@@ -8,7 +8,7 @@ import serial.{DataOutput, DataInput, ImmutableSerializer}
 import bitemp.BiType
 import synth.proc.impl.CommonSerializers
 import de.sciss.lucre.event.{Change, Pull, Targets}
-import synth.expr.{SpanLikes, Longs}
+import de.sciss.synth.expr.{EnvShapes, Doubles, BiTypeImpl, SpanLikes, Longs}
 import span.SpanLike
 
 object FadeSpec {
@@ -36,11 +36,14 @@ object FadeSpec {
   }
   final case class Value(numFrames: Long, shape: Env.ConstShape = linShape, floor: Float = 0f)
 
-  object Elem extends BiType[Value] {
+  object Elem extends BiTypeImpl[Value] {
     final val typeID = 14
 
-    def longType    : BiType[Long    ] = Longs
-    def spanLikeType: BiType[SpanLike] = SpanLikes
+    // 0 reserved for variables
+    private final val elemCookie = 1
+
+    //    def longType    : BiType[Long    ] = Longs
+    //    def spanLikeType: BiType[SpanLike] = SpanLikes
 
     def readValue(in: DataInput): Value = Value.serializer.read(in)
 
@@ -62,7 +65,11 @@ object FadeSpec {
 
     protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                               (implicit tx: S#Tx): ReprNode[S] = {
-      ??? // XXX TODO: should we care about readTuple?
+      require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
+      val numFrames = Longs.readExpr    (in, access)
+      val shape     = EnvShapes.readExpr(in, access)
+      val floor     = Doubles.readExpr  (in, access)
+      new Impl(targets, numFrames, shape, floor)
     }
 
     private final class Impl[S <: evt.Sys[S]](protected val targets: Targets[S],
@@ -107,6 +114,7 @@ object FadeSpec {
       }
 
       protected def writeData(out: DataOutput) {
+        out.writeByte(elemCookie)
         numFrames.write(out)
         shape    .write(out)
         floor    .write(out)
