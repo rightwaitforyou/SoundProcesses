@@ -7,6 +7,7 @@ import synth.proc.{ProcKeys, graph, impl}
 import lucre.{event => evt}
 import evt.{Targets, Sys}
 import lucre.expr.Expr
+import scala.annotation.switch
 
 object SynthGraphs extends BiTypeImpl[SynthGraph] {
   final val typeID = 16
@@ -23,7 +24,8 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
   //  }
 
   private final val tapeCookie  = 1
-  // private final val mapCookie   = 2
+  private final val emptyCookie = 2
+  // private final val mapCookie   = 3
 
   def readValue(in: DataInput): SynthGraph = impl.SynthGraphSerializer.read(in)
 
@@ -33,9 +35,11 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
 
   protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                       (implicit tx: S#Tx): ReprNode[S] =
-    (cookie /* : @switch */) match {
+    (cookie: @switch) match {
       case `tapeCookie` =>
-        new TapeImpl(targets)
+        new Predefined(targets, cookie)
+      case `emptyCookie` =>
+        new Predefined(targets, cookie)
 
       //      case `mapCookie`  =>
       //        val key     = in.readUTF()
@@ -56,23 +60,36 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
     Out.ar(bus, sig * amp)
   }
 
+  private val emptySynthGraph = SynthGraph {}
+
   def tape[S <: Sys[S]](implicit tx: S#Tx): Ex[S] = {
     val targets = evt.Targets[S]
-    new TapeImpl(targets)
+    new Predefined(targets, tapeCookie)
+  }
+
+  def empty[S <: Sys[S]](implicit tx: S#Tx): Ex[S] = {
+    val targets = evt.Targets[S]
+    new Predefined(targets, emptyCookie)
   }
 
   // XXX TODO -- we should allow other constant values in Type. now we have a wasted evt.Targets...
-  private final class TapeImpl[S <: Sys[S]](protected val targets: Targets[S])
+  private final class Predefined[S <: Sys[S]](protected val targets: Targets[S], cookie: Int)
     extends Expr[S, SynthGraph]
     with evt.Node[S]
     with evt.impl.SingleGenerator[S, evt.Change[SynthGraph], Ex[S]] {
 
-    protected def writeData(out: DataOutput) {}
+    protected def writeData(out: DataOutput) {
+      out.writeByte(cookie)
+    }
+
     protected def disposeData()(implicit tx: S#Tx) {}
 
     protected def reader: evt.Reader[S, SynthGraphs.Ex[S]] = serializer
 
-    def value(implicit tx: S#Tx): SynthGraph = tapeSynthGraph
+    def value(implicit tx: S#Tx): SynthGraph = (cookie: @switch) match {
+      case `tapeCookie`   => tapeSynthGraph
+      case `emptyCookie`  => emptySynthGraph
+    }
   }
 }
 // sealed trait SynthGraphSource[S <: Sys[S]] extends Expr[S, SynthGraph]

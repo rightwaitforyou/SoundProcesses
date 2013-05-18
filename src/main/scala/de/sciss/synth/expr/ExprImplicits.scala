@@ -7,24 +7,10 @@ import expr.Expr
 import de.sciss.synth.proc.Grapheme
 import language.implicitConversions
 import de.sciss.span.{Span, SpanLike}
+import de.sciss.synth.SynthGraph
 
 object ExprImplicits {
-  //   implicit def stringConst[   S <: stm.Sys[ S ]]( s: String )   : Expr[ S, String   ] = Strings.newConst(   s )
-  //   implicit def booleanConst[  S <: stm.Sys[ S ]]( b: Boolean )  : Expr[ S, Boolean  ] = Booleans.newConst(  b )
-  //   implicit def doubleConst[   S <: stm.Sys[ S ]]( d: Double )   : Expr[ S, Double   ] = Doubles.newConst(   d )
-  //   implicit def intConst[      S <: stm.Sys[ S ]]( i: Int )      : Expr[ S, Int      ] = Ints.newConst(      i )
-  //   implicit def longConst[     S <: stm.Sys[ S ]]( n: Long )     : Expr[ S, Long     ] = Longs.newConst(     n )
-  //   implicit def spanConst[     S <: stm.Sys[ S ]]( s: Span )     : Expr[ S, Span     ] = Spans.newConst(     s )
-  //   implicit def spanLikeConst[ S <: stm.Sys[ S ]]( s: SpanLike ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
-
-  //   trait LowPriority[ S <: Sys[ S ]] {
-  //      implicit def lowSpanLikeConst( s: Span ) : Expr[ S, SpanLike ] = SpanLikes.newConst( s )
-  ////      implicit def lowSpanLikeOps( ex: Expr[ S, Span ])( implicit tx: S#Tx ) : SpanLikes.Ops[ S ] = new SpanLikes.Ops( ex )
-  ////      implicit def lowDoubleConst( d: Float ) : Expr[ S, Double ] = Doubles.newConst( d )
-  //   }
-
   def apply[S <: Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
-
   private object Imp extends ExprImplicits[evt.InMemory]
 }
 
@@ -63,6 +49,8 @@ class ExprImplicits[S <: Sys[S]] protected /* extends ExprImplicits.LowPriority[
   implicit def spanOps(ex: Expr[S, Span])(implicit tx: S#Tx): Spans.Ops[S] = new Spans.Ops(ex)
   implicit def spanLikeConst(s: SpanLike): Expr[S, SpanLike] = SpanLikes.newConst(s)
   implicit def spanLikeOps(ex: Expr[S, SpanLike])(implicit tx: S#Tx): SpanLikes.Ops[S] = new SpanLikes.Ops(ex)
+
+  implicit def synthGraphConst(s: SynthGraph): Expr[S, SynthGraph] = SynthGraphs.newConst(s)
 
   // ---- biexpr ----
   implicit def biExpr[A, A1, T](tuple: (T, A1))

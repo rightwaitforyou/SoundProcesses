@@ -27,8 +27,8 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, expr, data, bitemp}
-import de.sciss.synth.expr.Doubles
+import de.sciss.lucre.{event => evt, data, bitemp}
+import de.sciss.synth.expr.{SynthGraphs, Doubles}
 import evt.{Event, impl => evti, Sys}
 import bitemp.BiType
 import data.SkipList
@@ -37,13 +37,14 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import language.higherKinds
+import de.sciss.lucre.expr.Expr
 
 object ProcImpl {
-  private final val SER_VERSION = 0x5072  // "Pr"
+  private final val SER_VERSION = 0x5073  // was "Pr"
 
   implicit val paramType: BiType[Param] = Doubles
 
-  def apply[S <: Sys[S]](implicit tx: S#Tx): Proc[S] = new New[S](tx)
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Proc[S] = new New[S]
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] =
     serializer[S].read(in, access)
@@ -51,32 +52,17 @@ object ProcImpl {
   def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Proc[S]] =
     anySer.asInstanceOf[evt.NodeSerializer[S, Proc[S]]]
 
-  final val emptyGraph: SynthGraph = SynthGraph {}
-
   private val anySer = new Serializer[evt.InMemory]
 
   private class Serializer[S <: Sys[S]] extends evt.NodeSerializer[S, Proc[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Proc[S] =
-      new Read(in, access, targets, tx)
+      new Read(in, access, targets)
   }
 
-  // private def opNotSupported: Nothing = sys.error("Operation not supported")
-
-  // private type GraphemeEntry [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Grapheme [S], Grapheme .Update[S]]
   private type ScanEntry     [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan     [S], Scan     .Update[S]]
   private type AttributeEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Attribute[S], Attribute.Update[S]]
 
   private type I = evt.InMemory
-
-  // implicit def graphemeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Grapheme[S], Grapheme.Update[S]] =
-  //   anyGraphemeEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Grapheme[S], Grapheme.Update[S]]]
-  //
-  //  private val anyGraphemeEntryInfo = new KeyMapImpl.ValueInfo[I, String, Grapheme[I], Grapheme.Update[I]] {
-  //    def valueEvent(value: Grapheme[I]) = value.changed
-  //
-  //    val keySerializer   = ImmutableSerializer.String
-  //    val valueSerializer = Grapheme.serializer[I]
-  //  }
 
   implicit def scanEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]] =
     anyScanEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]]]
@@ -104,24 +90,18 @@ object ProcImpl {
 
     import Proc._
 
-    protected def _graph    : S#Var[SynthGraph] // Code[SynthGraph]]
-    // protected def name_#     : Expr.Var    [S, String]
-    // protected def graphemeMap : SkipList.Map[S, String, GraphemeEntry[S]]
+    protected def _graph    : Expr.Var[S, SynthGraph] // Code[SynthGraph]]
     protected def attributeMap: SkipList.Map[S, String, AttributeEntry[S]]
     protected def scanMap     : SkipList.Map[S, String, ScanEntry[S]]
 
-    // final def name(implicit tx: S#Tx): Expr[S, String] = name_#()
-    // final def name_=(s: Expr[S, String])(implicit tx: S#Tx) {
-    //   name_#() = s
-    // }
+    final def graph(implicit tx: S#Tx): Expr[S, SynthGraph] = _graph()
 
-    final def graph(implicit tx: S#Tx): /*Code[*/ SynthGraph /*]*/ = _graph()
-
-    final def graph_=(g: /* Code[*/ SynthGraph /*]*/)(implicit tx: S#Tx) {
+    final def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx) {
       val old = _graph()
       if (old != g) {
         _graph() = g
-        StateEvent(Proc.Update(proc, Vector(GraphChange(evt.Change(old /* .value */, g /* .value */ )))))
+        val ch = evt.Change(old.value, g.value)
+        if (ch.isSignificant) StateEvent(Proc.Update(proc, Vector(GraphChange(ch))))
       }
     }
 
@@ -153,25 +133,6 @@ object ProcImpl {
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
     }
-
-    //    object graphemes extends Graphemes.Modifiable[S] with KeyMap[Grapheme[S], Grapheme.Update[S], Proc.Update[S]] {
-    //      final val slot = 1
-    //
-    //      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
-    //        val changes = foldUpdate(pull)
-    //        if (changes.isEmpty) None
-    //        else Some(Proc.Update(proc,
-    //          changes.map({
-    //            case (key, u) => Proc.GraphemeChange(key, u)
-    //          })(breakOut)))
-    //      }
-    //
-    //      protected def wrapKey(key: String) = GraphemeKey(key)
-    //
-    //      protected def map: SkipList.Map[S, String, Entry] = graphemeMap
-    //
-    //      protected def valueInfo = graphemeEntryInfo[S]
-    //    }
 
     object attributes extends Attributes.Modifiable[S] with KeyMap[Attribute[S], Attribute.Update[S], Proc.Update[S]] {
       final val slot = 0
@@ -315,38 +276,15 @@ object ProcImpl {
     override def toString() = "Proc" + id
   }
 
-  private final class New[S <: Sys[S]](tx0: S#Tx) extends Impl[S] {
-    protected val targets = evt.Targets[S](tx0)
-
-    // protected val name_# = Strings.newVar[S](Strings.newConst("unnamed"))(tx0)
-    protected val _graph = {
-      implicit val peerSer = SynthGraphSerializer
-      tx0.newVar[/*Code[ */ SynthGraph /*]*/ ](id, emptyGraph)
-    }
-
-    protected val scanMap = {
-      implicit val tx = tx0
-      //         implicit val _scanSer = implicitly[ stm.Serializer[ S#Tx, S#Acc, Scan[ S ]]]
-      //         implicit val _scanSer : stm.Serializer[ S#Tx, S#Acc, Scan[ S ]] = Scan.serializer
-      // implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, ScanEntry[S]] = KeyMapImpl.entrySerializer
-      SkipList.Map.empty[S, String, ScanEntry[S]]
-    }
-
-    //    protected val graphemeMap = {
-    //      implicit val tx = tx0
-    //      implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, GraphemeEntry[S]] = KeyMapImpl.entrySerializer
-    //      SkipList.Map.empty[S, String, GraphemeEntry[S]]
-    //    }
-
-    protected val attributeMap = {
-      implicit val tx = tx0
-      // implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, GraphemeEntry[S]] = KeyMapImpl.entrySerializer
-      SkipList.Map.empty[S, String, AttributeEntry[S]]
-    }
+  private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {
+    protected val targets       = evt.Targets[S](tx0)
+    protected val _graph        = SynthGraphs.newVar(SynthGraphs.empty)
+    protected val scanMap       = SkipList.Map.empty[S, String, ScanEntry[S]]
+    protected val attributeMap  = SkipList.Map.empty[S, String, AttributeEntry[S]]
   }
 
-  private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S],
-                                        tx0: S#Tx)
+  private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S])
+                                       (implicit tx0: S#Tx)
     extends Impl[S] {
 
     {
@@ -354,28 +292,8 @@ object ProcImpl {
       require(serVer == SER_VERSION, s"Incompatible serialized (found $serVer, required $SER_VERSION)")
     }
 
-    // protected val name_# = Strings.readVar[S](in, access)(tx0)
-    protected val _graph = {
-      implicit val peerSer = SynthGraphSerializer
-      tx0.readVar[/* Code[ */ SynthGraph /* ]*/ ](id, in)
-    }
-
-    protected val attributeMap = {
-      implicit val tx = tx0
-      // implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, AttributeEntry[S]] = KeyMapImpl.entrySerializer
-      SkipList.Map.read[S, String, AttributeEntry[S]](in, access)
-    }
-
-    protected val scanMap = {
-      implicit val tx = tx0
-      // implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, ScanEntry[S]] = KeyMapImpl.entrySerializer
-      SkipList.Map.read[S, String, ScanEntry[S]](in, access)
-    }
-
-    //    protected val graphemeMap = {
-    //      implicit val tx = tx0
-    //      implicit val _screwYou: serial.Serializer[S#Tx, S#Acc, GraphemeEntry[S]] = KeyMapImpl.entrySerializer
-    //      SkipList.Map.read[S, String, GraphemeEntry[S]](in, access)
-    //    }
+    protected val _graph        = SynthGraphs.readVar(in, access)
+    protected val attributeMap  = SkipList.Map.read[S, String, AttributeEntry[S]](in, access)
+    protected val scanMap       = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
   }
 }

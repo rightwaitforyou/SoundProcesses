@@ -94,8 +94,8 @@ trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
   // def name(implicit tx: S#Tx): Expr[S, String]
   // def name_=(expr: Expr[S, String])(implicit tx: S#Tx): Unit
 
-  def graph(implicit tx: S#Tx): SynthGraph // Code[SynthGraph]
-  def graph_=(g: /*Code[*/ SynthGraph /*]*/)(implicit tx: S#Tx): Unit
+  def graph(implicit tx: S#Tx): Expr[S, SynthGraph] // Code[SynthGraph]
+  def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx): Unit
 
   // ---- controls preview demo ----
 
