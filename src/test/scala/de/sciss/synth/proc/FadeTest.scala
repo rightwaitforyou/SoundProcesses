@@ -29,13 +29,15 @@ object FadeTest extends App {
     // val spatIn = spat.scans.add("in")
     // spatIn.addSink()
 
-    val proc      = Proc[S]
-    val fadeExpr  = FadeSpec.Elem(44100, EnvShapes.newConst(linShape), 0.0) // FadeSpec.Value(44100, linShape)
-    proc.attributes.put("fadeIn", Attribute.FadeSpec(fadeExpr))
+    val proc        = Proc[S]
+    val fadeExprIn  = FadeSpec.Elem(44100, EnvShapes.newConst(linShape), 0.0) // FadeSpec.Value(44100, linShape)
+    val fadeExprOut = FadeSpec.Elem(44100, EnvShapes.newConst(expShape), -40.dbamp) // FadeSpec.Value(44100, linShape)
+    proc.attributes.put("fadeIn" , Attribute.FadeSpec(fadeExprIn ))
+    proc.attributes.put("fadeOut", Attribute.FadeSpec(fadeExprOut))
     proc.graph_=(SynthGraph {
       import ugen._
       val noise = PinkNoise.ar
-      val env   = graph.FadeIn("fadeIn").ar
+      val env   = graph.FadeInOut("fadeIn", "fadeOut").ar
       val sig   = noise * env
       Out.ar(0, Pan2.ar(sig))
     })

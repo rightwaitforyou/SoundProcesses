@@ -37,6 +37,7 @@ import UGenGraphBuilder.MissingIn
 import graph.scan
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import TxnExecutor.{defaultAtomic => atomic}
+import de.sciss.span.Span
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -237,7 +238,18 @@ object AuralPresentationImpl {
       val timed     = ugen.timed
       var busUsers  = Vector.empty[DynamicBusUser]
       val p         = timed.value
-      var setMap    = Vector.empty[ControlSetMap]
+      val span      = timed.span.value
+      var setMap    = Vector[ControlSetMap](
+        graph.Time    .key -> time / sampleRate,
+        graph.Offset  .key -> (span match {
+          case Span.HasStart(start) => (time - start) / sampleRate
+          case _ => 0.0
+        }),
+        graph.Duration.key -> (span match {
+          case Span(start, stop)  => (stop - start) / sampleRate
+          case _ => Double.PositiveInfinity
+        })
+      )
       var deps      = Nil: List[Resource.Source]
 
       val attrNames = ugen.attributeIns

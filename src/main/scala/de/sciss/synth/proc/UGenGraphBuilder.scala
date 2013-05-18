@@ -72,15 +72,17 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
    */
   def isComplete: Boolean
 
-  /**
-   * The process which is building this graph.
-   */
+  /** The process which is building this graph. */
   def timed: TimedProc[S]
 
-  /**
-   * The transport time at which this graph is built.
-   */
+  /** The transport time at which this graph is built. */
   def time: Long
+
+  //  /** The offset from which this proc if played. */
+  //  def offset: Long
+  //
+  //  /** The total number of frames. */
+  //  def numFrames: Long
 
   def tx: S#Tx
 

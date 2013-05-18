@@ -29,11 +29,18 @@ package impl
 
 import java.io.{ObjectInputStream, ObjectOutputStream}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
+import collection.mutable
 
 /**
  * A serializer using plain old java (object output) serialization
  */
 object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
+  //  private val map = mutable.Map.empty[String, SynthGraph]
+  //
+  //  def register(key: String, graph: SynthGraph) {
+  //    map.synchronized(map += key -> graph)
+  //  }
+
   private final val SER_VERSION = 0x5347
 
   def write(v: SynthGraph, out: DataOutput) {
