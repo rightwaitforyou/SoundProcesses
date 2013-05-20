@@ -376,6 +376,7 @@ object AuralPresentationImpl {
           //               implicit val ptx = ProcTxn()( tx )
           aural.getBus(key)
         case _ =>
+          assert(ongoingBuild.isInitialized(tx.peer))
           ongoingBuild.get(tx.peer).idMap.flatMap { map =>
             map.get(timedID).flatMap(_.outBuses.get(key))
           }
@@ -421,7 +422,9 @@ object AuralPresentationImpl {
     //      }
 
     private def addFlush()(implicit tx: S#Tx) {
+      log(s"addFlush (${hashCode.toHexString})")
       tx.beforeCommit(flush()(_))
+      // concurrent.stm.Txn.afterRollback(status => log(s"rollback $status !!"))(tx.peer)
     }
 
     def procAdded(time: Long, timed: TimedProc[S])(implicit tx: S#Tx) {
@@ -431,10 +434,11 @@ object AuralPresentationImpl {
       val timedID = timed.id
       val ugen    = UGenGraphBuilder(this, timed, time)
       val builder = new AuralProcBuilder(ugen /*, name */)
-      if (!ongoingBuild.isInitialized(tx.peer)) addFlush() // ( ProcTxn() )   // the next line (`ongoingBuild.get`) will initialise then
+      val newTxn  = !ongoingBuild.isInitialized(tx.peer)
+      if (newTxn) addFlush() // ( ProcTxn() )   // the next line (`ongoingBuild.get`) will initialise then
       val ongoing = ongoingBuild.get(tx.peer)
       ongoing.seq :+= builder
-      assert(ongoingBuild.isInitialized(tx.peer))
+      // assert(ongoingBuild.isInitialized(tx.peer))
 
       // initialise the id-to-builder map if necessary
       val builderMap = ongoing.idMap.getOrElse {
@@ -546,6 +550,8 @@ object AuralPresentationImpl {
             if (!mute) println("WARNING: could not find view for " + timed)
           }
 
+          val newTxn  = !ongoingBuild.isInitialized(tx.peer)
+          if (newTxn) addFlush()
           val ongoing = ongoingBuild.get(tx.peer)
           ongoing.idMap match {
             case Some(idMap) => idMap.get(timedID) match {
