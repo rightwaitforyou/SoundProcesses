@@ -31,25 +31,31 @@ import de.sciss.lucre.{event => evt, stm}
 import stm.{DataStoreFactory, DataStore}
 
 private[proc] object DurableImpl {
-   def apply( factory: DataStoreFactory[ DataStore ], mainName: String, eventName: String ) : Durable = {
-      val mainStore  = factory.open( mainName )
-      val eventStore = factory.open( eventName )
-      new System( mainStore, eventStore )
-   }
+  def apply(factory: DataStoreFactory[DataStore], mainName: String, eventName: String): Durable = {
+    val mainStore   = factory.open(mainName)
+    val eventStore  = factory.open(eventName)
+    new System(mainStore, eventStore)
+  }
 
-   private final class TxnImpl( val system: System, val peer: InTxn )
-   extends stm.impl.DurableImpl.TxnMixin[ Durable ] with evt.impl.DurableImpl.DurableTxnMixin[ Durable ]
-   with ProcTxnFullImpl[ Durable ] {
-      lazy val inMemory: evt.InMemory#Tx = system.inMemory.wrap( peer )
-      override def toString = "proc.Durable#Tx@" + hashCode.toHexString
-   }
+  def apply(mainStore: DataStore, eventStore: DataStore): Durable = new System(mainStore, eventStore)
 
-   private final class System( protected val store: DataStore, protected val eventStore: DataStore )
-   extends evt.impl.DurableImpl.DurableMixin[ Durable, evt.InMemory ] with Durable
-   with evt.impl.ReactionMapImpl.Mixin[ Durable ] {
-      private type S = Durable
-      val inMemory: evt.InMemory = evt.InMemory()
-      def wrap( peer: InTxn ) : S#Tx = new TxnImpl( this, peer )
-      override def toString = "proc.Durable@" + hashCode.toHexString
-   }
+  private final class TxnImpl(val system: System, val peer: InTxn)
+    extends stm.impl.DurableImpl.TxnMixin[Durable] with evt.impl.DurableImpl.DurableTxnMixin[Durable]
+    with ProcTxnFullImpl[Durable] with Durable.Txn {
+
+    lazy val inMemory: /* evt. */ InMemory#Tx = system.inMemory.wrap(peer)
+
+    override def toString = "proc.Durable#Tx@" + hashCode.toHexString
+  }
+
+  private final class System(protected val store: DataStore, protected val eventStore: DataStore)
+    extends evt.impl.DurableImpl.DurableMixin[Durable, evt.InMemory] with Durable
+    with evt.impl.ReactionMapImpl.Mixin[Durable] {
+    private type S = Durable
+    val inMemory: /* evt. */ InMemory = /* evt. */ InMemory()
+
+    def wrap(peer: InTxn): S#Tx = new TxnImpl(this, peer)
+
+    override def toString = "proc.Durable@" + hashCode.toHexString
+  }
 }

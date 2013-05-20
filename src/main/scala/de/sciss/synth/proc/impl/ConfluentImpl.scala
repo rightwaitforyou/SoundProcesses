@@ -46,15 +46,15 @@ private[proc] object ConfluentImpl {
     val mainStoreD  = storeFactory.open("d-main")
     val eventStore  = storeFactory.open("event", overwrite = true)  // shared between durable + confluent
 
-    val durable     = evt.Durable(mainStore = mainStoreD, eventStore = eventStore)
+    val durable     = /* evt. */ Durable(mainStore = mainStoreD, eventStore = eventStore)
     new System(storeFactory, eventStore, durable)
   }
 
   private sealed trait TxnImpl extends Confluent.Txn with ConfluentReactiveImpl.TxnMixin[S] with ProcTxnFullImpl[S] {
-    final lazy val inMemory: evt.InMemory#Tx = system.inMemory.wrap(peer)
+    final lazy val inMemory: /* evt. */ InMemory#Tx = system.inMemory.wrap(peer)
   }
 
-  private final class RegularTxn(val system: S, val durable: evt.Durable#Tx,
+  private final class RegularTxn(val system: S, val durable: /* evt. */ Durable#Tx,
                                  val inputAccess: S#Acc, val cursorCache: confluent.Cache[S#Tx])
     extends confluent.impl.ConfluentImpl.RegularTxnMixin[S, evt.Durable] with TxnImpl {
     lazy val peer = durable.peer
@@ -62,14 +62,14 @@ private[proc] object ConfluentImpl {
 
   private final class RootTxn(val system: S, val peer: InTxn)
     extends confluent.impl.ConfluentImpl.RootTxnMixin[S, stm.Durable] with TxnImpl {
-    lazy val durable: evt.Durable#Tx = {
+    lazy val durable: /* evt. */ Durable#Tx = {
       log("txn durable")
       system.durable.wrap(peer)
     }
   }
 
   private final class System(protected val storeFactory: DataStoreFactory[DataStore],
-                             protected val eventStore: DataStore, val durable: evt.Durable)
+                             protected val eventStore: DataStore, val durable: /* evt. */ Durable)
     extends confluent.reactive.impl.ConfluentReactiveImpl.Mixin[S]
     with Confluent {
 
@@ -77,7 +77,7 @@ private[proc] object ConfluentImpl {
     def durableTx (tx: S#Tx)  = tx.durable
     def inMemoryTx(tx: S#Tx)  = tx.inMemory
 
-    protected def wrapRegular(dtx: evt.Durable#Tx, inputAccess: S#Acc, cursorCache: confluent.Cache[S#Tx]) =
+    protected def wrapRegular(dtx: /* evt. */ Durable#Tx, inputAccess: S#Acc, cursorCache: confluent.Cache[S#Tx]) =
       new RegularTxn(this, dtx, inputAccess, cursorCache)
 
     protected def wrapRoot(peer: InTxn) = new RootTxn(this, peer)

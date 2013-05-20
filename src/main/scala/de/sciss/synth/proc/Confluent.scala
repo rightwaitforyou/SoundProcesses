@@ -39,17 +39,17 @@ object Confluent {
   def apply(storeFactory: DataStoreFactory[DataStore]): S = Impl(storeFactory)
 
   trait Txn extends ConfluentReactiveLike.Txn[S] with Sys.Txn[S] {
-    private[proc] def durable : evt.Durable#Tx
-    private[proc] def inMemory: evt.InMemory#Tx
+    private[proc] def durable : Durable#Tx
+    private[proc] def inMemory: InMemory#Tx
   }
 
-  implicit def inMemory(tx: S#Tx): evt.InMemory#Tx = tx.inMemory
-  implicit def durable (tx: S#Tx): evt.Durable #Tx = tx.durable
+  implicit def inMemory(tx: S#Tx): InMemory#Tx = tx.inMemory
+  implicit def durable (tx: S#Tx): Durable #Tx = tx.durable
 }
 
 trait Confluent extends ConfluentReactiveLike[Confluent] with Sys[Confluent] {
   protected type S  = Confluent
-  type D            = evt.Durable
-  type I            = evt.InMemory
+  type D            = Durable
+  type I            = InMemory
   type Tx           = Confluent.Txn // Sys.Txn[ S ] with ConfluentReactiveLike.Txn[ S ]
 }

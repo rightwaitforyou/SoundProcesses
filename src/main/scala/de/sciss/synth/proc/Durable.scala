@@ -36,10 +36,17 @@ object Durable {
   def apply(factory: DataStoreFactory[DataStore], mainName: String = "data", eventName: String = "event"): S =
     Impl(factory, mainName, eventName)
 
-  implicit def inMemory(tx: Durable#Tx): evt.InMemory#Tx = tx.inMemory
+  def apply(mainStore: DataStore, eventStore: DataStore): S =
+    Impl(mainStore, eventStore)
+
+  implicit def inMemory(tx: Durable#Tx): InMemory#Tx = tx.inMemory
+
+  trait Txn extends Sys.Txn[Durable] with evt.DurableLike.Txn[Durable] {
+    def inMemory: InMemory#Tx
+  }
 }
 
 trait Durable extends evt.DurableLike[Durable] with Sys[Durable] {
-  final type Tx = Sys.Txn[Durable] with evt.DurableLike.Txn[Durable]
-  final type I  = evt.InMemory
+  final type Tx = Durable.Txn // Sys.Txn[Durable] with evt.DurableLike.Txn[Durable]
+  final type I  = InMemory
 }

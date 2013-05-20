@@ -15,8 +15,8 @@ scalaVersion := "2.10.1"
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= {
-  val confluentVersion = "2.3.+"
-  val eventVersion     = "2.2.+"
+  val confluentVersion = "2.4.+"
+  val eventVersion     = "2.3.+"
   val stmVersion       = "2.0.+"
   Seq(
     "de.sciss" %% "scalacollider"   % "1.7.1+",   // 1.7.1 adds ConfigBuilder.read
