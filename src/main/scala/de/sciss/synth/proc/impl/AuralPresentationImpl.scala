@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, stm}
+import de.sciss.lucre.stm
 import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
@@ -93,8 +93,8 @@ object AuralPresentationImpl {
       // implicit val itx: I#Tx = tx
       // println("startedTx")
 
-      val viewMap: IdentifierMap[S#ID, S#Tx, AuralProc] = tx.newInMemoryIDMap
-      val scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])] = tx.newInMemoryIDMap
+      val viewMap: IdentifierMap[S#ID, S#Tx, AuralProc]                         = tx.newInMemoryIDMap
+      val scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])]  = tx.newInMemoryIDMap
 
       val group = Group(server)
       //         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))

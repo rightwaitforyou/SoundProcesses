@@ -316,7 +316,7 @@ object BiPinImpl {
     def at     (time: Long)(implicit tx: S#Tx): Option[Elem] = intersect(time).headOption
     def valueAt(time: Long)(implicit tx: S#Tx): Option[A]    = intersect(time).headOption.map(_.magValue)
     def floor  (time: Long)(implicit tx: S#Tx): Option[Elem] = tree.floor(time).flatMap(_._2.headOption)
-    def ceil   (time: Long)(implicit tx: S#Tx): Option[Elem] = tree.ceil(time).flatMap(_._2.headOption)
+    def ceil   (time: Long)(implicit tx: S#Tx): Option[Elem] = tree.ceil (time).flatMap(_._2.headOption)
 
     /**
      * Adds a new value, and returns the dirty which corresponds to the new region holding `elem`.
