@@ -27,9 +27,10 @@ package de.sciss.synth.proc
 
 import impl.AuralProc
 import concurrent.stm.{Ref, TMap, InTxn, TSet}
-import de.sciss.synth.{UGen, ControlUGenOutProxy, Constant, SynthGraph, UGenGraph, SynthDef => SSynthDef, message}
+import de.sciss.synth.{UGen, SynthGraph, UGenGraph, SynthDef => SSynthDef, message}
+import de.sciss.synth.ugen.{UGenOutProxy, ControlUGenOutProxy, Constant}
 import de.sciss.{synth, osc}
-import collection.immutable.{IndexedSeq => IIdxSeq, IntMap}
+import collection.immutable.{IndexedSeq => IIdxSeq}
 import scala.concurrent.{ExecutionContext, Promise, Future}
 
 object ProcWorld {
@@ -422,7 +423,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
       val inStruct = ugen.inputs.map {
         //         case up: UGenProxy => mapUGen( up.source )
         case ugen: UGen.SingleOut => mapUGen(ugen)
-        case UGen.OutProxy(source, outputIndex: Int) => (mapUGen(source), outputIndex)
+        case UGenOutProxy(source, outputIndex: Int) => (mapUGen(source), outputIndex)
         case ctl: ControlUGenOutProxy => ctl
         case c: Constant => c
       }

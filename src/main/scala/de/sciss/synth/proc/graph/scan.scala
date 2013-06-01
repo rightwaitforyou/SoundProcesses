@@ -28,6 +28,7 @@ package proc
 package graph
 
 import collection.immutable.{IndexedSeq => IIdxSeq}
+import de.sciss.synth.ugen.UGenInGroup
 
 object scan {
   private[proc] def outControlName(key: String): String = "$out_" + key
