@@ -41,6 +41,7 @@ import evt.Event
 import span.{SpanLike, Span}
 import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 import java.io.File
+import de.sciss.synth.ugen.Env
 
 object Grapheme {
   // If necessary for some views, we could eventually add the Elems, too,
@@ -85,7 +86,7 @@ object Grapheme {
         val sz      = in.readInt()
         val values  = Vector.fill(sz) {
           val mag = in.readDouble()
-          val env = CommonSerializers.EnvConstShape.read(in)
+          val env = CommonSerializers.Curve.read(in)
           (mag, env)
         }
         Curve(values: _*)
@@ -96,7 +97,7 @@ object Grapheme {
       *
       * @param values  pairs interpreted as target values and target shapes.
       */
-    final case class Curve(values: (Double, Env.ConstShape)*) extends Value {
+    final case class Curve(values: (Double, synth.Curve)*) extends Value {
       def numChannels = values.size
 
       def write(out: DataOutput) {
@@ -105,7 +106,7 @@ object Grapheme {
         out.writeInt(sz)
         values.foreach { case (mag, shape) =>
           out.writeDouble(mag)
-          CommonSerializers.EnvConstShape.write(shape, out)
+          CommonSerializers.Curve.write(shape, out)
         }
       }
     }
@@ -198,7 +199,7 @@ object Grapheme {
     final case class Const(span: Span.HasStart, values: IIdxSeq[Double]) extends Defined {
       def numChannels = values.size
     }
-    final case class Curve(span: Span, values: IIdxSeq[(Double, Double, Env.ConstShape)]) extends Defined {
+    final case class Curve(span: Span, values: IIdxSeq[(Double, Double, synth.Curve)]) extends Defined {
       def numChannels = values.size
     }
     final case class Audio(span: Span.HasStart, value: Value.Audio) extends Defined {
@@ -218,12 +219,12 @@ object Grapheme {
     final val typeID = 11
 
     object Curve extends expr.Type[Value.Curve] {
-      def apply[S <: evt.Sys[S]](values: (Expr[S, Double], Env.ConstShape)*)(implicit tx: S#Tx): Curve[S] = {
+      def apply[S <: evt.Sys[S]](values: (Expr[S, Double], synth.Curve)*)(implicit tx: S#Tx): Curve[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new CurveImpl(targets, values.toIndexedSeq)
       }
 
-      def unapplySeq[S <: evt.Sys[S]](expr: Elem[S]): Option[Seq[(Expr[S, Double], Env.ConstShape)]] = {
+      def unapplySeq[S <: evt.Sys[S]](expr: Elem[S]): Option[Seq[(Expr[S, Double], synth.Curve)]] = {
         if (expr.isInstanceOf[CurveImpl[_]]) {
           val c = expr.asInstanceOf[CurveImpl[S]]
           Some(c.values)
@@ -247,7 +248,7 @@ object Grapheme {
         val sz      = in.readInt()
         val values  = IIdxSeq.fill(sz) {
           val mag   = Doubles.readExpr(in, access)
-          val shape = CommonSerializers.EnvConstShape.read(in)
+          val shape = CommonSerializers.Curve.read(in)
           (mag, shape)
         }
         new CurveImpl(targets, values)
@@ -297,7 +298,7 @@ object Grapheme {
     }
 
     private final class CurveImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
-                                                   val values: IIdxSeq[(Expr[S, Double], Env.ConstShape)])
+                                                   val values: IIdxSeq[(Expr[S, Double], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
       def value(implicit tx: S#Tx): Value.Curve = {
         val v = values.map {
@@ -319,8 +320,8 @@ object Grapheme {
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value.Curve]] = {
-        val beforeVals  = Vector.newBuilder[(Double, Env.ConstShape)]
-        val nowVals     = Vector.newBuilder[(Double, Env.ConstShape)]
+        val beforeVals  = Vector.newBuilder[(Double, synth.Curve)]
+        val nowVals     = Vector.newBuilder[(Double, synth.Curve)]
         values.foreach {
           case (mag, shape) =>
             val magEvt = mag.changed
@@ -351,7 +352,7 @@ object Grapheme {
         out.writeInt(sz)
         values.foreach { tup =>
           tup._1.write(out)
-          CommonSerializers.EnvConstShape.write(tup._2, out)
+          CommonSerializers.Curve.write(tup._2, out)
         }
       }
 

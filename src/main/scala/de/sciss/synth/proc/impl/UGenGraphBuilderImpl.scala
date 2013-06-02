@@ -45,8 +45,8 @@ private[proc] object UGenGraphBuilderImpl {
 
     override def toString = "proc.UGenGraph.Builder@" + hashCode.toHexString
 
-    private var remaining: IIdxSeq[Lazy]                  = g.sources
-    private var controlProxies: ISet[ControlProxyLike[_]] = g.controlProxies
+    private var remaining: IIdxSeq[Lazy]               = g.sources
+    private var controlProxies: ISet[ControlProxyLike] = g.controlProxies
 
     var scanOuts    = Map.empty[String, Int]
     var scanIns     = Map.empty[String, Int]

@@ -38,6 +38,7 @@ import graph.scan
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.span.Span
+import de.sciss.synth.Curve.parametric
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -265,7 +266,10 @@ object AuralPresentationImpl {
               val spec = a.peer.value
               // dur, shape-id, shape-curvature, floor
               ctlName -> Vector(
-                (spec.numFrames / sampleRate).toFloat, spec.shape.id.toFloat, spec.shape.curvature, spec.floor
+                (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+                  case parametric(c)  => c
+                  case _              => 0f
+                }, spec.floor
               )
             case a => sys.error(s"Cannot cast attribute $a to a scalar value")
           }

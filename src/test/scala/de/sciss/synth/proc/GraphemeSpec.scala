@@ -6,6 +6,7 @@ import lucre.expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import expr.{Doubles, Longs}
 import span.Span
+import de.sciss.synth.Curve.{parametric, step, welch, sine, exponential, linear}
 
 /**
  * To run only this suite:
@@ -28,15 +29,15 @@ class GraphemeSpec extends ConfluentEventSpec {
     }
 
     val (e1, e2, e3, e4, e5) = system.step { implicit tx =>
-       ((    0L -> Value.Curve( 441.0 -> linShape ))                       : TimedElem[ S ],
-        (10000L -> Value.Curve( 882.0 -> expShape ))                       : TimedElem[ S ],
-        (20000L -> Value.Curve( 123.4 -> sinShape, 567.8 -> sinShape ))    : TimedElem[ S ],
-        (30000L -> Value.Curve( 987.6 -> welchShape, 543.2 -> stepShape )) : TimedElem[ S ],
-        (20000L -> Value.Curve( 500.0 -> curveShape( -4f )))               : TimedElem[ S ]
-       )
+      ((    0L -> Value.Curve(441.0 -> linear))               : TimedElem[S],
+       (10000L -> Value.Curve(882.0 -> exponential))          : TimedElem[S],
+       (20000L -> Value.Curve(123.4 -> sine , 567.8 -> sine)) : TimedElem[S],
+       (30000L -> Value.Curve(987.6 -> welch, 543.2 -> step)) : TimedElem[S],
+       (20000L -> Value.Curve(500.0 -> parametric(-4f)))      : TimedElem[S]
+      )
     }
 
-      // adding constants
+    // adding constants
       system.step { implicit tx =>
          val g = gH()
 
@@ -47,7 +48,7 @@ class GraphemeSpec extends ConfluentEventSpec {
          obs.clear()
 
          g.add( e2 )
-         val s0_10000 = Segment.Curve( Span( 0L, 10000L ), IIdxSeq( (441.0, 882.0, expShape) ))
+         val s0_10000 = Segment.Curve( Span( 0L, 10000L ), IIdxSeq( (441.0, 882.0, exponential) ))
          obs.assertEquals(
             Update( g, IIdxSeq( s0_10000,
                                 Segment.Const( Span.from( 10000L ), IIdxSeq( 882.0 ))))
@@ -63,7 +64,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 
          g.add( e4 )
          obs.assertEquals(
-            Update( g, IIdxSeq( Segment.Curve( Span( 20000L, 30000L ), IIdxSeq( (123.4, 987.6, welchShape), (567.8, 543.2, stepShape) )),
+            Update( g, IIdxSeq( Segment.Curve( Span( 20000L, 30000L ), IIdxSeq( (123.4, 987.6, welch), (567.8, 543.2, step) )),
                                 Segment.Const( Span.from( 30000L ), IIdxSeq( 987.6, 543.2 ))))
          )
          obs.clear()
@@ -71,7 +72,7 @@ class GraphemeSpec extends ConfluentEventSpec {
          // override a stereo signal with a mono signal
          g.add( e5 )
          obs.assertEquals(
-            Update( g, IIdxSeq( Segment.Curve( Span( 10000L, 20000L ), IIdxSeq( (882.0, 500.0, curveShape( -4f )))),
+            Update( g, IIdxSeq( Segment.Curve( Span( 10000L, 20000L ), IIdxSeq( (882.0, 500.0, parametric(-4f)))),
                                 Segment.Const( Span( 20000L, 30000L ), IIdxSeq( 500.0 ))))
          )
          obs.clear()
@@ -83,7 +84,7 @@ class GraphemeSpec extends ConfluentEventSpec {
 
          assert( g.debugList() === List(
             s0_10000,
-            Segment.Curve( Span( 10000L, 20000L ), IIdxSeq( (882.0, 500.0, curveShape( -4f )))),
+            Segment.Curve( Span( 10000L, 20000L ), IIdxSeq( (882.0, 500.0, parametric( -4f )))),
             Segment.Const( Span( 20000L, 30000L ), IIdxSeq( 500.0 )),
             Segment.Const( Span.from( 30000L ), IIdxSeq( 987.6, 543.2 ))
          ))
@@ -130,43 +131,43 @@ class GraphemeSpec extends ConfluentEventSpec {
          val g       = gH()
          val time1   = Longs.newVar[ S ](      0L)
          val mag1    = Doubles.newVar[ S ]( 1234.5)
-         val value1  = Elem.Curve( mag1 -> linShape )
+         val value1  = Elem.Curve( mag1 -> linear)
          val elem1: TimedElem[ S ] = time1 -> value1
 
          val time2   = Longs.newVar[ S ]( 10000L )
          val mag2    = Doubles.newVar[ S ]( 6789.0 )
-         val value2  = Elem.Curve( mag2 -> linShape )
+         val value2  = Elem.Curve( mag2 -> linear )
          val elem2: TimedElem[ S ] = time2 -> value2
 
          val time3   = time2 + 1000L
          val mag3    = mag1 + 1000.0
-         val value3  = Elem.Curve( mag3 -> linShape )
+         val value3  = Elem.Curve( mag3 -> linear )
          val elem3: TimedElem[ S ] = time3 -> value3
 
          g.add( elem1 )
          g.add( elem2 )
          g.add( elem3 )
 
-         obs.assertEquals(
-            Update( g, IIdxSeq(
-               Segment.Const( Span.from( 0L ), IIdxSeq( 1234.5 ))
-            )),
-            Update( g, IIdxSeq(
-               Segment.Curve( Span( 0L, 10000L ), IIdxSeq( (1234.5, 6789.0, linShape) )),
-               Segment.Const( Span.from( 10000L ), IIdxSeq( 6789.0 ))
-            )),
-            Update( g, IIdxSeq(
-               Segment.Curve( Span( 10000L, 11000L ), IIdxSeq( (6789.0, 2234.5, linShape) )),
-               Segment.Const( Span.from( 11000L ), IIdxSeq( 2234.5 ))
-            ))
-         )
-         obs.clear()
+        obs.assertEquals(
+          Update(g, IIdxSeq(
+            Segment.Const(Span.from(0L), Vector(1234.5))
+          )),
+          Update(g, IIdxSeq(
+            Segment.Curve(Span(0L, 10000L), Vector((1234.5, 6789.0, linear))),
+            Segment.Const(Span.from(10000L), Vector(6789.0))
+          )),
+          Update(g, IIdxSeq(
+            Segment.Curve(Span(10000L, 11000L), Vector((6789.0, 2234.5, linear))),
+            Segment.Const(Span.from(11000L), Vector(2234.5))
+          ))
+        )
+        obs.clear()
 
          time1() = 2000L
          obs.assertEquals(
             Update( g, IIdxSeq(
                Segment.Undefined( Span( 0L, 2000L )),
-               Segment.Curve( Span( 2000L, 10000L ), IIdxSeq( (1234.5, 6789.0, linShape) ))
+               Segment.Curve( Span( 2000L, 10000L ), Vector( (1234.5, 6789.0, linear) ))
             ))
          )
 //         obs.print()
@@ -175,9 +176,9 @@ class GraphemeSpec extends ConfluentEventSpec {
          mag1() = 666.6
          obs.assertEquals(
             Update( g, IIdxSeq (
-               Segment.Curve( Span( 2000L, 10000L ), IIdxSeq( (666.6, 6789.0, linShape) )),
-               Segment.Curve( Span( 10000L, 11000L ), IIdxSeq( (6789.0, 1666.6, linShape) )),
-               Segment.Const( Span.from( 11000L ), IIdxSeq( 1666.6 ))
+               Segment.Curve( Span( 2000L, 10000L ), Vector( (666.6, 6789.0, linear) )),
+               Segment.Curve( Span( 10000L, 11000L ), Vector( (6789.0, 1666.6, linear) )),
+               Segment.Const( Span.from( 11000L ), Vector( 1666.6 ))
             ))
          )
          obs.clear()
@@ -185,9 +186,9 @@ class GraphemeSpec extends ConfluentEventSpec {
          time2() = 11000L
          obs.assertEquals(
             Update( g, IIdxSeq (
-               Segment.Curve( Span( 2000L, 11000L ), IIdxSeq( (666.6, 6789.0, linShape) )),
-               Segment.Curve( Span( 11000L, 12000L ), IIdxSeq( (6789.0, 1666.6, linShape) )),
-               Segment.Const( Span.from( 12000L ), IIdxSeq( 1666.6 ))
+               Segment.Curve( Span( 2000L, 11000L ), Vector( (666.6, 6789.0, linear) )),
+               Segment.Curve( Span( 11000L, 12000L ), Vector( (6789.0, 1666.6, linear) )),
+               Segment.Const( Span.from( 12000L ), Vector( 1666.6 ))
             ))
          )
          obs.clear()

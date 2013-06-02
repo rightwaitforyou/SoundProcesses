@@ -29,25 +29,30 @@ package impl
 
 import annotation.switch
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
+import ugen.Env
+import Curve._
+import de.sciss.synth
 
 object CommonSerializers {
-  implicit object EnvConstShape extends ImmutableSerializer[Env.ConstShape] {
-    def write(shape: Env.ConstShape, out: DataOutput) {
-      val sid = shape.id
-      out.writeInt(sid)
-      if (sid == curveShape.id) out.writeFloat(shape.curvature)
+  implicit object Curve extends ImmutableSerializer[synth.Curve] {
+    def write(shape: synth.Curve, out: DataOutput) {
+      out.writeInt(shape.id)
+      shape match {
+        case parametric(c)  => out.writeFloat(c)
+        case _              =>
+      }
     }
 
-    def read(in: DataInput): Env.ConstShape = {
+    def read(in: DataInput): synth.Curve = {
       (in.readInt(): @switch) match {
-        case stepShape  .id => stepShape
-        case linShape   .id => linShape
-        case expShape   .id => expShape
-        case sinShape   .id => sinShape
-        case welchShape .id => welchShape
-        case curveShape .id => curveShape(in.readFloat())
-        case sqrShape   .id => sqrShape
-        case cubShape   .id => cubShape
+        case step       .id => step
+        case linear     .id => linear
+        case exponential.id => exponential
+        case sine       .id => sine
+        case welch      .id => welch
+        case parametric .id => parametric(in.readFloat())
+        case squared    .id => squared
+        case cubed      .id => cubed
         case other          => sys.error("Unexpected envelope shape ID " + other)
       }
     }

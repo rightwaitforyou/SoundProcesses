@@ -49,7 +49,7 @@ object scan {
           if (numChannels == 1) {
             ctlName.ar(default).expand
           } else if (numChannels > 1) {
-            ctlName.ar(default, Vector.fill(numChannels - 1)(default): _*).expand
+            ctlName.ar(Vector.fill(numChannels)(default)).expand
           } else {
             UGenInGroup.empty
           }

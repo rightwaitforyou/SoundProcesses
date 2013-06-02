@@ -115,13 +115,13 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     val m         = companion.getClass.getMethods.find(_.getName == "apply")
       .getOrElse(sys.error(s"No apply method found on $companion"))
 
-    try {
+    // try {
       m.invoke(companion, elems: _*).asInstanceOf[Product]
-    } catch {
-      case i: IllegalArgumentException =>
-        println(s"IllegalArgumentException. companion = $companion, m = $m, elems = $elems")
-        throw i
-    }
+    //    } catch {
+    //      case i: IllegalArgumentException =>
+    //        println(s"IllegalArgumentException. companion = $companion, m = $m, elems = $elems")
+    //        throw i
+    //    }
   }
 
   private def readElem(in: DataInput): Any = {
@@ -154,11 +154,11 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     val b2 = in.readByte()
     require(b2 == 'T')    // expecting set
     val numControls = in.readInt()
-    val controls    = Set.newBuilder[ControlProxyLike[_]] // stupid Set doesn't have `fill` and `tabulate` methods
+    val controls    = Set.newBuilder[ControlProxyLike] // stupid Set doesn't have `fill` and `tabulate` methods
     for (_ <- 0 until numControls) {
       controls += (readElem(in) match {
-        case ctl: ControlProxyLike[_] => ctl
-        case other                    => sys.error(s"Expected ControlProxyLike but found $other")
+        case ctl: ControlProxyLike  => ctl
+        case other                  => sys.error(s"Expected ControlProxyLike but found $other")
       })
     }
     SynthGraph(sources, controls.result())

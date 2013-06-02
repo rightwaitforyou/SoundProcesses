@@ -6,6 +6,7 @@ import de.sciss.synth.expr.ExprImplicits
 import de.sciss.synth.io.AudioFile
 import java.io.File
 import de.sciss.span.Span
+import de.sciss.synth.Curve.{step, linear}
 
 object TapeTest extends App {
   type S = Durable
@@ -41,8 +42,8 @@ object TapeTest extends App {
     val gSpat     = Grapheme.Modifiable[S]
     val sSpat     = proc.scans.add("spat")
     sSpat.source_=(Some(Scan.Link.Grapheme(gSpat)))
-    gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, stepShape)))
-    gSpat.add(4.seconds -> Grapheme.Value.Curve(( 1.0,  linShape)))
+    gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, step  )))
+    gSpat.add(4.seconds -> Grapheme.Value.Curve(( 1.0, linear)))
 
     proc.attributes.put("freq", Attribute.Double(200.0))
 

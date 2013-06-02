@@ -2,10 +2,11 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.synth.expr.{EnvShapes, ExprImplicits}
+import de.sciss.synth.expr.{Curves, ExprImplicits}
 import de.sciss.synth.io.AudioFile
 import java.io.File
 import de.sciss.span.Span
+import de.sciss.synth.Curve.{exponential, linear}
 
 object FadeTest extends App {
   type S = Durable
@@ -30,8 +31,8 @@ object FadeTest extends App {
     // spatIn.addSink()
 
     val proc        = Proc[S]
-    val fadeExprIn  = FadeSpec.Elem(44100, EnvShapes.newConst(linShape), 0.0) // FadeSpec.Value(44100, linShape)
-    val fadeExprOut = FadeSpec.Elem(44100, EnvShapes.newConst(expShape), -40.dbamp) // FadeSpec.Value(44100, linShape)
+    val fadeExprIn  = FadeSpec.Elem(44100, Curves.newConst(linear     ),   0.0    ) // FadeSpec.Value(44100, linShape)
+    val fadeExprOut = FadeSpec.Elem(44100, Curves.newConst(exponential), -40.dbamp) // FadeSpec.Value(44100, linShape)
     proc.attributes.put("fadeIn" , Attribute.FadeSpec(fadeExprIn ))
     proc.attributes.put("fadeOut", Attribute.FadeSpec(fadeExprOut))
     proc.graph_=(SynthGraph {

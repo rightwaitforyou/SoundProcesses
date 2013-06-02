@@ -24,11 +24,11 @@ object Fade {
     }
 
     /** Returns (dur, shape, floor) */
-    final protected def readCtl(b: UGenGraphBuilder[_], key: String): (GE, Env.Shape, GE) = {
+    final protected def readCtl(b: UGenGraphBuilder[_], key: String): (GE, Env.Curve, GE) = {
       b.addAttributeIn(key)
       val ctlName = attribute.controlName(key)
-      val ctl     = ctlName.ir(0f, 0f, 0f, 0f)  // dur, shape-id, shape-curvature, floor
-      (ctl \ 0, varShape(ctl \ 1, ctl \ 2), ctl \ 3)
+      val ctl     = ctlName.ir(Seq(0f, 0f, 0f, 0f))  // dur, shape-id, shape-curvature, floor
+      (ctl \ 0, Env.Curve(ctl \ 1, ctl \ 2), ctl \ 3)
     }
   }
 
@@ -44,28 +44,28 @@ object Fade {
       mkSingleEnv(dur, fadeDur, shape, floor)
     }
 
-    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Shape, floor: GE): IEnv
+    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv
   }
 
-  @SerialVersionUID(6793156274707521366L)
+  // @SerialVersionUID(6793156274707521366L)
   private[graph] final case class In(key: String, rate: Rate) extends SingleBase {
 
     def displayName = "FadeIn"
 
-    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Shape, floor: GE): IEnv =
-      IEnv(floor, Env.Seg(fadeDur, 1, shape) :: Nil)
+    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
+      IEnv(floor, Env.Segment(fadeDur, 1, shape) :: Nil)
   }
 
-  @SerialVersionUID(6793156274707521366L)
+  // @SerialVersionUID(6793156274707521366L)
   private[graph] final case class Out(key: String, rate: Rate)  extends SingleBase {
 
     def displayName = "FadeOut"
 
-    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Shape, floor: GE): IEnv =
-      IEnv(1, Env.Seg(fadeDur, floor, shape) :: Nil, totalDur - fadeDur)
+    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
+      IEnv(1, Env.Segment(fadeDur, floor, shape) :: Nil, totalDur - fadeDur)
   }
 
-  @SerialVersionUID(6793156274707521366L)
+  // @SerialVersionUID(6793156274707521366L)
   private[graph] final case class InOut(inKey: String, outKey: String, rate: Rate) extends Base {
 
     def displayName = "FadeInOut"
@@ -74,9 +74,9 @@ object Fade {
       val (fadeDurIn , shapeIn , floorIn ) = readCtl(b, inKey )
       val (fadeDurOut, shapeOut, floorOut) = readCtl(b, outKey)
       IEnv(floorIn,
-        Env.Seg(fadeDurIn, 1, shapeIn) ::
-        Env.Seg(totalDur - (fadeDurIn + fadeDurOut), 1, stepShape) ::
-        Env.Seg(fadeDurOut, floorOut, shapeOut) :: Nil
+        Env.Segment(fadeDurIn, 1, shapeIn) ::
+        Env.Segment(totalDur - (fadeDurIn + fadeDurOut), 1, Curve.step) ::
+        Env.Segment(fadeDurOut, floorOut, shapeOut) :: Nil
       )
     }
   }

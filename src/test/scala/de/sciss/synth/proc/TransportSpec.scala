@@ -7,6 +7,7 @@ import bitemp.BiExpr
 import expr.Expr
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import span.Span
+import de.sciss.synth.Curve.linear
 
 /**
  * To run only this suite:
@@ -25,7 +26,7 @@ class TransportSpec extends ConfluentEventSpec {
 
   import imp._
 
-  def curve(amp: Expr[S, Double], shape: Env.ConstShape = linShape)(implicit tx: S#Tx) =
+  def curve(amp: Expr[S, Double], shape: Curve = Curve.linear)(implicit tx: S#Tx) =
     Grapheme.Elem.Curve(amp -> shape)
 
   "Transport" should "notify observers about all relevant events" in { implicit system =>
@@ -76,7 +77,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 7000L, isSeek = false, isPlaying = true, changes =
-          IIdxSeq(pt1 -> GraphemesChanged(Map("freq" -> Segment.Const(Span.from(7000L), IIdxSeq(441.0)))))
+          Vector(pt1 -> GraphemesChanged(Map("freq" -> Segment.Const(Span.from(7000L), IIdxSeq(441.0)))))
         )
       )
       obs.clear()
@@ -84,7 +85,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 10000L, isSeek = false, isPlaying = true, removed = IIdxSeq(pt1), changes =
-          IIdxSeq(pt2 -> GraphemesChanged(Map("amp" -> Segment.Curve(Span(10000L, 15000L), IIdxSeq((0.5, 0.7, linShape))))))
+          Vector(pt2 -> GraphemesChanged(Map("amp" -> Segment.Curve(Span(10000L, 15000L), Vector((0.5, 0.7, linear))))))
         )
       )
       obs.clear()
@@ -92,7 +93,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 15000L, isSeek = false, isPlaying = true, changes =
-          IIdxSeq(pt2 -> GraphemesChanged(Map("amp" -> Segment.Curve(Span(15000L, 25000L), IIdxSeq((0.7, 1.0, linShape))))))
+          Vector(pt2 -> GraphemesChanged(Map("amp" -> Segment.Curve(Span(15000L, 25000L), Vector((0.7, 1.0, linear))))))
         )
       )
       obs.clear()
@@ -195,17 +196,17 @@ class TransportSpec extends ConfluentEventSpec {
       // there should be a GraphemesChanged as well
       val elem: BiExpr[S, Grapheme.Value] = 1000L -> curve(441.0)
       g1.add(elem)
-      val segm = Segment.Curve(Span(1000L, 6000L), IIdxSeq((441.0, 882.0, linShape)))
+      val segm = Segment.Curve(Span(1000L, 6000L), Vector((441.0, 882.0, linear)))
       obs.assertEquals(
-          a0.copy( changes = IIdxSeq(
-             // pt1 -> ProcChanged(
-             //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, IIdxSeq( segm )))
-             // ),
-             pt1 -> GraphemesChanged(
-                Map( "freq" -> segm )
-             )
-          ))
-       )
+        a0.copy(changes = Vector(
+          // pt1 -> ProcChanged(
+          //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, IIdxSeq( segm )))
+          // ),
+          pt1 -> GraphemesChanged(
+            Map("freq" -> segm)
+          )
+        ))
+      )
       obs.clear()
 
       // p1.graphemes.remove( "graph" )

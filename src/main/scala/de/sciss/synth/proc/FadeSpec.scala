@@ -2,14 +2,14 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{event => evt, bitemp}
+import lucre.{event => evt}
 import lucre.expr.Expr
 import serial.{DataOutput, DataInput, ImmutableSerializer}
-import bitemp.BiType
 import synth.proc.impl.CommonSerializers
 import de.sciss.lucre.event.{Change, Pull, Targets}
-import de.sciss.synth.expr.{EnvShapes, Doubles, BiTypeImpl, SpanLikes, Longs}
-import span.SpanLike
+import de.sciss.synth.expr.{Curves, Doubles, BiTypeImpl, Longs}
+import de.sciss.synth.ugen.Env
+import de.sciss.synth.Curve.linear
 
 object FadeSpec {
   private final val COOKIE = 0x4664 // 'Fd'
@@ -20,7 +20,7 @@ object FadeSpec {
         import v._
         out.writeShort(COOKIE)
         out.writeLong (numFrames)
-        CommonSerializers.EnvConstShape.write(shape, out)
+        CommonSerializers.Curve.write(curve, out)
         out.writeFloat(floor)
       }
 
@@ -28,13 +28,13 @@ object FadeSpec {
         val cookie = in.readShort()
         require(cookie == COOKIE, s"Unexpected cookie $cookie, expected $COOKIE")
         val numFrames = in.readLong()
-        val shape     = CommonSerializers.EnvConstShape.read(in)
-        val floor = in.readFloat()
-        Value(numFrames = numFrames, shape = shape, floor = floor)
+        val curve     = CommonSerializers.Curve.read(in)
+        val floor     = in.readFloat()
+        Value(numFrames = numFrames, curve = curve, floor = floor)
       }
     }
   }
-  final case class Value(numFrames: Long, shape: Env.ConstShape = linShape, floor: Float = 0f)
+  final case class Value(numFrames: Long, curve: Curve = linear, floor: Float = 0f)
 
   object Elem extends BiTypeImpl[Value] {
     final val typeID = 14
@@ -51,13 +51,13 @@ object FadeSpec {
       Value.serializer.write(value, out)
     }
 
-    def apply[S <: evt.Sys[S]](numFrames: Expr[S, Long], shape: Expr[S, Env.ConstShape], floor: Expr[S, Double])
+    def apply[S <: evt.Sys[S]](numFrames: Expr[S, Long], shape: Expr[S, Curve], floor: Expr[S, Double])
                               (implicit tx: S#Tx): Elem[S] = {
       val targets = Targets.partial[S] // XXX TODO partial?
       new Impl(targets, numFrames, shape, floor)
     }
 
-    def unapply[S <: evt.Sys[S]](expr: Elem[S]): Option[(Expr[S, Long], Expr[S, Env.ConstShape], Expr[S, Double])] =
+    def unapply[S <: evt.Sys[S]](expr: Elem[S]): Option[(Expr[S, Long], Expr[S, Curve], Expr[S, Double])] =
       expr match {
         case impl: Impl[S] => Some((impl.numFrames, impl.shape, impl.floor))
         case _ => None
@@ -66,15 +66,15 @@ object FadeSpec {
     protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                               (implicit tx: S#Tx): ReprNode[S] = {
       require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
-      val numFrames = Longs.readExpr    (in, access)
-      val shape     = EnvShapes.readExpr(in, access)
-      val floor     = Doubles.readExpr  (in, access)
+      val numFrames = Longs  .readExpr(in, access)
+      val shape     = Curves .readExpr(in, access)
+      val floor     = Doubles.readExpr(in, access)
       new Impl(targets, numFrames, shape, floor)
     }
 
     private final class Impl[S <: evt.Sys[S]](protected val targets: Targets[S],
                                               val numFrames: Expr[S, Long],
-                                              val shape: Expr[S, Env.ConstShape],
+                                              val shape: Expr[S, Curve],
                                               val floor: Expr[S, Double])
       extends lucre.expr.impl.NodeImpl[S, Value] with Elem[S] {
 

@@ -5,14 +5,14 @@ package expr
 import de.sciss.lucre.{event => evt}
 import evt.Targets
 import serial.{DataInput, DataOutput}
-import proc.impl.CommonSerializers.{EnvConstShape => ser}
+import proc.impl.CommonSerializers.{Curve => ser}
 
-object EnvShapes extends BiTypeImpl[Env.ConstShape] {
+object Curves extends BiTypeImpl[Curve] {
   final val typeID = 15
 
-  def readValue(in: DataInput): Env.ConstShape = ser.read(in)
+  def readValue(in: DataInput): Curve = ser.read(in)
 
-  def writeValue(value: Env.ConstShape, out: DataOutput) {
+  def writeValue(value: Curve, out: DataOutput) {
     ser.write(value, out)
   }
 

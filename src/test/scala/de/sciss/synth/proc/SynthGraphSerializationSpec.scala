@@ -6,6 +6,7 @@ import ugen._
 import org.scalatest.FunSpec
 import impl.SynthGraphSerializer
 import de.sciss.serial.{DataInput, DataOutput}
+import de.sciss.synth.Curve.cubed
 
 /**
  * To run only this suite:
@@ -208,7 +209,7 @@ class SynthGraphSerializationSpec extends FunSpec {
     val freq = DemandEnvGen.ar(
       Dseq(Seq(204, 400, 201, 502, 300, 200), inf),
       Drand(Seq(1.01, 0.2, 0.1, 2), inf) * MouseY.kr(0.01, 3, 1),
-      cubShape.id)
+      cubed.id)
     val res = SinOsc.ar(freq * Seq(1, 1.01)) * 0.1
     WrapOut(res)
   }
@@ -234,12 +235,9 @@ class SynthGraphSerializationSpec extends FunSpec {
 
   // a synth def that has 4 partials
   dfs += "multi-con" -> SynthGraph {
-    // harmonics
-    val harm  = "harm".ir(1, 2, 3, 4)
-    // amplitudes
-    val amp   = "amp".ir(0.05, 0.05, 0.05, 0.05)
-    // ring times
-    val ring  = "ring".ir(1, 1, 1, 1)
+    val harm  = "harm"  ir Seq(1,    2,    3,    4   )  // harmonics
+    val amp   = "amp"   ir Seq(0.05, 0.05, 0.05, 0.05)  // amplitudes
+    val ring  = "ring"  ir Seq(1,    1,    1,    1   )  // ring times
     val klank = Klank.ar(Zip(harm, amp, ring), ClipNoise.ar(Seq(0.01, 0.01)), "freq".ir(300))
     Out.ar("out".kr(0), klank)
   }

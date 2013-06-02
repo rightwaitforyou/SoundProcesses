@@ -9,13 +9,14 @@ import java.awt.EventQueue
 import de.sciss.synth.io.AudioFile
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.Serializer
+import de.sciss.synth.Curve.linear
 
 //import de.sciss.nuages.VisualInstantPresentation
 import de.sciss.synth
 import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.expr.{SpanLikes, Longs, ExprImplicits}
-import synth.{Env, linShape, SynthGraph}
+import synth.SynthGraph
 
 object VisTest {
   def apply(): VisTest[InMemory, InMemory] = {
@@ -116,7 +117,7 @@ extends ExprImplicits[ S ] {
 
    def grapheme( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = Grapheme.Modifiable[ S ]
 
-   def curve( amp: Expr[ S, Double ], shape: Env.ConstShape = linShape )( implicit tx: S#Tx ) = Grapheme.Elem.Curve( amp -> shape )
+   def curve( amp: Expr[ S, Double ], shape: Curve = linear)( implicit tx: S#Tx ) = Grapheme.Elem.Curve( amp -> shape )
 
    def proc( name: String )( implicit tx: S#Tx ) : Proc[ S ] = {
       implicit val chr: Chronos[ S ] = Chronos(0L)

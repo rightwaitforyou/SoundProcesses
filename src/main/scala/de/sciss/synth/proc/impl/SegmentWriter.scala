@@ -28,6 +28,8 @@ package synth
 package proc
 package impl
 
+import de.sciss.synth.Curve.parametric
+
 object SegmentWriter {
   def apply(segm: Grapheme.Segment.Curve, time: Long, server: Server, sampleRate: Double)
            (implicit tx: Txn): SegmentWriter = {
@@ -44,10 +46,10 @@ object SegmentWriter {
   @inline private def mkMultiCtl(segm: Grapheme.Segment.Curve, name: String): GE = {
     // import ugen._
     // ControlProxy(scalar, Vector.fill(segm.numChannels)(0f), Some(name))(ControlProxyFactory.controlIrFactory)
-    name.ir(0f, Vector.fill(segm.numChannels - 1)(0f): _*)
+    name.ir(Vector.fill(segm.numChannels)(0f))
   }
 
-  private def graph(segm: Grapheme.Segment.Curve) = {
+  private def graph(segm: Grapheme.Segment.Curve): (Boolean, SynthGraph) = {
     var usesShape = false // XXX TODO dirty variable
     val sg = SynthGraph {
       import ugen._
@@ -58,16 +60,16 @@ object SegmentWriter {
       val stop        = mkMultiCtl(segm, "stop")
       val dur         = "dur".ir
 
-      lazy val shape  = mkMultiCtl(segm, "shape")
-      lazy val curve  = mkMultiCtl(segm, "curve")
+      lazy val shape      = mkMultiCtl(segm, "shape")
+      lazy val curvature  = mkMultiCtl(segm, "curve")
 
       val sig: GE = segm.values.zipWithIndex.map {
         case ((segmStart, segmStop, segmShape), ch) =>
           val doneAction = if (ch == 0) freeSelf else doNothing
           segmShape match {
-            case `linShape` =>
+            case Curve.linear =>
               Line.ar(start, stop, dur, doneAction = doneAction)
-            case `expShape` =>
+            case Curve.exponential =>
               if (segmStart != 0f && segmStop != 0f && segmStart * segmStop > 0f) {
                 XLine.ar(start, stop, dur, doneAction = doneAction)
               } else {
@@ -75,10 +77,9 @@ object SegmentWriter {
               }
             case _ =>
               usesShape = true
-              val env = Env(start, Env.Seg(dur = dur, targetLevel = stop,
-                shape = varShape(shape \ ch, curve \ ch)) :: Nil)
+              val curve = Env.Curve(shape \ ch, curvature \ ch)
+              val env   = Env(start, Env.Segment(dur = dur, targetLevel = stop, curve = curve) :: Nil)
               EnvGen.ar(env, doneAction = doneAction)
-
           }
       }
       // sig.poll(4)
@@ -122,7 +123,7 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
     val (vStart, vStop, vShape) = segm.values.unzip3
     val ctl0: Ctl = List("start" -> vStart.map(_.toFloat), "stop" -> vStop.map(_.toFloat), "dur" -> durSecs)
     val ctl1: Ctl = if (usesShape) ("shape" -> vShape.map(_.id.toFloat)) :: ctl0 else ctl0
-    val args: Ctl = if (usesShape) ("curve" -> vShape.map(_.curvature )) :: ctl1 else ctl1
+    val args: Ctl = if (usesShape) ("curve" -> vShape.map { case parametric(c) => c; case _ => 0f } :: ctl1) else ctl1
 
     // val rs        = rsd.play(aural.preGroup, ctl)
     synth.play(target = target, args = args, addAction = addToHead, dependencies = Nil)

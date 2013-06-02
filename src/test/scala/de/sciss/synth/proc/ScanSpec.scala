@@ -7,6 +7,7 @@ import lucre.bitemp
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import lucre.expr.Expr
 import span.Span
+import de.sciss.synth.Curve.linear
 
 /**
  * To run only this suite:
@@ -59,7 +60,7 @@ class ScanSpec extends ConfluentEventSpec {
       tx.newHandle(gr)
     }
 
-    def curve(amp: Expr[S, Double], shape: Env.ConstShape = linShape)(implicit tx: S#Tx) =
+    def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) =
       Grapheme.Elem.Curve(amp -> shape)
 
     system.step { implicit tx =>
@@ -87,8 +88,8 @@ class ScanSpec extends ConfluentEventSpec {
       gr.add(2000L, curve(5678.0)) // ...
       obs.assertEquals(
         Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceUpdate(scan,
-          Grapheme.Update(gr, IIdxSeq(Grapheme.Segment.Curve(Span(0L, 2000L), IIdxSeq((1234.0, 5678.0, linShape))),
-            Grapheme.Segment.Const(Span.from(2000L), IIdxSeq(5678.0)))
+          Grapheme.Update(gr, Vector(Grapheme.Segment.Curve(Span(0L, 2000L), Vector((1234.0, 5678.0, linear))),
+            Grapheme.Segment.Const(Span.from(2000L), Vector(5678.0)))
           )
         ))))
       )
@@ -110,8 +111,8 @@ class ScanSpec extends ConfluentEventSpec {
       //lucre.event.showLog = false
       obs.assertEquals(
         Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceUpdate(scan,
-          Grapheme.Update(gr, IIdxSeq(Grapheme.Segment.Curve(Span(2000L, 4000L), IIdxSeq((5678.0, 9876.0, linShape))),
-            Grapheme.Segment.Const(Span.from(4000L), IIdxSeq(9876.0)))
+          Grapheme.Update(gr, IIdxSeq(Grapheme.Segment.Curve(Span(2000L, 4000L), Vector((5678.0, 9876.0, linear))),
+            Grapheme.Segment.Const(Span.from(4000L), Vector(9876.0)))
           )
         ))))
       )
@@ -120,8 +121,8 @@ class ScanSpec extends ConfluentEventSpec {
       ampVar() = 5432.0 // ...
       obs.assertEquals(
         Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceUpdate(scan,
-          Grapheme.Update(gr, IIdxSeq(Grapheme.Segment.Curve(Span(2000L, 4000L), IIdxSeq((5678.0, 5432.0, linShape))),
-            Grapheme.Segment.Const(Span.from(4000L), IIdxSeq(5432.0)))
+          Grapheme.Update(gr, IIdxSeq(Grapheme.Segment.Curve(Span(2000L, 4000L), Vector((5678.0, 5432.0, linear))),
+            Grapheme.Segment.Const(Span.from(4000L), Vector(5432.0)))
           )
         ))))
       )
