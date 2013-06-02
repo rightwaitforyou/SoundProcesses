@@ -34,12 +34,12 @@ object scan {
   private[proc] def outControlName(key: String): String = "$out_" + key
   private[proc] def inControlName (key: String): String = "$in_"  + key
 
-  @SerialVersionUID(7931562747075213666L) private final case class ScanIn(key: String, default: Double)
+  private final case class In(key: String, default: Double)
     extends GE.Lazy /* with Elem */ with AudioRated {
 
-    def displayName = "ScanIn"
+    override def productPrefix = "scan$In"
 
-    override def toString = displayName + "(\"" + key + "\")"
+    override def toString = s"""scan("$key").ar($default)"""
 
     def makeUGens: UGenInLike = {
       UGenGraph.builder match {
@@ -54,19 +54,21 @@ object scan {
             UGenInGroup.empty
           }
 
-        case other => UGenGraphBuilder.outsideOfContext()
+        case _ => UGenGraphBuilder.outsideOfContext()
       }
     }
   }
 
-  private final case class ScanOut(key: String, in: GE)
+  private final case class Out(key: String, in: GE)
     extends UGenSource.ZeroOut with WritesBus {
 
-    override def toString = "ScanOut(\"" + key + "\")"
+    override def productPrefix = "scan$Out"
+
+    override def toString = "scan\"$key\") := $in"
 
     protected def makeUGens {
       val bus = outControlName(key).kr
-      unwrap(IIdxSeq(bus.expand) ++ in.expand.outputs)
+      unwrap(Vector(bus.expand) ++ in.expand.outputs)
     }
 
     // first arg: bus control, remaining args: signal to write; thus numChannels = _args.size - 1
@@ -81,7 +83,7 @@ object scan {
       }
       val sigArgAr = sigArg.map {
         ui =>
-          if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, IIdxSeq(ui))
+          if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, Vector(ui))
       }
       new UGen.ZeroOut(name, audio, busArg +: sigArgAr, isIndividual = true)
     }
@@ -90,9 +92,9 @@ object scan {
 
 final case class scan(key: String) {
   def ar: GE = ar(0.0)
-  def ar(default: Double): GE = scan.ScanIn(key, default)
+  def ar(default: Double): GE = scan.In(key, default)
 
   def :=(in: GE) {
-    scan.ScanOut(key, in)
+    scan.Out(key, in)
   }
 }

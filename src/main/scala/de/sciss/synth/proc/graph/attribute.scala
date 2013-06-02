@@ -5,12 +5,10 @@ package graph
 object attribute {
   private[proc] def controlName(key: String): String = "$attr_"  + key
 
-  @SerialVersionUID(6793156274707521366L) private final case class AttributeIn(key: String, default: Double)
-    extends GE.Lazy /* with Elem */ with ScalarRated {
+  private final case class In(key: String, default: Double) extends GE.Lazy with ScalarRated {
 
-    def displayName = "AttributeIn"
-
-    override def toString = s"""$displayName("$key")"""
+    override def productPrefix  = "attribute$In"
+    override def toString       = s"""attribute("$key").ir($default)"""
 
     def makeUGens: UGenInLike = {
       UGenGraph.builder match {
@@ -19,12 +17,12 @@ object attribute {
           val ctlName = controlName(key)
           ctlName.ir(default).expand
 
-        case other => UGenGraphBuilder.outsideOfContext()
+        case _ => UGenGraphBuilder.outsideOfContext()
       }
     }
   }
 }
 final case class attribute(key: String) {
   def ir: GE = ir(0.0)
-  def ir(default: Double): GE = attribute.AttributeIn(key, default)
+  def ir(default: Double): GE = attribute.In(key, default)
 }

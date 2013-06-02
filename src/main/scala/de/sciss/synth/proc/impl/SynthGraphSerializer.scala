@@ -41,20 +41,42 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
 
   private final val SER_VERSION = 0x5347
 
-  private def writeProduct(p: Product, out: DataOutput) {
-    out.writeByte('P')
-    out.writeUTF(p.productPrefix)
-    out.writeShort(p.productArity)
-    p.productIterator.foreach(writeElem(_, out))
+  private final class RefMapOut {
+    var map   = Map.empty[Product, Int]
+    var count = 0
   }
 
-  private def writeElemSeq(xs: Seq[Any], out: DataOutput) {
+  private final class RefMapIn {
+    var map   = Map.empty[Int, Product]
+    var count = 0
+  }
+
+  private def writeProduct(p: Product, out: DataOutput, ref: RefMapOut) {
+    ref.map.get(p).foreach { id =>
+      out.writeByte('<')
+      out.writeInt(id)
+      return
+    }
+    out.writeByte('P')
+    val pck     = p.getClass.getPackage.getName
+    val prefix  = p.productPrefix
+    val name    = if (pck == "de.sciss.synth.ugen") prefix else s"$pck.$prefix"
+    out.writeUTF(name)
+    out.writeShort(p.productArity)
+    p.productIterator.foreach(writeElem(_, out, ref))
+
+    val id     = ref.count
+    ref.map   += p -> id
+    ref.count  = id + 1
+  }
+
+  private def writeElemSeq(xs: Seq[Any], out: DataOutput, ref: RefMapOut) {
     out.writeByte('X')
     out.writeInt(xs.size)
-    xs.foreach(writeElem(_, out))
+    xs.foreach(writeElem(_, out, ref))
   }
 
-  private def writeElem(e: Any, out: DataOutput) {
+  private def writeElem(e: Any, out: DataOutput, ref: RefMapOut) {
     e match {
       case c: Constant =>
         out.writeByte('C')
@@ -65,11 +87,11 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
       case o: Option[_] =>
         out.writeByte('O')
         out.writeBoolean(o.isDefined)
-        if (o.isDefined) writeElem(o.get, out)
+        if (o.isDefined) writeElem(o.get, out, ref)
       case xs: Seq[_] =>  // 'X'. either indexed seq or var arg (e.g. wrapped array)
-        writeElemSeq(xs, out)
+        writeElemSeq(xs, out, ref)
       case p: Product =>
-        writeProduct(p, out) // 'P'
+        writeProduct(p, out, ref) // 'P' or '<'
       case i: Int =>
         out.writeByte('I')
         out.writeInt(i)
@@ -89,48 +111,50 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
   }
 
   def write(v: SynthGraph, out: DataOutput) {
+    val ref = new RefMapOut
     out.writeShort(SER_VERSION)
-    writeElemSeq(v.sources, out)
+    writeElemSeq(v.sources, out, ref)
     val ctl = v.controlProxies
     out.writeByte('T')
     out.writeInt(ctl.size)
-    ctl.foreach(writeProduct(_, out))
+    ctl.foreach(writeProduct(_, out, ref))
   }
 
 
   // expects that 'X' byte has already been read
-  private def readIdentifiedSeq(in: DataInput): Seq[Any] = {
+  private def readIdentifiedSeq(in: DataInput, ref: RefMapIn): Seq[Any] = {
     val num = in.readInt()
-    Vector.fill(num)(readElem(in))
+    Vector.fill(num)(readElem(in, ref))
   }
 
   // expects that 'P' byte has already been read
-  private def readIdentifiedProduct(in: DataInput): Product = {
+  private def readIdentifiedProduct(in: DataInput, ref: RefMapIn): Product = {
     val prefix    = in.readUTF()
     val arity     = in.readShort()
-    val elems     = Vector.fill[AnyRef](arity)(readElem(in).asInstanceOf[AnyRef])
+    val elems     = Vector.fill[AnyRef](arity)(readElem(in, ref).asInstanceOf[AnyRef])
+    val className = if (prefix.charAt(0).isUpper) "de.sciss.synth.ugen." + prefix else prefix
     // cf. stackoverflow #3039822
-    val companion = Class.forName(s"de.sciss.synth.ugen.$prefix$$").getField("MODULE$").get(null)
-    // val m         = companion.getClass.getMethod("apply", elems.map(_.getClass): _*)
+    val companion = Class.forName(className + "$").getField("MODULE$").get(null)
     val m         = companion.getClass.getMethods.find(_.getName == "apply")
       .getOrElse(sys.error(s"No apply method found on $companion"))
+    val res       = m.invoke(companion, elems: _*).asInstanceOf[Product]
 
-    // try {
-      m.invoke(companion, elems: _*).asInstanceOf[Product]
-    //    } catch {
-    //      case i: IllegalArgumentException =>
-    //        println(s"IllegalArgumentException. companion = $companion, m = $m, elems = $elems")
-    //        throw i
-    //    }
+    val id        = ref.count
+    ref.map      += id -> res
+    ref.count     = id + 1
+    res
   }
 
-  private def readElem(in: DataInput): Any = {
+  private def readElem(in: DataInput, ref: RefMapIn): Any = {
     (in.readByte(): @switch) match {
       case 'C' => Constant(in.readFloat())
       case 'R' => MaybeRate(in.readByte())
-      case 'O' => if (in.readBoolean()) Some(readElem(in)) else None
-      case 'X' => readIdentifiedSeq(in)
-      case 'P' => readIdentifiedProduct(in)
+      case 'O' => if (in.readBoolean()) Some(readElem(in, ref)) else None
+      case 'X' => readIdentifiedSeq(in, ref)
+      case 'P' => readIdentifiedProduct(in, ref)
+      case '<' =>
+        val id = in.readInt()
+        ref.map(id)
       case 'I' => in.readInt()
       case 'S' => in.readUTF()
       case 'B' => in.readBoolean()
@@ -140,13 +164,14 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
   }
 
   def read(in: DataInput): SynthGraph = {
-    val cookie = in.readShort()
+    val ref     = new RefMapIn
+    val cookie  = in.readShort()
     require(cookie == SER_VERSION, s"Unexpected cookie $cookie")
     val b1 = in.readByte()
     require(b1 == 'X')    // expecting sequence
     val numSources  = in.readInt()
     val sources     = Vector.fill(numSources) {
-      readElem(in) match {
+      readElem(in, ref) match {
         case lz: Lazy => lz
         case other    => sys.error(s"Expected Lazy but found $other")
       }
@@ -156,7 +181,7 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     val numControls = in.readInt()
     val controls    = Set.newBuilder[ControlProxyLike] // stupid Set doesn't have `fill` and `tabulate` methods
     for (_ <- 0 until numControls) {
-      controls += (readElem(in) match {
+      controls += (readElem(in, ref) match {
         case ctl: ControlProxyLike  => ctl
         case other                  => sys.error(s"Expected ControlProxyLike but found $other")
       })

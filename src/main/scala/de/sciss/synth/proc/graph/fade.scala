@@ -35,10 +35,6 @@ object Fade {
   private[graph] abstract class SingleBase extends Base {
     protected def key: String
 
-    def displayName: String
-
-    override def toString = s"""$displayName("$key", $rate)"""
-
     final protected def mkEnv(b: UGenGraphBuilder[_], dur: GE): IEnv = {
       val (fadeDur, shape, floor) = readCtl(b, key)
       mkSingleEnv(dur, fadeDur, shape, floor)
@@ -47,10 +43,10 @@ object Fade {
     protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv
   }
 
-  // @SerialVersionUID(6793156274707521366L)
   private[graph] final case class In(key: String, rate: Rate) extends SingleBase {
 
-    def displayName = "FadeIn"
+    override def productPrefix  = "Fade$In"
+    override def toString       = s"""FadeIn("$key").${rate.methodName}"""
 
     protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
       IEnv(floor, Env.Segment(fadeDur, 1, shape) :: Nil)
@@ -59,7 +55,8 @@ object Fade {
   // @SerialVersionUID(6793156274707521366L)
   private[graph] final case class Out(key: String, rate: Rate)  extends SingleBase {
 
-    def displayName = "FadeOut"
+    override def productPrefix  = "Fade$Out"
+    override def toString       = s"""FadeOut("$key").${rate.methodName}"""
 
     protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
       IEnv(1, Env.Segment(fadeDur, floor, shape) :: Nil, totalDur - fadeDur)
@@ -68,7 +65,8 @@ object Fade {
   // @SerialVersionUID(6793156274707521366L)
   private[graph] final case class InOut(inKey: String, outKey: String, rate: Rate) extends Base {
 
-    def displayName = "FadeInOut"
+    override def productPrefix  = "Fade$InOut"
+    override def toString       = s"""FadeInOut("$inKey", "$outKey").${rate.methodName}"""
 
     protected def mkEnv(b: UGenGraphBuilder[_], totalDur: GE): IEnv = {
       val (fadeDurIn , shapeIn , floorIn ) = readCtl(b, inKey )
