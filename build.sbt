@@ -33,7 +33,8 @@ retrieveManaged := true
 
 scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")   // "-Xelide-below", "INFO"
 
-scalacOptions += "-no-specialization"
+// SI-7481
+// scalacOptions += "-no-specialization"
 
 testOptions in Test += Tests.Argument("-oF")
 

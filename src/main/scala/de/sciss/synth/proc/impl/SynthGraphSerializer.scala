@@ -33,12 +33,6 @@ import ugen.{ControlProxyLike, Constant}
 
 /** A serializer for synth graphs. */
 object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
-  //  private val map = mutable.Map.empty[String, SynthGraph]
-  //
-  //  def register(key: String, graph: SynthGraph) {
-  //    map.synchronized(map += key -> graph)
-  //  }
-
   private final val SER_VERSION = 0x5347
 
   private final class RefMapOut {
@@ -54,21 +48,22 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
   }
 
   private def writeProduct(p: Product, out: DataOutput, ref: RefMapOut) {
-    ref.map.get(p).foreach { id =>
+    val id0 = ref.map.getOrElse(p, -1)
+    if (id0 >= 0) {
       out.writeByte('<')
-      out.writeInt(id)
+      out.writeInt(id0)
       return
     }
     out.writeByte('P')
     val pck     = p.getClass.getPackage.getName
     val prefix  = p.productPrefix
-    val name    = if (pck == "de.sciss.synth.ugen") prefix else s"$pck.$prefix"
+    val name    = if (pck == "de.sciss.synth.ugen") prefix else pck + "." + prefix
     out.writeUTF(name)
     out.writeShort(p.productArity)
     p.productIterator.foreach(writeElem(_, out, ref))
 
     val id     = ref.count
-    ref.map   += p -> id
+    ref.map   += ((p, id))
     ref.count  = id + 1
   }
 
@@ -114,28 +109,28 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
 
   def write(v: SynthGraph, out: DataOutput) {
     out.writeShort(SER_VERSION)
-    val t1    = System.nanoTime()
-    val p1    = out.position
-    writeOld(v, out)
-    val t2    = System.nanoTime()
-    val p2    = out.position
+    //    val t1    = System.nanoTime()
+    //    val p1    = out.position
+    //    writeOld(v, out)
+    //    val t2    = System.nanoTime()
+    //    val p2    = out.position
     writeNew(v, out)
-    val t3    = System.nanoTime()
-    val p3    = out.position
-    val timOld    = t2 - t1
-    val timNew    = t3 - t2
-    val spcOld    = p2 - p1
-    val spcNew    = p3 - p2
-    val timeRel   = timNew.toDouble/timOld.toDouble*100
-    val spaceRel  = spcNew.toDouble/spcOld.toDouble*100
-    println(f"<<< writ >>> time ${timOld/1000}%5d vs. ${timNew/1000}%5d ($timeRel%5.1f%); space $spcOld%5d vs. $spcNew%5d ($spaceRel%5.1f%)")
+    //    val t3    = System.nanoTime()
+    //    val p3    = out.position
+    //    val timOld    = t2 - t1
+    //    val timNew    = t3 - t2
+    //    val spcOld    = p2 - p1
+    //    val spcNew    = p3 - p2
+    //    val timeRel   = timNew.toDouble/timOld.toDouble*100
+    //    val spaceRel  = spcNew.toDouble/spcOld.toDouble*100
+    //    println(f"<<< writ >>> time ${timOld/1000}%5d vs. ${timNew/1000}%5d ($timeRel%5.1f%); space $spcOld%5d vs. $spcNew%5d ($spaceRel%5.1f%)")
   }
 
-  private def writeOld(v: SynthGraph, out: DataOutput) {
-    val oos = new java.io.ObjectOutputStream(out.asOutputStream)
-    oos.writeObject(v)
-    oos.flush()
-  }
+  //  private def writeOld(v: SynthGraph, out: DataOutput) {
+  //    val oos = new java.io.ObjectOutputStream(out.asOutputStream)
+  //    oos.writeObject(v)
+  //    oos.flush()
+  //  }
 
   private def writeNew(v: SynthGraph, out: DataOutput) {
     val ref = new RefMapOut
@@ -180,7 +175,7 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     val res       = m.invoke(companion, elems: _*).asInstanceOf[Product]
 
     val id        = ref.count
-    ref.map      += id -> res
+    ref.map      += ((id, res))
     ref.count     = id + 1
     res
   }
@@ -207,21 +202,21 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     val cookie  = in.readShort()
     require(cookie == SER_VERSION, s"Unexpected cookie $cookie")
 
-    val t1    = System.nanoTime()
-    val p1    = in.position
-    val res1  = readOld(in)
-    val t2    = System.nanoTime()
-    val p2    = in.position
+    //    val t1    = System.nanoTime()
+    //    val p1    = in.position
+    //    val res1  = readOld(in)
+    //    val t2    = System.nanoTime()
+    //    val p2    = in.position
     val res2  = readNew(in)
-    val t3    = System.nanoTime()
-    val p3    = in.position
-    val timOld    = t2 - t1
-    val timNew    = t3 - t2
-    val spcOld    = p2 - p1
-    val spcNew    = p3 - p2
-    val timeRel   = timNew.toDouble/timOld.toDouble*100
-    val spaceRel  = spcNew.toDouble/spcOld.toDouble*100
-    println(f"<<< read >>> time ${timOld/1000}%5d vs. ${timNew/1000}%5d ($timeRel%5.1f%); space $spcOld%5d vs. $spcNew%5d ($spaceRel%5.1f%)")
+    //    val t3    = System.nanoTime()
+    //    val p3    = in.position
+    //    val timOld    = t2 - t1
+    //    val timNew    = t3 - t2
+    //    val spcOld    = p2 - p1
+    //    val spcNew    = p3 - p2
+    //    val timeRel   = timNew.toDouble/timOld.toDouble*100
+    //    val spaceRel  = spcNew.toDouble/spcOld.toDouble*100
+    //    println(f"<<< read >>> time ${timOld/1000}%5d vs. ${timNew/1000}%5d ($timeRel%5.1f%); space $spcOld%5d vs. $spcNew%5d ($spaceRel%5.1f%)")
 
     res2
   }
@@ -232,28 +227,24 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     require(b1 == 'X')    // expecting sequence
     val numSources  = in.readInt()
     val sources     = Vector.fill(numSources) {
-      readElem(in, ref) match {
-        case lz: Lazy => lz
-        case other    => sys.error(s"Expected Lazy but found $other")
-      }
+      readElem(in, ref).asInstanceOf[Lazy]
     }
     val b2 = in.readByte()
     require(b2 == 'T')    // expecting set
     val numControls = in.readInt()
     val controls    = Set.newBuilder[ControlProxyLike] // stupid Set doesn't have `fill` and `tabulate` methods
-    for (_ <- 0 until numControls) {
-      controls += (readElem(in, ref) match {
-        case ctl: ControlProxyLike  => ctl
-        case other                  => sys.error(s"Expected ControlProxyLike but found $other")
-      })
+    var i = 0
+    while (i < numControls) {
+      controls += readElem(in, ref).asInstanceOf[ControlProxyLike]
+      i += 1
     }
     SynthGraph(sources, controls.result())
   }
 
-  private def readOld(in: DataInput): SynthGraph = {
-    val ois = new java.io.ObjectInputStream(in.asInputStream)
-    val res = ois.readObject().asInstanceOf[SynthGraph]
-    ois.close()
-    res
-  }
+  //  private def readOld(in: DataInput): SynthGraph = {
+  //    val ois = new java.io.ObjectInputStream(in.asInputStream)
+  //    val res = ois.readObject().asInstanceOf[SynthGraph]
+  //    ois.close()
+  //    res
+  //  }
 }
