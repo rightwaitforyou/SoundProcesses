@@ -1,0 +1,37 @@
+{
+  "organization" : "de.sciss",
+  "name" : "SoundProcesses",
+  "version" : "1.8.0",
+  "description" : "A framework for creating and managing ScalaCollider based sound processes",
+  "site" : "https://github.com/Sciss/SoundProcesses",
+  "tags" : [ "sound", "music", "sound-synthesis", "computer-music" ],
+  "docs" : "",
+  "resolvers" : [ "https://oss.sonatype.org/content/repositories/releases" ],
+  "dependencies" : [ {
+    "organization" : "de.sciss",
+    "name" : "scalacollider",
+    "version" : "1.8.+"
+  }, {
+    "organization" : "de.sciss",
+    "name" : "prefuse-core",
+    "version" : "0.21"
+  }, {
+    "organization" : "de.sciss",
+    "name" : "lucreconfluent",
+    "version" : "2.4.+"
+  }, {
+    "organization" : "de.sciss",
+    "name" : "lucreevent-expr",
+    "version" : "2.3.+"
+  }, {
+    "organization" : "de.sciss",
+    "name" : "span",
+    "version" : "1.2.+"
+  } ],
+  "scalas" : [ "2.10.1" ],
+  "licenses" : [ {
+    "name" : "GPL v2+",
+    "url" : "http://www.gnu.org/licenses/gpl-2.0.txt"
+  } ],
+  "sbt" : false
+}

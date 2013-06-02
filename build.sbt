@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.8.0-SNAPSHOT"
+version := "1.8.0"
 
 organization := "de.sciss"
 
@@ -86,12 +86,12 @@ buildInfoPackage := "de.sciss.synth.proc"
 
 publishMavenStyle := true
 
-publishTo <<= version { (v: String) =>
-   Some(if (v endsWith "-SNAPSHOT")
-      "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
-   else
-      "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-   )
+publishTo <<= version { v =>
+  Some(if (v endsWith "-SNAPSHOT")
+    "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+  else
+    "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+  )
 }
 
 publishArtifact in Test := false
@@ -104,11 +104,11 @@ pomExtra <<= name { n =>
   <connection>scm:git:git@github.com:Sciss/{n}.git</connection>
 </scm>
 <developers>
-   <developer>
-      <id>sciss</id>
-      <name>Hanns Holger Rutz</name>
-      <url>http://www.sciss.de</url>
-   </developer>
+  <developer>
+    <id>sciss</id>
+    <name>Hanns Holger Rutz</name>
+    <url>http://www.sciss.de</url>
+  </developer>
 </developers>
 }
 
