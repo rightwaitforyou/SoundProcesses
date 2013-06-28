@@ -104,7 +104,6 @@ object AuralPresentationImpl {
       val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
       log("started" + " (" + booted.hashCode.toHexString + ")")
       ProcDemiurg.addServer(server) // ( ProcTxn()( tx ))
-      //            transport.react { x => println( "Aural observation: " + x )}
 
       def t_play(time: Long)(implicit tx: S#Tx) {
         transport.iterator.foreach {

@@ -30,6 +30,7 @@ import evt.Targets
 import expr.Expr
 import de.sciss.span.Span
 import de.sciss.serial.{DataOutput, DataInput}
+import de.sciss.lucre.stm.Sys
 
 object Spans extends BiTypeImpl[Span] {
   final val typeID = 10
@@ -40,6 +41,14 @@ object Spans extends BiTypeImpl[Span] {
     value.write(out)
   }
 
+  def apply[S <: evt.Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
+    (start, stop) match {
+      case (Expr.Const(startC), Expr.Const(stopC)) => newConst(Span(startC, stopC))
+      case _ =>
+        new Tuple2(BinaryOp.Apply.id, BinaryOp.Apply, Targets.partial[S], start, stop)
+    }
+
+  // XXX TODO: fold constants
   final class Ops[S <: evt.Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     // ---- unary ----
     def start : Expr[S, Long] = UnaryOp.Start(ex)
@@ -52,8 +61,23 @@ object Spans extends BiTypeImpl[Span] {
 
   // ---- protected ----
 
-  def readTuple[S <: stm.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])(implicit tx: S#Tx): ExN[S] =
-    sys.error("Invalid cookie " + cookie)
+  def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                (implicit tx: S#Tx): ExN[S] = cookie match {
+    case 2 => // binary ops
+      val tpe = in.readInt()
+      require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
+      val opID  = in.readInt()
+      import BinaryOp._
+      val op    = opID match {
+        case Apply.id => Apply
+        case _        => sys.error(s"Invalid operation id $opID")
+      }
+      val _1 = Longs.readExpr(in, access)
+      val _2 = Longs.readExpr(in, access)
+      new Tuple2(typeID, op, targets, _1, _2)
+
+    case _        => sys.error(s"Invalid cookie $cookie")
+  }
 
   object UnaryOp {
     //      sealed trait OpLike[ T1 ] {
@@ -102,7 +126,7 @@ object Spans extends BiTypeImpl[Span] {
       def name: String = {
         val cn = getClass.getName
         val sz = cn.length
-        val i = cn.lastIndexOf('$', sz - 2) + 1
+        val i  = cn.lastIndexOf('$', sz - 2) + 1
         "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
       }
     }
@@ -123,6 +147,12 @@ object Spans extends BiTypeImpl[Span] {
 
     case object Shift extends LongSpanOp(0x1100) {
       def value(a: Span, b: Long): Span = a.shift(b)
+    }
+
+    object Apply extends Tuple2Op[Long, Long] {
+      final val id = 0
+      def value(a: Long, b: Long): Span = Span(a, b)
+      def toString[S1 <: Sys[S1]](_1: Expr[S1, Long], _2: Expr[S1, Long]): String = s"Span(${_1}, ${_2})"
     }
   }
 }

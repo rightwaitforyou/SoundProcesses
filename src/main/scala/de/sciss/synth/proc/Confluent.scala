@@ -27,7 +27,7 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{stm, confluent, event => evt}
+import lucre.{stm, confluent}
 import confluent.reactive.ConfluentReactiveLike
 import stm.{DataStore, DataStoreFactory}
 import impl.{ConfluentImpl => Impl}

@@ -329,18 +329,6 @@ object BiGroupImpl {
           case _                    => None
         }
       }
-
-      //      def react[A1 >: BiGroup.Update[S, Elem, U]](fun: A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiGroup.Modifiable[S, Elem, U]] =
-      //        reactTx[A1](_ => fun)
-      //
-      //      def reactTx[A1 >: BiGroup.Update[S, Elem, U]](fun: S#Tx => A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiGroup.Modifiable[S, Elem, U]] = {
-      //        val obs = evt.Observer(modifiableSerializer(eventView), fun)
-      //        obs.add(CollectionEvent)
-      //        obs.add(ElementEvent)
-      //        obs
-      //      }
-
-      // def isSource(pull: evt.Pull[S]): Boolean = CollectionEvent.isSource(pull) || ElementEvent.isSource(pull)
     }
 
     final protected def disposeData()(implicit tx: S#Tx) {

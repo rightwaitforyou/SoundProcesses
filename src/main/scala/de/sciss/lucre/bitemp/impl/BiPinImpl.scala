@@ -250,18 +250,6 @@ object BiPinImpl {
           case _ => None
         }
       }
-
-      //      def react[A1 >: BiPin.Update[S, A]](fun: A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiPin[S, A]] =
-      //        reactTx[A1](_ => fun)
-      //
-      //      def reactTx[A1 >: BiPin.Update[S, A]](fun: S#Tx => A1 => Unit)(implicit tx: S#Tx): evt.Observer[S, A1, BiPin[S, A]] = {
-      //        val obs = evt.Observer(serializer[S, A], fun)
-      //        obs.add(CollChanged)
-      //        obs.add(ElemChanged)
-      //        obs
-      //      }
-
-      // def isSource(pull: evt.Pull[S]): Boolean = CollChanged.isSource(pull) || ElemChanged.isSource(pull)
     }
 
     protected def disposeData()(implicit tx: S#Tx) {

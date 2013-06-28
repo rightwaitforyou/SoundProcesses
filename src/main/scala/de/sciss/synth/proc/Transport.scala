@@ -136,7 +136,6 @@ trait Transport[S <: evt.Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ 
 
   //   def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
 
-  // def react  (fun:         Transport.Update[S, Elem, U] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
   def react(fun: S#Tx => Transport.Update[S, Elem, U] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
 
   //   // unfortunately this needs to go in the API because of the self-access problem

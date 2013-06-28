@@ -45,77 +45,77 @@ object Longs extends BiTypeImpl[Long] {
     (cookie: @switch) match {
       case 1 =>
         val tpe  = in.readInt()
-            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
-            val opID = in.readInt()
-            import UnaryOp._
-            val op: Op[ _ ] = (opID: @switch) match {
-               // ---- Long ----
-               case 0  => Neg
-               case 4  => BitNot
-               case 5  => Abs
-               case 11 => Signum
-               case 12 => Squared
-               case 13 => Cubed
+        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
+        val opID = in.readInt()
+        import UnaryOp._
+        val op: Op[_] = (opID: @switch) match {
+          // ---- Long ----
+          case Neg    .id => Neg
+          case BitNot .id => BitNot
+          case Abs    .id => Abs
+          case Signum .id => Signum
+          case Squared.id => Squared
+          case Cubed  .id => Cubed
 
-               // ---- Span ----
-               case Spans.UnaryOp.Start .id => Spans.UnaryOp.Start
-               case Spans.UnaryOp.Stop  .id => Spans.UnaryOp.Stop
-               case Spans.UnaryOp.Length.id => Spans.UnaryOp.Length
+          // ---- Span ----
+          case Spans.UnaryOp.Start  .id => Spans.UnaryOp.Start
+          case Spans.UnaryOp.Stop   .id => Spans.UnaryOp.Stop
+          case Spans.UnaryOp.Length .id => Spans.UnaryOp.Length
 
-               case _  => sys.error( "Invalid operation id " + opID )
-            }
-            op.read( in, access, targets )
-//            val _1 = readExpr( in, access )
-//            new Tuple1( typeID, op, targets, _1 )
+          case _ => sys.error(s"Invalid operation id $opID")
+        }
+        op.read(in, access, targets)
+        //            val _1 = readExpr( in, access )
+        //            new Tuple1( typeID, op, targets, _1 )
 
-         case 2 =>
-            val tpe = in.readInt()
-            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
-            val opID = in.readInt()
-            import BinaryOp._
-            val op: Op = (opID: @switch) match {
-               case 0 => Plus
-               case 1 => Minus
-               case 2 => Times
-               case 3 => IDiv
-//               case 4 => Div
-//               case 5 => Mod
-         //      case 6 => Eq
-         //      case 7 => Neq
-         //      case 8 => Lt
-         //      case 9 => Gt
-         //      case 10 => Leq
-         //      case 11 => Geq
-               case 12 => Min
-               case 13 => Max
-               case 14 => BitAnd
-               case 15 => BitOr
-               case 16 => BitXor
-            // case 17 => Lcm
-            // case 18 => Gcd
-//               case 19 => Round
-//               case 20 => Roundup
-//               case 26 => <<
-//               case 27 => >>
-//               case 28 => >>>
-               case 38 => Absdif
-//               case 42 => Clip2
-//               case 44 => Fold2
-//               case 45 => Wrap2
-            }
-            val _1 = readExpr( in, access )
-            val _2 = readExpr( in, access )
-            new Tuple2( typeID, op, targets, _1, _2 )
+      case 2 =>
+        val tpe = in.readInt()
+        require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
+        val opID = in.readInt()
+        import BinaryOp._
+        val op: Op = (opID: @switch) match {
+          case Plus   .id => Plus
+          case Minus  .id => Minus
+          case Times  .id => Times
+          case IDiv   .id => IDiv
+          //               case 4 => Div
+          //               case 5 => Mod
+          //      case 6 => Eq
+          //      case 7 => Neq
+          //      case 8 => Lt
+          //      case 9 => Gt
+          //      case 10 => Leq
+          //      case 11 => Geq
+          case Min    .id => Min
+          case Max    .id => Max
+          case BitAnd .id => BitAnd
+          case BitOr  .id => BitOr
+          case BitXor .id => BitXor
+          // case 17 => Lcm
+          // case 18 => Gcd
+          //               case 19 => Round
+          //               case 20 => Roundup
+          //               case 26 => <<
+          //               case 27 => >>
+          //               case 28 => >>>
+          case Absdif .id => Absdif
+          //               case 42 => Clip2
+          //               case 44 => Fold2
+          //               case 45 => Wrap2
+          case _ => sys.error(s"Invalid operation id $opID")
+        }
+        val _1 = readExpr(in, access)
+        val _2 = readExpr(in, access)
+        new Tuple2(typeID, op, targets, _1, _2)
 
-//         case 3 =>
-//            readProjection[ S ]( in, access, targets )
+      //         case 3 =>
+      //            readProjection[ S ]( in, access, targets )
 
-         case _ => sys.error( "Invalid cookie " + cookie )
-      }
+      case _ => sys.error(s"Invalid cookie $cookie")
+    }
    }
 
   object UnaryOp {
-
     trait Op[T1] extends Tuple1Op[T1] {
       def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                            (implicit tx: S#Tx): Tuple1[S, T1]
@@ -136,7 +136,7 @@ object Longs extends BiTypeImpl[Long] {
     }
 
     sealed abstract class LongOp extends Op[Long] {
-      def id: Int
+      // def id: Int
 
       final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                                  (implicit tx: S#Tx): Tuple1[S, Long] = {
@@ -190,8 +190,7 @@ object Longs extends BiTypeImpl[Long] {
   }
 
   private object BinaryOp {
-
-    sealed abstract class Op(val id: Int) extends Tuple2Op[Long, Long] {
+    sealed trait Op extends Tuple2Op[Long, Long] {
       final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
         case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
         case _                                => new Tuple2(typeID, this, Targets.partial[S], a, b)
@@ -199,7 +198,7 @@ object Longs extends BiTypeImpl[Long] {
 
       def value(a: Long, b: Long): Long
 
-      def toString[ S <: stm.Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String = s"${_1}.$name(${_2})"
+      def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
 
       def name: String = {
         val cn = getClass.getName
@@ -212,8 +211,7 @@ object Longs extends BiTypeImpl[Long] {
     trait Infix {
       _: Op =>
 
-      override def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String =
-        "(" + _1 + " " + name + " " + _2 + ")"
+      override def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"(${_1} $name ${_2})"
     }
 
     //      sealed trait MathStyle {
@@ -222,49 +220,68 @@ object Longs extends BiTypeImpl[Long] {
     //            "(" + _1 + " " + name + " " + _2 + ")"
     //      }
 
-    case object Plus           extends Op(  0 ) with Infix {
-         override val name = "+"
-         def value( a: Long, b: Long ) : Long = a + b
-      }
-      case object Minus          extends Op(  1 ) with Infix {
-         override val name = "-"
-         def value( a: Long, b: Long ) : Long = a - b
-      }
-      case object Times          extends Op(  2 ) with Infix {
-         override val name = "*"
-         def value( a: Long, b: Long ) : Long = a * b
-      }
-      case object IDiv           extends Op(  3 ) {
-         override val name = "div"
-         def value( a: Long, b: Long ) : Long = a / b
-      }
-      case object Min            extends Op( 12 ) {
-         def value( a: Long, b: Long ) : Long = math.min( a, b )
-      }
-      case object Max            extends Op( 13 ) {
-         def value( a: Long, b: Long ) : Long = math.max( a, b )
-      }
-      case object BitAnd         extends Op( 14 ) {
-         def value( a: Long, b: Long ) : Long = a & b
-      }
-      case object BitOr          extends Op( 15 ) {
-         def value( a: Long, b: Long ) : Long = a | b
-      }
-      case object BitXor         extends Op( 16 ) {
-         def value( a: Long, b: Long ) : Long = a ^ b
-      }
-//      case object <<             extends Op( 26 ) {
-//         def value( a: Long, b: Long ) : Long = a << b
-//      }
-//      case object >>             extends Op( 27 ) {
-//         def value( a: Long, b: Long ) : Long = a >> b
-//      }
-//      case object >>>            extends Op( 28 ) {
-//         def value( a: Long, b: Long ) : Long = a >>> b
-//      }
-      case object Absdif         extends Op( 38 ) {
-         def value( a: Long, b: Long ) : Long = math.abs( a - b )
-      }
+    case object Plus extends Op with Infix {
+      final val id = 0
+      override val name = "+"
+      def value(a: Long, b: Long): Long = a + b
+    }
+
+    case object Minus extends Op with Infix {
+      final val id = 1
+      override val name = "-"
+      def value(a: Long, b: Long): Long = a - b
+    }
+
+    case object Times extends Op with Infix {
+      final val id = 2
+      override val name = "*"
+      def value(a: Long, b: Long): Long = a * b
+    }
+
+    case object IDiv extends Op {
+      final val id = 3
+      override val name = "div"
+      def value(a: Long, b: Long): Long = a / b
+    }
+
+    case object Min extends Op {
+      final val id = 12
+      def value(a: Long, b: Long): Long = math.min(a, b)
+    }
+
+    case object Max extends Op {
+      final val id = 13
+      def value(a: Long, b: Long): Long = math.max(a, b)
+    }
+
+    case object BitAnd extends Op {
+      final val id = 14
+      def value(a: Long, b: Long): Long = a & b
+    }
+
+    case object BitOr extends Op {
+      final val id = 15
+      def value(a: Long, b: Long): Long = a | b
+    }
+
+    case object BitXor extends Op {
+      final val id = 16
+      def value(a: Long, b: Long): Long = a ^ b
+    }
+
+    //      case object <<             extends Op( 26 ) {
+    //         def value( a: Long, b: Long ) : Long = a << b
+    //      }
+    //      case object >>             extends Op( 27 ) {
+    //         def value( a: Long, b: Long ) : Long = a >> b
+    //      }
+    //      case object >>>            extends Op( 28 ) {
+    //         def value( a: Long, b: Long ) : Long = a >>> b
+    //      }
+    case object Absdif extends Op {
+      final val id = 38
+      def value(a: Long, b: Long): Long = math.abs(a - b)
+    }
 
     //      case object Clip2          extends Op( 42 ) {
     //         def value( a: Long, b: Long ) : Long = rd_clip2( a, b )
