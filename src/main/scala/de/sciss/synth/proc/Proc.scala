@@ -67,10 +67,6 @@ object Proc {
     override def toString = s"[scan: $name]"
   }
 
-  //  final case class GraphemeKey(name: String) extends AssociativeKey {
-  //    override def toString = "[grapheme: " + name + "]"
-  //  }
-
   final case class AttributeKey(name: String) extends AssociativeKey {
     override def toString = s"[attribute: $name]"
   }
@@ -79,28 +75,21 @@ object Proc {
     override def toString = s"ScanChange($key, $scanUpdate)"
   }
 
-  //  final case class GraphemeChange[S <: evt.Sys[S]](key: String, graphemeUpdate: Grapheme.Update[S]) extends Change[S] {
-  //    override def toString = s"GraphemeChange($key, $graphemeUpdate)"
-  //  }
-
   final case class AttributeChange[S <: evt.Sys[S]](key: String, attributeUpdate: Attribute.Update[S]) extends Change[S] {
     override def toString = s"AttributeChange($key, $attributeUpdate)"
   }
 }
-
+/** The `Proc` trait is the basic entity representing a sound process. */
 trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
   import Proc._
 
-  // def name(implicit tx: S#Tx): Expr[S, String]
-  // def name_=(expr: Expr[S, String])(implicit tx: S#Tx): Unit
+  /** The variable synth graph function of the process. */
+  def graph: Expr.Var[S, SynthGraph]
 
-  def graph(implicit tx: S#Tx): Expr[S, SynthGraph] // Code[SynthGraph]
-  def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx): Unit
-
-  // ---- controls preview demo ----
-
+  /** The real-time inputs and outputs of the process. */
   def scans     : Scans     .Modifiable[S]
-  // def graphemes : Graphemes .Modifiable[S]
+
+  /** The scalar attributes of the process. */
   def attributes: Attributes.Modifiable[S]
 
   def changed: evt.Event[S, Update[S], Proc[S]]

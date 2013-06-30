@@ -37,7 +37,6 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import language.higherKinds
-import de.sciss.lucre.expr.Expr
 
 object ProcImpl {
   private final val SER_VERSION = 0x5073  // was "Pr"
@@ -90,20 +89,19 @@ object ProcImpl {
 
     import Proc._
 
-    protected def _graph    : Expr.Var[S, SynthGraph] // Code[SynthGraph]]
     protected def attributeMap: SkipList.Map[S, String, AttributeEntry[S]]
     protected def scanMap     : SkipList.Map[S, String, ScanEntry[S]]
 
-    final def graph(implicit tx: S#Tx): Expr[S, SynthGraph] = _graph()
-
-    final def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx) {
-      val old = _graph()
-      if (old != g) {
-        _graph() = g
-        val ch = evt.Change(old.value, g.value)
-        if (ch.isSignificant) StateEvent(Proc.Update(proc, Vector(GraphChange(ch))))
-      }
-    }
+    //    final def graph(implicit tx: S#Tx): Expr[S, SynthGraph] = _graph()
+    //
+    //    final def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx) {
+    //      val old = _graph()
+    //      if (old != g) {
+    //        _graph() = g
+    //        val ch = evt.Change(old.value, g.value)
+    //        if (ch.isSignificant) StateEvent(Proc.Update(proc, Vector(GraphChange(ch))))
+    //      }
+    //    }
 
     // ---- key maps ----
 
@@ -208,40 +206,39 @@ object ProcImpl {
       final val slot = 3
 
       def connect   ()(implicit tx: S#Tx) {
-        attributes ---> this
-        scans      ---> this
-        StateEvent ---> this
+        graph.changed ---> this
+        attributes    ---> this
+        scans         ---> this
+        StateEvent    ---> this
       }
       def disconnect()(implicit tx: S#Tx) {
-        attributes -/-> this
-        scans      -/-> this
-        StateEvent -/-> this
+        graph.changed -/-> this
+        attributes    -/-> this
+        scans         -/-> this
+        StateEvent    -/-> this
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
+        val graphCh  = graph.changed
+        val graphOpt = if (pull.contains(graphCh   )) pull(graphCh   ) else None
         val attrOpt  = if (pull.contains(attributes)) pull(attributes) else None
         val scansOpt = if (pull.contains(scans     )) pull(scans     ) else None
         val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
 
-        val seq0 =
-        //        graphOpt match {
-        //          case Some(u) => u.changes
-        //          case _ => IIdxSeq.empty
-        //        }
-        attrOpt match {
-          case Some(u) => u.changes
-          case _ => Vector.empty
+        val seq0 = graphOpt.fold(IIdxSeq.empty[Change[S]]) { u =>
+          Vector(GraphChange(u))
         }
-        val seq1 = scansOpt match {
-          case Some(u) => if (seq0.isEmpty) u.changes else seq0 ++ u.changes
-          case _ => seq0
+        val seq1 = attrOpt.fold(seq0) { u =>
+          if (seq0.isEmpty) u.changes else seq0 ++ u.changes
         }
-        val seq2 = stateOpt match {
-          case Some(u) => if (seq1.isEmpty) u.changes else seq1 ++ u.changes
-          case _ => seq1
+        val seq2 = scansOpt.fold(seq1) { u =>
+          if (seq1.isEmpty) u.changes else seq1 ++ u.changes
         }
-        if (seq2.isEmpty) None else Some(Proc.Update(proc, seq2))
+        val seq3 = stateOpt.fold(seq2) { u =>
+          if (seq2.isEmpty) u.changes else seq2 ++ u.changes
+        }
+        if (seq3.isEmpty) None else Some(Proc.Update(proc, seq3))
       }
     }
 
@@ -259,7 +256,7 @@ object ProcImpl {
     final protected def writeData(out: DataOutput) {
       out.writeShort(SER_VERSION)
       // name_#     .write(out)
-      _graph    .write(out)
+      graph       .write(out)
       // graphemeMap .write(out)
       attributeMap.write(out)
       scanMap     .write(out)
@@ -267,7 +264,7 @@ object ProcImpl {
 
     final protected def disposeData()(implicit tx: S#Tx) {
       // name_#     .dispose()
-      _graph    .dispose()
+      graph       .dispose()
       // graphemeMap.dispose()
       attributeMap.dispose()
       scanMap     .dispose()
@@ -278,7 +275,7 @@ object ProcImpl {
 
   private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {
     protected val targets       = evt.Targets[S](tx0)
-    protected val _graph        = SynthGraphs.newVar(SynthGraphs.empty)
+    val graph                   = SynthGraphs.newVar(SynthGraphs.empty)
     protected val scanMap       = SkipList.Map.empty[S, String, ScanEntry[S]]
     protected val attributeMap  = SkipList.Map.empty[S, String, AttributeEntry[S]]
   }
@@ -292,7 +289,7 @@ object ProcImpl {
       require(serVer == SER_VERSION, s"Incompatible serialized (found $serVer, required $SER_VERSION)")
     }
 
-    protected val _graph        = SynthGraphs.readVar(in, access)
+    val graph                   = SynthGraphs.readVar(in, access)
     protected val attributeMap  = SkipList.Map.read[S, String, AttributeEntry[S]](in, access)
     protected val scanMap       = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
   }
