@@ -9,7 +9,7 @@ import evt.{Sys => ESys, Event, EventLikeSerializer, EventLike}
 import serial.{DataOutput, DataInput, Writable}
 import expr.{Ints, Doubles, Booleans, Strings}
 import scala.annotation.switch
-import language.higherKinds
+import language.{higherKinds, implicitConversions}
 
 object Attribute {
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean}
@@ -43,6 +43,9 @@ object Attribute {
   }
 
   // ----------------- Int -----------------
+
+  //  implicit def intAttribute[S <: ESys[S], A](source: A)(implicit view: A => Expr[S, _Int], tx: S#Tx): Int[S] =
+  //    Int(source)
 
   object Int extends Companion[Int] {
     protected[Attribute] final val typeID = Ints.typeID
@@ -78,6 +81,9 @@ object Attribute {
 
   // ----------------- Double -----------------
 
+  //  implicit def doubleAttribute[S <: ESys[S], A](source: A)(implicit view: A => Expr[S, _Double], tx: S#Tx): Double[S] =
+  //    Double(source)
+
   object Double extends Companion[Double] {
     protected[Attribute] final val typeID = Doubles.typeID
 
@@ -110,7 +116,10 @@ object Attribute {
     def mkCopy()(implicit tx: S#Tx): Double[S]
   }
 
-  // ----------------- Double -----------------
+  // ----------------- Boolean -----------------
+
+  //  implicit def booleanAttribute[S <: ESys[S], A](source: A)(implicit view: A => Expr[S, _Boolean], tx: S#Tx): Boolean[S] =
+  //    Boolean(source)
 
   object Boolean extends Companion[Boolean] {
     protected[Attribute] final val typeID = Booleans.typeID
@@ -146,6 +155,9 @@ object Attribute {
 
   // ----------------- String -----------------
 
+  //  implicit def stringAttribute[S <: ESys[S], A](source: A)(implicit view: A => Expr[S, _String], tx: S#Tx): String[S] =
+  //    String(source)
+
   object String extends Companion[String] {
     protected[Attribute] final val typeID = Strings.typeID
 
@@ -179,6 +191,10 @@ object Attribute {
   }
 
   // ----------------- Double -----------------
+
+  //  implicit def fadeSpecAttribute[S <: ESys[S], A](source: A)
+  //                                                 (implicit view: A => Expr[S, _FadeSpec.Value], tx: S#Tx): FadeSpec[S] =
+  //    FadeSpec(source)
 
   object FadeSpec extends Companion[FadeSpec] {
     protected[Attribute] final val typeID = _FadeSpec.Elem.typeID

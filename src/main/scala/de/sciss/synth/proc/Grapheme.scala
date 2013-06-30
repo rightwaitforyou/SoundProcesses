@@ -423,7 +423,7 @@ object Grapheme {
 
     // ---- bitype ----
 
-    def longType: BiType[Long] = Longs
+    def longType    : BiType[Long    ] = Longs
     def spanLikeType: BiType[SpanLike] = SpanLikes
 
     def readValue(in: DataInput): Value = Value.serializer.read(in)
