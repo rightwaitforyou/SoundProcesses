@@ -47,7 +47,7 @@ object TapeTest extends App {
 
     proc.attributes.put("freq", Attribute.Double(200.0))
 
-    proc.graph_=(SynthGraph {
+    proc.graph() = SynthGraph {
       import ugen._
       val freq  = graph.attribute("freq").ir
       val sig0  = graph.scan("sig").ar(0.0)
@@ -55,7 +55,7 @@ object TapeTest extends App {
       val sig   = FreqShift.ar(sig1, freq)
       val spat  = graph.scan("spat").ar(0.0)
       Out.ar(0, Pan2.ar(sig, spat))
-    })
+    }
     val group     = ProcGroup.Modifiable[S]
     group.add(Span(1.seconds, 4.seconds), proc)
 

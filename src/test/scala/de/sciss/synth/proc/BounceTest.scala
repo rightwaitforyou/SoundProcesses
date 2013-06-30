@@ -22,10 +22,10 @@ object BounceTest extends App {
     import expr._
 
     val proc      = Proc[S]
-    proc.graph_=(SynthGraph {
+    proc.graph() = SynthGraph {
       import ugen._
       Out.ar(0, SinOsc.ar(440))
-    })
+    }
     val group     = ProcGroup.Modifiable[S]
     group.add(Span(4410, 8820), proc)
     import ProcGroup.serializer

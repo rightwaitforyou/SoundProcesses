@@ -138,15 +138,15 @@ object ScansTest extends App {
     import ugen._
       import graph.scan
 
-    p1.graph_=(SynthGraph {
+    p1.graph() = SynthGraph {
       scan("out") := SinOsc.ar(100).linexp(-1, 1, 30, 3000)
-    })
+    }
 
-    p2.graph_=(SynthGraph {
+    p2.graph() = SynthGraph {
       val freq = scan("freq").ar(333)
       //         freq.poll
       Out.ar(0, SinOsc.ar(freq))
-    })
+    }
 
     //      {
     //         implicit val chr = Chronos[ S ]( t1 )

@@ -49,15 +49,15 @@ object PatchTest extends App {
     val p1out = p1.scans.add("out")
     val p2in = p2.scans.add("freq")
 
-    p1.graph_=(SynthGraph {
+    p1.graph() = SynthGraph {
       graph.scan("out") := SinOsc.ar(0.1).linexp(-1, 1, 200, 2000)
-    })
+    }
 
-    p2.graph_=(SynthGraph {
+    p2.graph() = SynthGraph {
       val freq = graph.scan("freq").ar(441)
       val sig = RLPF.ar(Pulse.ar(freq), freq * 2, 0.1)
       Out.ar(0, Pan2.ar(sig))
-    })
+    }
 
     p2in.source_=(Some(Scan.Link.Scan(p1out)))
 

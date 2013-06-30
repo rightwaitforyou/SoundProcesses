@@ -124,7 +124,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     implicit val chr: Chronos[S] = Chronos(0L)
     val p = Proc[S]
     // p.name_=( name )
-    p.graph_=(SynthGraph {
+    p.graph() = SynthGraph {
       import synth._
       import ugen._
       val f = graph.scan("freq").ar(50) // fundamental frequency
@@ -141,7 +141,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
       //         Trigger( "silence", DetectSilence.ar( m ))
 
       Out.ar(0, m)
-    })
+    }
     val g = Grapheme.Modifiable[S]
     val scan = p.scans.add("freq")
     scan.source_=(Some(Scan.Link.Grapheme(g)))
@@ -276,12 +276,12 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     t { implicit tx =>
       val p = Proc[S]
       // p.name_=( "AudioFilePlayer" )
-      p.graph_=(SynthGraph {
+      p.graph() = SynthGraph {
         import synth._
         import ugen._
         val in = graph.scan("in").ar(0)
         Out.ar(0, in * SinOsc.ar(3))
-      })
+      }
       val g = Grapheme.Modifiable[S]
       val scan = p.scans.add("in")
       scan.source_=(Some(Scan.Link.Grapheme(g)))

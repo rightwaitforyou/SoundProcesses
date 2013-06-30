@@ -35,13 +35,13 @@ object FadeTest extends App {
     val fadeExprOut = FadeSpec.Elem(44100, Curves.newConst(exponential), -40.dbamp) // FadeSpec.Value(44100, linShape)
     proc.attributes.put("fadeIn" , Attribute.FadeSpec(fadeExprIn ))
     proc.attributes.put("fadeOut", Attribute.FadeSpec(fadeExprOut))
-    proc.graph_=(SynthGraph {
+    proc.graph() = SynthGraph {
       import ugen._
       val noise = PinkNoise.ar
       val env   = graph.FadeInOut("fadeIn", "fadeOut").ar
       val sig   = noise * env
       Out.ar(0, Pan2.ar(sig))
-    })
+    }
     val group     = ProcGroup.Modifiable[S]
     group.add(Span(1.seconds, 4.seconds), proc)
 

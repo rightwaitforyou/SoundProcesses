@@ -81,8 +81,6 @@ object Proc {
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
 trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
-  import Proc._
-
   /** The variable synth graph function of the process. */
   def graph: Expr.Var[S, SynthGraph]
 
@@ -92,5 +90,5 @@ trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
   /** The scalar attributes of the process. */
   def attributes: Attributes.Modifiable[S]
 
-  def changed: evt.Event[S, Update[S], Proc[S]]
+  def changed: evt.Event[S, Proc.Update[S], Proc[S]]
 }
