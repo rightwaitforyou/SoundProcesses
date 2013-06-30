@@ -124,7 +124,7 @@ object BiPinImpl {
     //      protected def tree: Tree[ S, A ]
     //      implicit protected def biType: BiType[ A ]
 
-    override def toString = "BiPin" + tree.id
+    override def toString() = "BiPin" + tree.id
 
     def modifiableOption: Option[BiPin.Modifiable[S, A]] = Some(this)
 
@@ -164,7 +164,7 @@ object BiPinImpl {
       }
 
       def connect()(implicit tx: S#Tx) {
-        foreach(+= _)
+        foreach(+= _) // XXX TODO: verify point in time
       }
 
       def disconnect()(implicit tx: S#Tx) {

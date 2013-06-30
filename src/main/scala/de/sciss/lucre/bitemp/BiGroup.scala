@@ -35,6 +35,7 @@ import data.Iterator
 import de.sciss.span.SpanLike
 import de.sciss.serial.DataInput
 import de.sciss.serial
+import de.sciss.lucre.stm.Identifiable
 
 object BiGroup {
   // ---- updates ----
@@ -76,12 +77,11 @@ object BiGroup {
       extends TimedElem[S, Elem]
   }
 
-  trait TimedElem[S <: Sys[S], Elem] /* extends evt.Node[ S ] */ {
-    def id: S#ID
-    def span: Expr[S, SpanLike]
+  trait TimedElem[S <: Sys[S], Elem] extends Identifiable[S#ID] {
+    def span : Expr[S, SpanLike]
     def value: Elem
 
-    override def toString = "TimedElem(" + id + ", " + span + ", " + value + ")"
+    override def toString = s"TimedElem($id, $span, $value)"
   }
 
   object Expr {
