@@ -20,7 +20,7 @@ object Curves extends BiTypeImpl[Curve] {
 
   def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                             (implicit tx: S#Tx): ExN[S] = {
-    (cookie /* : @switch */) match {
+    cookie match {
       case _ => sys.error("Invalid cookie " + cookie)
     }
   }

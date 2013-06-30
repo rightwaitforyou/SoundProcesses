@@ -8,6 +8,7 @@ import de.sciss.synth.proc.Grapheme
 import language.implicitConversions
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.SynthGraph
+import de.sciss.synth
 
 object ExprImplicits {
   def apply[S <: Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
@@ -51,6 +52,8 @@ class ExprImplicits[S <: Sys[S]] protected /* extends ExprImplicits.LowPriority[
   implicit def spanLikeOps(ex: Expr[S, SpanLike])(implicit tx: S#Tx): SpanLikes.Ops[S] = new SpanLikes.Ops(ex)
 
   implicit def synthGraphConst(s: SynthGraph): Expr[S, SynthGraph] = SynthGraphs.newConst(s)
+
+  implicit def curveConst(c: synth.Curve): Expr[S, synth.Curve] = Curves.newConst(c)
 
   // ---- biexpr ----
   implicit def biExpr[A, A1, T](tuple: (T, A1))
