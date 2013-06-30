@@ -41,7 +41,7 @@ import evt.Event
 import span.{SpanLike, Span}
 import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 import java.io.File
-import de.sciss.synth.ugen.Env
+import language.implicitConversions
 
 object Grapheme {
   // If necessary for some views, we could eventually add the Elems, too,
@@ -73,7 +73,11 @@ object Grapheme {
       }
     }
 
+    // implicit def curveFromMonoTuple(tup: (Double, synth.Curve)): Curve = Curve.fromMonoTuple(tup)
+
     object Curve {
+      // implicit def fromMonoTuple(tup: (Double, synth.Curve)): Curve = Curve(tup)
+
       implicit object serializer extends ImmutableSerializer[Curve] {
         def write(v: Curve, out: DataOutput) { v.write(out) }
         def read(in: DataInput): Curve = {

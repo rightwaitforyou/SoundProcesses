@@ -3,11 +3,15 @@ package synth
 package proc
 
 import de.sciss.synth.expr.{Longs, ExprImplicits, Ints}
+import lucre.{event => evt}
+import de.sciss.span.Span
 
-class ThesisExamples[S <: Sys[S]] {
+object ThesisExamples extends App {
+  playScans()
+
   import ugen._
 
-  val sg = SynthGraph {
+  def sg = SynthGraph {
     val sig   = PinkNoise.ar
     val bus   = graph.attribute(ProcKeys.attrBus ).ir(0)
     val mute  = graph.attribute(ProcKeys.attrMute).ir(0)
@@ -16,10 +20,10 @@ class ThesisExamples[S <: Sys[S]] {
     Out.ar(bus, sig * amp)
   }
 
-  val imp = ExprImplicits[S]
-  import imp._
+  def configure[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx) {
+    val imp = ExprImplicits[S]
+    import imp._
 
-  def configure(proc: Proc[S])(implicit tx: S#Tx) {
     val bus       = Ints .newVar[S](    0)
     val fadeInLen = Longs.newVar[S](44100)
     val fadeIn    = FadeSpec.Elem(fadeInLen, Curve.sine, 0.0)
@@ -30,5 +34,65 @@ class ThesisExamples[S <: Sys[S]] {
 
     bus()       = 1       // adjust bus
     fadeInLen() = 22050   // adjust fade-in duration
+  }
+
+  import ugen._
+
+  def scans[S <: Sys[S]]()(implicit tx: S#Tx): (Proc[S], Proc[S]) = {
+    val imp = ExprImplicits[S]
+    import imp._
+
+    val gMute     = Grapheme.Modifiable[S]
+    gMute.add(    0L -> Grapheme.Value.Curve(0.0 -> Curve.step))
+    gMute.add(22050L -> Grapheme.Value.Curve(1.0 -> Curve.step))
+    gMute.add(44100L -> Grapheme.Value.Curve(0.0 -> Curve.step))
+
+    val p1        = Proc[S]
+    val p2        = Proc[S]
+
+    val sMute     = p1.scans.add("mute")
+    sMute.source  = Some(Scan.Link.Grapheme(gMute))
+    val sOut      = p1.scans.add("out")
+    val sIn       = p2.scans.add("in")
+    sOut addSink sIn
+
+    p1.graph() = SynthGraph {
+      val mute           = graph.scan("mute").ar
+      graph.scan("out") := PinkNoise.ar * (1 - mute)
+    }
+
+    p2.graph() = SynthGraph {
+      val sig = graph.scan("in").ar
+      Out.ar(0, Pan2.ar(sig, LFSaw.ar(1)))
+    }
+
+    (p1, p2)
+  }
+
+  def playScans() {
+    type S            = InMemory
+    implicit val sys  = InMemory()
+
+    val imp = ExprImplicits[S]
+    import imp._
+
+    val transp = sys.step { implicit tx =>
+      val (p1, p2)  = scans[S]()
+      val span      = Span(0L, 66150L)
+      val group     = ProcGroup.Modifiable[S]
+      group.add(span, p1)
+      group.add(span, p2)
+
+      Transport[S, S](group)
+    }
+
+    val aural = AuralSystem.start()
+    AuralPresentation.run(transp, aural)
+
+    aural.whenStarted { _ =>
+      sys.step { implicit tx =>
+        transp.play()
+      }
+    }
   }
 }

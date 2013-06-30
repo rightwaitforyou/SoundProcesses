@@ -109,7 +109,7 @@ object ScanImpl {
     extends Scan[S]
     with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
     with evti.Generator[S, Scan.Update[S], Scan[S]] {
-    override def toString = "Scan" + id
+    override def toString() = "Scan" + id
 
     def sinks(implicit tx: S#Tx ) : data.Iterator[ S#Tx, Link[ S ]] = sinkList.iterator
 
@@ -156,7 +156,7 @@ object ScanImpl {
       old match {
         case Some(Link.Scan(peer)) =>
           peer.removeSink(this)
-        case Some(Link.Grapheme(peer)) if (con) =>
+        case Some(Link.Grapheme(peer)) if con =>
           peer.changed -/-> this
         case _ =>
       }

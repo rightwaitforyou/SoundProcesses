@@ -34,8 +34,8 @@ import de.sciss.serial.DataInput
 
 object Scan {
   object Link {
-    implicit def grapheme[S <: evt.Sys[S]](link: proc.Grapheme[S]): Grapheme[S] = Grapheme(link)
-    implicit def scan    [S <: evt.Sys[S]](link: proc.Scan    [S]): Scan    [S] = Scan    (link)
+    implicit def grapheme[S <: evt.Sys[S]](peer: proc.Grapheme[S]): Grapheme[S] = Grapheme(peer)
+    implicit def scan    [S <: evt.Sys[S]](peer: proc.Scan    [S]): Scan    [S] = Scan    (peer)
 
     final case class Grapheme[S <: evt.Sys[S]](peer: proc.Grapheme[S]) extends Link[S] {
       def id = peer.id
