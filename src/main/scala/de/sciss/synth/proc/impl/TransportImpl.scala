@@ -79,7 +79,7 @@ object TransportImpl {
     implicit val infoSer    = dummySerializer[Info, I]
     val infoVar             = itx.newVar(iid, Info.init) // ( dummySerializer )
     val gMap                = tx.newInMemoryIDMap[(S#ID, Map[String, DefSeg])] // (1)
-    implicit val skipSer    = dummySerializer[Map[S#ID, Map[String, DefSeg]], I]
+    implicit val skipSer    = dummySerializer[Map [S#ID, Map[String, DefSeg]], I]
     val gPrio               = SkipList.Map.empty[I, Long, Map[S#ID, Map[String, DefSeg]]] // (2)
     val timedMap            = tx.newInMemoryIDMap[TimedProc[S]] // (3)
     implicit val obsSer     = dummySerializer[IIdxSeq[Observation[S, I]], I]
@@ -302,22 +302,18 @@ object TransportImpl {
     // the three structures maintained for the update algorithm
     // (1) for each observed timed proc, store information about all scans whose source is a grapheme.
     //     an observed proc is one whose time span overlaps the current span in the transport info.
-    //     the value found in the map is a tuple. the tuple's first element is the _stale_ ID which
+    //     the value found in the map is a tuple. the tuple's first element is the _stale_ (timed-proc) ID which
     //     corresponds to the ID when the underlying grapheme value was stored in structure (2), thereby
-    //     allowing to find that value in (2). the tuple's second element is a map from the scan keys
+    //     allowing to find that value in (2) with a normal map. the tuple's second element is a map from the scan keys
     //     to a grapheme segment. the segment span's start time value is the value at
     //     which the grapheme value was stored in (2)
     // (2) a skiplist is used as priority queue for the next interesting point in time at which the
     //     transport needs to emit an advancement message. the value is a map from stale timed-proc ID's
     //     to a map from scan keys to grapheme values, i.e. for scans whose source is a grapheme.
     // (3) a refreshment map for the timed procs
-    protected def gMap: IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSeg])]
-
-    // (1)
-    protected def gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]]
-
-    // (2)
-    protected def timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]] // (3)
+    protected def gMap    : IdentifierMap[S#ID, S#Tx,    (S#ID, Map[String, DefSeg])]  // (1)
+    protected def gPrio   : SkipList.Map [I, Long   , Map[S#ID, Map[String, DefSeg]]]  // (2)
+    protected def timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]]                    // (3)
 
     protected def groupHandle: stm.Source[S#Tx, ProcGroup[S]]
 
@@ -413,7 +409,7 @@ object TransportImpl {
         case _                  => false
       }
 
-      val perceived = (oldSpan.contains(newFrame) || newSpan.contains(newFrame)) // (1)
+      val perceived = oldSpan.contains(newFrame) || newSpan.contains(newFrame) // (1)
       val needsNewProcTime = perceived || // (2)
           calcNeedsNewProcTime(oldSpan) || calcNeedsNewProcTime(newSpan)
 

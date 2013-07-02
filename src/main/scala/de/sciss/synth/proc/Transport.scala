@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.{bitemp, stm, data, event => evt}
-import bitemp.{BiGroup, Chronos}
+import bitemp.BiGroup
 import stm.{Disposable, Cursor}
 import collection.immutable.{IndexedSeq => IIdxSeq}
 import data.Iterator
@@ -111,13 +111,14 @@ object Transport {
   }
 }
 
-trait Transport[S <: evt.Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ S ] */ with Chronos[S] {
+trait Transport[S <: evt.Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ S ] */ /* with Chronos[S] */ {
   //   def id: S#ID
 
   def play()(implicit tx: S#Tx): Unit
   def stop()(implicit tx: S#Tx): Unit
 
   def seek(time: Long)(implicit tx: S#Tx): Unit
+  def time(implicit tx: S#Tx): Long
 
   //   def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
   //   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
