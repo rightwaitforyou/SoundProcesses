@@ -10,7 +10,7 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion := "2.10.1"
+scalaVersion := "2.10.2"
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 

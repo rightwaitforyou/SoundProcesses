@@ -3,7 +3,7 @@ package proc
 
 import de.sciss.lucre.{stm, bitemp, expr, event => evt}
 import stm.Cursor
-import bitemp.{BiExpr, BiType, BiGroup, Chronos}
+import bitemp.{BiExpr, BiType, BiGroup}
 import expr.Expr
 import java.awt.EventQueue
 import de.sciss.synth.io.AudioFile
@@ -121,7 +121,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
   def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) = Grapheme.Elem.Curve(amp -> shape)
 
   def proc(name: String)(implicit tx: S#Tx): Proc[S] = {
-    implicit val chr: Chronos[S] = Chronos(0L)
+    // implicit val chr: Chronos[S] = Chronos(0L)
     val p = Proc[S]
     // p.name_=( name )
     p.graph() = SynthGraph {

@@ -26,7 +26,6 @@
 package de.sciss.synth.proc
 
 import impl.{AuralSystemImpl => Impl}
-import de.sciss.lucre.stm
 
 object AuralSystem {
   def apply(): AuralSystem = Impl()

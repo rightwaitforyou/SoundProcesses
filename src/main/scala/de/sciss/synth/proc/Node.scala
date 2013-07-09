@@ -27,7 +27,7 @@ package de.sciss.synth.proc
 
 import de.sciss.synth.{Node => SNode, ControlSetMap, ControlABusMap, ControlKBusMap}
 
-trait Node extends Resource {
+trait   Node extends Resource {
   // ---- abstract ----
   def peer: SNode
 
