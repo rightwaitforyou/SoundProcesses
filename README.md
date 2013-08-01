@@ -16,7 +16,7 @@ The following dependency is necessary:
     
     "de.sciss" %% "soundprocesses" % v
 
-The current version `v` is `"1.8.+"`.
+The current version `v` is `"1.9.+"`.
 
 ## REPL example
 

@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.8.1-SNAPSHOT"
+version := "1.9.0-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -19,7 +19,7 @@ libraryDependencies ++= {
   val eventVersion     = "2.3.+"
   val stmVersion       = "2.0.+"
   Seq(
-    "de.sciss" %% "scalacollider"   % "1.8.+",
+    "de.sciss" %% "scalacollider"   % "1.9.+",
     "de.sciss" %  "prefuse-core"    % "0.21",
     "de.sciss" %% "lucreconfluent"  % confluentVersion,
     "de.sciss" %% "lucreevent-expr" % eventVersion,
