@@ -62,26 +62,32 @@ object Scan {
   implicit def serializer[ S <: evt.Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
 
   /** A scan's event fires updates of this type. */
-  sealed trait Update    [S <: evt.Sys[S]]                   { def scan: Scan[S] }
-  sealed trait SinkUpdate[S <: evt.Sys[S]] extends Update[S] { def sink: Link[S] }
+  sealed trait Update      [S <: evt.Sys[S]]                        { def scan  : Scan[S] }
+  sealed trait LinkUpdate  [S <: evt.Sys[S]] extends Update[S]      { def link  : Link[S] }
+  sealed trait SinkUpdate  [S <: evt.Sys[S]] extends LinkUpdate[S]  { def sink  : Link[S] }
+  sealed trait SourceUpdate[S <: evt.Sys[S]] extends LinkUpdate[S]  { def source: Link[S] }
 
   final case class SinkAdded[S <: evt.Sys[S]](scan: Scan[S], sink: Link[S]) extends SinkUpdate[S] {
     override def toString = s"[$scan ---> $sink]"
+    def link = sink
   }
 
   final case class SinkRemoved[S <: evt.Sys[S]](scan: Scan[S], sink: Link[S]) extends SinkUpdate[S] {
     override def toString = s"[$scan -/-> $sink]"
+    def link = sink
   }
 
-  final case class SourceAdded[S <: evt.Sys[S]](scan: Scan[S], source: Option[Link[S]]) extends Update[S] {
+  final case class SourceAdded[S <: evt.Sys[S]](scan: Scan[S], source: Link[S]) extends SourceUpdate[S] {
     override def toString = s"[$scan <--- $source]"
+    def link = source
   }
 
-  final case class SourceRemoved[S <: evt.Sys[S]](scan: Scan[S], source: Option[Link[S]]) extends Update[S] {
+  final case class SourceRemoved[S <: evt.Sys[S]](scan: Scan[S], source: Link[S]) extends SourceUpdate[S] {
     override def toString = s"[$scan <-/- $source]"
+    def link = source
   }
 
-  final case class SourceUpdate[S <: evt.Sys[S]](scan: Scan[S], source: Grapheme.Update[S]) extends Update[S]
+  final case class SourceChange[S <: evt.Sys[S]](scan: Scan[S], source: Grapheme.Update[S]) extends Update[S]
 }
 
 /**
