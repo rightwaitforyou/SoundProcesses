@@ -898,7 +898,7 @@ object TransportImpl {
       p.scans.iterator.foreach {
         case (key, scan) =>
           scan.source match {
-            case Some(link @ Scan.Link.Grapheme(peer)) =>
+            case Some(/* link @ */ Scan.Link.Grapheme(peer)) =>
               peer.nearestEventAfter(newFrameP).foreach { ceilTime =>
                 peer.segment(ceilTime).foreach { ceilSeg =>
                   scanMap += key -> ceilSeg
