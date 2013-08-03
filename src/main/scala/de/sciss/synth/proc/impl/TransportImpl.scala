@@ -46,6 +46,8 @@ object TransportImpl {
   import Segment.{Defined => DefSeg}
   import Transport.Proc.{GraphemesChanged, Changed => ProcChanged}
 
+  private type DefSegs = Vec[DefSeg]
+
   def apply[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double)(
     implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): ProcTransport[S] = {
 
@@ -69,8 +71,8 @@ object TransportImpl {
                                                    (implicit tx: S#Tx, bridge: S#Tx => I#Tx):
   (stm.Source[S#Tx, ProcGroup[S]],
     I#Var[Info],
-    IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSeg])],
-    SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
+    IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSegs])],
+    SkipList.Map[I, Long, Map[S#ID, Map[String, DefSegs]]],
     IdentifierMap[S#ID, S#Tx, TimedProc[S]],
     I#Var[Vec[Observation[S, I]]]) = {
 
@@ -78,9 +80,9 @@ object TransportImpl {
     val iid                 = itx.newID()
     implicit val infoSer    = dummySerializer[Info, I]
     val infoVar             = itx.newVar(iid, Info.init) // ( dummySerializer )
-    val gMap                = tx.newInMemoryIDMap[(S#ID, Map[String, DefSeg])] // (1)
-    implicit val skipSer    = dummySerializer[Map [S#ID, Map[String, DefSeg]], I]
-    val gPrio               = SkipList.Map.empty[I, Long, Map[S#ID, Map[String, DefSeg]]] // (2)
+    val gMap                = tx.newInMemoryIDMap[(S#ID, Map[String, DefSegs])] // (1)
+    implicit val skipSer    = dummySerializer[Map [S#ID, Map[String, DefSegs]], I]
+    val gPrio               = SkipList.Map.empty[I, Long, Map[S#ID, Map[String, DefSegs]]] // (2)
     val timedMap            = tx.newInMemoryIDMap[TimedProc[S]] // (3)
     implicit val obsSer     = dummySerializer[Vec[Observation[S, I]], I]
     val obsVar              = itx.newVar(iid, Vec.empty[Observation[S, I]])
@@ -163,10 +165,8 @@ object TransportImpl {
   private case object Playing extends State
 
   private def flatSpans[S <: Sys[S]](in: (SpanLike, Vec[TimedProc[S]])): Vec[(SpanLike, TimedProc[S])] = {
-    val span = in._1
-    in._2.map {
-      span -> _
-    }
+    val (span, procs) = in
+    procs.map(span -> _)
   }
 
   //   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, Vec[ TimedProc[ S ]])) : Vec[ TimedProc[ S ]] = in._2
@@ -200,15 +200,17 @@ object TransportImpl {
   private final class OfflineStep(val logicalNow: Long, val logicalDelay: Long, val schedValid: Int)
   private final val offlineEmptyStep = new OfflineStep(0L, 0L, -1)
 
-  private final class Offline[S <: Sys[S], I <: stm.Sys[I]](protected val groupHandle: stm.Source[S#Tx, ProcGroup[S]],
-                                                            val sampleRate: Double,
-                                                            protected val infoVar: I#Var[Info],
-                                                            protected val gMap: IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSeg])],
-                                                            protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
-                                                            protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-                                                            protected val obsVar: I#Var[Vec[Observation[S, I]]])
-                                                           (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
+  private final class Offline[S <: Sys[S], I <: stm.Sys[I]](
+          protected val groupHandle: stm.Source[S#Tx, ProcGroup[S]],
+          val sampleRate: Double,
+          protected val infoVar: I#Var[Info],
+          protected val gMap: IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSegs])],
+          protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSegs]]],
+          protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
+          protected val obsVar: I#Var[Vec[Observation[S, I]]])
+         (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] with Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] {
+
     private val submitRef = Ref(offlineEmptyStep)
     private val timeRef   = Ref(0L)
 
@@ -255,21 +257,22 @@ object TransportImpl {
 
   // system wide wall clock in microseconds
 
-  private final class Realtime[S <: Sys[S], I <: stm.Sys[I]](protected val groupHandle: stm.Source[S#Tx, ProcGroup[S]],
-                                                             val sampleRate: Double,
-                                                             protected val infoVar: I#Var[Info],
-                                                             protected val gMap: IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSeg])],
-                                                             protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
-                                                             protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-                                                             protected val obsVar: I#Var[Vec[Observation[S, I]]])
-                                                            (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
+  private final class Realtime[S <: Sys[S], I <: stm.Sys[I]](
+        protected val groupHandle: stm.Source[S#Tx, ProcGroup[S]],
+        val sampleRate: Double,
+        protected val infoVar: I#Var[Info],
+        protected val gMap: IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSegs])],
+        protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSegs]]],
+        protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
+        protected val obsVar: I#Var[Vec[Observation[S, I]]])
+       (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] {
 
     protected def logicalTime             ()(implicit tx: S#Tx): Long = rt_cpuTime.get       (tx.peer)
     protected def logicalTime_=(value: Long)(implicit tx: S#Tx): Unit = rt_cpuTime.set(value)(tx.peer)
 
     protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit = {
-      val jitter = sysMicros() - logicalNow
+      val jitter      = sysMicros() - logicalNow
       val actualDelay = math.max(0L, logicalDelay - jitter)
       log("scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay)
       Txn.afterCommit(_ => {
@@ -294,20 +297,21 @@ object TransportImpl {
     private final val microsPerSample = 1000000 / sampleRate
 
     // the three structures maintained for the update algorithm
-    // (1) for each observed timed proc, store information about all scans whose source is a grapheme.
+    // (1) for each observed timed proc, store information about all scans whose sources contain graphemes.
     //     an observed proc is one whose time span overlaps the current span in the transport info.
     //     the value found in the map is a tuple. the tuple's first element is the _stale_ (timed-proc) ID which
-    //     corresponds to the ID when the underlying grapheme value was stored in structure (2), thereby
-    //     allowing to find that value in (2) with a normal map. the tuple's second element is a map from the scan keys
-    //     to a grapheme segment. the segment span's start time value is the value at
+    //     corresponds to the observed timed proc's ID in the transaction in which the underlying grapheme value
+    //     was stored in structure (2), thereby allowing to find that value in (2) with a normal map.
+    //     the tuple's second element is a map from the scan keys
+    //     to a grapheme segment. the segment span's start time value is the value (transport time) at
     //     which the grapheme value was stored in (2)
     // (2) a skiplist is used as priority queue for the next interesting point in time at which the
     //     transport needs to emit an advancement message. the value is a map from stale timed-proc ID's
     //     to a map from scan keys to grapheme values, i.e. for scans whose source is a grapheme.
     // (3) a refreshment map for the timed procs
-    protected def gMap    : IdentifierMap[S#ID, S#Tx,    (S#ID, Map[String, DefSeg])]  // (1)
-    protected def gPrio   : SkipList.Map [I, Long   , Map[S#ID, Map[String, DefSeg]]]  // (2)
-    protected def timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]]                    // (3)
+    protected def gMap    : IdentifierMap[S#ID, S#Tx,    (S#ID, Map[String, DefSegs])]  // (1)
+    protected def gPrio   : SkipList.Map [I, Long   , Map[S#ID, Map[String, DefSegs]]]  // (2)
+    protected def timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]]                     // (3)
 
     protected def groupHandle: stm.Source[S#Tx, ProcGroup[S]]
 
@@ -336,25 +340,23 @@ object TransportImpl {
       }
     }
 
-    /**
-     * Invoked to submit a schedule step either to a realtime scheduler or other mechanism.
-     * When the step is performed, execution should be handed over to `eventReached`, passing
-     * over the same three arguments.
-     *
-     * @param logicalNow       the logical now time at the time the event was scheduled
-     * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
-     *                         (the event `happens` at `logicalNow + logicalDelay`)
-     * @param schedValid       the valid counter at the time of scheduling
-     */
+    /** Invoked to submit a schedule step either to a realtime scheduler or other mechanism.
+      * When the step is performed, execution should be handed over to `eventReached`, passing
+      * over the same three arguments.
+      *
+      * @param logicalNow       the logical now time at the time the event was scheduled
+      * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
+      *                         (the event `happens` at `logicalNow + logicalDelay`)
+      * @param schedValid       the valid counter at the time of scheduling
+      */
     protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit
 
-    /**
-     * Invoked from the `submit` body after the scheduled event is reached.
-     *
-     * @param logicalNow       the logical now time at the time the event was scheduled
-     * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
-     * @param expectedValid    the valid counter at the time of scheduling
-     */
+    /** Invoked from the `submit` body after the scheduled event is reached.
+      *
+      * @param logicalNow       the logical now time at the time the event was scheduled
+      * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
+      * @param expectedValid    the valid counter at the time of scheduling
+      */
     final protected def eventReached(logicalNow: Long, logicalDelay: Long, expectedValid: Int)(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val info = infoVar()
@@ -392,7 +394,7 @@ object TransportImpl {
 
     // returns: `true` if the changes are perceived (updates should be fired), else `false`
     private def u_addRemoveProcs(state: GroupUpdateState, doFire: Boolean, oldSpan: SpanLike, newSpan: SpanLike,
-                                 procAdded: Option[TimedProc[S]],
+                                 procAdded  : Option[TimedProc[S]],
                                  procRemoved: Option[TimedProc[S]])(implicit tx: S#Tx): Unit = {
 
       val oldInfo   = state.info
@@ -485,25 +487,13 @@ object TransportImpl {
 
     // adds the structure for a newly added scan
     // NOT: also adds the current grapheme segment if applicable
-    private def u_addScan(state: GroupUpdateState, timed: TimedProc[S], key: String, sourceOpt: Option[Scan.Link[S]])
+    private def u_addScan(state: GroupUpdateState, timed: TimedProc[S], key: String,
+                          sources: data.Iterator[S#Tx, Scan.Link[S]])
                          (implicit tx: S#Tx): Unit = {
       sourceOpt match {
         case Some(Scan.Link.Grapheme(peer)) =>
-          //               implicit val itx: I#Tx  = tx
           val newFrame = state.info.frame
-          //               val ceilTime            = peer.segment( newFrame ) match {
-          //                  case Some( segm ) =>
-          //// do _not_ add the segment
-          ////                     u_addSegment( state, timed, key, segm )
-          //                     segm.span match {
-          //                        case hs: Span.HasStop   => hs.stop
-          //                        case _                  => Long.MaxValue
-          //                     }
-          //                  case _ => peer.nearestEventAfter( newFrame + 1 ).getOrElse( Long.MaxValue )
-          //               }
-
           peer.nearestEventAfter(newFrame + 1).foreach { ceilTime =>
-            //               if( ceilTime != Long.MaxValue ) {
             peer.segment(ceilTime).foreach { ceilSegm =>
               assert(ceilSegm.span.start == ceilTime && ceilTime > newFrame)
               u_addScan2(state, timed, key, ceilSegm)
@@ -514,17 +504,17 @@ object TransportImpl {
       }
     }
 
-    // store a new scan connected to grapheme source in the stucture,
-    // given an already calculated segment
-    private def u_addScan2(state: GroupUpdateState, timed: TimedProc[S], key: String, segm: DefSeg)
+    // store a new scan connected to grapheme sources in the stucture,
+    // given the already calculated segments
+    private def u_addScan2(state: GroupUpdateState, timed: TimedProc[S], key: String, segms: DefSegs)
                           (implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx  = tx
       val id                  = timed.id
-      val (staleID, keyMap1)  = gMap.get(id).getOrElse(id -> Map.empty[String, DefSeg])
-      val entry               = key -> segm
+      val (staleID, keyMap1)  = gMap.get(id).getOrElse(id -> Map.empty[String, DefSegs])
+      val entry               = key -> segms
       val newKeyMap1          = keyMap1 + entry
       gMap.put(id, staleID -> newKeyMap1)
-      val time                = segm.span.start
+      val time                = segms.map(_.span.start).min
       val skipMap             = gPrio.get(time).getOrElse(Map.empty)
       val keyMap2             = skipMap.getOrElse(staleID, Map.empty)
       val newKeyMap2          = keyMap2 + entry
@@ -542,7 +532,7 @@ object TransportImpl {
       val id = timed.id
       gMap.get(id).foreach {
         case (staleID, keyMap1) =>
-          keyMap1.get(key).foreach { segm =>
+          keyMap1.get(key).foreach { segms =>
             implicit val itx: I#Tx = tx
             val newKeyMap1 = keyMap1 - key
             if (newKeyMap1.isEmpty) {
@@ -550,7 +540,7 @@ object TransportImpl {
             } else {
               gMap.put(id, staleID -> newKeyMap1)
             }
-            val time = segm.span.start
+            val time = segms.map(_.span.start).min
             gPrio.get(time).foreach { skipMap =>
               skipMap.get(staleID).foreach { keyMap2 =>
                 val newKeyMap2 = keyMap2 - key
@@ -586,7 +576,7 @@ object TransportImpl {
       change match {
         case Proc.AssociationAdded(Proc.ScanKey(key)) =>
           p.scans.get(key).foreach {
-            scan => u_addScan(state, timed, key, scan.source)
+            scan => u_addScan(state, timed, key, scan.sources)
           }
         case Proc.AssociationRemoved(Proc.ScanKey(key)) =>
           u_removeScan(timed, key)
@@ -609,7 +599,7 @@ object TransportImpl {
             var newSegm: Segment = dummySegment
             // determine closest new segment (`newSegm`) and add all relevant segments to update list
             graphUpd.changes.foreach { segm =>
-              val span = segm.span
+              val span  = segm.span
               val start = span.start
               if (segm.isDefined && start < newSegm.span.start && start > newFrame) {
                 newSegm = segm
@@ -920,16 +910,15 @@ object TransportImpl {
       timedMap.put(id, timed) // in (3)
     }
 
-    /**
-     * The core method: based on the previous info and the reached target frame, update the structures
-     * accordingly (invalidate obsolete information, gather new information regarding the next
-     * advancement), assemble and fire the corresponding events, and update the info to be ready for
-     * a subsequent call to `scheduleNext`.
-     *
-     * @param isSeek     whether the advancement is due to a hard seek (`true`) or a regular passing of time (`false`).
-     *                   the information is carried in the fired event.
-     * @param newFrame   the frame which has been reached
-     */
+    /** The core method: based on the previous info and the reached target frame, update the structures
+      * accordingly (invalidate obsolete information, gather new information regarding the next
+      * advancement), assemble and fire the corresponding events, and update the info to be ready for
+      * a subsequent call to `scheduleNext`.
+      *
+      * @param isSeek     whether the advancement is due to a hard seek (`true`) or a regular passing of time (`false`).
+      *                   the information is carried in the fired event.
+      * @param newFrame   the frame which has been reached
+      */
     private def advance(newFrame: Long, isSeek: Boolean = false, startPlay: Boolean = false)(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val oldInfo           = infoVar()
@@ -1034,8 +1023,8 @@ object TransportImpl {
                     val time = segm.span.start
                     keyMap += key -> segm
                     val staleMap = gPrio.get(time).getOrElse(Map.empty)
-                    val keyMap2 = staleMap.get(staleID).getOrElse(Map.empty) + (key -> segm)
-                    val newMap = staleMap + (staleID -> keyMap2)
+                    val keyMap2  = staleMap.get(staleID).getOrElse(Map.empty) + (key -> segm)
+                    val newMap   = staleMap + (staleID -> keyMap2)
                     gPrio.add(time -> newMap)
 
                   case _ =>
