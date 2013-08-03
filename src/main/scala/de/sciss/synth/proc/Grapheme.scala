@@ -112,35 +112,6 @@ object Grapheme {
       }
     }
 
-    //      /**
-    //       * A mono- or polyphonic envelope segment
-    //       *
-    //       * @param span    the span value covered by this segment
-    //       * @param values  a sequence of tuples, each consisting of the value at start of the segment,
-    //       *                the target value of the segment, and the shape of the segment
-    //       */
-    //      final case class Segment( span: Span.HasStart, values: (Double, Double, Env.ConstShape)* ) extends Value {
-    //         def numChannels = values.size
-    //
-    //         def from( start: Long ) : Segment = {
-    //            val newSpan = span.intersect( Span.from( start )).nonEmptyOption.getOrElse {
-    //               throw new IllegalArgumentException(
-    //                  "Segment.from - start position " + start + " lies outside of span " + span )
-    //            }
-    //            val newValues  = span match {
-    //               case Span( oldStart, oldStop) =>
-    //                  val pos = (start - oldStart).toDouble / (oldStop - oldStart)
-    //                  values.map { case (oldStartVal, stopVal, shape) =>
-    //                     val newStartVal = shape.levelAt( pos.toFloat, oldStartVal.toFloat, stopVal.toFloat).toDouble
-    //                     (newStartVal, stopVal, shape)
-    //                  }
-    //
-    //               case _ => values // either of start or stop is infinite, therefore interpolation does not make sense
-    //            }
-    //            Segment( newSpan, newValues: _* )
-    //         }
-    //      }
-
     object Audio {
       implicit object serializer extends ImmutableSerializer[Audio] {
         def write(v: Audio, out: DataOutput): Unit = v.write(out)
@@ -181,15 +152,12 @@ object Grapheme {
     }
   }
 
-  /**
-   * An evaluated and flattened scan element. This is either an immutable value such as a constant or
-   * envelope segment, or a real-time signal, coming either from the same process (`Source`) or being
-   * fed by another embedded process (`Sink`).
-   */
+  /** An evaluated and flattened scan element. This is either an immutable value such as a constant or
+    * envelope segment, or a real-time signal, coming either from the same process (`Source`) or being
+    * fed by another embedded process (`Sink`).
+    */
   sealed trait Value extends Writable {
     def numChannels: Int
-
-    // def span: Span.HasStart
   }
 
   object Segment {
@@ -458,9 +426,7 @@ object Grapheme {
     implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] =
       Impl.modifiableSerializer[S]
 
-    /**
-     * Extractor to check if a `Grapheme` is actually a `Grapheme.Modifiable`
-     */
+    /** Extractor to check if a `Grapheme` is actually a `Grapheme.Modifiable`. */
     def unapply[S <: evt.Sys[S]](g: Grapheme[S]): Option[Modifiable[S]] = {
       if (g.isInstanceOf[Modifiable[_]]) Some(g.asInstanceOf[Modifiable[S]]) else None
     }
@@ -471,12 +437,11 @@ object Grapheme {
 trait Grapheme[S <: evt.Sys[S]] extends evt.Node[S] {
   import Grapheme.{Value, Segment, Modifiable, TimedElem, Update}
 
-  /**
-   * The idea of all traits which distinguish between read-only and modifiable sub-type is that
-   * eventually the super-type acts somewhat like an expression. It might be possible to map
-   * a grapheme with operators, and it might be preferable to avoid having to have the modifiable
-   * operations in the mapped object (cf. `Expr` versus `Expr.Var`).
-   */
+  /** The idea of all traits which distinguish between read-only and modifiable sub-type is that
+    * eventually the super-type acts somewhat like an expression. It might be possible to map
+    * a grapheme with operators, and it might be preferable to avoid having to have the modifiable
+    * operations in the mapped object (cf. `Expr` versus `Expr.Var`).
+    */
   def modifiableOption: Option[Modifiable[S]]
 
   def at     (time: Long)(implicit tx: S#Tx): Option[TimedElem[S]]
