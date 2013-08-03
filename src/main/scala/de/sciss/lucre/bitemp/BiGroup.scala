@@ -29,7 +29,7 @@ package bitemp
 import de.sciss.lucre.{event => evt}
 import evt.{EventLike, Sys}
 import impl.{BiGroupImpl => Impl}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import expr.{Expr, Type}
 import data.Iterator
 import de.sciss.span.SpanLike
@@ -40,7 +40,7 @@ import de.sciss.lucre.stm.Identifiable
 object BiGroup {
   // ---- updates ----
 
-  final case class Update[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], changes: IIdxSeq[Change[S, Elem, U]])
+  final case class Update[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], changes: Vec[Change[S, Elem, U]])
 
   sealed trait Change[S <: Sys[S], Elem, +U]
 
@@ -67,7 +67,7 @@ object BiGroup {
 
   // ---- structural data ----
 
-  type Leaf[S <: Sys[S], Elem] = (SpanLike /* Span.HasStart */ , IIdxSeq[TimedElem[S, Elem]])
+  type Leaf[S <: Sys[S], Elem] = (SpanLike /* Span.HasStart */ , Vec[TimedElem[S, Elem]])
 
   object TimedElem {
     def apply[S <: Sys[S], Elem](id: S#ID, span: Expr[S, SpanLike], value: Elem): TimedElem[S, Elem] =

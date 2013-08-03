@@ -144,7 +144,7 @@ object ArtifactImpl {
     def changed: EventLike[S, Update[S], Location[S]] = this
 
     def directory(implicit tx: S#Tx): File = _directory()
-    def directory_=(value: File)(implicit tx: S#Tx) {
+    def directory_=(value: File)(implicit tx: S#Tx): Unit = {
       val change = evt.Change(_directory(), value)
       if (change.isSignificant) {
         _directory() = value
@@ -154,7 +154,7 @@ object ArtifactImpl {
 
     // def createFile(): File = File.createTempFile("artifact", ".bin", directory())
 
-    def remove(artifact: Artifact[S])(implicit tx: S#Tx) {
+    def remove(artifact: Artifact[S])(implicit tx: S#Tx): Unit = {
       val idx = artifacts.indexOf(artifact)
       if (!artifacts.remove(artifact)) throw new NoSuchElementException(s"Artifact $artifact was not found in the store")
       fire(Location.Removed(loc, idx, artifact))
@@ -170,13 +170,13 @@ object ArtifactImpl {
       artifact
     }
 
-    protected def writeData(out: DataOutput) {
+    protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
       _directory.write(out)
       artifacts .write(out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx) {
+    protected def disposeData()(implicit tx: S#Tx): Unit = {
       _directory.dispose()
       artifacts .dispose()
     }
@@ -229,12 +229,12 @@ object ArtifactImpl {
       new File(base, child)
     }
 
-    protected def disposeData()(implicit tx: S#Tx) {
+    protected def disposeData()(implicit tx: S#Tx): Unit = {
       // location.dispose()
       _child.dispose()
     }
 
-    protected def writeData(out: DataOutput) {
+    protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
       location.write(out)
       _child  .write(out)

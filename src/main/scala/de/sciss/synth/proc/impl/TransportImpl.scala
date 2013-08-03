@@ -33,7 +33,7 @@ import evt.Sys
 import bitemp.BiGroup
 import data.SkipList
 import collection.breakOut
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import concurrent.stm.{Ref, Txn, TxnLocal}
 import java.util.concurrent.TimeUnit
 import java.text.SimpleDateFormat
@@ -72,7 +72,7 @@ object TransportImpl {
     IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSeg])],
     SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
     IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-    I#Var[IIdxSeq[Observation[S, I]]]) = {
+    I#Var[Vec[Observation[S, I]]]) = {
 
     implicit val itx: I#Tx  = tx
     val iid                 = itx.newID()
@@ -82,8 +82,8 @@ object TransportImpl {
     implicit val skipSer    = dummySerializer[Map [S#ID, Map[String, DefSeg]], I]
     val gPrio               = SkipList.Map.empty[I, Long, Map[S#ID, Map[String, DefSeg]]] // (2)
     val timedMap            = tx.newInMemoryIDMap[TimedProc[S]] // (3)
-    implicit val obsSer     = dummySerializer[IIdxSeq[Observation[S, I]], I]
-    val obsVar              = itx.newVar(iid, IIdxSeq.empty[Observation[S, I]])
+    implicit val obsSer     = dummySerializer[Vec[Observation[S, I]], I]
+    val obsVar              = itx.newVar(iid, Vec.empty[Observation[S, I]])
     val groupH              = tx.newHandle(group)(ProcGroup.serializer)
 
     (groupH, infoVar, gMap, gPrio, timedMap, obsVar)
@@ -162,25 +162,25 @@ object TransportImpl {
   private case object Stopped extends State
   private case object Playing extends State
 
-  private def flatSpans[S <: Sys[S]](in: (SpanLike, IIdxSeq[TimedProc[S]])): IIdxSeq[(SpanLike, TimedProc[S])] = {
+  private def flatSpans[S <: Sys[S]](in: (SpanLike, Vec[TimedProc[S]])): Vec[(SpanLike, TimedProc[S])] = {
     val span = in._1
     in._2.map {
       span -> _
     }
   }
 
-  //   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, IIdxSeq[ TimedProc[ S ]])) : IIdxSeq[ TimedProc[ S ]] = in._2
+  //   private def flatSpans[ S <: Sys[ S ]]( in: (SpanLike, Vec[ TimedProc[ S ]])) : Vec[ TimedProc[ S ]] = in._2
 
-  //   private val anyEmptySeq = IIdxSeq.empty[ Nothing ]
-  //   @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ IIdxSeq[ A ]]
+  //   private val anyEmptySeq = Vec.empty[ Nothing ]
+  //   @inline private def emptySeq[ A ] = anyEmptySeq.asInstanceOf[ Vec[ A ]]
 
-  private val emptySeq = IIdxSeq.empty[Nothing]
+  private val emptySeq = Vec.empty[Nothing]
 
   private def dummySerializer[A, I <: stm.Sys[I]]: Serializer[I#Tx, I#Acc, A] =
     DummySerializer.asInstanceOf[Serializer[I#Tx, I#Acc, A]]
 
   private object DummySerializer extends Serializer[stm.InMemory#Tx, stm.InMemory#Acc, Nothing] {
-    def write(v: Nothing, out: DataOutput) {}
+    def write(v: Nothing, out: DataOutput) = ()
     def read(in: DataInput, access: stm.InMemory#Acc)(implicit tx: stm.InMemory#Tx): Nothing = sys.error("Operation not supported")
   }
 
@@ -191,9 +191,7 @@ object TransportImpl {
 
     override def toString = impl.toString + ".react@" + hashCode().toHexString
 
-    def dispose()(implicit tx: S#Tx) {
-      impl.removeObservation(this)
-    }
+    def dispose()(implicit tx: S#Tx): Unit = impl.removeObservation(this)
   }
 
   private final val dummySegment = Segment.Undefined(Span.from(Long.MaxValue))
@@ -208,23 +206,21 @@ object TransportImpl {
                                                             protected val gMap: IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSeg])],
                                                             protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
                                                             protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-                                                            protected val obsVar: I#Var[IIdxSeq[Observation[S, I]]])
+                                                            protected val obsVar: I#Var[Vec[Observation[S, I]]])
                                                            (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] with Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] {
     private val submitRef = Ref(offlineEmptyStep)
     private val timeRef   = Ref(0L)
 
-    protected def logicalTime()(implicit tx: S#Tx): Long = timeRef.get(tx.peer)
-    protected def logicalTime_=(value: Long)(implicit tx: S#Tx) {
-      timeRef.set(value)(tx.peer)
-    }
+    protected def logicalTime             ()(implicit tx: S#Tx): Long = timeRef.get       (tx.peer)
+    protected def logicalTime_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
 
-    protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx) {
+    protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit = {
       log("scheduled: logicalDelay = " + logicalDelay)
       submitRef.set(new OfflineStep(logicalNow, logicalDelay, schedValid))(tx.peer)
     }
 
-    def step()(implicit tx: S#Tx) {
+    def step()(implicit tx: S#Tx): Unit = {
       val subm = submitRef.swap(offlineEmptyStep)(tx.peer)
       import subm._
       if (schedValid >= 0) {
@@ -249,7 +245,7 @@ object TransportImpl {
       info.frame
     }
 
-    def elapse(seconds: Double)(implicit tx: S#Tx) {
+    def elapse(seconds: Double)(implicit tx: S#Tx): Unit = {
       val micros = (seconds * 1e6).toLong
       timeRef.transform(_ + micros)(tx.peer)
     }
@@ -265,23 +261,21 @@ object TransportImpl {
                                                              protected val gMap: IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSeg])],
                                                              protected val gPrio: SkipList.Map[I, Long, Map[S#ID, Map[String, DefSeg]]],
                                                              protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-                                                             protected val obsVar: I#Var[IIdxSeq[Observation[S, I]]])
+                                                             protected val obsVar: I#Var[Vec[Observation[S, I]]])
                                                             (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] {
 
-    protected def logicalTime()(implicit tx: S#Tx): Long = rt_cpuTime.get(tx.peer)
-    protected def logicalTime_=(value: Long)(implicit tx: S#Tx) {
-      rt_cpuTime.set(value)(tx.peer)
-    }
+    protected def logicalTime             ()(implicit tx: S#Tx): Long = rt_cpuTime.get       (tx.peer)
+    protected def logicalTime_=(value: Long)(implicit tx: S#Tx): Unit = rt_cpuTime.set(value)(tx.peer)
 
-    protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx) {
+    protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit = {
       val jitter = sysMicros() - logicalNow
       val actualDelay = math.max(0L, logicalDelay - jitter)
       log("scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay)
       Txn.afterCommit(_ => {
         // log("(after commit)")
         SoundProcesses.pool.schedule(new Runnable {
-          def run() {
+          def run(): Unit = {
             log("scheduled: execute")
             cursor.step { implicit tx =>
               eventReached(logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid)
@@ -319,7 +313,7 @@ object TransportImpl {
 
     protected def infoVar: I#Var[Info]
 
-    protected def obsVar: I#Var[IIdxSeq[Observation[S, I]]]
+    protected def obsVar: I#Var[Vec[Observation[S, I]]]
 
     protected implicit def trans: S#Tx => I#Tx
 
@@ -327,9 +321,9 @@ object TransportImpl {
 
     private final class GroupUpdateState(val g: ProcGroup[S], info0: Info) {
       var info: Info = info0
-      var procAdded:   IIdxSeq[TimedProc[S]] = emptySeq
-      var procRemoved: IIdxSeq[TimedProc[S]] = emptySeq
-      var procChanged: IIdxSeq[(TimedProc[S], Transport.Proc.Update[S])] = emptySeq
+      var procAdded:   Vec[TimedProc[S]] = emptySeq
+      var procRemoved: Vec[TimedProc[S]] = emptySeq
+      var procChanged: Vec[(TimedProc[S], Transport.Proc.Update[S])] = emptySeq
 
       def shouldFire: Boolean = procAdded.nonEmpty || procRemoved.nonEmpty || procChanged.nonEmpty
 
@@ -361,7 +355,7 @@ object TransportImpl {
      * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
      * @param expectedValid    the valid counter at the time of scheduling
      */
-    final protected def eventReached(logicalNow: Long, logicalDelay: Long, expectedValid: Int)(implicit tx: S#Tx) {
+    final protected def eventReached(logicalNow: Long, logicalDelay: Long, expectedValid: Int)(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val info = infoVar()
       if (info.valid != expectedValid) return // the scheduled task was invalidated by an intermediate stop or seek command
@@ -399,7 +393,7 @@ object TransportImpl {
     // returns: `true` if the changes are perceived (updates should be fired), else `false`
     private def u_addRemoveProcs(state: GroupUpdateState, doFire: Boolean, oldSpan: SpanLike, newSpan: SpanLike,
                                  procAdded: Option[TimedProc[S]],
-                                 procRemoved: Option[TimedProc[S]])(implicit tx: S#Tx) {
+                                 procRemoved: Option[TimedProc[S]])(implicit tx: S#Tx): Unit = {
 
       val oldInfo   = state.info
       val newFrame  = oldInfo.frame
@@ -443,7 +437,7 @@ object TransportImpl {
     }
 
     private def u_moveProc(state: GroupUpdateState, timed: TimedProc[S],
-                           oldSpan: SpanLike, newSpan: SpanLike)(implicit tx: S#Tx) {
+                           oldSpan: SpanLike, newSpan: SpanLike)(implicit tx: S#Tx): Unit = {
       // ... possible situations
       //     (1) old span contains current time frame `v`, but new span not --> treat as removal
       //     (2) old span does not contain `v`, but new span does --> treat as addition
@@ -466,7 +460,7 @@ object TransportImpl {
         procAdded = procAdded, procRemoved = procRemoved)
     }
 
-    final def init()(implicit tx: S#Tx) {
+    final def init()(implicit tx: S#Tx): Unit = {
       // we can use groupStale because init is called straight away after instantiating Impl
       groupObs = group.changed.react { implicit tx =>
         biGroupUpdate(_)(tx)
@@ -476,7 +470,7 @@ object TransportImpl {
 
     // adds a segment to the update to be fired (does not update the structure)
     private def u_addSegment(state: GroupUpdateState, timed: TimedProc[S], key: String, segm: Grapheme.Segment)
-                            (implicit tx: S#Tx) {
+                            (implicit tx: S#Tx): Unit = {
       val entry = key -> segm
       // try to re-use and update a previous grapheme changed message in the state
       state.procChanged.lastOption match {
@@ -492,7 +486,7 @@ object TransportImpl {
     // adds the structure for a newly added scan
     // NOT: also adds the current grapheme segment if applicable
     private def u_addScan(state: GroupUpdateState, timed: TimedProc[S], key: String, sourceOpt: Option[Scan.Link[S]])
-                         (implicit tx: S#Tx) {
+                         (implicit tx: S#Tx): Unit = {
       sourceOpt match {
         case Some(Scan.Link.Grapheme(peer)) =>
           //               implicit val itx: I#Tx  = tx
@@ -523,7 +517,7 @@ object TransportImpl {
     // store a new scan connected to grapheme source in the stucture,
     // given an already calculated segment
     private def u_addScan2(state: GroupUpdateState, timed: TimedProc[S], key: String, segm: DefSeg)
-                          (implicit tx: S#Tx) {
+                          (implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx  = tx
       val id                  = timed.id
       val (staleID, keyMap1)  = gMap.get(id).getOrElse(id -> Map.empty[String, DefSeg])
@@ -544,7 +538,7 @@ object TransportImpl {
       }
     }
 
-    private def u_removeScan(timed: TimedProc[S], key: String)(implicit tx: S#Tx) {
+    private def u_removeScan(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Unit = {
       val id = timed.id
       gMap.get(id).foreach {
         case (staleID, keyMap1) =>
@@ -580,7 +574,7 @@ object TransportImpl {
     }
 
     private def u_assocChange(state: GroupUpdateState, timed: TimedProc[S], change: Proc.AssociativeChange)
-                             (implicit tx: S#Tx) {
+                             (implicit tx: S#Tx): Unit = {
       //        AssociativeChange : we need to track the addition and removal of scans.
       //                            filter only those AssociativeKeys which are ScanKeys.
       //                            track appearance or disappearence of graphemes as sources
@@ -601,11 +595,11 @@ object TransportImpl {
     }
 
     private def u_scanSourceUpdate(state: GroupUpdateState, timed: TimedProc[S], key: String, scan: Scan[S],
-                                   graphUpd: Grapheme.Update[S])(implicit tx: S#Tx) {
+                                   graphUpd: Grapheme.Update[S])(implicit tx: S#Tx): Unit = {
       //        SourceUpdate (passing on changes in a grapheme source) :
       //          - grapheme changes must then be tracked, structures updated
 
-      // graphUpd.changes: IIdxSeq[ Segment ]
+      // graphUpd.changes: Vec[ Segment ]
 
       val id = timed.id
       gMap.get(id).foreach {
@@ -636,13 +630,13 @@ object TransportImpl {
     }
 
     private def u_scanSourceChange(state: GroupUpdateState, timed: TimedProc[S], key: String, scan: Scan[S],
-                                   sourceOpt: Option[Scan.Link[S]])(implicit tx: S#Tx) {
+                                   sourceOpt: Option[Scan.Link[S]])(implicit tx: S#Tx): Unit = {
       //        SourceChanged : if it means a grapheme is connected or disconnect, update structures
       u_removeScan(timed, key)
       u_addScan(state, timed, key, sourceOpt)
     }
 
-    private def biGroupUpdate(groupUpd: BiGroup.Update[S, Proc[S], Proc.Update[S]])(implicit tx: S#Tx) {
+    private def biGroupUpdate(groupUpd: BiGroup.Update[S, Proc[S], Proc.Update[S]])(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val state = {
         val info0     = infoVar()
@@ -664,7 +658,7 @@ object TransportImpl {
           u_addRemoveProcs(state, doFire = true, oldSpan = Span.Void, newSpan = span,
             procAdded = None, procRemoved = Some(timed))
 
-        // changes: IIdxSeq[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
+        // changes: Vec[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
         // ElementUpdate is either of Moved( change: evt.Change[ SpanLike ])
         //                         or Mutated[ U ]( change: U ) ; U = Proc.Update[ S ]
         // Mutated:
@@ -697,9 +691,9 @@ object TransportImpl {
         //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
 
         case BiGroup.ElementMutated(timed, procUpd) =>
-          def forward(u: Proc.Change[S]) {
+          def forward(u: Proc.Change[S]): Unit =
             state.procChanged :+= timed -> ProcChanged(u)
-          }
+
           if (gMap.contains(timed.id)) procUpd.changes.foreach {
             case assoc: Proc.AssociativeChange =>
               forward(assoc)
@@ -736,7 +730,7 @@ object TransportImpl {
       }
     }
 
-    final def dispose()(implicit tx: S#Tx) {
+    final def dispose()(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       groupObs.dispose()
       infoVar() = Info.init // if there is pending scheduled tasks, they should abort gracefully
@@ -770,9 +764,9 @@ object TransportImpl {
     }
 
     //      def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ] = playingVar.get
-    //      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) { playingVar.set( expr )}
+    //      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ): Unit = playingVar.set( expr )
 
-    final def play()(implicit tx: S#Tx) {
+    final def play()(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val oldInfo = infoVar()
       if (oldInfo.isRunning) return
@@ -782,7 +776,7 @@ object TransportImpl {
       scheduleNext(newInfo)
     }
 
-    final def stop()(implicit tx: S#Tx) {
+    final def stop()(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val oldInfo = infoVar()
       if (!oldInfo.isRunning) return
@@ -792,7 +786,7 @@ object TransportImpl {
       fire(Transport.Stop(impl, newInfo.frame))
     }
 
-    final def seek(time: Long)(implicit tx: S#Tx) {
+    final def seek(time: Long)(implicit tx: S#Tx): Unit = {
       advance(isSeek = true, newFrame = time)
     }
 
@@ -801,7 +795,7 @@ object TransportImpl {
       infoVar().isRunning
     }
 
-    private def scheduleNext(info: Info)(implicit tx: S#Tx) {
+    private def scheduleNext(info: Info)(implicit tx: S#Tx): Unit = {
       //         implicit val itx  = tx.inMemory
       //         val info          = infoVar.get
       val targetFrame = info.nextTime
@@ -817,13 +811,13 @@ object TransportImpl {
 
     final def group(implicit tx: S#Tx): ProcGroup[S] = groupHandle() // tx.refresh( csrPos, groupStale )
 
-    private def fire(update: Update[S])(implicit tx: S#Tx) {
+    private def fire(update: Update[S])(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val obs = obsVar()
       obs.foreach(_.fun(tx)(update))
     }
 
-    final def removeObservation(obs: Observation[S, I])(implicit tx: S#Tx) {
+    final def removeObservation(obs: Observation[S, I])(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       obsVar.transform(_.filterNot(_ == obs))
     }
@@ -876,7 +870,7 @@ object TransportImpl {
     //   will go into the advancement message
     // - retrieve the new nextGraphemeTime by looking at the head element in (2).
 
-    private def removeProc(timed: TimedProc[S])(implicit tx: S#Tx) {
+    private def removeProc(timed: TimedProc[S])(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val id        = timed.id
       timedMap.remove(id) // in (3)
@@ -894,7 +888,7 @@ object TransportImpl {
       }
     }
 
-    private def addProc(newFrame: Long, timed: TimedProc[S])(implicit tx: S#Tx) {
+    private def addProc(newFrame: Long, timed: TimedProc[S])(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val newFrameP   = newFrame + 1
       val id          = timed.id
@@ -936,7 +930,7 @@ object TransportImpl {
      *                   the information is carried in the fired event.
      * @param newFrame   the frame which has been reached
      */
-    private def advance(newFrame: Long, isSeek: Boolean = false, startPlay: Boolean = false)(implicit tx: S#Tx) {
+    private def advance(newFrame: Long, isSeek: Boolean = false, startPlay: Boolean = false)(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val oldInfo           = infoVar()
       val oldFrame          = oldInfo.frame
@@ -948,9 +942,9 @@ object TransportImpl {
       val needsNewProcTime  = newFrame < oldFrame || newFrame >= oldInfo.nextProcTime
       val newFrameP         = newFrame + 1
 
-      var procAdded:   IIdxSeq[TimedProc[S]] = emptySeq
-      var procRemoved: IIdxSeq[TimedProc[S]] = emptySeq
-      var procUpdated: IIdxSeq[(TimedProc[S], Transport.Proc.Update[S])] = emptySeq
+      var procAdded:   Vec[TimedProc[S]] = emptySeq
+      var procRemoved: Vec[TimedProc[S]] = emptySeq
+      var procUpdated: Vec[(TimedProc[S], Transport.Proc.Update[S])] = emptySeq
 
       // algorithm [A] or [B]
       if (needsNewProcTime) {
@@ -1004,7 +998,7 @@ object TransportImpl {
       // algorithm [C] or [D]
       if (needsNewGraphemeTime) {
         // [C]
-        val updMap: IIdxSeq[(TimedProc[S], Map[String, DefSeg])] = if (newFrame == oldInfo.nextGraphemeTime) {
+        val updMap: Vec[(TimedProc[S], Map[String, DefSeg])] = if (newFrame == oldInfo.nextGraphemeTime) {
           // we went exactly till a known event spot
 
           // - in (2) find and remove the map for the given time frame
@@ -1013,7 +1007,7 @@ object TransportImpl {
           // - and for each of these scans, look up the timed proc through (3) and gather the new next grapheme
           //   values, store (replace) them in (1) and (2), and calculate the new nextGraphemeTime.
 
-          val scanMap: IIdxSeq[(TimedProc[S], Map[String, DefSeg])] = gPrio.remove(newFrame) match {
+          val scanMap: Vec[(TimedProc[S], Map[String, DefSeg])] = gPrio.remove(newFrame) match {
             case Some(staleMap) => staleMap.flatMap({
               case (staleID, keyMap) => timedMap.get(staleID).map(_ -> keyMap)
               //                        case _ => None
@@ -1091,7 +1085,7 @@ object TransportImpl {
                     // store a new entry in the structure, and
                     // also make sure an update entry in scan map
                     // is produced (if it exists and is new)
-                    def addNewEntry(segm: DefSeg) {
+                    def addNewEntry(segm: DefSeg): Unit = {
                       keyMap         += key -> segm // (time -> value)
                       val time        = segm.span.start
                       val staleMap    = gPrio.get(time).getOrElse(Map.empty)
@@ -1121,7 +1115,7 @@ object TransportImpl {
                     // given that no potentially re-usable segment was found,
                     // find one for the new frame, and if one exists and is
                     // new (didn't overlap with the previous old frame), add it to the scan map
-                    def findAndAddToScanMap() {
+                    def findAndAddToScanMap(): Unit =
                       peer.segment(newFrame).foreach { nowSegm =>
                         // only add it if it did not cover the previous transport position
                         // (because if it did, it would not constitute a change)
@@ -1129,7 +1123,6 @@ object TransportImpl {
                           scanMap += key -> nowSegm
                         }
                       }
-                    }
 
                     keyMap.get(key) match {
                       // first case: there was an entry in the previous info

@@ -30,7 +30,7 @@ import concurrent.stm.{Ref, TMap, InTxn, TSet}
 import de.sciss.synth.{UGen, SynthGraph, UGenGraph, SynthDef => SSynthDef, message}
 import de.sciss.synth.ugen.{UGenOutProxy, ControlUGenOutProxy, Constant}
 import de.sciss.{synth, osc}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.{ExecutionContext, Promise, Future}
 
 object ProcWorld {
@@ -41,10 +41,10 @@ object ProcWorld {
 
   var DEBUG = false
 
-  def reduceFutures(futs: IIdxSeq[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
+  def reduceFutures(futs: Vec[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
     futs match {
-      case IIdxSeq()        => Future.successful()
-      case IIdxSeq(single)  => single
+      case Vec()        => Future.successful()
+      case Vec(single)  => single
       case more             => Future.reduce(futs)((_, _) => ())
     }
 }
@@ -65,7 +65,7 @@ final class ProcWorld(val server: Server) {
   // EEE
   //   def topology( implicit tx: Txn ) = topologyRef()
 
-  def addProc(p: AuralProc)(implicit tx: Txn) {
+  def addProc(p: AuralProc)(implicit tx: Txn): Unit = {
     // MMM
     //      touch()
 
@@ -80,7 +80,7 @@ final class ProcWorld(val server: Server) {
     //      })
   }
 
-  def removeProc(p: AuralProc)(implicit tx: Txn) {
+  def removeProc(p: AuralProc)(implicit tx: Txn): Unit = {
     // MMM
     //      touch()
 
@@ -96,27 +96,26 @@ final class ProcWorld(val server: Server) {
   }
 
   // EEE
-  //   def addEdge( e: ProcEdge )( implicit tx: Txn ) : Option[ (Topo, Proc, IIdxSeq[ Proc ])] = {
+  //   def addEdge( e: ProcEdge )( implicit tx: Txn ) : Option[ (Topo, Proc, Vec[ Proc ])] = {
   //      val res = topologyRef().addEdge( e )
   //      res.foreach( tup => topologyRef.set( tup._1 ))
   //      res
   //   }
   //
-  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ) {
+  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ): Unit =
   //      topologyRef.transform( _.removeEdge( e ))
-  //   }
 
   private val msgStampRef     = Ref(0)
 
   private[proc] def messageTimeStamp: Ref[Int] = msgStampRef
 
   private val sync            = new AnyRef
-  private var bundleWaiting   = Map.empty[Int, IIdxSeq[Scheduled]]
+  private var bundleWaiting   = Map.empty[Int, Vec[Scheduled]]
   private var bundleReplySeen = -1
 
   import server.executionContext
 
-  private final class Scheduled(val msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int,
+  private final class Scheduled(val msgs: Vec[osc.Message with message.Send], allSync: Boolean, cnt: Int,
                                 promise: Promise[Unit]) {
     def apply(): Future[Unit] = {
       val fut = sendNow(msgs, allSync, cnt)
@@ -127,7 +126,7 @@ final class ProcWorld(val server: Server) {
 
   private def sendAdvance(cnt: Int): Future[Unit] = {
     if (DEBUG) println("ADVANCE " + cnt)
-    val futs: IIdxSeq[Future[Unit]] = sync.synchronized {
+    val futs: Vec[Future[Unit]] = sync.synchronized {
       val i = bundleReplySeen + 1
       if (i <= cnt) {
         bundleReplySeen = cnt
@@ -144,12 +143,12 @@ final class ProcWorld(val server: Server) {
     reduceFutures(futs)
   }
 
-  private def sendNow(msgs: IIdxSeq[osc.Message with message.Send], allSync: Boolean, cnt: Int): Future[Unit] = {
+  private def sendNow(msgs: Vec[osc.Message with message.Send], allSync: Boolean, cnt: Int): Future[Unit] = {
     // val peer = server.peer
     if (DEBUG) println("SEND NOW " + msgs + " - allSync? " + allSync + "; cnt = " + cnt)
     if (allSync) {
       val p = msgs match {
-        case IIdxSeq(msg) if allSync  => msg
+        case Vec(msg) if allSync  => msg
         case _                        => osc.Bundle.now(msgs: _*)
       }
       server ! p
@@ -239,14 +238,14 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
     res
   }
 
-  def addServer(server: Server)(implicit tx: Txn) {
+  def addServer(server: Server)(implicit tx: Txn): Unit = {
     implicit val itx = tx.peer
     if (servers.contains(server)) return
     servers += server
     worlds  += server -> new ProcWorld(server)
   }
 
-  def removeServer(server: Server)(implicit tx: Txn) {
+  def removeServer(server: Server)(implicit tx: Txn): Unit = {
     implicit val itx = tx.peer
     servers -= server
     worlds -= server
@@ -264,7 +263,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
   //   protected def emptyUpdate = ProcDemiurgUpdate( Set.empty, Set.empty )
 
   // FFF
-  //   def addFactory( pf: ProcFactory )( implicit tx: Txn ) {
+  //   def addFactory( pf: ProcFactory )( implicit tx: Txn ): Unit = {
   //      touch
   //      factoriesRef.transform( _ + pf )
   //      updateRef.transform( u => if( u.factoriesRemoved.contains( pf )) {
@@ -274,7 +273,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
   //      })
   //   }
   //
-  //   def removeFactory( pf: ProcFactory )( implicit tx: Txn ) {
+  //   def removeFactory( pf: ProcFactory )( implicit tx: Txn ): Unit = {
   //      touch
   //      factoriesRef.transform( _ - pf )
   //      updateRef.transform( u => if( u.factoriesAdded.contains( pf )) {
@@ -284,18 +283,18 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
   //      })
   //   }
 
-  def addVertex(e: AuralProc)(implicit tx: Txn) {
+  def addVertex(e: AuralProc)(implicit tx: Txn): Unit = {
     val world = worlds(e.server)(tx.peer)
     world.addProc(e)
   }
 
-  def removeVertex(e: AuralProc)(implicit tx: Txn) {
+  def removeVertex(e: AuralProc)(implicit tx: Txn): Unit = {
     val world = worlds(e.server)(tx.peer)
     world.removeProc(e)
   }
 
   // EEE
-  //   def addEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
+  //   def addEdge( e: ProcEdge )( implicit tx: Txn ): Unit = { syn.synchronized {
   //      val world = worlds( e.sourceVertex.server )
   //      val res = world.addEdge( e )
   //      if( res.isEmpty ) error( "Could not add edge" )
@@ -310,7 +309,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
   //      val tgtGroups  = affected.map( p => (p, p.groupOption) )
   //      val isAfter    = source == e.sourceVertex
   //
-  //      def startMoving( g: RichGroup ) {
+  //      def startMoving( g: RichGroup ): Unit = {
   //         var succ                = g
   //         var pred : RichGroup    = null
   //         val iter                = tgtGroups.iterator
@@ -348,7 +347,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
   //   }}
 
   // EEE
-  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ) { syn.synchronized {
+  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ): Unit = { syn.synchronized {
   //      val world = worlds( e.sourceVertex.server )
   //      world.removeEdge( e )
   //   }}
@@ -380,7 +379,7 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
     sb.toString
   }
 
-  private[proc] def send(server: Server, bundles: Txn.Bundles) {
+  private[proc] def send(server: Server, bundles: Txn.Bundles): Unit = {
     val w = worlds.single.get(server).getOrElse(sys.error("Trying to access unregistered server " + server))
     w.send(bundles)
   }

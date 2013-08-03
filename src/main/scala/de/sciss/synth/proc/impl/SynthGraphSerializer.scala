@@ -47,7 +47,7 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     var count = 0
   }
 
-  private def writeProduct(p: Product, out: DataOutput, ref: RefMapOut) {
+  private def writeProduct(p: Product, out: DataOutput, ref: RefMapOut): Unit = {
     val id0 = ref.map.getOrElse(p, -1)
     if (id0 >= 0) {
       out.writeByte('<')
@@ -67,13 +67,13 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     ref.count  = id + 1
   }
 
-  private def writeElemSeq(xs: Seq[Any], out: DataOutput, ref: RefMapOut) {
+  private def writeElemSeq(xs: Seq[Any], out: DataOutput, ref: RefMapOut): Unit = {
     out.writeByte('X')
     out.writeInt(xs.size)
     xs.foreach(writeElem(_, out, ref))
   }
 
-  private def writeElem(e: Any, out: DataOutput, ref: RefMapOut) {
+  private def writeElem(e: Any, out: DataOutput, ref: RefMapOut): Unit =
     e match {
       case c: Constant =>
         out.writeByte('C')
@@ -105,9 +105,8 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
         out.writeByte('D')
         out.writeDouble(d)
     }
-  }
 
-  def write(v: SynthGraph, out: DataOutput) {
+  def write(v: SynthGraph, out: DataOutput): Unit = {
     out.writeShort(SER_VERSION)
     //    val t1    = System.nanoTime()
     //    val p1    = out.position
@@ -126,13 +125,13 @@ object SynthGraphSerializer extends ImmutableSerializer[SynthGraph] {
     //    println(f"<<< writ >>> time ${timOld/1000}%5d vs. ${timNew/1000}%5d ($timeRel%5.1f%); space $spcOld%5d vs. $spcNew%5d ($spaceRel%5.1f%)")
   }
 
-  //  private def writeOld(v: SynthGraph, out: DataOutput) {
+  //  private def writeOld(v: SynthGraph, out: DataOutput): Unit = {
   //    val oos = new java.io.ObjectOutputStream(out.asOutputStream)
   //    oos.writeObject(v)
   //    oos.flush()
   //  }
 
-  private def writeNew(v: SynthGraph, out: DataOutput) {
+  private def writeNew(v: SynthGraph, out: DataOutput): Unit = {
     val ref = new RefMapOut
     writeElemSeq(v.sources, out, ref)
     val ctl = v.controlProxies

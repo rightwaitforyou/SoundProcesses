@@ -27,7 +27,7 @@ package de.sciss.synth
 package proc
 package graph
 
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.ugen.UGenInGroup
 
 object scan {
@@ -72,7 +72,7 @@ object scan {
     }
 
     // first arg: bus control, remaining args: signal to write; thus numChannels = _args.size - 1
-    protected def makeUGen(_args: IIdxSeq[UGenIn]) {
+    protected def makeUGen(_args: Vec[UGenIn]): Unit = {
       val busArg = _args.head
       val sigArg = _args.tail
       val numChannels = sigArg.size
@@ -94,7 +94,5 @@ final case class scan(key: String) {
   def ar: GE = ar(0.0)
   def ar(default: Double): GE = scan.In(key, default)
 
-  def :=(in: GE) {
-    scan.Out(key, in)
-  }
+  def :=(in: GE): Unit = scan.Out(key, in)
 }

@@ -98,13 +98,13 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
   def resource(implicit tx: Txn) = synth
 
   //  protected def synth(implicit tx: Txn): Option[Synth] = synthRef.get(tx.peer)
-  //  protected def synth_=(value: Option[Synth])(implicit tx: Txn) {
+  //  protected def synth_=(value: Option[Synth])(implicit tx: Txn): Unit = {
   //    val oldSynth = synthRef.swap(value)(tx.peer)
   //    value.foreach(addMapBusConsumer)
   //    oldSynth.foreach(_.free(audible = true))
   //  }
   //
-  //  protected def addMapBusConsumer(rs: Synth)(implicit tx: Txn) {
+  //  protected def addMapBusConsumer(rs: Synth)(implicit tx: Txn): Unit = {
   //    //         val rb = mapBus
   //    //         rs.write( rb -> "$out" )
   //    rs.write(bus -> "$out")
@@ -112,9 +112,9 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
 
   def server = synth.server
 
-  def add()(implicit tx: Txn) {}
+  def add()(implicit tx: Txn) = ()
 
-  def britzelAdd()(implicit tx: Txn) {
+  def britzelAdd()(implicit tx: Txn): Unit = {
     type Ctl = List[ControlSetMap]
 
     // val rsd       = SynthDef(aural.server, g)
@@ -138,7 +138,7 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
     // require(oldSynth.isEmpty, "SegmentWriter.add() : old synth still playing")
   }
 
-  def remove()(implicit tx: Txn) {
+  def remove()(implicit tx: Txn): Unit = {
     //    val rs = synthRef.swap(None)(tx.peer).getOrElse(
     //      sys.error("SegmentWriter.remove() : there was no synth playing")
     //    )
@@ -146,7 +146,7 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
     synth.free()
   }
 
-  //  def stop(implicit tx: Txn) {
+  //  def stop(implicit tx: Txn): Unit = {
   //    synthRef.swap(None)(tx.peer).foreach(_.free(audible = true))
   //  }
   //
@@ -154,17 +154,17 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
   //
   //  // ---- RichAudioBus.User ----
   //
-  //  def busChanged(bus: AudioBus)(implicit tx: Txn) {
+  //  def busChanged(bus: AudioBus)(implicit tx: Txn): Unit = {
   //    ...
   //  }
   //
   //  // ---- DynamicAudioBusUser ----
   //
-  //  def add()(implicit tx: Txn) {
+  //  def add()(implicit tx: Txn): Unit = {
   //    bus.addWriter(this)
   //  }
   //
-  //  def remove()(implicit tx: Txn) {
+  //  def remove()(implicit tx: Txn): Unit = {
   //    bus.removeWriter(this)
   //  }
   //

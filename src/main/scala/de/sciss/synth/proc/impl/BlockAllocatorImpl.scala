@@ -67,7 +67,7 @@ object BlockAllocatorImpl {
       res
     }
 
-    def free( address: Int, size: Int )( implicit tx: InTxn ) {
+    def free(address: Int, size: Int)(implicit tx: InTxn): Unit = {
       logAlloc(s"$name free $address, $size @${tx.hashCode().toHexString}/${Thread.currentThread().hashCode().toHexString}")
       val b       = Block(address, size)
       val state0  = ref()
@@ -144,7 +144,7 @@ object BlockAllocatorImpl {
       state.copy(used = state.used + b)
     }
 
-    def consistencyCheck()(implicit tx: InTxn) {
+    def consistencyCheck()(implicit tx: InTxn): Unit = {
       val state = ref()
       val f = state.freeBySize
       val g = state.freeByStart

@@ -73,12 +73,18 @@ object State {
 //   final case class Change( state: State, value: Boolean, ifEqual: IfEqual )
 }
 sealed trait State {
-   protected def value: ScalaRef[ Boolean ]
-   def swap( newValue: Boolean )( implicit tx: Txn ) : Boolean
-   def get( implicit tx: Txn ) : Boolean
-   final def set( newValue: Boolean )( implicit tx: Txn ) { value.set( newValue )( tx.peer )}
+  protected def value: ScalaRef[Boolean]
 
-   protected def owner: Any
-   def name: String
-   override def toString = "<" + owner.toString + " " + name + ">"
+  def swap(newValue: Boolean)(implicit tx: Txn): Boolean
+
+  def get(implicit tx: Txn): Boolean
+
+  final def set(newValue: Boolean)(implicit tx: Txn): Unit =
+    value.set(newValue)(tx.peer)
+
+  protected def owner: Any
+
+  def name: String
+
+  override def toString = s"<$owner $name>"
 }

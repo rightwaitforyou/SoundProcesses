@@ -35,7 +35,7 @@ import de.sciss.synth
 
 object CommonSerializers {
   implicit object Curve extends ImmutableSerializer[synth.Curve] {
-    def write(shape: synth.Curve, out: DataOutput) {
+    def write(shape: synth.Curve, out: DataOutput): Unit = {
       out.writeInt(shape.id)
       shape match {
         case parametric(c)  => out.writeFloat(c)

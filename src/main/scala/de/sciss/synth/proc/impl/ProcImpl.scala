@@ -34,7 +34,7 @@ import bitemp.BiType
 import data.SkipList
 import annotation.switch
 import collection.breakOut
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import language.higherKinds
 
@@ -94,7 +94,7 @@ object ProcImpl {
 
     //    final def graph(implicit tx: S#Tx): Expr[S, SynthGraph] = _graph()
     //
-    //    final def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx) {
+    //    final def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx): Unit = {
     //      val old = _graph()
     //      if (old != g) {
     //        _graph() = g
@@ -119,9 +119,9 @@ object ProcImpl {
 
       // ---- keymapimpl details ----
 
-      final protected def fire(added: Set[String], removed: Set[String])(implicit tx: S#Tx) {
-        val seqAdd: IIdxSeq[Proc.StateChange] = added  .map(key => Proc.AssociationAdded  (wrapKey(key)))(breakOut)
-        val seqRem: IIdxSeq[Proc.StateChange] = removed.map(key => Proc.AssociationRemoved(wrapKey(key)))(breakOut)
+      final protected def fire(added: Set[String], removed: Set[String])(implicit tx: S#Tx): Unit = {
+        val seqAdd: Vec[Proc.StateChange] = added  .map(key => Proc.AssociationAdded  (wrapKey(key)))(breakOut)
+        val seqRem: Vec[Proc.StateChange] = removed.map(key => Proc.AssociationRemoved(wrapKey(key)))(breakOut)
         // convention: first the removals, then the additions. thus, overwriting a key yields
         // successive removal and addition of the same key.
         val seq = if (seqAdd.isEmpty) seqRem else if (seqRem.isEmpty) seqAdd else seqRem ++ seqAdd
@@ -137,9 +137,7 @@ object ProcImpl {
 
       protected def wrapKey(key: String) = AttributeKey(key)
 
-      def put(key: String, value: Attribute[S])(implicit tx: S#Tx) {
-        add(key, value)
-      }
+      def put(key: String, value: Attribute[S])(implicit tx: S#Tx): Unit = add(key, value)
 
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
 
@@ -205,13 +203,13 @@ object ProcImpl {
 
       final val slot = 3
 
-      def connect   ()(implicit tx: S#Tx) {
+      def connect   ()(implicit tx: S#Tx): Unit = {
         graph.changed ---> this
         attributes    ---> this
         scans         ---> this
         StateEvent    ---> this
       }
-      def disconnect()(implicit tx: S#Tx) {
+      def disconnect()(implicit tx: S#Tx): Unit = {
         graph.changed -/-> this
         attributes    -/-> this
         scans         -/-> this
@@ -226,7 +224,7 @@ object ProcImpl {
         val scansOpt = if (pull.contains(scans     )) pull(scans     ) else None
         val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
 
-        val seq0 = graphOpt.fold(IIdxSeq.empty[Change[S]]) { u =>
+        val seq0 = graphOpt.fold(Vec.empty[Change[S]]) { u =>
           Vector(GraphChange(u))
         }
         val seq1 = attrOpt.fold(seq0) { u =>
@@ -253,7 +251,7 @@ object ProcImpl {
     //      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
     final def changed: evt.Event[S, Update[S], Proc[S]] = ChangeEvent
 
-    final protected def writeData(out: DataOutput) {
+    final protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
       // name_#     .write(out)
       graph       .write(out)
@@ -262,7 +260,7 @@ object ProcImpl {
       scanMap     .write(out)
     }
 
-    final protected def disposeData()(implicit tx: S#Tx) {
+    final protected def disposeData()(implicit tx: S#Tx): Unit = {
       // name_#     .dispose()
       graph       .dispose()
       // graphemeMap.dispose()

@@ -30,7 +30,7 @@ import de.sciss.synth.{Server => SServer, addToHead, proc, message, AllocatorExh
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
 import de.sciss.osc.Packet
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 
 object ServerImpl {
   def apply  (peer: SServer): Server          = new OnlineImpl (peer)
@@ -41,18 +41,18 @@ object ServerImpl {
 
     // ---- side effects ----
 
-    def !(p: Packet) { peer ! p }
+    def !(p: Packet): Unit = peer ! p
 
     def !!(bndl: osc.Bundle): Future[Unit] = {
       val syncMsg = peer.syncMsg()
       val syncID  = syncMsg.id
-      val bndlS   = osc.Bundle(bndl.timetag, (bndl :+ syncMsg): _*)
+      val bndlS   = osc.Bundle(bndl.timetag, bndl :+ syncMsg: _*)
       peer.!!(bndlS) {
         case message.Synced(`syncID`) =>
       }
     }
 
-    def commit(future: Future[Unit]) {}   // we don't use these
+    def commit(future: Future[Unit]) = ()  // we don't use these
   }
 
   private final case class OfflineImpl(peer: SServer) extends Impl with Server.Offline {
@@ -77,7 +77,7 @@ object ServerImpl {
       ProcWorld.reduceFutures(futs)
     }
 
-    def bundles(addDefaultGroup: Boolean): IIdxSeq[osc.Bundle] = sync.synchronized {
+    def bundles(addDefaultGroup: Boolean): Vec[osc.Bundle] = sync.synchronized {
       val res   = _bundles
       _bundles  = Vector.empty
       val res1  = if (res.isEmpty || !addDefaultGroup) res else {
@@ -87,13 +87,13 @@ object ServerImpl {
       res1
     }
 
-    private def addBundle(b: osc.Bundle) {
+    private def addBundle(b: osc.Bundle): Unit = {
       val b1 = if (b.timetag == osc.Timetag.now) osc.Bundle.secs(time, b: _*) else b
       log(s"addBundle $b1")
       sync.synchronized(_bundles :+= b1)
     }
 
-    def !(p: Packet) {
+    def !(p: Packet): Unit = {
       val b = p match {
         case m : osc.Message  => osc.Bundle.secs(time, m)
         case b0: osc.Bundle   => b0
@@ -109,11 +109,10 @@ object ServerImpl {
     // caller must have `sync`
     private def filteredCommits = _commits.filterNot(_.isCompleted)
 
-    def commit(future: Future[Unit]) {
+    def commit(future: Future[Unit]): Unit =
       sync.synchronized {
         _commits = filteredCommits :+ future
       }
-    }
   }
 
   private abstract class Impl extends Server {
@@ -139,13 +138,11 @@ object ServerImpl {
       res
     }
 
-    def freeControlBus(index: Int, numChannels: Int)(implicit tx: Txn) {
+    def freeControlBus(index: Int, numChannels: Int)(implicit tx: Txn): Unit =
       controlBusAllocator.free(index, numChannels)(tx.peer)
-    }
 
-    def freeAudioBus(index: Int, numChannels: Int)(implicit tx: Txn) {
+    def freeAudioBus(index: Int, numChannels: Int)(implicit tx: Txn): Unit =
       audioBusAllocator.free(index, numChannels)(tx.peer)
-    }
 
     def allocBuffer(numConsecutive: Int)(implicit tx: Txn): Int = {
       val res = bufferAllocator.alloc(numConsecutive)(tx.peer)
@@ -153,9 +150,8 @@ object ServerImpl {
       res
     }
 
-    def freeBuffer(index: Int, numConsecutive: Int)(implicit tx: Txn) {
+    def freeBuffer(index: Int, numConsecutive: Int)(implicit tx: Txn): Unit =
       bufferAllocator.free(index, numConsecutive)(tx.peer)
-    }
 
     def nextNodeID()(implicit tx: Txn): Int = nodeAllocator.alloc()(tx.peer)
   }

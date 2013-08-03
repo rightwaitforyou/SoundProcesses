@@ -48,17 +48,16 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
 
   private var bundlesMap = Map.empty[Server, Txn.Bundles]
 
-  final protected def flush() {
+  final protected def flush(): Unit =
     bundlesMap.foreach { case (server, bundles) =>
       logTxn("flush " + server + " -> " + bundles.payload.size + " bundles")
       ProcDemiurg.send(server, bundles)
     }
-  }
 
   protected def markBundlesDirty(): Unit
 
   final def addMessage(resource: Resource, m: osc.Message with message.Send, audible: Boolean, dependencies: Seq[Resource],
-                       noErrors: Boolean) {
+                       noErrors: Boolean): Unit = {
 
     //      val rsrc = system.resources
 
@@ -109,7 +108,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
       val payOld = bOld.payload
       val szOld = payOld.size
       //         if( rsrcCnt == cntOld - 1 ) {   // prepend to front
-      //            val payNew = IIdxSeq( message ) +: payOld
+      //            val payNew = Vec( message ) +: payOld
       //            bOld.copy( firstCnt = rsrcCnt, payload = payNew )
       //
       //         } else
@@ -154,7 +153,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
 }
 
 private[proc] trait ProcTxnFullImpl[S <: Sys[S]] extends ProcTxnImpl with Sys.Txn[S] {
-  final protected def markBundlesDirty() {
+  final protected def markBundlesDirty(): Unit = {
     logTxn("registering after commit handler")
     afterCommit(flush())
   }
@@ -163,7 +162,7 @@ private[proc] trait ProcTxnFullImpl[S <: Sys[S]] extends ProcTxnImpl with Sys.Tx
 private[proc] final class ProcTxnPlainImpl(val peer: InTxn) extends ProcTxnImpl {
   override def toString = "proc.Txn<plain>@" + hashCode().toHexString
 
-  protected def markBundlesDirty() {
+  protected def markBundlesDirty(): Unit = {
     logTxn("registering after commit handler")
     ScalaTxn.afterCommit(_ => flush())(peer)
   }

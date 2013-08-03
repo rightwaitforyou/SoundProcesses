@@ -65,9 +65,9 @@ final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, se
 
   def server = synth.server
 
-  def add()(implicit tx: Txn) {}
+  def add()(implicit tx: Txn) = ()
 
-  def britzelAdd()(implicit tx: Txn) {
+  def britzelAdd()(implicit tx: Txn): Unit = {
     val audioVal  = segm.value
     val file      = audioVal.artifact
     val path      = file.getAbsolutePath
@@ -98,7 +98,7 @@ final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, se
     // require(oldSynth.isEmpty, "AudioArtifactWriter.add() : old synth still playing")
   }
 
-  def remove()(implicit tx: Txn) {
+  def remove()(implicit tx: Txn): Unit = {
     //    val rs = synthRef.swap(None)(tx.peer).getOrElse(
     //      sys.error("AudioArtifactWriter.remove() : there was no synth playing")
     //    )

@@ -19,9 +19,8 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
   //    * is registered before any possible deserialization (which would
   //    * fail if no in-memory graph is found under the key)
   //    */
-  //  def add(key: String, graph: SynthGraph) {
+  //  def add(key: String, graph: SynthGraph): Unit =
   //    map.synchronized(map += (key, graph))
-  //  }
 
   private final val tapeCookie  = 1
   private final val emptyCookie = 2
@@ -29,9 +28,8 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
 
   def readValue(in: DataInput): SynthGraph = impl.SynthGraphSerializer.read(in)
 
-  def writeValue(value: SynthGraph, out: DataOutput) {
+  def writeValue(value: SynthGraph, out: DataOutput): Unit =
     impl.SynthGraphSerializer.write(value, out)
-  }
 
   protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                       (implicit tx: S#Tx): ReprNode[S] =
@@ -78,11 +76,9 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
     with evt.Node[S]
     with evt.impl.SingleGenerator[S, evt.Change[SynthGraph], Ex[S]] {
 
-    protected def writeData(out: DataOutput) {
-      out.writeByte(cookie)
-    }
+    protected def writeData(out: DataOutput): Unit = out.writeByte(cookie)
 
-    protected def disposeData()(implicit tx: S#Tx) {}
+    protected def disposeData()(implicit tx: S#Tx) = ()
 
     protected def reader: evt.Reader[S, SynthGraphs.Ex[S]] = serializer
 

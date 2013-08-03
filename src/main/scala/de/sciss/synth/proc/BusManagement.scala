@@ -213,14 +213,14 @@ object RichBus {
     private val useCount = ScalaRef(0) // Ref.withCheck( 0 ) { case 0 => peer.free() }
 
     // increments use count
-    final def alloc()(implicit tx: Txn) {
+    final def alloc()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       useCount += 1
       if (verbose) println(peer.toString + ".alloc -> " + useCount.get)
     }
 
     // decrements use count and calls `remove` if that count reaches zero
-    final def free()(implicit tx: Txn) {
+    final def free()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val cnt = useCount.get - 1
       if (verbose) println(peer.toString + ".free -> " + cnt)
@@ -245,29 +245,26 @@ object RichBus {
 
   private final class PlainAudioBusHolder(server: Server, val peer: AudioBus)
     extends BusHolder[AudioBus] {
-    protected def remove()(implicit tx: Txn) {
+    protected def remove()(implicit tx: Txn): Unit =
       server.freeAudioBus(peer.index, peer.numChannels)
-    }
   }
 
   private final class PlainControlBusHolder(server: Server, val peer: ControlBus)
     extends BusHolder[ControlBus] {
 
-    protected def remove()(implicit tx: Txn) {
+    protected def remove()(implicit tx: Txn): Unit =
       server.freeControlBus(peer.index, peer.numChannels)
-    }
   }
 
   private final class RichAudioBusHolder(val server: Server, val peer: AudioBus, mapScalaRef: ScalaRef[ABusHolderMap])
     extends AudioBusHolder {
 
-    def add()(implicit tx: Txn) {
+    def add()(implicit tx: Txn): Unit =
       mapScalaRef.transform(map => map +
         (server -> (map.getOrElse(server, ISortedMap.empty[Int, AudioBusHolder]) + (numChannels -> this)))
       )(tx.peer)
-    }
 
-    protected def remove()(implicit tx: Txn) {
+    protected def remove()(implicit tx: Txn): Unit = {
       server.freeAudioBus(peer.index, peer.numChannels)
       mapScalaRef.transform(map => {
         val newMap = map(server) - numChannels
@@ -332,30 +329,19 @@ object RichBus {
 
     def busOption(implicit tx: Txn): Option[AudioBus] = Some(bus)
 
-    def addReader(u: AU)(implicit tx: Txn) {
-      add(readers, u)
-    }
+    def addReader(u: AU)(implicit tx: Txn): Unit = add(readers, u)
+    def addWriter(u: AU)(implicit tx: Txn): Unit = add(writers, u)
 
-    def addWriter(u: AU)(implicit tx: Txn) {
-      add(writers, u)
-    }
-
-    private def add(users: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn) {
+    private def add(users: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn): Unit = {
       users.transform(_ + u)(tx.peer)
       u.busChanged(bus)
     }
 
-    def removeReader(u: AU)(implicit tx: Txn) {
-      remove(readers, u)
-    }
+    def removeReader(u: AU)(implicit tx: Txn): Unit = remove(readers, u)
+    def removeWriter(u: AU)(implicit tx: Txn): Unit = remove(writers, u)
 
-    def removeWriter(u: AU)(implicit tx: Txn) {
-      remove(writers, u)
-    }
-
-    private def remove(users: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn) {
+    private def remove(users: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn): Unit =
       users.transform(_ - u)(tx.peer)
-    }
 
     override def toString = "h-abus(" + bus + ")"
   }
@@ -374,7 +360,7 @@ object RichBus {
 
     override def toString = "sh-abus(numChannels=" + numChannels + ")@" + hashCode
 
-    def addReader(u: AU)(implicit tx: Txn) {
+    def addReader(u: AU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val rs = readers.get
       require(!rs.contains(u))
@@ -419,7 +405,7 @@ object RichBus {
       u.busChanged(newBus)
     }
 
-    def addWriter(u: AU)(implicit tx: Txn) {
+    def addWriter(u: AU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val ws = writers.get
       require(!ws.contains(u))
@@ -459,7 +445,7 @@ object RichBus {
       u.busChanged(newBus)
     }
 
-    def removeReader(u: AU)(implicit tx: Txn) {
+    def removeReader(u: AU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val rs0 = readers()
       if (!rs0.contains(u)) return
@@ -483,7 +469,7 @@ object RichBus {
       }
     }
 
-    def removeWriter(u: AU)(implicit tx: Txn) {
+    def removeWriter(u: AU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val ws0 = writers.get
       if (!ws0.contains(u)) return
@@ -513,15 +499,10 @@ object RichBus {
 
     override def toString = "tmp-abus(numChannels=" + numChannels + ")@" + hashCode
 
-    def addReader(u: AU)(implicit tx: Txn) {
-      add(readers, writers, u)
-    }
+    def addReader(u: AU)(implicit tx: Txn): Unit = add(readers, writers, u)
+    def addWriter(u: AU)(implicit tx: Txn): Unit = add(writers, readers, u)
 
-    def addWriter(u: AU)(implicit tx: Txn) {
-      add(writers, readers, u)
-    }
-
-    private def add(users: ScalaRef[Set[AU]], others: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn) {
+    private def add(users: ScalaRef[Set[AU]], others: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val us = users.get
       require(!us.contains(u))
@@ -546,15 +527,10 @@ object RichBus {
       u.busChanged(newBus)
     }
 
-    def removeReader(u: AU)(implicit tx: Txn) {
-      remove(readers, u)
-    }
+    def removeReader(u: AU)(implicit tx: Txn): Unit = remove(readers, u)
+    def removeWriter(u: AU)(implicit tx: Txn): Unit = remove(writers, u)
 
-    def removeWriter(u: AU)(implicit tx: Txn) {
-      remove(writers, u)
-    }
-
-    private def remove(users: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn) {
+    private def remove(users: ScalaRef[Set[AU]], u: AU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val rw = users.get
       if (!rw.contains(u)) return
@@ -577,15 +553,10 @@ object RichBus {
       if (bh != null) Some(bh.peer) else None
     }
 
-    def addReader(u: CU)(implicit tx: Txn) {
-      add(readers, writers, u)
-    }
+    def addReader(u: CU)(implicit tx: Txn): Unit = add(readers, writers, u)
+    def addWriter(u: CU)(implicit tx: Txn): Unit = add(writers, readers, u)
 
-    def addWriter(u: CU)(implicit tx: Txn) {
-      add(writers, readers, u)
-    }
-
-    private def add(users: ScalaRef[Set[CU]], others: ScalaRef[Set[CU]], u: CU)(implicit tx: Txn) {
+    private def add(users: ScalaRef[Set[CU]], others: ScalaRef[Set[CU]], u: CU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val us = users.get
       require(!us.contains(u))
@@ -610,15 +581,10 @@ object RichBus {
       u.busChanged(newBus)
     }
 
-    def removeReader(u: CU)(implicit tx: Txn) {
-      remove(readers, u)
-    }
+    def removeReader(u: CU)(implicit tx: Txn): Unit = remove(readers, u)
+    def removeWriter(u: CU)(implicit tx: Txn): Unit = remove(writers, u)
 
-    def removeWriter(u: CU)(implicit tx: Txn) {
-      remove(writers, u)
-    }
-
-    private def remove(users: ScalaRef[Set[CU]], u: CU)(implicit tx: Txn) {
+    private def remove(users: ScalaRef[Set[CU]], u: CU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val rw = users.get
       if (!rw.contains(u)) return

@@ -27,7 +27,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.impl.BasicUGenGraphBuilder
-import collection.immutable.{IndexedSeq => IIdxSeq, Set => ISet}
+import collection.immutable.{IndexedSeq => Vec, Set => ISet}
 import de.sciss.synth.{UGenGraph, Lazy, SynthGraph}
 import de.sciss.synth.ugen.ControlProxyLike
 
@@ -45,7 +45,7 @@ private[proc] object UGenGraphBuilderImpl {
 
     override def toString = "proc.UGenGraph.Builder@" + hashCode.toHexString
 
-    private var remaining: IIdxSeq[Lazy]               = g.sources
+    private var remaining: Vec[Lazy]               = g.sources
     private var controlProxies: ISet[ControlProxyLike] = g.controlProxies
 
     var scanOuts    = Map.empty[String, Int]
@@ -59,7 +59,7 @@ private[proc] object UGenGraphBuilderImpl {
       res
     }
 
-    def addScanOut(key: String, numChannels: Int) {
+    def addScanOut(key: String, numChannels: Int): Unit =
       scanOuts.get(key) match {
         case Some(prevChans) =>
           require(numChannels == prevChans, "Cannot write multiple times to the same scan (" + key +
@@ -67,9 +67,8 @@ private[proc] object UGenGraphBuilderImpl {
         case _ =>
           scanOuts += key -> numChannels
       }
-    }
 
-    def addAttributeIn(key: String) { attributeIns += key }
+    def addAttributeIn(key: String): Unit = attributeIns += key
 
     def tryBuild(): Boolean = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]

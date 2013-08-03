@@ -37,9 +37,7 @@ object Spans extends BiTypeImpl[Span] {
 
   def readValue(in: DataInput): Span = Span.read(in)
 
-  def writeValue(value: Span, out: DataOutput) {
-    value.write(out)
-  }
+  def writeValue(value: Span, out: DataOutput): Unit = value.write(out)
 
   def apply[S <: evt.Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
     (start, stop) match {

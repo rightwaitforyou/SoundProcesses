@@ -35,7 +35,7 @@ private[proc] final case class SynthImpl(peer: SSynth, definition: SynthDef) ext
   def server: Server = definition.server
 
   def play(target: Node, args: ISeq[ControlSetMap], addAction: AddAction, dependencies: List[Resource])
-          (implicit tx: Txn) {
+          (implicit tx: Txn): Unit = {
 
     val s = server
     require(target.server == s && target.isOnline)

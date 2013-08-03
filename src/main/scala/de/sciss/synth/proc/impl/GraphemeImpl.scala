@@ -31,7 +31,7 @@ import de.sciss.lucre.{event => evt, bitemp}
 import bitemp.BiPin
 import de.sciss.synth.expr.Longs
 import collection.breakOut
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import evt.{Event, impl => evti, Sys}
 import proc.Grapheme.Segment
 import annotation.tailrec
@@ -99,15 +99,10 @@ object GraphemeImpl {
 
     // ---- forwarding to pin ----
 
-    def add(elem: TimedElem[S])(implicit tx: S#Tx) {
-      pin.add(elem)
-    }
+    def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit     = pin.add(elem)
+    def remove(elem: TimedElem[S])(implicit tx: S#Tx): Boolean  = pin.remove(elem)
 
-    def remove(elem: TimedElem[S])(implicit tx: S#Tx): Boolean = pin.remove(elem)
-
-    def clear()(implicit tx: S#Tx) {
-      pin.clear()
-    }
+    def clear()(implicit tx: S#Tx): Unit = pin.clear()
 
     def at(time: Long)(implicit tx: S#Tx): Option[TimedElem[S]] = pin.at(time)
 
@@ -137,7 +132,7 @@ object GraphemeImpl {
       }
     }
 
-    private def segmentFromSpan(floorTime: Long, floorCurveVals: IIdxSeq[Double],
+    private def segmentFromSpan(floorTime: Long, floorCurveVals: Vec[Double],
                                 ceilTime: Long, ceilValue: Value): Segment.Defined = {
       val span = Span(floorTime, ceilTime)
       ceilValue match {
@@ -155,7 +150,7 @@ object GraphemeImpl {
       val t1 = floorTime + 1
       floorValue match {
         case floorCurve: Value.Curve =>
-          val floorCurveVals: IIdxSeq[Double] = floorCurve.values.map(_._1)(breakOut)
+          val floorCurveVals: Vec[Double] = floorCurve.values.map(_._1)(breakOut)
           pin.ceil(t1) match {
             case Some(ceilElem) =>
               val (ceilTime, ceilVal) = ceilElem.value
@@ -181,13 +176,13 @@ object GraphemeImpl {
       Segment.Undefined(span)
     }
 
-    private def segmentsAfterAdded(addTime: Long, addValue: Value)(implicit tx: S#Tx): IIdxSeq[Segment] = {
+    private def segmentsAfterAdded(addTime: Long, addValue: Value)(implicit tx: S#Tx): Vec[Segment] = {
       val floorSegm = pin.floor(addTime - 1) match {
         case Some(floorElem) =>
           val (floorTime, floorValue) = floorElem.value
           val s = floorValue match {
             case floorCurve: Value.Curve =>
-              val floorCurveVals: IIdxSeq[Double] = floorCurve.values.map(_._1)(breakOut)
+              val floorCurveVals: Vec[Double] = floorCurve.values.map(_._1)(breakOut)
               segmentFromSpan(floorTime, floorCurveVals, addTime, addValue)
             case av: Value.Audio =>
               Segment.Audio(Span(floorTime, addTime), av)
@@ -204,15 +199,10 @@ object GraphemeImpl {
 
     protected def reader: evt.Reader[S, Grapheme[S]] = serializer[S]
 
-    def connect()(implicit tx: S#Tx) {
-      pin.changed ---> this
-    }
+    def connect   ()(implicit tx: S#Tx): Unit = pin.changed ---> this
+    def disconnect()(implicit tx: S#Tx): Unit = pin.changed -/-> this
 
-    def disconnect()(implicit tx: S#Tx) {
-      pin.changed -/-> this
-    }
-
-    private def incorporate(in: IIdxSeq[Segment], add: Segment): IIdxSeq[Segment] = {
+    private def incorporate(in: Vec[Segment], add: Segment): Vec[Segment] = {
       val addSpan = add.span
       //         val (pre, tmp)    = in.span(  s => !s.span.overlaps( addSpan ))
       //         val (mid, post)   = tmp.span( s =>  s.span.overlaps( addSpan ))
@@ -225,21 +215,21 @@ object GraphemeImpl {
       } else {
         val inSpan = in(i).span
         if (inSpan == addSpan) {
-          in.patch(i, IIdxSeq(add), 1)
+          in.patch(i, Vec(add), 1)
         } else {
           assert(!inSpan.overlaps(addSpan))
-          in.patch(i, IIdxSeq(add), 0)
+          in.patch(i, Vec(add), 0)
         }
       }
     }
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Grapheme.Update[S]] = {
       pull(pin.changed).flatMap { upd =>
-        val segm: IIdxSeq[Segment] = upd.changes.foldLeft(IIdxSeq.empty[Segment]) {
+        val segm: Vec[Segment] = upd.changes.foldLeft(Vec.empty[Segment]) {
           case (res, ch) =>
             val seq = ch match {
               case BiPin.Added((addTime, addVal), _)  => segmentsAfterAdded(addTime, addVal)
-              case BiPin.Removed((remTime, _), _)     => IIdxSeq(segmentAfterRemoved(remTime))
+              case BiPin.Removed((remTime, _), _)     => Vec(segmentAfterRemoved(remTime))
 
               // the BiPin.Collection update assumes the 'pin' character
               // of the elements. that means that for example, an insertion
@@ -279,12 +269,7 @@ object GraphemeImpl {
       }
     }
 
-    protected def disposeData()( implicit tx: S#Tx ) {
-      pin.dispose()
-    }
-
-    protected def writeData(out: DataOutput) {
-      pin.write(out)
-    }
+    protected def disposeData()(implicit tx: S#Tx): Unit = pin.dispose()
+    protected def writeData(out: DataOutput)      : Unit = pin.write(out)
   }
 }

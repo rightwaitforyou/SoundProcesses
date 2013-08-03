@@ -31,7 +31,7 @@ import de.sciss.synth.addBefore
 
 object AuralProc {
   //   implicit object Serializer extends stm.Serializer[ AuralProc ] {
-  //      def write( v: AuralProc, out: DataOutput ) { v.write( out )}
+  //      def write( v: AuralProc, out: DataOutput ): Unit = v.write( out )
   //      def read( in: DataInput ) : AuralProc = {
   //         val name = in.readString()
   //         new Impl( name )
@@ -70,7 +70,7 @@ object AuralProc {
     //      def group( implicit tx: Txn ) : Option[ Group ] = groupRef.get( tx.peer )
 
     //      def graph( implicit tx: Txn ) : SynthGraph          = graphRef.get( tx.peer )
-    //      def graph_=( g: SynthGraph )( implicit tx: Txn ) {
+    //      def graph_=( g: SynthGraph )( implicit tx: Txn ): Unit = {
     //         graphRef.set( g )( tx.peer )
     //         if( playing ) {
     //            stop()
@@ -109,7 +109,7 @@ object AuralProc {
       }
     }
 
-    private def group_=(newGroup: Group)(implicit tx: Txn) {
+    private def group_=(newGroup: Group)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       groupsRef.transform(_ map { all =>
         moveAllTo(all, newGroup)
@@ -155,7 +155,7 @@ object AuralProc {
       groupsRef().flatMap(_.core) getOrElse synth // runningRef().map( _.anchorNode )
     }
 
-    private def moveAllTo(all: AllGroups, newGroup: Group)(implicit tx: Txn) {
+    private def moveAllTo(all: AllGroups, newGroup: Group)(implicit tx: Txn): Unit = {
       val core = anchorNode
       //         anchorNodeOption map { core =>
       core.moveToTail(audible = true, group = newGroup)
@@ -176,9 +176,9 @@ object AuralProc {
     }
 
     //      def name( implicit tx: Txn ) : String = nameRef.get( tx.peer )
-    //      def name_=( n: String )( implicit tx: Txn ) { nameRef.set( n )( tx.peer )}
+    //      def name_=( n: String )( implicit tx: Txn ): Unit = nameRef.set( n )( tx.peer )
 
-    //      def play()( implicit tx: Txn ) {
+    //      def play()( implicit tx: Txn ): Unit = {
     ////         val gr         = graph
     ////         val df         = ProcDemiurg.getSynthDef( server, gr )
     //
@@ -193,7 +193,7 @@ object AuralProc {
     //         old.foreach( _.free() )
     //      }
 
-    def stop()(implicit tx: Txn) {
+    def stop()(implicit tx: Txn): Unit = {
       //         val synth = synthRef.swap( None )( tx.peer )
       //         synth.foreach( _.free() )
       synth.free()
@@ -201,16 +201,16 @@ object AuralProc {
     }
 
     //      def playing( implicit tx: Txn ) : Boolean = synthRef.get( tx.peer ).map( _.isOnline.get ).getOrElse( false )
-    //      def playing_=( p: Boolean )( implicit tx: Txn ) {
+    //      def playing_=( p: Boolean )( implicit tx: Txn ): Unit = {
     //         if( p ) play() else stop()
     //      }
 
     // XXX if they stay static that way, we can remove the tx argument
     def getBus(key: String)(implicit tx: Txn): Option[RichAudioBus] = outBuses.get(key)
 
-    //      def setBus( key: String, bus: Option[ RichAudioBus ]) { ?? }
+    //      def setBus( key: String, bus: Option[ RichAudioBus ]): Unit = ??
 
-    //      def addParams( map: Map[ String, Param ])( implicit tx: Txn ) {
+    //      def addParams( map: Map[ String, Param ])( implicit tx: Txn ): Unit = {
     //         if( map.nonEmpty ) {
     //            implicit val itx = tx.peer
     //            entriesRef.transform( _ ++ map )

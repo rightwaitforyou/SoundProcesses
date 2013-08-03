@@ -12,9 +12,7 @@ object Curves extends BiTypeImpl[Curve] {
 
   def readValue(in: DataInput): Curve = ser.read(in)
 
-  def writeValue(value: Curve, out: DataOutput) {
-    ser.write(value, out)
-  }
+  def writeValue(value: Curve, out: DataOutput): Unit = ser.write(value, out)
 
   // ---- protected ----
 

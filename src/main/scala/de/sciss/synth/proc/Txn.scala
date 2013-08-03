@@ -27,7 +27,7 @@ package de.sciss.synth.proc
 
 import de.sciss.osc
 import concurrent.stm.InTxn
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import impl.{ProcTxnPlainImpl => PlainImpl}
 import de.sciss.synth.message
 
@@ -40,7 +40,7 @@ object Txn {
    * @param firstCnt   the counter value of the first bundle in the payload
    * @param payload    the succession of bundles, represented as a sequence of a sequence of messages
    */
-  final case class Bundles(firstCnt: Int, payload: IIdxSeq[IIdxSeq[osc.Message with message.Send]])
+  final case class Bundles(firstCnt: Int, payload: Vec[Vec[osc.Message with message.Send]])
 }
 
 /**
@@ -59,5 +59,5 @@ trait Txn {
                                audible: Boolean, dependencies: Seq[Resource] = Nil, noErrors: Boolean = false): Unit
 
   //   def addMessage( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, State, Boolean) ], audible: Boolean,
-  //                   dependencies: Map[ State, Boolean ], noError: Boolean = false ) {
+  //                   dependencies: Map[ State, Boolean ], noError: Boolean = false ): Unit = ???
 }

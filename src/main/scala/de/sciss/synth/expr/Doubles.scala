@@ -37,9 +37,7 @@ object Doubles extends BiTypeImpl[Double] {
 
   def readValue(in: DataInput): Double = in.readDouble()
 
-  def writeValue(value: Double, out: DataOutput) {
-    out.writeDouble(value)
-  }
+  def writeValue(value: Double, out: DataOutput): Unit = out.writeDouble(value)
 
   def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                 (implicit tx: S#Tx): ExN[S] = {

@@ -30,7 +30,7 @@ package impl
 import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike, impl => evti, Sys}
 import data.SkipList
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import collection.breakOut
 import annotation.switch
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
@@ -46,7 +46,7 @@ object BiPinImpl {
     new LeafSer
 
   private final class LeafSer[S <: Sys[S], A](implicit biType: BiType[A]) extends Serializer[S#Tx, S#Acc, Leaf[S, A]] {
-    def write(leaf: BiPin.Leaf[S, A], out: DataOutput) {
+    def write(leaf: BiPin.Leaf[S, A], out: DataOutput): Unit = {
       val sz = leaf.size
       out.writeInt(sz)
       if (sz == 0) return
@@ -55,10 +55,10 @@ object BiPinImpl {
 
     def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): BiPin.Leaf[S, A] = {
       val sz = in.readInt()
-      if (sz == 0) return IIdxSeq.empty
+      if (sz == 0) return Vec.empty
 
       val elemSer = BiExpr.serializer[S, A]
-      IIdxSeq.fill(sz)(elemSer.read(in, access))
+      Vec.fill(sz)(elemSer.read(in, access))
     }
   }
 
@@ -154,8 +154,8 @@ object BiPinImpl {
 
       def node: BiPin[S, A] with evt.Node[S] = pin
 
-      //         def connect()( implicit tx: S#Tx ) {}
-      //         def disconnect()( implicit tx: S#Tx ) {}
+      //         def connect()(implicit tx: S#Tx) = ()
+      //         def disconnect()(implicit tx: S#Tx) = ()
 
       private def foreach(fun: Elem => Unit)(implicit tx: S#Tx) {
         tree.iterator.foreach {
@@ -163,26 +163,17 @@ object BiPinImpl {
         }
       }
 
-      def connect()(implicit tx: S#Tx) {
-        foreach(+= _) // XXX TODO: verify point in time
-      }
-
-      def disconnect()(implicit tx: S#Tx) {
-        foreach(-= _)
-      }
+      def connect   ()(implicit tx: S#Tx): Unit = foreach(+=) // XXX TODO: verify point in time
+      def disconnect()(implicit tx: S#Tx): Unit = foreach(-=)
 
       // call this under the assumption that the event is connected
-      def +=(elem: Elem)(implicit tx: S#Tx) {
-        elem.changed ---> this
-      }
+      def +=(elem: Elem)(implicit tx: S#Tx): Unit = elem.changed ---> this
 
       // call this under the assumption that the event is connected
-      def -=(elem: Elem)(implicit tx: S#Tx) {
-        elem.changed -/-> this
-      }
+      def -=(elem: Elem)(implicit tx: S#Tx): Unit = elem.changed -/-> this
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiPin.Update[S, A]] = {
-        val changes: IIdxSeq[BiPin.Element[S, A]] = pull.parents(this).flatMap(sel => {
+        val changes: Vec[BiPin.Element[S, A]] = pull.parents(this).flatMap(sel => {
           // wow... how does this get the event update type right I'm wondering... ?
           // UPDATE: ha! it doesn't. hell, this produces a runtime exception re Nothing??
           // --> fix: evt needs type ascription!!!
@@ -218,22 +209,22 @@ object BiPinImpl {
 
       def node: BiPin[S, A] with evt.Node[S] = pin
 
-      def connect()(implicit tx: S#Tx) {
+      def connect()(implicit tx: S#Tx): Unit = {
         CollChanged ---> this
         ElemChanged ---> this
       }
 
-      def disconnect()(implicit tx: S#Tx) {
+      def disconnect()(implicit tx: S#Tx): Unit = {
         CollChanged -/-> this
         ElemChanged -/-> this
       }
 
-      //      def --->(r: evt.Selector[S])(implicit tx: S#Tx) {
+      //      def --->(r: evt.Selector[S])(implicit tx: S#Tx): Unit = {
       //        CollChanged ---> r
       //        ElemChanged ---> r
       //      }
       //
-      //      def -/->(r: evt.Selector[S])(implicit tx: S#Tx) {
+      //      def -/->(r: evt.Selector[S])(implicit tx: S#Tx): Unit = {
       //        CollChanged -/-> r
       //        ElemChanged -/-> r
       //      }
@@ -252,13 +243,8 @@ object BiPinImpl {
       }
     }
 
-    protected def disposeData()(implicit tx: S#Tx) {
-      tree.dispose()
-    }
-
-    protected def writeData(out: DataOutput) {
-      tree.write(out)
-    }
+    protected def disposeData()(implicit tx: S#Tx): Unit = tree.dispose()
+    protected def writeData(out: DataOutput)      : Unit = tree.write(out)
 
     def select(slot: Int /*, invariant: Boolean */): Event[S, Any, Any] = (slot: @switch) match {
       case Changed.slot     => Changed
@@ -270,7 +256,7 @@ object BiPinImpl {
 
     @inline private def isConnected(implicit tx: S#Tx): Boolean = targets.nonEmpty
 
-    def clear()(implicit tx: S#Tx) {
+    def clear()(implicit tx: S#Tx): Unit =
       if (isConnected) {
         //            val changes = tree.iterator.toIndexedSeq.flatMap { case (spanVal, seq) =>
         //               seq.map { case (_, elem) => BiPin.Removed( this, spanVal, elem )}
@@ -282,21 +268,20 @@ object BiPinImpl {
       } else {
         tree.clear()
       }
-    }
 
-    def add(elem: Elem)(implicit tx: S#Tx) {
+    def add(elem: Elem)(implicit tx: S#Tx): Unit = {
       val timeVal = elem.timeValue
       addNoFire(timeVal, elem)
       if (isConnected) {
         //            CollChanged += time
         ElemChanged += elem
-        CollChanged(BiPin.Update(pin, IIdxSeq(BiPin.Added(timeVal -> elem.magValue, elem))))
+        CollChanged(BiPin.Update(pin, Vec(BiPin.Added(timeVal -> elem.magValue, elem))))
       }
     }
 
     def intersect(time: Long)(implicit tx: S#Tx): Leaf[S, A] = tree.floor(time) match {
       case Some((_, seq)) => seq
-      case _ => IIdxSeq.empty
+      case _ => Vec.empty
     }
 
     def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long] = tree.ceil(time).map(_._1)
@@ -313,14 +298,13 @@ object BiPinImpl {
      * @param elem    the element which is inserted
      * @return
      */
-    private def addNoFire(timeVal: Long, elem: Elem)(implicit tx: S#Tx) {
+    private def addNoFire(timeVal: Long, elem: Elem)(implicit tx: S#Tx): Unit =
       tree.get(timeVal) match {
         case Some(oldLeaf) =>
           tree += timeVal -> (elem +: oldLeaf)
         case _ =>
-          tree += timeVal -> IIdxSeq(elem)
+          tree += timeVal -> Vec(elem)
       }
-    }
 
     def remove(elem: Elem)(implicit tx: S#Tx): Boolean = {
       val timeVal = elem.timeValue
@@ -328,14 +312,14 @@ object BiPinImpl {
       if (visible && isConnected) {
         //            CollChanged -= time
         ElemChanged -= elem
-        CollChanged(BiPin.Update(pin, IIdxSeq(BiPin.Removed(timeVal -> elem.magValue, elem))))
+        CollChanged(BiPin.Update(pin, Vec(BiPin.Removed(timeVal -> elem.magValue, elem))))
       }
       found
     }
 
     private def removeNoFire(timeVal: Long, elem: Elem)(implicit tx: S#Tx): (Boolean, Boolean) = {
       tree.get(timeVal) match {
-        case Some(IIdxSeq(single)) =>
+        case Some(Vec(single)) =>
           val found = single == elem
           if (found) tree -= timeVal
           (found, found)
@@ -345,7 +329,7 @@ object BiPinImpl {
           val found   = i >= 0
           val visible = i == 0
           if (found) {
-            val seqNew = seq.patch(i, IIdxSeq.empty[Elem], 1)
+            val seqNew = seq.patch(i, Vec.empty[Elem], 1)
             tree += timeVal -> seqNew
           }
           (found, visible)

@@ -35,9 +35,7 @@ object Strings extends BiTypeImpl[String] {
 
   def readValue(in: DataInput): String = in.readUTF()
 
-  def writeValue(value: String, out: DataOutput) {
-    out.writeUTF(value)
-  }
+  def writeValue(value: String, out: DataOutput): Unit = out.writeUTF(value)
 
   final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     private type E = Ex[S]

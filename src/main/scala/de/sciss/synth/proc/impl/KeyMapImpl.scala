@@ -57,20 +57,15 @@ object KeyMapImpl {
     extends evti.StandaloneLike[S, (Key, ValueUpd), Entry[S, Key, Value, ValueUpd]] {
     protected def reader: evt.Reader[S, Entry[S, Key, Value, ValueUpd]] = entrySerializer
 
-    def connect()(implicit tx: S#Tx) {
-      info.valueEvent(value) ---> this
-    }
+    def connect   ()(implicit tx: S#Tx): Unit = info.valueEvent(value) ---> this
+    def disconnect()(implicit tx: S#Tx): Unit = info.valueEvent(value) -/-> this
 
-    def disconnect()(implicit tx: S#Tx) {
-      info.valueEvent(value) -/-> this
-    }
-
-    protected def writeData(out: DataOutput) {
+    protected def writeData(out: DataOutput): Unit = {
       info.keySerializer  .write(key  , out)
       info.valueSerializer.write(value, out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx) {}
+    protected def disposeData()(implicit tx: S#Tx) = ()
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[(Key, ValueUpd)] =
       pull(info.valueEvent(value)).map(key -> _)
@@ -122,7 +117,7 @@ trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
       case (key, entry) => key -> entry.value
     }
 
-  final def add(key: Key, value: Value)(implicit tx: S#Tx) {
+  final def add(key: Key, value: Value)(implicit tx: S#Tx): Unit = {
     val con = isConnected
     val tgt = evt.Targets[S] // XXX TODO : partial?
     val n = new KeyMapImpl.Entry(tgt, key, value)
@@ -152,35 +147,24 @@ trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
     }
   }
 
-  @inline private def +=(entry: Entry)(implicit tx: S#Tx) {
-    //println( "KEY MAP " + this + " ADD ENTRY " + entry )
-    entry ---> this
-  }
+  @inline private def +=(entry: Entry)(implicit tx: S#Tx): Unit = entry ---> this
+  @inline private def -=(entry: Entry)(implicit tx: S#Tx): Unit = entry -/-> this
 
-  @inline private def -=(entry: Entry)(implicit tx: S#Tx) {
-    //println( "KEY MAP " + this + " REMOVE ENTRY " + entry )
-    entry -/-> this
-  }
-
-  final def connect()(implicit tx: S#Tx) {
-    //println( "KEY MAP " + this + " CONNECT" )
+  final def connect()(implicit tx: S#Tx): Unit =
     map.iterator.foreach {
       case (_, node) => this += node
     }
-  }
 
-  final def disconnect()(implicit tx: S#Tx) {
-    //println( "KEY MAP " + this + " DISCONNECT" )
+  final def disconnect()(implicit tx: S#Tx): Unit =
     map.iterator.foreach {
       case (_, node) => this -= node
     }
-  }
 
-  //   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, IIdxSeq[ ValueUpd ]] = {
-  //      pull.parents( this ).foldLeft( Map.empty[ Key, IIdxSeq[ ValueUpd ]]) { case (map, sel) =>
+  //   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, Vec[ ValueUpd ]] = {
+  //      pull.parents( this ).foldLeft( Map.empty[ Key, Vec[ ValueUpd ]]) { case (map, sel) =>
   //         val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer )
   //         pull(entryEvt) match {
-  //            case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, IIdxSeq.empty ) :+ upd))
+  //            case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, Vec.empty ) :+ upd))
   //            case None => map
   //         }
   //      }

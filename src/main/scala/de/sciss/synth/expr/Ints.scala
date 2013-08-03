@@ -36,9 +36,7 @@ object Ints extends BiTypeImpl[Int] {
 
   /* protected */ def readValue(in: DataInput): Int = in.readInt()
 
-  /* protected */ def writeValue(value: Int, out: DataOutput) {
-    out.writeInt(value)
-  }
+  /* protected */ def writeValue(value: Int, out: DataOutput): Unit = out.writeInt(value)
 
   def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                             (implicit tx: S#Tx): ExN[S] = {

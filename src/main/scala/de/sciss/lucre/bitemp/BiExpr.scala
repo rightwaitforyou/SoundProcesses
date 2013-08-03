@@ -84,17 +84,17 @@ object BiExpr {
     def timeValue(implicit tx: S#Tx)            = time.value
     def magValue (implicit tx: S#Tx)            = mag.value
 
-    protected def writeData(out: DataOutput) {
+    protected def writeData(out: DataOutput): Unit = {
       time.write(out)
       mag.write(out)
     }
 
-    def connect()(implicit tx: S#Tx) {
+    def connect()(implicit tx: S#Tx): Unit = {
       time.changed ---> this
       mag .changed ---> this
     }
 
-    def disconnect()(implicit tx: S#Tx) {
+    def disconnect()(implicit tx: S#Tx): Unit = {
       time.changed -/-> this
       mag .changed -/-> this
     }
@@ -130,7 +130,7 @@ object BiExpr {
     def timeValue(implicit tx: S#Tx) = timeVal
     def magValue (implicit tx: S#Tx) = magVal
 
-    protected def writeData(out: DataOutput) {
+    protected def writeData(out: DataOutput): Unit = {
       out.writeLong(timeVal)
       magType.writeValue(magVal, out)
     }

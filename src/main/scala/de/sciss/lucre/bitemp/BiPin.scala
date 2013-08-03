@@ -28,13 +28,13 @@ package bitemp
 
 import impl.{BiPinImpl => Impl}
 import de.sciss.lucre.{event => evt}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import evt.{EventLike, Sys}
 import stm.Disposable
 import de.sciss.serial.{Writable, Serializer, DataInput}
 
 object BiPin {
-  final case class Update[S <: Sys[S], A](pin: BiPin[S, A], changes: IIdxSeq[Change[S, A]])
+  final case class Update[S <: Sys[S], A](pin: BiPin[S, A], changes: Vec[Change[S, A]])
 
   sealed trait Change[S <: Sys[S], A]
 
@@ -48,7 +48,7 @@ object BiPin {
   final case class Element[S <: Sys[S], A](elem: BiExpr[S, A], elemUpdate: evt.Change[(Long, A)])
     extends Change[S, A]
 
-  type Leaf[S <: Sys[S], A] = IIdxSeq[BiExpr[S, A]]
+  type Leaf[S <: Sys[S], A] = Vec[BiExpr[S, A]]
 
   object Modifiable {
     /**

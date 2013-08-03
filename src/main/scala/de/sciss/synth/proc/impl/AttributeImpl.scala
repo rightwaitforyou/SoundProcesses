@@ -205,9 +205,7 @@ object AttributeImpl {
 
     private val anySer = new Serializer[InMemory]
     private final class Serializer[S <: evt.Sys[S]] extends serial.Serializer[S#Tx, S#Acc, E[S]] {
-      def write(v: E[S], out: DataOutput) {
-        v.write(out)
-      }
+      def write(v: E[S], out: DataOutput): Unit = v.write(out)
 
       def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): E[S] = {
         val targets = evt.Targets.read[S](in, access)
@@ -226,14 +224,12 @@ object AttributeImpl {
 
     protected def typeID: Int
 
-    final protected def writeData(out: DataOutput) {
+    final protected def writeData(out: DataOutput): Unit = {
       out.writeInt(typeID)
       peer.write(out)
     }
 
-    final protected def disposeData()(implicit tx: S#Tx) {
-      peer.dispose()
-    }
+    final protected def disposeData()(implicit tx: S#Tx): Unit = peer.dispose()
 
     protected def prefix: String
 
@@ -277,13 +273,8 @@ object AttributeImpl {
         pull(peerEvent).map(ch => Update(self, ch))
       }
 
-      def connect()(implicit tx: S#Tx) {
-        peerEvent ---> this
-      }
-
-      def disconnect()(implicit tx: S#Tx) {
-        peerEvent -/-> this
-      }
+      def connect   ()(implicit tx: S#Tx): Unit = peerEvent ---> this
+      def disconnect()(implicit tx: S#Tx): Unit = peerEvent -/-> this
     }
   }
 

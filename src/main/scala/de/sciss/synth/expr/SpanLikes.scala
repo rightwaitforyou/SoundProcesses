@@ -37,9 +37,7 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
 
   /* protected */ def readValue(in: DataInput): SpanLike = SpanLike.read(in)
 
-  /* protected */ def writeValue(value: SpanLike, out: DataOutput) {
-    value.write(out)
-  }
+  /* protected */ def writeValue(value: SpanLike, out: DataOutput): Unit = value.write(out)
 
   def newExpr[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
     BinaryOp.Apply(start, stop)

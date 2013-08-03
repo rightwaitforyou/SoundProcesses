@@ -32,10 +32,9 @@ object SoundProcesses {
 
   private[proc] def isPowerOfTwo(value: Int) = (value & (value - 1)) == 0
 
-  private[proc] def validateCueBufferSize(value: Int) {
+  private[proc] def validateCueBufferSize(value: Int): Unit =
     require(isPowerOfTwo(value) && value >= 8192 && value <= 131072,
       "Must be a power of two and in (8192, 131072) : " + value)
-  }
 
   private var cueBufSz = 32768
   def cueBufferSize: Int = cueBufSz
@@ -54,7 +53,7 @@ object SoundProcesses {
     res
   }
 
-  private def shutdownScheduler() {
+  private def shutdownScheduler(): Unit = {
     log("Shutting down scheduler thread pool")
     pool.shutdown()
   }

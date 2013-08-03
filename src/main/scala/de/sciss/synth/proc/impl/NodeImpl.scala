@@ -28,12 +28,12 @@ package impl
 
 import concurrent.stm.{TxnExecutor, InTxn, Ref}
 import de.sciss.synth.{ControlABusMap, ControlKBusMap, ControlSetMap}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 
 object NodeImpl {
-  private val EmptyOnEnd = new OnEnd(IIdxSeq.empty, IIdxSeq.empty)
+  private val EmptyOnEnd = new OnEnd(Vec.empty, Vec.empty)
 
-  private final case class OnEnd(direct: IIdxSeq[() => Unit], inTxn: IIdxSeq[Txn => Unit]) {
+  private final case class OnEnd(direct: Vec[() => Unit], inTxn: Vec[Txn => Unit]) {
     def nonEmpty = direct.nonEmpty || inTxn.nonEmpty
   }
 }
@@ -60,23 +60,16 @@ trait NodeImpl extends ResourceImpl with Node {
   // sending out new messages from an onEnd because that
   // is executed within the osc receiver actor.
   // decouple it instead.
-  private def spawn(fun: InTxn => Unit) {
+  private def spawn(fun: InTxn => Unit): Unit =
     SoundProcesses.pool.submit(new Runnable {
-      def run() {
-        TxnExecutor.defaultAtomic(fun)
-      }
+      def run(): Unit = TxnExecutor.defaultAtomic(fun)
     })
-  }
 
-  final def onEndTxn(fun: Txn => Unit)(implicit tx: Txn) {
+  final def onEndTxn(fun: Txn => Unit)(implicit tx: Txn): Unit =
     onEndFuns.transform(e => e.copy(inTxn = e.inTxn :+ fun))(tx.peer)
-    //      onEndTouch()( tx.peer )
-  }
 
-  final def onEnd(code: => Unit)(implicit tx: Txn) {
+  final def onEnd(code: => Unit)(implicit tx: Txn): Unit =
     onEndFuns.transform(e => e.copy(direct = e.direct :+ (() => code)))(tx.peer)
-    //      onEndTouch()( tx.peer )
-  }
 
   final def read(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
@@ -139,29 +132,27 @@ trait NodeImpl extends ResourceImpl with Node {
     mapper
   }
 
-  private def registerSetter(bns: BusNodeSetter)(implicit tx: Txn) {
+  private def registerSetter(bns: BusNodeSetter)(implicit tx: Txn): Unit = {
     bns.add()
     onEndTxn {
       implicit tx => bns.remove()
     }
   }
 
-  final def dispose()(implicit tx: Txn) {
-    free(audible = true)
-  }
+  final def dispose()(implicit tx: Txn): Unit = free(audible = true)
 
-  final def free(audible: Boolean = true)(implicit tx: Txn) {
+  final def free(audible: Boolean = true)(implicit tx: Txn): Unit = {
     require(isOnline)
     tx.addMessage(this, peer.freeMsg, audible = audible)
     disposed()
   }
 
-  final def set(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn) {
+  final def set(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {
     require(isOnline)
     tx.addMessage(this, peer.setMsg(pairs: _*), audible = audible)
   }
 
-  final def setn(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn) {
+  final def setn(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {
     require(isOnline)
     tx.addMessage(this, peer.setnMsg(pairs: _*), audible = audible)
   }
@@ -175,17 +166,17 @@ trait NodeImpl extends ResourceImpl with Node {
   ////         OSCMessage( "/error", -1 ), node.setMsg( pairs: _* ), OSCMessage( "/error", -2 )), true )
   //   }
 
-  final def mapn(audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn) {
+  final def mapn(audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn): Unit = {
     require(isOnline)
     tx.addMessage(this, peer.mapnMsg(pairs: _*), audible = audible)
   }
 
-  final def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn) {
+  final def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn): Unit = {
     require(isOnline)
     tx.addMessage(this, peer.mapanMsg(pairs: _*), audible = audible) // , dependencies = this :: Nil /* ?! */)
   }
 
-  final def moveToHead(audible: Boolean, group: Group)(implicit tx: Txn) {
+  final def moveToHead(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
     require(isOnline && group.isOnline)
     tx.addMessage(this, peer.moveToHeadMsg(group.peer), audible = audible, dependencies = group :: Nil)
   }
@@ -197,17 +188,17 @@ trait NodeImpl extends ResourceImpl with Node {
   //      }
   //   }
 
-  final def moveToTail( audible: Boolean, group: Group )( implicit tx: Txn ) {
+  final def moveToTail(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
     require(isOnline && group.isOnline)
     tx.addMessage(this, peer.moveToTailMsg(group.peer), audible = audible, dependencies = group :: Nil)
   }
 
-  final def moveBefore(audible: Boolean, target: Node)(implicit tx: Txn) {
+  final def moveBefore(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
     require(isOnline && target.isOnline)
     tx.addMessage(this, peer.moveBeforeMsg(target.peer), audible = audible, dependencies = target :: Nil)
   }
 
-  final def moveAfter( audible: Boolean, target: Node )( implicit tx: Txn ) {
+  final def moveAfter(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
     require(isOnline && target.isOnline)
     tx.addMessage(this, peer.moveAfterMsg(target.peer), audible = audible, dependencies = target :: Nil)
   }

@@ -31,7 +31,7 @@ import de.sciss.synth.{Group => SGroup, AddAction}
 private[proc] case class GroupImpl(server: Server, peer: SGroup) extends NodeImpl with Group {
   override def toString = "Group(" + peer.toString + ")"
 
-  def play(target: Node, addAction: AddAction)(implicit tx: Txn) {
+  def play(target: Node, addAction: AddAction)(implicit tx: Txn): Unit = {
     require(target.server == server && target.isOnline)
 
     // THERE IS CURRENTLY A PROBLEM EXHIBITED BY TEST3: BASICALLY --
@@ -47,7 +47,6 @@ private[proc] case class GroupImpl(server: Server, peer: SGroup) extends NodeImp
       dependencies = target :: Nil)
   }
 
-  def freeAll(audible: Boolean)(implicit tx: Txn) {
+  def freeAll(audible: Boolean)(implicit tx: Txn): Unit =
     tx.addMessage(this, peer.freeAllMsg, audible = audible)
-  }
 }

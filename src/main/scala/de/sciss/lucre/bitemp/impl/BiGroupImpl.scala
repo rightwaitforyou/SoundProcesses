@@ -30,7 +30,7 @@ package impl
 import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike, impl => evti, Sys}
 import data.{SkipOctree, Iterator}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import collection.breakOut
 import scala.annotation.{elidable, switch}
 import geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2DLike, LongPoint2D, LongSquare, LongSpace}
@@ -45,9 +45,8 @@ object BiGroupImpl {
 
   var showLog = false
 
-  @elidable(elidable.CONFIG) private def log(what: => String) {
+  @elidable(elidable.CONFIG) private def log(what: => String): Unit =
     if (showLog) println(s"<bigroup> $what")
-  }
 
   private val MAX_SQUARE  = LongSquare(0, 0, 0x2000000000000000L)
   private val MIN_COORD   = MAX_SQUARE.left
@@ -56,7 +55,7 @@ object BiGroupImpl {
 
   //   private final case class Entry[ Elem ]( )
 
-  private type LeafImpl[S <: Sys[S], Elem, U] = (SpanLike, IIdxSeq[TimedElemImpl[S, Elem, U]])
+  private type LeafImpl[S <: Sys[S], Elem, U] = (SpanLike, Vec[TimedElemImpl[S, Elem, U]])
   private type Tree    [S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
 
   private def opNotSupported: Nothing = sys.error("Operation not supported")
@@ -119,7 +118,7 @@ object BiGroupImpl {
 
   private final class TimedElemImpl[S <: Sys[S], Elem, U](group: Impl[S, Elem, U],
                                                           protected val targets: evt.Targets[S], val span: Expr[S, SpanLike], val value: Elem)
-  //   extends TimedElem[ S, Elem, U ] with evt.StandaloneLike[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElemImpl[ S, Elem, U ]]
+  //   extends TimedElem[ S, Elem, U ] with evt.StandaloneLike[ S, Vec[ BiGroup.ElementUpdate[ U ]], TimedElemImpl[ S, Elem, U ]]
     extends evti.StandaloneLike[S, BiGroup.Update[S, Elem, U], TimedElem[S, Elem]] with TimedElem[S, Elem] {
 
     import group.{eventView, elemSerializer}
@@ -143,22 +142,22 @@ object BiGroupImpl {
       if (res.nonEmpty) Some(BiGroup.Update(group, res)) else None
     }
 
-    //      def changed: Event[ S, IIdxSeq[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]] = this
+    //      def changed: Event[ S, Vec[ BiGroup.ElementUpdate[ U ]], TimedElem[ S, Elem ]] = this
 
-    protected def writeData(out: DataOutput) {
+    protected def writeData(out: DataOutput): Unit = {
       span.write(out)
       elemSerializer.write(value, out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx) {}
+    protected def disposeData()(implicit tx: S#Tx) = ()
 
-    /* private[lucre] */ def connect()(implicit tx: S#Tx) {
+    /* private[lucre] */ def connect()(implicit tx: S#Tx): Unit = {
       log(s"$this.connect()")
       span.changed     ---> this
       eventView(value) ---> this
     }
 
-    /* private[lucre] */ def disconnect()(implicit tx: S#Tx) {
+    /* private[lucre] */ def disconnect()(implicit tx: S#Tx): Unit = {
       log(s"$this.disconnect()")
       span.changed     -/-> this
       eventView(value) -/-> this
@@ -226,40 +225,35 @@ object BiGroupImpl {
       final val slot = 1
       def node: BiGroup[S, Elem, U] = group
 
-      //      def connect   ()(implicit tx: S#Tx) {}
-      //      def disconnect()(implicit tx: S#Tx) {}
+      //      def connect   ()(implicit tx: S#Tx) = ()
+      //      def disconnect()(implicit tx: S#Tx) = ()
 
-      private def foreach(fun: TimedElemImpl[S, Elem, U] => Unit)(implicit tx: S#Tx) {
+      private def foreach(fun: TimedElemImpl[S, Elem, U] => Unit)(implicit tx: S#Tx): Unit =
         tree.iterator.foreach {
           case (_, seq) => seq.foreach(fun)
         }
-      }
 
-      def connect()(implicit tx: S#Tx) {
+      def connect()(implicit tx: S#Tx): Unit = {
         log(s"$this.connect()")
         foreach(+= _)
       }
 
-      def disconnect()(implicit tx: S#Tx) {
+      def disconnect()(implicit tx: S#Tx): Unit = {
         log(s"$this.disconnect()")
         foreach(-= _)
       }
 
-      def +=(elem: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx) {
-        // log(s"$this += $elem")
+      def +=(elem: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx): Unit =
         elem ---> this
-      }
 
-      def -=(elem: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx) {
-        // log(s"$this -= $elem")
+      def -=(elem: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx): Unit =
         elem -/-> this
-      }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
         val par = pull.parents(this)
         log(s"$this.pullUpdate -> parents = $par")
 
-        val changes: IIdxSeq[BiGroup.Change[S, Elem, U]] = par.flatMap(sel => {
+        val changes: Vec[BiGroup.Change[S, Elem, U]] = par.flatMap(sel => {
           //               val elem = sel.devirtualize( elemReader ).node.asInstanceOf[ Elem ]
           //val elem = sel.devirtualize( elemSerializer.asInstanceOf[ evt.Reader[ S, evt.Node[ S ]]]).node.
           //   asInstanceOf[ Elem ]
@@ -299,23 +293,21 @@ object BiGroupImpl {
 
       def node: BiGroup.Modifiable[S, Elem, U] = group
 
-      def connect()(implicit tx: S#Tx) {
+      def connect()(implicit tx: S#Tx): Unit = {
         log(s"$this.connect")
         CollectionEvent ---> this
         ElementEvent    ---> this
       }
 
-      def disconnect()(implicit tx: S#Tx) {
+      def disconnect()(implicit tx: S#Tx): Unit = {
         log(s"$this.disconnect()")
         CollectionEvent -/-> this
         ElementEvent    -/-> this
       }
 
-      //      def --->(r: evt.Selector[S])(implicit tx: S#Tx) {
-      //      }
+      //      def --->(r: evt.Selector[S])(implicit tx: S#Tx) = ()
       //
-      //      def -/->(r: evt.Selector[S])(implicit tx: S#Tx) {
-      //      }
+      //      def -/->(r: evt.Selector[S])(implicit tx: S#Tx) = ()
 
       // XXX TODO: potential problem with event collapsing
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
@@ -331,26 +323,23 @@ object BiGroupImpl {
       }
     }
 
-    final protected def disposeData()(implicit tx: S#Tx) {
+    final protected def disposeData()(implicit tx: S#Tx): Unit =
       tree.dispose()
-    }
 
-    final protected def writeData(out: DataOutput) {
+    final protected def writeData(out: DataOutput): Unit =
       tree.write(out)
-    }
 
-    //    private def foreach(fun: TimedElemImpl[S, Elem, U] => Unit)(implicit tx: S#Tx) {
+    //    private def foreach(fun: TimedElemImpl[S, Elem, U] => Unit)(implicit tx: S#Tx): Unit =
     //      tree.iterator.foreach {
     //        case (_, seq) => seq.foreach(fun)
     //      }
-    //    }
 
-    //    final def connect()(implicit tx: S#Tx) {
+    //    final def connect()(implicit tx: S#Tx): Unit = {
     //      log(s"$this.connect()")
     //      foreach(ElementEvent += _)
     //    }
     //
-    //    final def disconnect()(implicit tx: S#Tx) {
+    //    final def disconnect()(implicit tx: S#Tx): Unit = {
     //      log(s"$this.disconnect()")
     //      foreach(ElementEvent -= _)
     //    }
@@ -365,7 +354,7 @@ object BiGroupImpl {
 
     @inline private def isConnected(implicit tx: S#Tx): Boolean = targets.nonEmpty
 
-    final def clear()(implicit tx: S#Tx) {
+    final def clear()(implicit tx: S#Tx): Unit =
       if (isConnected) {
         val changes = tree.iterator.toIndexedSeq.flatMap {
           case (spanVal, seq) =>
@@ -379,7 +368,6 @@ object BiGroupImpl {
       } else {
         tree.clear()
       }
-    }
 
     final def add(span: Expr[S, SpanLike], elem: Elem)(implicit tx: S#Tx): TimedElem[S, Elem] = {
       log(s"$this.add($span, $elem); isConnected? $isConnected")
@@ -389,17 +377,17 @@ object BiGroupImpl {
       addNoFire(spanVal, timed)
       if (isConnected) {
         ElementEvent += timed
-        CollectionEvent(BiGroup.Update(group, IIdxSeq(BiGroup.Added(spanVal, timed))))
+        CollectionEvent(BiGroup.Update(group, Vec(BiGroup.Added(spanVal, timed))))
       }
       timed
     }
 
-    private def addNoFire(spanVal: SpanLike, timed: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx) {
+    private def addNoFire(spanVal: SpanLike, timed: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx): Unit = {
       val point = spanToPoint(spanVal)
       //if( showLog ) println( "add at point " + point )
       //         val entry   = (span, elem)
       tree.transformAt(point) {
-        case None => Some(spanVal -> IIdxSeq(timed))
+        case None => Some(spanVal -> Vec(timed))
         case Some((_, seq)) => Some(spanVal -> (seq :+ timed))
       }
     }
@@ -408,7 +396,7 @@ object BiGroupImpl {
       val spanVal = span.value
       val point   = spanToPoint(spanVal)
       val timedO  = tree.get(point).flatMap {
-        case (_, IIdxSeq(single)) =>
+        case (_, Vec(single)) =>
           if (single.span == span && single.value == elem) {
             tree.removeAt(point)
             Some(single)
@@ -427,7 +415,7 @@ object BiGroupImpl {
 
       if (isConnected) timedO.foreach { timed =>
         ElementEvent -= timed
-        CollectionEvent(BiGroup.Update(group, IIdxSeq(BiGroup.Removed(spanVal, timed))))
+        CollectionEvent(BiGroup.Update(group, Vec(BiGroup.Removed(spanVal, timed))))
       }
 
       timedO.isDefined
@@ -437,7 +425,7 @@ object BiGroupImpl {
       val point = spanToPoint(spanVal)
       val entry = tree.get(point)
       entry match {
-        case Some((_, IIdxSeq(single))) =>
+        case Some((_, Vec(single))) =>
           if (single == timed) {
             assert(tree.removeAt(point).isDefined)
             true

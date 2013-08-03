@@ -31,7 +31,7 @@ import lucre.{event => evt, bitemp, expr}
 import impl.CommonSerializers
 import expr.Expr
 import bitemp.{BiType, BiExpr}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 
@@ -45,10 +45,10 @@ import language.implicitConversions
 
 object Grapheme {
   // If necessary for some views, we could eventually add the Elems, too,
-  // like `changes: IIdxSeq[ (Elem[ S ], Value) ]`. Then the question would be
+  // like `changes: Vec[ (Elem[ S ], Value) ]`. Then the question would be
   // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
   // where `trait StoredElem[ S <: Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
-  final case class Update[S <: evt.Sys[S]](grapheme: Grapheme[S], changes: IIdxSeq[Segment])
+  final case class Update[S <: evt.Sys[S]](grapheme: Grapheme[S], changes: Vec[Segment])
 
   implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Grapheme[S]] = Impl.serializer[S]
 
@@ -60,17 +60,14 @@ object Grapheme {
     implicit val biType: BiType[Value] = Elem
 
     implicit object serializer extends ImmutableSerializer[Value] {
-      def write(v: Value, out: DataOutput) {
-        v.write(out)
-      }
+      def write(v: Value, out: DataOutput): Unit = v.write(out)
 
-      def read(in: DataInput): Value = {
+      def read(in: DataInput): Value =
         (in.readByte().toInt: @switch) match {
           case `curveCookie`  => Curve.readIdentified(in)
           case `audioCookie`  => Audio.readIdentified(in)
           case cookie         => sys.error("Unexpected cookie " + cookie)
         }
-      }
     }
 
     // implicit def curveFromMonoTuple(tup: (Double, synth.Curve)): Curve = Curve.fromMonoTuple(tup)
@@ -79,7 +76,7 @@ object Grapheme {
       // implicit def fromMonoTuple(tup: (Double, synth.Curve)): Curve = Curve(tup)
 
       implicit object serializer extends ImmutableSerializer[Curve] {
-        def write(v: Curve, out: DataOutput) { v.write(out) }
+        def write(v: Curve, out: DataOutput): Unit = v.write(out)
         def read(in: DataInput): Curve = {
           val cookie = in.readByte()
           require(cookie == `curveCookie`, s"Unexpected cookie $cookie")
@@ -104,7 +101,7 @@ object Grapheme {
     final case class Curve(values: (Double, synth.Curve)*) extends Value {
       def numChannels = values.size
 
-      def write(out: DataOutput) {
+      def write(out: DataOutput): Unit = {
         out.writeByte(curveCookie)
         val sz = values.size
         out.writeInt(sz)
@@ -146,7 +143,7 @@ object Grapheme {
 
     object Audio {
       implicit object serializer extends ImmutableSerializer[Audio] {
-        def write(v: Audio, out: DataOutput) { v.write(out) }
+        def write(v: Audio, out: DataOutput): Unit = v.write(out)
         def read(in: DataInput): Audio = {
           val cookie = in.readByte()
           require(cookie == `audioCookie`, s"Unexpected cookie $cookie")
@@ -200,10 +197,10 @@ object Grapheme {
       def numChannels: Int
       final def isDefined = true
     }
-    final case class Const(span: Span.HasStart, values: IIdxSeq[Double]) extends Defined {
+    final case class Const(span: Span.HasStart, values: Vec[Double]) extends Defined {
       def numChannels = values.size
     }
-    final case class Curve(span: Span, values: IIdxSeq[(Double, Double, synth.Curve)]) extends Defined {
+    final case class Curve(span: Span, values: Vec[(Double, Double, synth.Curve)]) extends Defined {
       def numChannels = values.size
     }
     final case class Audio(span: Span.HasStart, value: Value.Audio) extends Defined {
@@ -239,7 +236,7 @@ object Grapheme {
 
       def readValue(in: DataInput): Value.Curve = Value.Curve.serializer.read(in)
 
-      def writeValue(v: Value.Curve, out: DataOutput) { v.write(out) }
+      def writeValue(v: Value.Curve, out: DataOutput): Unit = v.write(out)
 
       protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
                                                targets: evt.Targets[S])(implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
@@ -250,7 +247,7 @@ object Grapheme {
       private[Grapheme] def readIdentifiedTuple[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                                 (implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
         val sz      = in.readInt()
-        val values  = IIdxSeq.fill(sz) {
+        val values  = Vec.fill(sz) {
           val mag   = Doubles.readExpr(in, access)
           val shape = CommonSerializers.Curve.read(in)
           (mag, shape)
@@ -278,7 +275,7 @@ object Grapheme {
 
       def readValue(in: DataInput): Value.Audio = Value.Audio.serializer.read(in)
 
-      def writeValue(v: Value.Audio, out: DataOutput) { v.write(out) }
+      def writeValue(v: Value.Audio, out: DataOutput): Unit = v.write(out)
 
       protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
                                            targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
@@ -302,7 +299,7 @@ object Grapheme {
     }
 
     private final class CurveImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
-                                                   val values: IIdxSeq[(Expr[S, Double], synth.Curve)])
+                                                   val values: Vec[(Expr[S, Double], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
       def value(implicit tx: S#Tx): Value.Curve = {
         val v = values.map {
@@ -311,17 +308,15 @@ object Grapheme {
         Value.Curve(v: _*)
       }
 
-      def connect()(implicit tx: S#Tx) {
+      def connect()(implicit tx: S#Tx): Unit =
         values.foreach { tup =>
           tup._1.changed ---> this
         }
-      }
 
-      def disconnect()(implicit tx: S#Tx) {
+      def disconnect()(implicit tx: S#Tx): Unit =
         values.foreach { tup =>
           tup._1.changed -/-> this
         }
-      }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value.Curve]] = {
         val beforeVals  = Vector.newBuilder[(Double, synth.Curve)]
@@ -350,7 +345,7 @@ object Grapheme {
 
       protected def reader = Curve.serializer[S]
 
-      protected def writeData( out: DataOutput ) {
+      protected def writeData(out: DataOutput): Unit = {
         out.writeByte(curveCookie)
         val sz = values.size
         out.writeInt(sz)
@@ -374,13 +369,13 @@ object Grapheme {
         Value.Audio(artVal, spec, offsetVal, gainVal)
       }
 
-      def connect()(implicit tx: S#Tx) {
+      def connect()(implicit tx: S#Tx): Unit = {
         artifact.changed ---> this
         offset  .changed ---> this
         gain    .changed ---> this
       }
 
-      def disconnect()(implicit tx: S#Tx) {
+      def disconnect()(implicit tx: S#Tx): Unit = {
         artifact.changed -/-> this
         offset  .changed -/-> this
         gain    .changed -/-> this
@@ -414,7 +409,7 @@ object Grapheme {
 
       protected def reader = Audio.serializer[S]
 
-      protected def writeData(out: DataOutput) {
+      protected def writeData(out: DataOutput): Unit = {
         out.writeByte(audioCookie)
         artifact.write(out)
         AudioFileSpec.Serializer.write(spec, out)
@@ -431,9 +426,7 @@ object Grapheme {
     def spanLikeType: BiType[SpanLike] = SpanLikes
 
     def readValue(in: DataInput): Value = Value.serializer.read(in)
-    def writeValue(value: Value, out: DataOutput) {
-      value.write(out)
-    }
+    def writeValue(value: Value, out: DataOutput): Unit =value.write(out)
 
     protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                             (implicit tx: S#Tx): Elem[S] with evt.Node[S] = {

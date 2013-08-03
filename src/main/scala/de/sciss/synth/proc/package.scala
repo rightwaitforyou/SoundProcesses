@@ -45,23 +45,18 @@ package object proc {
   var showTransportLog = false
   var showAllocLog     = false
 
-  @elidable(CONFIG) private[proc] def log(what: => String) {
+  @elidable(CONFIG) private[proc] def log(what: => String): Unit =
     if (showLog) Console.out.println(logHeader.format(new Date()) + what)
-  }
 
-  @elidable(CONFIG) private[proc] def logAural(what: => String) {
+  @elidable(CONFIG) private[proc] def logAural(what: => String): Unit =
     if (showAuralLog) Console.out.println(logHeader.format(new Date()) + "aural " + what)
-  }
 
-  @elidable(CONFIG) private[proc] def logTransport(what: => String) {
+  @elidable(CONFIG) private[proc] def logTransport(what: => String): Unit =
     if (showTransportLog) Console.out.println(logHeader.format(new Date()) + "transport " + what)
-  }
 
-  @elidable(CONFIG) private[proc] def logTxn(what: => String) {
+  @elidable(CONFIG) private[proc] def logTxn(what: => String): Unit =
     if (showTxnLog) Console.out.println(logHeader.format(new Date()) + "txn " + what)
-  }
 
-  @elidable(CONFIG) private[proc] def logAlloc(what: => String) {
+  @elidable(CONFIG) private[proc] def logAlloc(what: => String): Unit =
     if (showAllocLog) Console.out.println(logHeader.format(new Date()) + "block " + what)
-  }
 }

@@ -36,23 +36,18 @@ private[proc] trait ResourceImpl extends Resource {
 
   final def isOnline(implicit tx: Txn): Boolean = timeStamp >= 0
 
-  final protected def disposed()(implicit tx: Txn) {
-    //      require( dependentsRef.isEmpty( tx.peer ), "Disposing a resource which still has dependents : " + this )
-    timeStamp_=(-1)
-  }
+  final protected def disposed()(implicit tx: Txn): Unit = timeStamp_=(-1)
 
   final def timeStamp(implicit tx: Txn): TimeStamp = timeStampRef.get(tx.peer)
 
-  final def timeStamp_=(value: TimeStamp)(implicit tx: Txn) {
-    timeStampRef.set(value)(tx.peer)
-  }
+  final def timeStamp_=(value: TimeStamp)(implicit tx: Txn): Unit = timeStampRef.set(value)(tx.peer)
 
-  //   final def addDependent( dependent: Resource )( implicit tx: Txn ) {
+  //   final def addDependent( dependent: Resource )( implicit tx: Txn ): Unit = {
   //      require( dependent.server == server, "Dependency uses divergent server : " + dependent )
   //      dependentsRef.add( dependent )( tx.peer )
   //   }
   //
-  //   final def removeDependent( dependent: Resource )( implicit tx: Txn ) {
+  //   final def removeDependent( dependent: Resource )( implicit tx: Txn ): Unit = {
   //      dependentsRef.remove( dependent )( tx.peer )
   //   }
 }

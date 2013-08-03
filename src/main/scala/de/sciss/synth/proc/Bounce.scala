@@ -74,9 +74,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       if (_group == null) throw new IllegalStateException("A group has not yet been assigned")
       _group
     }
-    def group_=(value: GroupH) {
-      _group = value
-    }
+    def group_=(value: GroupH): Unit = _group = value
 
     var span  : SpanLike                = Span.Void
     val server: Server.ConfigBuilder    = Server.Config()
@@ -249,7 +247,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
         def buffer[T](f: => T): T = f
 
         // ??
-        def out(line: => String) {
+        def out(line: => String): Unit =
           if (line.startsWith("nextOSCPacket")) {
             val time = line.substring(14).toFloat
             val prog = time / dur
@@ -263,11 +261,8 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
           } else if (line != "start time 0") {
             Console.out.println(line)
           }
-        }
 
-        def err(line: => String) {
-          Console.err.println(line)
-        }
+        def err(line: => String): Unit = Console.err.println(line)
       }
       lazy val proc: Process = procBuilder.run(log)
 

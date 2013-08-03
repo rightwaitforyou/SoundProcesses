@@ -76,7 +76,7 @@ object ScanImpl {
   private val anyLinkSer: Serializer[I#Tx, I#Acc, Link[I]] = new LinkSer[I]
 
   private final class LinkSer[S <: Sys[S]] extends Serializer[S#Tx, S#Acc, Link[S]] {
-    def write(link: Link[S], out: DataOutput) {
+    def write(link: Link[S], out: DataOutput): Unit =
       link match {
         case Link.Grapheme(peer) =>
           out.writeByte(0)
@@ -85,7 +85,6 @@ object ScanImpl {
           out.writeByte(1)
           peer.write(out)
       }
-    }
 
     def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Link[S] = {
       (in.readByte(): @switch) match {
@@ -138,14 +137,13 @@ object ScanImpl {
 
     def source(implicit tx: S#Tx): Option[Link[S]] = sourceRef()
 
-    def source_=(link: Option[Link[S]])(implicit tx: S#Tx) {
+    def source_=(link: Option[Link[S]])(implicit tx: S#Tx): Unit =
       if (setSource(link)) {
         link match {
           case Some(Link.Scan(peer)) => peer.addSink(this)
           case _ =>
         }
       }
-    }
 
     private def setSource(link: Option[Link[S]])(implicit tx: S#Tx): Boolean = {
       val old = sourceRef()
@@ -171,19 +169,17 @@ object ScanImpl {
 
     def changed: Event[S, Scan.Update[S], Scan[S]] = this
 
-    def connect()(implicit tx: S#Tx) {
+    def connect()(implicit tx: S#Tx): Unit =
       source match {
         case Some(Scan.Link.Grapheme(peer)) => peer.changed ---> this
         case _ =>
       }
-    }
 
-    def disconnect()(implicit tx: S#Tx) {
+    def disconnect()(implicit tx: S#Tx): Unit =
       source match {
         case Some(Scan.Link.Grapheme(peer)) => peer.changed -/-> this
         case _ =>
       }
-    }
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
       if (pull.parents(this).isEmpty) {
@@ -201,20 +197,19 @@ object ScanImpl {
     // to source_= is that this method should not establish the opposite connection
     // by calling addSink on the source, as this would result in an infinite feedback.
     // still, this method should fire an Scan.SourceChanged event.
-    private[proc] def setScanSource(source: Scan[S])(implicit tx: S#Tx) {
+    private[proc] def setScanSource(source: Scan[S])(implicit tx: S#Tx): Unit =
       setSource(Some(source: Link[S]))
-    }
 
-    protected def writeData(out: DataOutput) {
+    protected def writeData(out: DataOutput): Unit = {
       sourceRef.write(out)
-      sinkMap.write(out)
-      sinkList.write(out)
+      sinkMap  .write(out)
+      sinkList .write(out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx) {
+    protected def disposeData()(implicit tx: S#Tx): Unit = {
       sourceRef.dispose()
-      sinkMap.dispose()
-      sinkList.dispose()
+      sinkMap  .dispose()
+      sinkList .dispose()
     }
 
     protected def reader: evt.Reader[S, Scan[S]] = serializer

@@ -29,7 +29,7 @@ package proc
 import de.sciss.lucre.{bitemp, stm, data, event => evt}
 import bitemp.BiGroup
 import stm.{Disposable, Cursor}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import data.Iterator
 import impl.{TransportImpl => Impl}
 import de.sciss.span.SpanLike
@@ -86,9 +86,9 @@ object Transport {
 
   final case class Advance[S <: evt.Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long,
                                                      isSeek: Boolean, isPlaying: Boolean,
-                                                     added:   IIdxSeq[ BiGroup.TimedElem[S, Elem]]      = IIdxSeq.empty,
-                                                     removed: IIdxSeq[ BiGroup.TimedElem[S, Elem]]      = IIdxSeq.empty,
-                                                     changes: IIdxSeq[(BiGroup.TimedElem[S, Elem], U)]  = IIdxSeq.empty)
+                                                     added:   Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
+                                                     removed: Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
+                                                     changes: Vec[(BiGroup.TimedElem[S, Elem], U)]  = Vec.empty)
     extends Update[S, Elem, U] {
     override def toString =
       "Advance(" + transport + ", " + time + ", isSeek = " + isSeek + ", isPlaying = " + isPlaying +

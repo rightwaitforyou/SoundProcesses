@@ -27,9 +27,8 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.osc.Dump
-import scala.concurrent.stm.{Txn => ScalaTxn, TxnExecutor, Ref}
-import collection.immutable.{IndexedSeq => IIdxSeq}
-import de.sciss.lucre.stm
+import scala.concurrent.stm.{TxnExecutor, Ref}
+import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.{Server => SServer, ServerLike => SServerLike, ServerConnection}
 import TxnExecutor.{defaultAtomic => atomic}
 
@@ -44,7 +43,7 @@ object AuralSystemImpl {
   //      DummySerializer.asInstanceOf[ stm.Serializer[ I#Tx, I#Acc, A ]]
   //
   //   private object DummySerializer extends stm.Serializer[ stm.InMemory#Tx, stm.InMemory#Acc, Nothing ] {
-  //      def write( v: Nothing, out: DataOutput) {}
+  //      def write( v: Nothing, out: DataOutput) = ()
   //      def read( in: DataInput, access: stm.InMemory#Acc )( implicit tx: stm.InMemory#Tx ) : Nothing = sys.error( "Operation not supported" )
   //   }
 
@@ -53,7 +52,7 @@ object AuralSystemImpl {
 
     override def toString = "AuralSystem@" + hashCode.toHexString
 
-    private val clients       = Ref(IIdxSeq.empty[Client])
+    private val clients       = Ref(Vec.empty[Client])
     private val server        = Ref(Option.empty[Server])
     private val connection    = Ref(Option.empty[SServerLike])
 
@@ -62,16 +61,14 @@ object AuralSystemImpl {
       this
     }
 
-    def offline(server: Server.Offline) {
-      serverStarted(server)
-    }
+    def offline(server: Server.Offline): Unit = serverStarted(server)
 
     def stop(): AuralSystem = {
       doStop()
       this
     }
 
-    private def serverStarted(rich: Server) {
+    private def serverStarted(rich: Server): Unit = {
       val cs = atomic { implicit itx =>
         implicit val ptx = Txn.applyPlain(itx)
         connection() = Some(rich.peer)
@@ -82,11 +79,11 @@ object AuralSystemImpl {
       cs.foreach(_.started(rich))
     }
 
-    private def doStart(config: Server.Config, connect: Boolean) {
+    private def doStart(config: Server.Config, connect: Boolean): Unit = {
       val launch: ServerConnection.Listener => ServerConnection = if (connect) {
-        SServer.connect("SoundProcesses", config) _
+        SServer.connect("SoundProcesses", config)
       } else {
-        SServer.boot("SoundProcesses", config) _
+        SServer.boot("SoundProcesses", config)
       }
 
       val c = launch {
@@ -96,29 +93,24 @@ object AuralSystemImpl {
         case ServerConnection.Running(s) =>
           if (dumpOSC) s.dumpOSC(Dump.Text)
           SoundProcesses.pool.submit(new Runnable() {
-            def run() {
-              serverStarted(Server(s))
-            }
+            def run(): Unit = serverStarted(Server(s))
           })
       }
 
       Runtime.getRuntime.addShutdownHook(new Thread(new Runnable {
-        def run() {
-          impl.shutdown()
-        }
+        def run(): Unit = impl.shutdown()
       }))
 
       connection.single() = Some(c)   // XXX TODO: not good
     }
 
-    private def shutdown() {
+    private def shutdown(): Unit =
       connection.single().foreach {
         case s: SServer => s.quit()
         case _ =>
       }
-    }
 
-    private def doStop() {
+    private def doStop(): Unit = {
       val opt = atomic { implicit itx =>
         connection.single.swap(None) match {
           case Some(c: ServerConnection) => c.abort(); None
@@ -138,7 +130,7 @@ object AuralSystemImpl {
       }
     }
 
-    def addClient(c: Client) {
+    def addClient(c: Client): Unit = {
       clients.single.transform(_ :+ c)
       //      val sOpt = atomic { implicit itx =>
       //        clients.transform(_ :+ c)
@@ -149,18 +141,14 @@ object AuralSystemImpl {
 
     def serverOption(implicit tx: Txn): Option[Server] = server()(tx.peer)
 
-    def removeClient(c: Client) {
+    def removeClient(c: Client): Unit =
       clients.single.transform { _.filterNot(_ == c) }
-    }
 
-    def whenStarted(fun: Server => Unit) {
+    def whenStarted(fun: Server => Unit): Unit =
       addClient(new Client {
-        def started(s: Server) {
-          fun(s)    // XXX TODO: should we remove the client?
-        }
+        def started(s: Server): Unit = fun(s)    // XXX TODO: should we remove the client?
 
-        def stopped() {}
+        def stopped() = ()
       })
-    }
   }
 }

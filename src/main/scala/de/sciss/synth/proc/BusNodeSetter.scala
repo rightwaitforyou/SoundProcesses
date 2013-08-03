@@ -71,29 +71,23 @@ object BusNodeSetter {
   }
 
   private sealed trait AudioSetterLike extends ImplLike {
-    final def busChanged(b: AudioBus)(implicit tx: Txn) {
-      //         node.setIfOnline( controlName -> b.index )
+    final def busChanged(b: AudioBus)(implicit tx: Txn): Unit =
       if (node.isOnline) node.set(audible = true, pairs = controlName -> b.index)
-    }
   }
 
   private sealed trait ControlSetterLike extends ImplLike {
-    final def busChanged(b: ControlBus)(implicit tx: Txn) {
-      //         node.setIfOnline( controlName -> b.index )
+    final def busChanged(b: ControlBus)(implicit tx: Txn): Unit =
       if (node.isOnline) node.set(audible = true, pairs = controlName -> b.index)
-    }
   }
 
   private trait AudioMapperLike extends ImplLike {
-    final def busChanged(b: AudioBus)(implicit tx: Txn) {
+    final def busChanged(b: AudioBus)(implicit tx: Txn): Unit =
       node.mapan(true, controlName -> b)
-    }
   }
 
   private sealed trait ControlMapperLike extends ImplLike {
-    final def busChanged(b: ControlBus)(implicit tx: Txn) {
+    final def busChanged(b: ControlBus)(implicit tx: Txn): Unit =
       node.mapn(true, controlName -> b)
-    }
   }
 
   private abstract class AbstractAudioImpl
@@ -125,26 +119,26 @@ object BusNodeSetter {
   }
 
   private abstract class AbstractAudioReader extends AbstractAudioImpl {
-    final def add()(implicit tx: Txn) {
+    final def add()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(true)(tx.peer)
       if (wasAdded) sys.error("Was already added : " + this)
       bus.addReader(this)
     }
 
-    final def remove()( implicit tx: Txn ) {
+    final def remove()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(false)(tx.peer)
       if (wasAdded) bus.removeReader(this)
     }
   }
 
   private abstract class AbstractControlReader extends AbstractControlImpl {
-    final def add()(implicit tx: Txn) {
+    final def add()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(true)(tx.peer)
       if (wasAdded) sys.error("Was already added : " + this)
       bus.addReader(this)
     }
 
-    final def remove()(implicit tx: Txn) {
+    final def remove()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(false)(tx.peer)
       if (wasAdded) bus.removeReader(this)
     }
@@ -188,13 +182,13 @@ object BusNodeSetter {
    */
   private final class AudioWriterImpl(val controlName: String, val bus: RichAudioBus, val node: Node)
     extends AbstractAudioImpl with AudioSetterLike {
-    def add()(implicit tx: Txn) {
+    def add()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(true)(tx.peer)
       if (wasAdded) sys.error("Was already added : " + this)
       bus.addWriter(this)
     }
 
-    def remove()(implicit tx: Txn) {
+    def remove()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(false)(tx.peer)
       if (wasAdded) bus.removeWriter(this)
     }
@@ -206,13 +200,13 @@ object BusNodeSetter {
 
   private final class ControlWriterImpl(val controlName: String, val bus: RichControlBus, val node: Node)
     extends AbstractControlImpl with ControlSetterLike {
-    def add()(implicit tx: Txn) {
+    def add()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(true)(tx.peer)
       if (wasAdded) sys.error("Was already added : " + this)
       bus.addWriter(this)
     }
 
-    def remove()(implicit tx: Txn) {
+    def remove()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(false)(tx.peer)
       if (wasAdded) bus.removeWriter(this)
     }
@@ -230,17 +224,17 @@ object BusNodeSetter {
    extends AbstractAudioImpl with AudioSetterLike {
 
     object dummy extends RichAudioBus.User {
-      def busChanged(b: AudioBus)(implicit tx: Txn) {}
+      def busChanged(b: AudioBus)(implicit tx: Txn) = ()
     }
 
-    def add()(implicit tx: Txn) {
+    def add()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(true)(tx.peer)
       if (wasAdded) sys.error("Was already added : " + this)
       bus.addReader(this)
       bus.addWriter(dummy)
     }
 
-    def remove()(implicit tx: Txn) {
+    def remove()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(false)(tx.peer)
       if (wasAdded) {
         bus.removeWriter(dummy)
@@ -257,17 +251,17 @@ object BusNodeSetter {
     extends AbstractControlImpl with ControlSetterLike {
 
     object dummy extends RichControlBus.User {
-      def busChanged(b: ControlBus)(implicit tx: Txn) {}
+      def busChanged(b: ControlBus)(implicit tx: Txn) = ()
     }
 
-    def add()(implicit tx: Txn) {
+    def add()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(true)(tx.peer)
       if (wasAdded) sys.error("Was already added : " + this)
       bus.addReader(this)
       bus.addWriter(dummy)
     }
 
-    def remove()(implicit tx: Txn) {
+    def remove()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(false)(tx.peer)
       if (wasAdded) {
         bus.removeWriter(dummy)

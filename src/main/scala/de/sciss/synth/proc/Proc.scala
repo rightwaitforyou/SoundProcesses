@@ -29,7 +29,7 @@ package proc
 import de.sciss.lucre.{event => evt, expr}
 import expr.Expr
 import impl.{ProcImpl => Impl}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.DataInput
 
 object Proc {
@@ -44,7 +44,7 @@ object Proc {
   // ---- event types ----
 
   /** An update is a sequence of changes */
-  final case class Update[S <: evt.Sys[S]](proc: Proc[S], changes: IIdxSeq[Change[S]])
+  final case class Update[S <: evt.Sys[S]](proc: Proc[S], changes: Vec[Change[S]])
 
   /** A change is either a state change, or a scan or a grapheme change */
   sealed trait Change[+S]

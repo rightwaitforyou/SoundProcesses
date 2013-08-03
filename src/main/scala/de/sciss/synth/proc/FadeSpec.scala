@@ -16,7 +16,7 @@ object FadeSpec {
 
   object Value {
     implicit object serializer extends ImmutableSerializer[Value] {
-      def write(v: Value, out: DataOutput) {
+      def write(v: Value, out: DataOutput): Unit = {
         import v._
         out.writeShort(COOKIE)
         out.writeLong (numFrames)
@@ -47,9 +47,8 @@ object FadeSpec {
 
     def readValue(in: DataInput): Value = Value.serializer.read(in)
 
-    def writeValue(value: Value, out: DataOutput) {
+    def writeValue(value: Value, out: DataOutput): Unit =
       Value.serializer.write(value, out)
-    }
 
     def apply[S <: evt.Sys[S]](numFrames: Expr[S, Long], shape: Expr[S, Curve], floor: Expr[S, Double])
                               (implicit tx: S#Tx): Elem[S] = {
@@ -113,20 +112,20 @@ object FadeSpec {
         Some(Change(before, now))
       }
 
-      protected def writeData(out: DataOutput) {
+      protected def writeData(out: DataOutput): Unit = {
         out.writeByte(elemCookie)
         numFrames.write(out)
         shape    .write(out)
         floor    .write(out)
       }
 
-      def connect()(implicit tx: S#Tx) {
+      def connect()(implicit tx: S#Tx): Unit = {
         numFrames.changed ---> this
         shape    .changed ---> this
         floor    .changed ---> this
       }
 
-      def disconnect()(implicit tx: S#Tx) {
+      def disconnect()(implicit tx: S#Tx): Unit = {
         numFrames.changed -/-> this
         shape    .changed -/-> this
         floor    .changed -/-> this

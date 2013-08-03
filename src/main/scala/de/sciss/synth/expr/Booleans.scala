@@ -34,9 +34,7 @@ object Booleans extends BiTypeImpl[Boolean] {
 
   def readValue(in: DataInput): Boolean = in.readBoolean()
 
-  def writeValue(value: Boolean, out: DataOutput) {
-    out.writeBoolean(value)
-  }
+  def writeValue(value: Boolean, out: DataOutput): Unit = out.writeBoolean(value)
 
   final class Ops[S <: Sys[S]](ex: Ex[S]) {
 

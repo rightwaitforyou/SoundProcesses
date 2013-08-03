@@ -30,7 +30,7 @@ package impl
 import de.sciss.lucre.stm
 import stm.IdentifierMap
 import collection.breakOut
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal, Txn => ScalaTxn}
 import proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
@@ -68,11 +68,9 @@ object AuralPresentationImpl {
     private val running   = Ref(Option.empty[RunningImpl[S]])
     private val groupRef  = Ref(Option.empty[Group])
 
-    def dispose()(implicit tx: S#Tx) {
-      // XXX TODO dispose running
-    }
+    def dispose()(implicit tx: S#Tx) = () // XXX TODO dispose running
 
-    def stopped() {
+    def stopped(): Unit = {
       // implicit val itx: I#Tx = tx
       aural.removeClient(this)
       running.single() = None // XXX TODO dispose
@@ -80,17 +78,15 @@ object AuralPresentationImpl {
 
     def group(implicit tx: S#Tx): Option[Group] = groupRef.get(tx.peer)
 
-    def started(server: Server) {
+    def started(server: Server): Unit =
       transport.cursor.step { implicit tx =>
         startedTx(server)
       }
-    }
 
-    def stopAll(implicit tx: S#Tx) {
+    def stopAll(implicit tx: S#Tx): Unit =
       group.foreach(_.freeAll())
-    }
 
-    def startedTx(server: Server)(implicit tx: S#Tx) {
+    def startedTx(server: Server)(implicit tx: S#Tx): Unit = {
       // implicit val itx: I#Tx = tx
       // println("startedTx")
 
@@ -105,17 +101,15 @@ object AuralPresentationImpl {
       log("started" + " (" + booted.hashCode.toHexString + ")")
       ProcDemiurg.addServer(server) // ( ProcTxn()( tx ))
 
-      def t_play(time: Long)(implicit tx: S#Tx) {
+      def t_play(time: Long)(implicit tx: S#Tx): Unit =
         transport.iterator.foreach {
           case (_, timed) => booted.procAdded(time, timed)
         }
-      }
 
-      def t_stop(time: Long)(implicit tx: S#Tx) {
+      def t_stop(time: Long)(implicit tx: S#Tx): Unit =
         transport.iterator.foreach {
           case (_, timed) => booted.procRemoved(timed)
         }
-      }
 
       if (transport.isPlaying) t_play(transport.time)
 
@@ -132,7 +126,7 @@ object AuralPresentationImpl {
             case (timed, m) => booted.procUpdated(timed, m)
           }
           added.foreach { timed =>
-            val mute = timed.value.attributes[Attribute.Boolean]("mute").map(_.value).getOrElse(false)
+            val mute = timed.value.attributes[Attribute.Boolean]("mute").exists(_.value)
             if (!mute) booted.procAdded(time, timed)
           }
 
@@ -170,9 +164,7 @@ object AuralPresentationImpl {
   private val anyIDSer = new IDSer[stm.InMemory]
 
   private final class IDSer[S <: stm.Sys[S]] extends Serializer[S#Tx, S#Acc, S#ID] {
-    def write(id: S#ID, out: DataOutput) {
-      id.write(out)
-    }
+    def write(id: S#ID, out: DataOutput): Unit = id.write(out)
 
     def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): S#ID = tx.readID(in, access)
   }
@@ -186,7 +178,7 @@ object AuralPresentationImpl {
                                                   Map.empty[MissingIn[S], Set[AuralProcBuilder[S]]],
                                                 var idMap: Option[IdentifierMap[S#ID, S#Tx, AuralProcBuilder[S]]] =
                                                   None,
-                                                var seq: IIdxSeq[AuralProcBuilder[S]] = IIdxSeq.empty) {
+                                                var seq: Vec[AuralProcBuilder[S]] = Vec.empty) {
     override def toString = "OngoingBuild(missingMap = " + missingMap + ", idMap = " + idMap + ", seq = " + seq + ")"
   }
 
@@ -218,7 +210,7 @@ object AuralPresentationImpl {
     //         }).getOrElse( throw MissingIn( timed, key ))
     //      }
 
-    private def launchProc(builder: AuralProcBuilder[S]) {
+    private def launchProc(builder: AuralProcBuilder[S]): Unit = {
       val ugen          = builder.ugen
       // finalise the ugen graph
       val ug            = ugen.finish
@@ -281,9 +273,8 @@ object AuralPresentationImpl {
       ugen.scanIns.foreach {
         case (key, numCh) =>
 
-          def ensureChannels(n: Int) {
+          def ensureChannels(n: Int): Unit =
             require(n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")")
-          }
 
           val inCtlName = scan.inControlName(key)
 
@@ -360,7 +351,7 @@ object AuralPresentationImpl {
 
     // called before the transaction successfully completes.
     // this is the place where we launch completely built procs.
-    private def flush()(ptx: Txn) {
+    private def flush()(ptx: Txn): Unit = {
       val itx = ptx.peer
       ongoingBuild.get(itx).seq.foreach { builder =>
         val ugen = builder.ugen
@@ -416,21 +407,20 @@ object AuralPresentationImpl {
       }
     }
 
-    def dispose()(implicit tx: S#Tx) {
+    def dispose()(implicit tx: S#Tx): Unit =
       viewMap.dispose()
-    }
 
     //      private def addFlush()( implicit ptx: Txn ) {
     //         ptx.beforeCommit( flush()( _ ))
     //      }
 
-    private def addFlush()(implicit tx: S#Tx) {
+    private def addFlush()(implicit tx: S#Tx): Unit = {
       log(s"addFlush (${hashCode.toHexString})")
       tx.beforeCommit(flush()(_))
       // concurrent.stm.Txn.afterRollback(status => log(s"rollback $status !!"))(tx.peer)
     }
 
-    def procAdded(time: Long, timed: TimedProc[S])(implicit tx: S#Tx) {
+    def procAdded(time: Long, timed: TimedProc[S])(implicit tx: S#Tx): Unit = {
       // val name = timed.value.name.value
       log(s"added $timed (${hashCode.toHexString})")
 
@@ -467,7 +457,7 @@ object AuralPresentationImpl {
     }
 
     // note: builder.outBuses will be updated by this method
-    private def incrementalBuild(ongoing: OngoingBuild[S], builder: AuralProcBuilder[S])(implicit tx: S#Tx) {
+    private def incrementalBuild(ongoing: OngoingBuild[S], builder: AuralProcBuilder[S])(implicit tx: S#Tx): Unit = {
       // simpler algorithm (does not allow for circular relationships):
       // - just store with the missing keys, and wait for other finished ugs to show up within the txn
 
@@ -538,7 +528,7 @@ object AuralPresentationImpl {
       retry.foreach(r => incrementalBuild(ongoing, r))
     }
 
-    def procRemoved(timed: TimedProc[S])(implicit tx: S#Tx) {
+    def procRemoved(timed: TimedProc[S])(implicit tx: S#Tx): Unit = {
       val timedID = timed.id
       viewMap.get(timedID) match {
         case Some(aural) =>
@@ -548,8 +538,8 @@ object AuralPresentationImpl {
           aural.stop()
 
         case _ =>
-          def warn() {
-            val mute = timed.value.attributes[Attribute.Boolean]("mute").map(_.value).getOrElse(false)
+          def warn(): Unit = {
+            val mute = timed.value.attributes[Attribute.Boolean]("mute").exists(_.value)
             if (!mute) println("WARNING: could not find view for " + timed)
           }
 
@@ -576,7 +566,7 @@ object AuralPresentationImpl {
       }
     }
 
-    //      def procGraphChanged( timed: TimedProc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ) {
+    //      def procGraphChanged( timed: TimedProc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ): Unit = {
     //         viewMap.get( timed.id ) match {
     //            case Some( aural ) =>
     //               implicit val ptx = ProcTxn()( tx.peer )
@@ -587,7 +577,7 @@ object AuralPresentationImpl {
     //         }
     //      }
 
-    def procUpdated(timed: TimedProc[S], change: Transport.Proc.Update[S])(implicit tx: S#Tx) {
+    def procUpdated(timed: TimedProc[S], change: Transport.Proc.Update[S])(implicit tx: S#Tx): Unit = {
       // XXX TODO !
       //         viewMap.get( timed.id ) match {
       //            case Some( aural ) =>

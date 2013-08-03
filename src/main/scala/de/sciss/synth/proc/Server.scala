@@ -29,7 +29,7 @@ import impl.{ServerImpl => Impl}
 import de.sciss.synth.{Server => SServer, Client => SClient}
 import de.sciss.osc
 import scala.concurrent.{ExecutionContext, Future}
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import language.implicitConversions
 
 object Server {
@@ -59,7 +59,7 @@ object Server {
       * @param  addDefaultGroup if `true`, prepends a `/g_new` message for the standard default group
         *                       (node id 1) to the returned bundles
       */
-    def bundles(addDefaultGroup: Boolean = true): IIdxSeq[osc.Bundle]
+    def bundles(addDefaultGroup: Boolean = true): Vec[osc.Bundle]
   }
 
   val  Config         = SServer.Config
