@@ -72,7 +72,7 @@ object TransportImpl {
   (stm.Source[S#Tx, ProcGroup[S]],
     I#Var[Info],
     IdentifierMap[S#ID, S#Tx, (S#ID, Map[String, DefSegs])],
-    SkipList.Map[I, Long, Map[S#ID, Map[String, DefSegs]]],
+    SkipList.Map[I, Long,  Map[S#ID, Map[String, DefSegs]]],
     IdentifierMap[S#ID, S#Tx, TimedProc[S]],
     I#Var[Vec[Observation[S, I]]]) = {
 
@@ -196,6 +196,14 @@ object TransportImpl {
 
   private final val dummySegment = Segment.Undefined(Span.from(Long.MaxValue))
 
+  // --------------------------------------------
+
+  private type ScanCache[S <: Sys[S]] = Vec[(Long, Grapheme[S])]
+  private final case class ProcCache[S <: Sys[S]](staleID: S#ID, stop: Long, nextScanTime: Long,
+                                                  scans: Map[String, ScanCache[S]])
+
+  // --------------------------------------------
+
   // see `submit` docs for argument descriptions
   private final class OfflineStep(val logicalNow: Long, val logicalDelay: Long, val schedValid: Int)
   private final val offlineEmptyStep = new OfflineStep(0L, 0L, -1)
@@ -309,9 +317,9 @@ object TransportImpl {
     //     transport needs to emit an advancement message. the value is a map from stale timed-proc ID's
     //     to a map from scan keys to grapheme values, i.e. for scans whose source is a grapheme.
     // (3) a refreshment map for the timed procs
-    protected def gMap    : IdentifierMap[S#ID, S#Tx,    (S#ID, Map[String, DefSegs])]  // (1)
-    protected def gPrio   : SkipList.Map [I, Long   , Map[S#ID, Map[String, DefSegs]]]  // (2)
-    protected def timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]]                     // (3)
+    protected def gMap    : IdentifierMap[S#ID, S#Tx, ProcCache[S]]   // (1)
+    protected def gPrio   : SkipList.Map [I, Long   , Set[S#ID]]      // (2)
+    protected def timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]]   // (3)
 
     protected def groupHandle: stm.Source[S#Tx, ProcGroup[S]]
 
