@@ -161,7 +161,7 @@ class TransportSpec extends ConfluentEventSpec {
             Proc.AssociationAdded(Proc.ScanKey("freq"))))),
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
           Vec(pt1 -> ProcChanged(
-            Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.SourceAdded(source))))
+            Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded(source)))
           ))
         )
       )

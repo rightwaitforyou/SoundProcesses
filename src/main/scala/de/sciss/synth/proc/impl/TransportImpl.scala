@@ -732,7 +732,7 @@ object TransportImpl {
               forward(assoc)
               u_assocChange(state, timed, assoc)
 
-            case sc @ Proc.ScanChange(key, scUpd @ Scan.Update(scan, scanChanges)) =>
+            case sc @ Proc.ScanChange(key, scan, scanChanges) =>
               val flt = scanChanges.filter {
                 case Scan.GraphemeChange(grapheme, graphCh) =>
                   u_scanSourceUpdate(state, timed, key, scan, grapheme, graphCh)
@@ -744,7 +744,7 @@ object TransportImpl {
 
                 case _ => true // SinkAdded, SinkRemoved
               }
-              if (flt.nonEmpty) forward(sc.copy(scanUpdate = scUpd.copy(changes = flt)))
+              if (flt.nonEmpty) forward(sc.copy(changes = flt))
 
             case other => // StateChange other than AssociativeChange, or GraphemeChange
               forward(other)

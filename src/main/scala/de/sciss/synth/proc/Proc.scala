@@ -71,11 +71,13 @@ object Proc {
     override def toString = s"[attribute: $name]"
   }
 
-  final case class ScanChange[S <: evt.Sys[S]](key: String, scanUpdate: Scan.Update[S]) extends Change[S] {
-    override def toString = s"ScanChange($key, $scanUpdate)"
+  final case class ScanChange[S <: evt.Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
+    extends Change[S] {
+    override def toString = s"ScanChange($key, $scan, $changes)"
   }
 
-  final case class AttributeChange[S <: evt.Sys[S]](key: String, attributeUpdate: Attribute.Update[S]) extends Change[S] {
+  final case class AttributeChange[S <: evt.Sys[S]](key: String, attributeUpdate: Attribute.Update[S])
+    extends Change[S] {
     override def toString = s"AttributeChange($key, $attributeUpdate)"
   }
 }

@@ -179,7 +179,7 @@ object ProcImpl {
         if (changes.isEmpty) None
         else Some(Proc.Update(proc,
           changes.map({
-            case (key, u) => Proc.ScanChange(key, u)
+            case (key, u) => Proc.ScanChange(key, u.scan, u.changes)
           })(breakOut)))
       }
 
@@ -193,6 +193,7 @@ object ProcImpl {
       with evt.InvariantEvent [S, Proc.Update[S], Proc[S]]
       with evti.Root          [S, Proc.Update[S]]
       with ProcEvent {
+
       final val slot = 2
     }
 

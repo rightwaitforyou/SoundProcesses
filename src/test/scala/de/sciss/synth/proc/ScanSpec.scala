@@ -80,19 +80,17 @@ class ScanSpec extends ConfluentEventSpec {
       val grSource = Scan.Link.Grapheme(gr)
       scan.addSource(grSource) // should be observed
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq",
-          Scan.Update(scan, Vec(Scan.SourceAdded(grSource)))
-        )))
+        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded(grSource)))))
       )
       obs.clear()
 
       gr.add(2000L, curve(5678.0)) // ...
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(
+        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(
           Scan.GraphemeChange(gr, Vec(Grapheme.Segment.Curve(Span(0L, 2000L), Vec((1234.0, 5678.0, linear))),
             Grapheme.Segment.Const(Span.from(2000L), Vec(5678.0)))
           )
-        )))))
+        ))))
       )
       obs.clear()
 
@@ -103,8 +101,8 @@ class ScanSpec extends ConfluentEventSpec {
       val grSourceNew = Scan.Link.Grapheme(gr)
       scan.addSource(grSourceNew) // should be observed
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.SourceRemoved(grSource   )))))),
-        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.SourceAdded  (grSourceNew))))))
+        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.SourceRemoved(grSource   ))))),
+        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded  (grSourceNew)))))
       )
       obs.clear()
 
@@ -112,19 +110,19 @@ class ScanSpec extends ConfluentEventSpec {
       timeVar() = 4000L // ...
       //lucre.event.showLog = false
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.GraphemeChange(
+        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.GraphemeChange(
           gr, Vec(Grapheme.Segment.Curve(Span(2000L, 4000L), Vec((5678.0, 9876.0, linear))),
             Grapheme.Segment.Const(Span.from(4000L), Vec(9876.0)))
-        ))))))
+        )))))
       )
       obs.clear()
 
       ampVar() = 5432.0 // ...
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.GraphemeChange(
+        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.GraphemeChange(
           gr, Vec(Grapheme.Segment.Curve(Span(2000L, 4000L), Vec((5678.0, 5432.0, linear))),
             Grapheme.Segment.Const(Span.from(4000L), Vec(5432.0)))
-        ))))))
+        )))))
       )
       obs.clear()
     }
