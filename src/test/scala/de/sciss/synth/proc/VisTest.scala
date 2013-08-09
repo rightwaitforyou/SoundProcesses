@@ -79,7 +79,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     implicit         val procVarSer: Serializer[S#Tx, S#Acc, PG     ] =
       BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](_.changed)
     //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-    //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
+    //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ?? // Transport.serializer[ S ]( cursor )
   }
 
   import Implicits._

@@ -150,6 +150,7 @@ trait Scan[S <: evt.Sys[S]] extends evt.Node[S] {
   // to source_= is that this method should not establish the opposite connection
   // by calling addSink on the source, as this would result in an infinite feedback.
   // still, this method should fire an Scan.SourceChanged event.
-  //
-  // private[proc] def setScanSource(source: Scan[S])(implicit tx: S#Tx): Unit
+
+  // private[proc] def addScanSource(source: Scan[S])(implicit tx: S#Tx): Unit
+  // private[proc] def addScanSink  (sink  : Scan[S])(implicit tx: S#Tx): Unit
 }

@@ -59,5 +59,5 @@ trait Txn {
                                audible: Boolean, dependencies: Seq[Resource] = Nil, noErrors: Boolean = false): Unit
 
   //   def addMessage( msg: osc.Message with sosc.Send, change: Option[ (FilterMode, State, Boolean) ], audible: Boolean,
-  //                   dependencies: Map[ State, Boolean ], noError: Boolean = false ): Unit = ???
+  //                   dependencies: Map[ State, Boolean ], noError: Boolean = false ): Unit = ??
 }
