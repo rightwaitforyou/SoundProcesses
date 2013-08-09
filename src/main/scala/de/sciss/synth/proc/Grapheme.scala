@@ -50,7 +50,7 @@ object Grapheme {
   // where `trait StoredElem[ S <: Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
   final case class Update[S <: evt.Sys[S]](grapheme: Grapheme[S], changes: Vec[Segment])
 
-  implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Grapheme[S]] = Impl.serializer[S]
+  implicit def serializer[S <: evt.Sys[S]]: evt.Serializer[S, Grapheme[S]] = Impl.serializer[S]
 
   // 0 reserved for variables
   private final val curveCookie = 1

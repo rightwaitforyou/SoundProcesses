@@ -32,6 +32,7 @@ import evt.Event
 import language.implicitConversions
 import de.sciss.serial.DataInput
 import de.sciss.lucre.stm.Identifiable
+import collection.immutable.{IndexedSeq => Vec}
 
 object Scan {
   object Link {
@@ -62,32 +63,33 @@ object Scan {
   implicit def serializer[ S <: evt.Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
 
   /** A scan's event fires updates of this type. */
-  sealed trait Update      [S <: evt.Sys[S]]                        { def scan  : Scan[S] }
-  sealed trait LinkUpdate  [S <: evt.Sys[S]] extends Update[S]      { def link  : Link[S] }
-  sealed trait SinkUpdate  [S <: evt.Sys[S]] extends LinkUpdate[S]  { def sink  : Link[S] }
-  sealed trait SourceUpdate[S <: evt.Sys[S]] extends LinkUpdate[S]  { def source: Link[S] }
+  final case class Update[S <: evt.Sys[S]](scan: Scan[S], changes: Vec[Change[S]])
+  sealed trait Change      [S <: evt.Sys[S]]
+  sealed trait LinkChange  [S <: evt.Sys[S]] extends Change[S]      { def link  : Link[S] }
+  sealed trait SinkChange  [S <: evt.Sys[S]] extends LinkChange[S]  { def sink  : Link[S] }
+  sealed trait SourceChange[S <: evt.Sys[S]] extends LinkChange[S]  { def source: Link[S] }
 
-  final case class SinkAdded[S <: evt.Sys[S]](scan: Scan[S], sink: Link[S]) extends SinkUpdate[S] {
-    override def toString = s"[$scan ---> $sink]"
+  final case class SinkAdded[S <: evt.Sys[S]](sink: Link[S]) extends SinkChange[S] {
+    // override def toString = s"[$scan ---> $sink]"
     def link = sink
   }
 
-  final case class SinkRemoved[S <: evt.Sys[S]](scan: Scan[S], sink: Link[S]) extends SinkUpdate[S] {
-    override def toString = s"[$scan -/-> $sink]"
+  final case class SinkRemoved[S <: evt.Sys[S]](sink: Link[S]) extends SinkChange[S] {
+    // override def toString = s"[$scan -/-> $sink]"
     def link = sink
   }
 
-  final case class SourceAdded[S <: evt.Sys[S]](scan: Scan[S], source: Link[S]) extends SourceUpdate[S] {
-    override def toString = s"[$scan <--- $source]"
+  final case class SourceAdded[S <: evt.Sys[S]](source: Link[S]) extends SourceChange[S] {
+    // override def toString = s"[$scan <--- $source]"
     def link = source
   }
 
-  final case class SourceRemoved[S <: evt.Sys[S]](scan: Scan[S], source: Link[S]) extends SourceUpdate[S] {
-    override def toString = s"[$scan <-/- $source]"
+  final case class SourceRemoved[S <: evt.Sys[S]](source: Link[S]) extends SourceChange[S] {
+    // override def toString = s"[$scan <-/- $source]"
     def link = source
   }
 
-  final case class SourceChange[S <: evt.Sys[S]](scan: Scan[S], source: Grapheme.Update[S]) extends Update[S]
+  final case class GraphemeChange[S <: evt.Sys[S]](source: Grapheme.Update[S]) extends Change[S]
 }
 
 /**

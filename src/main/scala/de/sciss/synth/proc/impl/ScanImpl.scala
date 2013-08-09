@@ -27,13 +27,13 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, stm, data, expr}
-import stm.IdentifierMap
+import de.sciss.lucre.{event => evt, data, expr}
 import evt.{impl => evti, Event, Sys}
 import annotation.switch
 import expr.LinkedList
 import proc.Scan
 import de.sciss.serial.{DataOutput, Serializer, DataInput}
+import collection.immutable.{IndexedSeq => Vec}
 
 object ScanImpl {
   import Scan.Link
@@ -43,13 +43,11 @@ object ScanImpl {
   sealed trait Update[S]
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = {
-    val targets   = evt.Targets[S] // XXX TODO: partial?
-    // val id        = targets.id
-    val sourceMap = tx.newDurableIDMap[Link[S]]
-    val sourceList= LinkedList.Modifiable[S, Link[S]]
-    val sinkMap   = tx.newDurableIDMap[Link[S]]
-    val sinkList  = LinkedList.Modifiable[S, Link[S]]
-    new Impl(targets, sourceMap, sourceList, sinkMap, sinkList)
+    val targets           = evt.Targets[S] // XXX TODO: partial?
+    val scanSourceList    = LinkedList.Modifiable[S, Scan    [S]]
+    val graphemeSourceList= LinkedList.Modifiable[S, Grapheme[S], Grapheme.Update[S]](_.changed)
+    val sinkList          = LinkedList.Modifiable[S, Link[S]]
+    new Impl(targets, scanSourceList, graphemeSourceList, sinkList)
   }
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = {
@@ -67,17 +65,16 @@ object ScanImpl {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Scan[S] = {
       val serVer    = in.readShort()
       require(serVer == SER_VERSION, s"Incompatible serialized (found $serVer, required $SER_VERSION)")
-      // val id        = targets.id
-      val sourceMap = tx.readDurableIDMap[Link[S]](in)
-      val sourceList= LinkedList.Modifiable.read[S, Link[S]](in, access)
-      val sinkMap   = tx.readDurableIDMap[Link[S]](in)
-      val sinkList  = LinkedList.Modifiable.read[S, Link[S]](in, access)
-      new Impl(targets, sourceMap, sourceList, sinkMap, sinkList)
+
+      val scanSourceList      = LinkedList.Modifiable.read[S, Scan[S]]                                   (in, access)
+      val graphemeSourceList  = LinkedList.Modifiable.read[S, Grapheme[S], Grapheme.Update[S]](_.changed)(in, access)
+      val sinkList            = LinkedList.Modifiable.read[S, Link[S]](in, access)
+      new Impl(targets, scanSourceList, graphemeSourceList, sinkList)
     }
   }
 
   implicit def linkSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Link[S]] =
-    anyLinkSer.asInstanceOf[Serializer[S#Tx, S#Acc, Link[S]]]
+    anyLinkSer.asInstanceOf[evt.Serializer[S, Link[S]]]
 
   private val anyLinkSer: Serializer[I#Tx, I#Acc, Link[I]] = new LinkSer[I]
 
@@ -108,119 +105,131 @@ object ScanImpl {
   // TODO: the crappy sinkList is only needed because the id map does not have an iterator...
   // we should really figure out how to add iterator functionality to the id map!!!
   private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
-                                        protected val sourceMap: IdentifierMap[S#ID, S#Tx, Link[S]],
-                                        protected val sourceList: LinkedList.Modifiable[S, Link[S], Unit],
-                                        protected val sinkMap: IdentifierMap[S#ID, S#Tx, Link[S]],
-                                        protected val sinkList: LinkedList.Modifiable[S, Link[S], Unit])
+                                        protected val scanSourceList    : LinkedList.Modifiable[S, Scan[S], Unit],
+                                        protected val graphemeSourceList: LinkedList.Modifiable[S, Grapheme[S], Grapheme.Update[S]],
+                                        protected val sinkList          : LinkedList.Modifiable[S, Link[S], Unit])
     extends Scan[S]
     with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
     with evti.Generator[S, Scan.Update[S], Scan[S]] {
     override def toString() = "Scan" + id
 
-    def sinks  (implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = sinkList  .iterator
-    def sources(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = sourceList.iterator
+    def sinks  (implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = sinkList.iterator
+    def sources(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = new data.Iterator[S#Tx, Link[S]] {
+      val scanIt  = scanSourceList.iterator
+      val graphIt = graphemeSourceList.iterator
+
+      def hasNext(implicit tx: S#Tx) = scanIt.hasNext || graphIt.hasNext
+
+      def next()(implicit tx: S#Tx): Link[S] = if (scanIt.hasNext)
+        Link.Scan(scanIt.next())
+      else
+        Link.Grapheme(graphIt.next())
+    }
 
     def addSink(sink: Link[S])(implicit tx: S#Tx): Boolean = {
-      val sinkID = sink.id
-      if (sinkMap.contains(sinkID)) return false
+      // val sinkID = sink.id
+      // if (sinkMap.contains(sinkID)) return false
+      if (sinkList.indexOf(sink) >= 0) return false
 
-      sinkMap.put(sinkID, sink)
+      // sinkMap.put(sinkID, sink)
       sinkList.addLast(sink) // addHead faster than addLast; but perhaps we should use addLast to have a better iterator order?
       sink match {
         case Link.Scan(peer) => peer.addSource(Link.Scan(this))
         case _ =>
       }
-      fire(Scan.SinkAdded(this, sink))
+      fire(Scan.Update(this, Vec(Scan.SinkAdded(sink))))
       true
     }
 
     def removeSink(sink: Link[S])(implicit tx: S#Tx): Boolean = {
-      val sinkID = sink.id
-      if (!sinkMap.contains(sinkID)) return false
-      sinkMap.remove(sinkID)
+      // val sinkID = sink.id
+      // if (!sinkMap.contains(sinkID)) return false
+      if (sinkList.indexOf(sink) < 0) return false
+      // sinkMap.remove(sinkID)
       sinkList.remove(sink)
       sink match {
         case Link.Scan(peer) => peer.removeSource(Link.Scan(this))
         case _ =>
       }
-      fire(Scan.SinkRemoved(this, sink))
+      fire(Scan.Update(this, Vec(Scan.SinkRemoved(sink))))
       true
     }
 
     def addSource(source: Link[S])(implicit tx: S#Tx): Boolean = {
-      val sourceID = source.id
-      if (sourceMap.contains(sourceID)) return false
-
-      sourceMap.put(sourceID, source)
-      sourceList.addLast(source)
-      source match {
-        case Link.Scan(peer) =>
-          peer.addSink(Link.Scan(this))
-        case Link.Grapheme(peer) if isConnected =>
-          peer.changed ---> this
-        case _ =>
+      val res = source match {
+        case Link.Scan    (peer) => addScanSource    (peer)
+        case Link.Grapheme(peer) => addGraphemeSource(peer)
       }
-      fire(Scan.SourceAdded(this, source))
+      if (res) fire(Scan.Update(this, Vec(Scan.SourceAdded(source))))
+      res
+    }
+
+    private def addScanSource(source: Scan[S])(implicit tx: S#Tx): Boolean = {
+      if (scanSourceList.indexOf(source) >= 0) return false
+
+      scanSourceList.addLast(source)
+      source.addSink(Link.Scan(this))
       true
     }
 
-    @inline private def isConnected(implicit tx: S#Tx): Boolean = targets.nonEmpty
+    private def addGraphemeSource(source: Grapheme[S])(implicit tx: S#Tx): Boolean = {
+      if (graphemeSourceList.indexOf(source) >= 0) return false
+
+      graphemeSourceList.addLast(source)
+      true
+    }
 
     def removeSource(source: Link[S])(implicit tx: S#Tx): Boolean = {
-      val sourceID = source.id
-      if (!sourceMap.contains(sourceID)) return false
-      sourceMap.remove(sourceID)
-      sourceList.remove(source)
-      source match {
-        case Link.Scan(peer) =>
-          peer.removeSink(Link.Scan(this))
-        case Link.Grapheme(peer) if isConnected =>
-          peer.changed -/-> this
+      val res = source match {
+        case Link.Scan    (peer) => removeScanSource    (peer)
+        case Link.Grapheme(peer) => removeGraphemeSource(peer)
       }
-      fire(Scan.SourceRemoved(this, source))
-      true
+      if (res) fire(Scan.Update(this, Vec(Scan.SourceRemoved(source))))
+      res
     }
+
+    private def removeScanSource(source: Scan[S])(implicit tx: S#Tx): Boolean = {
+      val res = scanSourceList.remove(source)
+      if (res) {
+        source.removeSink(Link.Scan(this))
+      }
+      res
+    }
+
+    private def removeGraphemeSource(source: Grapheme[S])(implicit tx: S#Tx): Boolean =
+      graphemeSourceList.remove(source)
 
     def changed: Event[S, Scan.Update[S], Scan[S]] = this
 
-    def connect()(implicit tx: S#Tx): Unit =
-      sources.foreach {
-        case Scan.Link.Grapheme(peer) => peer.changed ---> this
-        case _ =>
-      }
-
-    def disconnect()(implicit tx: S#Tx): Unit =
-      sources.foreach {
-        case Scan.Link.Grapheme(peer) => peer.changed -/-> this
-        case _ =>
-      }
+    def connect   ()(implicit tx: S#Tx): Unit = graphemeSourceList.changed ---> this
+    def disconnect()(implicit tx: S#Tx): Unit = graphemeSourceList.changed -/-> this
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
-      if (pull.parents(this).isEmpty) {
-        pull.resolve[Scan.Update[S]]
-      } else {
-        ???
-        //        source.flatMap {
-        //          case Scan.Link.Grapheme(peer) =>
-        //            pull(peer.changed).map(Scan.SourceUpdate(this, _))
-        //          case _ => None
-        //        }
+      val u1 = if (pull.parents(this).isEmpty)
+        pull.resolve[Scan.Update[S]].fold(Vec.empty[Scan.Change[S]])(_.changes)
+      else
+        Vec.empty
+
+      val u2 = pull(graphemeSourceList.changed).fold(u1) { ll =>
+        val gcs = ll.changes.collect {
+          case LinkedList.Element(_, gc) => Scan.GraphemeChange(gc)
+        }
+        if (u1.isEmpty) gcs else if (gcs.isEmpty) u1 else u1 ++ gcs
       }
+      if (u2.isEmpty) None else Some(Scan.Update(this, u2))
     }
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
-      sourceMap .write(out)
-      sourceList.write(out)
-      sinkMap   .write(out)
-      sinkList  .write(out)
+      scanSourceList    .write(out)
+      graphemeSourceList.write(out)
+      sinkList          .write(out)
     }
 
     protected def disposeData()(implicit tx: S#Tx): Unit = {
-      sourceMap .dispose()
-      sourceList.dispose()
-      sinkMap   .dispose()
-      sinkList  .dispose()
+      scanSourceList    .dispose()
+      graphemeSourceList.dispose()
+      sinkList          .dispose()
     }
 
     protected def reader: evt.Reader[S, Scan[S]] = serializer
