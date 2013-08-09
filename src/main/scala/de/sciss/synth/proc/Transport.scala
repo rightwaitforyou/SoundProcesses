@@ -102,7 +102,6 @@ object Transport {
 
   // particular update for ProcTransport
   object Proc {
-
     sealed trait Update[+S]
 
     final case class Changed[S <: evt.Sys[S]](peer: proc.Proc.Change[S])  extends Update[S]

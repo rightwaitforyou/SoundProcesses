@@ -51,7 +51,7 @@ object ThesisExamples extends App {
     val p2        = Proc[S]
 
     val sMute     = p1.scans.add("mute")
-    sMute.source  = Some(Scan.Link.Grapheme(gMute))
+    sMute addSource Scan.Link.Grapheme(gMute)
     val sOut      = p1.scans.add("out")
     val sIn       = p2.scans.add("in")
     sOut addSink sIn

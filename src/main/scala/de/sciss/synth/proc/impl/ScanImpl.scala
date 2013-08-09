@@ -74,7 +74,7 @@ object ScanImpl {
   }
 
   implicit def linkSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Link[S]] =
-    anyLinkSer.asInstanceOf[evt.Serializer[S, Link[S]]]
+    anyLinkSer.asInstanceOf[Serializer[S#Tx, S#Acc, Link[S]]]
 
   private val anyLinkSer: Serializer[I#Tx, I#Acc, Link[I]] = new LinkSer[I]
 

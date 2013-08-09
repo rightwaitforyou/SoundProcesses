@@ -144,7 +144,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     }
     val g = Grapheme.Modifiable[S]
     val scan = p.scans.add("freq")
-    scan.source_=(Some(Scan.Link.Grapheme(g)))
+    scan.addSource(Scan.Link.Grapheme(g))
 
     //      p.trigger( "silence" )
 
@@ -284,7 +284,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
       }
       val g = Grapheme.Modifiable[S]
       val scan = p.scans.add("in")
-      scan.source_=(Some(Scan.Link.Grapheme(g)))
+      scan.addSource(Scan.Link.Grapheme(g))
 
       g.add(0L -> af)
       group.add(Span(0.sec, 4.sec), p)
@@ -292,12 +292,13 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     }
   }
 
-  private def addFreq2(value: BiExpr[S, Grapheme.Value])(implicit tx: S#Tx) {
-    pr().scans.get("freq").flatMap(_.source).foreach {
-      case Scan.Link.Grapheme(Grapheme.Modifiable(peer)) => peer.add(value)
-      case _ =>
+  private def addFreq2(value: BiExpr[S, Grapheme.Value])(implicit tx: S#Tx): Unit =
+    pr().scans.get("freq").foreach { scan =>
+      scan.sources.foreach {
+        case Scan.Link.Grapheme(Grapheme.Modifiable(peer)) => peer.add(value)
+        case _ =>
+      }
     }
-  }
 
   //   implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )
 

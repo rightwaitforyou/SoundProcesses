@@ -59,7 +59,7 @@ object PatchTest extends App {
       Out.ar(0, Pan2.ar(sig))
     }
 
-    p2in.source_=(Some(Scan.Link.Scan(p1out)))
+    p2in.addSource(Scan.Link.Scan(p1out))
 
     group.add(Span.from(0L), p1)
     group.add(Span.from((2.5 * 44100L).toLong), p2) // begin when sine wave is at positive peak

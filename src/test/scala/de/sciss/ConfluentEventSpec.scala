@@ -6,7 +6,7 @@ import org.scalatest.fixture
 import org.scalatest.matchers.ShouldMatchers
 import synth.expr.{Longs, ExprImplicits, Ints}
 import concurrent.stm.TxnLocal
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import stm.store.BerkeleyDB
 
 trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
@@ -30,7 +30,7 @@ trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
   }
 
   final class Observation[S <: stm.Sys[S]] {
-    private val seqRef = TxnLocal(init = IIdxSeq.empty[Any])
+    private val seqRef = TxnLocal(init = Vec.empty[Any])
 
     def register(tx: S#Tx)(upd: Any) {
       seqRef.transform(_ :+ upd)(tx.peer)

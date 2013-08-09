@@ -3,8 +3,7 @@ package synth
 package proc
 
 import expr.{Doubles, Longs}
-import lucre.bitemp
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import lucre.expr.Expr
 import span.Span
 import de.sciss.synth.Curve.linear
@@ -39,21 +38,22 @@ class ScanSpec extends ConfluentEventSpec {
       // p.graphemes.add( "test", gr )
       // p.graphemes.remove( "test" )
       // p.graphemes.add( "gr", gr )
-      val gr2 = Grapheme.Modifiable[S]
+
+      // val gr2 = Grapheme.Modifiable[S]
       obs.assertEquals(
-        Proc.Update(p, IIdxSeq(Proc.AssociationAdded  (Proc.ScanKey("amp" )))),
-        Proc.Update(p, IIdxSeq(Proc.AssociationAdded  (Proc.ScanKey("freq")))),
-        Proc.Update(p, IIdxSeq(Proc.AssociationRemoved(Proc.ScanKey("amp" ))))
-        // Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "test" )))),
-        // Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "test" )))),
-        // Proc.Update( p, IIdxSeq( Proc.AssociationAdded( Proc.GraphemeKey( "gr" ))))
+        Proc.Update(p, Vec(Proc.AssociationAdded  (Proc.ScanKey("amp" )))),
+        Proc.Update(p, Vec(Proc.AssociationAdded  (Proc.ScanKey("freq")))),
+        Proc.Update(p, Vec(Proc.AssociationRemoved(Proc.ScanKey("amp" ))))
+        // Proc.Update( p, Vec( Proc.AssociationAdded( Proc.GraphemeKey( "test" )))),
+        // Proc.Update( p, Vec( Proc.AssociationRemoved( Proc.GraphemeKey( "test" )))),
+        // Proc.Update( p, Vec( Proc.AssociationAdded( Proc.GraphemeKey( "gr" ))))
       )
       obs.clear()
 
       // p.graphemes.add( "gr", gr2 )
       // gr.dispose()
       // obs.assertEquals(
-      //    Proc.Update( p, IIdxSeq( Proc.AssociationRemoved( Proc.GraphemeKey( "gr" )),
+      //    Proc.Update( p, Vec( Proc.AssociationRemoved( Proc.GraphemeKey( "gr" )),
       //                             Proc.AssociationAdded(   Proc.GraphemeKey( "gr" ))))
       // )
 
@@ -71,38 +71,42 @@ class ScanSpec extends ConfluentEventSpec {
 
       gr.add(0L, curve(1234.0)) // should be observed only directly through proc (but not scan)
       obs.assertEquals()
-      //    Proc.Update( p, IIdxSeq( Proc.GraphemeChange( "gr",
-      //       Grapheme.Update( gr, IIdxSeq( Grapheme.Segment.Const( Span.from( 0L ), IIdxSeq( 1234.0 ))))
+      //    Proc.Update( p, Vec( Proc.GraphemeChange( "gr",
+      //       Grapheme.Update( gr, Vec( Grapheme.Segment.Const( Span.from( 0L ), Vec( 1234.0 ))))
       //    )))
       // )
       obs.clear()
 
-      scan.source_=(Some(Scan.Link.Grapheme(gr))) // should be observed
+      val grSource = Scan.Link.Grapheme(gr)
+      scan.addSource(grSource) // should be observed
       obs.assertEquals(
-        Proc.Update(p, IIdxSeq(Proc.ScanChange("freq",
-          Scan.SourceChanged(scan, Some(Scan.Link.Grapheme(gr)))
+        Proc.Update(p, Vec(Proc.ScanChange("freq",
+          Scan.Update(scan, Vec(Scan.SourceAdded(grSource)))
         )))
       )
       obs.clear()
 
       gr.add(2000L, curve(5678.0)) // ...
       obs.assertEquals(
-        Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceUpdate(scan,
-          Grapheme.Update(gr, Vector(Grapheme.Segment.Curve(Span(0L, 2000L), Vector((1234.0, 5678.0, linear))),
-            Grapheme.Segment.Const(Span.from(2000L), Vector(5678.0)))
+        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(
+          Scan.GraphemeChange(
+            Grapheme.Update(gr, Vec(Grapheme.Segment.Curve(Span(0L, 2000L), Vec((1234.0, 5678.0, linear))),
+              Grapheme.Segment.Const(Span.from(2000L), Vec(5678.0)))
+            )
           )
-        ))))
+        )))))
       )
       obs.clear()
 
-      scan.source_=(None)
+      scan.removeSource(grSource)
       val timeVar = Longs.newVar[S](3000L)
       val ampVar  = Doubles.newVar[S](9876.0)
       gr.add(timeVar, curve(ampVar)) // should not be observed
-      scan.source_=(Some(Scan.Link.Grapheme(gr))) // should be observed
+      val grSourceNew = Scan.Link.Grapheme(gr)
+      scan.addSource(grSourceNew) // should be observed
       obs.assertEquals(
-        Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceChanged(scan, None)))),
-        Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceChanged(scan, Some(Scan.Link.Grapheme(gr))))))
+        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.SourceRemoved(grSource   )))))),
+        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.SourceAdded  (grSourceNew))))))
       )
       obs.clear()
 
@@ -110,21 +114,21 @@ class ScanSpec extends ConfluentEventSpec {
       timeVar() = 4000L // ...
       //lucre.event.showLog = false
       obs.assertEquals(
-        Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceUpdate(scan,
-          Grapheme.Update(gr, IIdxSeq(Grapheme.Segment.Curve(Span(2000L, 4000L), Vector((5678.0, 9876.0, linear))),
-            Grapheme.Segment.Const(Span.from(4000L), Vector(9876.0)))
+        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.GraphemeChange(
+          Grapheme.Update(gr, Vec(Grapheme.Segment.Curve(Span(2000L, 4000L), Vec((5678.0, 9876.0, linear))),
+            Grapheme.Segment.Const(Span.from(4000L), Vec(9876.0)))
           )
-        ))))
+        ))))))
       )
       obs.clear()
 
       ampVar() = 5432.0 // ...
       obs.assertEquals(
-        Proc.Update(p, IIdxSeq(Proc.ScanChange("freq", Scan.SourceUpdate(scan,
-          Grapheme.Update(gr, IIdxSeq(Grapheme.Segment.Curve(Span(2000L, 4000L), Vector((5678.0, 5432.0, linear))),
-            Grapheme.Segment.Const(Span.from(4000L), Vector(5432.0)))
+        Proc.Update(p, Vec(Proc.ScanChange("freq", Scan.Update(scan, Vec(Scan.GraphemeChange(
+          Grapheme.Update(gr, Vec(Grapheme.Segment.Curve(Span(2000L, 4000L), Vec((5678.0, 5432.0, linear))),
+            Grapheme.Segment.Const(Span.from(4000L), Vec(5432.0)))
           )
-        ))))
+        ))))))
       )
       obs.clear()
     }
