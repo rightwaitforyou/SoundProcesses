@@ -76,9 +76,9 @@ object Proc {
     override def toString = s"ScanChange($key, $scan, $changes)"
   }
 
-  final case class AttributeChange[S <: evt.Sys[S]](key: String, attributeUpdate: Attribute.Update[S])
+  final case class AttributeChange[S <: evt.Sys[S]](key: String, attribute: Attribute[S], change: Any)
     extends Change[S] {
-    override def toString = s"AttributeChange($key, $attributeUpdate)"
+    override def toString = s"AttributeChange($key, $attribute, $change)"
   }
 }
 /** The `Proc` trait is the basic entity representing a sound process. */

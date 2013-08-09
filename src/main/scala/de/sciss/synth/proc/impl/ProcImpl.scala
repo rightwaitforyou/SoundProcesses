@@ -146,7 +146,7 @@ object ProcImpl {
         if (changes.isEmpty) None
         else Some(Proc.Update(proc,
           changes.map({
-            case (key, u) => Proc.AttributeChange(key, u)
+            case (key, u) => Proc.AttributeChange(key, u.element, u.change)
           })(breakOut)))
       }
 
