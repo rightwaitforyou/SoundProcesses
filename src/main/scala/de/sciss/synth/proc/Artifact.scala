@@ -42,8 +42,12 @@ object Artifact {
   implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Artifact[S]] = Impl.serializer
 
   def relativize(parent: File, sub: File): Child = {
-    val can     = sub   .getCanonicalFile
-    val base    = parent.getCanonicalFile
+    // Note: .getCanonicalFile will resolve symbolic links.
+    // In order to support artifacts being symbolic links
+    // inside a parent folder, we must not resolve them!
+
+    val can     = sub   .getAbsoluteFile // .getCanonicalFile
+    val base    = parent.getAbsoluteFile // .getCanonicalFile
 
     @tailrec def loop(res: File, left: File): File = {
       if (left == null)
