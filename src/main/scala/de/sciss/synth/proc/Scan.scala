@@ -89,7 +89,8 @@ object Scan {
     def link = source
   }
 
-  final case class GraphemeChange[S <: evt.Sys[S]](source: Grapheme.Update[S]) extends Change[S]
+  final case class GraphemeChange[S <: evt.Sys[S]](grapheme: Grapheme[S],
+                                                   changes: Vec[Grapheme.Segment]) extends Change[S]
 }
 
 /**

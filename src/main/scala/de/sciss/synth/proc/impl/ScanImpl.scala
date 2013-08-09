@@ -212,7 +212,7 @@ object ScanImpl {
 
       val u2 = pull(graphemeSourceList.changed).fold(u1) { ll =>
         val gcs = ll.changes.collect {
-          case LinkedList.Element(_, gc) => Scan.GraphemeChange(gc)
+          case LinkedList.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
         }
         if (u1.isEmpty) gcs else if (gcs.isEmpty) u1 else u1 ++ gcs
       }

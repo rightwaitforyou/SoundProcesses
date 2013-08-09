@@ -623,7 +623,7 @@ object TransportImpl {
     }
 
     private def u_scanSourceUpdate(state: GroupUpdateState, timed: TimedProc[S], key: String, scan: Scan[S],
-                                   graphUpd: Grapheme.Update[S])(implicit tx: S#Tx): Unit = {
+                                   grapheme: Grapheme[S], graphCh: Vec[Grapheme.Segment])(implicit tx: S#Tx): Unit = {
       //        SourceUpdate (passing on changes in a grapheme source) :
       //          - grapheme changes must then be tracked, structures updated
 
@@ -634,7 +634,7 @@ object TransportImpl {
         val newFrame = state.info.frame
         var newSegm: Segment = dummySegment
         // determine closest new segment (`newSegm`) and add all relevant segments to update list
-        graphUpd.changes.foreach { segm =>
+        graphCh.foreach { segm =>
           val span  = segm.span
           val start = span.start
           if (segm.isDefined && start < newSegm.span.start && start > newFrame) {
@@ -734,8 +734,8 @@ object TransportImpl {
 
             case sc @ Proc.ScanChange(key, scUpd @ Scan.Update(scan, scanChanges)) =>
               val flt = scanChanges.filter {
-                case Scan.GraphemeChange(graphUpd) =>
-                  u_scanSourceUpdate(state, timed, key, scan, graphUpd)
+                case Scan.GraphemeChange(grapheme, graphCh) =>
+                  u_scanSourceUpdate(state, timed, key, scan, grapheme, graphCh)
                   false // scan changes are filtered and prepared already by u_scanSourceUpdate
 
                 case u: Scan.SourceChange[S] =>
