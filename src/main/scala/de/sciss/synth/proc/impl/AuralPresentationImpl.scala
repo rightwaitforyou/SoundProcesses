@@ -142,8 +142,12 @@ object AuralPresentationImpl {
     }
   }
 
+  private final class OutputBuilder(val bus: RichAudioBus) {
+    var sinks = Vec.empty[AudioBusNodeSetter]
+  }
+
   private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilder[S] /*, val name: String */) {
-    var outBuses: Map[String, RichAudioBus] = Map.empty
+    var outputs = Map.empty[String, OutputBuilder]
   }
 
   // this is plain stupid... another reason why the scan should reproduce the proc and key
@@ -265,14 +269,14 @@ object AuralPresentationImpl {
             require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
 
           val inCtlName = scan.inControlName(key)
-          var inBus     = Option.empty[RichAudioBus]
+          var inBus     = Option.empty[AudioBusNodeSetter]
 
-          def lazyInBus: RichAudioBus =
+          def lazyInBus: AudioBusNodeSetter =
             inBus.getOrElse {
-              val res    = RichBus.audio(server, numCh)
+              val b     = RichBus.audio(server, numCh)
+              val res    = BusNodeSetter.mapper(inCtlName, b, synth)
+              busUsers :+= res
               inBus      = Some(res)
-              val bm     = BusNodeSetter.mapper(inCtlName, res, synth)
-              busUsers :+= bm
               res
             }
 
@@ -295,47 +299,61 @@ object AuralPresentationImpl {
                   case segm: Segment.Curve =>
                     ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
                     // println(s"segment : ${segm.span}")
-                    val b      = lazyInBus
-                    val w      = SegmentWriter(b, segm, time, sampleRate)
+                    val bm     = lazyInBus
+                    val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
                     deps     ::= w
                     busUsers :+= w
 
                   case audio: Segment.Audio =>
                     ensureChannels(audio.numChannels)
-                    val b      = lazyInBus
-                    val w      = AudioArtifactWriter(b, audio, time, sampleRate)
+                    val bm     = lazyInBus
+                    val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
                     deps     ::= w
                     busUsers :+= w
                 }
               case Link.Scan(peer) =>
                 scanMap.get(peer.id).foreach {
-                  case (sourceKey, idH) =>
-                    val sourceTimedID = idH()
-                    val bOut = getBus(sourceTimedID, sourceKey).getOrElse {
-                      // ... or could just stick with the default control value ?
-                      sys.error(s"Bus disappeared $sourceTimedID -> $sourceKey")
+                  case (srcKey, idH) =>
+                    val srcTimedID  = idH()
+                    val bIn         = lazyInBus
+                    viewMap.get(srcTimedID) match {
+                      case Some(srcAural) =>
+                        srcAural.addSink(srcKey, bIn)
+
+                      case _ =>
+                        assert(ongoingBuild.isInitialized(tx.peer))
+                        val ob = ongoingBuild.get(tx.peer)
+                        for {
+                          map <- ob.idMap
+                          pb  <- map.get(srcTimedID)
+                          bus <- pb.outputs.get(srcKey)
+                        } yield bus
+
+                        //                    val bOut = getBus(sourceTimedID, sourceKey).getOrElse {
+                        //                      // ... or could just stick with the default control value ?
+                        //                      sys.error(s"Bus disappeared $sourceTimedID -> $sourceKey")
+                        //                    }
+                        //                    ensureChannels(bOut.numChannels) // ... or could insert a channel coercing synth
+                        ???
                     }
-                    ensureChannels(bOut.numChannels) // ... or could insert a channel coercing synth
-                    val bIn    = lazyInBus
-                    ???
                 }
             }
           }
       }
 
-      val outBuses = builder.outBuses
+      val outBuses = builder.outputs
 
       // ---- handle output buses ----
-      builder.outBuses.foreach {
-        case (key, bus) =>
-          val bw = BusNodeSetter.writer(scan.outControlName(key), bus, synth)
+      builder.outputs.foreach {
+        case (key, out) =>
+          val bw = BusNodeSetter.writer(scan.outControlName(key), out.bus, synth)
           busUsers :+= bw
       }
 
       // wrap as AuralProc and save it in the identifier map for later lookup
       val deps1 = deps.map(_.resource)
       synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
-      val aural = AuralProc(synth, outBuses, busUsers)
+      val aural = AuralProc(synth, outBuses.mapValues(_.bus), busUsers)
 
       busUsers.foreach(_.add())
 
@@ -369,8 +387,8 @@ object AuralPresentationImpl {
           for {
             map <- ob.idMap
             pb  <- map.get(timedID)
-            bus <- pb.outBuses.get(key)
-          } yield bus
+            out <- pb.outputs.get(key)
+          } yield out.bus
       }
 
     // called by UGenGraphBuilderImpl
@@ -465,14 +483,14 @@ object AuralPresentationImpl {
       // detect which new scan outputs have been determined in the last iteration
       // (newOuts is a map from `name: String` to `numChannels Int`)
       val newOuts = ugen.scanOuts.filterNot {
-        case (key, _) => builder.outBuses.contains(key)
+        case (key, _) => builder.outputs.contains(key)
       }
       // if there were any, create rich audio buses for them, and store them in the builder's bus map.
       //    note that these buses initially do not have any real resources allocated, so it's safe to
       //    forget about them and have them gc'ed if the process does not complete by the end of the txn.
       if (newOuts.nonEmpty) {
-        val newBuses = newOuts.mapValues(numCh => RichBus.audio(server, numCh))
-        builder.outBuses ++= newBuses
+        val newBuses = newOuts.mapValues(numCh => new OutputBuilder(RichBus.audio(server, numCh)))
+        builder.outputs ++= newBuses
       }
 
       // if the last iteration did not complete the build process, store the missing in keys

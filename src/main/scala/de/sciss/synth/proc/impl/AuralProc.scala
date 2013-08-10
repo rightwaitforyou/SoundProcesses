@@ -42,7 +42,7 @@ object AuralProc {
     new Impl(synth, outBuses, busUsers)
   }
 
-  /*
+   /*
     * The possible differentiation of groups for an aural process. The minimum configuration is one main
     * group. If synths need to play before the main process, a pre group will be established, if they need
     * to play after the main process, a post group will be established. If multiple synths participate in
@@ -208,6 +208,10 @@ object AuralProc {
     // XXX if they stay static that way, we can remove the tx argument
     def getBus(key: String)(implicit tx: Txn): Option[RichAudioBus] = outBuses.get(key)
 
+    def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
+      ???
+    }
+
     //      def setBus( key: String, bus: Option[ RichAudioBus ]): Unit = ??
 
     //      def addParams( map: Map[ String, Param ])( implicit tx: Txn ): Unit = {
@@ -226,35 +230,18 @@ sealed trait AuralProc /* extends Writer */ {
   //   def name( implicit tx: Txn ) : String
   //   def name_=( n: String )( implicit tx: Txn ) : Unit
 
-  /**
-   *    Retrieves the main group of the Proc, or
-   *    returns None if a group has not yet been assigned.
-   */
+  /** Retrieves the main group of the Proc, or returns None if a group has not yet been assigned. */
   def groupOption(implicit tx: Txn): Option[Group]
 
-  /**
-   *    Retrieves the main group of the Proc. If this
-   *    group has not been assigned yet, this method will
-   *    create a new group.
-   */
+  /** Retrieves the main group of the Proc. If this group has not been assigned yet,
+    * this method will create a new group. */
   def group()(implicit tx: Txn): Group
 
   def preGroup()(implicit tx: Txn): Group
 
-  //   def play()( implicit tx: Txn ) : Unit
-  //   def playing( implicit tx: Txn ) : Boolean
-  //   def playing_=( p: Boolean )( implicit tx: Txn ) : Unit
   def stop()(implicit tx: Txn): Unit
-
-  //   def addParams( map: Map[ String, Param ])( implicit tx: Txn ) : Unit
-
-  //   def graph( implicit tx: Txn ) : SynthGraph
-  //   def graph_=( g: SynthGraph )( implicit tx: Txn ) : Unit
 
   def getBus(key: String)(implicit tx: Txn): Option[RichAudioBus]
 
-  //   def setBus( key: String, bus: Option[ RichAudioBus ])
-
-  //   def freq( implicit tx: Txn ) : Double
-  //   def freq_=( f: Double )( implicit tx: Txn ) : Unit
+  def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
 }
