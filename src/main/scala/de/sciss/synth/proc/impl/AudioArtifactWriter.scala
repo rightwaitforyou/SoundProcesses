@@ -54,8 +54,7 @@ object AudioArtifactWriter {
 }
 final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, segm: Grapheme.Segment.Audio, time: Long,
                                          sampleRate: Double)
-  extends DynamicBusUser /* DynamicAudioBusUser */
-  /* with RichAudioBus.User */ with Resource.Source {
+  extends DynamicBusUser with Resource.Source {
 
   // private val synthRef  = Ref(Option.empty[Synth])
 
@@ -99,12 +98,6 @@ final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, se
   }
 
   def remove()(implicit tx: Txn): Unit = {
-    //    val rs = synthRef.swap(None)(tx.peer).getOrElse(
-    //      sys.error("AudioArtifactWriter.remove() : there was no synth playing")
-    //    )
-    //    rs.free()
     if (synth.isOnline) synth.free()
-
-    // bus.removeWriter( this )
   }
 }

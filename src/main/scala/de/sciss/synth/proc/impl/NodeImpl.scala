@@ -85,11 +85,10 @@ trait NodeImpl extends ResourceImpl with Node {
     reader
   }
 
-  /**
-   * Associates an audio bus with this node such that the node writes to this bus.
-   * This creates a `DynamicAudioBusUser` which will be freed automatically when
-   * this node ends.
-   */
+  /** Associates an audio bus with this node such that the node writes to this bus.
+    * This creates a `DynamicAudioBusUser` which will be freed automatically when
+    * this node ends.
+    */
   final def write(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
     val writer = BusNodeSetter.writer(name, rb, this)

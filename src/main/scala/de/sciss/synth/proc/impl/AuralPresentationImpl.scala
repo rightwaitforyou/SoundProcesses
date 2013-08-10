@@ -235,8 +235,9 @@ object AuralPresentationImpl {
         })
       )
       var deps      = List.empty[Resource.Source]
-      var sinks     = List.empty[(String, String, AuralProc)]
-      var sources   = List.empty[(String, OutputBuilder)]
+      // var sinks     = List.empty[(String, String, AuralProc)]
+      // var sources   = List.empty[(String, OutputBuilder)]
+      var edges     = List.empty[ProcEdge]
 
       val attrNames = ugen.attributeIns
       if (attrNames.nonEmpty) {
@@ -322,7 +323,8 @@ object AuralPresentationImpl {
                       // srcAural.addSink(srcKey, bIn)
                       val bOut = srcAural.getBus(srcKey).getOrElse(sys.error(s"Bus disappeared $srcTimedID -> $srcKey"))
                       ensureChannels(bOut.numChannels)
-                      ??? // sinks ::= (key, srcAural)
+                      // sinks ::= (key, srcAural)
+                      edges ::= ProcEdge(srcAural, srcKey, null, key)
                     }
                 }
             }

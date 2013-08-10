@@ -29,6 +29,7 @@ package proc
 package impl
 
 import de.sciss.synth.Curve.parametric
+import collection.immutable.{IndexedSeq => Vec}
 
 object SegmentWriter {
   def apply(bus: RichAudioBus, segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
@@ -42,26 +43,18 @@ object SegmentWriter {
     res
   }
 
-  // ... until ScalaCollider has better methods in ControlProxyFactory
-  @inline private def mkMultiCtl(segm: Grapheme.Segment.Curve, name: String): GE = {
-    // import ugen._
-    // ControlProxy(scalar, Vector.fill(segm.numChannels)(0f), Some(name))(ControlProxyFactory.controlIrFactory)
-    name.ir(Vector.fill(segm.numChannels)(0f))
-  }
-
   private def graph(segm: Grapheme.Segment.Curve): (Boolean, SynthGraph) = {
     var usesShape = false // XXX TODO dirty variable
     val sg = SynthGraph {
       import ugen._
 
-      // val start       = "start".ir
-      val start       = mkMultiCtl(segm, "start")
-      // val stop        = "stop".ir
-      val stop        = mkMultiCtl(segm, "stop")
+      val zero        = Vec.fill(segm.numChannels)(0f)
+      val start       = "start".ir(zero)
+      val stop        = "stop" .ir(zero)
       val dur         = "dur".ir
 
-      lazy val shape      = mkMultiCtl(segm, "shape")
-      lazy val curvature  = mkMultiCtl(segm, "curve")
+      lazy val shape      = "shape".ir(zero)
+      lazy val curvature  = "curve".ir(zero)
 
       val sig: GE = segm.values.zipWithIndex.map {
         case ((segmStart, segmStop, segmShape), ch) =>
@@ -90,25 +83,9 @@ object SegmentWriter {
 }
 final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: RichAudioBus,
                                    segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
-  extends DynamicBusUser /* DynamicAudioBusUser with RichAudioBus.User with TxnPlayer */ with Resource.Source {
-
-  // private val synthRef  = Ref(Option.empty[Synth])
-  // val bus               = RichBus.audio(server, segm.numChannels)
+  extends DynamicBusUser with Resource.Source {
 
   def resource(implicit tx: Txn) = synth
-
-  //  protected def synth(implicit tx: Txn): Option[Synth] = synthRef.get(tx.peer)
-  //  protected def synth_=(value: Option[Synth])(implicit tx: Txn): Unit = {
-  //    val oldSynth = synthRef.swap(value)(tx.peer)
-  //    value.foreach(addMapBusConsumer)
-  //    oldSynth.foreach(_.free(audible = true))
-  //  }
-  //
-  //  protected def addMapBusConsumer(rs: Synth)(implicit tx: Txn): Unit = {
-  //    //         val rb = mapBus
-  //    //         rs.write( rb -> "$out" )
-  //    rs.write(bus -> "$out")
-  //  }
 
   def server = synth.server
 
@@ -117,7 +94,6 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
   def britzelAdd()(implicit tx: Txn): Unit = {
     type Ctl = List[ControlSetMap]
 
-    // val rsd       = SynthDef(aural.server, g)
     val target    = server.defaultGroup // XXX
     val durSecs   = segm.span.length / sampleRate
     val (vStart, vStop, vShape) = segm.values.unzip3
@@ -125,50 +101,12 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
     val ctl1: Ctl = if (usesShape) "shape" -> vShape.map(_.id.toFloat) :: ctl0 else ctl0
     val args: Ctl = if (usesShape) "curve" -> vShape.map { case parametric(c) => c; case _ => 0f } :: ctl1 else ctl1
 
-    // val rs        = rsd.play(aural.preGroup, ctl)
     synth.play(target = target, args = args, addAction = addToHead, dependencies = Nil)
 
-    // rs.onEndTxn { implicit tx =>
-    //   synth.foreach { rs2 => if (rs == rs2) ctrl.glidingDone() }
-    // }
-
     synth.write(bus -> "out")
-
-    // val oldSynth = synthRef.swap(Some(rs))(tx.peer)
-    // require(oldSynth.isEmpty, "SegmentWriter.add() : old synth still playing")
   }
 
   def remove()(implicit tx: Txn): Unit = {
-    //    val rs = synthRef.swap(None)(tx.peer).getOrElse(
-    //      sys.error("SegmentWriter.remove() : there was no synth playing")
-    //    )
-    //    rs.free()
     synth.free()
   }
-
-  //  def stop(implicit tx: Txn): Unit = {
-  //    synthRef.swap(None)(tx.peer).foreach(_.free(audible = true))
-  //  }
-  //
-  //  def isPlaying(implicit tx: Txn): Boolean = synth.map(_.isOnline).getOrElse(false)
-  //
-  //  // ---- RichAudioBus.User ----
-  //
-  //  def busChanged(bus: AudioBus)(implicit tx: Txn): Unit = {
-  //    ...
-  //  }
-  //
-  //  // ---- DynamicAudioBusUser ----
-  //
-  //  def add()(implicit tx: Txn): Unit = {
-  //    bus.addWriter(this)
-  //  }
-  //
-  //  def remove()(implicit tx: Txn): Unit = {
-  //    bus.removeWriter(this)
-  //  }
-  //
-  //  def migrateTo(newBus: RichAudioBus)(implicit tx: Txn): DynamicAudioBusUser = {
-  //    ...
-  //  }
 }

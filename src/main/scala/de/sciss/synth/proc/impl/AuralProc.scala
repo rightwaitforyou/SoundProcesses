@@ -30,8 +30,11 @@ import concurrent.stm.Ref
 import de.sciss.synth.addBefore
 
 object AuralProc {
-  def apply(synth: Synth, outBuses: Map[String, RichAudioBus], busUsers: Iterable[DynamicBusUser]): AuralProc = {
-    new Impl(synth, outBuses, busUsers)
+  def apply(synth: Synth, outBuses: Map[String, RichAudioBus], busUsers: Iterable[DynamicBusUser])
+           (implicit tx: Txn): AuralProc = {
+    val res = new Impl(synth, outBuses, busUsers)
+    ProcDemiurg.addVertex(res)
+    res
   }
 
    /*
@@ -56,13 +59,12 @@ object AuralProc {
 
     def groupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).map(_.main)
 
-    def group()(implicit tx: Txn): Group = {
+    def group()(implicit tx: Txn): Group =
       groupOption.getOrElse {
         val res = Group(server)
         group_=(res)
         res
       }
-    }
 
     def group_=(newGroup: Group)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
@@ -83,10 +85,10 @@ object AuralProc {
       implicit val itx = tx.peer
       preGroupOption.getOrElse {
         /* val main = */ group() // creates group if necessary
-        val all = groupsRef().get
-        val target = anchorNode
+        val all       = groupsRef().get
+        val target    = anchorNode
         val addAction = addBefore
-        val res = Group(target = target, addAction = addAction)
+        val res       = Group(target = target, addAction = addAction)
         groupsRef.set(Some(all.copy(pre = Some(res))))
         res
       }
@@ -111,14 +113,15 @@ object AuralProc {
     def stop()(implicit tx: Txn): Unit = {
       synth.free()
       busUsers.foreach(_.remove())
+      ProcDemiurg.removeVertex(this)
     }
 
     // XXX if they stay static that way, we can remove the tx argument
     def getBus(key: String)(implicit tx: Txn): Option[RichAudioBus] = outBuses.get(key)
 
-    def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
-      ???
-    }
+    // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
+    //   ?
+    // }
   }
 }
 
@@ -140,5 +143,5 @@ sealed trait AuralProc /* extends Writer */ {
 
   def getBus(key: String)(implicit tx: Txn): Option[RichAudioBus]
 
-  def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
+  // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
 }

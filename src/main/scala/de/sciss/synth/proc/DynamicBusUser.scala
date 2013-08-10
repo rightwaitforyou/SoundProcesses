@@ -28,7 +28,7 @@ package proc
 
 import concurrent.stm.{Ref => ScalaRef}
 
-trait DynamicBusUser {
+trait DynamicBusUser /* extends Removable */ {
   def add   ()(implicit tx: Txn): Unit
   def remove()(implicit tx: Txn): Unit
 
