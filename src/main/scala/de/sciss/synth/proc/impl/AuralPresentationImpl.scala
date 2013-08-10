@@ -265,6 +265,16 @@ object AuralPresentationImpl {
             require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
 
           val inCtlName = scan.inControlName(key)
+          var inBus     = Option.empty[RichAudioBus]
+
+          def lazyInBus: RichAudioBus =
+            inBus.getOrElse {
+              val res    = RichBus.audio(server, numCh)
+              inBus      = Some(res)
+              val bm     = BusNodeSetter.mapper(inCtlName, res, synth)
+              busUsers :+= bm
+              res
+            }
 
           // note: if not found, stick with default
           p.scans.get(key).foreach { scan =>
@@ -285,31 +295,29 @@ object AuralPresentationImpl {
                   case segm: Segment.Curve =>
                     ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
                     // println(s"segment : ${segm.span}")
-                    val w      = SegmentWriter(segm, time, server, sampleRate)
+                    val b      = lazyInBus
+                    val w      = SegmentWriter(b, segm, time, sampleRate)
                     deps     ::= w
                     busUsers :+= w
-                    val bm     = BusNodeSetter.mapper(inCtlName, w.bus, synth)
-                    busUsers :+= bm
 
                   case audio: Segment.Audio =>
                     ensureChannels(audio.numChannels)
-                    val w      = AudioArtifactWriter(audio, time, server, sampleRate)
+                    val b      = lazyInBus
+                    val w      = AudioArtifactWriter(b, audio, time, sampleRate)
                     deps     ::= w
-                    busUsers :+= w  // XXX TODO: DRY (see Segment.Curve above)
-                    val bm     = BusNodeSetter.mapper(inCtlName, w.bus, synth)
-                    busUsers :+= bm
+                    busUsers :+= w
                 }
               case Link.Scan(peer) =>
                 scanMap.get(peer.id).foreach {
                   case (sourceKey, idH) =>
                     val sourceTimedID = idH()
-                    val bus    = getBus(sourceTimedID, sourceKey).getOrElse {
+                    val bOut = getBus(sourceTimedID, sourceKey).getOrElse {
                       // ... or could just stick with the default control value ?
-                      sys.error("Bus disappeared " + sourceTimedID + " -> " + sourceKey)
+                      sys.error(s"Bus disappeared $sourceTimedID -> $sourceKey")
                     }
-                    ensureChannels(bus.numChannels) // ... or could insert a channel coercing synth
-                    val bm     = BusNodeSetter.mapper(inCtlName, bus, synth)
-                    busUsers :+= bm
+                    ensureChannels(bOut.numChannels) // ... or could insert a channel coercing synth
+                    val bIn    = lazyInBus
+                    ???
                 }
             }
           }
@@ -351,23 +359,19 @@ object AuralPresentationImpl {
       }
     }
 
-    private def getBus(timedID: S#ID, key: String)(implicit tx: S#Tx): Option[RichAudioBus] = {
+    private def getBus(timedID: S#ID, key: String)(implicit tx: S#Tx): Option[RichAudioBus] =
       viewMap.get(timedID) match {
         case Some(aural) =>
-          //               implicit val ptx = ProcTxn()( tx )
           aural.getBus(key)
         case _ =>
           assert(ongoingBuild.isInitialized(tx.peer))
-          ongoingBuild.get(tx.peer).idMap.flatMap { map =>
-            map.get(timedID).flatMap(_.outBuses.get(key))
-          }
+          val ob = ongoingBuild.get(tx.peer)
+          for {
+            map <- ob.idMap
+            pb  <- map.get(timedID)
+            bus <- pb.outBuses.get(key)
+          } yield bus
       }
-    }
-
-    //      private def getBusNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
-    //         val bus = getBus( timed, key ).getOrElse( throw MissingIn( timed, key ))
-    //         bus.numChannels
-    //      }
 
     // called by UGenGraphBuilderImpl
     def scanInNumChannels(timed: TimedProc[S], time: Long, key: String)(implicit tx: S#Tx): Int = {
@@ -384,10 +388,8 @@ object AuralPresentationImpl {
                 val sourceTimedID = idH()
                 getBus(sourceTimedID, sourceKey)
             }
-            busOpt match {
-              case Some(bus) => bus.numChannels
-              case _ => throw MissingIn(peer)
-            }
+            val bus = busOpt.getOrElse(throw MissingIn(peer))
+            bus.numChannels
         }
         if (chans.isEmpty) 0 else chans.max
       }

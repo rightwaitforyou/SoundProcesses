@@ -31,12 +31,12 @@ package impl
 import de.sciss.synth.Curve.parametric
 
 object SegmentWriter {
-  def apply(segm: Grapheme.Segment.Curve, time: Long, server: Server, sampleRate: Double)
+  def apply(bus: RichAudioBus, segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
            (implicit tx: Txn): SegmentWriter = {
 
     val (usesShape, sg) = graph(segm)
-    val synth = Synth(server, sg, nameHint = Some("grapheme-segm"))
-    val bus   = RichBus.audio(server, segm.numChannels)
+    val synth = Synth(bus.server, sg, nameHint = Some("grapheme-segm"))
+    // val bus   = RichBus.audio(server, segm.numChannels)
     val res = new SegmentWriter(synth, usesShape, bus, segm, time, sampleRate)
     res.britzelAdd()
     res
