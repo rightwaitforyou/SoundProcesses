@@ -99,7 +99,7 @@ object AuralPresentationImpl {
       groupRef.set(Some(group))(tx.peer)
 
       val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
-      log("started" + " (" + booted.hashCode.toHexString + ")")
+      log(s"started (${booted.hashCode.toHexString})")
       ProcDemiurg.addServer(server) // ( ProcTxn()( tx ))
 
       def t_play(time: Long)(implicit tx: S#Tx): Unit =
@@ -117,9 +117,8 @@ object AuralPresentationImpl {
       transport.react { implicit tx => {
         // only when playing
         case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
-          log("at " + time + " added " + added.mkString("[", ", ", "]") +
-            "; removed " + removed.mkString("[", ", ", "]") +
-            "; changes? " + changes.nonEmpty + " (" + booted.hashCode.toHexString + ")")
+          log(s"at $time added ${added.mkString("[", ", ", "]")}; removed ${removed.mkString("[", ", ", "]")}; " +
+            s"changes? ${changes.nonEmpty} (${booted.hashCode.toHexString})")
           removed.foreach {
             timed => booted.procRemoved(timed)
           }
@@ -208,13 +207,15 @@ object AuralPresentationImpl {
       implicit val tx   = ugen.tx
       implicit val itx  = tx.peer
 
-      val synth     = Synth.expanded(server, ug /*, nameHint = Some(builder.name) */)
-
-      // ---- handle input buses ----
       val time      = ugen.time
       val timed     = ugen.timed
-      var busUsers  = List.empty[DynamicBusUser]
       val p         = timed.value
+
+      val nameHint  = p.attributes[Attribute.String](ProcKeys.attrName).map(_.value)
+      val synth     = Synth.expanded(server, ug, nameHint = nameHint)
+
+      // ---- handle input buses ----
+      var busUsers  = List.empty[DynamicBusUser]
       val span      = timed.span.value
       var setMap    = Vec[ControlSetMap](
         graph.Time    .key -> time / sampleRate,
@@ -371,7 +372,7 @@ object AuralPresentationImpl {
       synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
-      log("launched " + aural + " (" + hashCode.toHexString + ")")
+      log(s"launched $timed -> $aural (${hashCode.toHexString})")
       viewMap.put(timed.id, aural)
     }
 
@@ -554,7 +555,7 @@ object AuralPresentationImpl {
         case Some(aural) =>
           viewMap.remove(timedID)
           //               implicit val ptx = ProcTxn()( tx )
-          log("removed " + timed + " (" + hashCode.toHexString + ")") // + " -- playing? " + aural.playing )
+          log(s"removed $timed (${hashCode.toHexString})") // + " -- playing? " + aural.playing )
           aural.stop()
 
         case _ =>

@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.synth.expr.ExprImplicits
+import de.sciss.synth.expr.{Strings, ExprImplicits}
 import de.sciss.synth.{ugen, SynthGraph}
 import de.sciss.span.Span
 import ugen._
@@ -17,6 +17,8 @@ object MixTest extends App {
   type I  = InMemory
   implicit val system = InMemory()
 
+  showAuralLog  = true
+
   implicit class RichDouble(d: Double) {
     def seconds = (d * 44100).toLong
   }
@@ -24,12 +26,17 @@ object MixTest extends App {
   val aural = AuralSystem()
 
   val transp = system.step { implicit tx =>
+    import Implicits._
     val expr      = ExprImplicits[S]
     import expr._
 
     val procOut1  = Proc[S]
     val procIn    = Proc[S]
     val procOut2  = Proc[S]
+
+    procOut1.name = "proc-out1"
+    procOut2.name = "proc-out2"
+    procIn  .name = "proc-in"
 
     val out1      = procOut1.scans.add("out")
     val in        = procIn  .scans.add("in" )

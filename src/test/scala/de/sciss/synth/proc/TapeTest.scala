@@ -20,17 +20,21 @@ object TapeTest extends App {
 
   val aural = AuralSystem()
 
-  def twice = true
+  def twice     = false // true
+  showAuralLog  = true
+  showTxnLog    = true
 
   val transp = system.step { implicit tx =>
     val expr      = ExprImplicits[S]
     import expr._
+    import Implicits._
 
     // val spat = Proc[S]
     // val spatIn = spat.scans.add("in")
     // spatIn.addSink()
 
     val proc      = Proc[S]
+    proc.name     = "tape"
     val sAudio    = proc.scans.add("sig")
     val file      = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
     val spec      = AudioFile.readSpec(file)

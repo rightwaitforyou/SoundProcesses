@@ -55,7 +55,8 @@ object AuralProc {
     private var busUsers  = List.empty[DynamicBusUser]
     private var inBuses   = Map.empty[String, RichAudioBus]
 
-    override def toString = s"AuralProc($synth, $outBuses)"
+    override def toString = s"AuralProc($synth, outs = ${outBuses.mkString("(", ", ", ")")}, " +
+      s"ins = ${inBuses.mkString("(", ", ", ")")}"
 
     def server = synth.server
 
