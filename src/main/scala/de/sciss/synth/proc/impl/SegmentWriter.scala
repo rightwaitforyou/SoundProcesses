@@ -122,8 +122,8 @@ final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: Ri
     val durSecs   = segm.span.length / sampleRate
     val (vStart, vStop, vShape) = segm.values.unzip3
     val ctl0: Ctl = List("start" -> vStart.map(_.toFloat), "stop" -> vStop.map(_.toFloat), "dur" -> durSecs)
-    val ctl1: Ctl = if (usesShape) ("shape" -> vShape.map(_.id.toFloat)) :: ctl0 else ctl0
-    val args: Ctl = if (usesShape) ("curve" -> vShape.map { case parametric(c) => c; case _ => 0f } :: ctl1) else ctl1
+    val ctl1: Ctl = if (usesShape) "shape" -> vShape.map(_.id.toFloat) :: ctl0 else ctl0
+    val args: Ctl = if (usesShape) "curve" -> vShape.map { case parametric(c) => c; case _ => 0f } :: ctl1 else ctl1
 
     // val rs        = rsd.play(aural.preGroup, ctl)
     synth.play(target = target, args = args, addAction = addToHead, dependencies = Nil)
