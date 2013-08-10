@@ -140,10 +140,13 @@ trait NodeImpl extends ResourceImpl with Node {
 
   final def dispose()(implicit tx: Txn): Unit = free(audible = true)
 
+  /** Note: this is graceful in not throwing up if the node was already freed. */
   final def free(audible: Boolean = true)(implicit tx: Txn): Unit = {
-    requireOnline()
-    tx.addMessage(this, peer.freeMsg, audible = audible)
-    setOnline(value = false)
+    // requireOnline()
+    if (isOnline) {
+      tx.addMessage(this, peer.freeMsg, audible = audible)
+      setOnline(value = false)
+    }
   }
 
   final def set(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {

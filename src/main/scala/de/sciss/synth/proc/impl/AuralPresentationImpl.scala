@@ -367,12 +367,13 @@ object AuralPresentationImpl {
           }
       }
 
-      busUsers.foreach(_.add())
+      // busUsers.foreach(_.add())
 
       aural.setBusUsers(busUsers)
       // wrap as AuralProc and save it in the identifier map for later lookup
       val deps1 = deps.map(_.resource)
       synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
+      busUsers.foreach(_.add())
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
       log(s"launched $timed -> $aural (${hashCode.toHexString})")
