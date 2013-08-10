@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.synth.expr.{Strings, ExprImplicits}
+import de.sciss.synth.expr.ExprImplicits
 import de.sciss.synth.{ugen, SynthGraph}
 import de.sciss.span.Span
 import ugen._

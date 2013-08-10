@@ -270,14 +270,15 @@ object AuralPresentationImpl {
             require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
 
           val inCtlName = scan.inControlName(key)
-          var inBus     = Option.empty[AudioBusNodeSetter]
+          // var inBus     = Option.empty[AudioBusNodeSetter]
 
-          def lazyInBus: AudioBusNodeSetter =
+          lazy val lazyInBus: AudioBusNodeSetter =
             inBus.getOrElse {
               val b      = RichBus.audio(server, numCh)
               val res    = BusNodeSetter.mapper(inCtlName, b, synth)
               busUsers ::= res
-              inBus      = Some(res)
+              // inBus      = Some(res)
+              aural.addInputBus(key, res.bus)
               res
             }
 
