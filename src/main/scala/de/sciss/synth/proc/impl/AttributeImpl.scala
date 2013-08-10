@@ -297,7 +297,7 @@ object AttributeImpl {
 
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Attribute[S] with evt.Node[S] = {
       val typeID = in.readInt()
-      (typeID: @switch) match {
+      (typeID /* : @switch */) match {
         case Int             .typeID => Int             .readIdentified(in, access, targets)
         case Double          .typeID => Double          .readIdentified(in, access, targets)
         case Boolean         .typeID => Boolean         .readIdentified(in, access, targets)

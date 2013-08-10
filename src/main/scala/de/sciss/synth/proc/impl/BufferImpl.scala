@@ -101,6 +101,6 @@ private[proc] final case class BufferImpl(server: Server, peer: SBuffer)(closeOn
     }
     tx.addMessage(this, peer.freeMsg(release = false), audible = false)
     server.freeBuffer(peer.id)
-    disposed()
+    setOnline(value = false)
   }
 }

@@ -32,11 +32,11 @@ private[proc] trait ResourceImpl extends Resource {
   import Resource.TimeStamp
 
   private val timeStampRef = Ref(0)
-  //   private val dependentsRef  = TSet.empty[ Resource ]
 
-  final def isOnline(implicit tx: Txn): Boolean = timeStamp >= 0
+  private val stateOnline = Ref(initialValue = false)
 
-  final protected def disposed()(implicit tx: Txn): Unit = timeStamp_=(-1)
+  final def isOnline(implicit tx: Txn): Boolean = stateOnline.get(tx.peer)
+  final protected def setOnline(value: Boolean)(implicit tx: Txn): Unit = stateOnline.set(value)(tx.peer)
 
   final def timeStamp(implicit tx: Txn): TimeStamp = timeStampRef.get(tx.peer)
 

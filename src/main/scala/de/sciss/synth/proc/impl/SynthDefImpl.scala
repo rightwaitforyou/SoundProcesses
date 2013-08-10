@@ -29,9 +29,7 @@ package impl
 import de.sciss.synth.{SynthDef => SSynthDef}
 
 private[proc] final case class SynthDefImpl(server: Server, peer: SSynthDef) extends ResourceImpl with SynthDef {
-  //   val isOnline = State( this, "isOnline", init = false )
-
-  override def toString = "SynthDef(" + peer.name + ")"
+  override def toString = s"SynthDef(${peer.name})"
 
   def name: String = peer.name
 
@@ -39,19 +37,15 @@ private[proc] final case class SynthDefImpl(server: Server, peer: SSynthDef) ext
     *    Only if that is not the case, the receive message
     *    will be queued.
     */
-  def recv()(implicit tx: Txn): Unit = tx.addMessage(this, peer.recvMsg, audible = false)
-
-  //   def play( target: Node, args: Seq[ ControlSetMap ] = Nil,
-  //             addAction: AddAction = addToHead, buffers: Seq[ Buffer ] = Nil )( implicit tx: Txn ) : Synth = {
-  ////      recv()  // make sure it is online
-  //      val rs = Synth( this )
-  //      rs.play( target, args, addAction, buffers )
-  //      rs
-  //   }
+  def recv()(implicit tx: Txn): Unit = {
+    require(!isOnline)
+    tx.addMessage(this, peer.recvMsg, audible = false)
+    setOnline(value = true)
+  }
 
   def dispose()(implicit tx: Txn): Unit = {
     require(isOnline)
     tx.addMessage(this, peer.freeMsg, audible = false)
-    disposed()
+    setOnline(value = false)
   }
 }

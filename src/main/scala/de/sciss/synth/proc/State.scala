@@ -28,16 +28,19 @@ package de.sciss.synth.proc
 import concurrent.stm.{Ref => ScalaRef}
 
 object State {
-   def apply( owner: Any, name: String, init: Boolean ) : State = new Impl( owner, name, init )
-//   def and( that: State )( owner: Any, name: String, init: Boolean ) : State = new And( that, owner, name, init )
+  def apply(owner: Any, name: String, init: Boolean): State = new Impl(owner, name, init)
 
-   private final class Impl( val owner: Any, val name: String, init: Boolean ) extends State {
-      val value = ScalaRef( init )
-      def swap( newValue: Boolean )( implicit tx: Txn ) : Boolean = value.swap( newValue )( tx.peer )
-      def get( implicit tx: Txn ) : Boolean = value.get( tx.peer )
-   }
+  //   def and( that: State )( owner: Any, name: String, init: Boolean ) : State = new And( that, owner, name, init )
 
-//   private final class And( that: State, val owner: Any, val name: String, init: Boolean ) extends State {
+  private final class Impl(val owner: Any, val name: String, init: Boolean) extends State {
+    val value = ScalaRef(init)
+
+    def swap(newValue: Boolean)(implicit tx: Txn): Boolean = value.swap(newValue)(tx.peer)
+
+    def get(implicit tx: Txn): Boolean = value.get(tx.peer)
+  }
+
+  //   private final class And( that: State, val owner: Any, val name: String, init: Boolean ) extends State {
 //      val value = ScalaRef( init )
 //      def swap( newValue: Boolean )( implicit tx: Txn ) : Boolean = {
 //         value.swap( newValue )( tx.peer ) && that.get

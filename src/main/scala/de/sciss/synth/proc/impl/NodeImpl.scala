@@ -72,7 +72,7 @@ trait NodeImpl extends ResourceImpl with Node {
 
   final def read(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
-    val reader = BusNodeSetter.reader( name, rb, this )
+    val reader = BusNodeSetter.reader(name, rb, this)
     registerSetter(reader)
     reader
   }
@@ -131,6 +131,7 @@ trait NodeImpl extends ResourceImpl with Node {
   }
 
   private def registerSetter(bns: BusNodeSetter)(implicit tx: Txn): Unit = {
+    require(isOnline)
     bns.add()
     onEndTxn {
       implicit tx => bns.remove()
@@ -142,7 +143,7 @@ trait NodeImpl extends ResourceImpl with Node {
   final def free(audible: Boolean = true)(implicit tx: Txn): Unit = {
     require(isOnline)
     tx.addMessage(this, peer.freeMsg, audible = audible)
-    disposed()
+    setOnline(value = false)
   }
 
   final def set(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {

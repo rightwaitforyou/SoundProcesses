@@ -32,7 +32,7 @@ private[proc] case class GroupImpl(server: Server, peer: SGroup) extends NodeImp
   override def toString = "Group(" + peer.toString + ")"
 
   def play(target: Node, addAction: AddAction)(implicit tx: Txn): Unit = {
-    require(target.server == server && target.isOnline)
+    require(!isOnline && target.server == server && target.isOnline)
 
     // THERE IS CURRENTLY A PROBLEM EXHIBITED BY TEST3: BASICALLY --
     // since newMsg is not audible, it might be placed in the first bundle, but then
@@ -45,6 +45,7 @@ private[proc] case class GroupImpl(server: Server, peer: SGroup) extends NodeImp
     //              Map( target.isOnline -> true ))
     tx.addMessage(this, peer.newMsg(target.peer, addAction), audible = true,
       dependencies = target :: Nil)
+    setOnline(value = true)
   }
 
   def freeAll(audible: Boolean)(implicit tx: Txn): Unit =

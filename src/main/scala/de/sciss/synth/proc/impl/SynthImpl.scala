@@ -38,7 +38,7 @@ private[proc] final case class SynthImpl(peer: SSynth, definition: SynthDef) ext
           (implicit tx: Txn): Unit = {
 
     val s = server
-    require(target.server == s && target.isOnline)
+    require(!isOnline && target.server == s && target.isOnline)
     if (dependencies.nonEmpty) {
       dependencies.foreach(r => require(r.server == s && r.isOnline))
     }
@@ -46,6 +46,6 @@ private[proc] final case class SynthImpl(peer: SSynth, definition: SynthDef) ext
       audible = true,
       dependencies = target :: definition :: dependencies)
 
-    //      peer.register()   // ok to call multiple times
+    setOnline(value = true)
   }
 }
