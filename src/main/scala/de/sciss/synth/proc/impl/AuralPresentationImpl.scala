@@ -203,21 +203,24 @@ object AuralPresentationImpl {
 
     private def launchProc(builder: AuralProcBuilder[S]): Unit = {
       val ugen          = builder.ugen
+      val timed         = ugen.timed
+
+      log(s"begin launch $timed (${hashCode.toHexString})")
+
       val ug            = ugen.finish   // finalise the ugen graph
       implicit val tx   = ugen.tx
       implicit val itx  = tx.peer
 
-      val time      = ugen.time
-      val timed     = ugen.timed
-      val p         = timed.value
+      val time          = ugen.time
+      val p             = timed.value
 
-      val nameHint  = p.attributes[Attribute.String](ProcKeys.attrName).map(_.value)
-      val synth     = Synth.expanded(server, ug, nameHint = nameHint)
+      val nameHint      = p.attributes[Attribute.String](ProcKeys.attrName).map(_.value)
+      val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
       // ---- handle input buses ----
-      var busUsers  = List.empty[DynamicBusUser]
-      val span      = timed.span.value
-      var setMap    = Vec[ControlSetMap](
+      var busUsers      = List.empty[DynamicBusUser]
+      val span          = timed.span.value
+      var setMap        = Vec[ControlSetMap](
         graph.Time    .key -> time / sampleRate,
         graph.Offset  .key -> (span match {
           case Span.HasStart(start) => (time - start) / sampleRate
@@ -228,9 +231,9 @@ object AuralPresentationImpl {
           case _ => Double.PositiveInfinity
         })
       )
-      var deps      = List.empty[Resource.Source]
+      var deps          = List.empty[Resource.Source]
 
-      val attrNames = ugen.attributeIns
+      val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) {
         // println(s"Attributes used: ${attrNames.mkString(", ")}")
         attrNames.foreach { n =>

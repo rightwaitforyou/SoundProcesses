@@ -38,9 +38,11 @@ private[proc] final case class SynthImpl(peer: SSynth, definition: SynthDef) ext
           (implicit tx: Txn): Unit = {
 
     val s = server
-    require(!isOnline && target.server == s && target.isOnline)
+    requireOffline()
+    require(target.server == s && target.isOnline, s"Target $target must be running and using the same server")
     if (dependencies.nonEmpty) {
-      dependencies.foreach(r => require(r.server == s && r.isOnline))
+      dependencies.foreach(r => require(r.server == s && r.isOnline,
+        s"Dependency $r must be running and using the same server"))
     }
     tx.addMessage(this, peer.newMsg(definition.name, target.peer, args, addAction),
       audible = true,

@@ -38,13 +38,13 @@ private[proc] final case class SynthDefImpl(server: Server, peer: SSynthDef) ext
     *    will be queued.
     */
   def recv()(implicit tx: Txn): Unit = {
-    require(!isOnline)
+    requireOffline()
     tx.addMessage(this, peer.recvMsg, audible = false)
     setOnline(value = true)
   }
 
   def dispose()(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.freeMsg, audible = false)
     setOnline(value = false)
   }

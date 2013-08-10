@@ -131,7 +131,7 @@ trait NodeImpl extends ResourceImpl with Node {
   }
 
   private def registerSetter(bns: BusNodeSetter)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     bns.add()
     onEndTxn {
       implicit tx => bns.remove()
@@ -141,18 +141,18 @@ trait NodeImpl extends ResourceImpl with Node {
   final def dispose()(implicit tx: Txn): Unit = free(audible = true)
 
   final def free(audible: Boolean = true)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.freeMsg, audible = audible)
     setOnline(value = false)
   }
 
   final def set(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.setMsg(pairs: _*), audible = audible)
   }
 
   final def setn(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.setnMsg(pairs: _*), audible = audible)
   }
 
@@ -166,17 +166,17 @@ trait NodeImpl extends ResourceImpl with Node {
   //   }
 
   final def mapn(audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.mapnMsg(pairs: _*), audible = audible)
   }
 
   final def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.mapanMsg(pairs: _*), audible = audible) // , dependencies = this :: Nil /* ?! */)
   }
 
   final def moveToHead(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
-    require(isOnline && group.isOnline)
+    require(isOnline && group.isOnline, s"Both source $this and target $group must be online")
     tx.addMessage(this, peer.moveToHeadMsg(group.peer), audible = audible, dependencies = group :: Nil)
   }
 
@@ -188,17 +188,17 @@ trait NodeImpl extends ResourceImpl with Node {
   //   }
 
   final def moveToTail(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
-    require(isOnline && group.isOnline)
+    require(isOnline && group.isOnline, s"Both source $this and target $group must be online")
     tx.addMessage(this, peer.moveToTailMsg(group.peer), audible = audible, dependencies = group :: Nil)
   }
 
   final def moveBefore(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
-    require(isOnline && target.isOnline)
+    require(isOnline && target.isOnline, s"Both source $this and target $target must be online")
     tx.addMessage(this, peer.moveBeforeMsg(target.peer), audible = audible, dependencies = target :: Nil)
   }
 
   final def moveAfter(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
-    require(isOnline && target.isOnline)
+    require(isOnline && target.isOnline, s"Both source $this and target $target must be online")
     tx.addMessage(this, peer.moveAfterMsg(target.peer), audible = audible, dependencies = target :: Nil)
   }
 }
