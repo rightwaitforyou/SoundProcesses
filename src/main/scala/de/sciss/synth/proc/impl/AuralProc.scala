@@ -30,9 +30,9 @@ import concurrent.stm.Ref
 import de.sciss.synth.addBefore
 
 object AuralProc {
-  def apply(synth: Synth, outBuses: Map[String, RichAudioBus], busUsers: Iterable[DynamicBusUser])
+  def apply(synth: Synth, outputBuses: Map[String, RichAudioBus])
            (implicit tx: Txn): AuralProc = {
-    val res = new Impl(synth, outBuses, busUsers)
+    val res = new Impl(synth, outputBuses)
     ProcDemiurg.addVertex(res)
     res
   }
@@ -48,10 +48,12 @@ object AuralProc {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl(synth: Synth, outBuses: Map[String, RichAudioBus], busUsers: Iterable[DynamicBusUser])
+  private final class Impl(synth: Synth, outBuses: Map[String, RichAudioBus])
     extends AuralProc {
 
     private val groupsRef = Ref[Option[AllGroups]](None)
+    private var busUsers  = List.empty[DynamicBusUser]
+    private var inBuses   = Map.empty[String, RichAudioBus]
 
     override def toString = s"AuralProc($synth, $outBuses)"
 
@@ -116,8 +118,12 @@ object AuralProc {
       ProcDemiurg.removeVertex(this)
     }
 
-    // XXX if they stay static that way, we can remove the tx argument
-    def getBus(key: String)(implicit tx: Txn): Option[RichAudioBus] = outBuses.get(key)
+    def getInputBus (key: String): Option[RichAudioBus] = inBuses .get(key)
+    def getOutputBus(key: String): Option[RichAudioBus] = outBuses.get(key)
+
+    private[impl] def setBusUsers(users: List[DynamicBusUser]): Unit = busUsers = users
+
+    private[impl] def addInputBus(key: String, bus: RichAudioBus): Unit = inBuses += key -> bus
 
     // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
     //   ?
@@ -141,7 +147,16 @@ sealed trait AuralProc /* extends Writer */ {
 
   def stop()(implicit tx: Txn): Unit
 
-  def getBus(key: String)(implicit tx: Txn): Option[RichAudioBus]
+  def getInputBus (key: String): Option[RichAudioBus]
+  def getOutputBus(key: String): Option[RichAudioBus]
+
+  /** Warning: This is strictly for the builder to update the bus users, and it must be
+    * called within the same transaction that the aural proc was created.
+    */
+  private[impl] def setBusUsers(users: List[DynamicBusUser]): Unit
+
+  // dito
+  private[impl] def addInputBus(key: String, bus: RichAudioBus): Unit
 
   // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
 }
