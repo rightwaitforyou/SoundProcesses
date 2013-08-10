@@ -104,9 +104,8 @@ object Transport {
   object Proc {
     sealed trait Update[+S]
 
-    final case class Changed[S <: evt.Sys[S]](peer: proc.Proc.Change[S])  extends Update[S]
+    final case class Changed[S <: evt.Sys[S]](peer: proc.Proc.Change[S])       extends Update[S]
     final case class GraphemesChanged(map: Map[String, Vec[Grapheme.Segment]]) extends Update[Nothing]
-
   }
 }
 

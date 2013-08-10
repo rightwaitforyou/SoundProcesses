@@ -98,29 +98,33 @@ object TransportImpl {
   private object Info {
     // the initial info is at minimum possible frame. that way, calling seek(0L) which initialise
     // the structures properly
-    final val init: Info = apply(cpuTime = 0L, frame = Long.MinValue, state = Stopped,
-      nextProcTime = Long.MinValue + 1,
-      nextGraphemeTime = Long.MinValue + 1, valid = -1)
+    final val init: Info = apply(
+      cpuTime           = 0L,
+      frame             = Long.MinValue,
+      state             = Stopped,
+      nextProcTime      = Long.MinValue + 1,
+      nextGraphemeTime  = Long.MinValue + 1,
+      valid             = -1
+    )
   }
 
-  /**
-   * Information about the current situation of the transport.
-   *
-   * @param cpuTime             the CPU time in microseconds at which the info was last updated
-   * @param frame               the frame corresponding to the transport position at the time the info was updated
-   * @param state               the current state of the transport scheduling (stopped, scheduled, free-wheeling).
-   *                            when scheduled, the state contains the target frame aimed at in the subsequent
-   *                            scheduler invocation.
-   * @param nextProcTime        the next frame greater than `frame` at which a significant event happens in terms
-   *                            of processes starting or stopping in the transport's group
-   * @param nextGraphemeTime    the next frame greater than `frame` at which
-   * @param valid               a counter which is automatically incremented by the `copy` method, used to determine
-   *                            whether a scheduled runnable is still valid. the scheduler needs to read this value
-   *                            before scheduling the runnable, then after the runnable is invoked, the current
-   *                            info must be retrieved and its valid counter compared to the previously extracted
-   *                            valid value. if both are equal, the runnable should go on executing, otherwise it
-   *                            is meant to silently abort.
-   */
+  /** Information about the current situation of the transport.
+    *
+    * @param cpuTime             the CPU time in microseconds at which the info was last updated
+    * @param frame               the frame corresponding to the transport position at the time the info was updated
+    * @param state               the current state of the transport scheduling (stopped, scheduled, free-wheeling).
+    *                            when scheduled, the state contains the target frame aimed at in the subsequent
+    *                            scheduler invocation.
+    * @param nextProcTime        the next frame greater than `frame` at which a significant event happens in terms
+    *                            of processes starting or stopping in the transport's group
+    * @param nextGraphemeTime    the next frame greater than `frame` at which
+    * @param valid               a counter which is automatically incremented by the `copy` method, used to determine
+    *                            whether a scheduled runnable is still valid. the scheduler needs to read this value
+    *                            before scheduling the runnable, then after the runnable is invoked, the current
+    *                            info must be retrieved and its valid counter compared to the previously extracted
+    *                            valid value. if both are equal, the runnable should go on executing, otherwise it
+    *                            is meant to silently abort.
+    */
   private final case class Info private(cpuTime: Long, frame: Long, state: State, nextProcTime: Long,
                                         nextGraphemeTime: Long, valid: Int) {
     require(nextProcTime > frame && nextGraphemeTime > frame)
@@ -155,9 +159,8 @@ object TransportImpl {
       df.format(d)
     }
 
-    override def toString = "Info(cpuTime = " + smartMicros(cpuTime) + "; frame = " + smartLong(frame) + ", state = " + state +
-      ", nextProcTime = " + smartLong(nextProcTime) + ", nextGraphemeTime = " + smartLong(nextGraphemeTime) +
-      ", valid = " + valid + ")"
+    override def toString = s"Info(cpuTime = ${smartMicros(cpuTime)}; frame = ${smartLong(frame)}, state = $state, " +
+      s"nextProcTime = ${smartLong(nextProcTime)}, nextGraphemeTime = ${smartLong(nextGraphemeTime)}, valid = $valid)"
   }
 
   private sealed trait State
@@ -195,7 +198,7 @@ object TransportImpl {
     def dispose()(implicit tx: S#Tx): Unit = impl.removeObservation(this)
   }
 
-  private final val dummySegment = Segment.Undefined(Span.from(Long.MaxValue))
+  private final val dummySegment: Segment = Segment.Undefined(Span.from(Long.MaxValue))
 
   // --------------------------------------------
 
@@ -504,36 +507,37 @@ object TransportImpl {
     }
 
     // adds a segment to the update to be fired (does not update the structure)
-    private def u_addSegment(state: GroupUpdateState, timed: TimedProc[S], key: String, segm: Grapheme.Segment)
-                            (implicit tx: S#Tx): Unit = {
-      ???
-//      val entry = key -> segm
-//      // try to re-use and update a previous grapheme changed message in the state
-//      state.procChanged.lastOption match {
-//        case Some((`timed`, GraphemesChanged(map))) =>
-//          val newMap = GraphemesChanged(map + entry)
-//          state.procChanged = state.procChanged.init :+ (timed -> newMap)
-//        case _ =>
-//          val map = GraphemesChanged(Map(entry))
-//          state.procChanged :+= timed -> map
-//      }
-    }
-
-    private def removePrio(time: Long, staleID: S#ID)(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx  = tx
-      val setRemoved = gPrio.get(time).getOrElse(Set.empty) - staleID
-      if (setRemoved.isEmpty) {
-        gPrio.remove(time)
-      } else {
-        gPrio.add(time -> setRemoved)
+    private def u_addSegments(state: GroupUpdateState, timed: TimedProc[S], key: String, segms: Vec[Grapheme.Segment])
+                             (implicit tx: S#Tx): Unit = {
+      val entry = key -> segms
+      // try to re-use and update a previous grapheme changed message in the state
+      state.procChanged.lastOption match {
+        case Some((`timed`, GraphemesChanged(map))) =>
+          val newMap = GraphemesChanged(map + entry)
+          state.procChanged = state.procChanged.init :+ (timed -> newMap)
+        case _ =>
+          val map = GraphemesChanged(Map(entry))
+          state.procChanged :+= timed -> map
       }
     }
 
-    private def addPrio(time: Long, staleID: S#ID)(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx  = tx
-      val setAdded = gPrio.get(time).getOrElse(Set.empty) + staleID
-      gPrio.add(time -> setAdded)
-    }
+    private def removePrio(cache: ProcCache[S])(implicit tx: S#Tx): Unit =
+      if (cache.hasNextTime) {
+        implicit val itx: I#Tx  = tx
+        val setRemoved = gPrio.get(time).fold(Set.empty[S#ID])(_ - cache.staleID)
+        if (setRemoved.isEmpty) {
+          gPrio.remove(cache.nextTime)
+        } else {
+          gPrio.add(cache.nextTime -> setRemoved)
+        }
+      }
+
+    private def addPrio(cache: ProcCache[S])(implicit tx: S#Tx): Unit =
+      if (cache.hasNextTime) {
+        implicit val itx: I#Tx  = tx
+        val setAdded = gPrio.get(time).fold(Set(cache.staleID))(_ + cache.staleID)
+        gPrio.add(cache.nextTime -> setAdded)
+      }
 
     // adds the structure for a newly added scan
     // NOT: also adds the current grapheme segment if applicable
@@ -549,12 +553,12 @@ object TransportImpl {
         val oldTime = procCache.nextTime
         val newTime = procCacheNew.nextTime
         if (oldTime != newTime) {
-          if (procCache.hasNextTime) removePrio(oldTime, procCache.staleID)
-          addPrio(newTime, procCache.staleID)
+          removePrio(procCache)
+          addPrio(procCacheNew)
 
           val needsNewGraphemeTime = newTime < state.info.nextGraphemeTime
           if (needsNewGraphemeTime) {
-            state.info = state.info.copy1(nextGraphemeTime = time)
+            state.info = state.info.copy1(nextGraphemeTime = newTime /* time */)
           }
         }
       }
@@ -562,9 +566,8 @@ object TransportImpl {
 
     // store a new scan connected to grapheme sources in the structure,
     // given the already calculated segments
-    private def u_addScan2(state: GroupUpdateState, timed: TimedProc[S], key: String, segms: DefSegs)
+    private def u_addScan2(state: GroupUpdateState, timed: TimedProc[S], key: String, segm: DefSeg)
                           (implicit tx: S#Tx): Unit = {
-      ???
 //      implicit val itx: I#Tx  = tx
 //      val id                  = timed.id
 //      val (staleID, keyMap1)  = gMap.get(id).getOrElse(id -> Map.empty[String, DefSegs])
@@ -591,10 +594,10 @@ object TransportImpl {
         val procCacheNew  = procCache.removeScan(key)
         gMap.put(timed.id, procCacheNew)
         val oldTime       = procCache.nextTime
-        val newTime       = procCache.nextTime
+        val newTime       = procCacheNew.nextTime
         if (oldTime != newTime) {
-          removePrio(oldTime, procCache.staleID)
-          if (procCacheNew.hasNextTime) addPrio(newTime, procCache.staleID)
+          removePrio(procCache)
+          addPrio(procCacheNew)
 
           // XXX TODO: should we update state.info?
         }
@@ -622,8 +625,8 @@ object TransportImpl {
       }
     }
 
-    private def u_scanSourceUpdate(state: GroupUpdateState, timed: TimedProc[S], key: String, scan: Scan[S],
-                                   grapheme: Grapheme[S], graphCh: Vec[Grapheme.Segment])(implicit tx: S#Tx): Unit = {
+    private def u_graphemeChange(state: GroupUpdateState, timed: TimedProc[S], key: String, scan: Scan[S],
+                                 grapheme: Grapheme[S], graphCh: Vec[Grapheme.Segment])(implicit tx: S#Tx): Unit = {
       //        SourceUpdate (passing on changes in a grapheme source) :
       //          - grapheme changes must then be tracked, structures updated
 
@@ -631,27 +634,26 @@ object TransportImpl {
 
       val id = timed.id
       gMap.get(id).foreach { procCache =>
-        val newFrame = state.info.frame
-        var newSegm: Segment = dummySegment
+        val newFrame  = state.info.frame
         // determine closest new segment (`newSegm`) and add all relevant segments to update list
-        graphCh.foreach { segm =>
-          val span  = segm.span
-          val start = span.start
-          if (segm.isDefined && start < newSegm.span.start && start > newFrame) {
-            newSegm = segm
-          }
-          if (span.contains(newFrame)) {
-            u_addSegment(state, timed, key, segm)
-          }
+        val (s1, s2) = ((dummySegment -> Vec.empty[Segment]) /: graphCh) {
+          case ((nextSegm, dirtySpans), segm) =>
+            val span        = segm.span
+            val start       = span.start
+            val nextSegm1   = if (segm.isDefined && start > newFrame &&
+              start < math.min(nextSegm.span.start, procCache.nextTime)) segm else nextSegm
+            val dirtySpans1 = if (span.contains(newFrame)) dirtySpans :+ segm else dirtySpans
+            nextSegm1 -> dirtySpans1
         }
+        if (s2.nonEmpty) u_addSegments(state, timed, key, s2)
 
-        // XXX TODO: what's missing from here:
-        //        newSegm match {
-        //          case defSegm: Segment.Defined if defSegm.span.overlaps(segmOld.span) =>
-        //            u_removeScan(timed, key)
-        //            u_addScan2(state, timed, key, defSegm)
-        //          case _ =>
-        //        }
+        s1 match {
+          case defSegm: Segment.Defined /* if defSegm.span.overlaps(segmOld.span) */ =>
+            u_removeScan(timed, key)
+            u_addScan(state, timed, key, scan)
+            // u_addScan2(state, timed, key, defSegm)
+          case _ =>
+        }
       }
     }
 
@@ -735,7 +737,7 @@ object TransportImpl {
             case sc @ Proc.ScanChange(key, scan, scanChanges) =>
               val flt = scanChanges.filter {
                 case Scan.GraphemeChange(grapheme, graphCh) =>
-                  u_scanSourceUpdate(state, timed, key, scan, grapheme, graphCh)
+                  u_graphemeChange(state, timed, key, scan, grapheme, graphCh)
                   false // scan changes are filtered and prepared already by u_scanSourceUpdate
 
                 case u: Scan.SourceChange[S] =>
@@ -777,7 +779,7 @@ object TransportImpl {
       obsVar  .dispose()
     }
 
-    override def toString = "Transport(group=" + groupHandle + ")@" + hashCode.toHexString
+    override def toString = s"Transport(group=$groupHandle)@${hashCode.toHexString}"
 
     final def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, (SpanLike, TimedProc[S])] =
       group.intersect(time).flatMap(flatSpans)
@@ -912,10 +914,7 @@ object TransportImpl {
       timedMap.remove(id) // in (3)
       val entries   = gMap.get(id)
       gMap.remove(id)     // in (1)
-      entries.foreach { procCache =>
-        val time = procCache.nextTime
-        removePrio(time, procCache.staleID)
-      }
+      entries.foreach(removePrio)
     }
 
     private def mkScanCache(key: String, scan: Scan[S], newFrame: Long)(implicit tx: S#Tx): Option[ScanCache[S]] = {
@@ -972,7 +971,7 @@ object TransportImpl {
       implicit val itx: I#Tx = tx
       val oldInfo           = infoVar()
       val oldFrame          = oldInfo.frame
-      log("advance(newFrame = " + newFrame + ", isSeek = " + isSeek + ", startPlay = " + startPlay + "); oldInfo = " + oldInfo)
+      log(s"advance(newFrame = $newFrame, isSeek = $isSeek, startPlay = $startPlay); oldInfo = $oldInfo")
       // do not short cut and return; because we may want to enforce play and call `scheduleNext`
       //         if( newFrame == oldFrame ) return
 
@@ -1084,8 +1083,9 @@ object TransportImpl {
                 }
                 if (map.nonEmpty) scanMap :+= (timed, map)
                 val procCacheNew  = procCache.copy(scans = newScans)
-                removePrio(newFrame, procCache.staleID)
-                if (procCacheNew.hasNextTime) addPrio(procCacheNew.nextTime, procCache.staleID)
+                // removePrio(newFrame, procCache.staleID) - that's wrong?!
+                removePrio(procCache)
+                addPrio(procCacheNew)
                 gMap.put(timed.id, procCacheNew)
               }
             }
@@ -1095,161 +1095,46 @@ object TransportImpl {
 
           // [D]
         } else {
-          ???
-//          // the new time frame lies outside the range for the known next grapheme event.
-//          // therefore we need to fire grapheme changes (if there are any)
-//          // and recalculate the next grapheme event time after the new time frame
-//
-//          // - assume that interesting procs have already been removed and added (algorithm [A] or [B])
-//          // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
-//          //   at the new time, yielding all timed procs active at that point
-//          // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
-//          //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and < the
-//          //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
-//          //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
-//          //   the new time and the new grapheme value; perform the corresponding update in (2).
-//          // - for the changed entries, collect those which overlap the current transport time, so that they
-//          //   will go into the advancement message
-//
-//          val newProcs: Set[TimedProc[S]] = procAdded.toSet // .map( _._2 )( breakOut )
-//
-//          // filter because new procs have already build up their scan maps
-//          val oldProcs = g.intersect(newFrame).flatMap(_._2.filterNot(newProcs.contains))
-//          val itMap = oldProcs.map { timed =>
-//            val id  = timed.id
-//            val p   = timed.value
-//            var (staleID, keyMap) = gMap.get(id).getOrElse(id -> Map.empty[String, DefSeg])
-//
-//            // we collect in here the scan grapheme source changes to fire as update
-//            var scanMap = Map.empty[String, DefSeg]
-//
-//            // check again all scan's which are linked to a grapheme source,
-//            // because we may have new entries for which no data existed before
-//            p.scans.iterator.foreach {
-//              case (key, scan) =>
-//                scan.source match {
-//                  case Some(Scan.Link.Grapheme(peer)) =>
-//
-//                    // store a new entry in the structure, and
-//                    // also make sure an update entry in scan map
-//                    // is produced (if it exists and is new)
-//                    def addNewEntry(segm: DefSeg): Unit = {
-//                      keyMap         += key -> segm // (time -> value)
-//                      val time        = segm.span.start
-//                      val staleMap    = gPrio.get(time).getOrElse(Map.empty)
-//                      val m           = staleMap.getOrElse(staleID, Map.empty) + (key -> segm)
-//                      val newStaleMap = staleMap + (staleID -> m)
-//                      gPrio.add(time, newStaleMap)
-//
-//
-//                      // deal with scanMap (fired update)
-//                      // - for the changed entries, collect those which overlap the current
-//                      //   transport time but not the previous one, so that they will go into
-//                      //   the advancement message
-//
-//                      // if next segment is valid also for current time, re-use it
-//                      if (segm.span.contains(newFrame)) {
-//                        // only add it if it did not cover the previous transport position
-//                        // (because if it did, it would not constitute a change)
-//                        if (!segm.span.contains(oldFrame)) {
-//                          scanMap += key -> segm
-//                        }
-//                      } else {
-//                        // either no value, or ceilTime is larger than now, need to find value explicitly
-//                        findAndAddToScanMap()
-//                      }
-//                    }
-//
-//                    // given that no potentially re-usable segment was found,
-//                    // find one for the new frame, and if one exists and is
-//                    // new (didn't overlap with the previous old frame), add it to the scan map
-//                    def findAndAddToScanMap(): Unit =
-//                      peer.segment(newFrame).foreach { nowSegm =>
-//                        // only add it if it did not cover the previous transport position
-//                        // (because if it did, it would not constitute a change)
-//                        if (!nowSegm.span.contains(oldFrame)) {
-//                          scanMap += key -> nowSegm
-//                        }
-//                      }
-//
-//                    keyMap.get(key) match {
-//                      // first case: there was an entry in the previous info
-//                      case Some(oldSegm) =>
-//                        val oldSegmSpan = oldSegm.span
-//                        val oldSegmTime = oldSegmSpan.start
-//                        // invalid if transport went backwards or past the previously stored segment's span
-//                        val oldSegmInvalid = newFrame < oldFrame ||
-//                          (newFrame >= oldSegmTime && !oldSegmSpan.contains(newFrame))
-//                        val newSegm = if (oldSegmInvalid) {
-//                          // need to verify next time point
-//                          val opt = peer.nearestEventAfter(newFrameP).flatMap { ceilTime =>
-//                            peer.segment(ceilTime)
-//                          }
-//                          opt.getOrElse(dummySegment)
-//                        } else oldSegm
-//
-//                        if (newSegm != oldSegm) {
-//                          // remove old entry from gPrio
-//                          gPrio.get(oldSegmTime).foreach { staleMap =>
-//                            staleMap.get(staleID).foreach { mOld =>
-//                              val m = mOld - key
-//                              val newStaleMap = if (m.isEmpty) {
-//                                staleMap - staleID
-//                              } else {
-//                                staleMap + (staleID -> m)
-//                              }
-//                              if (newStaleMap.isEmpty) {
-//                                gPrio.remove(oldSegmTime)
-//                              } else {
-//                                gPrio.add(oldSegmTime -> newStaleMap)
-//                              }
-//                            }
-//                          }
-//                          // check if there is a new entry
-//                          newSegm match {
-//                            case segm: DefSeg =>
-//                              // ...yes... store the new entry
-//                              addNewEntry(segm)
-//
-//                            case _ =>
-//                              // no event after newFrame
-//                              keyMap -= key
-//                              findAndAddToScanMap()
-//                          }
-//
-//                        } else {
-//                          // no change in next segment;
-//                          // however if we went backwards in time, the current value might
-//                          // have changed!
-//                          if (newFrame < oldFrame) findAndAddToScanMap()
-//                        }
-//
-//                      // second case: there was not entry in the previous info.
-//                      // if we advanced in time, there might be new data.
-//                      // if we went back in time, it means there can't be any
-//                      // previous data (so we won't need to search for an update segment)
-//                      case _ =>
-//                        if (newFrame > oldFrame) {
-//                          peer.nearestEventAfter(newFrameP) match {
-//                            case Some(ceilTime) =>
-//                              peer.segment(ceilTime) match {
-//                                case Some(ceilSegm) =>
-//                                  // a new entry
-//                                  addNewEntry(ceilSegm)
-//
-//                                case _ => findAndAddToScanMap()
-//                              }
-//                            case _ => findAndAddToScanMap()
-//                          }
-//                        }
-//                    }
-//
-//                  case _ => // for client timing, we are only interested in scans whose source is a grapheme
-//                }
-//            }
-//            timed -> scanMap
-//          }
-//          itMap.toIndexedSeq
+          // the new time frame lies outside the range for the known next grapheme event.
+          // therefore we need to fire grapheme changes (if there are any)
+          // and recalculate the next grapheme event time after the new time frame
+
+          // - assume that interesting procs have already been removed and added (algorithm [A] or [B])
+          // - because iterator is not yet working for IdentifierMap, make a point intersection of the group
+          //   at the new time, yielding all timed procs active at that point
+          // - for each timed proc, look up the entries in (1). if the time value stored there is still valid,
+          //   ignore this entry. a point is still valid, if the new transport time is >= info.frame and < the
+          //   value stored here in (1). otherwise, determine the ceil time for that grapheme. if this time is
+          //   the same as was stored in (1), ignore this entry. otherwise, remove the old entry and replace with
+          //   the new time and the new grapheme value; perform the corresponding update in (2).
+          // - for the changed entries, collect those which overlap the current transport time, so that they
+          //   will go into the advancement message
+
+          val newProcs: Set[TimedProc[S]] = procAdded.toSet // .map( _._2 )( breakOut )
+
+          // filter because new procs have already build up their scan maps
+          val oldProcs = g.intersect(newFrame).flatMap(_._2.filterNot(newProcs.contains))
+          oldProcs.foreach { timed =>
+            val id  = timed.id
+            val p   = timed.value
+            gMap.get(id).foreach { procCache =>
+              var scanMap = Map.empty[String, ScanCache[S]] // this will be the new map
+              p.scans.iterator.foreach {
+                case (key, scan) =>
+                  scan.sources.foreach {
+                    case Scan.Link.Grapheme(peer) =>
+                      mkScanCache(key, scan, newFrame).foreach(scanMap += key -> _)
+
+                    case _ =>
+                  }
+              }
+              val procCacheNew = procCache.copy(scans = scanMap)
+              gMap.put(id, procCacheNew)
+              removePrio(procCache)
+              addPrio(procCacheNew)
+            }
+          }
+          Vec.empty // XXX TODO itMap.toIndexedSeq
         }
 
         procUpdated = updMap.map {
