@@ -45,7 +45,7 @@ object ProcWorld {
     futs match {
       case Vec()        => Future.successful()
       case Vec(single)  => single
-      case more             => Future.reduce(futs)((_, _) => ())
+      case more         => Future.reduce(futs)((_, _) => ())
     }
 }
 

@@ -143,7 +143,7 @@ object AuralPresentationImpl {
   }
 
   private final class OutputBuilder(val bus: RichAudioBus) {
-    var sinks = Vec.empty[AudioBusNodeSetter]
+    var sinks = List.empty[(String, AuralProc)]
   }
 
   private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilder[S] /*, val name: String */) {
@@ -215,12 +215,12 @@ object AuralPresentationImpl {
 
       //         val df            = ProcDemiurg.getSynthDef( server, ug, nameHint = Some( builder.name )) // RichSynthDef()
       //         val synth         = df.play( target = group, addAction = addToHead )
-      val synth = Synth.expanded(server, ug /*, nameHint = Some(builder.name) */)
+      val synth     = Synth.expanded(server, ug /*, nameHint = Some(builder.name) */)
 
       // ---- handle input buses ----
       val time      = ugen.time
       val timed     = ugen.timed
-      var busUsers  = Vec.empty[DynamicBusUser]
+      var busUsers  = List.empty[DynamicBusUser]
       val p         = timed.value
       val span      = timed.span.value
       var setMap    = Vec[ControlSetMap](
@@ -235,6 +235,8 @@ object AuralPresentationImpl {
         })
       )
       var deps      = List.empty[Resource.Source]
+      var sinks     = List.empty[(String, String, AuralProc)]
+      var sources   = List.empty[(String, OutputBuilder)]
 
       val attrNames = ugen.attributeIns
       if (attrNames.nonEmpty) {
@@ -273,9 +275,9 @@ object AuralPresentationImpl {
 
           def lazyInBus: AudioBusNodeSetter =
             inBus.getOrElse {
-              val b     = RichBus.audio(server, numCh)
+              val b      = RichBus.audio(server, numCh)
               val res    = BusNodeSetter.mapper(inCtlName, b, synth)
-              busUsers :+= res
+              busUsers ::= res
               inBus      = Some(res)
               res
             }
@@ -302,14 +304,14 @@ object AuralPresentationImpl {
                     val bm     = lazyInBus
                     val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
                     deps     ::= w
-                    busUsers :+= w
+                    busUsers ::= w
 
                   case audio: Segment.Audio =>
                     ensureChannels(audio.numChannels)
                     val bm     = lazyInBus
                     val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
                     deps     ::= w
-                    busUsers :+= w
+                    busUsers ::= w
                 }
               case Link.Scan(peer) =>
                 scanMap.get(peer.id).foreach {
@@ -318,23 +320,27 @@ object AuralPresentationImpl {
                     val bIn         = lazyInBus
                     viewMap.get(srcTimedID) match {
                       case Some(srcAural) =>
-                        srcAural.addSink(srcKey, bIn)
+                        // srcAural.addSink(srcKey, bIn)
+                        sinks ::= (key, srcAural)
 
                       case _ =>
                         assert(ongoingBuild.isInitialized(tx.peer))
-                        val ob = ongoingBuild.get(tx.peer)
-                        for {
+                        val ob      = ongoingBuild.get(tx.peer)
+                        val outOpt  = for {
                           map <- ob.idMap
                           pb  <- map.get(srcTimedID)
                           bus <- pb.outputs.get(srcKey)
                         } yield bus
+
+                        val out = outOpt.getOrElse(sys.error(s"Bus disappeared $srcTimedID -> $srcKey"))
+
+                        sources ::= out
 
                         //                    val bOut = getBus(sourceTimedID, sourceKey).getOrElse {
                         //                      // ... or could just stick with the default control value ?
                         //                      sys.error(s"Bus disappeared $sourceTimedID -> $sourceKey")
                         //                    }
                         //                    ensureChannels(bOut.numChannels) // ... or could insert a channel coercing synth
-                        ???
                     }
                 }
             }

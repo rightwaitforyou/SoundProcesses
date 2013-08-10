@@ -145,11 +145,24 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set
     copy(v +: vertices)(unpositioned + 1, edgeMap)
   }
 
+  /** Removes a vertex and all associated edges. */
   def removeVertex(v: V): T = {
     val idx = vertices.indexOf(v)
     if (idx >= 0) {
-      val newUnpos = if (idx < unpositioned) unpositioned - 1 else unpositioned
-      copy(vertices.patch(idx, emptySeq, 1))(newUnpos, edgeMap - v)
+      val newV = vertices.patch(idx, emptySeq, 1)
+      if (idx < unpositioned) {
+        val newUnpos  = unpositioned - 1
+        copy(newV)(newUnpos, edgeMap)
+      } else {
+        if (edgeMap.contains(v)) {
+          val e     = edgeMap(v)
+          val newEM = edgeMap - v
+          val newE  = edges -- e
+          copy(newV, newE)(unpositioned, newEM)
+        } else {
+          copy(newV)(unpositioned, edgeMap)
+        }
+      }
     } else this
   }
 
