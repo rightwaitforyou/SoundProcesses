@@ -54,15 +54,19 @@ final class AudioLink private (edge: ProcEdge, sourceBus: RichAudioBus, sinkBus:
 
   def server = synth.server
 
-  def add()(implicit tx: Txn) = ()
+  def add()(implicit tx: Txn): Unit = {
+    synth.moveToHead(audible = false, group = edge.sink.preGroup())
+    ProcDemiurg.addEdge(edge)
+  }
 
   def bus: RichAudioBus = sourceBus  // XXX whatever
 
   def britzelAdd()(implicit tx: Txn): Unit = {
-    synth.play(target = edge.sink.preGroup(), args = Nil, addAction = addToHead, dependencies = Nil)
+    // synth.play(target = edge.sink.preGroup(), args = Nil, addAction = addToHead, dependencies = Nil)
+    synth.play(target = server.defaultGroup, args = Nil, addAction = addToHead, dependencies = Nil)
     synth.read (sourceBus -> "in")
     synth.write(sinkBus   -> "out")
-    ProcDemiurg.addEdge(edge)
+    // ProcDemiurg.addEdge(edge)
   }
 
   def remove()(implicit tx: Txn): Unit = {

@@ -40,6 +40,7 @@ import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.Scan.Link
+import scala.util.control.NonFatal
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -329,6 +330,7 @@ object AuralPresentationImpl {
                       val edge    = ProcEdge(srcAural, srcKey, aural, key)
                       val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
                       deps      ::= link
+                      // deps      ::= srcAural.group()
                       busUsers  ::= link
                     }
                 }
@@ -387,7 +389,14 @@ object AuralPresentationImpl {
       ongoingBuild.get(itx).seq.foreach { builder =>
         val ugen = builder.ugen
         if (ugen.isComplete) {
-          launchProc(builder)
+          try {
+            launchProc(builder)
+          } catch {
+            case NonFatal(e) =>
+              e.printStackTrace()
+              throw e
+          }
+
         } else {
           // XXX TODO: do we need to free buses associated with ugen.scanOuts ?
           println("Warning: Incomplete aural proc build for " + ugen.timed.value)

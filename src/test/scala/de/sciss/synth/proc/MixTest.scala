@@ -18,6 +18,7 @@ object MixTest extends App {
   implicit val system = InMemory()
 
   showAuralLog  = true
+  showTxnLog    = true
 
   implicit class RichDouble(d: Double) {
     def seconds = (d * 44100).toLong

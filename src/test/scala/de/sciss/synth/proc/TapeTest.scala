@@ -20,7 +20,7 @@ object TapeTest extends App {
 
   val aural = AuralSystem()
 
-  def twice     = false // true
+  def twice     = true
   showAuralLog  = true
   showTxnLog    = true
 
