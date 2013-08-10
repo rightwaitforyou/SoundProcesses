@@ -90,7 +90,7 @@ private[proc] sealed trait ProcTxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys
     // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
     val rsrcStampNew = if (msgAsync) depStampMax | 1 else (depStampMax + 1) & ~1
 
-    logTxn("addMessage(" + resource + ", " + m + ") -> stamp = " + rsrcStampNew)
+    logTxn(s"addMessage($resource, $m) -> stamp = $rsrcStampNew")
     if (rsrcStampNew != rsrcStampOld) resource.timeStamp_=(rsrcStampNew)(tx)
 
     val bNew = if (bOld.payload.isEmpty) {

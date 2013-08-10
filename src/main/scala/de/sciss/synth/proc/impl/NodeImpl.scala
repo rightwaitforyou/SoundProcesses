@@ -39,7 +39,6 @@ object NodeImpl {
 }
 
 trait NodeImpl extends ResourceImpl with Node {
-
   import NodeImpl._
 
   private val onEndFuns = Ref(EmptyOnEnd)
