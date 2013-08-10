@@ -38,18 +38,20 @@ private[proc] final case class BufferImpl(server: Server, peer: SBuffer)(closeOn
   def id: Int = peer.id
 
   def alloc(numFrames: Int, numChannels: Int = 1)(implicit tx: Txn): Unit = {
-    requireOnline()
+    requireOffline()
     require(numFrames >= 0 && numChannels >= 0, s"numFrames ($numFrames) and numChannels ($numChannels) must be >= 0")
     tx.addMessage(this, peer.allocMsg(numFrames = numFrames, numChannels = numChannels), audible = false)
+    setOnline(value = true)
   }
 
   /** Allocates and reads the buffer content once (closes the file). */
   def allocRead(path: String, startFrame: Long, numFrames: Int)(implicit tx: Txn): Unit = {
-    requireOnline()
+    requireOffline()
     require(startFrame <= 0x7FFFFFFFL, s"Cannot encode start frame >32 bit ($startFrame)")
     require(numFrames >= 0, s"numFrames ($numFrames) must be >= 0")
     val frameI = startFrame.toInt
     tx.addMessage(this, peer.allocReadMsg(path, startFrame = frameI, numFrames = numFrames), audible = false)
+    setOnline(value = true)
   }
 
   /** Opens a file to write to in streaming mode (leaving it open), as useable for DiskOut. */
