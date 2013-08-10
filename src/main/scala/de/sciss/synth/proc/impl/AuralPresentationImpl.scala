@@ -39,6 +39,7 @@ import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
+import de.sciss.synth.proc.Scan.Link
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -56,7 +57,7 @@ object AuralPresentationImpl {
   def runTx[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] = {
     val c = new Client[S](transport, aural)
     aural.addClient(c)
-    aural.serverOption.foreach(c.startedTx(_))
+    aural.serverOption.foreach(c.startedTx)
     c
   }
 
@@ -281,7 +282,7 @@ object AuralPresentationImpl {
           p.scans.get(key).foreach { scan =>
             scan.sources.foreach {
               // if not found, stick with default
-              case Scan.Link.Grapheme(peer) =>
+              case Link.Grapheme(peer) =>
                 val segmOpt = peer.segment(time)
                 segmOpt.foreach {
                   // again if not found... stick with default
@@ -315,7 +316,7 @@ object AuralPresentationImpl {
                     val bm = BusNodeSetter.mapper(inCtlName, aaw.bus, synth)
                     busUsers :+= bm
                 }
-              case Scan.Link.Scan(peer) =>
+              case Link.Scan(peer) =>
                 scanMap.get(peer.id).foreach {
                   case (sourceKey, idH) =>
                     val sourceTimedID = idH()
@@ -387,11 +388,11 @@ object AuralPresentationImpl {
     def scanInNumChannels(timed: TimedProc[S], time: Long, key: String)(implicit tx: S#Tx): Int = {
       val numCh = timed.value.scans.get(key).fold(0) { scan =>
         val chans = scan.sources.toList.map {
-          case Scan.Link.Grapheme(peer) =>
+          case Link.Grapheme(peer) =>
             val chansOpt = peer.valueAt(time).map(_.numChannels)
             chansOpt.getOrElse(1) // producing a non-mapped monophonic control with default value; sounds sensible?
 
-          case Scan.Link.Scan(peer) =>
+          case Link.Scan(peer) =>
             val sourceOpt = scanMap.get(peer.id)
             val busOpt = sourceOpt.flatMap {
               case (sourceKey, idH) =>

@@ -25,11 +25,11 @@
 
 package de.sciss.synth.proc
 
-import collection.immutable.{IndexedSeq => Vec, Map => IMap, Set => ISet}
-import collection.mutable.{HashSet => MHashSet, Set => MSet, Stack => MStack}
+import collection.immutable.{IndexedSeq => Vec}
+import collection.mutable.{Set => MSet, Stack => MStack}
 
 object Topology {
-  def empty[V, E <: Edge[V]] = apply[V, E](emptySeq, ISet.empty)(0, Map.empty)
+  def empty[V, E <: Edge[V]] = apply[V, E](emptySeq, Set.empty)(0, Map.empty)
 
   trait Edge[V] {
     def sourceVertex: V
@@ -39,16 +39,29 @@ object Topology {
   private val emptySeq = Vec.empty[Nothing]
 }
 
-final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: ISet[E])
-                                                   (unpositioned: Int, edgeMap: IMap[V, ISet[E]])
+/** An online toplogical order maintenance structure. This is an immutable data structure with
+  * amortized costs. The edge adding operation returns a new copy of the modified structure along
+  * with a list of vertices which have been moved due to the insertion. The caller can then use
+  * that list to adjust any views (e.g. DSP processes).
+  *
+  * @param  vertices      the vertices in the structure
+  * @param  edges         a set of edges between the vertices
+  * @param  unpositioned  the number of unpositioned vertices (the leading elements in `vertices`)
+  * @param  edgeMap       allows lookup of edges via vertex keys
+  */
+final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set[E])
+                                                   (unpositioned: Int, edgeMap: Map[V, Set[E]])
   extends Ordering[V] {
 
   import Topology.emptySeq
 
   type T = Topology[V, E]
 
-  override def toString = "Topology(" + vertices + ", " + edges + ")(" + unpositioned + ", " + edgeMap + ")"
+  override def toString = s"Topology($vertices, $edges)($unpositioned, $edgeMap)"
 
+  /** For two positioned vertices `a` and `b`, returns `-1` if `a` is before `b`, or `1` if `a` follows `b`,
+    *  or `0` if both are equal. Throws an exception if `a` or `b` is unpositioned.
+    */
   def compare(a: V, b: V): Int = {
     val ai = vertices.indexOf(a)
     val bi = vertices.indexOf(b)
@@ -56,39 +69,47 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: ISe
     if (ai < bi) -1 else if (ai > bi) 1 else 0
   }
 
-  /**
-    *    @return  None if the edge would violate acyclicity, otherwise the Some tuple contains
-    *             the new topology, the reference vertex and the affected vertices which need to
-    *             be moved with respect to the reference to reflect the new ordering. In case
-    *             that the reference is the source vertex of the added edge, the affected vertices
-    *             should be moved _after_ the reference and keep their internal grouping order.
-    *             In case the reference is the target vertex, the affected vertices sequence is
-    *             guaranteed to consist only exactly one element -- the source vertex -- which
-    *             should be moved _before_ the reference
+  /** Tries to insert an edge into the topological order.
+    * Throws an exception of the source or target vertex of the edge is not contained in the vertex list of this
+    * structure.
+    *
+    * @param e  the edge to insert
+    * @return  `None` if the edge would violate acyclicity, otherwise `Some` tuple contains
+    *          the new topology, the reference vertex and the affected vertices which need to
+    *          be moved with respect to the reference to reflect the new ordering. In case
+    *          that the reference is the source vertex of the added edge, the affected vertices
+    *          should be moved _after_ the reference and keep their internal grouping order.
+    *          In case the reference is the target vertex, the affected vertices sequence is
+    *          guaranteed to consist only exactly one element -- the source vertex -- which
+    *          should be moved _before_ the reference
     */
   def addEdge(e: E): Option[(T, V, Vec[V])] = {
     val source	   = e.sourceVertex
     val target	   = e.targetVertex
     val upBound	   = vertices.indexOf(source)
     val loBound	   = vertices.indexOf(target)
-    require((loBound >= 0) && (upBound >= 0))
-    val newEdgeMap: IMap[V, ISet[E]] = edgeMap + (source -> (edgeMap.getOrElse(source, Set.empty) + e))
+    require(loBound >= 0 && upBound >= 0)
+    val newEdgeMap: Map[V, Set[E]] = edgeMap + (source -> (edgeMap.getOrElse(source, Set.empty) + e))
     val newEdgeSet = edges + e
 
     // dealing with unpositioned elements
     if (upBound < unpositioned) { // first edge for source
       if (loBound < unpositioned) { // first edge for target
-        val min = math.min(upBound, loBound)
-        val max = math.max(upBound, loBound)
-        val newUnpos   = unpositioned - 2
-        val newVertices = vertices.patch(min, emptySeq, 1).patch(max - 1, emptySeq, 1)
+        val min         = math.min(upBound, loBound)
+        val max         = math.max(upBound, loBound)
+        val newUnpos    = unpositioned - 2
+        val newVertices = vertices
+          .patch(min     , emptySeq, 1)
+          .patch(max - 1 , emptySeq, 1)
           .patch(newUnpos, Vec(source, target), 0)
         Some((copy(newVertices, newEdgeSet)(newUnpos, newEdgeMap), source, Vec(target)))
       } else {
         //            Some( (this, emptySeq) )
-        val newUnpos = unpositioned - 1
-        val sourceSeq = Vec(source)
-        val newVertices = vertices.patch(upBound, emptySeq, 1).patch(loBound - 1, sourceSeq, 0)
+        val newUnpos    = unpositioned - 1
+        val sourceSeq   = Vec(source)
+        val newVertices = vertices
+          .patch(upBound    , emptySeq , 1)
+          .patch(loBound - 1, sourceSeq, 0)
         Some((copy(newVertices, newEdgeSet)(newUnpos, newEdgeMap), target, sourceSeq))
       }
 
@@ -96,12 +117,12 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: ISe
     } else if (loBound > upBound) {
       Some((copy(vertices, newEdgeSet)(unpositioned, newEdgeMap), source, emptySeq))
     } else if (loBound < upBound) {
-      val visited = new MHashSet[V]()
+      val visited = MSet.empty[V]
       if (!discovery(visited, newEdgeMap, target, upBound)) {
         None // Cycle --> Abort
       } else {
         val (newVertices, affected) = shift(visited, loBound, upBound)
-        val newUnpos = if (loBound < unpositioned) unpositioned - 1 else unpositioned
+        val newUnpos                = if (loBound < unpositioned) unpositioned - 1 else unpositioned
         Some((copy(newVertices, newEdgeSet)(newUnpos, newEdgeMap), source, affected))
       }
     } else {
@@ -133,11 +154,11 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: ISe
   }
 
   // note: assumes audio rate
-  private def discovery(visited: MSet[V], newEdgeMap: IMap[V, ISet[E]], v: V, upBound: Int): Boolean = {
+  private def discovery(visited: MSet[V], newEdgeMap: Map[V, Set[E]], v: V, upBound: Int): Boolean = {
     val targets = MStack(v)
     while (targets.nonEmpty) {
-      val v = targets.pop()
-      visited += v
+      val v           = targets.pop()
+      visited        += v
       val moreTargets = newEdgeMap.getOrElse(v, Set.empty).map(_.targetVertex)
       val grouped     = moreTargets.groupBy { t =>
         val vidx = vertices.indexOf(t)

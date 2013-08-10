@@ -73,25 +73,24 @@ object scan {
 
     // first arg: bus control, remaining args: signal to write; thus numChannels = _args.size - 1
     protected def makeUGen(_args: Vec[UGenIn]): Unit = {
-      val busArg = _args.head
-      val sigArg = _args.tail
+      val busArg      = _args.head
+      val sigArg      = _args.tail
       val numChannels = sigArg.size
       UGenGraph.builder match {
         case b: UGenGraphBuilder[_] =>
           b.addScanOut(key, numChannels)
         case other => UGenGraphBuilder.outsideOfContext()
       }
-      val sigArgAr = sigArg.map {
-        ui =>
-          if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, Vector(ui))
+      val sigArgAr = sigArg.map { ui =>
+        if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, Vector(ui))
       }
-      new UGen.ZeroOut(name, audio, busArg +: sigArgAr, isIndividual = true)
+      new UGen.ZeroOut("Out", audio, busArg +: sigArgAr, isIndividual = true)
     }
   }
 }
 
 final case class scan(key: String) {
-  def ar: GE = ar(0.0)
+  def ar                 : GE = ar(0.0)
   def ar(default: Double): GE = scan.In(key, default)
 
   def :=(in: GE): Unit = scan.Out(key, in)
