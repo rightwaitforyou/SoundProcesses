@@ -272,15 +272,14 @@ object AuralPresentationImpl {
           val inCtlName = scan.inControlName(key)
           // var inBus     = Option.empty[AudioBusNodeSetter]
 
-          lazy val lazyInBus: AudioBusNodeSetter =
-            inBus.getOrElse {
-              val b      = RichBus.audio(server, numCh)
-              val res    = BusNodeSetter.mapper(inCtlName, b, synth)
-              busUsers ::= res
-              // inBus      = Some(res)
-              aural.addInputBus(key, res.bus)
-              res
-            }
+          lazy val lazyInBus: AudioBusNodeSetter = {
+            val b      = RichBus.audio(server, numCh)
+            val res    = BusNodeSetter.mapper(inCtlName, b, synth)
+            busUsers ::= res
+            // inBus      = Some(res)
+            aural.addInputBus(key, res.bus)
+            res
+          }
 
           // note: if not found, stick with default
           p.scans.get(key).foreach { scan =>
