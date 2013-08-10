@@ -64,7 +64,7 @@ object AuralProc {
       }
     }
 
-    private def group_=(newGroup: Group)(implicit tx: Txn): Unit = {
+    def group_=(newGroup: Group)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       groupsRef.transform(_ map { all =>
         moveAllTo(all, newGroup)
@@ -131,6 +131,8 @@ sealed trait AuralProc /* extends Writer */ {
   /** Retrieves the main group of the Proc. If this group has not been assigned yet,
     * this method will create a new group. */
   def group()(implicit tx: Txn): Group
+
+  def group_=(value: Group)(implicit tx: Txn): Unit
 
   def preGroup()(implicit tx: Txn): Group
 

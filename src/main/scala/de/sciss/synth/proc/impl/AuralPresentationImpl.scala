@@ -318,29 +318,11 @@ object AuralPresentationImpl {
                   case (srcKey, idH) =>
                     val srcTimedID  = idH()
                     val bIn         = lazyInBus
-                    viewMap.get(srcTimedID) match {
-                      case Some(srcAural) =>
-                        // srcAural.addSink(srcKey, bIn)
-                        sinks ::= (key, srcAural)
-
-                      case _ =>
-                        assert(ongoingBuild.isInitialized(tx.peer))
-                        val ob      = ongoingBuild.get(tx.peer)
-                        val outOpt  = for {
-                          map <- ob.idMap
-                          pb  <- map.get(srcTimedID)
-                          bus <- pb.outputs.get(srcKey)
-                        } yield bus
-
-                        val out = outOpt.getOrElse(sys.error(s"Bus disappeared $srcTimedID -> $srcKey"))
-
-                        sources ::= out
-
-                        //                    val bOut = getBus(sourceTimedID, sourceKey).getOrElse {
-                        //                      // ... or could just stick with the default control value ?
-                        //                      sys.error(s"Bus disappeared $sourceTimedID -> $sourceKey")
-                        //                    }
-                        //                    ensureChannels(bOut.numChannels) // ... or could insert a channel coercing synth
+                    viewMap.get(srcTimedID).foreach { srcAural =>
+                      // srcAural.addSink(srcKey, bIn)
+                      val bOut = srcAural.getBus(srcKey).getOrElse(sys.error(s"Bus disappeared $srcTimedID -> $srcKey"))
+                      ensureChannels(bOut.numChannels)
+                      ??? // sinks ::= (key, srcAural)
                     }
                 }
             }
@@ -363,9 +345,35 @@ object AuralPresentationImpl {
 
       busUsers.foreach(_.add())
 
+      // links
+      p.scans.iterator.foreach {
+        case (key, scan) =>
+          scan.sources.foreach {
+            case Link.Scan(peer) =>
+              scanMap.get(peer.id).foreach {
+                case (sinkKey, idH) =>
+                  val sinkTimedID = idH()
+                  viewMap.get(sinkTimedID).foreach { sinkAural =>
+                    mkLink(aural, key, sinkAural, sinkKey)
+                  }
+              }
+
+            case _ =>
+          }
+      }
+
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
       log("launched " + aural + " (" + hashCode.toHexString + ")")
       viewMap.put(timed.id, aural)
+    }
+
+    private def mkLink(source: AuralProc, sourceKey: String, sink: AuralProc, sinkKey: String): Unit = {
+      ???
+
+      // val bOut = srcAural.getBus(srcKey).getOrElse(sys.error(s"Bus disappeared $srcTimedID -> $srcKey"))
+      // ensureChannels(bOut.numChannels)
+      // sinks ::= (key, srcAural)
+
     }
 
     // called before the transaction successfully completes.
