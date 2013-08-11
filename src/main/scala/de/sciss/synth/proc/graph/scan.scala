@@ -34,7 +34,7 @@ object scan {
   private[proc] def outControlName(key: String): String = "$out_" + key
   private[proc] def inControlName (key: String): String = "$in_"  + key
 
-  private final case class In(key: String, default: Double)
+  final case class In(key: String, default: Double)
     extends GE.Lazy /* with Elem */ with AudioRated {
 
     override def productPrefix = "scan$In"
@@ -59,12 +59,12 @@ object scan {
     }
   }
 
-  private final case class Out(key: String, in: GE)
+  final case class Out(key: String, in: GE)
     extends UGenSource.ZeroOut with WritesBus {
 
     override def productPrefix = "scan$Out"
 
-    override def toString = "scan\"$key\") := $in"
+    override def toString = s"""scan("$key") := $in"""
 
     protected def makeUGens {
       val bus = outControlName(key).kr
