@@ -148,12 +148,4 @@ trait Scan[S <: evt.Sys[S]] extends evt.Node[S] {
 
   /** An event that is invoked when sinks or sources are connected or disconnected. */
   def changed: Event[S, Scan.Update[S], Scan[S]]
-
-  // called in the implementation from addSink( Link.Scan( _ )). the difference
-  // to source_= is that this method should not establish the opposite connection
-  // by calling addSink on the source, as this would result in an infinite feedback.
-  // still, this method should fire an Scan.SourceChanged event.
-
-  // private[proc] def addScanSource(source: Scan[S])(implicit tx: S#Tx): Unit
-  // private[proc] def addScanSink  (sink  : Scan[S])(implicit tx: S#Tx): Unit
 }

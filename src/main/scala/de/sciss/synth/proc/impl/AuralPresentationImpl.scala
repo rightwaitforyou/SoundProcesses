@@ -150,17 +150,6 @@ object AuralPresentationImpl {
     var outputs = Map.empty[String, OutputBuilder]
   }
 
-  // this is plain stupid... another reason why the scan should reproduce the proc and key
-  private def idSerializer[S <: stm.Sys[S]]: Serializer[S#Tx, S#Acc, S#ID] = anyIDSer.asInstanceOf[Serializer[S#Tx, S#Acc, S#ID]]
-
-  private val anyIDSer = new IDSer[stm.InMemory]
-
-  private final class IDSer[S <: stm.Sys[S]] extends Serializer[S#Tx, S#Acc, S#ID] {
-    def write(id: S#ID, out: DataOutput): Unit = id.write(out)
-
-    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): S#ID = tx.readID(in, access)
-  }
-
    /*
     * @param missingMap maps each missing input to a set of builders who requested that input
     * @param idMap      map's timed-ids to aural proc builders
@@ -190,8 +179,6 @@ object AuralPresentationImpl {
     // building the unfinished aural procs if possible.
     //      private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
     //         TxnLocal( init = OngoingBuild(), beforeCommit = beforeCommit )
-
-    implicit def idSer = idSerializer[S]
 
     private val ongoingBuild = TxnLocal(new OngoingBuild[S]())
 
@@ -484,6 +471,7 @@ object AuralPresentationImpl {
       val scans = timed.value.scans
       scans.iterator.foreach {
         case (key, scan) =>
+          import CommonSerializers.Identifier
           scanMap.put(scan.id, key -> tx.newHandle(timedID))
       }
 
