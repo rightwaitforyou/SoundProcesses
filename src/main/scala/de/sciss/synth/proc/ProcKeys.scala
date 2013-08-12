@@ -19,4 +19,7 @@ object ProcKeys {
   final val attrFadeIn  = "fade-in"
   /** Fade out. Type `FadeSpec` */
   final val attrFadeOut = "fade-out"
+
+  final val scanMainIn  = "in"
+  final val scanMainOut = "out"
 }

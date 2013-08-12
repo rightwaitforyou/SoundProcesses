@@ -562,7 +562,7 @@ object AuralPresentationImpl {
         case _ =>
           def warn(): Unit = {
             val mute = timed.value.attributes[Attribute.Boolean]("mute").exists(_.value)
-            if (!mute) println("WARNING: could not find view for " + timed)
+            if (!mute) println("WARNING: could not find aural view for " + timed)
           }
 
           val newTxn  = !ongoingBuild.isInitialized(tx.peer)
@@ -595,7 +595,7 @@ object AuralPresentationImpl {
     //               logConfig( "aural graph changed " + timed.value )
     //               aural.graph_=( newGraph )
     //            case _ =>
-    //               println( "WARNING: could not find view for proc " + timed.value )
+    //               println( "WARNING: could not find aural view for proc " + timed.value )
     //         }
     //      }
 
@@ -607,7 +607,7 @@ object AuralPresentationImpl {
       //               logConfig( "aural freq changed " + timed.value )
       //               aural.addParams( changes )
       //            case _ =>
-      //               println( "WARNING: could not find view for proc " + timed.value )
+      //               println( "WARNING: could not find aural view for proc " + timed.value )
       //         }
     }
   }

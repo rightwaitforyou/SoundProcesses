@@ -22,9 +22,9 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
   //  def add(key: String, graph: SynthGraph): Unit =
   //    map.synchronized(map += (key, graph))
 
-  private final val tapeCookie  = 1
-  private final val emptyCookie = 2
-  // private final val mapCookie   = 3
+  private final val oldTapeCookie = 1
+  private final val emptyCookie   = 2
+  private final val tapeCookie    = 3
 
   def readValue(in: DataInput): SynthGraph = impl.SynthGraphSerializer.read(in)
 
@@ -34,10 +34,7 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
   protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                       (implicit tx: S#Tx): ReprNode[S] =
     (cookie: @switch) match {
-      case `tapeCookie` =>
-        new Predefined(targets, cookie)
-      case `emptyCookie` =>
-        new Predefined(targets, cookie)
+      case `oldTapeCookie` | `emptyCookie` | `tapeCookie` => new Predefined(targets, cookie)
 
       //      case `mapCookie`  =>
       //        val key     = in.readUTF()
@@ -47,7 +44,7 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
 
   // private final class MapImpl[S <: Sys[S]]
 
-  private val tapeSynthGraph = SynthGraph {
+  private lazy val oldTapeSynthGraph = SynthGraph {
     import synth._
     import ugen._
     val sig   = graph.scan     (ProcKeys.graphAudio).ar(0)
@@ -58,16 +55,24 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
     Out.ar(bus, sig * amp)
   }
 
-  private val emptySynthGraph = SynthGraph {}
-
-  def tape[S <: Sys[S]](implicit tx: S#Tx): Ex[S] = {
-    val targets = evt.Targets[S]
-    new Predefined(targets, tapeCookie)
+  private lazy val tapeSynthGraph = SynthGraph {
+    import synth._
+    val sig   = graph.scan     (ProcKeys.graphAudio).ar(0)
+    val mute  = graph.attribute(ProcKeys.attrMute  ).ir(0)
+    val env   = graph.FadeInOut(ProcKeys.attrFadeIn, ProcKeys.attrFadeOut).ar
+    val amp   = env * (1 - mute)
+    graph.scan(ProcKeys.scanMainOut) := sig * amp
   }
 
-  def empty[S <: Sys[S]](implicit tx: S#Tx): Ex[S] = {
+  private val emptySynthGraph = SynthGraph {}
+
+  def tape   [S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(tapeCookie   )
+  def tapeOld[S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(oldTapeCookie)
+  def empty  [S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(emptyCookie  )
+
+  private def apply[S <: Sys[S]](cookie: Int)(implicit tx: S#Tx): Ex[S] = {
     val targets = evt.Targets[S]
-    new Predefined(targets, emptyCookie)
+    new Predefined(targets, cookie)
   }
 
   // XXX TODO -- we should allow other constant values in Type. now we have a wasted evt.Targets...
@@ -83,8 +88,9 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
     protected def reader: evt.Reader[S, SynthGraphs.Ex[S]] = serializer
 
     def value(implicit tx: S#Tx): SynthGraph = (cookie: @switch) match {
-      case `tapeCookie`   => tapeSynthGraph
-      case `emptyCookie`  => emptySynthGraph
+      case `oldTapeCookie`  => oldTapeSynthGraph
+      case `emptyCookie`    => emptySynthGraph
+      case `tapeCookie`     => tapeSynthGraph
     }
   }
 }
