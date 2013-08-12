@@ -511,10 +511,10 @@ object TransportImpl {
       // try to re-use and update a previous grapheme changed message in the state
       state.procChanged.lastOption match {
         case Some((`timed`, GraphemesChanged(map))) =>
-          val newMap = GraphemesChanged(map + entry)
+          val newMap = GraphemesChanged[S](map + entry)
           state.procChanged = state.procChanged.init :+ (timed -> newMap)
         case _ =>
-          val map = GraphemesChanged(Map(entry))
+          val map = GraphemesChanged[S](Map(entry))
           state.procChanged :+= timed -> map
       }
     }
@@ -1136,7 +1136,7 @@ object TransportImpl {
         }
 
         procUpdated = updMap.map {
-          case (timed, map) => timed -> GraphemesChanged(map)
+          case (timed, map) => timed -> GraphemesChanged[S](map)
         }
       }
 

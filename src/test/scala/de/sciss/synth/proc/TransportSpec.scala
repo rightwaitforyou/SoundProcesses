@@ -77,7 +77,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 7000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> GraphemesChanged(Map("freq" -> Vec(Segment.Const(Span.from(7000L), Vec(441.0))))))
+          Vec(pt1 -> GraphemesChanged[S](Map("freq" -> Vec(Segment.Const(Span.from(7000L), Vec(441.0))))))
         )
       )
       obs.clear()
@@ -85,7 +85,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 10000L, isSeek = false, isPlaying = true, removed = Vec(pt1), changes =
-          Vec(pt2 -> GraphemesChanged(Map("amp" -> Vec(Segment.Curve(Span(10000L, 15000L), Vec((0.5, 0.7, linear)))))))
+          Vec(pt2 -> GraphemesChanged[S](Map("amp" -> Vec(Segment.Curve(Span(10000L, 15000L), Vec((0.5, 0.7, linear)))))))
         )
       )
       obs.clear()
@@ -93,7 +93,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 15000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt2 -> GraphemesChanged(Map("amp" -> Vec(Segment.Curve(Span(15000L, 25000L), Vec((0.7, 1.0, linear)))))))
+          Vec(pt2 -> GraphemesChanged[S](Map("amp" -> Vec(Segment.Curve(Span(15000L, 25000L), Vec((0.7, 1.0, linear)))))))
         )
       )
       obs.clear()
@@ -157,10 +157,10 @@ class TransportSpec extends ConfluentEventSpec {
 
       obs.assertEquals(
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> ProcChanged(
+          Vec(pt1 -> ProcChanged[S](
             Proc.AssociationAdded(Proc.ScanKey("freq"))))),
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> ProcChanged(
+          Vec(pt1 -> ProcChanged[S](
             Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded(source)))
           ))
         )
@@ -174,7 +174,7 @@ class TransportSpec extends ConfluentEventSpec {
       val a0 = Advance(t, time = 2000L, isSeek = false, isPlaying = true)
       p1.scans.add("egal")
       obs.assertEquals(
-        a0.copy(changes = Vec(pt1 -> ProcChanged(
+        a0.copy(changes = Vec(pt1 -> ProcChanged[S](
           Proc.AssociationAdded(Proc.ScanKey("egal")))))
       )
       obs.clear()
@@ -188,7 +188,7 @@ class TransportSpec extends ConfluentEventSpec {
 
       p1.scans.remove( "egal" )
       obs.assertEquals(
-        a0.copy(changes = Vec(pt1 -> ProcChanged(
+        a0.copy(changes = Vec(pt1 -> ProcChanged[S](
           Proc.AssociationRemoved(Proc.ScanKey("egal")))))
       )
       obs.clear()
@@ -204,7 +204,7 @@ class TransportSpec extends ConfluentEventSpec {
           // pt1 -> ProcChanged(
           //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, Vec( segm )))
           // ),
-          pt1 -> GraphemesChanged(
+          pt1 -> GraphemesChanged[S](
             Map("freq" -> Vec(segm))
           )
         ))

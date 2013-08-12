@@ -26,7 +26,7 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{bitemp, stm, data, event => evt}
+import de.sciss.lucre.{bitemp, stm, data}
 import bitemp.BiGroup
 import stm.{Disposable, Cursor}
 import collection.immutable.{IndexedSeq => Vec}
@@ -102,10 +102,10 @@ object Transport {
 
   // particular update for ProcTransport
   object Proc {
-    sealed trait Update[+S]
+    sealed trait Update[S <: Sys[S]]
 
-    final case class Changed[S <: Sys[S]](peer: proc.Proc.Change[S])           extends Update[S]
-    final case class GraphemesChanged(map: Map[String, Vec[Grapheme.Segment]]) extends Update[Nothing]
+    final case class Changed[S <: Sys[S]](peer: proc.Proc.Change[S])                        extends Update[S]
+    final case class GraphemesChanged[S <: Sys[S]](map: Map[String, Vec[Grapheme.Segment]]) extends Update[S]
   }
 }
 
