@@ -29,7 +29,7 @@ package impl
 
 import de.sciss.lucre.{event => evt, data, bitemp}
 import de.sciss.synth.expr.{SynthGraphs, Doubles}
-import evt.{Event, impl => evti, Sys}
+import evt.{Event, impl => evti}
 import bitemp.BiType
 import data.SkipList
 import annotation.switch
@@ -51,7 +51,7 @@ object ProcImpl {
   def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Proc[S]] =
     anySer.asInstanceOf[evt.NodeSerializer[S, Proc[S]]]
 
-  private val anySer = new Serializer[evt.InMemory]
+  private val anySer = new Serializer[InMemory]
 
   private class Serializer[S <: Sys[S]] extends evt.NodeSerializer[S, Proc[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Proc[S] =
@@ -154,7 +154,7 @@ object ProcImpl {
 
       protected def valueInfo = attributeEntryInfo[S]
 
-      def apply[Attr[~ <: evt.Sys[~]] <: Attribute[_]](key: String)(implicit tx: S#Tx,
+      def apply[Attr[~ <: Sys[~]] <: Attribute[_]](key: String)(implicit tx: S#Tx,
                                                       tag: reflect.ClassTag[Attr[S]]): Option[Attr[S]#Peer] =
         get(key) match {
           // cf. stackoverflow #16377741

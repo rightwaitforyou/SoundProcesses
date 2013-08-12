@@ -20,7 +20,7 @@ class TransportSpec extends ConfluentEventSpec {
   import Grapheme.Segment
   import Transport.Proc.{GraphemesChanged, Changed => ProcChanged}
 
-  type I = stm.InMemory
+  type I = InMemory
 
   //   import ConfluentReactive.inMemory
 

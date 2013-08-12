@@ -33,9 +33,9 @@ import annotation.elidable
 import annotation.elidable._
 
 package object proc {
-  type ProcGroup[S <: evt.Sys[S]] = BiGroup[S, Proc[S], Proc.Update[S]]
-  type TimedProc[S <: evt.Sys[S]] = BiGroup.TimedElem[S, Proc[S]]
-  type ProcTransport[S <: evt.Sys[S]] = Transport[S, Proc[S], Transport.Proc.Update[S]]  // Proc.Update[ S ]
+  type ProcGroup[S <: Sys[S]] = BiGroup[S, Proc[S], Proc.Update[S]]
+  type TimedProc[S <: Sys[S]] = BiGroup.TimedElem[S, Proc[S]]
+  type ProcTransport[S <: Sys[S]] = Transport[S, Proc[S], Transport.Proc.Update[S]]  // Proc.Update[ S ]
   type Param = Double
 
   private lazy val logHeader = new SimpleDateFormat("[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US)

@@ -34,30 +34,30 @@ import de.sciss.span.SpanLike
 import de.sciss.serial.{Serializer, DataInput}
 
 object ProcGroup {
-  type Update[S <: evt.Sys[S]] = BiGroup.Update[S, Proc[S], Proc.Update[S]]
+  type Update[S <: Sys[S]] = BiGroup.Update[S, Proc[S], Proc.Update[S]]
 
-  type Modifiable[S <: evt.Sys[S]] = BiGroup.Modifiable[S, Proc[S], Proc.Update[S]]
+  type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Proc[S], Proc.Update[S]]
 
   private implicit val spanType: Type[SpanLike] = SpanLikes
 
-  private def eventView[S <: evt.Sys[S]](proc: Proc[S]): EventLike[S, Proc.Update[S], Proc[S]] = proc.changed
+  private def eventView[S <: Sys[S]](proc: Proc[S]): EventLike[S, Proc.Update[S], Proc[S]] = proc.changed
 
   object Modifiable {
-    def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] = {
+    def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] = {
       BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](eventView)
     }
 
-    def apply[S <: evt.Sys[S]](implicit tx: S#Tx): ProcGroup.Modifiable[S] =
+    def apply[S <: Sys[S]](implicit tx: S#Tx): ProcGroup.Modifiable[S] =
       BiGroup.Modifiable[S, Proc[S], Proc.Update[S]](eventView)
 
-    def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup.Modifiable[S] =
+    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup.Modifiable[S] =
       BiGroup.Modifiable.read[S, Proc[S], Proc.Update[S]](in, access, eventView)
   }
 
-  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup[S] =
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup[S] =
     BiGroup.Modifiable.read[S, Proc[S], Proc.Update[S]](in, access, eventView)
 
-  implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup[S]] = {
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup[S]] = {
     BiGroup.serializer[S, Proc[S], Proc.Update[S]](eventView)
   }
 }

@@ -36,22 +36,22 @@ import de.sciss.span.SpanLike
 
 object Transport {
   /** Creates a new realtime transport. The transport is positioned at time zero. */
-  def apply[S <: evt.Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)
-                                             (implicit tx: S#Tx, cursor: Cursor[S],
-                                              bridge: S#Tx => I#Tx): ProcTransport[S] =
+  def apply[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)
+                                         (implicit tx: S#Tx, cursor: Cursor[S],
+                                          bridge: S#Tx => I#Tx): ProcTransport[S] =
     Impl[S, I](group, sampleRate)
 
   //   implicit def serializer[ S <: evt.Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
   //      Impl.serializer( cursor )
 
-  sealed trait Update[S <: evt.Sys[S], Elem, U] {
+  sealed trait Update[S <: Sys[S], Elem, U] {
     def transport: Transport[S, Elem, U]
 
     def time: Long
   }
 
   /** Creates a new offline transport. The transport is not positioned. */
-  def offline[S <: evt.Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
+  def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
     implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Offline[S, Proc[S], Transport.Proc.Update[S]] =
     Impl.offline[S, I](group, sampleRate)
 
@@ -60,7 +60,7 @@ object Transport {
    * to a real-time clock, but awaits manually stepping through. This can be
    * used for offline-bouncing, debugging or unit testing purposes.
    */
-  trait Offline[S <: evt.Sys[S], Elem, U] extends Transport[S, Elem, U] {
+  trait Offline[S <: Sys[S], Elem, U] extends Transport[S, Elem, U] {
     /** Advances the transport to the next position (if there is any) */
     def step()(implicit tx: S#Tx): Unit
 
@@ -84,11 +84,11 @@ object Transport {
     def position(implicit tx: S#Tx): Long
   }
 
-  final case class Advance[S <: evt.Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long,
-                                                     isSeek: Boolean, isPlaying: Boolean,
-                                                     added:   Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
-                                                     removed: Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
-                                                     changes: Vec[(BiGroup.TimedElem[S, Elem], U)]  = Vec.empty)
+  final case class Advance[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long,
+                                                 isSeek: Boolean, isPlaying: Boolean,
+                                                 added:   Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
+                                                 removed: Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
+                                                 changes: Vec[(BiGroup.TimedElem[S, Elem], U)]  = Vec.empty)
     extends Update[S, Elem, U] {
     override def toString =
       "Advance(" + transport + ", " + time + ", isSeek = " + isSeek + ", isPlaying = " + isPlaying +
@@ -97,19 +97,19 @@ object Transport {
         (if (changes.nonEmpty) changes.mkString(", changes = [", ",", "]") else "") + ")"
   }
 
-  final case class Play[S <: evt.Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long) extends Update[S, Elem, U]
-  final case class Stop[S <: evt.Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long) extends Update[S, Elem, U]
+  final case class Play[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long) extends Update[S, Elem, U]
+  final case class Stop[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long) extends Update[S, Elem, U]
 
   // particular update for ProcTransport
   object Proc {
     sealed trait Update[+S]
 
-    final case class Changed[S <: evt.Sys[S]](peer: proc.Proc.Change[S])       extends Update[S]
+    final case class Changed[S <: Sys[S]](peer: proc.Proc.Change[S])           extends Update[S]
     final case class GraphemesChanged(map: Map[String, Vec[Grapheme.Segment]]) extends Update[Nothing]
   }
 }
 
-trait Transport[S <: evt.Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ S ] */ /* with Chronos[S] */ {
+trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ S ] */ /* with Chronos[S] */ {
   //   def id: S#ID
 
   def play()(implicit tx: S#Tx): Unit

@@ -29,10 +29,8 @@ package impl
 
 import de.sciss.lucre.{stm, bitemp, data, event => evt}
 import stm.{Disposable, IdentifierMap, Cursor}
-import evt.Sys
 import bitemp.BiGroup
 import data.SkipList
-import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
 import concurrent.stm.{Ref, Txn, TxnLocal}
 import java.util.concurrent.TimeUnit

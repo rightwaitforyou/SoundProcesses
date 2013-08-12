@@ -35,16 +35,16 @@ import de.sciss.serial.DataInput
 object Proc {
   // ---- implementation forwards ----
 
-  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): Proc[S] = Impl[S]
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Proc[S] = Impl[S]
 
-  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] = Impl.read(in, access)
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] = Impl.read(in, access)
 
-  implicit def serializer[S <: evt.Sys[S]]: evt.NodeSerializer[S, Proc[S]] = Impl.serializer[S]
+  implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Proc[S]] = Impl.serializer[S]
 
   // ---- event types ----
 
   /** An update is a sequence of changes */
-  final case class Update[S <: evt.Sys[S]](proc: Proc[S], changes: Vec[Change[S]])
+  final case class Update[S <: Sys[S]](proc: Proc[S], changes: Vec[Change[S]])
 
   /** A change is either a state change, or a scan or a grapheme change */
   sealed trait Change[+S]
@@ -71,18 +71,18 @@ object Proc {
     override def toString = s"[attribute: $name]"
   }
 
-  final case class ScanChange[S <: evt.Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
+  final case class ScanChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
     extends Change[S] {
     override def toString = s"ScanChange($key, $scan, $changes)"
   }
 
-  final case class AttributeChange[S <: evt.Sys[S]](key: String, attribute: Attribute[S], change: Any)
+  final case class AttributeChange[S <: Sys[S]](key: String, attribute: Attribute[S], change: Any)
     extends Change[S] {
     override def toString = s"AttributeChange($key, $attribute, $change)"
   }
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
-trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
+trait Proc[S <: Sys[S]] extends evt.Node[S] {
   /** The variable synth graph function of the process. */
   def graph: Expr.Var[S, SynthGraph]
 

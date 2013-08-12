@@ -104,7 +104,7 @@ object ScansTest extends App {
     //      Thread.sleep( 1000 )
   }
 
-  def test[S <: evt.Sys[S]](group: ProcGroup.Modifiable[S])(implicit tx: S#Tx) {
+  def test[S <: Sys[S]](group: ProcGroup.Modifiable[S])(implicit tx: S#Tx) {
     proc.showLog = true
 
     val imp = ExprImplicits[S]
