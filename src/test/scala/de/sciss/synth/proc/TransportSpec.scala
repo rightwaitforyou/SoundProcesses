@@ -2,7 +2,7 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{bitemp, stm, expr}
+import lucre.{bitemp, expr}
 import bitemp.BiExpr
 import expr.Expr
 import collection.immutable.{IndexedSeq => Vec}

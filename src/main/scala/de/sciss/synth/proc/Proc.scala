@@ -47,19 +47,19 @@ object Proc {
   final case class Update[S <: Sys[S]](proc: Proc[S], changes: Vec[Change[S]])
 
   /** A change is either a state change, or a scan or a grapheme change */
-  sealed trait Change[+S]
+  sealed trait Change[S <: Sys[S]]
 
   /** A state change is either a renaming, a change of graph, or a change of association (map) */
-  sealed trait StateChange extends Change[Nothing]
+  sealed trait StateChange[S <: Sys[S]] extends Change[S]
   // final case class Rename     (change: evt.Change[String    ]) extends StateChange
-  final case class GraphChange(change: evt.Change[SynthGraph]) extends StateChange
+  final case class GraphChange[S <: Sys[S]](change: evt.Change[SynthGraph]) extends StateChange[S]
 
   /** An associative change is either adding or removing an association */
-  sealed trait AssociativeChange extends StateChange {
+  sealed trait AssociativeChange[S <: Sys[S]] extends StateChange[S] {
     def key: AssociativeKey
   }
-  final case class AssociationAdded  (key: AssociativeKey) extends AssociativeChange
-  final case class AssociationRemoved(key: AssociativeKey) extends AssociativeChange
+  final case class AssociationAdded  [S <: Sys[S]](key: AssociativeKey) extends AssociativeChange[S]
+  final case class AssociationRemoved[S <: Sys[S]](key: AssociativeKey) extends AssociativeChange[S]
 
   /** An associative key is either a grapheme or a scan key */
   sealed trait AssociativeKey { def name: String }

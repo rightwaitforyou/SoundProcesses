@@ -120,8 +120,8 @@ object ProcImpl {
       // ---- keymapimpl details ----
 
       final protected def fire(added: Set[String], removed: Set[String])(implicit tx: S#Tx): Unit = {
-        val seqAdd: Vec[Proc.StateChange] = added  .map(key => Proc.AssociationAdded  (wrapKey(key)))(breakOut)
-        val seqRem: Vec[Proc.StateChange] = removed.map(key => Proc.AssociationRemoved(wrapKey(key)))(breakOut)
+        val seqAdd: Vec[Proc.StateChange[S]] = added  .map(key => Proc.AssociationAdded  [S](wrapKey(key)))(breakOut)
+        val seqRem: Vec[Proc.StateChange[S]] = removed.map(key => Proc.AssociationRemoved[S](wrapKey(key)))(breakOut)
         // convention: first the removals, then the additions. thus, overwriting a key yields
         // successive removal and addition of the same key.
         val seq = if (seqAdd.isEmpty) seqRem else if (seqRem.isEmpty) seqAdd else seqRem ++ seqAdd

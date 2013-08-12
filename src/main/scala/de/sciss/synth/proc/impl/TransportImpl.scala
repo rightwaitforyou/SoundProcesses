@@ -607,7 +607,7 @@ object TransportImpl {
     //                            track appearance or disappearence of graphemes as sources
     //                            of these scans, and update structures
     // addendum: Meaning, _do not_ include segments in updates
-    private def u_assocChange(state: GroupUpdateState, timed: TimedProc[S], change: Proc.AssociativeChange)
+    private def u_assocChange(state: GroupUpdateState, timed: TimedProc[S], change: Proc.AssociativeChange[S])
                              (implicit tx: S#Tx): Unit = {
       change match {
         case Proc.AssociationAdded(Proc.ScanKey(key)) =>
@@ -728,7 +728,7 @@ object TransportImpl {
             state.procChanged :+= timed -> ProcChanged(u)
 
           procUpd.changes.foreach {
-            case assoc: Proc.AssociativeChange =>
+            case assoc: Proc.AssociativeChange[S] =>
               forward(assoc)
               u_assocChange(state, timed, assoc)
 

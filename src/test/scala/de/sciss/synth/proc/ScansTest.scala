@@ -1,11 +1,8 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, bitemp, stm}
+import de.sciss.lucre.stm
 import expr.ExprImplicits
-import stm.store.BerkeleyDB
-import java.io.File
-import de.sciss.lucre.confluent.reactive.ConfluentReactive
 import de.sciss.span.Span
 
 object ScansTest extends App {
