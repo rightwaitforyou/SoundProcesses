@@ -28,13 +28,13 @@ package de.sciss.synth.proc
 import de.sciss.lucre.{event => evt, data}
 
 object Scans {
-  trait Modifiable[S <: evt.Sys[S]] extends Scans[S] {
-    def add(key: String)(implicit tx: S#Tx): Scan[S]
+  trait Modifiable[S <: Sys[S]] extends Scans[S] {
+    def add   (key: String)(implicit tx: S#Tx): Scan[S]
     def remove(key: String)(implicit tx: S#Tx): Boolean
   }
 }
 
-trait Scans[S <: evt.Sys[S]] {
+trait Scans[S <: Sys[S]] {
   def get(key: String)(implicit tx: S#Tx): Option[Scan[S]]
   def keys(implicit tx: S#Tx): Set[String]
   def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, (String, Scan[S])]

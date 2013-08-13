@@ -28,7 +28,7 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, data, expr}
-import evt.{impl => evti, Event, Sys}
+import evt.{impl => evti, Event}
 import annotation.switch
 import expr.LinkedList
 import proc.Scan
@@ -57,7 +57,7 @@ object ScanImpl {
   implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Scan[S]] =
     anySer.asInstanceOf[evt.NodeSerializer[S, Scan[S]]]
 
-  private type I = evt.InMemory
+  private type I = InMemory
 
   private val anySer: evt.NodeSerializer[I, Scan[I]] = new Ser[I]
 

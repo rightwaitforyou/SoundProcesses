@@ -61,7 +61,7 @@ object ProcImpl {
   private type ScanEntry     [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan     [S], Scan     .Update[S]]
   private type AttributeEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Attribute[S], Attribute.Update[S]]
 
-  private type I = evt.InMemory
+  private type I = InMemory
 
   implicit def scanEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]] =
     anyScanEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]]]
@@ -69,7 +69,7 @@ object ProcImpl {
   private val anyScanEntryInfo = new KeyMapImpl.ValueInfo[I, String, Scan[I], Scan.Update[I]] {
     def valueEvent(value: Scan[I]) = value.changed
 
-    val keySerializer = ImmutableSerializer.String
+    val keySerializer   = ImmutableSerializer.String
     val valueSerializer = Scan.serializer[I]
   }
 

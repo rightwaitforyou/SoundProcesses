@@ -36,60 +36,60 @@ import collection.immutable.{IndexedSeq => Vec}
 
 object Scan {
   object Link {
-    implicit def grapheme[S <: evt.Sys[S]](peer: proc.Grapheme[S]): Grapheme[S] = Grapheme(peer)
-    implicit def scan    [S <: evt.Sys[S]](peer: proc.Scan    [S]): Scan    [S] = Scan    (peer)
+    implicit def grapheme[S <: Sys[S]](peer: proc.Grapheme[S]): Grapheme[S] = Grapheme(peer)
+    implicit def scan    [S <: Sys[S]](peer: proc.Scan    [S]): Scan    [S] = Scan    (peer)
 
     /** A link to a grapheme (random access). */
-    final case class Grapheme[S <: evt.Sys[S]](peer: proc.Grapheme[S]) extends Link[S] {
+    final case class Grapheme[S <: Sys[S]](peer: proc.Grapheme[S]) extends Link[S] {
       def id = peer.id
       override def toString = peer.toString()
     }
 
     /** A link to another scan (real-time). */
-    final case class Scan[S <: evt.Sys[S]](peer: proc.Scan[S]) extends Link[S] {
+    final case class Scan[S <: Sys[S]](peer: proc.Scan[S]) extends Link[S] {
       def id = peer.id
       override def toString = peer.toString()
     }
   }
 
   /** This trait describes a source or sink link to/from a sink. */
-  sealed trait Link[S <: evt.Sys[S]] extends Identifiable[S#ID]
+  sealed trait Link[S <: Sys[S]] extends Identifiable[S#ID]
 
   /** Constructs a new unconnected scan. */
-  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): Scan[S] = Impl.apply
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = Impl.apply
 
-  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = Impl.read(in, access)
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = Impl.read(in, access)
 
-  implicit def serializer[ S <: evt.Sys[ S ]] : evt.Serializer[ S, Scan[ S ]] = Impl.serializer
+  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Scan[S]] = Impl.serializer
 
   /** A scan's event fires updates of this type. */
-  final case class Update[S <: evt.Sys[S]](scan: Scan[S], changes: Vec[Change[S]])
-  sealed trait Change      [S <: evt.Sys[S]]
-  sealed trait LinkChange  [S <: evt.Sys[S]] extends Change[S]      { def link  : Link[S] }
-  sealed trait SinkChange  [S <: evt.Sys[S]] extends LinkChange[S]  { def sink  : Link[S] }
-  sealed trait SourceChange[S <: evt.Sys[S]] extends LinkChange[S]  { def source: Link[S] }
+  final case class Update[S <: Sys[S]](scan: Scan[S], changes: Vec[Change[S]])
+  sealed trait Change      [S <: Sys[S]]
+  sealed trait LinkChange  [S <: Sys[S]] extends Change[S]      { def link  : Link[S] }
+  sealed trait SinkChange  [S <: Sys[S]] extends LinkChange[S]  { def sink  : Link[S] }
+  sealed trait SourceChange[S <: Sys[S]] extends LinkChange[S]  { def source: Link[S] }
 
-  final case class SinkAdded[S <: evt.Sys[S]](sink: Link[S]) extends SinkChange[S] {
+  final case class SinkAdded[S <: Sys[S]](sink: Link[S]) extends SinkChange[S] {
     // override def toString = s"[$scan ---> $sink]"
     def link = sink
   }
 
-  final case class SinkRemoved[S <: evt.Sys[S]](sink: Link[S]) extends SinkChange[S] {
+  final case class SinkRemoved[S <: Sys[S]](sink: Link[S]) extends SinkChange[S] {
     // override def toString = s"[$scan -/-> $sink]"
     def link = sink
   }
 
-  final case class SourceAdded[S <: evt.Sys[S]](source: Link[S]) extends SourceChange[S] {
+  final case class SourceAdded[S <: Sys[S]](source: Link[S]) extends SourceChange[S] {
     // override def toString = s"[$scan <--- $source]"
     def link = source
   }
 
-  final case class SourceRemoved[S <: evt.Sys[S]](source: Link[S]) extends SourceChange[S] {
+  final case class SourceRemoved[S <: Sys[S]](source: Link[S]) extends SourceChange[S] {
     // override def toString = s"[$scan <-/- $source]"
     def link = source
   }
 
-  final case class GraphemeChange[S <: evt.Sys[S]](grapheme: Grapheme[S],
+  final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
                                                    changes: Vec[Grapheme.Segment]) extends Change[S]
 }
 
@@ -105,7 +105,7 @@ object Scan {
  *
  * A scan's event forwards updates from any of its sources, but does not observe its sinks.
  */
-trait Scan[S <: evt.Sys[S]] extends evt.Node[S] {
+trait Scan[S <: Sys[S]] extends evt.Node[S] {
   import Scan._
 
   /** Returns an iterator over all currently connected sinks. */
