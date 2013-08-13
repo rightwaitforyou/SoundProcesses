@@ -74,7 +74,7 @@ private[proc] object UGenGraphBuilderImpl {
       var missingElems  = Vector.empty[Lazy]
       missingIns        = Set.empty
       var someSucceeded = false
-      while (remaining.nonEmpty) {
+      while (remaining.nonEmpty) {  // XXX TODO: this can go through many exceptions. perhaps should short circuit?
         val g = SynthGraph {
           remaining.foreach { elem =>
             // save rollback information -- not very elegant; should figure out how scala-stm nesting works
