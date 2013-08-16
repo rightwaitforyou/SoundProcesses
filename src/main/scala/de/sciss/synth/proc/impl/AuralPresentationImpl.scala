@@ -406,12 +406,12 @@ object AuralPresentationImpl {
       }
 
     // called by UGenGraphBuilderImpl
-    def scanInNumChannels(timed: TimedProc[S], time: Long, key: String)(implicit tx: S#Tx): Int = {
+    def scanInNumChannels(timed: TimedProc[S], time: Long, key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
       val numCh = timed.value.scans.get(key).fold(0) { scan =>
         val chans = scan.sources.toList.map {
           case Link.Grapheme(peer) =>
             val chansOpt = peer.valueAt(time).map(_.numChannels)
-            chansOpt.getOrElse(1) // producing a non-mapped monophonic control with default value; sounds sensible?
+            chansOpt.getOrElse(numChannels)
 
           case Link.Scan(peer) =>
             val sourceOpt = scanMap.get(peer.id)
@@ -420,8 +420,10 @@ object AuralPresentationImpl {
                 val sourceTimedID = idH()
                 getOutputBus(sourceTimedID, sourceKey)
             }
-            val bus = busOpt.getOrElse(throw MissingIn(peer))
-            bus.numChannels
+            busOpt.map(_.numChannels).getOrElse {
+              if (numChannels < 0) throw MissingIn(peer)
+              numChannels
+            }
         }
         if (chans.isEmpty) 0 else chans.max
       }

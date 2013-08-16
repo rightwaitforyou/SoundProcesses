@@ -53,8 +53,8 @@ private[proc] object UGenGraphBuilderImpl {
     var missingIns  = Set.empty[MissingIn[S]]
     var attributeIns= Set.empty[String]
 
-    def addScanIn(key: String): Int = {
-      val res = aural.scanInNumChannels(timed, time, key)(tx)
+    def addScanIn(key: String, numChannels: Int): Int = {
+      val res = aural.scanInNumChannels(timed = timed, time = time, key = key, numChannels = numChannels)(tx)
       scanIns += key -> res
       res
     }

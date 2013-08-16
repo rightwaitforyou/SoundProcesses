@@ -30,12 +30,15 @@ private[proc] object UGenGraphBuilder {
 private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
   import UGenGraphBuilder._
 
-  /**
-   * This method should only be invoked by the `graph.scan.Elem` instances. It requests a scan input, and
-   * the method returns the corresponding number of channels, or throws a `MissingIn` exception which
-   * is then caught by the main builder body.
-   */
-  def addScanIn(key: String): Int
+  /** This method should only be invoked by the `graph.scan.Elem` instances. It requests a scan input, and
+    * the method returns the corresponding number of channels, or throws a `MissingIn` exception which
+    * is then caught by the main builder body.
+    *
+    * @param  key           the scan input key
+    * @param  numChannels   a given number of channels (if `>= 0`) or `-1` in which case the number of channels
+    *                       is determined using the scan.
+    */
+  def addScanIn(key: String, numChannels: Int): Int
 
   def addAttributeIn(key: String): Unit
 

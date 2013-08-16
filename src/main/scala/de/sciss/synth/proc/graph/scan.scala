@@ -34,22 +34,24 @@ object scan {
   private[proc] def outControlName(key: String): String = "$out_" + key
   private[proc] def inControlName (key: String): String = "$in_"  + key
 
-  final case class In(key: String, default: Double)
-    extends GE.Lazy /* with Elem */ with AudioRated {
+  sealed trait InLike extends GE.Lazy with AudioRated {
+    protected def key: String
+    protected def default: Double
+    protected def numChannels: Int
 
-    override def productPrefix = "scan$In"
+    override def toString = s"""scan("$key").ar($default$chansString)"""
 
-    override def toString = s"""scan("$key").ar($default)"""
+    private def chansString = if (numChannels >= 0) numChannels.toString else ""
 
     def makeUGens: UGenInLike = {
       UGenGraph.builder match {
         case b: UGenGraphBuilder[_] =>
-          val numChannels = b.addScanIn(key)
+          val numCh   = b.addScanIn(key, numChannels)
           val ctlName = inControlName(key)
-          if (numChannels == 1) {
+          if (numCh == 1) {
             ctlName.ar(default).expand
-          } else if (numChannels > 1) {
-            ctlName.ar(Vector.fill(numChannels)(default)).expand
+          } else if (numCh > 1) {
+            ctlName.ar(Vector.fill(numCh)(default)).expand
           } else {
             UGenInGroup.empty
           }
@@ -57,6 +59,20 @@ object scan {
         case _ => UGenGraphBuilder.outsideOfContext()
       }
     }
+  }
+
+  final case class In(key: String, default: Double)
+    extends InLike {
+
+    override def productPrefix = "scan$In"
+
+    protected def numChannels = -1
+  }
+
+  final case class InFix(key: String, default: Double, numChannels: Int)
+    extends InLike {
+
+    override def productPrefix = "scan$InFix"
   }
 
   final case class Out(key: String, in: GE)
@@ -92,6 +108,7 @@ object scan {
 final case class scan(key: String) {
   def ar                 : GE = ar(0.0)
   def ar(default: Double): GE = scan.In(key, default)
+  def ar(default: Double, numChannels: Int): GE = scan.InFix(key, default, numChannels)
 
   def :=(in: GE): Unit = scan.Out(key, in)
 }

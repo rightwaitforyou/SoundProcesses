@@ -58,9 +58,10 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
   private lazy val tapeSynthGraph = SynthGraph {
     import synth._
     val sig   = graph.scan     (ProcKeys.graphAudio).ar(0)
+    val gain  = graph.attribute(ProcKeys.attrGain  ).ir(1)
     val mute  = graph.attribute(ProcKeys.attrMute  ).ir(0)
     val env   = graph.FadeInOut(ProcKeys.attrFadeIn, ProcKeys.attrFadeOut).ar
-    val amp   = env * (1 - mute)
+    val amp   = env * (1 - mute) * gain
     graph.scan(ProcKeys.scanMainOut) := sig * amp
   }
 
