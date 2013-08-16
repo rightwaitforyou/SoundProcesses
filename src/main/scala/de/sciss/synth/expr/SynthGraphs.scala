@@ -47,7 +47,7 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
   private lazy val oldTapeSynthGraph = SynthGraph {
     import synth._
     import ugen._
-    val sig   = graph.scan     (ProcKeys.graphAudio).ar(0)
+    val sig   = graph.scan.In(ProcKeys.graphAudio)
     val bus   = graph.attribute(ProcKeys.attrBus   ).ir(0)
     val mute  = graph.attribute(ProcKeys.attrMute  ).ir(0)
     val env   = graph.FadeInOut(ProcKeys.attrFadeIn, ProcKeys.attrFadeOut).ar
@@ -57,12 +57,12 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
 
   private lazy val tapeSynthGraph = SynthGraph {
     import synth._
-    val sig   = graph.scan     (ProcKeys.graphAudio).ar(0)
+    val sig   = graph.scan.In(ProcKeys.graphAudio)
     val gain  = graph.attribute(ProcKeys.attrGain  ).ir(1)
     val mute  = graph.attribute(ProcKeys.attrMute  ).ir(0)
     val env   = graph.FadeInOut(ProcKeys.attrFadeIn, ProcKeys.attrFadeOut).ar
     val amp   = env * (1 - mute) * gain
-    graph.scan(ProcKeys.scanMainOut) := sig * amp
+    graph.scan.Out(ProcKeys.scanMainOut, sig * amp)
   }
 
   private val emptySynthGraph = SynthGraph {}

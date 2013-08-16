@@ -61,7 +61,7 @@ object scan {
     }
   }
 
-  final case class In(key: String, default: Double)
+  final case class In(key: String, default: Double = 0.0)
     extends InLike {
 
     override def productPrefix = "scan$In"
@@ -69,10 +69,12 @@ object scan {
     protected def numChannels = -1
   }
 
-  final case class InFix(key: String, default: Double, numChannels: Int)
+  final case class InFix(key: String, numChannels: Int)
     extends InLike {
 
     override def productPrefix = "scan$InFix"
+
+    protected def default = 0.0
   }
 
   final case class Out(key: String, in: GE)
@@ -105,10 +107,10 @@ object scan {
   }
 }
 
-final case class scan(key: String) {
-  def ar                 : GE = ar(0.0)
-  def ar(default: Double): GE = scan.In(key, default)
-  def ar(default: Double, numChannels: Int): GE = scan.InFix(key, default, numChannels)
-
-  def :=(in: GE): Unit = scan.Out(key, in)
-}
+//final case class scan(key: String) {
+//  def ar                 : GE = ar(0.0)
+//  def ar(default: Double): GE = scan.In(key, default)
+//  def ar(default: Double, numChannels: Int): GE = scan.InFix(key, default, numChannels)
+//
+//  def :=(in: GE): Unit = scan.Out(key, in)
+//}

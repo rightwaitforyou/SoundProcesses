@@ -54,10 +54,10 @@ object TapeTest extends App {
     proc.graph() = SynthGraph {
       import ugen._
       val freq  = graph.attribute("freq").ir
-      val sig0  = graph.scan("sig").ar(0.0)
+      val sig0  = graph.scan.In("sig")
       val sig1  = Mix.mono(sig0)
       val sig   = FreqShift.ar(sig1, freq)
-      val spat  = graph.scan("spat").ar(0.0)
+      val spat  = graph.scan.In("spat")
       Out.ar(0, Pan2.ar(sig, spat))
     }
     val group     = ProcGroup.Modifiable[S]

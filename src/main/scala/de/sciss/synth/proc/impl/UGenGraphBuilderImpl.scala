@@ -49,13 +49,14 @@ private[proc] object UGenGraphBuilderImpl {
     private var controlProxies: ISet[ControlProxyLike] = g.controlProxies
 
     var scanOuts    = Map.empty[String, Int]
-    var scanIns     = Map.empty[String, Int]
+    var scanIns     = Map.empty[String, UGenGraphBuilder.ScanIn]
     var missingIns  = Set.empty[MissingIn[S]]
     var attributeIns= Set.empty[String]
 
     def addScanIn(key: String, numChannels: Int): Int = {
-      val res = aural.scanInNumChannels(timed = timed, time = time, key = key, numChannels = numChannels)(tx)
-      scanIns += key -> res
+      val fixed = numChannels >= 0
+      val res   = aural.scanInNumChannels(timed = timed, time = time, key = key, numChannels = numChannels)(tx)
+      scanIns += key -> UGenGraphBuilder.ScanIn(numChannels = res, fixed = fixed)
       res
     }
 

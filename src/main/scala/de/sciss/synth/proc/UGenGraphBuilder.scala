@@ -26,6 +26,8 @@ private[proc] object UGenGraphBuilder {
   def apply[S <: Sys[S]](aural: AuralPresentation.Running[S], timed: TimedProc[S], time: Long)
                         (implicit tx: S#Tx): UGenGraphBuilder[S] =
     Impl(aural, timed, time)
+
+  case class ScanIn(numChannels: Int, fixed: Boolean)
 }
 private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
   import UGenGraphBuilder._
@@ -52,7 +54,7 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
    * Current set of used inputs (scan keys to number of channels).
    * This is guaranteed to only grow during incremental building, never shrink.
    */
-  def scanIns: Map[String, Int]
+  def scanIns: Map[String, ScanIn]
 
   // Set[ String ]
   /**

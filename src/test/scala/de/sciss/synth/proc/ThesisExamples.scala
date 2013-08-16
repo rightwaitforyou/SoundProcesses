@@ -57,12 +57,12 @@ object ThesisExamples extends App {
     sOut addSink sIn
 
     p1.graph() = SynthGraph {
-      val mute           = graph.scan("mute").ar
-      graph.scan("out") := PinkNoise.ar * (1 - mute)
+      val mute           = graph.scan.In("mute")
+      graph.scan.Out("out", PinkNoise.ar * (1 - mute))
     }
 
     p2.graph() = SynthGraph {
-      val sig = graph.scan("in").ar
+      val sig = graph.scan.In("in")
       Out.ar(0, Pan2.ar(sig, LFSaw.ar(1)))
     }
 

@@ -127,7 +127,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     p.graph() = SynthGraph {
       import synth._
       import ugen._
-      val f = graph.scan("freq").ar(50) // fundamental frequency
+      val f = graph.scan.In("freq", 50) // fundamental frequency
       val p = 20 // number of partials per channel
       val m = Mix.tabulate(p) {
           i =>
@@ -279,7 +279,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
       p.graph() = SynthGraph {
         import synth._
         import ugen._
-        val in = graph.scan("in").ar(0)
+        val in = graph.scan.In("in")
         Out.ar(0, in * SinOsc.ar(3))
       }
       val g = Grapheme.Modifiable[S]

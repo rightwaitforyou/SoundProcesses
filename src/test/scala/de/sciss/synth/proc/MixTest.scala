@@ -47,16 +47,16 @@ object MixTest extends App {
     out2.addSink(in)
 
     procOut1.graph() = SynthGraph {
-      graph.scan("out") := WhiteNoise.ar(0.5) // SinOsc.ar(SinOsc.ar(10) * 30 + 400)
+      graph.scan.Out("out", WhiteNoise.ar(0.5)) // SinOsc.ar(SinOsc.ar(10) * 30 + 400)
     }
 
     procIn.graph() = SynthGraph {
-      val sig = graph.scan("in").ar * Lag.ar(LFPulse.ar(3), 0.02)
+      val sig = graph.scan.In("in") * Lag.ar(LFPulse.ar(3), 0.02)
       Out.ar(0, Pan2.ar(sig))
     }
 
     procOut2.graph() = SynthGraph {
-      graph.scan("out") := SinOsc.ar(LFSaw.ar(0.5).linexp(-1, 1, 400, 800))
+      graph.scan.Out("out", SinOsc.ar(LFSaw.ar(0.5).linexp(-1, 1, 400, 800)))
     }
 
     val group     = ProcGroup.Modifiable[S]

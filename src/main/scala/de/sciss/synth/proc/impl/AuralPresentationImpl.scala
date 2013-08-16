@@ -251,7 +251,8 @@ object AuralPresentationImpl {
       val aural     = AuralProc(synth, outBuses.mapValues(_.bus))
 
       ugen.scanIns.foreach {
-        case (key, numCh) =>
+        case (key, scanIn) =>
+          val numCh = scanIn.numChannels
 
           @inline def ensureChannels(n: Int): Unit =
             require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
@@ -269,59 +270,67 @@ object AuralPresentationImpl {
           }
 
           // note: if not found, stick with default
+
+          // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
+          //           we cannot use ControlSetMap any more, but need other mechanism
           p.scans.get(key).foreach { scan =>
-            scan.sources.foreach {
-              case Link.Grapheme(peer) =>
-                val segmOpt = peer.segment(time)
-                segmOpt.foreach {
-                  // again if not found... stick with default
-                  case const: Segment.Const =>
-                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-                    //                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
-                    setMap :+= (if (const.numChannels == 1) {
-                      ControlSetMap.Single(inCtlName, const.values.head .toFloat )
-                    } else {
-                      ControlSetMap.Multi (inCtlName, const.values.map(_.toFloat))
-                    })
+            val src = scan.sources
+            // if (src.isEmpty) {
+              if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
+            // } else {
+              src.foreach {
+                case Link.Grapheme(peer) =>
+                  val segmOpt = peer.segment(time)
+                  segmOpt.foreach {
+                    // again if not found... stick with default
+                    case const: Segment.Const =>
+                      ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
+                      //                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
+                      setMap :+= (if (const.numChannels == 1) {
+                        ControlSetMap.Single(inCtlName, const.values.head .toFloat )
+                      } else {
+                        ControlSetMap.Multi (inCtlName, const.values.map(_.toFloat))
+                      })
 
-                  case segm: Segment.Curve =>
-                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-                    // println(s"segment : ${segm.span}")
-                    val bm     = lazyInBus
-                    val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
-                    deps     ::= w
-                    busUsers ::= w
+                    case segm: Segment.Curve =>
+                      ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
+                      // println(s"segment : ${segm.span}")
+                      val bm     = lazyInBus
+                      val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
+                      deps     ::= w
+                      busUsers ::= w
 
-                  case audio: Segment.Audio =>
-                    ensureChannels(audio.numChannels)
-                    val bm     = lazyInBus
-                    val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
-                    deps     ::= w
-                    busUsers ::= w
-                }
+                    case audio: Segment.Audio =>
+                      ensureChannels(audio.numChannels)
+                      val bm     = lazyInBus
+                      val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
+                      deps     ::= w
+                      busUsers ::= w
+                  }
 
-              case Link.Scan(peer) =>
-                scanMap.get(peer.id).foreach {
-                  case (srcKey, idH) =>
-                    val srcTimedID  = idH()
-                    val bIn         = lazyInBus
+                case Link.Scan(peer) =>
+                  scanMap.get(peer.id).foreach {
+                    case (srcKey, idH) =>
+                      val srcTimedID  = idH()
+                      val bIn         = lazyInBus
 
-                    // if the source isn't found (because it's probably in the ongoing build),
-                    // we ignore that here; there is a symmetric counter part, looking for the
-                    // builder.outputs that will handle these cases.
-                    viewMap.get(srcTimedID).foreach { srcAural =>
-                      val bOut    = srcAural.getOutputBus(srcKey).getOrElse {
-                        sys.error(s"Source bus disappeared $srcTimedID -> $srcKey")
+                      // if the source isn't found (because it's probably in the ongoing build),
+                      // we ignore that here; there is a symmetric counter part, looking for the
+                      // builder.outputs that will handle these cases.
+                      viewMap.get(srcTimedID).foreach { srcAural =>
+                        val bOut    = srcAural.getOutputBus(srcKey).getOrElse {
+                          sys.error(s"Source bus disappeared $srcTimedID -> $srcKey")
+                        }
+                        ensureChannels(bOut.numChannels)
+                        val edge    = ProcEdge(srcAural, srcKey, aural, key)
+                        val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
+                        deps      ::= link
+                        // deps      ::= srcAural.group()
+                        busUsers  ::= link
                       }
-                      ensureChannels(bOut.numChannels)
-                      val edge    = ProcEdge(srcAural, srcKey, aural, key)
-                      val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
-                      deps      ::= link
-                      // deps      ::= srcAural.group()
-                      busUsers  ::= link
-                    }
-                }
-            }
+                  }
+              }
+            // }
           }
       }
 

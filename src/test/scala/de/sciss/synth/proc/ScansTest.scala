@@ -136,11 +136,11 @@ object ScansTest extends App {
       import graph.scan
 
     p1.graph() = SynthGraph {
-      scan("out") := SinOsc.ar(100).linexp(-1, 1, 30, 3000)
+      scan.Out("out", SinOsc.ar(100).linexp(-1, 1, 30, 3000))
     }
 
     p2.graph() = SynthGraph {
-      val freq = scan("freq").ar(333)
+      val freq = scan.In("freq", 333)
       //         freq.poll
       Out.ar(0, SinOsc.ar(freq))
     }
