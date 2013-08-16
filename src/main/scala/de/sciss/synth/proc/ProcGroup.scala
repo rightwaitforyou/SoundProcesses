@@ -43,9 +43,8 @@ object ProcGroup {
   private def eventView[S <: Sys[S]](proc: Proc[S]): EventLike[S, Proc.Update[S], Proc[S]] = proc.changed
 
   object Modifiable {
-    def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] = {
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] =
       BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](eventView)
-    }
 
     def apply[S <: Sys[S]](implicit tx: S#Tx): ProcGroup.Modifiable[S] =
       BiGroup.Modifiable[S, Proc[S], Proc.Update[S]](eventView)
