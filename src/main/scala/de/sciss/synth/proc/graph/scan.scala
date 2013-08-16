@@ -36,45 +36,50 @@ object scan {
 
   sealed trait InLike extends GE.Lazy with AudioRated {
     protected def key: String
-    protected def default: Double
     protected def numChannels: Int
 
-    override def toString = s"""scan("$key").ar($default$chansString)"""
-
-    private def chansString = if (numChannels >= 0) numChannels.toString else ""
-
-    def makeUGens: UGenInLike = {
+    final def makeUGens: UGenInLike = {
       UGenGraph.builder match {
         case b: UGenGraphBuilder[_] =>
           val numCh   = b.addScanIn(key, numChannels)
           val ctlName = inControlName(key)
-          if (numCh == 1) {
-            ctlName.ar(default).expand
-          } else if (numCh > 1) {
-            ctlName.ar(Vector.fill(numCh)(default)).expand
-          } else {
-            UGenInGroup.empty
-          }
+          mkUGen(ctlName, numCh)
 
         case _ => UGenGraphBuilder.outsideOfContext()
       }
     }
+
+    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike
   }
 
   final case class In(key: String, default: Double = 0.0)
     extends InLike {
 
+    override def toString = s"""scan.In("$key", $default)"""
+
     override def productPrefix = "scan$In"
 
     protected def numChannels = -1
+
+    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
+      if (numCh == 1) {
+        ctlName.ar(default).expand
+      } else if (numCh > 1) {
+        ctlName.ar(Vector.fill(numCh)(default)).expand
+      } else {
+        UGenInGroup.empty
+      }
   }
 
   final case class InFix(key: String, numChannels: Int)
     extends InLike {
 
+    override def toString = s"""scan.InFix("$key", $numChannels)"""
+
     override def productPrefix = "scan$InFix"
 
-    protected def default = 0.0
+    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
+      ugen.In.ar(ctlName.kr, numCh)
   }
 
   final case class Out(key: String, in: GE)

@@ -262,7 +262,10 @@ object AuralPresentationImpl {
 
           lazy val lazyInBus: AudioBusNodeSetter = {
             val b      = RichBus.audio(server, numCh)
-            val res    = BusNodeSetter.mapper(inCtlName, b, synth)
+            val res    = if (scanIn.fixed)
+              BusNodeSetter.reader(inCtlName, b, synth)
+            else
+              BusNodeSetter.mapper(inCtlName, b, synth)
             busUsers ::= res
             // inBus      = Some(res)
             aural.addInputBus(key, res.bus)
