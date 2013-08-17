@@ -168,11 +168,12 @@ object ProcImpl {
 
       protected def wrapKey(key: String) = ScanKey(key)
 
-      def add(key: String)(implicit tx: S#Tx): Scan[S] = {
-        val scan = Scan[S]
-        add(key, scan)
-        scan
-      }
+      def add(key: String)(implicit tx: S#Tx): Scan[S] =
+        get(key).getOrElse {
+          val res = Scan[S]
+          add(key, res)
+          res
+        }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         val changes = foldUpdate(pull)

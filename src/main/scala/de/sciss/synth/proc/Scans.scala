@@ -29,6 +29,7 @@ import de.sciss.lucre.{event => evt, data}
 
 object Scans {
   trait Modifiable[S <: Sys[S]] extends Scans[S] {
+    /** Adds a new scan by the given key. If a span by that name already exists, the old scan is returned. */
     def add   (key: String)(implicit tx: S#Tx): Scan[S]
     def remove(key: String)(implicit tx: S#Tx): Boolean
   }
