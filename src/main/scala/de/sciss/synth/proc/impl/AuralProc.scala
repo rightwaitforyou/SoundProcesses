@@ -71,15 +71,18 @@ object AuralProc {
 
     def group_=(newGroup: Group)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
-      groupsRef.transform(_ map { all =>
-        moveAllTo(all, newGroup)
-        all.main.free(audible = true) // que se puede...?
-        all.copy(main = newGroup)
-      } orElse {
-        val all = AllGroups(main = newGroup)
-        synth.moveToHead(audible = true, group = newGroup)
-        Some(all)
-      })
+      groupsRef.transform { groupsOpt =>
+        val res = groupsOpt.fold {
+          val all = AllGroups(main = newGroup)
+          synth.moveToHead(audible = true, group = newGroup)
+          all
+        } { all =>
+          moveAllTo(all, newGroup)
+          all.main.free(audible = true) // que se puede...?
+          all.copy(main = newGroup)
+        }
+        Some(res)
+      }
     }
 
     @inline private def preGroupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).flatMap(_.pre)
@@ -114,7 +117,8 @@ object AuralProc {
     }
 
     def stop()(implicit tx: Txn): Unit = {
-      synth.free()
+      val node = groupOption.getOrElse(synth)
+      node.free()
       busUsers.foreach(_.remove())
       ProcDemiurg.removeVertex(this)
     }

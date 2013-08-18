@@ -35,7 +35,6 @@ import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal, Txn => ScalaTxn}
 import proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
-import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
