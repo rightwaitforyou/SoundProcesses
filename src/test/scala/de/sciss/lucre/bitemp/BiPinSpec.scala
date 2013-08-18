@@ -5,7 +5,7 @@ package bitemp
 import collection.immutable.{IndexedSeq => Vec}
 import expr.Expr
 import synth.expr.{Ints, Longs}
-import event.Change
+import de.sciss.model.Change
 
 /**
  * To run only this suite:
@@ -159,8 +159,8 @@ class BiPinSpec extends ConfluentEventSpec {
 //         val expr = Ints.newVar[ S ]( 4 )
          val time = Longs.newConfluentVar[ S ]( 10000L )
          val expr = Ints.newConfluentVar[ S ]( 4 )
-         val th   = tx.newHandle( (time -> 3) : BiExpr[ S, Int ])
-         val eh   = tx.newHandle( (30000L -> expr) : BiExpr[ S, Int ])
+         val th   = tx.newHandle( time -> 3 : BiExpr[ S, Int ])
+         val eh   = tx.newHandle( 30000L -> expr : BiExpr[ S, Int ])
          (th, eh)
       }
 

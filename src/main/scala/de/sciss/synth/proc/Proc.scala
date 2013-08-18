@@ -31,6 +31,7 @@ import expr.Expr
 import impl.{ProcImpl => Impl}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.DataInput
+import de.sciss.model
 
 object Proc {
   // ---- implementation forwards ----
@@ -52,7 +53,7 @@ object Proc {
   /** A state change is either a renaming, a change of graph, or a change of association (map) */
   sealed trait StateChange[S <: Sys[S]] extends Change[S]
   // final case class Rename     (change: evt.Change[String    ]) extends StateChange
-  final case class GraphChange[S <: Sys[S]](change: evt.Change[SynthGraph]) extends StateChange[S]
+  final case class GraphChange[S <: Sys[S]](change: model.Change[SynthGraph]) extends StateChange[S]
 
   /** An associative change is either adding or removing an association */
   sealed trait AssociativeChange[S <: Sys[S]] extends StateChange[S] {

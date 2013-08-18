@@ -93,7 +93,7 @@ object Attribute {
   /** An event for tracking element changes, which can be renaming
     * the element or forwarding changes from the underlying entity.
     */
-  def changed: EventLike[S, Update[S], Attribute[S]]
+  def changed: EventLike[S, Update[S]]
 
   def mkCopy()(implicit tx: S#Tx): Attribute[S] // { type Peer = attr.Peer }
 }

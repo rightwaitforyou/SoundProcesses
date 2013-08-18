@@ -34,7 +34,6 @@ import bitemp.{BiType, BiExpr}
 import collection.immutable.{IndexedSeq => Vec}
 import synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
-
 import impl.{GraphemeImpl => Impl}
 import synth.io.AudioFileSpec
 import evt.Event
@@ -42,6 +41,7 @@ import span.{SpanLike, Span}
 import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 import java.io.File
 import language.implicitConversions
+import de.sciss.{model => m}
 
 object Grapheme {
   // If necessary for some views, we could eventually add the Elems, too,
@@ -286,7 +286,7 @@ object Grapheme {
           tup._1.changed -/-> this
         }
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value.Curve]] = {
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Curve]] = {
         val beforeVals  = Vector.newBuilder[(Double, synth.Curve)]
         val nowVals     = Vector.newBuilder[(Double, synth.Curve)]
         values.foreach {
@@ -294,7 +294,7 @@ object Grapheme {
             val magEvt = mag.changed
             if (pull.contains(magEvt)) {
               pull(magEvt) match {
-                case Some(evt.Change(magBefore, magNow)) =>
+                case Some(m.Change(magBefore, magNow)) =>
                   beforeVals += magBefore -> shape
                   nowVals    += magNow    -> shape
                 case _ =>
@@ -349,7 +349,7 @@ object Grapheme {
         gain    .changed -/-> this
       }
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value.Audio]] = {
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Audio]] = {
         val artEvt = artifact.changed
         val artOpt = if (pull.contains(artEvt)) pull(artEvt) else None
         val (artBefore, artNow) = artOpt.map(_.toTuple).getOrElse {

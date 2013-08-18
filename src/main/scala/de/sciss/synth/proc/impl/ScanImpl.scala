@@ -206,7 +206,7 @@ object ScanImpl {
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
       val u1 = if (pull.parents(this).isEmpty)
-        pull.resolve[Scan.Update[S]].fold(Vec.empty[Scan.Change[S]])(_.changes)
+        pull.resolve[Scan.Update[S]].changes // fold(Vec.empty[Scan.Change[S]])(_.changes)
       else
         Vec.empty
 

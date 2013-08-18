@@ -6,10 +6,10 @@ import lucre.{event => evt}
 import lucre.expr.Expr
 import serial.{DataOutput, DataInput, ImmutableSerializer}
 import synth.proc.impl.CommonSerializers
-import de.sciss.lucre.event.{Change, Pull, Targets}
+import de.sciss.lucre.event.{Pull, Targets}
 import de.sciss.synth.expr.{Curves, Doubles, BiTypeImpl, Longs}
-import de.sciss.synth.ugen.Env
 import de.sciss.synth.Curve.linear
+import de.sciss.{model => m}
 
 object FadeSpec {
   private final val COOKIE = 0x4664 // 'Fd'
@@ -81,7 +81,7 @@ object FadeSpec {
 
       protected def reader = Elem.serializer[S]
 
-      def pullUpdate(pull: Pull[S])(implicit tx: S#Tx): Option[evt.Change[Value]] = {
+      def pullUpdate(pull: Pull[S])(implicit tx: S#Tx): Option[m.Change[Value]] = {
         val framesEvt = numFrames.changed
         val framesChO = if (pull.contains(framesEvt)) pull(framesEvt) else None
         val shapeEvt  = shape.changed
@@ -93,23 +93,23 @@ object FadeSpec {
 
         val framesCh = framesChO.getOrElse {
           val framesV = numFrames.value
-          Change(framesV, framesV)
+          m.Change(framesV, framesV)
         }
 
         val shapeCh = shapeChO.getOrElse {
           val shapeV = shape.value
-          Change(shapeV, shapeV)
+          m.Change(shapeV, shapeV)
         }
 
         val floorCh = floorChO.getOrElse {
           val floorV = floor.value
-          Change(floorV, floorV)
+          m.Change(floorV, floorV)
         }
 
         val before  = Value(framesCh.before, shapeCh.before, floorCh.before.toFloat)
         val now     = Value(framesCh.now,    shapeCh.now,    floorCh.now   .toFloat)
 
-        Some(Change(before, now))
+        Some(m.Change(before, now))
       }
 
       protected def writeData(out: DataOutput): Unit = {

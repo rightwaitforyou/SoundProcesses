@@ -8,6 +8,7 @@ import lucre.{event => evt}
 import evt.{Targets, Sys}
 import lucre.expr.Expr
 import scala.annotation.switch
+import de.sciss.model
 
 object SynthGraphs extends BiTypeImpl[SynthGraph] {
   final val typeID = 16
@@ -80,7 +81,7 @@ object SynthGraphs extends BiTypeImpl[SynthGraph] {
   private final class Predefined[S <: Sys[S]](protected val targets: Targets[S], cookie: Int)
     extends Expr[S, SynthGraph]
     with evt.Node[S]
-    with evt.impl.SingleGenerator[S, evt.Change[SynthGraph], Ex[S]] {
+    with evt.impl.SingleGenerator[S, model.Change[SynthGraph], Ex[S]] {
 
     protected def writeData(out: DataOutput): Unit = out.writeByte(cookie)
 

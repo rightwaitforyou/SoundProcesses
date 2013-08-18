@@ -38,6 +38,7 @@ import java.text.SimpleDateFormat
 import proc.{logTransport => log}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
+import de.sciss.{model => m}
 
 object TransportImpl {
   import Grapheme.Segment
@@ -692,7 +693,7 @@ object TransportImpl {
             procAdded = None, procRemoved = Some(timed))
 
         // changes: Vec[ (TimedProc[ S ], BiGroup.ElementUpdate[ U ])]
-        // ElementUpdate is either of Moved( change: evt.Change[ SpanLike ])
+        // ElementUpdate is either of Moved( change: m.Change[ SpanLike ])
         //                         or Mutated[ U ]( change: U ) ; U = Proc.Update[ S ]
         // Mutated:
         // ... only process procs which are observed (found in timedMap)
@@ -750,7 +751,7 @@ object TransportImpl {
               forward(other)
           }
 
-        case BiGroup.ElementMoved(timed, evt.Change(oldSpan, newSpan)) if gMap.contains(timed.id) =>
+        case BiGroup.ElementMoved(timed, m.Change(oldSpan, newSpan)) if gMap.contains(timed.id) =>
            u_moveProc(state, timed, oldSpan, newSpan)
 
         case _ => // mutated or moved unobserved proc

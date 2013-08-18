@@ -34,7 +34,7 @@ import de.sciss.serial.{DataOutput, DataInput, Serializer}
 
 object KeyMapImpl {
   trait ValueInfo[S <: Sys[S], Key, Value, ValueUpd] {
-    def valueEvent(value: Value): EventLike[S, ValueUpd, Value]
+    def valueEvent(value: Value): EventLike[S, ValueUpd]
 
     def keySerializer  : Serializer[S#Tx, S#Acc, Key]
     def valueSerializer: Serializer[S#Tx, S#Acc, Value]

@@ -40,7 +40,7 @@ object ProcGroup {
 
   private implicit val spanType: Type[SpanLike] = SpanLikes
 
-  private def eventView[S <: Sys[S]](proc: Proc[S]): EventLike[S, Proc.Update[S], Proc[S]] = proc.changed
+  private def eventView[S <: Sys[S]](proc: Proc[S]): EventLike[S, Proc.Update[S]] = proc.changed
 
   object Modifiable {
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] =
