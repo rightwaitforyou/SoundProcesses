@@ -49,13 +49,14 @@ private[proc] object UGenGraphBuilderImpl {
     private var controlProxies: ISet[ControlProxyLike] = g.controlProxies
 
     var scanOuts    = Map.empty[String, Int]
-    var scanIns     = Map.empty[String, Int]
+    var scanIns     = Map.empty[String, UGenGraphBuilder.ScanIn]
     var missingIns  = Set.empty[MissingIn[S]]
     var attributeIns= Set.empty[String]
 
-    def addScanIn(key: String): Int = {
-      val res = aural.scanInNumChannels(timed, time, key)(tx)
-      scanIns += key -> res
+    def addScanIn(key: String, numChannels: Int): Int = {
+      val fixed = numChannels >= 0
+      val res   = aural.scanInNumChannels(timed = timed, time = time, key = key, numChannels = numChannels)(tx)
+      scanIns += key -> UGenGraphBuilder.ScanIn(numChannels = res, fixed = fixed)
       res
     }
 
@@ -74,7 +75,7 @@ private[proc] object UGenGraphBuilderImpl {
       var missingElems  = Vector.empty[Lazy]
       missingIns        = Set.empty
       var someSucceeded = false
-      while (remaining.nonEmpty) {
+      while (remaining.nonEmpty) {  // XXX TODO: this can go through many exceptions. perhaps should short circuit?
         val g = SynthGraph {
           remaining.foreach { elem =>
             // save rollback information -- not very elegant; should figure out how scala-stm nesting works

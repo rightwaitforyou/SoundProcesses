@@ -2,10 +2,10 @@ package de.sciss
 package lucre
 package bitemp
 
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import expr.Expr
 import synth.expr.{Ints, Longs}
-import event.Change
+import de.sciss.model.Change
 
 /**
  * To run only this suite:
@@ -38,8 +38,8 @@ class BiPinSpec extends ConfluentEventSpec {
       val bip = bipH()
       bip.add(tup1)
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup1, tup1)))
+        //            BiPin.Collection( bip, Vec( Span.from( 10000L ) -> (1: IntEx) ))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Added(tup1, tup1)))
       )
       obs.clear()
       assert(bip.valueAt(tup1._1 - 1) === None)
@@ -48,8 +48,8 @@ class BiPinSpec extends ConfluentEventSpec {
 
       bip.add(tup2)
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( Span( 5000L, 10000L ) -> (2: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup2, tup2)))
+        //            BiPin.Collection( bip, Vec( Span( 5000L, 10000L ) -> (2: IntEx) ))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Added(tup2, tup2)))
       )
       obs.clear()
 
@@ -57,16 +57,16 @@ class BiPinSpec extends ConfluentEventSpec {
       //         println( "at 10000 : " + bip.at( 10000L ))
       // note: the shrunken regions are _not_ fired!
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( /* Span( 10000L, 15000L ) -> (1: IntEx), */
+        //            BiPin.Collection( bip, Vec( /* Span( 10000L, 15000L ) -> (1: IntEx), */
         //                                            Span.from( 15000L ) -> (3: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup3, tup3)))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Added(tup3, tup3)))
       )
       obs.clear()
 
       bip.add(tup4)
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (4: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup4, tup4)))
+        //            BiPin.Collection( bip, Vec( Span.from( 20000L ) -> (4: IntEx) ))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Added(tup4, tup4)))
       )
       obs.clear()
 
@@ -76,13 +76,13 @@ class BiPinSpec extends ConfluentEventSpec {
       bip.add(tup6) // should override the `5`
       assert(bip.valueAt(tup3._1) === Some(tup6._2))
 
-      assert(bip.intersect(tup3._1) === IIdxSeq[BiExpr[S, Int]](tup6, tup5, tup3)) // recent values first
+      assert(bip.intersect(tup3._1) === Vec[BiExpr[S, Int]](tup6, tup5, tup3)) // recent values first
 
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (5: IntEx) )),
-        //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (6: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup5, tup5))),
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Added(tup6, tup6)))
+        //            BiPin.Collection( bip, Vec( Span( 15000L, 20000L ) -> (5: IntEx) )),
+        //            BiPin.Collection( bip, Vec( Span( 15000L, 20000L ) -> (6: IntEx) ))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Added(tup5, tup5))),
+        BiPin.Update[S, Int](bip, Vec(BiPin.Added(tup6, tup6)))
       )
       obs.clear()
     }
@@ -92,16 +92,16 @@ class BiPinSpec extends ConfluentEventSpec {
 
       bip.remove(tup5) // should not be noticable
       assert(bip.valueAt  (tup3._1) === Some(tup6._2))
-      assert(bip.intersect(tup3._1) === IIdxSeq[BiExpr[S, Int]](tup6, tup3))
+      assert(bip.intersect(tup3._1) === Vec[BiExpr[S, Int]](tup6, tup3))
 
       bip.remove(tup6) // should fall back to `3`
       assert(bip.valueAt  (tup3._1) === Some(tup3._2))
-      assert(bip.intersect(tup3._1) === IIdxSeq[BiExpr[S, Int]](tup3))
+      assert(bip.intersect(tup3._1) === Vec[BiExpr[S, Int]](tup3))
 
       // tup5 removal not noticable!
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( Span( 15000L, 20000L ) -> (3: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup6, tup6)))
+        //            BiPin.Collection( bip, Vec( Span( 15000L, 20000L ) -> (3: IntEx) ))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Removed(tup6, tup6)))
       )
       obs.clear()
 
@@ -112,16 +112,16 @@ class BiPinSpec extends ConfluentEventSpec {
 
       bip.remove(tup3)
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (1: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup3, tup3)))
+        //            BiPin.Collection( bip, Vec( Span( 10000L, 20000L ) -> (1: IntEx) ))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Removed(tup3, tup3)))
       )
       obs.clear()
       assert(bip.valueAt(tup3._1) === Some(tup1._2))
 
       bip.remove(tup4)
       obs.assertEquals(
-        //            BiPin.Collection( bip, IIdxSeq( Span.from( 10000L ) -> (1: IntEx) ))
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup4, tup4)))
+        //            BiPin.Collection( bip, Vec( Span.from( 10000L ) -> (1: IntEx) ))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Removed(tup4, tup4)))
       )
       obs.clear()
 
@@ -129,8 +129,8 @@ class BiPinSpec extends ConfluentEventSpec {
       bip.remove(tup1)
       //         obs.assertEmpty()
       obs.assertEquals(
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup2, tup2))),
-        BiPin.Update[S, Int](bip, IIdxSeq(BiPin.Removed(tup1, tup1)))
+        BiPin.Update[S, Int](bip, Vec(BiPin.Removed(tup2, tup2))),
+        BiPin.Update[S, Int](bip, Vec(BiPin.Removed(tup1, tup1)))
       )
       obs.clear()
 
@@ -159,8 +159,8 @@ class BiPinSpec extends ConfluentEventSpec {
 //         val expr = Ints.newVar[ S ]( 4 )
          val time = Longs.newConfluentVar[ S ]( 10000L )
          val expr = Ints.newConfluentVar[ S ]( 4 )
-         val th   = tx.newHandle( (time -> 3) : BiExpr[ S, Int ])
-         val eh   = tx.newHandle( (30000L -> expr) : BiExpr[ S, Int ])
+         val th   = tx.newHandle( time -> 3 : BiExpr[ S, Int ])
+         val eh   = tx.newHandle( 30000L -> expr : BiExpr[ S, Int ])
          (th, eh)
       }
 
@@ -174,10 +174,10 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.add( tup1 )
          bip.add( tup2 )
          obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span.from(     0L ) -> (1: IntEx) )),
-//            BiPin.Collection( bip, IIdxSeq( Span.from( 20000L ) -> (2: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup1, tup1 ))),
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( tup2, tup2 )))
+//            BiPin.Collection( bip, Vec( Span.from(     0L ) -> (1: IntEx) )),
+//            BiPin.Collection( bip, Vec( Span.from( 20000L ) -> (2: IntEx) ))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Added( tup1, tup1 ))),
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Added( tup2, tup2 )))
          )
          obs.clear()
 
@@ -187,10 +187,10 @@ class BiPinSpec extends ConfluentEventSpec {
          bip.add( expr )
 
          obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span( 10000L, 20000L ) -> (3: IntEx) )),
-//            BiPin.Collection( bip, IIdxSeq( Span.from( 30000L ) -> expr ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( 10000L -> 3, time ))),
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Added( 30000L -> 4, expr )))
+//            BiPin.Collection( bip, Vec( Span( 10000L, 20000L ) -> (3: IntEx) )),
+//            BiPin.Collection( bip, Vec( Span.from( 30000L ) -> expr ))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Added( 10000L -> 3, time ))),
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Added( 30000L -> 4, expr )))
          )
          obs.clear()
       }
@@ -204,8 +204,8 @@ class BiPinSpec extends ConfluentEventSpec {
 
          exprVar() = 5
          obs.assertEquals(
-//            BiPin.Element( bip, IIdxSeq( expr -> Change( 4, 5 )))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( expr, Change( 30000L -> 4, 30000L -> 5 ))))
+//            BiPin.Element( bip, Vec( expr -> Change( 4, 5 )))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Element( expr, Change( 30000L -> 4, 30000L -> 5 ))))
          )
          obs.clear()
 
@@ -216,9 +216,9 @@ class BiPinSpec extends ConfluentEventSpec {
          assert( bip.valueAt( 10000L ) === Some( tup1._2 ))
          assert( bip.valueAt( 15000L ) === Some( time.magValue ))
          obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span(     0L, 15000L ) -> (1: IntEx),
+//            BiPin.Collection( bip, Vec( Span(     0L, 15000L ) -> (1: IntEx),
 //                                            Span( 15000L, 20000L ) -> (3: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( 10000L -> 3, 15000L -> 3 ))))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Element( time, Change( 10000L -> 3, 15000L -> 3 ))))
          )
          obs.clear()
 
@@ -226,31 +226,31 @@ class BiPinSpec extends ConfluentEventSpec {
          assert( bip.valueAt(    -1L ) === Some( time.magValue ))
          assert( bip.valueAt( 15001L ) === Some( tup1._2 ))
          obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span(     0L, 20000L ) -> (1: IntEx),
+//            BiPin.Collection( bip, Vec( Span(     0L, 20000L ) -> (1: IntEx),
 //                                            Span( -5000L,     0L ) -> (3: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( 15000L -> 3, -5000L -> 3 ))))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Element( time, Change( 15000L -> 3, -5000L -> 3 ))))
          )
          obs.clear()
 
          timeVar() = 25000L // the region -5000 ... 0 is 'swallowed' (NO: OBSOLETE)
          obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span( 25000L, 30000L ) -> (3: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( -5000L -> 3, 25000L -> 3 ))))
+//            BiPin.Collection( bip, Vec( Span( 25000L, 30000L ) -> (3: IntEx) ))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Element( time, Change( -5000L -> 3, 25000L -> 3 ))))
          )
          obs.clear()
 
          timeVar() = 35000L
          obs.assertEquals(
-//            BiPin.Collection( bip, IIdxSeq( Span( 20000L, 30000L ) -> (2: IntEx),
+//            BiPin.Collection( bip, Vec( Span( 20000L, 30000L ) -> (2: IntEx),
 //                                            Span.from( 35000L )    -> (3: IntEx) ))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( time, Change( 25000L -> 3, 35000L -> 3 ))))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Element( time, Change( 25000L -> 3, 35000L -> 3 ))))
          )
          obs.clear()
 
          exprVar() = 6
          obs.assertEquals(
-//            BiPin.Element( bip, IIdxSeq( expr -> Change( 5, 6 )))
-            BiPin.Update[ S, Int ]( bip, IIdxSeq( BiPin.Element( expr, Change( 30000L -> 5, 30000L -> 6 ))))
+//            BiPin.Element( bip, Vec( expr -> Change( 5, 6 )))
+            BiPin.Update[ S, Int ]( bip, Vec( BiPin.Element( expr, Change( 30000L -> 5, 30000L -> 6 ))))
          )
          obs.clear()
 

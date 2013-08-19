@@ -31,35 +31,36 @@ import expr.Expr
 import impl.{ProcImpl => Impl}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.DataInput
+import de.sciss.model
 
 object Proc {
   // ---- implementation forwards ----
 
-  def apply[S <: evt.Sys[S]](implicit tx: S#Tx): Proc[S] = Impl[S]
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Proc[S] = Impl[S]
 
-  def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] = Impl.read(in, access)
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] = Impl.read(in, access)
 
-  implicit def serializer[S <: evt.Sys[S]]: evt.NodeSerializer[S, Proc[S]] = Impl.serializer[S]
+  implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Proc[S]] = Impl.serializer[S]
 
   // ---- event types ----
 
   /** An update is a sequence of changes */
-  final case class Update[S <: evt.Sys[S]](proc: Proc[S], changes: Vec[Change[S]])
+  final case class Update[S <: Sys[S]](proc: Proc[S], changes: Vec[Change[S]])
 
   /** A change is either a state change, or a scan or a grapheme change */
-  sealed trait Change[+S]
+  sealed trait Change[S <: Sys[S]]
 
   /** A state change is either a renaming, a change of graph, or a change of association (map) */
-  sealed trait StateChange extends Change[Nothing]
+  sealed trait StateChange[S <: Sys[S]] extends Change[S]
   // final case class Rename     (change: evt.Change[String    ]) extends StateChange
-  final case class GraphChange(change: evt.Change[SynthGraph]) extends StateChange
+  final case class GraphChange[S <: Sys[S]](change: model.Change[SynthGraph]) extends StateChange[S]
 
   /** An associative change is either adding or removing an association */
-  sealed trait AssociativeChange extends StateChange {
+  sealed trait AssociativeChange[S <: Sys[S]] extends StateChange[S] {
     def key: AssociativeKey
   }
-  final case class AssociationAdded  (key: AssociativeKey) extends AssociativeChange
-  final case class AssociationRemoved(key: AssociativeKey) extends AssociativeChange
+  final case class AssociationAdded  [S <: Sys[S]](key: AssociativeKey) extends AssociativeChange[S]
+  final case class AssociationRemoved[S <: Sys[S]](key: AssociativeKey) extends AssociativeChange[S]
 
   /** An associative key is either a grapheme or a scan key */
   sealed trait AssociativeKey { def name: String }
@@ -71,16 +72,18 @@ object Proc {
     override def toString = s"[attribute: $name]"
   }
 
-  final case class ScanChange[S <: evt.Sys[S]](key: String, scanUpdate: Scan.Update[S]) extends Change[S] {
-    override def toString = s"ScanChange($key, $scanUpdate)"
+  final case class ScanChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
+    extends Change[S] {
+    override def toString = s"ScanChange($key, $scan, $changes)"
   }
 
-  final case class AttributeChange[S <: evt.Sys[S]](key: String, attributeUpdate: Attribute.Update[S]) extends Change[S] {
-    override def toString = s"AttributeChange($key, $attributeUpdate)"
+  final case class AttributeChange[S <: Sys[S]](key: String, attribute: Attribute[S], change: Any)
+    extends Change[S] {
+    override def toString = s"AttributeChange($key, $attribute, $change)"
   }
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
-trait Proc[S <: evt.Sys[S]] extends evt.Node[S] {
+trait Proc[S <: Sys[S]] extends evt.Node[S] {
   /** The variable synth graph function of the process. */
   def graph: Expr.Var[S, SynthGraph]
 

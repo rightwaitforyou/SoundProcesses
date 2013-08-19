@@ -2,10 +2,10 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{bitemp, stm, expr}
+import lucre.{bitemp, expr}
 import bitemp.BiExpr
 import expr.Expr
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import span.Span
 import de.sciss.synth.Curve.linear
 
@@ -20,7 +20,7 @@ class TransportSpec extends ConfluentEventSpec {
   import Grapheme.Segment
   import Transport.Proc.{GraphemesChanged, Changed => ProcChanged}
 
-  type I = stm.InMemory
+  type I = InMemory
 
   //   import ConfluentReactive.inMemory
 
@@ -45,16 +45,16 @@ class TransportSpec extends ConfluentEventSpec {
       val pg = pgH()
       val p1 = Proc[S]
       val g1 = Grapheme.Modifiable[S]
-      p1.scans.add("freq").source_=(Some(Scan.Link.Grapheme(g1)))
+      p1.scans.add("freq").addSource(Scan.Link.Grapheme(g1))
       p1.scans.add("egal")
       g1.add(7000L -> curve(441.0))
       val p2 = Proc[S]
       val g2 = Grapheme.Modifiable[S]
-      p2.scans.add("amp").source_=(Some(Scan.Link.Grapheme(g2)))
+      p2.scans.add("amp").addSource(Scan.Link.Grapheme(g2))
       val pt1 = pg.add(Span(0L, 10000L), p1)
       val pt2 = pg.add(Span(5000L, 20000L), p2)
       obs.assertEquals(
-        Advance(t, time = 0L, isSeek = false, isPlaying = false, added = IIdxSeq(pt1))
+        Advance(t, time = 0L, isSeek = false, isPlaying = false, added = Vec(pt1))
       )
       obs.clear()
 
@@ -70,22 +70,22 @@ class TransportSpec extends ConfluentEventSpec {
 
       t.step()
       obs.assertEquals(
-        Advance(t, time = 5000L, isSeek = false, isPlaying = true, added = IIdxSeq(pt2))
+        Advance(t, time = 5000L, isSeek = false, isPlaying = true, added = Vec(pt2))
       )
       obs.clear()
 
       t.step()
       obs.assertEquals(
         Advance(t, time = 7000L, isSeek = false, isPlaying = true, changes =
-          Vector(pt1 -> GraphemesChanged(Map("freq" -> Segment.Const(Span.from(7000L), IIdxSeq(441.0)))))
+          Vec(pt1 -> GraphemesChanged[S](Map("freq" -> Vec(Segment.Const(Span.from(7000L), Vec(441.0))))))
         )
       )
       obs.clear()
 
       t.step()
       obs.assertEquals(
-        Advance(t, time = 10000L, isSeek = false, isPlaying = true, removed = IIdxSeq(pt1), changes =
-          Vector(pt2 -> GraphemesChanged(Map("amp" -> Segment.Curve(Span(10000L, 15000L), Vector((0.5, 0.7, linear))))))
+        Advance(t, time = 10000L, isSeek = false, isPlaying = true, removed = Vec(pt1), changes =
+          Vec(pt2 -> GraphemesChanged[S](Map("amp" -> Vec(Segment.Curve(Span(10000L, 15000L), Vec((0.5, 0.7, linear)))))))
         )
       )
       obs.clear()
@@ -93,14 +93,14 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 15000L, isSeek = false, isPlaying = true, changes =
-          Vector(pt2 -> GraphemesChanged(Map("amp" -> Segment.Curve(Span(15000L, 25000L), Vector((0.7, 1.0, linear))))))
+          Vec(pt2 -> GraphemesChanged[S](Map("amp" -> Vec(Segment.Curve(Span(15000L, 25000L), Vec((0.7, 1.0, linear)))))))
         )
       )
       obs.clear()
 
       t.step()
       obs.assertEquals(
-        Advance(t, time = 20000L, isSeek = false, isPlaying = true, removed = IIdxSeq(pt2))
+        Advance(t, time = 20000L, isSeek = false, isPlaying = true, removed = Vec(pt2))
       )
       obs.clear()
 
@@ -135,7 +135,7 @@ class TransportSpec extends ConfluentEventSpec {
       g1.add(7000L -> curve(441.0))
       val pt1 = pg.add(Span(-1000L, 10000L), p1)
       obs.assertEquals(
-        Advance(t, time = 0L, isSeek = false, isPlaying = false, added = IIdxSeq(pt1))
+        Advance(t, time = 0L, isSeek = false, isPlaying = false, added = Vec(pt1))
       )
       obs.clear()
 
@@ -149,19 +149,21 @@ class TransportSpec extends ConfluentEventSpec {
       //println( "GRAPHEME " + g1 )
 
       t.elapse(0.1) // t now at 1000 frames
-      val scan = p1.scans.add("freq")
-      val sourceOpt = Some(Scan.Link.Grapheme(g1))
-      scan.source_=(sourceOpt)
+      val scan    = p1.scans.add("freq")
+      val source  = Scan.Link.Grapheme(g1)
+      scan.addSource(source)
       // note: there will be separate Advance messages because there is no way to bundle them if they
       // originate from distinct actions (scans.add versus scan.source_=)
 
       obs.assertEquals(
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          IIdxSeq(pt1 -> ProcChanged(
+          Vec(pt1 -> ProcChanged[S](
             Proc.AssociationAdded(Proc.ScanKey("freq"))))),
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          IIdxSeq(pt1 -> ProcChanged(
-            Proc.ScanChange("freq", Scan.SourceChanged(scan, sourceOpt)))))
+          Vec(pt1 -> ProcChanged[S](
+            Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded(source)))
+          ))
+        )
       )
       obs.clear()
 
@@ -172,21 +174,21 @@ class TransportSpec extends ConfluentEventSpec {
       val a0 = Advance(t, time = 2000L, isSeek = false, isPlaying = true)
       p1.scans.add("egal")
       obs.assertEquals(
-        a0.copy(changes = IIdxSeq(pt1 -> ProcChanged(
+        a0.copy(changes = Vec(pt1 -> ProcChanged[S](
           Proc.AssociationAdded(Proc.ScanKey("egal")))))
       )
       obs.clear()
 
       // p1.graphemes.add( "graph", g1 )
       // obs.assertEquals(
-      //    a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
+      //    a0.copy( changes = Vec( pt1 -> ProcChanged(
       //       Proc.AssociationAdded( Proc.GraphemeKey( "graph" )))))
       // )
       // obs.clear()
 
       p1.scans.remove( "egal" )
       obs.assertEquals(
-        a0.copy(changes = IIdxSeq(pt1 -> ProcChanged(
+        a0.copy(changes = Vec(pt1 -> ProcChanged[S](
           Proc.AssociationRemoved(Proc.ScanKey("egal")))))
       )
       obs.clear()
@@ -196,14 +198,14 @@ class TransportSpec extends ConfluentEventSpec {
       // there should be a GraphemesChanged as well
       val elem: BiExpr[S, Grapheme.Value] = 1000L -> curve(441.0)
       g1.add(elem)
-      val segm = Segment.Curve(Span(1000L, 6000L), Vector((441.0, 882.0, linear)))
+      val segm = Segment.Curve(Span(1000L, 6000L), Vec((441.0, 882.0, linear)))
       obs.assertEquals(
-        a0.copy(changes = Vector(
+        a0.copy(changes = Vec(
           // pt1 -> ProcChanged(
-          //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, IIdxSeq( segm )))
+          //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, Vec( segm )))
           // ),
-          pt1 -> GraphemesChanged(
-            Map("freq" -> segm)
+          pt1 -> GraphemesChanged[S](
+            Map("freq" -> Vec(segm))
           )
         ))
       )
@@ -211,7 +213,7 @@ class TransportSpec extends ConfluentEventSpec {
 
       // p1.graphemes.remove( "graph" )
       // obs.assertEquals(
-      //    a0.copy( changes = IIdxSeq( pt1 -> ProcChanged(
+      //    a0.copy( changes = Vec( pt1 -> ProcChanged(
       //       Proc.AssociationRemoved( Proc.GraphemeKey( "graph" )))))
       // )
       // obs.clear()

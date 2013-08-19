@@ -36,6 +36,7 @@ import de.sciss.span.SpanLike
 import de.sciss.serial.DataInput
 import de.sciss.serial
 import de.sciss.lucre.stm.Identifiable
+import de.sciss.{model => m}
 
 object BiGroup {
   // ---- updates ----
@@ -59,7 +60,7 @@ object BiGroup {
     def elem: TimedElem[S, Elem]
   }
 
-  final case class ElementMoved[S <: Sys[S], Elem](elem: TimedElem[S, Elem], change: evt.Change[SpanLike])
+  final case class ElementMoved[S <: Sys[S], Elem](elem: TimedElem[S, Elem], change: m.Change[SpanLike])
     extends Element[S, Elem, Nothing]
 
   final case class ElementMutated[S <: Sys[S], Elem, U](elem: TimedElem[S, Elem], change: U)
@@ -85,33 +86,33 @@ object BiGroup {
   }
 
   object Expr {
-    def serializer[S <: Sys[S], A](implicit elemType: BiType[A]): serial.Serializer[S#Tx, S#Acc, BiGroup[S, Expr[S, A], evt.Change[A]]] with evt.Reader[S, BiGroup[S, Expr[S, A], evt.Change[A]]] =
-      Impl.serializer[S, Expr[S, A], evt.Change[A]](_.changed)(elemType.serializer[S], elemType.spanLikeType)
+    def serializer[S <: Sys[S], A](implicit elemType: BiType[A]): serial.Serializer[S#Tx, S#Acc, BiGroup[S, Expr[S, A], m.Change[A]]] with evt.Reader[S, BiGroup[S, Expr[S, A], m.Change[A]]] =
+      Impl.serializer[S, Expr[S, A], m.Change[A]](_.changed)(elemType.serializer[S], elemType.spanLikeType)
 
     object Modifiable {
-      def serializer[S <: Sys[S], A](implicit elemType: BiType[A]): serial.Serializer[S#Tx, S#Acc, BiGroup.Modifiable[S, Expr[S, A], evt.Change[A]]] with evt.Reader[S, BiGroup.Modifiable[S, Expr[S, A], evt.Change[A]]] =
-        Impl.modifiableSerializer[S, Expr[S, A], evt.Change[A]](_.changed)(elemType.serializer[S], elemType.spanLikeType)
+      def serializer[S <: Sys[S], A](implicit elemType: BiType[A]): serial.Serializer[S#Tx, S#Acc, BiGroup.Modifiable[S, Expr[S, A], m.Change[A]]] with evt.Reader[S, BiGroup.Modifiable[S, Expr[S, A], m.Change[A]]] =
+        Impl.modifiableSerializer[S, Expr[S, A], m.Change[A]](_.changed)(elemType.serializer[S], elemType.spanLikeType)
 
-      def apply[S <: Sys[S], A](implicit tx: S#Tx, elemType: BiType[A]): Modifiable[S, Expr[S, A], evt.Change[A]] =
-        Impl.newModifiable[S, Expr[S, A], evt.Change[A]](_.changed)(tx, elemType.serializer[S], elemType.spanLikeType)
+      def apply[S <: Sys[S], A](implicit tx: S#Tx, elemType: BiType[A]): Modifiable[S, Expr[S, A], m.Change[A]] =
+        Impl.newModifiable[S, Expr[S, A], m.Change[A]](_.changed)(tx, elemType.serializer[S], elemType.spanLikeType)
 
       def read[S <: Sys[S], A](in: DataInput, access: S#Acc)
-                              (implicit tx: S#Tx, elemType: BiType[A]): Modifiable[S, Expr[S, A], evt.Change[A]] =
-        Impl.readModifiable[S, Expr[S, A], evt.Change[A]](in, access, _.changed)(tx, elemType.serializer[S], elemType.spanLikeType)
+                              (implicit tx: S#Tx, elemType: BiType[A]): Modifiable[S, Expr[S, A], m.Change[A]] =
+        Impl.readModifiable[S, Expr[S, A], m.Change[A]](in, access, _.changed)(tx, elemType.serializer[S], elemType.spanLikeType)
     }
   }
 
   object Modifiable {
-    def serializer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U, Elem])
+    def serializer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])
                                         (implicit elemSerializer: serial.Serializer[S#Tx, S#Acc, Elem],
                                          spanType: Type[SpanLike]): serial.Serializer[S#Tx, S#Acc, BiGroup.Modifiable[S, Elem, U]] with evt.Reader[S, BiGroup.Modifiable[S, Elem, U]] =
       Impl.modifiableSerializer[S, Elem, U](eventView)
 
-    def apply[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U, Elem])
+    def apply[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])
                                    (implicit tx: S#Tx, elemSerializer: serial.Serializer[S#Tx, S#Acc, Elem],
                                     spanType: Type[SpanLike]): Modifiable[S, Elem, U] = Impl.newModifiable(eventView)
 
-    def read[S <: Sys[S], Elem, U](in: DataInput, access: S#Acc, eventView: Elem => EventLike[S, U, Elem])
+    def read[S <: Sys[S], Elem, U](in: DataInput, access: S#Acc, eventView: Elem => EventLike[S, U])
                                   (implicit tx: S#Tx, elemSerializer: serial.Serializer[S#Tx, S#Acc, Elem],
                                    spanType: Type[SpanLike]): Modifiable[S, Elem, U] = Impl.readModifiable(in, access, eventView)
   }
@@ -123,10 +124,10 @@ object BiGroup {
 
     def clear()(implicit tx: S#Tx): Unit
 
-    override def changed: EventLike[S, BiGroup.Update[S, Elem, U], BiGroup.Modifiable[S, Elem, U]]
+    override def changed: EventLike[S, BiGroup.Update[S, Elem, U]]
   }
 
-  def serializer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U, Elem])
+  def serializer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])
                                       (implicit elemSerializer: serial.Serializer[S#Tx, S#Acc, Elem],
                                        spanType: Type[SpanLike])
   : serial.Serializer[S#Tx, S#Acc, BiGroup[S, Elem, U]] with evt.Reader[S, BiGroup[S, Elem, U]] =
@@ -228,7 +229,9 @@ trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] {
 
   //   def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
   //   def elementChanged:     Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]]
-  def changed: EventLike[S, BiGroup.Update[S, Elem, U], BiGroup[S, Elem, U]]
+  def changed: EventLike[S, BiGroup.Update[S, Elem, U]]
 
-  def debugList()(implicit tx: S#Tx): List[(SpanLike, Elem)]
+  def debugList(implicit tx: S#Tx): List[(SpanLike, Elem)]
+
+  def debugPrint(implicit tx: S#Tx): String
 }

@@ -7,7 +7,7 @@
 //import bitemp.{BiType, BiPin}
 //import expr.Expr
 //import java.io.File
-//import collection.immutable.{IndexedSeq => IIdxSeq}
+//import collection.immutable.{IndexedSeq => Vec}
 //import de.sciss.synth.expr.{Longs, Doubles, ExprImplicits}
 //
 //object BiTempTest extends App {
@@ -30,12 +30,12 @@
 //      implicit val longVarSer    = Longs.varSerializer[ S ]
 //      implicit val doubleVarSer  = Doubles.varSerializer[ S ]
 //
-////      implicit val accessSer = implicitly[ TxnSerializer[ S#Tx, S#Acc, (Bi.Var[ S, Double ], IIdxSeq[ Expr.Var[ S, Long ]])]]
+////      implicit val accessSer = implicitly[ TxnSerializer[ S#Tx, S#Acc, (Bi.Var[ S, Double ], Vec[ Expr.Var[ S, Long ]])]]
 //
 //      println( "__STEP__ root" )
 //      val access = system.root { implicit tx =>
 //         val bi = BiPin.Modifiable[ S, Double ] // ( 0.0 )
-//         (bi, IIdxSeq.empty[ Expr.Var[ S, Long ]], IIdxSeq.empty[ Expr.Var[ S, Double ]])
+//         (bi, Vec.empty[ Expr.Var[ S, Long ]], Vec.empty[ Expr.Var[ S, Double ]])
 //      }
 //
 //      println( "__STEP__ create bi and cursor" )

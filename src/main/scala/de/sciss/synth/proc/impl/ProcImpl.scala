@@ -29,7 +29,7 @@ package impl
 
 import de.sciss.lucre.{event => evt, data, bitemp}
 import de.sciss.synth.expr.{SynthGraphs, Doubles}
-import evt.{Event, impl => evti, Sys}
+import evt.{Event, impl => evti}
 import bitemp.BiType
 import data.SkipList
 import annotation.switch
@@ -51,7 +51,7 @@ object ProcImpl {
   def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Proc[S]] =
     anySer.asInstanceOf[evt.NodeSerializer[S, Proc[S]]]
 
-  private val anySer = new Serializer[evt.InMemory]
+  private val anySer = new Serializer[InMemory]
 
   private class Serializer[S <: Sys[S]] extends evt.NodeSerializer[S, Proc[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Proc[S] =
@@ -61,7 +61,7 @@ object ProcImpl {
   private type ScanEntry     [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan     [S], Scan     .Update[S]]
   private type AttributeEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Attribute[S], Attribute.Update[S]]
 
-  private type I = evt.InMemory
+  private type I = InMemory
 
   implicit def scanEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]] =
     anyScanEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]]]
@@ -69,7 +69,7 @@ object ProcImpl {
   private val anyScanEntryInfo = new KeyMapImpl.ValueInfo[I, String, Scan[I], Scan.Update[I]] {
     def valueEvent(value: Scan[I]) = value.changed
 
-    val keySerializer = ImmutableSerializer.String
+    val keySerializer   = ImmutableSerializer.String
     val valueSerializer = Scan.serializer[I]
   }
 
@@ -120,8 +120,8 @@ object ProcImpl {
       // ---- keymapimpl details ----
 
       final protected def fire(added: Set[String], removed: Set[String])(implicit tx: S#Tx): Unit = {
-        val seqAdd: Vec[Proc.StateChange] = added  .map(key => Proc.AssociationAdded  (wrapKey(key)))(breakOut)
-        val seqRem: Vec[Proc.StateChange] = removed.map(key => Proc.AssociationRemoved(wrapKey(key)))(breakOut)
+        val seqAdd: Vec[Proc.StateChange[S]] = added  .map(key => Proc.AssociationAdded  [S](wrapKey(key)))(breakOut)
+        val seqRem: Vec[Proc.StateChange[S]] = removed.map(key => Proc.AssociationRemoved[S](wrapKey(key)))(breakOut)
         // convention: first the removals, then the additions. thus, overwriting a key yields
         // successive removal and addition of the same key.
         val seq = if (seqAdd.isEmpty) seqRem else if (seqRem.isEmpty) seqAdd else seqRem ++ seqAdd
@@ -146,7 +146,7 @@ object ProcImpl {
         if (changes.isEmpty) None
         else Some(Proc.Update(proc,
           changes.map({
-            case (key, u) => Proc.AttributeChange(key, u)
+            case (key, u) => Proc.AttributeChange(key, u.element, u.change)
           })(breakOut)))
       }
 
@@ -154,7 +154,7 @@ object ProcImpl {
 
       protected def valueInfo = attributeEntryInfo[S]
 
-      def apply[Attr[~ <: evt.Sys[~]] <: Attribute[_]](key: String)(implicit tx: S#Tx,
+      def apply[Attr[~ <: Sys[~]] <: Attribute[_]](key: String)(implicit tx: S#Tx,
                                                       tag: reflect.ClassTag[Attr[S]]): Option[Attr[S]#Peer] =
         get(key) match {
           // cf. stackoverflow #16377741
@@ -168,18 +168,19 @@ object ProcImpl {
 
       protected def wrapKey(key: String) = ScanKey(key)
 
-      def add(key: String)(implicit tx: S#Tx): Scan[S] = {
-        val scan = Scan[S]
-        add(key, scan)
-        scan
-      }
+      def add(key: String)(implicit tx: S#Tx): Scan[S] =
+        get(key).getOrElse {
+          val res = Scan[S]
+          add(key, res)
+          res
+        }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         val changes = foldUpdate(pull)
         if (changes.isEmpty) None
         else Some(Proc.Update(proc,
           changes.map({
-            case (key, u) => Proc.ScanChange(key, u)
+            case (key, u) => Proc.ScanChange(key, u.scan, u.changes)
           })(breakOut)))
       }
 
@@ -193,6 +194,7 @@ object ProcImpl {
       with evt.InvariantEvent [S, Proc.Update[S], Proc[S]]
       with evti.Root          [S, Proc.Update[S]]
       with ProcEvent {
+
       final val slot = 2
     }
 

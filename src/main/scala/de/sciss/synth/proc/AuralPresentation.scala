@@ -39,19 +39,19 @@ object AuralPresentation {
     Impl.runTx[S](transport, aural)
 
   private[proc] trait Running[S <: Sys[S]] {
-    /**
-     * Queries the number of channel associated with a scanned input.
-     * Throws a control throwable when no value can be determined, making
-     * the ugen graph builder mark the querying graph element as incomplete
-     * (missing information).
-     *
-     * @param timed   the process whose graph is currently built
-     * @param time    the time at which to query the scan
-     * @param key     the scan key
-     * @param tx      the current transaction
-     * @return        the number of channels for the scan input at the given time
-     */
-    def scanInNumChannels(timed: TimedProc[S], time: Long, key: String)(implicit tx: S#Tx): Int // Scan_.Value[ S ]
+    /** Queries the number of channel associated with a scanned input.
+      * Throws a control throwable when no value can be determined, making
+      * the ugen graph builder mark the querying graph element as incomplete
+      * (missing information).
+      *
+      * @param timed        the process whose graph is currently built
+      * @param time         the time at which to query the scan
+      * @param key          the scan key
+      * @param numChannels  a given number of channels if `>= 0`, or `-1` to accept whatever the scan in provides
+      *
+      * @return             the number of channels for the scan input at the given time
+      */
+    def scanInNumChannels(timed: TimedProc[S], time: Long, key: String, numChannels: Int)(implicit tx: S#Tx): Int
   }
 
   final private[proc] case class MissingInfo[S <: Sys[S]](source: TimedProc[S], key: String) extends Throwable

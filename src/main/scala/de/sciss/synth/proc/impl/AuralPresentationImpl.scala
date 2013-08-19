@@ -35,10 +35,11 @@ import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal, Txn => ScalaTxn}
 import proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
-import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
+import de.sciss.synth.proc.Scan.Link
+import scala.util.control.NonFatal
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -56,7 +57,7 @@ object AuralPresentationImpl {
   def runTx[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] = {
     val c = new Client[S](transport, aural)
     aural.addClient(c)
-    aural.serverOption.foreach(c.startedTx(_))
+    aural.serverOption.foreach(c.startedTx)
     c
   }
 
@@ -98,7 +99,7 @@ object AuralPresentationImpl {
       groupRef.set(Some(group))(tx.peer)
 
       val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
-      log("started" + " (" + booted.hashCode.toHexString + ")")
+      log(s"started (${booted.hashCode.toHexString})")
       ProcDemiurg.addServer(server) // ( ProcTxn()( tx ))
 
       def t_play(time: Long)(implicit tx: S#Tx): Unit =
@@ -116,9 +117,8 @@ object AuralPresentationImpl {
       transport.react { implicit tx => {
         // only when playing
         case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
-          log("at " + time + " added " + added.mkString("[", ", ", "]") +
-            "; removed " + removed.mkString("[", ", ", "]") +
-            "; changes? " + changes.nonEmpty + " (" + booted.hashCode.toHexString + ")")
+          log(s"at $time added ${added.mkString("[", ", ", "]")}; removed ${removed.mkString("[", ", ", "]")}; " +
+            s"changes? ${changes.nonEmpty} (${booted.hashCode.toHexString})")
           removed.foreach {
             timed => booted.procRemoved(timed)
           }
@@ -134,7 +134,6 @@ object AuralPresentationImpl {
         case Transport.Stop(tr, time) => t_stop(time)
 
         case _ =>
-        //                  log( "other " + other )
       }}
 
       implicit val itx = tx.peer
@@ -142,34 +141,15 @@ object AuralPresentationImpl {
     }
   }
 
-  //   sealed trait Running[ S <: Sys[ S ]] {
-  ////      def addScanIn(  proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Int
-  ////      def addScanOut( proc: Proc[ S ], time: Long, key: String, numChannels: Int )( implicit tx: S#Tx ) : Unit
-  //      def scanInValue( proc: Proc[ S ], time: Long, key: String )( implicit tx: S#Tx ) : Option[ Scan_.Value[ S ]]
-  //   }
+  private final class OutputBuilder(val bus: RichAudioBus) {
+    var sinks = List.empty[(String, AuralProc)]
+  }
 
   private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilder[S] /*, val name: String */) {
-    var outBuses: Map[String, RichAudioBus] = Map.empty
-    //      def finish : AuralProc = {
-    //         val ug = ugen.finish
-    //         AuralProc()
-    //      }
-
-    //      def id: S#ID = ugen.timed.id
+    var outputs = Map.empty[String, OutputBuilder]
   }
 
-  // this is plain stupid... another reason why the scan should reproduce the proc and key
-  private def idSerializer[S <: stm.Sys[S]]: Serializer[S#Tx, S#Acc, S#ID] = anyIDSer.asInstanceOf[Serializer[S#Tx, S#Acc, S#ID]]
-
-  private val anyIDSer = new IDSer[stm.InMemory]
-
-  private final class IDSer[S <: stm.Sys[S]] extends Serializer[S#Tx, S#Acc, S#ID] {
-    def write(id: S#ID, out: DataOutput): Unit = id.write(out)
-
-    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): S#ID = tx.readID(in, access)
-  }
-
-  /*
+   /*
     * @param missingMap maps each missing input to a set of builders who requested that input
     * @param idMap      map's timed-ids to aural proc builders
     * @param seq        sequence of builders in the current transaction
@@ -199,8 +179,6 @@ object AuralPresentationImpl {
     //      private val ongoingBuild: TxnLocal[ OngoingBuild[ S ]] =
     //         TxnLocal( init = OngoingBuild(), beforeCommit = beforeCommit )
 
-    implicit def idSer = idSerializer[S]
-
     private val ongoingBuild = TxnLocal(new OngoingBuild[S]())
 
     //      private def getNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
@@ -212,26 +190,24 @@ object AuralPresentationImpl {
 
     private def launchProc(builder: AuralProcBuilder[S]): Unit = {
       val ugen          = builder.ugen
-      // finalise the ugen graph
-      val ug            = ugen.finish
+      val timed         = ugen.timed
+
+      log(s"begin launch $timed (${hashCode.toHexString})")
+
+      val ug            = ugen.finish   // finalise the ugen graph
       implicit val tx   = ugen.tx
       implicit val itx  = tx.peer
-      //         implicit val ptx  = ProcTxn()
-      // get a rich synth def and synth playing just in the default group
-      // (we'll have additional messages moving the group into place if needed,
-      // as well as setting and mapping controls)
 
-      //         val df            = ProcDemiurg.getSynthDef( server, ug, nameHint = Some( builder.name )) // RichSynthDef()
-      //         val synth         = df.play( target = group, addAction = addToHead )
-      val synth = Synth.expanded(server, ug /*, nameHint = Some(builder.name) */)
+      val time          = ugen.time
+      val p             = timed.value
+
+      val nameHint      = p.attributes[Attribute.String](ProcKeys.attrName).map(_.value)
+      val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
       // ---- handle input buses ----
-      val time      = ugen.time
-      val timed     = ugen.timed
-      var busUsers  = Vector.empty[DynamicBusUser]
-      val p         = timed.value
-      val span      = timed.span.value
-      var setMap    = Vector[ControlSetMap](
+      var busUsers      = List.empty[DynamicBusUser]
+      val span          = timed.span.value
+      var setMap        = Vec[ControlSetMap](
         graph.Time    .key -> time / sampleRate,
         graph.Offset  .key -> (span match {
           case Span.HasStart(start) => (time - start) / sampleRate
@@ -242,9 +218,9 @@ object AuralPresentationImpl {
           case _ => Double.PositiveInfinity
         })
       )
-      var deps      = Nil: List[Resource.Source]
+      var deps          = List.empty[Resource.Source]
 
-      val attrNames = ugen.attributeIns
+      val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) {
         // println(s"Attributes used: ${attrNames.mkString(", ")}")
         attrNames.foreach { n =>
@@ -256,7 +232,7 @@ object AuralPresentationImpl {
             case a: Attribute.FadeSpec[S] =>
               val spec = a.peer.value
               // dur, shape-id, shape-curvature, floor
-              ctlName -> Vector(
+              ctlName -> Vec(
                 (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
                   case parametric(c)  => c
                   case _              => 0f
@@ -270,82 +246,137 @@ object AuralPresentationImpl {
 
       import Grapheme.Segment
 
-      ugen.scanIns.foreach {
-        case (key, numCh) =>
+      val outBuses  = builder.outputs
+      val aural     = AuralProc(synth, outBuses.mapValues(_.bus))
 
-          def ensureChannels(n: Int): Unit =
-            require(n == numCh, "Scan input changed number of channels (expected " + numCh + " but found " + n + ")")
+      ugen.scanIns.foreach {
+        case (key, scanIn) =>
+          val numCh = scanIn.numChannels
+
+          @inline def ensureChannels(n: Int): Unit =
+            require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
 
           val inCtlName = scan.inControlName(key)
+          // var inBus     = Option.empty[AudioBusNodeSetter]
 
-          val sourceOpt = p.scans.get(key).flatMap(_.source)
-          sourceOpt.foreach {
-            // if not found, stick with default
-            case Scan.Link.Grapheme(peer) =>
-              val segmOpt = peer.segment(time)
-              segmOpt.foreach {
-                // again if not found... stick with default
-                case const: Segment.Const =>
-                  ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-                  //                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
-                  setMap :+= (if (const.numChannels == 1) {
-                    ControlSetMap.Single(inCtlName, const.values.head.toFloat)
-                  } else {
-                    ControlSetMap.Multi(inCtlName, const.values.map(_.toFloat))
-                  })
+          lazy val lazyInBus: AudioBusNodeSetter = {
+            val b      = RichBus.audio(server, numCh)
+            val res    = if (scanIn.fixed)
+              BusNodeSetter.reader(inCtlName, b, synth)
+            else
+              BusNodeSetter.mapper(inCtlName, b, synth)
+            busUsers ::= res
+            // inBus      = Some(res)
+            aural.addInputBus(key, res.bus)
+            res
+          }
 
-                case segm: Segment.Curve =>
-                  ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-                  // println(s"segment : ${segm.span}")
-                  val sw = SegmentWriter(segm, time, server, sampleRate)
-                  deps  ::= sw
-                  busUsers :+= sw
-                  val bm = BusNodeSetter.mapper(inCtlName, sw.bus, synth)
-                  busUsers :+= bm
+          // note: if not found, stick with default
 
-                case audio: Segment.Audio =>
-                  ensureChannels(audio.numChannels)
-                  // val file = audio.value.artifact
-                  // val file      =  artifactStore().resolve(artifact)
-                  val aaw = AudioArtifactWriter(audio, time, server, sampleRate)
-                  deps  ::= aaw
+          // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
+          //           we cannot use ControlSetMap any more, but need other mechanism
+          p.scans.get(key).foreach { scan =>
+            val src = scan.sources
+            // if (src.isEmpty) {
+              if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
+            // } else {
+              src.foreach {
+                case Link.Grapheme(peer) =>
+                  val segmOpt = peer.segment(time)
+                  segmOpt.foreach {
+                    // again if not found... stick with default
+                    case const: Segment.Const =>
+                      ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
+                      //                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
+                      setMap :+= (if (const.numChannels == 1) {
+                        ControlSetMap.Single(inCtlName, const.values.head .toFloat )
+                      } else {
+                        ControlSetMap.Multi (inCtlName, const.values.map(_.toFloat))
+                      })
 
-                  // XXX TODO: DRY (see Segment.Curve above)
-                  busUsers :+= aaw
-                  val bm = BusNodeSetter.mapper(inCtlName, aaw.bus, synth)
-                  busUsers :+= bm
+                    case segm: Segment.Curve =>
+                      ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
+                      // println(s"segment : ${segm.span}")
+                      val bm     = lazyInBus
+                      val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
+                      deps     ::= w
+                      busUsers ::= w
+
+                    case audio: Segment.Audio =>
+                      ensureChannels(audio.numChannels)
+                      val bm     = lazyInBus
+                      val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
+                      deps     ::= w
+                      busUsers ::= w
+                  }
+
+                case Link.Scan(peer) =>
+                  scanMap.get(peer.id).foreach {
+                    case (srcKey, idH) =>
+                      val srcTimedID  = idH()
+                      val bIn         = lazyInBus
+
+                      // if the source isn't found (because it's probably in the ongoing build),
+                      // we ignore that here; there is a symmetric counter part, looking for the
+                      // builder.outputs that will handle these cases.
+                      viewMap.get(srcTimedID).foreach { srcAural =>
+                        val bOut    = srcAural.getOutputBus(srcKey).getOrElse {
+                          sys.error(s"Source bus disappeared $srcTimedID -> $srcKey")
+                        }
+                        ensureChannels(bOut.numChannels)
+                        val edge    = ProcEdge(srcAural, srcKey, aural, key)
+                        val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
+                        deps      ::= link
+                        // deps      ::= srcAural.group()
+                        busUsers  ::= link
+                      }
+                  }
               }
-            case Scan.Link.Scan(peer) =>
-              scanMap.get(peer.id).foreach {
-                case (sourceKey, idH) =>
-                  val sourceTimedID = idH()
-                  val bus = getBus(sourceTimedID, sourceKey).getOrElse(// ... or could just stick with the default control value
-                    sys.error("Bus disappeared " + sourceTimedID + " -> " + sourceKey))
-                  ensureChannels(bus.numChannels) // ... or could insert a channel coercing synth
-                val bm = BusNodeSetter.mapper(inCtlName, bus, synth)
-                  busUsers :+= bm
-              }
+            // }
           }
       }
 
-      val outBuses = builder.outBuses
-
-      // ---- handle output buses ----
-      builder.outBuses.foreach {
-        case (key, bus) =>
-          val bw = BusNodeSetter.writer(scan.outControlName(key), bus, synth)
+      // ---- handle output buses, and establish missing links to sinks ----
+      builder.outputs.foreach {
+        case (key, out) =>
+          val bw     = BusNodeSetter.writer(scan.outControlName(key), out.bus, synth)
+          val bOut   = bw.bus
           busUsers :+= bw
+
+          p.scans.get(key).foreach { scan =>
+            scan.sinks.foreach {
+              case Link.Scan(peer) =>
+                scanMap.get(peer.id).foreach {
+                  case (sinkKey, idH) =>
+                    val sinkTimedID = idH()
+                    viewMap.get(sinkTimedID).foreach { sinkAural =>
+                      val bIn = sinkAural.getInputBus(sinkKey).getOrElse {
+                        sys.error(s"Sink bus disappeared $sinkTimedID -> $sinkKey")
+                      }
+                      require(bIn.numChannels == bOut.numChannels,
+                        s"Scan input changed number of channels (expected ${bOut.numChannels} but found ${bIn.numChannels})")
+                      val edge    = ProcEdge(aural, key, sinkAural, sinkKey)
+                      val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn)
+                      deps      ::= link
+                      busUsers  ::= link
+                    }
+                }
+
+              case _  =>
+            }
+          }
       }
 
+      // busUsers.foreach(_.add())
+
+      aural.setBusUsers(busUsers)
       // wrap as AuralProc and save it in the identifier map for later lookup
       val deps1 = deps.map(_.resource)
       synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
-      val aural = AuralProc(synth, outBuses, busUsers)
-
       busUsers.foreach(_.add())
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
-      log("launched " + aural + " (" + hashCode.toHexString + ")")
+      log(s"launched $timed -> $aural (${hashCode.toHexString})")
       viewMap.put(timed.id, aural)
     }
 
@@ -356,7 +387,14 @@ object AuralPresentationImpl {
       ongoingBuild.get(itx).seq.foreach { builder =>
         val ugen = builder.ugen
         if (ugen.isComplete) {
-          launchProc(builder)
+          try {
+            launchProc(builder)
+          } catch {
+            case NonFatal(e) =>
+              e.printStackTrace()
+              throw e
+          }
+
         } else {
           // XXX TODO: do we need to free buses associated with ugen.scanOuts ?
           println("Warning: Incomplete aural proc build for " + ugen.timed.value)
@@ -364,47 +402,43 @@ object AuralPresentationImpl {
       }
     }
 
-    private def getBus(timedID: S#ID, key: String)(implicit tx: S#Tx): Option[RichAudioBus] = {
+    private def getOutputBus(timedID: S#ID, key: String)(implicit tx: S#Tx): Option[RichAudioBus] =
       viewMap.get(timedID) match {
         case Some(aural) =>
-          //               implicit val ptx = ProcTxn()( tx )
-          aural.getBus(key)
+          aural.getOutputBus(key)
         case _ =>
           assert(ongoingBuild.isInitialized(tx.peer))
-          ongoingBuild.get(tx.peer).idMap.flatMap { map =>
-            map.get(timedID).flatMap(_.outBuses.get(key))
-          }
+          val ob = ongoingBuild.get(tx.peer)
+          for {
+            map <- ob.idMap
+            pb  <- map.get(timedID)
+            out <- pb.outputs.get(key)
+          } yield out.bus
       }
-    }
-
-    //      private def getBusNumChannels( timed: TimedProc[ S ], key: String )( implicit tx: S#Tx ) : Int = {
-    //         val bus = getBus( timed, key ).getOrElse( throw MissingIn( timed, key ))
-    //         bus.numChannels
-    //      }
 
     // called by UGenGraphBuilderImpl
-    def scanInNumChannels(timed: TimedProc[S], time: Long, key: String)(implicit tx: S#Tx): Int = {
-      val scanOpt = timed.value.scans.get(key)
-      val sourceOpt = scanOpt.flatMap(_.source)
-      sourceOpt match {
-        case Some(Scan.Link.Grapheme(peer)) =>
-          val chansOpt = peer.valueAt(time).map(_.numChannels)
-          chansOpt.getOrElse(1) // producing a non-mapped monophonic control with default value; sounds sensible?
+    def scanInNumChannels(timed: TimedProc[S], time: Long, key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
+      val numCh = timed.value.scans.get(key).fold(0) { scan =>
+        val chans = scan.sources.toList.map {
+          case Link.Grapheme(peer) =>
+            val chansOpt = peer.valueAt(time).map(_.numChannels)
+            chansOpt.getOrElse(numChannels)
 
-        case Some(Scan.Link.Scan(peer)) =>
-          val sourceOpt = scanMap.get(peer.id)
-          val busOpt = sourceOpt.flatMap {
-            case (sourceKey, idH) =>
-              val sourceTimedID = idH()
-              getBus(sourceTimedID, sourceKey)
-          }
-          busOpt match {
-            case Some(bus) => bus.numChannels
-            case _ => throw MissingIn(peer)
-          }
-
-        case None => 1 // producing a non-mapped monophonic control with default value; sounds sensible?
+          case Link.Scan(peer) =>
+            val sourceOpt = scanMap.get(peer.id)
+            val busOpt = sourceOpt.flatMap {
+              case (sourceKey, idH) =>
+                val sourceTimedID = idH()
+                getOutputBus(sourceTimedID, sourceKey)
+            }
+            busOpt.map(_.numChannels).getOrElse {
+              if (numChannels < 0) throw MissingIn(peer)
+              numChannels
+            }
+        }
+        if (chans.isEmpty) 0 else chans.max
       }
+      math.max(1, numCh)
     }
 
     def dispose()(implicit tx: S#Tx): Unit =
@@ -450,6 +484,7 @@ object AuralPresentationImpl {
       val scans = timed.value.scans
       scans.iterator.foreach {
         case (key, scan) =>
+          import CommonSerializers.Identifier
           scanMap.put(scan.id, key -> tx.newHandle(timedID))
       }
 
@@ -476,14 +511,14 @@ object AuralPresentationImpl {
       // detect which new scan outputs have been determined in the last iteration
       // (newOuts is a map from `name: String` to `numChannels Int`)
       val newOuts = ugen.scanOuts.filterNot {
-        case (key, _) => builder.outBuses.contains(key)
+        case (key, _) => builder.outputs.contains(key)
       }
       // if there were any, create rich audio buses for them, and store them in the builder's bus map.
       //    note that these buses initially do not have any real resources allocated, so it's safe to
       //    forget about them and have them gc'ed if the process does not complete by the end of the txn.
       if (newOuts.nonEmpty) {
-        val newBuses = newOuts.mapValues(numCh => RichBus.audio(server, numCh))
-        builder.outBuses ++= newBuses
+        val newBuses = newOuts.mapValues(numCh => new OutputBuilder(RichBus.audio(server, numCh)))
+        builder.outputs ++= newBuses
       }
 
       // if the last iteration did not complete the build process, store the missing in keys
@@ -534,13 +569,13 @@ object AuralPresentationImpl {
         case Some(aural) =>
           viewMap.remove(timedID)
           //               implicit val ptx = ProcTxn()( tx )
-          log("removed " + timed + " (" + hashCode.toHexString + ")") // + " -- playing? " + aural.playing )
+          log(s"removed $timed (${hashCode.toHexString})") // + " -- playing? " + aural.playing )
           aural.stop()
 
         case _ =>
           def warn(): Unit = {
             val mute = timed.value.attributes[Attribute.Boolean]("mute").exists(_.value)
-            if (!mute) println("WARNING: could not find view for " + timed)
+            if (!mute) println("WARNING: could not find aural view for " + timed)
           }
 
           val newTxn  = !ongoingBuild.isInitialized(tx.peer)
@@ -573,7 +608,7 @@ object AuralPresentationImpl {
     //               logConfig( "aural graph changed " + timed.value )
     //               aural.graph_=( newGraph )
     //            case _ =>
-    //               println( "WARNING: could not find view for proc " + timed.value )
+    //               println( "WARNING: could not find aural view for proc " + timed.value )
     //         }
     //      }
 
@@ -585,7 +620,7 @@ object AuralPresentationImpl {
       //               logConfig( "aural freq changed " + timed.value )
       //               aural.addParams( changes )
       //            case _ =>
-      //               println( "WARNING: could not find view for proc " + timed.value )
+      //               println( "WARNING: could not find aural view for proc " + timed.value )
       //         }
     }
   }

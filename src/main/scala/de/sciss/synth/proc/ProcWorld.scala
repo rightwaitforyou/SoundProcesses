@@ -27,83 +27,45 @@ package de.sciss.synth.proc
 
 import impl.AuralProc
 import concurrent.stm.{Ref, TMap, InTxn, TSet}
-import de.sciss.synth.{UGen, SynthGraph, UGenGraph, SynthDef => SSynthDef, message}
+import de.sciss.synth.{SynthDef => SSynthDef, addAfter, addBefore, UGen, SynthGraph, UGenGraph, message}
 import de.sciss.synth.ugen.{UGenOutProxy, ControlUGenOutProxy, Constant}
 import de.sciss.{synth, osc}
 import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.{ExecutionContext, Promise, Future}
 
 object ProcWorld {
-  // MMM
-  //   case class Update( procsAdded: ISet[ Proc ], procsRemoved: ISet[ Proc ])
-  //   type Listener = TxnModel.Listener[ Update ]
-  //   var TIMEOUT_MILLIS = 10000L
-
   var DEBUG = false
 
   def reduceFutures(futs: Vec[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
     futs match {
       case Vec()        => Future.successful()
       case Vec(single)  => single
-      case more             => Future.reduce(futs)((_, _) => ())
+      case more         => Future.reduce(futs)((_, _) => ())
     }
 }
 
 final class ProcWorld(val server: Server) {
   import ProcWorld._
 
-  // EEE
-  //   private type Topo = Topology[ AuralProc, ProcEdge ]
+  private type Topo = Topology[ AuralProc, ProcEdge ]
   val ugenGraphs = Ref(Map.empty[ProcDemiurg.GraphEquality, SynthDef])
-  // EEE
-  //   private val topologyRef = Ref[ Topo ]( Topology.empty )
 
-  // MMM
-  //   protected def fullUpdate( implicit tx: Txn ) = Update( topologyRef().vertices.toSet, Set.empty )
-  //   protected def emptyUpdate = Update( Set.empty, Set.empty )
+  private val topologyRef = Ref[Topo](Topology.empty)
 
-  // EEE
-  //   def topology( implicit tx: Txn ) = topologyRef()
+  def addProc(p: AuralProc)(implicit tx: Txn): Unit =
+    topologyRef.transform(_.addVertex(p))(tx.peer)
 
-  def addProc(p: AuralProc)(implicit tx: Txn): Unit = {
-    // MMM
-    //      touch()
+  def removeProc(p: AuralProc)(implicit tx: Txn): Unit =
+    topologyRef.transform(_.removeVertex(p))(tx.peer)
 
-    // EEE
-    //      topologyRef.transform( _.addVertex( p ))
-
-    // MMM
-    //      updateRef.transform( u => if( u.procsRemoved.contains( p )) {
-    //          u.copy( procsRemoved = u.procsRemoved - p )
-    //      } else {
-    //          u.copy( procsAdded   = u.procsAdded   + p )
-    //      })
+  def addEdge(e: ProcEdge)(implicit tx: Txn): Option[(Topo, AuralProc, Vec[AuralProc])] = {
+    val res = topologyRef.get(tx.peer).addEdge(e)
+    res.foreach(tup => topologyRef.set(tup._1)(tx.peer))
+    res
   }
 
-  def removeProc(p: AuralProc)(implicit tx: Txn): Unit = {
-    // MMM
-    //      touch()
-
-    // EEE
-    //      topologyRef.transform( _ removeVertex p )
-
-    // MMM
-    //      updateRef.transform( u => if( u.procsAdded.contains( p )) {
-    //          u.copy( procsAdded = u.procsAdded - p )
-    //      } else {
-    //          u.copy( procsRemoved = u.procsRemoved + p )
-    //      })
-  }
-
-  // EEE
-  //   def addEdge( e: ProcEdge )( implicit tx: Txn ) : Option[ (Topo, Proc, Vec[ Proc ])] = {
-  //      val res = topologyRef().addEdge( e )
-  //      res.foreach( tup => topologyRef.set( tup._1 ))
-  //      res
-  //   }
-  //
-  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ): Unit =
-  //      topologyRef.transform( _.removeEdge( e ))
+  def removeEdge(e: ProcEdge)(implicit tx: Txn): Unit =
+    topologyRef.transform(_.removeEdge(e))(tx.peer)
 
   private val msgStampRef     = Ref(0)
 
@@ -133,12 +95,12 @@ final class ProcWorld(val server: Server) {
         val funs = (i to cnt).flatMap { j =>
           bundleWaiting.get(j) match {
             case Some(_funs)  => bundleWaiting -= j; _funs
-            case _            => Vector.empty
+            case _            => Vec.empty
           }
         }
         funs.map(_.apply())
       }
-      else Vector.empty
+      else Vec.empty
     }
     reduceFutures(futs)
   }
@@ -189,7 +151,7 @@ final class ProcWorld(val server: Server) {
       val futsLater = later.map { case (depCnt, msgs, allSync, cnt) =>
         val p   = Promise[Unit]()
         val sch = new Scheduled(msgs, allSync, cnt, p)
-        bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vector.empty) :+ sch)
+        bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vec.empty) :+ sch)
         p.future
       }
       reduceFutures(futsNow ++ futsLater)
@@ -208,7 +170,7 @@ final class ProcWorld(val server: Server) {
     //            sendNow(msgs, allSync, cnt)
     //          } else {
     //            if (DEBUG) println("WAIT FOR DEP " + depCnt + " TO SEND " + msgs)
-    //            bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vector.empty) :+ { () =>
+    //            bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vec.empty) :+ { () =>
     //              sendNow(msgs, allSync, cnt)
     //            })
     //          }
@@ -293,64 +255,57 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
     world.removeProc(e)
   }
 
-  // EEE
-  //   def addEdge( e: ProcEdge )( implicit tx: Txn ): Unit = { syn.synchronized {
-  //      val world = worlds( e.sourceVertex.server )
-  //      val res = world.addEdge( e )
-  //      if( res.isEmpty ) error( "Could not add edge" )
-  //
-  //      val Some( (newTopo, source, affected) ) = res
-  //      if( verbose ) println( "NEW TOPO = " + newTopo + "; SOURCE = " + source + "; AFFECTED = " + affected )
-  //      if( affected.isEmpty ) {
-  //         return
-  //      }
-  //
-  //      val srcGroup   = source.groupOption
-  //      val tgtGroups  = affected.map( p => (p, p.groupOption) )
-  //      val isAfter    = source == e.sourceVertex
-  //
-  //      def startMoving( g: RichGroup ): Unit = {
-  //         var succ                = g
-  //         var pred : RichGroup    = null
-  //         val iter                = tgtGroups.iterator
-  //         while( iter.hasNext ) {
-  //            pred = succ
-  //            val (target, tgtGroup) = iter.next()
-  //            tgtGroup match {
-  //               case Some( g2 ) => {
-  //                  if( isAfter ) {
-  //                     g2.moveAfter( true, pred )
-  //                  } else {
-  //                     g2.moveBefore( true, pred )
-  //                  }
-  //                  succ = g2
-  //               }
-  //               case None => {
-  //                  val g2 = RichGroup( Group( target.server ))
-  //                  g2.play( pred, if( isAfter ) addAfter else addBefore )
-  //                  target.group = g2
-  //                  succ = g2
-  //               }
-  //            }
-  //         }
-  //      }
-  //
-  //      srcGroup match {
-  //         case None => {
-  //            val g = RichGroup( Group( source.server ))
-  //            g.play( RichGroup.default( g.server ))
-  //            source.group = g
-  //            startMoving( g )
-  //         }
-  //         case Some( g ) => startMoving( g )
-  //      }
-  //   }}
+  def addEdge(e: ProcEdge)(implicit tx: Txn): Unit = {
+    val world                 = worlds(e.sourceVertex.server)(tx.peer)
+    val res                   = world.addEdge(e)
+    val (_, source, affected) = res.getOrElse(sys.error(s"Edge $e is cyclic"))
 
-  // EEE
-  //   def removeEdge( e: ProcEdge )( implicit tx: Txn ): Unit = { syn.synchronized {
-  //      val world = worlds( e.sourceVertex.server )
-  //      world.removeEdge( e )
-  //   }}
+    // if (verbose) println("NEW TOPO = " + newTopo + "; SOURCE = " + source + "; AFFECTED = " + affected)
+    if (affected.isEmpty) return
+
+    val srcGroup  = source.groupOption
+    val tgtGroups = affected.map(p => (p, p.groupOption))
+    val isAfter   = source == e.sourceVertex
+
+    def startMoving(g: Group): Unit = {
+      var succ = g
+      var pred: Group = null
+      val iter = tgtGroups.iterator
+      while (iter.hasNext) {
+        pred = succ
+        val (target, tgtGroup) = iter.next()
+        tgtGroup match {
+          case Some(g2) =>
+            if (isAfter) {
+              g2.moveAfter (audible = true, target = pred)
+            } else {
+              g2.moveBefore(audible = true, target = pred)
+            }
+            succ = g2
+
+          case None =>
+            val g2 = Group(pred, if (isAfter) addAfter else addBefore)
+            target.group_=(g2)
+            succ = g2
+        }
+      }
+    }
+
+    srcGroup match {
+      case None =>
+        val g = Group(source.server)
+        // g.play(RichGroup.default(g.server))
+        source.group_=(g)
+        startMoving(g)
+
+      case Some(g) => startMoving(g)
+    }
+  }
+
+  def removeEdge(e: ProcEdge)(implicit tx: Txn): Unit = {
+    val world = worlds(e.sourceVertex.server)(tx.peer)
+    world.removeEdge(e)
+  }
 
   private def allCharsOk(name: String): Boolean = {
     val len = name.length

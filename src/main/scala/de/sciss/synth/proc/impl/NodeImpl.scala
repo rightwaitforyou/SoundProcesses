@@ -39,7 +39,6 @@ object NodeImpl {
 }
 
 trait NodeImpl extends ResourceImpl with Node {
-
   import NodeImpl._
 
   private val onEndFuns = Ref(EmptyOnEnd)
@@ -73,7 +72,7 @@ trait NodeImpl extends ResourceImpl with Node {
 
   final def read(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
-    val reader = BusNodeSetter.reader( name, rb, this )
+    val reader = BusNodeSetter.reader(name, rb, this)
     registerSetter(reader)
     reader
   }
@@ -85,11 +84,10 @@ trait NodeImpl extends ResourceImpl with Node {
     reader
   }
 
-  /**
-   * Associates an audio bus with this node such that the node writes to this bus.
-   * This creates a `DynamicAudioBusUser` which will be freed automatically when
-   * this node ends.
-   */
+  /** Associates an audio bus with this node such that the node writes to this bus.
+    * This creates a `DynamicAudioBusUser` which will be freed automatically when
+    * this node ends.
+    */
   final def write(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
     val writer = BusNodeSetter.writer(name, rb, this)
@@ -133,6 +131,7 @@ trait NodeImpl extends ResourceImpl with Node {
   }
 
   private def registerSetter(bns: BusNodeSetter)(implicit tx: Txn): Unit = {
+    requireOnline()
     bns.add()
     onEndTxn {
       implicit tx => bns.remove()
@@ -141,19 +140,22 @@ trait NodeImpl extends ResourceImpl with Node {
 
   final def dispose()(implicit tx: Txn): Unit = free(audible = true)
 
+  /** Note: this is graceful in not throwing up if the node was already freed. */
   final def free(audible: Boolean = true)(implicit tx: Txn): Unit = {
-    require(isOnline)
-    tx.addMessage(this, peer.freeMsg, audible = audible)
-    disposed()
+    // requireOnline()
+    if (isOnline) {
+      tx.addMessage(this, peer.freeMsg, audible = audible)
+      setOnline(value = false)
+    }
   }
 
   final def set(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.setMsg(pairs: _*), audible = audible)
   }
 
   final def setn(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.setnMsg(pairs: _*), audible = audible)
   }
 
@@ -167,17 +169,17 @@ trait NodeImpl extends ResourceImpl with Node {
   //   }
 
   final def mapn(audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.mapnMsg(pairs: _*), audible = audible)
   }
 
   final def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.mapanMsg(pairs: _*), audible = audible) // , dependencies = this :: Nil /* ?! */)
   }
 
   final def moveToHead(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
-    require(isOnline && group.isOnline)
+    require(isOnline && group.isOnline, s"Both source $this and target $group must be online")
     tx.addMessage(this, peer.moveToHeadMsg(group.peer), audible = audible, dependencies = group :: Nil)
   }
 
@@ -189,17 +191,17 @@ trait NodeImpl extends ResourceImpl with Node {
   //   }
 
   final def moveToTail(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
-    require(isOnline && group.isOnline)
+    require(isOnline && group.isOnline, s"Both source $this and target $group must be online")
     tx.addMessage(this, peer.moveToTailMsg(group.peer), audible = audible, dependencies = group :: Nil)
   }
 
   final def moveBefore(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
-    require(isOnline && target.isOnline)
+    require(isOnline && target.isOnline, s"Both source $this and target $target must be online")
     tx.addMessage(this, peer.moveBeforeMsg(target.peer), audible = audible, dependencies = target :: Nil)
   }
 
   final def moveAfter(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
-    require(isOnline && target.isOnline)
+    require(isOnline && target.isOnline, s"Both source $this and target $target must be online")
     tx.addMessage(this, peer.moveAfterMsg(target.peer), audible = audible, dependencies = target :: Nil)
   }
 }

@@ -34,37 +34,60 @@ object scan {
   private[proc] def outControlName(key: String): String = "$out_" + key
   private[proc] def inControlName (key: String): String = "$in_"  + key
 
-  private final case class In(key: String, default: Double)
-    extends GE.Lazy /* with Elem */ with AudioRated {
+  sealed trait InLike extends GE.Lazy with AudioRated {
+    protected def key: String
+    protected def numChannels: Int
 
-    override def productPrefix = "scan$In"
-
-    override def toString = s"""scan("$key").ar($default)"""
-
-    def makeUGens: UGenInLike = {
+    final def makeUGens: UGenInLike = {
       UGenGraph.builder match {
         case b: UGenGraphBuilder[_] =>
-          val numChannels = b.addScanIn(key)
+          val numCh   = b.addScanIn(key, numChannels)
           val ctlName = inControlName(key)
-          if (numChannels == 1) {
-            ctlName.ar(default).expand
-          } else if (numChannels > 1) {
-            ctlName.ar(Vector.fill(numChannels)(default)).expand
-          } else {
-            UGenInGroup.empty
-          }
+          mkUGen(ctlName, numCh)
 
         case _ => UGenGraphBuilder.outsideOfContext()
       }
     }
+
+    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike
   }
 
-  private final case class Out(key: String, in: GE)
+  final case class In(key: String, default: Double = 0.0)
+    extends InLike {
+
+    override def toString = s"""scan.In("$key", $default)"""
+
+    override def productPrefix = "scan$In"
+
+    protected def numChannels = -1
+
+    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
+      if (numCh == 1) {
+        ctlName.ar(default).expand
+      } else if (numCh > 1) {
+        ctlName.ar(Vector.fill(numCh)(default)).expand
+      } else {
+        UGenInGroup.empty
+      }
+  }
+
+  final case class InFix(key: String, numChannels: Int)
+    extends InLike {
+
+    override def toString = s"""scan.InFix("$key", $numChannels)"""
+
+    override def productPrefix = "scan$InFix"
+
+    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
+      ugen.In.ar(ctlName.kr, numCh)
+  }
+
+  final case class Out(key: String, in: GE)
     extends UGenSource.ZeroOut with WritesBus {
 
     override def productPrefix = "scan$Out"
 
-    override def toString = "scan\"$key\") := $in"
+    override def toString = s"""scan("$key") := $in"""
 
     protected def makeUGens {
       val bus = outControlName(key).kr
@@ -73,26 +96,26 @@ object scan {
 
     // first arg: bus control, remaining args: signal to write; thus numChannels = _args.size - 1
     protected def makeUGen(_args: Vec[UGenIn]): Unit = {
-      val busArg = _args.head
-      val sigArg = _args.tail
+      val busArg      = _args.head
+      val sigArg      = _args.tail
       val numChannels = sigArg.size
       UGenGraph.builder match {
         case b: UGenGraphBuilder[_] =>
           b.addScanOut(key, numChannels)
         case other => UGenGraphBuilder.outsideOfContext()
       }
-      val sigArgAr = sigArg.map {
-        ui =>
-          if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, Vector(ui))
+      val sigArgAr = sigArg.map { ui =>
+        if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, Vector(ui))
       }
-      new UGen.ZeroOut(name, audio, busArg +: sigArgAr, isIndividual = true)
+      new UGen.ZeroOut("Out", audio, busArg +: sigArgAr, isIndividual = true)
     }
   }
 }
 
-final case class scan(key: String) {
-  def ar: GE = ar(0.0)
-  def ar(default: Double): GE = scan.In(key, default)
-
-  def :=(in: GE): Unit = scan.Out(key, in)
-}
+//final case class scan(key: String) {
+//  def ar                 : GE = ar(0.0)
+//  def ar(default: Double): GE = scan.In(key, default)
+//  def ar(default: Double, numChannels: Int): GE = scan.InFix(key, default, numChannels)
+//
+//  def :=(in: GE): Unit = scan.Out(key, in)
+//}

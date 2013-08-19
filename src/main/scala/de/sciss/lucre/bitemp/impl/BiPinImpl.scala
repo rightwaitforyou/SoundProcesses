@@ -34,6 +34,7 @@ import collection.immutable.{IndexedSeq => Vec}
 import collection.breakOut
 import annotation.switch
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
+import de.sciss.model
 
 object BiPinImpl {
   import BiPin.{Leaf, Modifiable}
@@ -119,7 +120,7 @@ object BiPinImpl {
     //   with evt.Node[ S ] {
     pin =>
 
-    private type ElemChange = evt.Change[(Long, A)]
+    private type ElemChange = model.Change[(Long, A)]
 
     //      protected def tree: Tree[ S, A ]
     //      implicit protected def biType: BiType[ A ]
@@ -343,6 +344,6 @@ object BiPinImpl {
         case (time, seq) => seq.map(time -> _.magValue)
       }
 
-    def changed: EventLike[S, BiPin.Update[S, A], BiPin[S, A]] = Changed
+    def changed: EventLike[S, BiPin.Update[S, A]] = Changed
   }
 }

@@ -1,11 +1,8 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, bitemp, stm}
+import de.sciss.lucre.stm
 import expr.ExprImplicits
-import stm.store.BerkeleyDB
-import java.io.File
-import de.sciss.lucre.confluent.reactive.ConfluentReactive
 import de.sciss.span.Span
 
 object ScansTest extends App {
@@ -104,7 +101,7 @@ object ScansTest extends App {
     //      Thread.sleep( 1000 )
   }
 
-  def test[S <: evt.Sys[S]](group: ProcGroup.Modifiable[S])(implicit tx: S#Tx) {
+  def test[S <: Sys[S]](group: ProcGroup.Modifiable[S])(implicit tx: S#Tx) {
     proc.showLog = true
 
     val imp = ExprImplicits[S]
@@ -139,11 +136,11 @@ object ScansTest extends App {
       import graph.scan
 
     p1.graph() = SynthGraph {
-      scan("out") := SinOsc.ar(100).linexp(-1, 1, 30, 3000)
+      scan.Out("out", SinOsc.ar(100).linexp(-1, 1, 30, 3000))
     }
 
     p2.graph() = SynthGraph {
-      val freq = scan("freq").ar(333)
+      val freq = scan.In("freq", 333)
       //         freq.poll
       Out.ar(0, SinOsc.ar(freq))
     }

@@ -35,7 +35,6 @@ import language.higherKinds
 import stm.Disposable
 import de.sciss.synth.expr.{Strings, Booleans, Doubles, Ints}
 import expr.{Expr => _Expr}
-import scala.annotation.switch
 
 object AttributeImpl {
   import Attribute.Update
@@ -256,7 +255,7 @@ object AttributeImpl {
     extends Basic[S] {
     self =>
 
-    protected def peerEvent: evt.EventLike[S, Any, _]
+    protected def peerEvent: evt.EventLike[S, Any]
 
     def select(slot: Int): Event[S, Any, Any] = changed
 
@@ -297,12 +296,12 @@ object AttributeImpl {
 
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Attribute[S] with evt.Node[S] = {
       val typeID = in.readInt()
-      (typeID: @switch) match {
+      typeID /* : @switch */ match {
         case Int             .typeID => Int             .readIdentified(in, access, targets)
-//        case Double          .typeID => Double          .readIdentified(in, access, targets)
-//        case Boolean         .typeID => Boolean         .readIdentified(in, access, targets)
-//        case String          .typeID => String          .readIdentified(in, access, targets)
-//        case FadeSpec        .typeID => FadeSpec        .readIdentified(in, access, targets)
+        case Double          .typeID => Double          .readIdentified(in, access, targets)
+        case Boolean         .typeID => Boolean         .readIdentified(in, access, targets)
+        case String          .typeID => String          .readIdentified(in, access, targets)
+        case FadeSpec        .typeID => FadeSpec        .readIdentified(in, access, targets)
         // case Folder          .typeID => Folder          .readIdentified(in, access, targets)
         // case ProcGroup       .typeID => ProcGroup       .readIdentified(in, access, targets)
         // case AudioGrapheme   .typeID => AudioGrapheme   .readIdentified(in, access, targets)

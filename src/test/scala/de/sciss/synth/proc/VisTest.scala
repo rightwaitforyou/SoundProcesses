@@ -79,7 +79,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     implicit         val procVarSer: Serializer[S#Tx, S#Acc, PG     ] =
       BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](_.changed)
     //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
-    //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ??? // Transport.serializer[ S ]( cursor )
+    //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ?? // Transport.serializer[ S ]( cursor )
   }
 
   import Implicits._
@@ -127,7 +127,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     p.graph() = SynthGraph {
       import synth._
       import ugen._
-      val f = graph.scan("freq").ar(50) // fundamental frequency
+      val f = graph.scan.In("freq", 50) // fundamental frequency
       val p = 20 // number of partials per channel
       val m = Mix.tabulate(p) {
           i =>
@@ -144,7 +144,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     }
     val g = Grapheme.Modifiable[S]
     val scan = p.scans.add("freq")
-    scan.source_=(Some(Scan.Link.Grapheme(g)))
+    scan.addSource(Scan.Link.Grapheme(g))
 
     //      p.trigger( "silence" )
 
@@ -279,12 +279,12 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
       p.graph() = SynthGraph {
         import synth._
         import ugen._
-        val in = graph.scan("in").ar(0)
+        val in = graph.scan.In("in")
         Out.ar(0, in * SinOsc.ar(3))
       }
       val g = Grapheme.Modifiable[S]
       val scan = p.scans.add("in")
-      scan.source_=(Some(Scan.Link.Grapheme(g)))
+      scan.addSource(Scan.Link.Grapheme(g))
 
       g.add(0L -> af)
       group.add(Span(0.sec, 4.sec), p)
@@ -292,12 +292,13 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     }
   }
 
-  private def addFreq2(value: BiExpr[S, Grapheme.Value])(implicit tx: S#Tx) {
-    pr().scans.get("freq").flatMap(_.source).foreach {
-      case Scan.Link.Grapheme(Grapheme.Modifiable(peer)) => peer.add(value)
-      case _ =>
+  private def addFreq2(value: BiExpr[S, Grapheme.Value])(implicit tx: S#Tx): Unit =
+    pr().scans.get("freq").foreach { scan =>
+      scan.sources.foreach {
+        case Scan.Link.Grapheme(Grapheme.Modifiable(peer)) => peer.add(value)
+        case _ =>
+      }
     }
-  }
 
   //   implicit def richNum( d: Double ) : RichDouble = new RichDouble( d )
 

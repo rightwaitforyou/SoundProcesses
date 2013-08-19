@@ -9,7 +9,7 @@
 //import de.sciss.lucre.stm.impl.BerkeleyDB
 //import java.io.File
 //import de.sciss.confluent.{TemporalObjects, Confluent, KSys}
-//import collection.immutable.{IndexedSeq => IIdxSeq}
+//import collection.immutable.{IndexedSeq => Vec}
 //import de.sciss.lucre.stm.{Serializer, TxnSerializer, Cursor}
 //import de.sciss.lucre.expr.{Span, Chronos, Expr}
 //
@@ -50,7 +50,7 @@
 //      }
 //
 //      object Access {
-//         def apply( g: ProcGroup.Var[ S ]) : Access = new Impl( g, IIdxSeq.empty )
+//         def apply( g: ProcGroup.Var[ S ]) : Access = new Impl( g, Vec.empty )
 //
 //         implicit def group( a: Access ) : ProcGroup.Var[ S ] = a.group
 //
@@ -73,7 +73,7 @@
 ////            def get( implicit tx: S#Tx ) : Expr.Var[ S, Double ]
 ////         }
 //
-//         private final class Impl( val group: ProcGroup.Var[ S ], val vars: IIdxSeq[ Expr.Var[ S, Double ]])
+//         private final class Impl( val group: ProcGroup.Var[ S ], val vars: Vec[ Expr.Var[ S, Double ]])
 //         extends Access {
 //            override def toString = "Access"
 //            def addVar( v: Expr.Var[ S, Double ]) : Access = new Impl( group, vars :+ v )
@@ -81,7 +81,7 @@
 //      }
 //      trait Access {
 //         def group : ProcGroup.Var[ S ]
-//         def vars  : IIdxSeq[ Expr.Var[ S, Double ]]
+//         def vars  : Vec[ Expr.Var[ S, Double ]]
 //         def addVar( v: Expr.Var[ S, Double ]) : Access
 //      }
 //

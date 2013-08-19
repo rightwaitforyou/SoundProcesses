@@ -1,0 +1,34 @@
+grapheme
+	curve
+	audio
+
+scan
+	sinks
+	source
+		link: scan / grapheme
+
+
+:::::::::::::::::::::::::
+
+group:
+  (next-time, events = Vec[(Proc, StartOrStop)]
+
+current procs:
+  - for each scans-whose-sources-include-graphemes:
+      (next-time, events = Vec[Grapheme])
+  - (next-time, events = Vec[Scan-key])
+
+ProcCache
+  - stopTime: Long
+  - ScansCache
+
+ScansCache
+  - Map[String, ScanCache]
+  - nextScanTime: Long
+
+ScanCache
+  // Annahme: Zahl der Grapheme ist meist null, oder eins,
+  // jedenfalls klein. Daher keine SkipList oder heavy weight verwenden,
+  // sondern einfache struktur mit cheap O(N) fuer kleine N
+
+  - Vec[(Long, Grapheme)]

@@ -38,18 +38,20 @@ private[proc] final case class BufferImpl(server: Server, peer: SBuffer)(closeOn
   def id: Int = peer.id
 
   def alloc(numFrames: Int, numChannels: Int = 1)(implicit tx: Txn): Unit = {
-    require(isOnline)
-    require(numFrames >= 0 && numChannels >= 0)
+    requireOffline()
+    require(numFrames >= 0 && numChannels >= 0, s"numFrames ($numFrames) and numChannels ($numChannels) must be >= 0")
     tx.addMessage(this, peer.allocMsg(numFrames = numFrames, numChannels = numChannels), audible = false)
+    setOnline(value = true)
   }
 
   /** Allocates and reads the buffer content once (closes the file). */
   def allocRead(path: String, startFrame: Long, numFrames: Int)(implicit tx: Txn): Unit = {
-    require(isOnline)
-    require(startFrame <= 0x7FFFFFFFL, "Cannot encode start frame >32 bit (" + startFrame + ")")
-    require(numFrames >= 0)
+    requireOffline()
+    require(startFrame <= 0x7FFFFFFFL, s"Cannot encode start frame >32 bit ($startFrame)")
+    require(numFrames >= 0, s"numFrames ($numFrames) must be >= 0")
     val frameI = startFrame.toInt
     tx.addMessage(this, peer.allocReadMsg(path, startFrame = frameI, numFrames = numFrames), audible = false)
+    setOnline(value = true)
   }
 
   /** Opens a file to write to in streaming mode (leaving it open), as useable for DiskOut. */
@@ -61,18 +63,18 @@ private[proc] final case class BufferImpl(server: Server, peer: SBuffer)(closeOn
   /** Writes the buffer contents once (closes the target file). */
   def write(path: String, fileType: AudioFileType, sampleFormat: SampleFormat, numFrames: Int = -1,
             startFrame: Int = 0, leaveOpen: Boolean = false)(implicit tx: Txn): Unit = {
-    require(isOnline)
-    require(leaveOpen == closeOnDisposal)
-    require(startFrame >= 0)
+    requireOnline()
+    require(leaveOpen == closeOnDisposal, s"leaveOpen is $leaveOpen but should be $closeOnDisposal")
+    require(startFrame >= 0, s"startFrame ($startFrame) must be >= 0")
     tx.addMessage(this, peer.writeMsg(path, fileType, sampleFormat, numFrames = numFrames, startFrame = startFrame,
       leaveOpen = leaveOpen), audible = false)
   }
 
   /** Cues the input sound file for streaming via DiskIn (leaves the file open). */
   def cue(path: String, fileStartFrame: Long = 0L, numFrames: Int = -1)(implicit tx: Txn): Unit = {
-    require(isOnline)
-    require(fileStartFrame <= 0x7FFFFFFFL, "Cannot encode start frame >32 bit (" + fileStartFrame + ")")
-    require(numFrames >= -1 /* && bufStartFrame >= 0 */)
+    requireOnline()
+    require(fileStartFrame <= 0x7FFFFFFFL, s"Cannot encode start frame >32 bit ($fileStartFrame)")
+    require(numFrames >= -1 /* && bufStartFrame >= 0 */, s"numFrames ($numFrames) must be >= -1")
     val frameI = fileStartFrame.toInt
     tx.addMessage(this, peer.readMsg(path, fileStartFrame = frameI, numFrames = numFrames, leaveOpen = true),
       audible = false)
@@ -80,9 +82,9 @@ private[proc] final case class BufferImpl(server: Server, peer: SBuffer)(closeOn
 
   /** Reads the buffer contents from a file (closes the file). */
   def read(path: String, fileStartFrame: Long = 0L, numFrames: Int = -1, bufStartFrame: Int = 0)(implicit tx: Txn): Unit = {
-    require(isOnline)
-    require(fileStartFrame <= 0x7FFFFFFFL, "Cannot encode start frame >32 bit (" + fileStartFrame + ")")
-    require(numFrames >= 0 && bufStartFrame >= 0)
+    requireOnline()
+    require(fileStartFrame <= 0x7FFFFFFFL, s"Cannot encode start frame >32 bit ($fileStartFrame)")
+    require(numFrames >= 0 && bufStartFrame >= 0, s"numFrames ($numFrames) and bufStartFrame ($bufStartFrame) must be >= 0")
     val frameI = fileStartFrame.toInt
     tx.addMessage(this, peer.readMsg(path, fileStartFrame = frameI, bufStartFrame = bufStartFrame,
       numFrames = numFrames, leaveOpen = false), audible = false)
@@ -90,17 +92,17 @@ private[proc] final case class BufferImpl(server: Server, peer: SBuffer)(closeOn
 
   /** Clears the buffer contents. */
   def zero()(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     tx.addMessage(this, peer.zeroMsg, audible = false)
   }
 
   def dispose()(implicit tx: Txn): Unit = {
-    require(isOnline)
+    requireOnline()
     if (closeOnDisposal) {
       tx.addMessage(this, peer.closeMsg, audible = false)
     }
     tx.addMessage(this, peer.freeMsg(release = false), audible = false)
     server.freeBuffer(peer.id)
-    disposed()
+    setOnline(value = false)
   }
 }

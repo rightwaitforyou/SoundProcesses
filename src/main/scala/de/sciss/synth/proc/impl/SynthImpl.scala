@@ -30,7 +30,7 @@ import de.sciss.synth.{ControlSetMap, AddAction, Synth => SSynth}
 import scala.collection.immutable.{Seq => ISeq}
 
 private[proc] final case class SynthImpl(peer: SSynth, definition: SynthDef) extends NodeImpl with Synth {
-  override def toString = s"Synth(id${peer.id}, def=${definition.name})"
+  override def toString = s"Synth(id=${peer.id}, def=${definition.name})"
 
   def server: Server = definition.server
 
@@ -38,14 +38,16 @@ private[proc] final case class SynthImpl(peer: SSynth, definition: SynthDef) ext
           (implicit tx: Txn): Unit = {
 
     val s = server
-    require(target.server == s && target.isOnline)
+    requireOffline()
+    require(target.server == s && target.isOnline, s"Target $target must be running and using the same server")
     if (dependencies.nonEmpty) {
-      dependencies.foreach(r => require(r.server == s && r.isOnline))
+      dependencies.foreach(r => require(r.server == s && r.isOnline,
+        s"Dependency $r must be running and using the same server"))
     }
     tx.addMessage(this, peer.newMsg(definition.name, target.peer, args, addAction),
       audible = true,
       dependencies = target :: definition :: dependencies)
 
-    //      peer.register()   // ok to call multiple times
+    setOnline(value = true)
   }
 }

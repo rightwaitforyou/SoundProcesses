@@ -50,16 +50,16 @@ object PatchTest extends App {
     val p2in = p2.scans.add("freq")
 
     p1.graph() = SynthGraph {
-      graph.scan("out") := SinOsc.ar(0.1).linexp(-1, 1, 200, 2000)
+      graph.scan.Out("out", SinOsc.ar(0.1).linexp(-1, 1, 200, 2000))
     }
 
     p2.graph() = SynthGraph {
-      val freq = graph.scan("freq").ar(441)
+      val freq = graph.scan.In("freq", 441)
       val sig = RLPF.ar(Pulse.ar(freq), freq * 2, 0.1)
       Out.ar(0, Pan2.ar(sig))
     }
 
-    p2in.source_=(Some(Scan.Link.Scan(p1out)))
+    p2in.addSource(Scan.Link.Scan(p1out))
 
     group.add(Span.from(0L), p1)
     group.add(Span.from((2.5 * 44100L).toLong), p2) // begin when sine wave is at positive peak

@@ -35,6 +35,7 @@ import java.io.File
 import evt.EventLike
 import expr.Expr
 import scala.annotation.tailrec
+import de.sciss.model
 
 object Artifact {
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = Impl.read(in, access)
@@ -84,13 +85,12 @@ object Artifact {
         Impl.readModLocation[S](in, access)
     }
     trait Modifiable[S <: evt.Sys[S]] extends Location[S] {
-      /**
-       * Registers a significant artifact with the system. That is,
-       * stores the artifact, which should have a real resource
-       * association, as belonging to the system.
-       *
-       * @param file   the file to turn into a registered artifact
-       */
+      /** Registers a significant artifact with the system. That is,
+        * stores the artifact, which should have a real resource
+        * association, as belonging to the system.
+        *
+        * @param file   the file to turn into a registered artifact
+        */
       def add(file: File)(implicit tx: S#Tx): Artifact.Modifiable[S]
       def remove(artifact: Artifact[S])(implicit tx: S#Tx): Unit
 
@@ -106,7 +106,7 @@ object Artifact {
     final case class Removed[S <: evt.Sys[S]](location: Location[S], idx: Int, artifact: Artifact[S])
       extends Update[S]
 
-    final case class Moved[S <: evt.Sys[S]](location: Location[S], change: evt.Change[File]) extends Update[S]
+    final case class Moved[S <: evt.Sys[S]](location: Location[S], change: model.Change[File]) extends Update[S]
 
     implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = Impl.locationSerializer
 
@@ -119,7 +119,7 @@ object Artifact {
 
     def modifiableOption: Option[Location.Modifiable[S]]
 
-    def changed: EventLike[S, Location.Update[S], Location[S]]
+    def changed: EventLike[S, Location.Update[S]]
   }
 
   type Value = File

@@ -31,6 +31,7 @@ import de.sciss.lucre.{event => evt}
 import evt.Targets
 import de.sciss.serial.{DataOutput, DataInput}
 import language.implicitConversions
+import de.sciss.model.Change
 
 object BiExpr {
   def apply[S <: evt.Sys[S], A](time: Expr[S, Long], mag: Expr[S, A])
@@ -99,7 +100,7 @@ object BiExpr {
       mag .changed -/-> this
     }
 
-    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[evt.Change[(Long, A)]] = {
+    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Change[(Long, A)]] = {
       val timeEvt = time.changed
       val timeCh  = if (pull.contains(timeEvt)) pull(timeEvt) else None
       val magEvt  = mag.changed
@@ -110,10 +111,10 @@ object BiExpr {
           Some(tch zip mch)
         case (Some(tch), None) =>
           val mv = magValue
-          Some(evt.Change(tch.before -> mv, tch.now -> mv))
+          Some(Change(tch.before -> mv, tch.now -> mv))
         case (None, Some(mch)) =>
           val tv = timeValue
-          Some(evt.Change(tv -> mch.before, tv -> mch.now))
+          Some(Change(tv -> mch.before, tv -> mch.now))
         case (None, None) =>
           None
       }

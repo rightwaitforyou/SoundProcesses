@@ -32,10 +32,10 @@ import span.Span
 import collection.immutable.{Seq => ISeq}
 
 object AudioArtifactWriter {
-  def apply(segm: Grapheme.Segment.Audio, time: Long, server: Server, sampleRate: Double)
+  def apply(bus: RichAudioBus, segm: Grapheme.Segment.Audio, time: Long, sampleRate: Double)
            (implicit tx: Txn): AudioArtifactWriter = {
     val numChannels = segm.numChannels
-    val bus         = RichBus.audio(server, numChannels)
+    // val bus         = RichBus.audio(server, numChannels)
     val sg  = SynthGraph {
       import ugen._
       val buf = "buf".ir
@@ -46,7 +46,7 @@ object AudioArtifactWriter {
       Line.kr(start = 0, end = 0, dur = dur, doneAction = freeSelf)
       Out.ar(out, sig)
     }
-    val synth = Synth(server, sg, nameHint = Some("audio-artifact"))
+    val synth = Synth(bus.server, sg, nameHint = Some("audio-artifact"))
     val res = new AudioArtifactWriter(synth, bus, segm, time, sampleRate)
     res.britzelAdd()
     res
@@ -54,8 +54,7 @@ object AudioArtifactWriter {
 }
 final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, segm: Grapheme.Segment.Audio, time: Long,
                                          sampleRate: Double)
-  extends DynamicBusUser /* DynamicAudioBusUser */
-  /* with RichAudioBus.User */ with Resource.Source {
+  extends DynamicBusUser with Resource.Source {
 
   // private val synthRef  = Ref(Option.empty[Synth])
 
@@ -99,12 +98,6 @@ final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, se
   }
 
   def remove()(implicit tx: Txn): Unit = {
-    //    val rs = synthRef.swap(None)(tx.peer).getOrElse(
-    //      sys.error("AudioArtifactWriter.remove() : there was no synth playing")
-    //    )
-    //    rs.free()
     if (synth.isOnline) synth.free()
-
-    // bus.removeWriter( this )
   }
 }

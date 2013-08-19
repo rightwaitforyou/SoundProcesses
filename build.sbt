@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.9.0-SNAPSHOT"
+version := "1.9.0"
 
 organization := "de.sciss"
 
@@ -15,8 +15,8 @@ scalaVersion := "2.10.2"
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= {
-  val confluentVersion = "2.4.+"
-  val eventVersion     = "2.3.+"
+  val confluentVersion = "2.5.+"
+  val eventVersion     = "2.4.+"
   val stmVersion       = "2.0.+"
   Seq(
     "de.sciss" %% "scalacollider"   % "1.9.+",
@@ -67,7 +67,7 @@ initialCommands in console :=
      |val g     = t { implicit tx => grapheme }
      |t { implicit tx => scan.source = Some( g )}
      |t { implicit tx => g.add( 0L, curve( 456.7 ))}
-   """.stripMargin + "\"\"\")"
+     |""".stripMargin + "\"\"\")"
 
 // ---- build info ----
 

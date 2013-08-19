@@ -28,13 +28,14 @@ package synth
 package proc
 package impl
 
-import de.sciss.serial.{Writer, Writable, DataOutput, DataInput}
+import de.sciss.serial.{DataOutput, DataInput}
 import lucre.{event => evt, data, expr}
 import java.io.File
 import expr.LinkedList
 import proc.Artifact.Location.Update
-import evt.{Change, EventLike, NodeSerializer}
+import evt.{EventLike, NodeSerializer}
 import de.sciss.synth.proc.Artifact.Modifiable
+import de.sciss.model.Change
 
 object ArtifactImpl {
   import Artifact.{Child, Location}
@@ -141,11 +142,11 @@ object ArtifactImpl {
 
     def modifiableOption: Option[Location.Modifiable[S]] = Some(this)
 
-    def changed: EventLike[S, Update[S], Location[S]] = this
+    def changed: EventLike[S, Update[S]] = this
 
     def directory(implicit tx: S#Tx): File = _directory()
     def directory_=(value: File)(implicit tx: S#Tx): Unit = {
-      val change = evt.Change(_directory(), value)
+      val change = Change(_directory(), value)
       if (change.isSignificant) {
         _directory() = value
         fire(Location.Moved(loc, change))
@@ -207,7 +208,7 @@ object ArtifactImpl {
       }
     }
 
-    protected def inputEvent: EventLike[S, Location.Update[S], _] = location.changed
+    protected def inputEvent: EventLike[S, Location.Update[S]] = location.changed
 
     protected def foldUpdate(generated: Option[Change[File]],
                              input: Update[S])(implicit tx: S#Tx): Option[Change[File]] =

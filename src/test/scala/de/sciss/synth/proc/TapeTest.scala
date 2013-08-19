@@ -20,28 +20,32 @@ object TapeTest extends App {
 
   val aural = AuralSystem()
 
-  def twice = true
+  def twice     = true
+  showAuralLog  = true
+  showTxnLog    = true
 
   val transp = system.step { implicit tx =>
     val expr      = ExprImplicits[S]
     import expr._
+    import Implicits._
 
     // val spat = Proc[S]
     // val spatIn = spat.scans.add("in")
     // spatIn.addSink()
 
     val proc      = Proc[S]
+    proc.name     = "tape"
     val sAudio    = proc.scans.add("sig")
     val file      = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
     val spec      = AudioFile.readSpec(file)
     val vAudio    = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
     val gAudio    = Grapheme.Modifiable[S]
     gAudio.add((1 - 4.5).seconds -> vAudio)  // ... çoit trop complexe ...
-    sAudio.source_=(Some(Scan.Link.Grapheme(gAudio)))
+    sAudio.addSource(Scan.Link.Grapheme(gAudio))
 
     val gSpat     = Grapheme.Modifiable[S]
     val sSpat     = proc.scans.add("spat")
-    sSpat.source_=(Some(Scan.Link.Grapheme(gSpat)))
+    sSpat.addSource(Scan.Link.Grapheme(gSpat))
     gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, step  )))
     gSpat.add(4.seconds -> Grapheme.Value.Curve(( 1.0, linear)))
 
@@ -50,10 +54,10 @@ object TapeTest extends App {
     proc.graph() = SynthGraph {
       import ugen._
       val freq  = graph.attribute("freq").ir
-      val sig0  = graph.scan("sig").ar(0.0)
+      val sig0  = graph.scan.In("sig")
       val sig1  = Mix.mono(sig0)
       val sig   = FreqShift.ar(sig1, freq)
-      val spat  = graph.scan("spat").ar(0.0)
+      val spat  = graph.scan.In("spat")
       Out.ar(0, Pan2.ar(sig, spat))
     }
     val group     = ProcGroup.Modifiable[S]

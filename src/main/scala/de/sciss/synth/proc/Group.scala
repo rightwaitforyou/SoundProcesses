@@ -32,15 +32,15 @@ object Group {
   def apply(target: Node /* = server.defaultGroup */, addAction: AddAction = addToHead)(implicit tx: Txn): Group = {
     val server  = target.server
     val nodeID  = server.nextNodeID()
-    val g       = new Impl(server, SGroup(server.peer, nodeID))
+    val g       = new Impl(server, SGroup(server.peer, nodeID))(online0 = false)
     g.play(target, addAction)
     g
   }
 
-    private[proc] def wrap(server: Server, peer: SGroup): Group = {
-      require(server.peer == peer.server)
-      new Impl(server, peer)
-    }
+  private[proc] def wrap(server: Server, peer: SGroup): Group = {
+    require(server.peer == peer.server)
+    new Impl(server, peer)(online0 = true)
+  }
 }
 
 trait Group extends Node {

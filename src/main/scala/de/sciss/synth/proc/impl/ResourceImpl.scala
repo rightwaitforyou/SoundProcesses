@@ -32,15 +32,31 @@ private[proc] trait ResourceImpl extends Resource {
   import Resource.TimeStamp
 
   private val timeStampRef = Ref(0)
-  //   private val dependentsRef  = TSet.empty[ Resource ]
 
-  final def isOnline(implicit tx: Txn): Boolean = timeStamp >= 0
+  protected def online0: Boolean = false
 
-  final protected def disposed()(implicit tx: Txn): Unit = timeStamp_=(-1)
+  private val stateOnline = Ref(initialValue = online0)
+
+  final def isOnline(implicit tx: Txn): Boolean = stateOnline.get(tx.peer)
+  final protected def setOnline(value: Boolean)(implicit tx: Txn): Unit = stateOnline.set(value)(tx.peer)
 
   final def timeStamp(implicit tx: Txn): TimeStamp = timeStampRef.get(tx.peer)
 
   final def timeStamp_=(value: TimeStamp)(implicit tx: Txn): Unit = timeStampRef.set(value)(tx.peer)
+
+  final protected def requireOnline ()(implicit tx: Txn): Unit = require( isOnline, "must be online")
+  final protected def requireOffline()(implicit tx: Txn): Unit = require(!isOnline, "must be offline")
+
+  // final protected def require(p: Boolean): Unit = require(p, "")
+
+  final protected def require(p: Boolean, message: => String): Unit = {
+    if (!p) {
+      val user  = message
+      val msg   = if (user.isEmpty) s"$this is not in required state" else s"$this - $user"
+      logTxn(msg)
+      throw new IllegalStateException(msg)
+    }
+  }
 
   //   final def addDependent( dependent: Resource )( implicit tx: Txn ): Unit = {
   //      require( dependent.server == server, "Dependency uses divergent server : " + dependent )

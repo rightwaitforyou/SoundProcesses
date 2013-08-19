@@ -18,12 +18,6 @@ The following dependency is necessary:
 
 The current version `v` is `"1.9.+"`.
 
-## REPL example
+## usage
 
-Everything under construction... __Note__: the following is obsolete:
-
-    val p = t { implicit tx => pr() }
-    t { implicit tx => group.add( p )}
-    t { implicit tx => p.graph = { Out.ar( 0, RHPF.ar((BrownNoise.ar(Seq(0.5,0.5))-0.49).max(0) * 20, 5000, 1))}}
-    t { implicit tx => p.stop() }
-    t { implicit tx => p.play() }
+Project is still experimental, and documentation is still missing. There is a graphical front-end [Mellite](https://github.com/Sciss/Mellite) (also experimental)...

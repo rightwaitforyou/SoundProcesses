@@ -2,7 +2,7 @@ package de.sciss
 package synth
 package proc
 
-import collection.immutable.{IndexedSeq => IIdxSeq}
+import collection.immutable.{IndexedSeq => Vec}
 import span.Span
 import de.sciss.synth.Curve.step
 
@@ -28,7 +28,7 @@ class GraphemeSerializationSpec extends ConfluentEventSpec {
     system.step { implicit tx =>
       val g = gH()
       assert(g.segment(0L) === None)
-      assert(g.segment(2222L) === Some(Grapheme.Segment.Const(Span.from(1234L), IIdxSeq(5678.9))))
+      assert(g.segment(2222L) === Some(Grapheme.Segment.Const(Span.from(1234L), Vec(5678.9))))
     }
   }
 }
