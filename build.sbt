@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.9.0"
+version := "1.9.1-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -13,6 +13,8 @@ licenses := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 scalaVersion := "2.10.2"
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
+
+libraryDependencies += "de.sciss" %% "lucredata-core" % "2.2.1+"  // debugSanitize!
 
 libraryDependencies ++= {
   val confluentVersion = "2.5.+"

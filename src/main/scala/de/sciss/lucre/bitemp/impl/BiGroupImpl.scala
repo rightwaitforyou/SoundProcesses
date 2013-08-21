@@ -29,7 +29,7 @@ package impl
 
 import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike, impl => evti, Sys}
-import data.{SkipOctree, Iterator}
+import de.sciss.lucre.data.{DeterministicSkipOctree, SkipOctree, Iterator}
 import collection.immutable.{IndexedSeq => Vec}
 import collection.breakOut
 import scala.annotation.{elidable, switch}
@@ -60,6 +60,16 @@ object BiGroupImpl {
   private type Tree    [S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
 
   // private def opNotSupported: Nothing = sys.error("Operation not supported")
+
+  def debugSanitize[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], reportOnly: Boolean)
+                                         (implicit tx: S#Tx): Option[String] = group match {
+    case impl: Impl[S, Elem, U] => impl.treeHandle match {
+      case t: DeterministicSkipOctree[S, _, _] =>
+        DeterministicSkipOctree.debugSanitize(t, reportOnly = reportOnly)
+      case _ => Some("Not a det octree!!")
+    }
+  }
+
 
   private def spanToPoint(span: SpanLike): LongPoint2D = span match {
     case Span(start, stop)  => LongPoint2D(start,     stop     )
@@ -177,6 +187,8 @@ object BiGroupImpl {
     implicit def pointView: (Leaf[S, Elem], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint(tup._1)
 
     protected def tree: Tree[S, Elem, U]
+
+    def treeHandle = tree
 
     override def toString() = "BiGroup" + tree.id
 
