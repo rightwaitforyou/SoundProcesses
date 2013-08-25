@@ -61,12 +61,12 @@ object BiGroupImpl {
 
   // private def opNotSupported: Nothing = sys.error("Operation not supported")
 
-  def debugSanitize[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], reportOnly: Boolean)
-                                         (implicit tx: S#Tx): Option[String] = group match {
+  def verifyConsistency[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], reportOnly: Boolean)
+                                             (implicit tx: S#Tx): Vec[String] = group match {
     case impl: Impl[S, Elem, U] => impl.treeHandle match {
       case t: DeterministicSkipOctree[S, _, _] =>
-        DeterministicSkipOctree.debugSanitize(t, reportOnly = reportOnly)
-      case _ => Some("Not a det octree!!")
+        DeterministicSkipOctree.verifyConsistency(t, reportOnly = reportOnly)
+      case _ => sys.error("Not a deterministic octree implementation")
     }
   }
 
