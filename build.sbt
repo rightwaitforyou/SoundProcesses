@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.9.1-SNAPSHOT"
+version := "1.9.1"
 
 organization := "de.sciss"
 
