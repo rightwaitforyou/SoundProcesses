@@ -1,10 +1,10 @@
 package de.sciss.synth.proc
 
-import de.sciss.synth.expr.ExprImplicits
 import de.sciss.synth.{ugen, SynthGraph}
 import de.sciss.span.Span
 import ugen._
 import Predef.{any2stringadd => _, _}
+import de.sciss.lucre.synth.InMemory
 
 object MixTest extends App {
 
@@ -18,7 +18,7 @@ object MixTest extends App {
   implicit val system = InMemory()
 
   showAuralLog  = true
-  showTxnLog    = true
+  showLog       = true
 
   implicit class RichDouble(d: Double) {
     def seconds = (d * 44100).toLong

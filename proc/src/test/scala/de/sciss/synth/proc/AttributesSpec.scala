@@ -1,14 +1,13 @@
 package de.sciss.synth.proc
 
-import de.sciss.synth.expr.Ints
 import de.sciss.lucre.expr.Expr
 import de.sciss.ConfluentEventSpec
+import de.sciss.lucre.synth.expr.Ints
 
-/**
- * To run only this suite:
- *
- * test-only de.sciss.synth.proc.AttributesSpec
- */
+/** To run only this suite:
+  *
+  * test-only de.sciss.synth.proc.AttributesSpec
+  */
 class AttributesSpec extends ConfluentEventSpec {
   import imp._
 

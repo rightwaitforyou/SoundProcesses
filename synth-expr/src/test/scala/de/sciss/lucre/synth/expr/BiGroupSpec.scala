@@ -1,17 +1,16 @@
-package de.sciss.lucre.bitemp
+package de.sciss.lucre.synth.expr
 
-import de.sciss.ConfluentEventSpec
 import de.sciss.lucre.expr.Expr
 import de.sciss.span.{SpanLike, Span}
 import de.sciss.lucre.event
-import de.sciss.synth.expr.SpanLikes
 import collection.immutable.{IndexedSeq => Vec}
 import scala.annotation.tailrec
+import de.sciss.lucre.bitemp.BiGroup
 
 /**
  * To run only this suite:
  *
- * test-only de.sciss.lucre.bitemp.BiGroupSpec
+ * test-only de.sciss.lucre.bitemp.expr.BiGroupSpec
  */
 class BiGroupSpec extends ConfluentEventSpec {
   type IntEx = Expr[S, Int]

@@ -1,12 +1,10 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.synth.expr.{Curves, ExprImplicits}
-import de.sciss.synth.io.AudioFile
-import java.io.File
 import de.sciss.span.Span
 import de.sciss.synth.Curve.{exponential, linear}
+import de.sciss.lucre.synth.expr.Curves
+import de.sciss.lucre.stm.store.BerkeleyDB
 
 object FadeTest extends App {
   type S = Durable
@@ -68,7 +66,7 @@ object FadeTest extends App {
             transp.stop()
             transp.seek(0L)
             transp.play()
-            showTxnLog = true
+            showLog = true
           }
           Thread.sleep(5 * 1000L)
         }

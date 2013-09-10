@@ -1,25 +1,24 @@
-package de.sciss
+package de.sciss.lucre.synth.expr
 
-import lucre.stm
-import org.scalatest.fixture
-import org.scalatest.matchers.ShouldMatchers
 import concurrent.stm.TxnLocal
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.synth.proc.{ExprImplicits, Confluent}
-import de.sciss.lucre.synth.expr.{Longs, Ints}
+import org.scalatest.fixture
+import org.scalatest.matchers.ShouldMatchers
 import de.sciss.lucre.stm.store.BerkeleyDB
+import de.sciss.lucre.{confluent, stm}
+import de.sciss.lucre.confluent.reactive.ConfluentReactive
 
 trait ConfluentEventSpec extends fixture.FlatSpec with ShouldMatchers {
-  type S = Confluent
+  type S = ConfluentReactive
   type D = S#D
-  type FixtureParam = lucre.confluent.Cursor[S, D]
+  type FixtureParam = confluent.Cursor[S, D]
 
   implicit final protected val IntType  = Ints
   implicit final protected val LongType = Longs
   final protected val imp = ExprImplicits[S]
 
   final def withFixture(test: OneArgTest) {
-    val system = Confluent(BerkeleyDB.tmp())
+    val system = ConfluentReactive(BerkeleyDB.tmp())
     try {
       val (_, cursor) = system.cursorRoot(_ => ())(implicit tx => _ => system.newCursor())
       test(cursor)

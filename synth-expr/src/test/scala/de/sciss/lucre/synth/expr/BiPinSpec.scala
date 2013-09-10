@@ -1,17 +1,14 @@
-package de.sciss
-package lucre
-package bitemp
+package de.sciss.lucre.synth.expr
 
 import collection.immutable.{IndexedSeq => Vec}
-import expr.Expr
-import synth.expr.{Ints, Longs}
 import de.sciss.model.Change
+import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.bitemp.{BiExpr, BiPin}
 
-/**
- * To run only this suite:
- *
- * test-only de.sciss.lucre.bitemp.BiPinSpec
- */
+/** To run only this suite:
+  *
+  * test-only de.sciss.lucre.bitemp.expr.BiPinSpec
+  */
 class BiPinSpec extends ConfluentEventSpec {
   type IntEx = Expr[S, Int]
 

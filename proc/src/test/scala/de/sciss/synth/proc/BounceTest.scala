@@ -1,11 +1,10 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.synth.expr.ExprImplicits
 import de.sciss.synth.{ugen, SynthGraph}
 import de.sciss.span.Span
 import scala.concurrent.ExecutionContext
 import de.sciss.processor.Processor
+import de.sciss.lucre.stm.store.BerkeleyDB
 
 // XXX TODO: this should be a ScalaTest spec, opening the file after bouncing, and
 // verifying the contents (easy with a sine).

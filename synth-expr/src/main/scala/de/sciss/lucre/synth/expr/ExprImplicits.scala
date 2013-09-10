@@ -3,15 +3,13 @@ package expr
 
 import de.sciss.lucre.{expr, bitemp, event => evt}
 import bitemp.{BiExpr, BiType}
-import evt.Sys
 import expr.Expr
 import language.implicitConversions
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.SynthGraph
 import de.sciss.synth
 
 object ExprImplicits {
-  def apply[S <: Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
+  def apply[S <: evt.Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
   private object Imp extends ExprImplicits[evt.InMemory]
 }
 
@@ -22,7 +20,7 @@ object ExprImplicits {
  * that require an existing expression (e.g. `longOps2`). This is so that primitive standard operations remain
  * outside the implicit scope (e.g. addition on longs).
  */
-class ExprImplicits[S <: Sys[S]] protected /* extends ExprImplicits.LowPriority[ S ] */ {
+class ExprImplicits[S <: evt.Sys[S]] protected /* extends ExprImplicits.LowPriority[ S ] */ {
   implicit def stringConst(s: String): Expr[S, String] = Strings.newConst(s)
   //   implicit def stringOps[ A ]( ex: A )( implicit tx: S#Tx, view: A => Expr[ S, String ]) : Strings.Ops[ S ] =
   //      new Strings.Ops( ex )

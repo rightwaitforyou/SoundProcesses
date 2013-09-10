@@ -2,11 +2,11 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.{stm, expr, bitemp, event => evt}
 import stm.Cursor
-import de.sciss.synth.expr.{SpanLikes, ExprImplicits, Longs}
 import bitemp.BiGroup
 import expr.Expr
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.synth.expr.{SpanLikes, Longs}
 
 object BiGroupTest {
   def apply(): BiGroupTest[InMemory] = new BiGroupTest(InMemory())

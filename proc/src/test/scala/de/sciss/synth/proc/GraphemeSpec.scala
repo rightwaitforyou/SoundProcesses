@@ -2,17 +2,15 @@ package de.sciss
 package synth
 package proc
 
-import lucre.expr.Expr
 import collection.immutable.{IndexedSeq => Vec}
-import expr.{Doubles, Longs}
 import span.Span
 import de.sciss.synth.Curve.{parametric, step, welch, sine, exponential, linear}
+import de.sciss.lucre.synth.expr.{Doubles, Longs}
 
-/**
- * To run only this suite:
- *
- * test-only de.sciss.synth.proc.GraphemeSpec
- */
+/** To run only this suite:
+  *
+  * test-only de.sciss.synth.proc.GraphemeSpec
+  */
 class GraphemeSpec extends ConfluentEventSpec {
   import imp._
 
@@ -29,11 +27,11 @@ class GraphemeSpec extends ConfluentEventSpec {
     }
 
     val (e1, e2, e3, e4, e5) = system.step { implicit tx =>
-      ((    0L -> Value.Curve(441.0 -> linear))               : TimedElem[S],
-       (10000L -> Value.Curve(882.0 -> exponential))          : TimedElem[S],
-       (20000L -> Value.Curve(123.4 -> sine , 567.8 -> sine)) : TimedElem[S],
-       (30000L -> Value.Curve(987.6 -> welch, 543.2 -> step)) : TimedElem[S],
-       (20000L -> Value.Curve(500.0 -> parametric(-4f)))      : TimedElem[S]
+      (    0L -> Value.Curve(441.0 -> linear)               : TimedElem[S],
+       10000L -> Value.Curve(882.0 -> exponential)          : TimedElem[S],
+       20000L -> Value.Curve(123.4 -> sine, 567.8 -> sine)  : TimedElem[S],
+       30000L -> Value.Curve(987.6 -> welch, 543.2 -> step) : TimedElem[S],
+       20000L -> Value.Curve(500.0 -> parametric(-4f))      : TimedElem[S]
       )
     }
 
@@ -126,72 +124,72 @@ class GraphemeSpec extends ConfluentEventSpec {
          assert( g.debugList() === Nil )
       }
 
-      // ok, now test with non-constant expressions
-      system.step { implicit tx =>
-         val g       = gH()
-         val time1   = Longs.newVar[ S ](      0L)
-         val mag1    = Doubles.newVar[ S ]( 1234.5)
-         val value1  = Elem.Curve( mag1 -> linear)
-         val elem1: TimedElem[ S ] = time1 -> value1
+    // ok, now test with non-constant expressions
+    system.step { implicit tx =>
+      val g       = gH()
+      val time1   = Longs.newVar[S](0L)
+      val mag1    = Doubles.newVar[S](1234.5)
+      val value1  = Elem.Curve(mag1 -> linear)
+      val elem1: TimedElem[S] = time1 -> value1
 
-         val time2   = Longs.newVar[ S ]( 10000L )
-         val mag2    = Doubles.newVar[ S ]( 6789.0 )
-         val value2  = Elem.Curve( mag2 -> linear )
-         val elem2: TimedElem[ S ] = time2 -> value2
+      val time2   = Longs.newVar[S](10000L)
+      val mag2    = Doubles.newVar[S](6789.0)
+      val value2  = Elem.Curve(mag2 -> linear)
+      val elem2: TimedElem[S] = time2 -> value2
 
-         val time3   = time2 + 1000L
-         val mag3    = mag1 + 1000.0
-         val value3  = Elem.Curve( mag3 -> linear )
-         val elem3: TimedElem[ S ] = time3 -> value3
+      val time3   = time2 + 1000L
+      val mag3    = mag1 + 1000.0
+      val value3  = Elem.Curve(mag3 -> linear)
+      val elem3: TimedElem[S] = time3 -> value3
 
-         g.add( elem1 )
-         g.add( elem2 )
-         g.add( elem3 )
+      g.add(elem1)
+      g.add(elem2)
+      g.add(elem3)
 
-        obs.assertEquals(
-          Update(g, Vec(
-            Segment.Const(Span.from(0L), Vector(1234.5))
-          )),
-          Update(g, Vec(
-            Segment.Curve(Span(0L, 10000L), Vector((1234.5, 6789.0, linear))),
-            Segment.Const(Span.from(10000L), Vector(6789.0))
-          )),
-          Update(g, Vec(
-            Segment.Curve(Span(10000L, 11000L), Vector((6789.0, 2234.5, linear))),
-            Segment.Const(Span.from(11000L), Vector(2234.5))
-          ))
-        )
-        obs.clear()
+      obs.assertEquals(
+        Update(g, Vec(
+          Segment.Const(Span.from(0L), Vector(1234.5))
+        )),
+        Update(g, Vec(
+          Segment.Curve(Span(0L, 10000L), Vector((1234.5, 6789.0, linear))),
+          Segment.Const(Span.from(10000L), Vector(6789.0))
+        )),
+        Update(g, Vec(
+          Segment.Curve(Span(10000L, 11000L), Vector((6789.0, 2234.5, linear))),
+          Segment.Const(Span.from(11000L), Vector(2234.5))
+        ))
+      )
+      obs.clear()
 
-         time1() = 2000L
-         obs.assertEquals(
-            Update( g, Vec(
-               Segment.Undefined( Span( 0L, 2000L )),
-               Segment.Curve( Span( 2000L, 10000L ), Vector( (1234.5, 6789.0, linear) ))
-            ))
-         )
-//         obs.print()
-         obs.clear()
+      time1() = 2000L
+      obs.assertEquals(
+        Update(g, Vec(
+          Segment.Undefined(Span(0L, 2000L)),
+          Segment.Curve(Span(2000L, 10000L), Vector((1234.5, 6789.0, linear)))
+        ))
+      )
+      //         obs.print()
+      obs.clear()
 
-         mag1() = 666.6
-         obs.assertEquals(
-            Update( g, Vec (
-               Segment.Curve( Span( 2000L, 10000L ), Vector( (666.6, 6789.0, linear) )),
-               Segment.Curve( Span( 10000L, 11000L ), Vector( (6789.0, 1666.6, linear) )),
-               Segment.Const( Span.from( 11000L ), Vector( 1666.6 ))
-            ))
-         )
-         obs.clear()
+      mag1() = 666.6
+      obs.assertEquals(
+        Update(g, Vec(
+          Segment.Curve(Span(2000L, 10000L), Vector((666.6, 6789.0, linear))),
+          Segment.Curve(Span(10000L, 11000L), Vector((6789.0, 1666.6, linear))),
+          Segment.Const(Span.from(11000L), Vector(1666.6))
+        ))
+      )
+      obs.clear()
 
-         time2() = 11000L
-         obs.assertEquals(
-            Update( g, Vec (
-               Segment.Curve( Span( 2000L, 11000L ), Vector( (666.6, 6789.0, linear) )),
-               Segment.Curve( Span( 11000L, 12000L ), Vector( (6789.0, 1666.6, linear) )),
-               Segment.Const( Span.from( 12000L ), Vector( 1666.6 ))
-            ))
-         )
-         obs.clear()
-      }
-   }
+      time2() = 11000L
+      obs.assertEquals(
+        Update(g, Vec(
+          Segment.Curve(Span(2000L, 11000L), Vector((666.6, 6789.0, linear))),
+          Segment.Curve(Span(11000L, 12000L), Vector((6789.0, 1666.6, linear))),
+          Segment.Const(Span.from(12000L), Vector(1666.6))
+        ))
+      )
+      obs.clear()
+    }
+  }
 }

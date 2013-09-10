@@ -14,9 +14,9 @@ import de.sciss.synth.Curve.linear
 import de.sciss.synth
 import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
-import synth.expr.{SpanLikes, Longs, ExprImplicits}
 import synth.SynthGraph
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{InMemory, Sys}
+import de.sciss.lucre.synth.expr.{Longs, SpanLikes}
 
 object VisTest {
   def apply(): VisTest[InMemory, InMemory] = {

@@ -2,9 +2,8 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.stm
-import expr.ExprImplicits
 import de.sciss.span.Span
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{InMemory, Sys}
 
 object ScansTest extends App {
   val AURAL = false

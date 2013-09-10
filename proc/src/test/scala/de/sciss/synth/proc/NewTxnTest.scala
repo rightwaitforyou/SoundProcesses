@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.synth
 import synth.SynthGraph
-import de.sciss.lucre.synth.{ProcDemiurg, Synth, Server}
+import de.sciss.lucre.synth.{InMemory, ProcDemiurg, Synth, Server}
 
 object NewTxnTest extends App {
    val sys = InMemory()

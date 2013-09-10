@@ -2,11 +2,10 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.stm
-import stm.store.BerkeleyDB
 import ugen._
-import expr.ExprImplicits
 import de.sciss.span.Span
 import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.stm.store.BerkeleyDB
 
 object PatchTest extends App {
 

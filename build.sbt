@@ -24,13 +24,7 @@ lazy val lucreConfluentVersion  = "2.5.+"
 
 lazy val scalaColliderVersion   = "1.9.+"
 
-//libraryDependencies ++= {
-//  Seq(
-//    "de.sciss" %  "prefuse-core"    % "0.21",
-//    "de.sciss"      %% "lucrestm-bdb" % lucreCoreVersion % "test",
-//    "org.scalatest" %% "scalatest"    % "1.9.1"    % "test"
-//  )
-//}
+lazy val scalaTestVersion       = "1.9.1"
 
 retrieveManaged := true
 
@@ -87,17 +81,22 @@ lazy val `soundprocesses-full` = project.in(file("."))
 lazy val lucrebitemp = project.in(file("bitemp")).settings(
   description := "Bitemporal Lucre extensions using Long expressions for time",
   libraryDependencies ++= Seq(
-    "de.sciss" %% "lucredata-core"  % lucreDataVersion,
-    "de.sciss" %% "lucreevent-expr" % lucreEventVersion,
-    "de.sciss" %% "span"            % "1.2.+"
+    "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
+    "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
+    "de.sciss"      %% "span"            % "1.2.+"
+    // "de.sciss"      %% "lucrestm-bdb"    % lucreCoreVersion % "test",
+    // "org.scalatest" %% "scalatest"       % "1.9.1"          % "test"
   )
 )
 
 lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitemp).settings(
   description := "Bitemporal expression types for SoundProcesses",
   libraryDependencies ++= Seq(
-    "de.sciss" %% "scalacollider" % scalaColliderVersion,
-    "de.sciss" %% "numbers"       % "0.1.+"
+    "de.sciss"      %% "scalacollider"  % scalaColliderVersion,
+    "de.sciss"      %% "numbers"        % "0.1.+",
+    "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
+    "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
+    "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion % "test"
   )
 )
 
@@ -113,7 +112,9 @@ lazy val lucresynth = project.in(file("synth")).settings(
 lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`).settings(
   description :=  "A framework for creating and managing ScalaCollider based sound processes",
   libraryDependencies ++= Seq(
-    "de.sciss" %% "lucreconfluent"  % lucreConfluentVersion
+    "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
+    "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
+    "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test"
   )
 )
 

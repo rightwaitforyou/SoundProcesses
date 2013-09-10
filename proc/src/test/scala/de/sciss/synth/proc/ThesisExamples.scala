@@ -2,10 +2,9 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.synth.expr.{Longs, ExprImplicits, Ints}
-import lucre.{event => evt}
 import de.sciss.span.Span
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{InMemory, Sys}
+import de.sciss.lucre.synth.expr.{Longs, Ints}
 
 object ThesisExamples extends App {
   playScans()

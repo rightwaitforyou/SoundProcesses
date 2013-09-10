@@ -6,7 +6,6 @@ import ugen._
 import org.scalatest.FunSpec
 import de.sciss.serial.{DataInput, DataOutput}
 import de.sciss.synth.Curve.cubed
-import de.sciss.lucre.synth.impl.SynthGraphSerializer
 
 /**
  * To run only this suite:
@@ -261,9 +260,9 @@ class SynthGraphSerializationSpec extends FunSpec {
     describe(s"SynthGraph '$name' ") {
       it("should serialize and de-serialize") {
         val out = DataOutput()
-        SynthGraphSerializer.write(graph, out)
+        SynthGraphs.ValueSerializer.write(graph, out)
         val in  = DataInput(out.toByteArray)
-        val res = SynthGraphSerializer.read(in)
+        val res = SynthGraphs.ValueSerializer.read(in)
         assert(res === graph)
       }
     }
