@@ -42,7 +42,6 @@ import de.sciss.synth.proc.Scan.Link
 import scala.util.control.NonFatal
 import de.sciss.lucre.synth.{ProcDemiurg, ProcEdge, AuralProc, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, RichBus, RichAudioBus, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
-import de.sciss.lucre.synth.expr.CommonSerializers
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -487,7 +486,7 @@ object AuralPresentationImpl {
       val scans = timed.value.scans
       scans.iterator.foreach {
         case (key, scan) =>
-          import CommonSerializers.Identifier
+          import de.sciss.lucre.synth.expr.IdentifierSerializer
           scanMap.put(scan.id, key -> tx.newHandle(timedID))
       }
 

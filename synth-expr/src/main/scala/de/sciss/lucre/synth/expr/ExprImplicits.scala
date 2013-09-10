@@ -9,7 +9,6 @@ import language.implicitConversions
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.SynthGraph
 import de.sciss.synth
-import de.sciss.synth.proc.SynthGraphs
 
 object ExprImplicits {
   def apply[S <: Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
@@ -52,7 +51,8 @@ class ExprImplicits[S <: Sys[S]] protected /* extends ExprImplicits.LowPriority[
   implicit def spanLikeConst(s: SpanLike): Expr[S, SpanLike] = SpanLikes.newConst(s)
   implicit def spanLikeOps(ex: Expr[S, SpanLike])(implicit tx: S#Tx): SpanLikes.Ops[S] = new SpanLikes.Ops(ex)
 
-  implicit def synthGraphConst(s: SynthGraph): Expr[S, SynthGraph] = SynthGraphs.newConst(s)
+  // ...disabled in this sub project
+  // implicit def synthGraphConst(s: SynthGraph): Expr[S, SynthGraph] = SynthGraphs.newConst(s)
 
   implicit def curveConst(c: synth.Curve): Expr[S, synth.Curve] = Curves.newConst(c)
 
@@ -65,8 +65,6 @@ class ExprImplicits[S <: Sys[S]] protected /* extends ExprImplicits.LowPriority[
 
   implicit def biExprSer[A](implicit biType: BiType[A]) = BiExpr.serializer[S, A]
 
-  // ---- XXX TODO ...making package synth.expr a bad choice... ----
-
-  // RRR disabled in this sub project
+  // ...disabled in this sub project
   // implicit def graphemeConst(v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Elem.newConst(v)
 }

@@ -23,7 +23,8 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
+package de.sciss
+package lucre.synth
 
 import concurrent.stm.Ref
 import de.sciss.synth.addBefore
@@ -157,12 +158,10 @@ sealed trait AuralProc /* extends Writer */ {
   /** Warning: This is strictly for the builder to update the bus users, and it must be
     * called within the same transaction that the aural proc was created.
     */
-  // RRR
-  /* private[impl] */ def setBusUsers(users: List[DynamicBusUser]): Unit
+  private[sciss] def setBusUsers(users: List[DynamicBusUser]): Unit
 
   // dito
-  // RRR
-  /* private[impl] */ def addInputBus(key: String, bus: RichAudioBus): Unit
+  private[sciss] def addInputBus(key: String, bus: RichAudioBus): Unit
 
   // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
 }

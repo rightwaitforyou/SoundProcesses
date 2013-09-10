@@ -9,7 +9,6 @@ import de.sciss.lucre.event.{Pull, Targets}
 import de.sciss.lucre.synth.expr.{Curves, Doubles, BiTypeImpl, Longs}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
-import de.sciss.lucre.synth.expr.CommonSerializers
 
 object FadeSpec {
   private final val COOKIE = 0x4664 // 'Fd'
@@ -20,7 +19,7 @@ object FadeSpec {
         import v._
         out.writeShort(COOKIE)
         out.writeLong (numFrames)
-        CommonSerializers.Curve.write(curve, out)
+        Curves.ValueSerializer.write(curve, out)
         out.writeFloat(floor)
       }
 
@@ -28,7 +27,7 @@ object FadeSpec {
         val cookie = in.readShort()
         require(cookie == COOKIE, s"Unexpected cookie $cookie, expected $COOKIE")
         val numFrames = in.readLong()
-        val curve     = CommonSerializers.Curve.read(in)
+        val curve     = Curves.ValueSerializer.read(in)
         val floor     = in.readFloat()
         Value(numFrames = numFrames, curve = curve, floor = floor)
       }

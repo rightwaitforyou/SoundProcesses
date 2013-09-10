@@ -37,6 +37,7 @@ import annotation.tailrec
 import de.sciss.span.Span
 import de.sciss.serial.{DataOutput, DataInput}
 import de.sciss.lucre.synth.expr.Longs
+import de.sciss.lucre.synth.InMemory
 
 object GraphemeImpl {
   import Grapheme.{Elem, TimedElem, Value, Modifiable}
@@ -57,17 +58,17 @@ object GraphemeImpl {
   implicit def modifiableSerializer[S <: synth.Sys[S]]: evt.NodeSerializer[S, Grapheme.Modifiable[S]] =
     anySer.asInstanceOf[evt.NodeSerializer[S, Grapheme.Modifiable[S]]] // whatever...
 
-  private val anySer = new Ser[evt.InMemory]
+  private val anySer = new Ser[InMemory]
 
   //   private val anyModSer   = new ModSer[ evt.InMemory ]
 
-  private final class Ser[ S <: synth.Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme[ S ]] {
-      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme[ S ] = {
-         implicit val elemType = Elem // .serializer[ S ]
-         val pin = BiPin.Modifiable.read[ S, Value ]( in, access )
-         new Impl( targets, pin )
-      }
-   }
+  private final class Ser[S <: synth.Sys[S]] extends evt.NodeSerializer[S, Grapheme[S]] {
+    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Grapheme[S] = {
+      implicit val elemType = Elem // .serializer[ S ]
+      val pin = BiPin.Modifiable.read[S, Value](in, access)
+      new Impl(targets, pin)
+    }
+  }
 
   //   private final class ModSer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme.Modifiable[ S ]] {
   //      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : Grapheme.Modifiable[ S ] = {
@@ -77,7 +78,7 @@ object GraphemeImpl {
   //      }
   //   }
 
-  def modifiable[ S <: synth.Sys[ S ]]( implicit tx: S#Tx ) : Modifiable[ S ] = {
+  def modifiable[S <: synth.Sys[S]](implicit tx: S#Tx): Modifiable[S] = {
     val targets = evt.Targets[S] // XXX TODO: partial?
     implicit val elemType = Elem
     val pin = BiPin.Modifiable[S, Value]

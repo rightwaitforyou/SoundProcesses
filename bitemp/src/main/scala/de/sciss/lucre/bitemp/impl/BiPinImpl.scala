@@ -259,12 +259,17 @@ object BiPinImpl {
 
     def clear()(implicit tx: S#Tx): Unit =
       if (isConnected) {
-        //            val changes = tree.iterator.toIndexedSeq.flatMap { case (spanVal, seq) =>
-        //               seq.map { case (_, elem) => BiPin.Removed( this, spanVal, elem )}
-        //            }
-        //            tree.clear()
-        //            changes.foreach( CollChanged.apply )
-        ???
+        val it = tree.iterator
+        if (it.hasNext) {
+          val changes = it.toIndexedSeq.flatMap {
+            case (spanVal, seq) =>
+             seq.map { elem =>
+               BiPin.Removed[S, A](spanVal -> elem.magValue, elem)
+             }
+          }
+          tree.clear()
+          CollChanged(BiPin.Update(this, changes))
+        }
 
       } else {
         tree.clear()
