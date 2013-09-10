@@ -1,35 +1,36 @@
-name := "SoundProcesses"
+name          := "SoundProcesses"
 
-version := "1.9.1"
+version       := "2.0.0-SNAPSHOT"
 
-organization := "de.sciss"
+organization  := "de.sciss"
 
-homepage <<= name { n => Some(url("https://github.com/Sciss/" + n)) }
+homepage      := Some(url("https://github.com/Sciss/" + name.value))
 
-description := "A framework for creating and managing ScalaCollider based sound processes"
+description   := "A framework for creating and managing ScalaCollider based sound processes"
 
-licenses := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
+licenses      := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion := "2.10.2"
+scalaVersion  := "2.10.2"
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-libraryDependencies += "de.sciss" %% "lucredata-core" % "2.2.1+"  // debugSanitize!
+lazy val lucreCoreVersion       = "2.0.+"
 
-libraryDependencies ++= {
-  val confluentVersion = "2.5.+"
-  val eventVersion     = "2.4.+"
-  val stmVersion       = "2.0.+"
-  Seq(
-    "de.sciss" %% "scalacollider"   % "1.9.+",
-    "de.sciss" %  "prefuse-core"    % "0.21",
-    "de.sciss" %% "lucreconfluent"  % confluentVersion,
-    "de.sciss" %% "lucreevent-expr" % eventVersion,
-    "de.sciss" %% "span"            % "1.2.+",
-    "de.sciss"      %% "lucrestm-bdb" % stmVersion % "test",
-    "org.scalatest" %% "scalatest"    % "1.9.1"    % "test"
-  )
-}
+lazy val lucreDataVersion       = "2.2.1+"   // debugSanitize!
+
+lazy val lucreEventVersion      = "2.4.+"
+
+lazy val lucreConfluentVersion  = "2.5.+"
+
+lazy val scalaColliderVersion   = "1.9.+"
+
+//libraryDependencies ++= {
+//  Seq(
+//    "de.sciss" %  "prefuse-core"    % "0.21",
+//    "de.sciss"      %% "lucrestm-bdb" % lucreCoreVersion % "test",
+//    "org.scalatest" %% "scalatest"    % "1.9.1"    % "test"
+//  )
+//}
 
 retrieveManaged := true
 
@@ -71,6 +72,51 @@ initialCommands in console :=
      |t { implicit tx => g.add( 0L, curve( 456.7 ))}
      |""".stripMargin + "\"\"\")"
 
+// ---- sub-projects ----
+
+lazy val `soundprocesses-full` = project.in(file("."))
+  .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
+  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
+  .settings(
+    publishArtifact in(Compile, packageBin) := false, // there are no binaries
+    publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
+    publishArtifact in(Compile, packageSrc) := false, // there are no sources
+    autoScalaLibrary := false
+  )
+
+lazy val lucrebitemp = project.in(file("bitemp")).settings(
+  description := "Bitemporal Lucre extensions using Long expressions for time",
+  libraryDependencies ++= Seq(
+    "de.sciss" %% "lucredata-core"  % lucreDataVersion,
+    "de.sciss" %% "lucreevent-expr" % lucreEventVersion,
+    "de.sciss" %% "span"            % "1.2.+"
+  )
+)
+
+lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitemp).settings(
+  description := "Bitemporal expression types for SoundProcesses",
+  libraryDependencies ++= Seq(
+    "de.sciss" %% "scalacollider" % scalaColliderVersion,
+    "de.sciss" %% "numbers"       % "0.1.+"
+  )
+)
+
+lazy val lucresynth = project.in(file("synth")).settings(
+  description := "Transactional extension for ScalaCollider",
+  libraryDependencies ++= Seq(
+    // "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
+    "de.sciss" %% "lucreevent-expr" % lucreEventVersion,
+    "de.sciss" %% "scalacollider"   % scalaColliderVersion
+  )
+)
+
+lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`).settings(
+  description :=  "A framework for creating and managing ScalaCollider based sound processes",
+  libraryDependencies ++= Seq(
+    "de.sciss" %% "lucreconfluent"  % lucreConfluentVersion
+  )
+)
+
 // ---- build info ----
 
 buildInfoSettings
@@ -88,19 +134,18 @@ buildInfoPackage := "de.sciss.synth.proc"
 
 publishMavenStyle := true
 
-publishTo <<= version { v =>
-  Some(if (v endsWith "-SNAPSHOT")
+publishTo :=
+  Some(if (version.value endsWith "-SNAPSHOT")
     "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
   else
     "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
   )
-}
 
 publishArtifact in Test := false
 
 pomIncludeRepository := { _ => false }
 
-pomExtra <<= name { n =>
+pomExtra := { val n = name.value
 <scm>
   <url>git@github.com:Sciss/{n}.git</url>
   <connection>scm:git:git@github.com:Sciss/{n}.git</connection>
@@ -118,8 +163,8 @@ pomExtra <<= name { n =>
 
 seq(lsSettings :_*)
 
-(LsKeys.tags in LsKeys.lsync) := Seq("sound", "music", "sound-synthesis", "computer-music")
+(LsKeys.tags   in LsKeys.lsync) := Seq("sound", "music", "sound-synthesis", "computer-music")
 
 (LsKeys.ghUser in LsKeys.lsync) := Some("Sciss")
 
-(LsKeys.ghRepo in LsKeys.lsync) <<= name(Some(_))
+(LsKeys.ghRepo in LsKeys.lsync) := Some(name.value)
