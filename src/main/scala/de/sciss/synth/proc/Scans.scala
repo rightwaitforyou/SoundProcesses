@@ -25,7 +25,7 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt, data}
+import de.sciss.lucre.data
 
 object Scans {
   trait Modifiable[S <: Sys[S]] extends Scans[S] {
