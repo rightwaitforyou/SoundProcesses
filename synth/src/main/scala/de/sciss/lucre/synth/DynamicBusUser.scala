@@ -26,50 +26,50 @@
 package de.sciss.lucre.synth
 
 import concurrent.stm.{Ref => ScalaRef}
-import de.sciss.synth.{ControlBus, AudioBus}
+import de.sciss.synth.{ControlBus => SControlBus, AudioBus => SAudioBus}
 
 trait DynamicBusUser /* extends Removable */ {
   def add   ()(implicit tx: Txn): Unit
   def remove()(implicit tx: Txn): Unit
 
-  def bus: RichBus
+  def bus: Bus
 }
 
 trait DynamicAudioBusUser extends DynamicBusUser {
-  def bus: RichAudioBus
-  def migrateTo(newBus: RichAudioBus)(implicit tx: Txn): DynamicAudioBusUser
+  def bus: AudioBus
+  def migrateTo(newBus: AudioBus)(implicit tx: Txn): DynamicAudioBusUser
 }
 
 trait DynamicControlBusUser extends DynamicBusUser {
-  def bus: RichControlBus
-  def migrateTo(newBus: RichControlBus)(implicit tx: Txn): DynamicControlBusUser
+  def bus: ControlBus
+  def migrateTo(newBus: ControlBus)(implicit tx: Txn): DynamicControlBusUser
 }
 
 object DynamicBusUser {
-  def reader(bus: RichAudioBus): DynamicAudioBusUser =
+  def reader(bus: AudioBus): DynamicAudioBusUser =
     new AudioReaderImpl(bus)
 
-  def reader(bus: RichControlBus): DynamicControlBusUser =
+  def reader(bus: ControlBus): DynamicControlBusUser =
     new ControlReaderImpl(bus)
 
-  def writer(bus: RichAudioBus): DynamicAudioBusUser =
+  def writer(bus: AudioBus): DynamicAudioBusUser =
     new AudioWriterImpl(bus)
 
-  def writer(bus: RichControlBus): DynamicControlBusUser =
+  def writer(bus: ControlBus): DynamicControlBusUser =
     new ControlWriterImpl(bus)
 
-  //   def readerWriter( bus: RichAudioBus ) : DynamicAudioBusUser =
+  //   def readerWriter( bus: AudioBus ) : DynamicAudioBusUser =
   //      new AudioReaderWriterImpl( bus )
 
-  //   def readerWriter( bus: RichControlBus ) : DynamicControlBusUser =
+  //   def readerWriter( bus: ControlBus ) : DynamicControlBusUser =
   //      new ControlReaderWriterImpl( bus )
 
-  private abstract class AbstractAudioImpl extends DynamicAudioBusUser with RichAudioBus.User {
+  private abstract class AbstractAudioImpl extends DynamicAudioBusUser with AudioBus.User {
     final val added = ScalaRef(initialValue = false)
 
-    final def busChanged(bus: AudioBus)(implicit tx: Txn) = ()
+    final def busChanged(bus: SAudioBus)(implicit tx: Txn) = ()
 
-    final def migrateTo(newBus: RichAudioBus)(implicit tx: Txn): DynamicAudioBusUser = {
+    final def migrateTo(newBus: AudioBus)(implicit tx: Txn): DynamicAudioBusUser = {
       require(newBus.numChannels == bus.numChannels)
       val wasAdded = added.get(tx.peer)
       if (wasAdded) remove()
@@ -78,29 +78,29 @@ object DynamicBusUser {
       res
     }
 
-    def newInstance(newBus: RichAudioBus): DynamicAudioBusUser
+    def newInstance(newBus: AudioBus): DynamicAudioBusUser
   }
 
-  private final class AudioReaderImpl(val bus: RichAudioBus) extends AbstractAudioImpl {
+  private final class AudioReaderImpl(val bus: AudioBus) extends AbstractAudioImpl {
     def add   ()(implicit tx: Txn): Unit = bus.addReader   (this)
     def remove()(implicit tx: Txn): Unit = bus.removeReader(this)
 
-    def newInstance(newBus: RichAudioBus): DynamicAudioBusUser = reader(newBus)
+    def newInstance(newBus: AudioBus): DynamicAudioBusUser = reader(newBus)
   }
 
-  private final class AudioWriterImpl(val bus: RichAudioBus) extends AbstractAudioImpl {
+  private final class AudioWriterImpl(val bus: AudioBus) extends AbstractAudioImpl {
     def add   ()(implicit tx: Txn): Unit = bus.addWriter   (this)
     def remove()(implicit tx: Txn): Unit = bus.removeWriter(this)
 
-    def newInstance(newBus: RichAudioBus): DynamicAudioBusUser = writer(newBus)
+    def newInstance(newBus: AudioBus): DynamicAudioBusUser = writer(newBus)
   }
 
-  private abstract class AbstractControlImpl extends DynamicControlBusUser with RichControlBus.User {
+  private abstract class AbstractControlImpl extends DynamicControlBusUser with ControlBus.User {
     final val added = ScalaRef(initialValue = false)
 
-    final def busChanged(bus: ControlBus)(implicit tx: Txn) = ()
+    final def busChanged(bus: SControlBus)(implicit tx: Txn) = ()
 
-    final def migrateTo(newBus: RichControlBus)(implicit tx: Txn): DynamicControlBusUser = {
+    final def migrateTo(newBus: ControlBus)(implicit tx: Txn): DynamicControlBusUser = {
       require(newBus.numChannels == bus.numChannels)
       val wasAdded = added.get(tx.peer)
       if (wasAdded) remove
@@ -109,20 +109,20 @@ object DynamicBusUser {
       res
     }
 
-    def newInstance(newBus: RichControlBus): DynamicControlBusUser
+    def newInstance(newBus: ControlBus): DynamicControlBusUser
   }
 
-  private final class ControlReaderImpl(val bus: RichControlBus) extends AbstractControlImpl {
+  private final class ControlReaderImpl(val bus: ControlBus) extends AbstractControlImpl {
     def add   ()(implicit tx: Txn): Unit = bus.addReader   (this)
     def remove()(implicit tx: Txn): Unit = bus.removeReader(this)
 
-    def newInstance(newBus: RichControlBus): DynamicControlBusUser = reader(newBus)
+    def newInstance(newBus: ControlBus): DynamicControlBusUser = reader(newBus)
   }
 
-  private final class ControlWriterImpl(val bus: RichControlBus) extends AbstractControlImpl {
+  private final class ControlWriterImpl(val bus: ControlBus) extends AbstractControlImpl {
     def add   ()(implicit tx: Txn): Unit = bus.addWriter   (this)
     def remove()(implicit tx: Txn): Unit = bus.removeWriter(this)
 
-    def newInstance(newBus: RichControlBus): DynamicControlBusUser = writer(newBus)
+    def newInstance(newBus: ControlBus): DynamicControlBusUser = writer(newBus)
   }
 }

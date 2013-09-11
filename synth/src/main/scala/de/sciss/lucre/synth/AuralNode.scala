@@ -1,5 +1,5 @@
 /*
- *  AuralProc.scala
+ *  AuralNode.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
@@ -29,11 +29,11 @@ package lucre.synth
 import concurrent.stm.Ref
 import de.sciss.synth.addBefore
 
-object AuralProc {
-  def apply(synth: Synth, outputBuses: Map[String, RichAudioBus])
-           (implicit tx: Txn): AuralProc = {
+object AuralNode {
+  def apply(synth: Synth, outputBuses: Map[String, AudioBus])
+           (implicit tx: Txn): AuralNode = {
     val res = new Impl(synth, outputBuses)
-    ProcDemiurg.addVertex(res)
+    NodeGraph.addNode(res)
     res
   }
 
@@ -48,12 +48,12 @@ object AuralProc {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl(synth: Synth, outBuses: Map[String, RichAudioBus])
-    extends AuralProc {
+  private final class Impl(synth: Synth, outBuses: Map[String, AudioBus])
+    extends AuralNode {
 
     private val groupsRef = Ref[Option[AllGroups]](None)
     private var busUsers  = List.empty[DynamicBusUser]
-    private var inBuses   = Map.empty[String, RichAudioBus]
+    private var inBuses   = Map.empty[String, AudioBus]
 
     override def toString = s"AuralProc($synth, outs = ${outBuses.mkString("(", ", ", ")")}, " +
       s"ins = ${inBuses.mkString("(", ", ", ")")}"
@@ -120,15 +120,15 @@ object AuralProc {
       val node = groupOption.getOrElse(synth)
       node.free()
       busUsers.foreach(_.remove())
-      ProcDemiurg.removeVertex(this)
+      NodeGraph.removeNode(this)
     }
 
-    def getInputBus (key: String): Option[RichAudioBus] = inBuses .get(key)
-    def getOutputBus(key: String): Option[RichAudioBus] = outBuses.get(key)
+    def getInputBus (key: String): Option[AudioBus] = inBuses .get(key)
+    def getOutputBus(key: String): Option[AudioBus] = outBuses.get(key)
 
     def setBusUsers(users: List[DynamicBusUser]): Unit = busUsers = users
 
-    def addInputBus(key: String, bus: RichAudioBus): Unit = inBuses += key -> bus
+    def addInputBus(key: String, bus: AudioBus): Unit = inBuses += key -> bus
 
     // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
     //   ?
@@ -136,7 +136,7 @@ object AuralProc {
   }
 }
 
-sealed trait AuralProc /* extends Writer */ {
+sealed trait AuralNode /* extends Writer */ {
   def server: Server
 
   /** Retrieves the main group of the Proc, or returns None if a group has not yet been assigned. */
@@ -152,8 +152,8 @@ sealed trait AuralProc /* extends Writer */ {
 
   def stop()(implicit tx: Txn): Unit
 
-  def getInputBus (key: String): Option[RichAudioBus]
-  def getOutputBus(key: String): Option[RichAudioBus]
+  def getInputBus (key: String): Option[AudioBus]
+  def getOutputBus(key: String): Option[AudioBus]
 
   /** Warning: This is strictly for the builder to update the bus users, and it must be
     * called within the same transaction that the aural proc was created.
@@ -161,7 +161,7 @@ sealed trait AuralProc /* extends Writer */ {
   private[sciss] def setBusUsers(users: List[DynamicBusUser]): Unit
 
   // dito
-  private[sciss] def addInputBus(key: String, bus: RichAudioBus): Unit
+  private[sciss] def addInputBus(key: String, bus: AudioBus): Unit
 
   // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
 }

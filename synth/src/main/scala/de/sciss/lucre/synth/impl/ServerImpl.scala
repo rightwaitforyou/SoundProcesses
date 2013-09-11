@@ -72,7 +72,7 @@ object ServerImpl {
       val futs  = filteredCommits
       _commits  = Vector.empty
       implicit val exec = peer.clientConfig.executionContext
-      ProcWorld.reduceFutures(futs)
+      NodeGraph.reduceFutures(futs)
     }
 
     def bundles(addDefaultGroup: Boolean): Vec[osc.Bundle] = sync.synchronized {

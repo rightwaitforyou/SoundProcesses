@@ -35,39 +35,29 @@ import de.sciss.synth.ugen.Constant
 import de.sciss.synth.ugen.ControlUGenOutProxy
 import de.sciss.synth.ugen.UGenOutProxy
 
-object ProcWorld {
-  var DEBUG = false
+final class NodeGraph(val server: Server) {
+  import NodeGraph._
 
-  def reduceFutures(futs: Vec[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
-    futs match {
-      case Vec()        => Future.successful()
-      case Vec(single)  => single
-      case more         => Future.reduce(futs)((_, _) => ())
-    }
-}
+  private type Topo = Topology[AuralNode, Edge]
 
-final class ProcWorld(val server: Server) {
-  import ProcWorld._
-
-  private type Topo = Topology[ AuralProc, ProcEdge ]
-  val ugenGraphs = Ref(Map.empty[ProcDemiurg.GraphEquality, SynthDef])
+  val ugenGraphs = Ref(Map.empty[NodeGraph.GraphEquality, SynthDef])
 
   private val topologyRef = Ref[Topo](Topology.empty)
 
-  def addProc(p: AuralProc)(implicit tx: Txn): Unit =
-    topologyRef.transform(_.addVertex(p))(tx.peer)
+  def addNode(node: AuralNode)(implicit tx: Txn): Unit =
+    topologyRef.transform(_.addVertex(node))(tx.peer)
 
-  def removeProc(p: AuralProc)(implicit tx: Txn): Unit =
-    topologyRef.transform(_.removeVertex(p))(tx.peer)
+  def removeNode(node: AuralNode)(implicit tx: Txn): Unit =
+    topologyRef.transform(_.removeVertex(node))(tx.peer)
 
-  def addEdge(e: ProcEdge)(implicit tx: Txn): Option[(Topo, AuralProc, Vec[AuralProc])] = {
-    val res = topologyRef.get(tx.peer).addEdge(e)
+  def addEdge(edge: Edge)(implicit tx: Txn): Option[(Topo, AuralNode, Vec[AuralNode])] = {
+    val res = topologyRef.get(tx.peer).addEdge(edge)
     res.foreach(tup => topologyRef.set(tup._1)(tx.peer))
     res
   }
 
-  def removeEdge(e: ProcEdge)(implicit tx: Txn): Unit =
-    topologyRef.transform(_.removeEdge(e))(tx.peer)
+  def removeEdge(edge: Edge)(implicit tx: Txn): Unit =
+    topologyRef.transform(_.removeEdge(edge))(tx.peer)
 
   private val msgStampRef     = Ref(0)
 
@@ -181,16 +171,25 @@ final class ProcWorld(val server: Server) {
   }
 }
 
-// MMM
-//case class ProcDemiurgUpdate( factoriesAdded: ISet[ ProcFactory ], factoriesRemoved: ISet[ ProcFactory ])
-
-object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
+object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
   demi =>
 
-  // MMM
-  //   type Update    = ProcDemiurgUpdate
-  //   type Listener  = TxnModel.Listener[ Update ]
+  var DEBUG = false
 
+  def reduceFutures(futures: Vec[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
+    futures match {
+      case Vec()        => Future.successful()
+      case Vec(single)  => single
+      case more         => Future.reduce(futures)((_, _) => ())
+    }
+  
+  final case class Edge(source: AuralNode, sourceKey: String, sink: AuralNode, sinkKey: String)
+    extends Topology.Edge[AuralNode] {
+    
+    def sourceVertex = source
+    def targetVertex = sink
+  }
+  
   var verbose = false
 
   private val servers     = TSet.empty[Server]
@@ -206,68 +205,39 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
     implicit val itx = tx.peer
     if (servers.contains(server)) return
     servers += server
-    worlds  += server -> new ProcWorld(server)
+    worlds  += server -> new NodeGraph(server)
   }
 
   def removeServer(server: Server)(implicit tx: Txn): Unit = {
     implicit val itx = tx.peer
     servers -= server
-    worlds -= server
+    worlds  -= server
   }
 
   // commented out for debugging inspection
-  private val worlds = TMap.empty[Server, ProcWorld]
+  private val worlds = TMap.empty[Server, NodeGraph]
 
-  // FFF
-  //   private val factoriesRef = Ref( Set.empty[ ProcFactory ])
-  //   def factories( implicit tx: Txn ) : Set[ ProcFactory ] = factoriesRef()
-
-  // MMM
-  //   protected def fullUpdate( implicit tx: Txn ) = ProcDemiurgUpdate( factoriesRef(), Set.empty )
-  //   protected def emptyUpdate = ProcDemiurgUpdate( Set.empty, Set.empty )
-
-  // FFF
-  //   def addFactory( pf: ProcFactory )( implicit tx: Txn ): Unit = {
-  //      touch
-  //      factoriesRef.transform( _ + pf )
-  //      updateRef.transform( u => if( u.factoriesRemoved.contains( pf )) {
-  //          u.copy( factoriesRemoved = u.factoriesRemoved - pf )
-  //      } else {
-  //          u.copy( factoriesAdded = u.factoriesAdded + pf )
-  //      })
-  //   }
-  //
-  //   def removeFactory( pf: ProcFactory )( implicit tx: Txn ): Unit = {
-  //      touch
-  //      factoriesRef.transform( _ - pf )
-  //      updateRef.transform( u => if( u.factoriesAdded.contains( pf )) {
-  //          u.copy( factoriesAdded = u.factoriesAdded - pf )
-  //      } else {
-  //          u.copy( factoriesRemoved = u.factoriesRemoved + pf )
-  //      })
-  //   }
-
-  def addVertex(e: AuralProc)(implicit tx: Txn): Unit = {
-    val world = worlds(e.server)(tx.peer)
-    world.addProc(e)
+  def addNode(node: AuralNode)(implicit tx: Txn): Unit = {
+    val world = worlds(node.server)(tx.peer)
+    world.addNode(node)
   }
 
-  def removeVertex(e: AuralProc)(implicit tx: Txn): Unit = {
-    val world = worlds(e.server)(tx.peer)
-    world.removeProc(e)
+  def removeNode(node: AuralNode)(implicit tx: Txn): Unit = {
+    val world = worlds(node.server)(tx.peer)
+    world.removeNode(node)
   }
 
-  def addEdge(e: ProcEdge)(implicit tx: Txn): Unit = {
-    val world                 = worlds(e.sourceVertex.server)(tx.peer)
-    val res                   = world.addEdge(e)
-    val (_, source, affected) = res.getOrElse(sys.error(s"Edge $e is cyclic"))
+  def addEdge(edge: Edge)(implicit tx: Txn): Unit = {
+    val world                 = worlds(edge.sourceVertex.server)(tx.peer)
+    val res                   = world.addEdge(edge)
+    val (_, source, affected) = res.getOrElse(sys.error(s"Edge $edge is cyclic"))
 
     // if (verbose) println("NEW TOPO = " + newTopo + "; SOURCE = " + source + "; AFFECTED = " + affected)
     if (affected.isEmpty) return
 
     val srcGroup  = source.groupOption
     val tgtGroups = affected.map(p => (p, p.groupOption))
-    val isAfter   = source == e.sourceVertex
+    val isAfter   = source == edge.sourceVertex
 
     def startMoving(g: Group): Unit = {
       var succ = g
@@ -304,9 +274,9 @@ object ProcDemiurg /* MMM extends TxnModel[ ProcDemiurgUpdate ] */ {
     }
   }
 
-  def removeEdge(e: ProcEdge)(implicit tx: Txn): Unit = {
-    val world = worlds(e.sourceVertex.server)(tx.peer)
-    world.removeEdge(e)
+  def removeEdge(edge: Edge)(implicit tx: Txn): Unit = {
+    val world = worlds(edge.sourceVertex.server)(tx.peer)
+    world.removeEdge(edge)
   }
 
   private def allCharsOk(name: String): Boolean = {

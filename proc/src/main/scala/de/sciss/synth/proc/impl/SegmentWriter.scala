@@ -23,17 +23,16 @@
  *  contact@sciss.de
  */
 
-package de.sciss
-package synth
-package proc
+package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.Curve.parametric
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.lucre.synth.{DynamicBusUser, RichAudioBus, Synth, Resource, Txn}
+import de.sciss.lucre.synth.{DynamicBusUser, AudioBus, Synth, Resource, Txn}
+import de.sciss.synth.{addToHead, ControlSetMap, SynthGraph}
 
 object SegmentWriter {
-  def apply(bus: RichAudioBus, segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
+  def apply(bus: AudioBus, segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
            (implicit tx: Txn): SegmentWriter = {
 
     val (usesShape, sg) = graph(segm)
@@ -47,6 +46,7 @@ object SegmentWriter {
   private def graph(segm: Grapheme.Segment.Curve): (Boolean, SynthGraph) = {
     var usesShape = false // XXX TODO dirty variable
     val sg = SynthGraph {
+      import de.sciss.synth._
       import ugen._
 
       val zero        = Vec.fill(segm.numChannels)(0f)
@@ -82,7 +82,7 @@ object SegmentWriter {
     (usesShape, sg)
   }
 }
-final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: RichAudioBus,
+final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: AudioBus,
                                    segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
   extends DynamicBusUser with Resource.Source {
 

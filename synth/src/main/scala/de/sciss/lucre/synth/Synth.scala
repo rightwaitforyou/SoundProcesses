@@ -32,7 +32,7 @@ import impl.{SynthImpl => Impl}
 
 object Synth {
   def apply(server: Server, graph: SynthGraph, nameHint: Option[String] = None)(implicit tx: Txn): Synth = {
-    val df = ProcDemiurg.getSynthDef(server, graph, nameHint)
+    val df = NodeGraph.getSynthDef(server, graph, nameHint)
     create(df)
   }
 
@@ -46,7 +46,7 @@ object Synth {
 
   /* private[synth] */ def expanded(server: Server, graph: UGenGraph, nameHint: Option[String] = None)
                             (implicit tx: Txn): Synth = {
-    val df = ProcDemiurg.getSynthDef(server, graph, nameHint)
+    val df = NodeGraph.getSynthDef(server, graph, nameHint)
     create(df)
   }
 

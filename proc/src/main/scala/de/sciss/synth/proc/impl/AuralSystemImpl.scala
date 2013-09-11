@@ -31,7 +31,7 @@ import scala.concurrent.stm.{TxnExecutor, Ref}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.{Server => SServer, ServerLike => SServerLike, ServerConnection}
 import TxnExecutor.{defaultAtomic => atomic}
-import de.sciss.lucre.synth.{ProcDemiurg, Server, Txn}
+import de.sciss.lucre.synth.{NodeGraph, Server, Txn}
 
 object AuralSystemImpl {
   import AuralSystem.Client
@@ -74,7 +74,7 @@ object AuralSystemImpl {
         implicit val ptx = Txn.wrap(itx)
         connection() = Some(rich.peer)
         server.set(Some(rich))
-        ProcDemiurg.addServer(rich) // ( ProcTxn()( tx ))
+        NodeGraph.addServer(rich) // ( ProcTxn()( tx ))
         clients()
       }
       cs.foreach(_.started(rich))
@@ -119,7 +119,7 @@ object AuralSystemImpl {
             val so = server.swap(None)
             so.foreach { rich =>
               implicit val ptx = Txn.wrap(itx)
-              ProcDemiurg.removeServer(rich) // ( ProcTxn()( tx ))
+              NodeGraph.removeServer(rich) // ( ProcTxn()( tx ))
             }
             so.map(_ -> clients())
           case _ => None

@@ -52,7 +52,7 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
   final protected def flush(): Unit =
     bundlesMap.foreach { case (server, bundles) =>
       log("flush " + server + " -> " + bundles.payload.size + " bundles")
-      ProcDemiurg.send(server, bundles)
+      NodeGraph.send(server, bundles)
     }
 
   protected def markBundlesDirty(): Unit
@@ -67,7 +67,7 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
     require(rsrcStampOld >= 0, "Already disposed : " + resource)
 
     implicit val itx  = peer
-    val txnCnt        = ProcDemiurg.messageTimeStamp(server)(tx)
+    val txnCnt        = NodeGraph.messageTimeStamp(server)(tx)
     val txnStopCnt    = txnCnt.get
     val bOld          = bundlesMap.getOrElse(server, noBundles)
     val txnStartCnt   = txnStopCnt - bOld.payload.size

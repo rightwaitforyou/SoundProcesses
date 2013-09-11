@@ -27,12 +27,12 @@ package de.sciss.synth.proc
 package impl
 
 import collection.immutable.{Seq => ISeq}
-import de.sciss.lucre.synth.{DynamicBusUser, RichAudioBus, Buffer, Synth, Resource, Txn}
-import de.sciss.synth.{addToHead, ControlSetMap, freeSelf, ugen, SynthGraph}
+import de.sciss.lucre.synth.{AudioBus, DynamicBusUser, Buffer, Synth, Resource, Txn}
+import de.sciss.synth.{addToHead, ControlSetMap, SynthGraph}
 import de.sciss.span.Span
 
 object AudioArtifactWriter {
-  def apply(bus: RichAudioBus, segm: Grapheme.Segment.Audio, time: Long, sampleRate: Double)
+  def apply(bus: AudioBus, segm: Grapheme.Segment.Audio, time: Long, sampleRate: Double)
            (implicit tx: Txn): AudioArtifactWriter = {
     val numChannels = segm.numChannels
     // val bus         = RichBus.audio(server, numChannels)
@@ -53,7 +53,7 @@ object AudioArtifactWriter {
     res
   }
 }
-final class AudioArtifactWriter private (synth: Synth, val bus: RichAudioBus, segm: Grapheme.Segment.Audio, time: Long,
+final class AudioArtifactWriter private (synth: Synth, val bus: AudioBus, segm: Grapheme.Segment.Audio, time: Long,
                                          sampleRate: Double)
   extends DynamicBusUser with Resource.Source {
 

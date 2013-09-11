@@ -26,19 +26,19 @@
 package de.sciss.lucre.synth
 
 import collection.immutable.{SortedMap => ISortedMap}
-import de.sciss.synth.{AudioBus, AudioRated, Bus, ControlBus, ControlRated, Rate}
+import de.sciss.synth.{AudioBus => SAudioBus, AudioRated, Bus => SBus, ControlBus => SControlBus, ControlRated, Rate}
 import concurrent.stm.{Ref => ScalaRef}
 
-sealed trait RichBus {
+sealed trait Bus {
   def server: Server
   def numChannels: Int
   def rate: Rate
 }
 
-object RichAudioBus {
+object AudioBus {
   /**
    *    A consumer reading or writing from an audio bus.
-   *    Since a RichAudioBus is a meta structure, the
+   *    Since a AudioBus is a meta structure, the
    *    underlying audio bus may change due to optimization.
    *    In this case the consumer is asked to update its
    *    data. Also initial bus allocation is lazy, therefore
@@ -46,15 +46,15 @@ object RichAudioBus {
    *    bus implementation will push its initial allocation
    *    information to the user.
    */
-  trait User /* extends RichBus.User */ {
-    def busChanged(bus: AudioBus)(implicit tx: Txn): Unit
+  trait User /* extends Bus.User */ {
+    def busChanged(bus: SAudioBus)(implicit tx: Txn): Unit
   }
 }
 
-trait RichAudioBus extends RichBus with AudioRated {
-  import RichAudioBus._
+trait AudioBus extends Bus with AudioRated {
+  import AudioBus._
 
-  def busOption(implicit tx: Txn): Option[AudioBus]
+  def busOption(implicit tx: Txn): Option[SAudioBus]
 
   /**
    *    Adds a reading consumer to the bus. Note that
@@ -107,16 +107,16 @@ trait RichAudioBus extends RichBus with AudioRated {
   def removeWriter(u: User)(implicit tx: Txn): Unit
 }
 
-object RichControlBus {
-  trait User /* extends RichBus.User */ {
-    def busChanged(bus: ControlBus)(implicit tx: Txn): Unit
+object ControlBus {
+  trait User /* extends Bus.User */ {
+    def busChanged(bus: SControlBus)(implicit tx: Txn): Unit
   }
 }
 
-trait RichControlBus extends RichBus with ControlRated {
-  import RichControlBus._
+trait ControlBus extends Bus with ControlRated {
+  import ControlBus._
 
-  def busOption(implicit tx: Txn): Option[ControlBus]
+  def busOption(implicit tx: Txn): Option[SControlBus]
 
   /**
    *    Adds a reading consumer to the bus. Note that
@@ -157,7 +157,7 @@ trait RichControlBus extends RichBus with ControlRated {
   def removeWriter(u: User)(implicit tx: Txn): Unit
 }
 
-object RichBus {
+object Bus {
   //   trait User {
   //      def busChanged( bus: Bus )( implicit tx: Txn ) : Unit
   //   }
@@ -167,8 +167,8 @@ object RichBus {
    *    there can be situations of semi-orphaned buses (only one reader or
    *    only one writer left).
    */
-  def audio  (server: Server, numChannels: Int): RichAudioBus   = new AudioImpl  (server, numChannels)
-  def control(server: Server, numChannels: Int): RichControlBus = new ControlImpl(server, numChannels)
+  def audio  (server: Server, numChannels: Int): AudioBus   = new AudioImpl  (server, numChannels)
+  def control(server: Server, numChannels: Int): ControlBus = new ControlImpl(server, numChannels)
 
   /**
    *    Constructs a new audio bus proxy for use in a short-term temporary fashion.
@@ -180,21 +180,21 @@ object RichBus {
    *    bus re-assignments causing further busChanged notifications (which would go
    *    to concurrently freed nodes).
    */
-  def tmpAudio(server: Server, numChannels: Int): RichAudioBus = new TempAudioImpl(server, numChannels)
+  def tmpAudio(server: Server, numChannels: Int): AudioBus = new TempAudioImpl(server, numChannels)
 
-  def soundIn(server: Server, numChannels: Int, offset: Int = 0): RichAudioBus = {
+  def soundIn(server: Server, numChannels: Int, offset: Int = 0): AudioBus = {
     val o = server.peer.config
     require(offset + numChannels <= o.inputBusChannels, "soundIn - offset is beyond allocated hardware channels")
-    FixedImpl(server, AudioBus(server.peer, index = o.outputBusChannels + offset, numChannels = numChannels))
+    FixedImpl(server, SAudioBus(server.peer, index = o.outputBusChannels + offset, numChannels = numChannels))
   }
 
-  def soundOut(server: Server, numChannels: Int, offset: Int = 0): RichAudioBus = {
+  def soundOut(server: Server, numChannels: Int, offset: Int = 0): AudioBus = {
     val o = server.peer.config
     require(offset + numChannels <= o.outputBusChannels, "soundOut - offset is beyond allocated hardware channels")
-    FixedImpl(server, AudioBus(server.peer, index = offset, numChannels = numChannels))
+    FixedImpl(server, SAudioBus(server.peer, index = offset, numChannels = numChannels))
   }
 
-  def wrap(server: Server, bus: AudioBus): RichAudioBus = {
+  def wrap(server: Server, bus: SAudioBus): AudioBus = {
     require(server.peer == bus.server)
     FixedImpl(server, bus)
   }
@@ -205,7 +205,7 @@ object RichBus {
 
   var verbose = false
 
-  private sealed trait BusHolder[T <: Bus] {
+  private sealed trait BusHolder[T <: SBus] {
     def peer: T
 
     //      def server: Server
@@ -238,25 +238,25 @@ object RichBus {
     protected def remove()(implicit tx: Txn): Unit
   }
 
-  private type AudioBusHolder   = BusHolder[AudioBus  ]
-  private type ControlBusHolder = BusHolder[ControlBus]
+  private type AudioBusHolder   = BusHolder[SAudioBus  ]
+  private type ControlBusHolder = BusHolder[SControlBus]
 
   private type ABusHolderMap = Map[Server, ISortedMap[Int, AudioBusHolder]]
 
-  private final class PlainAudioBusHolder(server: Server, val peer: AudioBus)
-    extends BusHolder[AudioBus] {
+  private final class PlainAudioBusHolder(server: Server, val peer: SAudioBus)
+    extends BusHolder[SAudioBus] {
     protected def remove()(implicit tx: Txn): Unit =
       server.freeAudioBus(peer.index, peer.numChannels)
   }
 
-  private final class PlainControlBusHolder(server: Server, val peer: ControlBus)
-    extends BusHolder[ControlBus] {
+  private final class PlainControlBusHolder(server: Server, val peer: SControlBus)
+    extends BusHolder[SControlBus] {
 
     protected def remove()(implicit tx: Txn): Unit =
       server.freeControlBus(peer.index, peer.numChannels)
   }
 
-  private final class RichAudioBusHolder(val server: Server, val peer: AudioBus, mapScalaRef: ScalaRef[ABusHolderMap])
+  private final class AudioBusHolderImpl(val server: Server, val peer: SAudioBus, mapScalaRef: ScalaRef[ABusHolderMap])
     extends AudioBusHolder {
 
     def add()(implicit tx: Txn): Unit =
@@ -282,19 +282,19 @@ object RichBus {
   private val writeOnlyBuses = ScalaRef(Map.empty[Server, ISortedMap[Int, AudioBusHolder]])
 
   private def createReadOnlyBus(server: Server, numChannels: Int)(implicit tx: Txn): AudioBusHolder =
-    createRichAudioBus(server, numChannels, readOnlyBuses)
+    createAudioBus(server, numChannels, readOnlyBuses)
 
   private def createWriteOnlyBus(server: Server, numChannels: Int)(implicit tx: Txn): AudioBusHolder =
-    createRichAudioBus(server, numChannels, writeOnlyBuses)
+    createAudioBus(server, numChannels, writeOnlyBuses)
 
-  private def createRichAudioBus(server: Server, numChannels: Int,
+  private def createAudioBus(server: Server, numChannels: Int,
                                  mapScalaRef: ScalaRef[Map[Server, ISortedMap[Int, AudioBusHolder]]])
                                 (implicit tx: Txn): AudioBusHolder = {
     val chanMapO = mapScalaRef.get(tx.peer).get(server)
     val bus: AudioBusHolder = chanMapO.flatMap(_.from(numChannels).headOption.map(_._2)).getOrElse {
       val index = server.allocAudioBus(numChannels)
-      val peer  = AudioBus(server.peer, index = index, numChannels = numChannels)
-      val res   = new RichAudioBusHolder(server, peer, mapScalaRef)
+      val peer  = SAudioBus(server.peer, index = index, numChannels = numChannels)
+      val res   = new AudioBusHolderImpl(server, peer, mapScalaRef)
       res.add()
       res
     }
@@ -303,31 +303,31 @@ object RichBus {
 
   private def createAudioBus(server: Server, numChannels: Int)(implicit tx: Txn): AudioBusHolder = {
     val index = server.allocAudioBus(numChannels)
-    val peer  = AudioBus(server.peer, index = index, numChannels = numChannels)
+    val peer  = SAudioBus(server.peer, index = index, numChannels = numChannels)
     new PlainAudioBusHolder(server, peer)
   }
 
   private def createControlBus(server: Server, numChannels: Int)(implicit tx: Txn): ControlBusHolder = {
     val index = server.allocControlBus(numChannels)
-    val peer  = ControlBus(server.peer, index = index, numChannels = numChannels)
+    val peer  = SControlBus(server.peer, index = index, numChannels = numChannels)
     new PlainControlBusHolder(server, peer)
   }
 
-  private abstract class AbstractAudioImpl extends RichAudioBus {
-    import RichAudioBus.{User => AU}
+  private abstract class AbstractAudioImpl extends AudioBus {
+    import AudioBus.{User => AU}
 
     final protected val readers = ScalaRef(Set.empty[AU])
     final protected val writers = ScalaRef(Set.empty[AU])
   }
 
-  private final case class FixedImpl(server: Server, bus: AudioBus)
+  private final case class FixedImpl(server: Server, bus: SAudioBus)
     extends AbstractAudioImpl {
 
-    import RichAudioBus.{User => AU}
+    import AudioBus.{User => AU}
 
     def numChannels = bus.numChannels
 
-    def busOption(implicit tx: Txn): Option[AudioBus] = Some(bus)
+    def busOption(implicit tx: Txn): Option[SAudioBus] = Some(bus)
 
     def addReader(u: AU)(implicit tx: Txn): Unit = add(readers, u)
     def addWriter(u: AU)(implicit tx: Txn): Unit = add(writers, u)
@@ -349,14 +349,14 @@ object RichBus {
   private abstract class BasicAudioImpl extends AbstractAudioImpl {
     final protected val bus = ScalaRef.make[AudioBusHolder]
 
-    final def busOption(implicit tx: Txn): Option[AudioBus] = {
+    final def busOption(implicit tx: Txn): Option[SAudioBus] = {
       val bh = bus.get(tx.peer)
       if (bh != null) Some(bh.peer) else None
     }
   }
 
   private final class AudioImpl(val server: Server, val numChannels: Int) extends BasicAudioImpl {
-    import RichAudioBus.{User => AU}
+    import AudioBus.{User => AU}
 
     override def toString = "sh-abus(numChannels=" + numChannels + ")@" + hashCode
 
@@ -495,7 +495,7 @@ object RichBus {
   }
 
   private final class TempAudioImpl(val server: Server, val numChannels: Int) extends BasicAudioImpl {
-    import RichAudioBus.{User => AU}
+    import AudioBus.{User => AU}
 
     override def toString = "tmp-abus(numChannels=" + numChannels + ")@" + hashCode
 
@@ -539,8 +539,8 @@ object RichBus {
     }
   }
 
-  private final class ControlImpl(val server: Server, val numChannels: Int) extends RichControlBus {
-    import RichControlBus.{User => CU}
+  private final class ControlImpl(val server: Server, val numChannels: Int) extends ControlBus {
+    import ControlBus.{User => CU}
 
     private val bus     = ScalaRef.make[ControlBusHolder]
     private val readers = ScalaRef(Set.empty[CU])

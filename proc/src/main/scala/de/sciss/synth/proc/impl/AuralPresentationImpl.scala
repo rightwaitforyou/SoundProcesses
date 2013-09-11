@@ -23,16 +23,15 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
 import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal, Txn => ScalaTxn}
-import proc.{logAural => log}
+import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal}
+import de.sciss.synth.proc.{logAural => log}
 import UGenGraphBuilder.MissingIn
 import graph.scan
 import TxnExecutor.{defaultAtomic => atomic}
@@ -40,8 +39,9 @@ import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.Scan.Link
 import scala.util.control.NonFatal
-import de.sciss.lucre.synth.{ProcDemiurg, ProcEdge, AuralProc, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, RichBus, RichAudioBus, Sys, Synth, Group, Server, Resource, Txn}
+import de.sciss.lucre.synth.{Bus, AudioBus, NodeGraph, AuralNode, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
+import de.sciss.synth.{addToHead, ControlSetMap}
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -93,7 +93,7 @@ object AuralPresentationImpl {
       // implicit val itx: I#Tx = tx
       // println("startedTx")
 
-      val viewMap: IdentifierMap[S#ID, S#Tx, AuralProc]                         = tx.newInMemoryIDMap
+      val viewMap: IdentifierMap[S#ID, S#Tx, AuralNode]                         = tx.newInMemoryIDMap
       val scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])]  = tx.newInMemoryIDMap
 
       val group = Group(server)
@@ -102,7 +102,7 @@ object AuralPresentationImpl {
 
       val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
       log(s"started (${booted.hashCode.toHexString})")
-      ProcDemiurg.addServer(server) // ( ProcTxn()( tx ))
+      NodeGraph.addServer(server) // ( ProcTxn()( tx ))
 
       def t_play(time: Long)(implicit tx: S#Tx): Unit =
         transport.iterator.foreach {
@@ -143,8 +143,8 @@ object AuralPresentationImpl {
     }
   }
 
-  private final class OutputBuilder(val bus: RichAudioBus) {
-    var sinks = List.empty[(String, AuralProc)]
+  private final class OutputBuilder(val bus: AudioBus) {
+    var sinks = List.empty[(String, AuralNode)]
   }
 
   private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilder[S] /*, val name: String */) {
@@ -165,7 +165,7 @@ object AuralPresentationImpl {
   }
 
   private final class RunningImpl[S <: Sys[S]](server: Server, group: Group,
-                                               viewMap: IdentifierMap[S#ID, S#Tx, AuralProc],
+                                               viewMap: IdentifierMap[S#ID, S#Tx, AuralNode],
                                                scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])],
                                                sampleRate: Double)
   //                                               artifactStore: stm.Source[S#Tx, ArtifactStore[S]]
@@ -249,7 +249,7 @@ object AuralPresentationImpl {
       import Grapheme.Segment
 
       val outBuses  = builder.outputs
-      val aural     = AuralProc(synth, outBuses.mapValues(_.bus))
+      val aural     = AuralNode(synth, outBuses.mapValues(_.bus))
 
       ugen.scanIns.foreach {
         case (key, scanIn) =>
@@ -262,7 +262,7 @@ object AuralPresentationImpl {
           // var inBus     = Option.empty[AudioBusNodeSetter]
 
           lazy val lazyInBus: AudioBusNodeSetter = {
-            val b      = RichBus.audio(server, numCh)
+            val b      = Bus.audio(server, numCh)
             val res    = if (scanIn.fixed)
               BusNodeSetter.reader(inCtlName, b, synth)
             else
@@ -326,7 +326,7 @@ object AuralPresentationImpl {
                           sys.error(s"Source bus disappeared $srcTimedID -> $srcKey")
                         }
                         ensureChannels(bOut.numChannels)
-                        val edge    = ProcEdge(srcAural, srcKey, aural, key)
+                        val edge    = NodeGraph.Edge(srcAural, srcKey, aural, key)
                         val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
                         deps      ::= link
                         // deps      ::= srcAural.group()
@@ -357,7 +357,7 @@ object AuralPresentationImpl {
                       }
                       require(bIn.numChannels == bOut.numChannels,
                         s"Scan input changed number of channels (expected ${bOut.numChannels} but found ${bIn.numChannels})")
-                      val edge    = ProcEdge(aural, key, sinkAural, sinkKey)
+                      val edge    = NodeGraph.Edge(aural, key, sinkAural, sinkKey)
                       val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn)
                       deps      ::= link
                       busUsers  ::= link
@@ -404,7 +404,7 @@ object AuralPresentationImpl {
       }
     }
 
-    private def getOutputBus(timedID: S#ID, key: String)(implicit tx: S#Tx): Option[RichAudioBus] =
+    private def getOutputBus(timedID: S#ID, key: String)(implicit tx: S#Tx): Option[AudioBus] =
       viewMap.get(timedID) match {
         case Some(aural) =>
           aural.getOutputBus(key)
@@ -519,7 +519,7 @@ object AuralPresentationImpl {
       //    note that these buses initially do not have any real resources allocated, so it's safe to
       //    forget about them and have them gc'ed if the process does not complete by the end of the txn.
       if (newOuts.nonEmpty) {
-        val newBuses = newOuts.mapValues(numCh => new OutputBuilder(RichBus.audio(server, numCh)))
+        val newBuses = newOuts.mapValues(numCh => new OutputBuilder(Bus.audio(server, numCh)))
         builder.outputs ++= newBuses
       }
 

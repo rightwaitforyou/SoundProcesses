@@ -38,21 +38,20 @@ trait Node extends Resource {
 
   //   final def server = peer.server
 
-  def read(assoc: (RichAudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
-  def read(assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
+  def read(assoc: (AudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
+  def read(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
 
-  /**
-   * Associates an audio bus with this node such that the node writes to this bus.
-   * This creates a `DynamicAudioBusUser` which will be freed automatically when
-   * this node ends.
-   */
-  def write    (assoc: (RichAudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
-  def write    (assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
-  def readWrite(assoc: (RichAudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
-  def readWrite(assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
+  /** Associates an audio bus with this node such that the node writes to this bus.
+    * This creates a `DynamicAudioBusUser` which will be freed automatically when
+    * this node ends.
+    */
+  def write    (assoc: (AudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
+  def write    (assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
+  def readWrite(assoc: (AudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
+  def readWrite(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
 
-  def map(assoc: (RichAudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
-  def map(assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
+  def map(assoc: (AudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
+  def map(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
 
   def free(audible: Boolean = true)(implicit tx: Txn): Unit
 

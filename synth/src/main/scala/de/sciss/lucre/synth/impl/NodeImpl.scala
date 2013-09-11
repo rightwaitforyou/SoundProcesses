@@ -87,14 +87,14 @@ trait NodeImpl extends ResourceImpl with Node {
   final def onEnd(code: => Unit)(implicit tx: Txn): Unit =
     onEndFuns.transform(e => e.copy(direct = e.direct :+ (() => code)))(tx.peer)
 
-  final def read(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
+  final def read(assoc: (AudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
     val reader = BusNodeSetter.reader(name, rb, this)
     registerSetter(reader)
     reader
   }
 
-  final def read(assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
+  final def read(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
     val (rb, name) = assoc
     val reader = BusNodeSetter.reader(name, rb, this)
     registerSetter(reader)
@@ -105,42 +105,42 @@ trait NodeImpl extends ResourceImpl with Node {
     * This creates a `DynamicAudioBusUser` which will be freed automatically when
     * this node ends.
     */
-  final def write(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
+  final def write(assoc: (AudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
     val writer = BusNodeSetter.writer(name, rb, this)
     registerSetter(writer)
     writer
   }
 
-  final def write(assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
+  final def write(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
     val (rb, name) = assoc
     val writer = BusNodeSetter.writer(name, rb, this)
     registerSetter(writer)
     writer
   }
 
-  final def readWrite(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
+  final def readWrite(assoc: (AudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
     val rw = BusNodeSetter.readerWriter(name, rb, this)
     registerSetter(rw)
     rw
   }
 
-  final def readWrite(assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
+  final def readWrite(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
     val (rb, name) = assoc
     val rw = BusNodeSetter.readerWriter(name, rb, this)
     registerSetter(rw)
     rw
   }
 
-  final def map(assoc: (RichAudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
+  final def map(assoc: (AudioBus, String))(implicit tx: Txn): AudioBusNodeSetter = {
     val (rb, name) = assoc
     val mapper = BusNodeSetter.mapper(name, rb, this)
     registerSetter(mapper)
     mapper
   }
 
-  final def map(assoc: (RichControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
+  final def map(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter = {
     val (rb, name) = assoc
     val mapper = BusNodeSetter.mapper(name, rb, this)
     registerSetter(mapper)
