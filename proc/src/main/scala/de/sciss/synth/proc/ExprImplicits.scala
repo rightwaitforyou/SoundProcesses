@@ -3,6 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.{event => evt}
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.expr.Expr
+import language.implicitConversions
 
 object ExprImplicits {
   def apply[S <: evt.Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]

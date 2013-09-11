@@ -16,7 +16,11 @@ The following dependency is necessary:
     
     "de.sciss" %% "soundprocesses" % v
 
-The current version `v` is `"1.9.1+"`.
+The current version `v` is `"2.0.+"`. The following sub modules are available:
+
+    "de.sciss" %% "lucrebitemp"     % v     // bi-temporal data structures
+    "de.sciss" %% "lucresynth"      % v     // transactional layer for ScalaCollider
+    "de.sciss" %% "lucresynth-expr" % v     // standard expression types
 
 ## usage
 

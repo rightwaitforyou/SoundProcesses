@@ -19,7 +19,7 @@ object FadeSpec {
         import v._
         out.writeShort(COOKIE)
         out.writeLong (numFrames)
-        Curves.ValueSerializer.write(curve, out)
+        Curve.serializer.write(curve, out)
         out.writeFloat(floor)
       }
 
@@ -27,7 +27,7 @@ object FadeSpec {
         val cookie = in.readShort()
         require(cookie == COOKIE, s"Unexpected cookie $cookie, expected $COOKIE")
         val numFrames = in.readLong()
-        val curve     = Curves.ValueSerializer.read(in)
+        val curve     = Curve.serializer.read(in)
         val floor     = in.readFloat()
         Value(numFrames = numFrames, curve = curve, floor = floor)
       }

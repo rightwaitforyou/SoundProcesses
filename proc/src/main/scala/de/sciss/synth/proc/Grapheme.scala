@@ -31,7 +31,7 @@ import lucre.{event => evt, bitemp, expr}
 import expr.Expr
 import bitemp.{BiType, BiExpr}
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.lucre.synth.expr.{Curves, Doubles, SpanLikes, Longs}
+import de.sciss.lucre.synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 import impl.{GraphemeImpl => Impl}
 import synth.io.AudioFileSpec
@@ -87,7 +87,7 @@ object Grapheme {
         val sz      = in.readInt()
         val values  = Vector.fill(sz) {
           val mag   = in.readDouble()
-          val env   = Curves.ValueSerializer.read(in)
+          val env   = synth.Curve.serializer.read(in)
           (mag, env)
         }
         Curve(values: _*)
@@ -107,7 +107,7 @@ object Grapheme {
         out.writeInt(sz)
         values.foreach { case (mag, shape) =>
           out.writeDouble(mag)
-          Curves.ValueSerializer.write(shape, out)
+          synth.Curve.serializer.write(shape, out)
         }
       }
     }
@@ -217,7 +217,7 @@ object Grapheme {
         val sz      = in.readInt()
         val values  = Vec.fill(sz) {
           val mag   = Doubles.readExpr(in, access)
-          val shape = Curves.ValueSerializer.read(in)
+          val shape = synth.Curve.serializer.read(in)
           (mag, shape)
         }
         new CurveImpl(targets, values)
@@ -319,7 +319,7 @@ object Grapheme {
         out.writeInt(sz)
         values.foreach { tup =>
           tup._1.write(out)
-          Curves.ValueSerializer.write(tup._2, out)
+          synth.Curve.serializer.write(tup._2, out)
         }
       }
 

@@ -1,16 +1,16 @@
-name          := "SoundProcesses"
+name                      := "SoundProcesses"
 
-version       := "2.0.0-SNAPSHOT"
+version in ThisBuild      := "2.0.0-SNAPSHOT"
 
-organization  := "de.sciss"
+organization in ThisBuild := "de.sciss"
 
-homepage      := Some(url("https://github.com/Sciss/" + name.value))
+homepage in ThisBuild     := Some(url("https://github.com/Sciss/" + name.value))
 
-description   := "A framework for creating and managing ScalaCollider based sound processes"
+description               := "A framework for creating and managing ScalaCollider based sound processes"
 
-licenses      := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
+licenses in ThisBuild     := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion  := "2.10.2"
+scalaVersion in ThisBuild := "2.10.2"
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
@@ -22,13 +22,13 @@ lazy val lucreEventVersion      = "2.4.+"
 
 lazy val lucreConfluentVersion  = "2.5.+"
 
-lazy val scalaColliderVersion   = "1.9.+"
+lazy val scalaColliderVersion   = "1.10.+"
 
 lazy val scalaTestVersion       = "1.9.1"
 
-retrieveManaged := true
+retrieveManaged in ThisBuild := true
 
-scalacOptions ++= Seq("-deprecation", "-unchecked", "-feature")   // "-Xelide-below", "INFO"
+scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature")   // "-Xelide-below", "INFO"
 
 // SI-7481
 // scalacOptions += "-no-specialization"
@@ -68,14 +68,15 @@ initialCommands in console :=
 
 // ---- sub-projects ----
 
-lazy val `soundprocesses-full` = project.in(file("."))
+lazy val root = project.in(file("."))
   .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
-  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
+  // .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
   .settings(
-    publishArtifact in(Compile, packageBin) := false, // there are no binaries
-    publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
-    publishArtifact in(Compile, packageSrc) := false, // there are no sources
-    autoScalaLibrary := false
+    //    publishArtifact in(Compile, packageBin) := false, // there are no binaries
+    //    publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
+    //    publishArtifact in(Compile, packageSrc) := false, // there are no sources
+    packagedArtifacts := Map.empty
+    // autoScalaLibrary := false
   )
 
 lazy val lucrebitemp = project.in(file("bitemp")).settings(
@@ -84,8 +85,6 @@ lazy val lucrebitemp = project.in(file("bitemp")).settings(
     "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
     "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
     "de.sciss"      %% "span"            % "1.2.+"
-    // "de.sciss"      %% "lucrestm-bdb"    % lucreCoreVersion % "test",
-    // "org.scalatest" %% "scalatest"       % "1.9.1"          % "test"
   )
 )
 
@@ -103,7 +102,6 @@ lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitem
 lazy val lucresynth = project.in(file("synth")).settings(
   description := "Transactional extension for ScalaCollider",
   libraryDependencies ++= Seq(
-    // "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
     "de.sciss" %% "lucreevent-expr" % lucreEventVersion,
     "de.sciss" %% "scalacollider"   % scalaColliderVersion
   )
