@@ -1,10 +1,12 @@
-name                      := "SoundProcesses"
+lazy val logicalName = "SoundProcesses"
+
+name                      := logicalName + "-full"
 
 version in ThisBuild      := "2.0.0"
 
 organization in ThisBuild := "de.sciss"
 
-homepage in ThisBuild     := Some(url("https://github.com/Sciss/" + name.value))
+homepage in ThisBuild     := Some(url("https://github.com/Sciss/" + logicalName))
 
 description               := "A framework for creating and managing ScalaCollider based sound processes"
 
@@ -70,7 +72,7 @@ initialCommands in console :=
 
 lazy val root = project.in(file("."))
   .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
-  // .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
+  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
   .settings(
     //    publishArtifact in(Compile, packageBin) := false, // there are no binaries
     //    publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
@@ -102,7 +104,7 @@ lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitem
 lazy val lucresynth = project.in(file("synth")).settings(
   description := "Transactional extension for ScalaCollider",
   libraryDependencies ++= Seq(
-    "de.sciss" %% "lucreevent-expr" % lucreEventVersion,
+    "de.sciss" %% "lucreevent-core" % lucreEventVersion,
     "de.sciss" %% "scalacollider"   % scalaColliderVersion
   )
 )
@@ -125,9 +127,9 @@ lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucres
 
 // ---- publishing ----
 
-publishMavenStyle := true
+publishMavenStyle in ThisBuild := true
 
-publishTo :=
+publishTo in ThisBuild :=
   Some(if (version.value endsWith "-SNAPSHOT")
     "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
   else
@@ -136,9 +138,9 @@ publishTo :=
 
 publishArtifact in Test := false
 
-pomIncludeRepository := { _ => false }
+pomIncludeRepository in ThisBuild := { _ => false }
 
-pomExtra := { val n = name.value
+pomExtra in ThisBuild := { val n = logicalName
 <scm>
   <url>git@github.com:Sciss/{n}.git</url>
   <connection>scm:git:git@github.com:Sciss/{n}.git</connection>
@@ -160,4 +162,4 @@ seq(lsSettings :_*)
 
 (LsKeys.ghUser in LsKeys.lsync) := Some("Sciss")
 
-(LsKeys.ghRepo in LsKeys.lsync) := Some(name.value)
+(LsKeys.ghRepo in LsKeys.lsync) := Some(logicalName)

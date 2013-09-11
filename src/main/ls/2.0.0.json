@@ -1,6 +1,6 @@
 {
   "organization" : "de.sciss",
-  "name" : "SoundProcesses",
+  "name" : "SoundProcesses-full",
   "version" : "2.0.0",
   "description" : "A framework for creating and managing ScalaCollider based sound processes",
   "site" : "https://github.com/Sciss/SoundProcesses",
