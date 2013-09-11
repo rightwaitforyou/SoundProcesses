@@ -107,27 +107,21 @@ lazy val lucresynth = project.in(file("synth")).settings(
   )
 )
 
-lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`).settings(
-  description :=  "A framework for creating and managing ScalaCollider based sound processes",
-  libraryDependencies ++= Seq(
-    "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
-    "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
-    "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test"
+lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`)
+  .settings(buildInfoSettings: _*).settings(
+    description :=  "A framework for creating and managing ScalaCollider based sound processes",
+    sourceGenerators in Compile <+= buildInfo,
+    buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
+      BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
+      BuildInfoKey.map(licenses) { case (_, Seq((lic, _))) => "license" -> lic }
+    ),
+    buildInfoPackage := "de.sciss.synth.proc",
+    libraryDependencies ++= Seq(
+      "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
+      "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
+      "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test"
+    )
   )
-)
-
-// ---- build info ----
-
-buildInfoSettings
-
-sourceGenerators in Compile <+= buildInfo
-
-buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
-  BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
-  BuildInfoKey.map(licenses) { case (_, Seq((lic, _))) => "license" -> lic }
-)
-
-buildInfoPackage := "de.sciss.synth.proc"
 
 // ---- publishing ----
 

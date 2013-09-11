@@ -47,7 +47,7 @@ object AudioBus {
    *    information to the user.
    */
   trait User /* extends Bus.User */ {
-    def busChanged(bus: SAudioBus)(implicit tx: Txn): Unit
+    def busChanged(peer: SAudioBus)(implicit tx: Txn): Unit
   }
 }
 
