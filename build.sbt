@@ -1,6 +1,6 @@
 name := "SoundProcesses"
 
-version := "1.3.1"
+version := "1.3.2-SNAPSHOT"
 
 organization := "de.sciss"
 
@@ -10,19 +10,19 @@ description := "A framework for creating and managing ScalaCollider based sound 
 
 licenses := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
-scalaVersion := "2.10.0"
+scalaVersion := "2.10.3"
 
-crossScalaVersions := Seq( "2.10.0", "2.9.2" )
+// crossScalaVersions := Seq( "2.10.0", "2.9.2" )
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 libraryDependencies ++= Seq(
    "de.sciss" %% "scalacollider" % "1.3.+",
-   "de.sciss" %% "lucreconfluent-event" % "1.6.+",
+   "de.sciss" %% "lucreconfluent-event" % "1.6.1+",
    "de.sciss" %% "lucreevent-expr" % "1.6.+",
    "de.sciss" % "prefuse-core" % "0.21",
    "de.sciss" %% "lucrestm-bdb" % "1.6.+" % "test",
-   ("org.scalatest" %% "scalatest" % "1.8" cross CrossVersion.full) % "test"
+   "org.scalatest" %% "scalatest" % "1.9.2" /* cross CrossVersion.full */ % "test"
 )
 
 retrieveManaged := true
@@ -106,14 +106,14 @@ pomExtra :=
 
 // ---- ls.implicit.ly ----
 
-seq( lsSettings :_* )
-
-(LsKeys.tags in LsKeys.lsync) := Seq( "sound", "music", "sound-synthesis", "computer-music" )
-
-(LsKeys.ghUser in LsKeys.lsync) := Some( "Sciss" )
-
-(LsKeys.ghRepo in LsKeys.lsync) := Some( "SoundProcesses" )
-
-// bug in ls -- doesn't find the licenses from global scope
-(licenses in LsKeys.lsync) := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
+// seq( lsSettings :_* )
+// 
+// (LsKeys.tags in LsKeys.lsync) := Seq( "sound", "music", "sound-synthesis", "computer-music" )
+// 
+// (LsKeys.ghUser in LsKeys.lsync) := Some( "Sciss" )
+// 
+// (LsKeys.ghRepo in LsKeys.lsync) := Some( "SoundProcesses" )
+// 
+// // bug in ls -- doesn't find the licenses from global scope
+// (licenses in LsKeys.lsync) := Seq( "GPL v2+" -> url( "http://www.gnu.org/licenses/gpl-2.0.txt" ))
 
