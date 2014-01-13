@@ -2,7 +2,7 @@
  *  Scan.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -28,7 +28,7 @@ package proc
 
 import de.sciss.lucre.{event => evt, data}
 import impl.{ScanImpl => Impl}
-import evt.Event
+import de.sciss.lucre.event.{Publisher, Event}
 import language.implicitConversions
 import de.sciss.serial.DataInput
 import de.sciss.lucre.stm.Identifiable
@@ -106,7 +106,7 @@ object Scan {
  *
  * A scan's event forwards updates from any of its sources, but does not observe its sinks.
  */
-trait Scan[S <: Sys[S]] extends evt.Node[S] {
+trait Scan[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Scan.Update[S]] {
   import Scan._
 
   /** Returns an iterator over all currently connected sinks. */
@@ -146,7 +146,4 @@ trait Scan[S <: Sys[S]] extends evt.Node[S] {
    *  @return `true` if the link was found in the list of source for this scan, `false` otherwise
    */
   def removeSource(source: Link[S])(implicit tx: S#Tx): Boolean
-
-  /** An event that is invoked when sinks or sources are connected or disconnected. */
-  def changed: Event[S, Scan.Update[S], Scan[S]]
 }

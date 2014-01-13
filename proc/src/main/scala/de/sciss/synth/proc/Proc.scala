@@ -2,7 +2,7 @@
  *  Proc.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -33,6 +33,7 @@ import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.DataInput
 import de.sciss.model
 import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.event.Publisher
 
 object Proc {
   // ---- implementation forwards ----
@@ -84,7 +85,7 @@ object Proc {
   }
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
-trait Proc[S <: Sys[S]] extends evt.Node[S] {
+trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */
   def graph: Expr.Var[S, SynthGraph]
 
@@ -93,6 +94,4 @@ trait Proc[S <: Sys[S]] extends evt.Node[S] {
 
   /** The scalar attributes of the process. */
   def attributes: Attributes.Modifiable[S]
-
-  def changed: evt.Event[S, Proc.Update[S], Proc[S]]
 }

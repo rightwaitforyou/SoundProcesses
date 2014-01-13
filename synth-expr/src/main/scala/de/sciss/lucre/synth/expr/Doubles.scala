@@ -2,7 +2,7 @@
  *  Doubles.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -31,6 +31,7 @@ import annotation.switch
 import de.sciss.numbers
 import de.sciss.serial.{DataInput, DataOutput}
 import de.sciss.lucre.expr.Expr
+import evt.Sys
 
 object Doubles extends BiTypeImpl[Double] {
   final val typeID = 5
@@ -39,7 +40,7 @@ object Doubles extends BiTypeImpl[Double] {
 
   def writeValue(value: Double, out: DataOutput): Unit = out.writeDouble(value)
 
-  def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                 (implicit tx: S#Tx): ExN[S] = {
     (cookie: @switch) match {
       case 1 =>
@@ -154,14 +155,14 @@ object Doubles extends BiTypeImpl[Double] {
 
     sealed abstract class Op extends Tuple1Op[Double] {
       def id: Int
-      final def apply[S <: evt.Sys[S]](a: Ex[S])(implicit tx: S#Tx): Ex[S] = a match {
+      final def apply[S <: Sys[S]](a: Ex[S])(implicit tx: S#Tx): Ex[S] = a match {
         case Expr.Const(c)  => newConst(value(c))
         case _              => new Tuple1(typeID, this, evt.Targets.partial[S], a)
       }
 
       //         def value( a: Double ) : Double
 
-      def toString[S <: stm.Sys[S]](_1: Ex[S]): String = s"${_1}.$name"
+      def toString[S <: Sys[S]](_1: Ex[S]): String = s"${_1}.$name"
 
       def name: String = {
         val cn = getClass.getName
@@ -175,7 +176,7 @@ object Doubles extends BiTypeImpl[Double] {
       final val id = 0
       def value(a: Double): Double = -a // rd.neg(a)
 
-      override def toString[S <: stm.Sys[S]](_1: Ex[S]): String = "-" + _1
+      override def toString[S <: Sys[S]](_1: Ex[S]): String = "-" + _1
     }
 
     case object Abs extends Op {
@@ -355,14 +356,14 @@ object Doubles extends BiTypeImpl[Double] {
 
     sealed abstract class Op extends Tuple2Op[Double, Double] {
       def id: Int
-      final def apply[S <: evt.Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
+      final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
         case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
         case _                                => new Tuple2(typeID, this, evt.Targets.partial[S], a, b)
       }
 
       def value(a: Double, b: Double): Double
 
-      def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
+      def toString[S <: Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
 
       def name: String = {
         val cn = getClass.getName
@@ -375,7 +376,7 @@ object Doubles extends BiTypeImpl[Double] {
     trait Infix {
       _: Op =>
 
-      override def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String =
+      override def toString[S <: Sys[S]](_1: Ex[S], _2: Ex[S]): String =
         "(" + _1 + " " + name + " " + _2 + ")"
     }
 
@@ -539,7 +540,7 @@ object Doubles extends BiTypeImpl[Double] {
     //      case object Firstarg       extends Op( 46 )
   }
 
-  final class Ops[S <: evt.Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     private type E = Ex[S]
 
     import UnaryOp._
@@ -561,7 +562,7 @@ object Doubles extends BiTypeImpl[Double] {
     def /(b: E): E = Div(ex, b)
   }
 
-  final class RichOps[S <: evt.Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class RichOps[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     private type E = Ex[S]
 
     import UnaryOp._

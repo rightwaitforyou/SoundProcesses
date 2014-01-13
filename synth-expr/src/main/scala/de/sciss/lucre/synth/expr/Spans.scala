@@ -2,7 +2,7 @@
  *  Booleans.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -26,12 +26,11 @@
 package de.sciss.lucre.synth
 package expr
 
-import de.sciss.lucre.{stm, event => evt, expr}
-import evt.Targets
+import de.sciss.lucre.{event => evt, expr}
+import evt.{Targets, Sys}
 import expr.Expr
 import de.sciss.span.Span
 import de.sciss.serial.{DataOutput, DataInput}
-import de.sciss.lucre.stm.Sys
 
 object Spans extends BiTypeImpl[Span] {
   final val typeID = 10
@@ -40,7 +39,7 @@ object Spans extends BiTypeImpl[Span] {
 
   def writeValue(value: Span, out: DataOutput): Unit = value.write(out)
 
-  def apply[S <: evt.Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
+  def apply[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
     (start, stop) match {
       case (Expr.Const(startC), Expr.Const(stopC)) => newConst(Span(startC, stopC))
       case _ =>
@@ -48,7 +47,7 @@ object Spans extends BiTypeImpl[Span] {
     }
 
   // XXX TODO: fold constants
-  final class Ops[S <: evt.Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     // ---- unary ----
     def start : Expr[S, Long] = UnaryOp.Start(ex)
     def stop  : Expr[S, Long] = UnaryOp.Stop(ex)
@@ -60,7 +59,7 @@ object Spans extends BiTypeImpl[Span] {
 
   // ---- protected ----
 
-  def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                 (implicit tx: S#Tx): ExN[S] = cookie match {
     case 2 => // binary ops
       val tpe = in.readInt()
@@ -91,7 +90,7 @@ object Spans extends BiTypeImpl[Span] {
 
     sealed abstract class LongOp extends Longs.UnaryOp.Op[Span] {
       def id: Int
-      final def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+      final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                                      (implicit tx: S#Tx): Longs.Tuple1[S, Span] = {
         val _1 = readExpr(in, access)
         new Longs.Tuple1(typeID, this, targets, _1)
@@ -120,7 +119,7 @@ object Spans extends BiTypeImpl[Span] {
 
   private object BinaryOp {
     sealed trait OpLike[T1, T2] {
-      def toString[S <: stm.Sys[S]](_1: Expr[S, T1], _2: Expr[S, T2]): String = s"${_1}.$name(${_2})"
+      def toString[S <: Sys[S]](_1: Expr[S, T1], _2: Expr[S, T2]): String = s"${_1}.$name(${_2})"
 
       def name: String = {
         val cn = getClass.getName
@@ -131,14 +130,14 @@ object Spans extends BiTypeImpl[Span] {
     }
 
     sealed abstract class LongSpanOp(val id: Int) extends Tuple2Op[Span, Long] with OpLike[Span, Long] {
-      final def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+      final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                                      (implicit tx: S#Tx): Tuple2[S, Span, Long] = {
         val _1 = readExpr(in, access)
         val _2 = Longs.readExpr(in, access)
         new Tuple2(typeID, this, targets, _1, _2)
       }
 
-      final def apply[S <: evt.Sys[S]](a: Ex[S], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = (a, b) match {
+      final def apply[S <: Sys[S]](a: Ex[S], b: Expr[S, Long])(implicit tx: S#Tx): Ex[S] = (a, b) match {
         case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
         case _                                => new Tuple2(typeID, this, Targets.partial[S], a, b)
       }

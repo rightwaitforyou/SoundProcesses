@@ -2,7 +2,7 @@
  *  ScanImpl.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -30,7 +30,7 @@ package impl
 import de.sciss.lucre.{event => evt, data, expr}
 import evt.{impl => evti, Event}
 import annotation.switch
-import expr.LinkedList
+import expr.List
 import proc.Scan
 import de.sciss.serial.{DataOutput, Serializer, DataInput}
 import collection.immutable.{IndexedSeq => Vec}
@@ -45,9 +45,9 @@ object ScanImpl {
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = {
     val targets           = evt.Targets[S] // XXX TODO: partial?
-    val scanSourceList    = LinkedList.Modifiable[S, Scan    [S]]
-    val graphemeSourceList= LinkedList.Modifiable[S, Grapheme[S], Grapheme.Update[S]](_.changed)
-    val sinkList          = LinkedList.Modifiable[S, Link[S]]
+    val scanSourceList    = List.Modifiable[S, Scan    [S]]
+    val graphemeSourceList= List.Modifiable[S, Grapheme[S], Grapheme.Update[S]]
+    val sinkList          = List.Modifiable[S, Link[S]]
     new Impl(targets, scanSourceList, graphemeSourceList, sinkList)
   }
 
@@ -67,9 +67,9 @@ object ScanImpl {
       val serVer    = in.readShort()
       require(serVer == SER_VERSION, s"Incompatible serialized (found $serVer, required $SER_VERSION)")
 
-      val scanSourceList      = LinkedList.Modifiable.read[S, Scan[S]]                                   (in, access)
-      val graphemeSourceList  = LinkedList.Modifiable.read[S, Grapheme[S], Grapheme.Update[S]](_.changed)(in, access)
-      val sinkList            = LinkedList.Modifiable.read[S, Link[S]](in, access)
+      val scanSourceList      = List.Modifiable.read[S, Scan[S]]                        (in, access)
+      val graphemeSourceList  = List.Modifiable.read[S, Grapheme[S], Grapheme.Update[S]](in, access)
+      val sinkList            = List.Modifiable.read[S, Link[S]](in, access)
       new Impl(targets, scanSourceList, graphemeSourceList, sinkList)
     }
   }
@@ -106,9 +106,9 @@ object ScanImpl {
   // TODO: the crappy sinkList is only needed because the id map does not have an iterator...
   // we should really figure out how to add iterator functionality to the id map!!!
   private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
-                                        protected val scanSourceList    : LinkedList.Modifiable[S, Scan[S], Unit],
-                                        protected val graphemeSourceList: LinkedList.Modifiable[S, Grapheme[S], Grapheme.Update[S]],
-                                        protected val sinkList          : LinkedList.Modifiable[S, Link[S], Unit])
+                                        protected val scanSourceList    : List.Modifiable[S, Scan[S], Unit],
+                                        protected val graphemeSourceList: List.Modifiable[S, Grapheme[S], Grapheme.Update[S]],
+                                        protected val sinkList          : List.Modifiable[S, Link[S], Unit])
     extends Scan[S]
     with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
     with evti.Generator[S, Scan.Update[S], Scan[S]] {
@@ -213,7 +213,7 @@ object ScanImpl {
 
       val u2 = pull(graphemeSourceList.changed).fold(u1) { ll =>
         val gcs = ll.changes.collect {
-          case LinkedList.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
+          case List.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
         }
         if (u1.isEmpty) gcs else if (gcs.isEmpty) u1 else u1 ++ gcs
       }

@@ -2,7 +2,7 @@
  *  Strings.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@
 package de.sciss.lucre.synth
 package expr
 
-import de.sciss.lucre.{stm, event => evt}
+import de.sciss.lucre.{event => evt}
 import evt.{Targets, Sys}
 import de.sciss.serial.{DataInput, DataOutput}
 import de.sciss.lucre.expr.Expr
@@ -56,7 +56,7 @@ object Strings extends BiTypeImpl[String] {
 
       def value(a: String, b: String): String
 
-      def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
+      def toString[S <: Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
 
       def name: String = {
         val cn = getClass.getName

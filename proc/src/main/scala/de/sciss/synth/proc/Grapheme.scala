@@ -2,7 +2,7 @@
  *  Grapheme.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -35,7 +35,7 @@ import de.sciss.lucre.synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 import impl.{GraphemeImpl => Impl}
 import synth.io.AudioFileSpec
-import evt.Event
+import de.sciss.lucre.event.{Publisher, Event}
 import span.{SpanLike, Span}
 import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 import java.io.File
@@ -434,8 +434,8 @@ object Grapheme {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = Impl.read(in, access)
 }
-trait Grapheme[S <: evt.Sys[S]] extends evt.Node[S] {
-  import Grapheme.{Value, Segment, Modifiable, TimedElem, Update}
+trait Grapheme[S <: evt.Sys[S]] extends evt.Node[S] with Publisher[S, Grapheme.Update[S]] {
+  import Grapheme.{Value, Segment, Modifiable, TimedElem}
 
   /** The idea of all traits which distinguish between read-only and modifiable sub-type is that
     * eventually the super-type acts somewhat like an expression. It might be possible to map
@@ -449,8 +449,6 @@ trait Grapheme[S <: evt.Sys[S]] extends evt.Node[S] {
   def segment(time: Long)(implicit tx: S#Tx): Option[Segment.Defined]
 
   def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
-
-  def changed: Event[S, Update[S], Grapheme[S]]
 
   def debugList()(implicit tx: S#Tx): List[Segment.Defined]
 }

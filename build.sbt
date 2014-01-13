@@ -2,7 +2,7 @@ lazy val logicalName = "SoundProcesses"
 
 name                      := logicalName + "-full"
 
-version in ThisBuild      := "2.0.0"
+version in ThisBuild      := "2.1.0-SNAPSHOT"
 
 organization in ThisBuild := "de.sciss"
 
@@ -12,7 +12,7 @@ description               := "A framework for creating and managing ScalaCollide
 
 licenses in ThisBuild     := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion in ThisBuild := "2.10.2"
+scalaVersion in ThisBuild := "2.10.3"
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
@@ -20,9 +20,9 @@ lazy val lucreCoreVersion       = "2.0.+"
 
 lazy val lucreDataVersion       = "2.2.1+"   // debugSanitize!
 
-lazy val lucreEventVersion      = "2.4.+"
+lazy val lucreEventVersion      = "2.5.+"
 
-lazy val lucreConfluentVersion  = "2.5.+"
+lazy val lucreConfluentVersion  = "2.6.+"
 
 lazy val scalaColliderVersion   = "1.10.+"
 

@@ -2,7 +2,7 @@
  *  BiGroup.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -27,7 +27,7 @@ package de.sciss.lucre
 package bitemp
 
 import de.sciss.lucre.{event => evt}
-import evt.{EventLike, Sys}
+import de.sciss.lucre.event.{Publisher, EventLike, Sys}
 import impl.{BiGroupImpl => Impl}
 import collection.immutable.{IndexedSeq => Vec}
 import expr.{Expr, Type}
@@ -134,7 +134,7 @@ object BiGroup {
     Impl.serializer[S, Elem, U](eventView)
 }
 
-trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] {
+trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] with Publisher[S, BiGroup.Update[S, Elem, U]] {
 
   import BiGroup.Leaf
 
@@ -153,83 +153,71 @@ trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] {
 
   def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Leaf[S, Elem]]
 
-  /**
-   * Queries all elements intersecting a given point in time.
-   * That is, returns an iterator of all elements whose span contains the time point
-   * `(span start <= time && span.stop > time)`
-   *
-   * This methods makes no guarantees about the ordering of the returned iterator.
-   *
-   * @param time the point in time to search at
-   * @return  a (possibly empty) iterator of the intersecting elements
-   */
+  /** Queries all elements intersecting a given point in time.
+    * That is, returns an iterator of all elements whose span contains the time point
+    * `(span start <= time && span.stop > time)`
+    *
+    * This methods makes no guarantees about the ordering of the returned iterator.
+    *
+    * @param time the point in time to search at
+    * @return  a (possibly empty) iterator of the intersecting elements
+    */
   def intersect(time: Long)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]]
 
-  /**
-   * Queries all elements intersecting a given time span.
-   * That is, returns an iterator of all elements whose span contains or partly overlaps the query span.
-   * `(span start < query.stop && span.stop > query.start)`
-   *
-   * This methods makes no guarantees about the ordering of the returned iterator.
-   *
-   * @param span the the span to search within (this may be a half-bounded interval or even `Span.All`)
-   * @return  a (possibly empty) iterator of the intersecting elements
-   */
+  /** Queries all elements intersecting a given time span.
+    * That is, returns an iterator of all elements whose span contains or partly overlaps the query span.
+    * `(span start < query.stop && span.stop > query.start)`
+    *
+    * This methods makes no guarantees about the ordering of the returned iterator.
+    *
+    * @param span the the span to search within (this may be a half-bounded interval or even `Span.All`)
+    * @return  a (possibly empty) iterator of the intersecting elements
+    */
   def intersect(span: SpanLike)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]]
 
-  /**
-   * Performs a range query according to separate intervals for the allowed start and stop positions
-   * of the element spans. That is, returns an iterator of all elements whose span satisfies the
-   * constraints given for start and stop positions
-   * `(start.contains( elem.span.start ) && stop.contains( elem.span.stop ))`
-   *
-   * Both for the start and stop constraint, half-bounded or unbounded (`Span.All`) intervals can be used.
-   * Examples
-   *
-   * - to find all elements which start between 10 (inclusive) and 20 (exclusive), use `start = Span( 10, 20 ), stop = Span.All`.
-   * - to find all elements which start before (<) 10 and stop from (>=) 20, use `start = Span.until( 10 ), stop = Span.from( 20 )`.
-   *
-   * This methods makes no guarantees about the ordering of the returned iterator.
-   *
-   * @param start   the constraint for the start position of the spans of the elements filtered.
-   * @param stop    the constraint for the stop position of the spans of the elements filtered.
-   * @return  a (possibly empty) iterator of the intersecting elements
-   */
+  /** Performs a range query according to separate intervals for the allowed start and stop positions
+    * of the element spans. That is, returns an iterator of all elements whose span satisfies the
+    * constraints given for start and stop positions
+    * `(start.contains( elem.span.start ) && stop.contains( elem.span.stop ))`
+    *
+    * Both for the start and stop constraint, half-bounded or unbounded (`Span.All`) intervals can be used.
+    * Examples
+    *
+    * - to find all elements which start between 10 (inclusive) and 20 (exclusive), use `start = Span( 10, 20 ), stop = Span.All`.
+    * - to find all elements which start before (<) 10 and stop from (>=) 20, use `start = Span.until( 10 ), stop = Span.from( 20 )`.
+    *
+    * This methods makes no guarantees about the ordering of the returned iterator.
+    *
+    * @param start   the constraint for the start position of the spans of the elements filtered.
+    * @param stop    the constraint for the stop position of the spans of the elements filtered.
+    * @return  a (possibly empty) iterator of the intersecting elements
+    */
   def rangeSearch(start: SpanLike, stop: SpanLike)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]]
 
-  /**
-   * Queries the closest event (an element's span starting or stopping) later than the given time
-   *
-   * @param time the query time
-   * @return a time, greater than the query time, at which the next event occurs, or `None` if
-   *         there are no events after the query time
-   */
+  /** Queries the closest event (an element's span starting or stopping) later than the given time
+    *
+    * @param time the query time
+    * @return a time, greater than the query time, at which the next event occurs, or `None` if
+    *         there are no events after the query time
+    */
   def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
 
-  /**
-   * Queries the closest event (an element's span starting or stopping) earlier than the given time
-   *
-   * @param time the query time
-   * @return a time, smaller than the query time, at which the previous event occurs, or `None` if
-   *         there are no events before the query time
-   */
+  /** Queries the closest event (an element's span starting or stopping) earlier than the given time
+    *
+    * @param time the query time
+    * @return a time, smaller than the query time, at which the previous event occurs, or `None` if
+    *         there are no events before the query time
+    */
   def nearestEventBefore(time: Long)(implicit tx: S#Tx): Option[Long]
 
-  /**
-   * Queries all elements which produce an event (starting or stopping) at a given time.
-   *
-   * @param time the time instant for which to gather the events
-   * @return  a tuple of two iterators. the first iterator (`_1`) contains the events which
-   *          start at the query time, the second iterator (_2) contains the event which
-   *          stop at the query time
-   */
+  /** Queries all elements which produce an event (starting or stopping) at a given time.
+    *
+    * @param time the time instant for which to gather the events
+    * @return  a tuple of two iterators. the first iterator (`_1`) contains the events which
+    *          start at the query time, the second iterator (_2) contains the event which
+    *          stop at the query time
+    */
   def eventsAt(time: Long)(implicit tx: S#Tx): (Iterator[S#Tx, Leaf[S, Elem]], Iterator[S#Tx, Leaf[S, Elem]])
-
-  //   def projection( implicit tx: S#Tx, time: Chronos[ S ]) : Expr[ S, A ]
-
-  //   def collectionChanged:  Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]]
-  //   def elementChanged:     Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]]
-  def changed: EventLike[S, BiGroup.Update[S, Elem, U]]
 
   def debugList(implicit tx: S#Tx): List[(SpanLike, Elem)]
 

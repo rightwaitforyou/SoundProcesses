@@ -2,7 +2,7 @@
  *  Artifact.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -32,7 +32,7 @@ import serial.{Serializer, DataInput}
 import lucre.{stm, event => evt, data, expr}
 import stm.Mutable
 import java.io.File
-import evt.EventLike
+import de.sciss.lucre.event.{Publisher, EventLike}
 import expr.Expr
 import scala.annotation.tailrec
 import de.sciss.model
@@ -114,13 +114,11 @@ object Artifact {
     def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] =
       Impl.readLocation[S](in, access)
   }
-  trait Location[S <: evt.Sys[S]] extends /* Writable with Disposable[S#Tx] */ Mutable[S#ID, S#Tx] {
+  trait Location[S <: evt.Sys[S]] extends Mutable[S#ID, S#Tx] with Publisher[S, Location.Update[S]] {
     def directory(implicit tx: S#Tx): File
     def iterator (implicit tx: S#Tx): data.Iterator[S#Tx, Artifact[S]]
 
     def modifiableOption: Option[Location.Modifiable[S]]
-
-    def changed: EventLike[S, Location.Update[S]]
   }
 
   type Value = File

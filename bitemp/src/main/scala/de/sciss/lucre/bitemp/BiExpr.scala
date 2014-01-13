@@ -2,7 +2,7 @@
  *  BiExpr.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -123,7 +123,7 @@ object BiExpr {
     protected def reader: evt.Reader[S, Expr[S, (Long, A)]] = serializer
   }
 
-  private final case class ConstImpl[S <: stm.Sys[S], A](timeVal: Long, magVal: A)(implicit magType: BiType[A])
+  private final case class ConstImpl[S <: evt.Sys[S], A](timeVal: Long, magVal: A)(implicit magType: BiType[A])
     extends BiExpr[S, A] with expr.impl.ConstImpl[S, (Long, A)] {
 
     protected def constValue: (Long, A) = timeVal -> magVal
@@ -141,7 +141,7 @@ object BiExpr {
   }
 }
 
-trait BiExpr[S <: stm.Sys[S], A] extends Expr[S, (Long, A)] {
+trait BiExpr[S <: evt.Sys[S], A] extends Expr[S, (Long, A)] {
   def time: Expr[S, Long]
   def mag : Expr[S, A   ]
 

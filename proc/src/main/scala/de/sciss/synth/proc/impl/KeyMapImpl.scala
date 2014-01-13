@@ -2,7 +2,7 @@
  *  KeyMapImpl.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -29,7 +29,7 @@ package impl
 
 import de.sciss.lucre.{event => evt, synth, data}
 import data.SkipList
-import evt.{EventLike, impl => evti, Sys}
+import evt.{EventLike, impl => evti}
 import de.sciss.serial.{DataOutput, DataInput, Serializer}
 
 object KeyMapImpl {
@@ -72,40 +72,32 @@ object KeyMapImpl {
   }
 }
 
-/**
- * Common building block for implementing reactive maps where the key is a constant element
- * (that is, it does not require updating such as an `S#ID`).
- *
- * @tparam S         the system used
- * @tparam Key       the type of key, such as `String`
- * @tparam Value     the value type, which has an event attached to it (found via `valueInfo`)
- * @tparam ValueUpd  the value updates fired
- */
+/** Common building block for implementing reactive maps where the key is a constant element
+  * (that is, it does not require updating such as an `S#ID`).
+  *
+  * @tparam S         the system used
+  * @tparam Key       the type of key, such as `String`
+  * @tparam Value     the value type, which has an event attached to it (found via `valueInfo`)
+  * @tparam ValueUpd  the value updates fired
+  */
 trait KeyMapImpl[S <: synth.Sys[S], Key, Value, ValueUpd] {
   _: evt.VirtualNodeSelector[S] =>
 
   protected type Entry = KeyMapImpl.Entry    [S, Key, Value, ValueUpd]
   protected type Info  = KeyMapImpl.ValueInfo[S, Key, Value, ValueUpd]
 
-  /**
-   * The underlying non-reactive map
-   */
+  /** The underlying non-reactive map */
   protected def map: SkipList.Map[S, Key, Entry]
 
-  /**
-   * Whether the underlying selector is currently connected or not
-   */
+  /** Whether the underlying selector is currently connected or not */
   protected def isConnected(implicit tx: S#Tx): Boolean
 
-  /**
-   * Wrap the given set of added and removed keys in an appropriate update message
-   * and dispatch it.
-   */
+  /** Wrap the given set of added and removed keys in an appropriate update message
+    * and dispatch it.
+    */
   protected def fire(added: Set[Key], removed: Set[Key])(implicit tx: S#Tx): Unit
 
-  /**
-   * A helper object providing key and value serialization and an event view of the value.
-   */
+  /** A helper object providing key and value serialization and an event view of the value. */
   protected implicit def valueInfo: Info
 
   final def get(key: Key)(implicit tx: S#Tx): Option[Value] = map.get(key).map(_.value)

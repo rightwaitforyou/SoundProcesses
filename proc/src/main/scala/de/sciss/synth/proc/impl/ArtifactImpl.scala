@@ -2,7 +2,7 @@
  *  ArtifactImpl.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -31,7 +31,7 @@ package impl
 import de.sciss.serial.{DataOutput, DataInput}
 import lucre.{event => evt, data, expr}
 import java.io.File
-import expr.LinkedList
+import expr.List
 import proc.Artifact.Location.Update
 import evt.{EventLike, NodeSerializer}
 import de.sciss.synth.proc.Artifact.Modifiable
@@ -91,7 +91,7 @@ object ArtifactImpl {
   def newLocation[S <: evt.Sys[S]](init: File)(implicit tx: S#Tx): Location.Modifiable[S] = {
     val targets   = evt.Targets[S]
     val directory = tx.newVar(targets.id, init)
-    val artifacts = LinkedList.Modifiable[S, Artifact[S]]
+    val artifacts = List.Modifiable[S, Artifact[S]]
     new LocationImpl(targets, directory, artifacts)
   }
 
@@ -114,7 +114,7 @@ object ArtifactImpl {
     val cookie    = in.readShort()
     require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
     val directory = tx.readVar[File](targets.id, in)
-    val artifacts = LinkedList.Modifiable.read[S, Artifact[S]](in, access)
+    val artifacts = List.Modifiable.read[S, Artifact[S]](in, access)
     new LocationImpl(targets, directory, artifacts)
   }
 
@@ -131,7 +131,7 @@ object ArtifactImpl {
 
   private final class LocationImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
                                                     _directory: S#Var[File],
-                                                    artifacts: LinkedList.Modifiable[S, Artifact[S], Unit])
+                                                    artifacts: List.Modifiable[S, Artifact[S], Unit])
     extends Location.Modifiable[S]
     with evt.impl.Generator     [S, Location.Update[S], Location[S]]
     with evt.impl.Root          [S, Location.Update[S]]

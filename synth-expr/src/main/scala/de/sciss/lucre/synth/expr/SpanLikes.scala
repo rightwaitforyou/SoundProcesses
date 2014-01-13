@@ -2,7 +2,7 @@
  *  Booleans.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@
 package de.sciss.lucre.synth
 package expr
 
-import de.sciss.lucre.{stm, event => evt, expr, bitemp}
+import de.sciss.lucre.{event => evt, expr}
 import evt.{Targets, Sys}
 import expr.Expr
 import annotation.switch
@@ -60,7 +60,7 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
       def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                            (implicit tx: S#Tx): Tuple1[S, T1]
 
-      def toString[S <: stm.Sys[S]](_1: Expr[S, T1]): String = s"$name(${_1})"
+      def toString[S <: Sys[S]](_1: Expr[S, T1]): String = s"$name(${_1})"
 
       def name: String = {
         val cn  = getClass.getName
@@ -87,14 +87,14 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
       final val id = 0
       def value(a: Long): SpanLike = Span.from(a)
 
-      override def toString[S <: stm.Sys[S]](_1: Expr[S, Long]): String = s"Span.from(${_1 })"
+      override def toString[S <: Sys[S]](_1: Expr[S, Long]): String = s"Span.from(${_1 })"
     }
 
     case object Until extends LongOp {
       final val id = 1
       def value(a: Long): SpanLike = Span.until(a)
 
-      override def toString[S <: stm.Sys[S]](_1: Expr[S, Long]): String = s"Span.until(${_1})"
+      override def toString[S <: Sys[S]](_1: Expr[S, Long]): String = s"Span.until(${_1})"
     }
   }
 
@@ -103,7 +103,7 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
       def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                            (implicit tx: S#Tx): Tuple2[S, T1, T2]
 
-      def toString[S <: stm.Sys[S]](_1: Expr[S, T1], _2: Expr[S, T2]): String =
+      def toString[S <: Sys[S]](_1: Expr[S, T1], _2: Expr[S, T2]): String =
         _1.toString + "." + name + "(" + _2 + ")"
 
       def value(a: T1, b: T2): SpanLike
@@ -147,7 +147,7 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
 
     case object Apply extends LongLongOp {
       final val id = 0
-      override def toString[S <: stm.Sys[S]](_1: Expr[S, Long], _2: Expr[S, Long]): String =
+      override def toString[S <: Sys[S]](_1: Expr[S, Long], _2: Expr[S, Long]): String =
         "Span(" + _1 + ", " + _2 + ")"
 
       def value(a: Long, b: Long): SpanLike = Span(a, b)

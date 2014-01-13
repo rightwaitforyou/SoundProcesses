@@ -5,7 +5,7 @@ package proc
 import lucre.{event => evt, stm}
 import lucre.expr.Expr
 import stm.Mutable
-import evt.EventLike
+import de.sciss.lucre.event.{Publisher, EventLike}
 import language.{higherKinds, implicitConversions}
 import proc.impl.{AttributeImpl => Impl}
 
@@ -80,20 +80,11 @@ object Attribute {
 
   implicit def serializer[S <: evt.Sys[S]]: evt.Serializer[S, Attribute[S]] = Impl.serializer[S]
 }
-/* sealed */ trait Attribute[S <: evt.Sys[S]] extends Mutable[S#ID, S#Tx] {
-  attr =>
-
-  import Attribute.Update
-
+trait Attribute[S <: evt.Sys[S]] extends Mutable[S#ID, S#Tx] with Publisher[S, Attribute.Update[S]] {
   type Peer
 
   /** The actual object wrapped by the element. */
   def peer: Peer
 
-  /** An event for tracking element changes, which can be renaming
-    * the element or forwarding changes from the underlying entity.
-    */
-  def changed: EventLike[S, Update[S]]
-
-  def mkCopy()(implicit tx: S#Tx): Attribute[S] // { type Peer = attr.Peer }
+  def mkCopy()(implicit tx: S#Tx): Attribute[S]
 }

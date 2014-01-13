@@ -2,7 +2,7 @@
  *  Transport.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -110,8 +110,7 @@ object Transport {
   }
 }
 
-trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ S ] */ /* with Chronos[S] */ {
-  //   def id: S#ID
+trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] {
 
   def play()(implicit tx: S#Tx): Unit
   def stop()(implicit tx: S#Tx): Unit
@@ -119,31 +118,14 @@ trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] /* evt.Node[ S ] 
   def seek(time: Long)(implicit tx: S#Tx): Unit
   def time(implicit tx: S#Tx): Long
 
-  //   def playing( implicit tx: S#Tx ) : Expr[ S, Boolean ]
-  //   def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ) : Unit
-
   def isPlaying(implicit tx: S#Tx): Boolean
 
   def sampleRate: Double
 
-  /**
-   * Iterator over all processes which intersect with the current time.
-   */
+  /** Iterator over all processes which intersect with the current time. */
   def iterator(implicit tx: S#Tx): Iterator[S#Tx, (SpanLike, BiGroup.TimedElem[S, Elem])]
 
-  //
-  //   def group: BiGroup[ S, Elem, U ]
-
-  //   def changed: Event[ S, Transport.Update[ S, Elem, U ], Transport[ S, Elem, U ]]
-
   def react(fun: S#Tx => Transport.Update[S, Elem, U] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
-
-  //   // unfortunately this needs to go in the API because of the self-access problem
-  //   private[proc] def eventReached( valid: Int, newLogical: Long, oldFrame: Long, newFrame: Long,
-  //                                   hasProcEvent: Boolean, hasParEvent: Boolean )( implicit tx: S#Tx ) : Unit
-
-  //   def play()( implicit time: Chronos[ S ]) : Unit
-  //   def stop()( implicit time: Chronos[ S ]) : Unit
 
   def cursor: stm.Cursor[S]
 }

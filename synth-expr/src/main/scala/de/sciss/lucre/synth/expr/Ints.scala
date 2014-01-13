@@ -2,7 +2,7 @@
  *  Ints.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2013 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
  *
  *  This software is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License
@@ -26,7 +26,7 @@
 package de.sciss.lucre.synth
 package expr
 
-import de.sciss.lucre.{stm, event => evt, expr}
+import de.sciss.lucre.{event => evt, expr}
 import evt.{Targets, Sys}
 import annotation.switch
 import expr.Expr
@@ -113,7 +113,7 @@ object Ints extends BiTypeImpl[Int] {
       def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                            (implicit tx: S#Tx): Tuple1[S, T1]
 
-      def toString[S <: stm.Sys[S]](_1: Expr[S, T1]): String = _1.toString + "." + name
+      def toString[S <: Sys[S]](_1: Expr[S, T1]): String = _1.toString + "." + name
 
       def apply[S <: Sys[S]](a: Expr[S, T1])(implicit tx: S#Tx): Ex[S] = a match {
         case Expr.Const(c)  => newConst(value(c))
@@ -140,7 +140,7 @@ object Ints extends BiTypeImpl[Int] {
     case object Neg extends IntOp {
       final val id = 0
       def value(a: Int): Int = -a
-      override def toString[S <: stm.Sys[S]](_1: Ex[S]): String = "-" + _1
+      override def toString[S <: Sys[S]](_1: Ex[S]): String = "-" + _1
     }
 
     case object Abs extends IntOp {
@@ -151,7 +151,7 @@ object Ints extends BiTypeImpl[Int] {
     case object BitNot extends IntOp {
       final val id = 4
       def value(a: Int): Int = ~a
-      override def toString[S <: stm.Sys[S]](_1: Ex[S]): String = "~" + _1
+      override def toString[S <: Sys[S]](_1: Ex[S]): String = "~" + _1
     }
 
     // case object ToLong     extends Op(  6 )
@@ -183,7 +183,7 @@ object Ints extends BiTypeImpl[Int] {
 
       def value(a: Int, b: Int): Int
 
-      def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
+      def toString[S <: Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"${_1}.$name(${_2})"
 
       def name: String = {
         val cn = getClass.getName
@@ -196,7 +196,7 @@ object Ints extends BiTypeImpl[Int] {
     trait Infix {
       _: Op =>
 
-      override def toString[S <: stm.Sys[S]](_1: Ex[S], _2: Ex[S]): String =
+      override def toString[S <: Sys[S]](_1: Ex[S], _2: Ex[S]): String =
         "(" + _1 + " " + name + " " + _2 + ")"
     }
 
