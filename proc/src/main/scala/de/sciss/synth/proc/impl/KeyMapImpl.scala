@@ -27,23 +27,23 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, synth, data}
+import de.sciss.lucre.{event => evt, data}
 import data.SkipList
 import evt.{EventLike, impl => evti}
 import de.sciss.serial.{DataOutput, DataInput, Serializer}
 
 object KeyMapImpl {
-  trait ValueInfo[S <: synth.Sys[S], Key, Value, ValueUpd] {
+  trait ValueInfo[S <: evt.Sys[S], Key, Value, ValueUpd] {
     def valueEvent(value: Value): EventLike[S, ValueUpd]
 
     def keySerializer  : Serializer[S#Tx, S#Acc, Key]
     def valueSerializer: Serializer[S#Tx, S#Acc, Value]
   }
 
-  implicit def entrySerializer[S <: synth.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
+  implicit def entrySerializer[S <: evt.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
   : evt.Serializer[S, Entry[S, Key, Value, ValueUpd]] = new EntrySer
 
-  private final class EntrySer[S <: synth.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
+  private final class EntrySer[S <: evt.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
     extends evt.NodeSerializer[S, Entry[S, Key, Value, ValueUpd]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Entry[S, Key, Value, ValueUpd] = {
       val key   = info.keySerializer.read(in, access)
@@ -52,7 +52,7 @@ object KeyMapImpl {
     }
   }
 
-  final class Entry[S <: synth.Sys[S], Key, Value, ValueUpd](protected val targets: evt.Targets[S], val key: Key,
+  final class Entry[S <: evt.Sys[S], Key, Value, ValueUpd](protected val targets: evt.Targets[S], val key: Key,
                                                        val value: Value)(implicit info: ValueInfo[S, Key, Value, ValueUpd])
     extends evti.StandaloneLike[S, (Key, ValueUpd), Entry[S, Key, Value, ValueUpd]] {
     protected def reader: evt.Reader[S, Entry[S, Key, Value, ValueUpd]] = entrySerializer
@@ -80,7 +80,7 @@ object KeyMapImpl {
   * @tparam Value     the value type, which has an event attached to it (found via `valueInfo`)
   * @tparam ValueUpd  the value updates fired
   */
-trait KeyMapImpl[S <: synth.Sys[S], Key, Value, ValueUpd] {
+trait KeyMapImpl[S <: evt.Sys[S], Key, Value, ValueUpd] {
   _: evt.VirtualNodeSelector[S] =>
 
   protected type Entry = KeyMapImpl.Entry    [S, Key, Value, ValueUpd]
