@@ -25,7 +25,7 @@
 
 package de.sciss.synth
 
-import de.sciss.lucre.{bitemp, event => evt}
+import de.sciss.lucre.bitemp
 import bitemp.BiGroup
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}

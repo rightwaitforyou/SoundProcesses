@@ -205,7 +205,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
         val keepPlaying = blocking {
           cursor.step { implicit tx =>
             transp.stepTarget match {
-              case _posO @ Some(pos) if (pos <= span.stop) =>
+              case _posO @ Some(pos) if pos <= span.stop =>
                 logTransport(s"stepTarget = $pos")
                 server.position = pos - span.start
                 transp.step()

@@ -76,7 +76,7 @@ object Strings extends BiTypeImpl[String] {
 
   def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                             (implicit tx: S#Tx): ExN[S] = {
-    (cookie /* : @switch */) match {
+    cookie /* : @switch */ match {
       //         case 1 =>
       //            val tpe  = in.readInt()
       //            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
@@ -93,7 +93,7 @@ object Strings extends BiTypeImpl[String] {
         require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
         val opID = in.readInt()
         import BinaryOp._
-        val op: Op = (opID /*: @switch */) match {
+        val op: Op = opID /*: @switch */ match {
           case Append.id => Append
         }
         val _1 = readExpr(in, access)

@@ -32,7 +32,7 @@ import serial.{Serializer, DataInput}
 import lucre.{stm, event => evt, data, expr}
 import stm.Mutable
 import java.io.File
-import de.sciss.lucre.event.{Publisher, EventLike}
+import de.sciss.lucre.event.Publisher
 import expr.Expr
 import scala.annotation.tailrec
 import de.sciss.model

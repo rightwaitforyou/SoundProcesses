@@ -35,7 +35,7 @@ import de.sciss.lucre.synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 import impl.{GraphemeImpl => Impl}
 import synth.io.AudioFileSpec
-import de.sciss.lucre.event.{Publisher, Event}
+import de.sciss.lucre.event.Publisher
 import span.{SpanLike, Span}
 import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 import java.io.File

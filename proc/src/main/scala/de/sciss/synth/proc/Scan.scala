@@ -28,7 +28,7 @@ package proc
 
 import de.sciss.lucre.{event => evt, data}
 import impl.{ScanImpl => Impl}
-import de.sciss.lucre.event.{Publisher, Event}
+import de.sciss.lucre.event.Publisher
 import language.implicitConversions
 import de.sciss.serial.DataInput
 import de.sciss.lucre.stm.Identifiable

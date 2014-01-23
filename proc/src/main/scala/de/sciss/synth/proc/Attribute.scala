@@ -5,7 +5,7 @@ package proc
 import lucre.{event => evt, stm}
 import lucre.expr.Expr
 import stm.Mutable
-import de.sciss.lucre.event.{Publisher, EventLike}
+import de.sciss.lucre.event.Publisher
 import language.{higherKinds, implicitConversions}
 import proc.impl.{AttributeImpl => Impl}
 
