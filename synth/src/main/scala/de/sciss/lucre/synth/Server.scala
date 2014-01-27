@@ -88,6 +88,9 @@ trait Server {
 
   def defaultGroup: Group
 
+  def config      : Server .Config
+  def clientConfig: SClient.Config
+
   // ---- side effects methods ----
 
   /** Sends out a packet immediately without synchronization */

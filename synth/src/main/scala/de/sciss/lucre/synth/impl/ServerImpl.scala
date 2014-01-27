@@ -30,6 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.{Server => SServer, AllocatorExhausted, addToHead, message}
 import de.sciss.osc
+import de.sciss.synth.{Client => SClient}
 
 object ServerImpl {
   def apply  (peer: SServer): Server          = new OnlineImpl (peer)
@@ -123,6 +124,9 @@ object ServerImpl {
     private val nodeAllocator       = NodeIDAllocator(peer.clientConfig.clientID, peer.clientConfig.nodeIDOffset)
 
     val defaultGroup: Group = Group.wrap(this, peer.defaultGroup) // .default( this )
+
+    def config      : Server .Config = peer.config
+    def clientConfig: SClient.Config = peer.clientConfig
 
     def allocControlBus(numChannels: Int)(implicit tx: Txn): Int = {
       val res = controlBusAllocator.alloc(numChannels)(tx.peer)

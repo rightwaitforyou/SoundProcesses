@@ -53,7 +53,7 @@ object AuralSystemImpl {
 
     override def toString = "AuralSystem@" + hashCode.toHexString
 
-    private val clients       = Ref(Vec.empty[Client])
+    private val clients       = Ref(Vec   .empty[Client])
     private val server        = Ref(Option.empty[Server])
     private val connection    = Ref(Option.empty[SServerLike])
 

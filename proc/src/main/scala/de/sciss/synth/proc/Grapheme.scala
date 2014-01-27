@@ -332,8 +332,8 @@ object Grapheme {
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
       def value(implicit tx: S#Tx): Value.Audio = {
         val artVal    = artifact.value
-        val offsetVal = offset.value
-        val gainVal   = gain.value
+        val offsetVal = offset  .value
+        val gainVal   = gain    .value
         Value.Audio(artVal, spec, offsetVal, gainVal)
       }
 
