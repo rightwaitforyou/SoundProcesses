@@ -6,8 +6,9 @@ import lucre.{event => evt, stm}
 import lucre.expr.Expr
 import stm.Mutable
 import de.sciss.lucre.event.Publisher
-import language.{higherKinds, implicitConversions}
 import proc.impl.{AttributeImpl => Impl}
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.{higherKinds, implicitConversions}
 
 object Attribute {
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean}
@@ -74,6 +75,19 @@ object Attribute {
   trait FadeSpec[S <: evt.Sys[S]] extends Attribute[S] {
     type Peer = Expr[S, _FadeSpec.Value]
     def mkCopy()(implicit tx: S#Tx): FadeSpec[S]
+  }
+
+  // ----------------- DoubleVec -----------------
+
+  object DoubleVec {
+    def apply[S <: evt.Sys[S]](peer: Expr[S, Vec[_Double]])(implicit tx: S#Tx): DoubleVec[S] = Impl.DoubleVec(peer)
+
+    implicit def serializer[S <: evt.Sys[S]]: serial.Serializer[S#Tx, S#Acc, DoubleVec[S]] =
+      Impl.DoubleVec.serializer[S]
+  }
+  trait DoubleVec[S <: evt.Sys[S]] extends Attribute[S] {
+    type Peer = Expr[S, Vec[_Double]]
+    def mkCopy()(implicit tx: S#Tx): DoubleVec[S]
   }
 
   // ----------------- Serializer -----------------

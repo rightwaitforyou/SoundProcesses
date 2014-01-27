@@ -31,17 +31,19 @@ package impl
 import lucre.{event => evt, expr, stm}
 import evt.Event
 import serial.{DataInput, DataOutput, Writable}
-import language.higherKinds
 import stm.Disposable
 import expr.{Expr => _Expr}
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.synth.expr.{Strings, Booleans, Doubles, Ints}
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.higherKinds
 
 object AttributeImpl {
   import Attribute.Update
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean}
   import java.lang.{String => _String}
   import proc.{FadeSpec => _FadeSpec}
+  import lucre.synth.expr.{DoubleVec => _DoubleVec}
 
   // ---- Int ----
 
@@ -193,6 +195,36 @@ object AttributeImpl {
     }
   }
 
+  // ---- DoubleVec ----
+
+  object DoubleVec extends Companion[Attribute.DoubleVec] {
+    val typeID = _DoubleVec.typeID
+
+    def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                       (implicit tx: S#Tx): Attribute.DoubleVec[S] with evt.Node[S] = {
+      val peer = _DoubleVec.readExpr(in, access)
+      new DoubleVecImpl(targets, peer)
+    }
+
+    def apply[S <: evt.Sys[S]](peer: _Expr[S, Vec[_Double]])(implicit tx: S#Tx): Attribute.DoubleVec[S] =
+      new DoubleVecImpl(evt.Targets[S], peer)
+  }
+
+  final class DoubleVecImpl[S <: evt.Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, Vec[_Double]])
+    extends Expr[S, Vec[_Double]] with Attribute.DoubleVec[S] {
+
+    def typeID = DoubleVec.typeID
+    def prefix = "DoubleVec"
+
+    def mkCopy()(implicit tx: S#Tx): Attribute.DoubleVec[S] = {
+      val newPeer = peer match {
+        case _Expr.Var(vr) => _DoubleVec.newVar(vr())
+        case _ => peer
+      }
+      DoubleVec(newPeer)
+    }
+  }
+
   // ---------- Impl ----------
 
   trait Companion[E[S <: evt.Sys[S]] <: Writable ] {
@@ -291,9 +323,8 @@ object AttributeImpl {
   private final val anySer = new Ser[InMemory]
 
   private final class Ser[S <: evt.Sys[S]] extends evt.EventLikeSerializer[S, Attribute[S]] {
-    def readConstant(in: DataInput)(implicit tx: S#Tx): Attribute[S] = {
+    def readConstant(in: DataInput)(implicit tx: S#Tx): Attribute[S] =
       sys.error("No passive elements known")
-    }
 
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Attribute[S] with evt.Node[S] = {
       val typeID = in.readInt()
@@ -303,6 +334,7 @@ object AttributeImpl {
         case Boolean         .typeID => Boolean         .readIdentified(in, access, targets)
         case String          .typeID => String          .readIdentified(in, access, targets)
         case FadeSpec        .typeID => FadeSpec        .readIdentified(in, access, targets)
+        case DoubleVec       .typeID => DoubleVec       .readIdentified(in, access, targets)
         // case Folder          .typeID => Folder          .readIdentified(in, access, targets)
         // case ProcGroup       .typeID => ProcGroup       .readIdentified(in, access, targets)
         // case AudioGrapheme   .typeID => AudioGrapheme   .readIdentified(in, access, targets)

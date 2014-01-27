@@ -240,6 +240,7 @@ object AuralPresentationImpl {
                   case _              => 0f
                 }, spec.floor
               )
+            case a: Attribute.DoubleVec[S] => ctlName -> a.peer.value.map(_.toFloat)
             case a => sys.error(s"Cannot cast attribute $a to a scalar value")
           }
           csm.foreach(setMap :+= _)
