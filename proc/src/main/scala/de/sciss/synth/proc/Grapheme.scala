@@ -73,7 +73,7 @@ object Grapheme {
       }
       private[Value] def readIdentified(in: DataInput): Curve = {
         val sz      = in.readInt()
-        val values  = Vector.fill(sz) {
+        val values  = Vec.fill(sz) {
           val mag   = in.readDouble()
           val env   = synth.Curve.serializer.read(in)
           (mag, env)
@@ -176,6 +176,8 @@ object Grapheme {
     final val typeID = 11
 
     object Curve extends expr.Type[Value.Curve] {
+      final val typeID = 12
+
       def apply[S <: Sys[S]](values: (Expr[S, Double], synth.Curve)*)(implicit tx: S#Tx): Curve[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new CurveImpl(targets, values.toIndexedSeq)
@@ -214,6 +216,8 @@ object Grapheme {
     sealed trait Curve[S <: evt.Sys[S]] extends Elem[S] with Expr[S, Value.Curve]
 
     object Audio extends expr.Type[Value.Audio] {
+      final val typeID = 13
+
       def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: Expr[S, Long], gain: Expr[S, Double])
                                 (implicit tx: S#Tx): Audio[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
@@ -252,6 +256,7 @@ object Grapheme {
       def artifact: Artifact[S]
       def offset  : Expr[S, Long  ]
       def gain    : Expr[S, Double]
+      def spec    : AudioFileSpec
     }
 
     private final class CurveImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
@@ -275,8 +280,8 @@ object Grapheme {
         }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Curve]] = {
-        val beforeVals  = Vector.newBuilder[(Double, synth.Curve)]
-        val nowVals     = Vector.newBuilder[(Double, synth.Curve)]
+        val beforeVals  = Vec.newBuilder[(Double, synth.Curve)]
+        val nowVals     = Vec.newBuilder[(Double, synth.Curve)]
         values.foreach {
           case (mag, shape) =>
             val magEvt = mag.changed
@@ -376,7 +381,7 @@ object Grapheme {
       override def toString() = "Elem.Audio" + id
     }
 
-    // ---- bitype ----
+    // ---- bi-type ----
 
     def longType    : BiType[Long    ] = Longs
     def spanLikeType: BiType[SpanLike] = SpanLikes

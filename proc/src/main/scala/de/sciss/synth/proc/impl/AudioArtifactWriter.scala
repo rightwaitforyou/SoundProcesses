@@ -49,10 +49,6 @@ final class AudioArtifactWriter private (synth: Synth, val bus: AudioBus, segm: 
                                          sampleRate: Double)
   extends DynamicBusUser with Resource.Source {
 
-  // private val synthRef  = Ref(Option.empty[Synth])
-
-  // def synth(implicit tx: Txn): Option[Synth] = synthRef()(tx.peer)
-
   def resource(implicit tx: Txn) = synth
 
   def server = synth.server
@@ -81,21 +77,15 @@ final class AudioArtifactWriter private (synth: Synth, val bus: AudioBus, segm: 
     val args0     = List[ControlSetMap]("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
     val args      = if (factor == 1.0) args0 else ("speed" -> factor: ControlSetMap) :: args0
 
-    // val rs = rd.play( target = target, args = args, buffers = rb :: Nil )
     synth.play(target = target, args = args, addAction = addToHead, dependencies = rb :: Nil)
 
     synth.onEndTxn { implicit tx =>
-      // bufPeer.close( bufPeer.freeMsg )
+      rb   .dispose() // XXX TODO: why was this not in the code before? Is this causing any trouble?
       synth.dispose()
     }
 
-    // rs.play( target = target, args = args, buffers = rb :: Nil )
     synth.write(bus -> "out")
-
-    // val oldSynth = synthRef.swap(Some(rs))(tx.peer)
-    // require(oldSynth.isEmpty, "AudioArtifactWriter.add() : old synth still playing")
   }
 
-  def remove()(implicit tx: Txn): Unit =
-    if (synth.isOnline) synth.free()
+  def remove()(implicit tx: Txn): Unit = if (synth.isOnline) synth.free()
 }

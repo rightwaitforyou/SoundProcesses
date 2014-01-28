@@ -66,7 +66,7 @@ object AuralNode {
           all
         } { all =>
           moveAllTo(all, newGroup)
-          all.main.free(audible = true) // que se puede...?
+          all.main.free(audible = true) // what can you do...?
           all.copy(main = newGroup)
         }
         Some(res)
@@ -116,7 +116,8 @@ object AuralNode {
 
     def setBusUsers(users: List[DynamicBusUser]): Unit = busUsers = users
 
-    def addInputBus(key: String, bus: AudioBus): Unit = inBuses += key -> bus
+    def addInputBus (key: String, bus: AudioBus): Unit = inBuses  += key -> bus
+    // def addOutputBus(key: String, bus: AudioBus): Unit = outBuses += key -> bus
 
     // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
     //   ?
@@ -148,7 +149,7 @@ sealed trait AuralNode /* extends Writer */ {
     */
   private[sciss] def setBusUsers(users: List[DynamicBusUser]): Unit
 
-  // dito
+  // ditto
   private[sciss] def addInputBus(key: String, bus: AudioBus): Unit
 
   // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit

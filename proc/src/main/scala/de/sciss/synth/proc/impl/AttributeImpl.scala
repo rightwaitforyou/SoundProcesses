@@ -213,6 +213,42 @@ object AttributeImpl {
     }
   }
 
+  // ---- DoubleVec ----
+
+  object AudioGrapheme extends Companion[Attribute.AudioGrapheme] {
+    val typeID = Grapheme.Elem.Audio.typeID
+
+    def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                       (implicit tx: S#Tx): Attribute.AudioGrapheme[S] with evt.Node[S] = {
+      // val peer = Grapheme.Elem.Audio.readExpr(in, access)
+      val peer = Grapheme.Elem.Audio.readExpr(in, access) match {
+        case a: Grapheme.Elem.Audio[S] => a
+        case other => sys.error(s"Expected a Grapheme.Elem.Audio, but found $other")  // XXX TODO
+      }
+      new AudioGraphemeImpl(targets, peer)
+    }
+
+    def apply[S <: evt.Sys[S]](peer: Grapheme.Elem.Audio[S])(implicit tx: S#Tx): Attribute.AudioGrapheme[S] =
+      new AudioGraphemeImpl(evt.Targets[S], peer)
+  }
+
+  final class AudioGraphemeImpl[S <: evt.Sys[S]](val targets: evt.Targets[S],
+                                                 val peer: Grapheme.Elem.Audio[S])
+    extends Expr[S, Grapheme.Value.Audio] with Attribute.AudioGrapheme[S] {
+
+    def typeID = AudioGrapheme.typeID
+    def prefix = "AudioGrapheme"
+
+    def mkCopy()(implicit tx: S#Tx): Attribute.AudioGrapheme[S] = {
+      val newPeer = peer
+      //      match {
+      //        case _Expr.Var(vr) => _DoubleVec.newVar(vr())
+      //        case _ => peer
+      //      }
+      AudioGrapheme(newPeer)
+    }
+  }
+
   // ---------- Impl ----------
 
   trait Companion[E[S <: evt.Sys[S]] <: Writable ] {
@@ -323,6 +359,7 @@ object AttributeImpl {
         case String          .typeID => String          .readIdentified(in, access, targets)
         case FadeSpec        .typeID => FadeSpec        .readIdentified(in, access, targets)
         case DoubleVec       .typeID => DoubleVec       .readIdentified(in, access, targets)
+        case AudioGrapheme   .typeID => AudioGrapheme   .readIdentified(in, access, targets)
         // case Folder          .typeID => Folder          .readIdentified(in, access, targets)
         // case ProcGroup       .typeID => ProcGroup       .readIdentified(in, access, targets)
         // case AudioGrapheme   .typeID => AudioGrapheme   .readIdentified(in, access, targets)

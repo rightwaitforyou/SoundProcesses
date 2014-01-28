@@ -209,36 +209,53 @@ object AuralPresentationImpl {
         })
       )
       var deps          = List.empty[Resource.Source]
-
       val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) {
         // println(s"Attributes used: ${attrNames.mkString(", ")}")
         attrNames.foreach { n =>
           val ctlName = graph.attribute.controlName(n)
-          val csm: Option[ControlSetMap] = p.attributes.get(n).map {
-            case a: Attribute.Int     [S] => ctlName -> a.peer.value.toFloat
-            case a: Attribute.Double  [S] => ctlName -> a.peer.value.toFloat
-            case a: Attribute.Boolean [S] => ctlName -> (if (a.peer.value) 1f else 0f)
+          p.attributes.get(n).map {
+            case a: Attribute.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
+            case a: Attribute.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
+            case a: Attribute.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSetMap)
             case a: Attribute.FadeSpec[S] =>
               val spec = a.peer.value
               // dur, shape-id, shape-curvature, floor
-              ctlName -> Vec(
+              val values = Vec(
                 (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
                   case parametric(c)  => c
                   case _              => 0f
                 }, spec.floor
               )
-            case a: Attribute.DoubleVec[S] => ctlName -> a.peer.value.map(_.toFloat)
+              setMap :+= (ctlName -> values: ControlSetMap)
+            case a: Attribute.DoubleVec[S] =>
+              val values = a.peer.value.map(_.toFloat)
+              setMap :+= (ctlName -> values: ControlSetMap)
+            case a: Attribute.AudioGrapheme[S] =>
+              val audioVal  = a.peer
+              val spec      = audioVal.spec
+              //              require(spec.numChannels == 1 || spec.numFrames == 1,
+              //                s"Audio grapheme ${a.peer} must have either 1 channel or 1 frame to be used as scalar attribute")
+              require(spec.numFrames == 1, s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
+              //              val numChL = if (spec.numChannels == 1) spec.numFrames else spec.numChannels
+              //              require(numChL <= 4096, s"Audio grapheme size ($numChL) must be <= 4096 to be used as scalar attribute")
+              val numCh  = spec.numChannels // numChL.toInt
+              require(numCh <= 4096, s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
+              val b      = Bus.control(server, numCh)
+              val res    = BusNodeSetter.mapper(ctlName, b, synth)
+              busUsers ::= res
+              val w      = AudioArtifactScalarWriter(b, audioVal.value)
+              deps     ::= w
+              busUsers ::= w
+
             case a => sys.error(s"Cannot cast attribute $a to a scalar value")
           }
-          csm.foreach(setMap :+= _)
         }
       }
 
       import Grapheme.Segment
-
-      val outBuses  = builder.outputs
-      val aural     = AuralNode(synth, outBuses.mapValues(_.bus))
+      val outBuses      = builder.outputs
+      val aural         = AuralNode(synth, outBuses.mapValues(_.bus))
 
       ugen.scanIns.foreach {
         case (key, scanIn) =>
@@ -257,7 +274,6 @@ object AuralPresentationImpl {
             else
               BusNodeSetter.mapper(inCtlName, b, synth)
             busUsers ::= res
-            // inBus      = Some(res)
             aural.addInputBus(key, res.bus)
             res
           }

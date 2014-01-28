@@ -103,6 +103,20 @@ object Attribute {
     def mkCopy()(implicit tx: S#Tx): DoubleVec[S]
   }
 
+  // ----------------- DoubleVec -----------------
+
+  object AudioGrapheme {
+    def apply[S <: evt.Sys[S]](peer: Grapheme.Elem.Audio[S])(implicit tx: S#Tx): AudioGrapheme[S] =
+      Impl.AudioGrapheme(peer)
+
+    implicit def serializer[S <: evt.Sys[S]]: serial.Serializer[S#Tx, S#Acc, AudioGrapheme[S]] =
+      Impl.AudioGrapheme.serializer[S]
+  }
+  trait AudioGrapheme[S <: evt.Sys[S]] extends Attribute[S] {
+    type Peer = Grapheme.Elem.Audio[S]
+    def mkCopy()(implicit tx: S#Tx): AudioGrapheme[S]
+  }
+
   // ----------------- Serializer -----------------
 
   implicit def serializer[S <: evt.Sys[S]]: evt.Serializer[S, Attribute[S]] = Impl.serializer[S]
