@@ -426,7 +426,7 @@ object AuralPresentationImpl {
     // called by UGenGraphBuilderImpl
     def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int = {
       timed.value.attributes.get(key).fold(1) {
-        case a: Attribute.DoubleVec[S]      => ??? // a.peer.size.value
+        case a: Attribute.DoubleVec[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: Attribute.AudioGrapheme[S]  => a.peer.spec.numChannels
         case _ => 1
       }
