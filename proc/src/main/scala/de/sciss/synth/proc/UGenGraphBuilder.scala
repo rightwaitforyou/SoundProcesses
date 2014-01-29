@@ -54,7 +54,8 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
     */
   def addScanIn(key: String, numChannels: Int): Int
 
-  def addAttributeIn(key: String): Unit
+  /** This method should only be invoked by the `graph.attribute.In` instances. It registers a control input. */
+  def addAttributeIn(key: String): Int
 
   /** This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along
     * with the number of channels written to it.

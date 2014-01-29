@@ -45,7 +45,7 @@ private[proc] object UGenGraphBuilderImpl {
     def addScanIn(key: String, numChannels: Int): Int = {
       val fixed = numChannels >= 0
       val res   = aural.scanInNumChannels(timed = timed, time = time, key = key, numChannels = numChannels)(tx)
-      scanIns += key -> UGenGraphBuilder.ScanIn(numChannels = res, fixed = fixed)
+      scanIns  += key -> UGenGraphBuilder.ScanIn(numChannels = res, fixed = fixed)
       res
     }
 
@@ -58,7 +58,11 @@ private[proc] object UGenGraphBuilderImpl {
           scanOuts += key -> numChannels
       }
 
-    def addAttributeIn(key: String): Unit = attributeIns += key
+    def addAttributeIn(key: String): Int = {
+      val res       = aural.attrNumChannels(timed = timed, key = key)(tx)
+      attributeIns += key
+      res
+    }
 
     def tryBuild(): Boolean = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]

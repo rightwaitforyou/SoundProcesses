@@ -15,6 +15,8 @@ package de.sciss.synth
 package proc
 package graph
 
+import scala.collection.immutable.{IndexedSeq => Vec}
+
 object attribute {
   private[proc] def controlName(key: String): String = "$attr_"  + key
 
@@ -26,9 +28,10 @@ object attribute {
     def makeUGens: UGenInLike = {
       UGenGraph.builder match {
         case b: UGenGraphBuilder[_] =>
-          b.addAttributeIn(key)
+          val numCh   = b.addAttributeIn(key)
           val ctlName = controlName(key)
-          ctlName.ir(default).expand
+          val ctl     = if (numCh == 1) ctlName.ir(default) else ctlName.ir(Vec.fill(numCh)(default))
+          ctl.expand
 
         case _ => UGenGraphBuilder.outsideOfContext()
       }

@@ -41,6 +41,14 @@ object AuralPresentation {
       * @return             the number of channels for the scan input at the given time
       */
     def scanInNumChannels(timed: TimedProc[S], time: Long, key: String, numChannels: Int)(implicit tx: S#Tx): Int
+
+    /** Queries the number of channels associated with an attribute input.
+      * @param timed        the process whose graph is currently built
+      * @param key          the attribute key
+      *
+      * @return             the number of channels for the attribute input
+      */
+    def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int
   }
 
   final private[proc] case class MissingInfo[S <: Sys[S]](source: TimedProc[S], key: String) extends Throwable

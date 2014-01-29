@@ -424,6 +424,15 @@ object AuralPresentationImpl {
       }
 
     // called by UGenGraphBuilderImpl
+    def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int = {
+      timed.value.attributes.get(key).fold(1) {
+        case a: Attribute.DoubleVec[S]      => ??? // a.peer.size.value
+        case a: Attribute.AudioGrapheme[S]  => a.peer.spec.numChannels
+        case _ => 1
+      }
+    }
+
+    // called by UGenGraphBuilderImpl
     def scanInNumChannels(timed: TimedProc[S], time: Long, key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
       val numCh = timed.value.scans.get(key).fold(0) { scan =>
         val chans = scan.sources.toList.map {
