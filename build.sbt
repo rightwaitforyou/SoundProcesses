@@ -2,7 +2,7 @@ lazy val logicalName = "SoundProcesses"
 
 name                      := logicalName + "-full"
 
-version in ThisBuild      := "2.1.0-SNAPSHOT"
+version in ThisBuild      := "2.1.0"
 
 organization in ThisBuild := "de.sciss"
 
@@ -16,7 +16,7 @@ scalaVersion in ThisBuild := "2.10.3"
 
 resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-lazy val lucreCoreVersion       = "2.0.+"
+lazy val lucreCoreVersion       = "2.0.1+"
 
 lazy val lucreDataVersion       = "2.2.1+"   // debugSanitize!
 
@@ -24,9 +24,13 @@ lazy val lucreEventVersion      = "2.5.+"
 
 lazy val lucreConfluentVersion  = "2.6.+"
 
-lazy val scalaColliderVersion   = "1.10.+"
+lazy val scalaColliderVersion   = "1.10.1+"
 
-lazy val scalaTestVersion       = "1.9.1"
+lazy val scalaTestVersion       = "2.0"
+
+lazy val spanVersion            = "1.2.+"
+
+lazy val scalaOSCVersion        = "1.1.2+"  // bug fix version, somehow doesn't come in automatically
 
 retrieveManaged in ThisBuild := true
 
@@ -86,7 +90,7 @@ lazy val lucrebitemp = project.in(file("bitemp")).settings(
   libraryDependencies ++= Seq(
     "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
     "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
-    "de.sciss"      %% "span"            % "1.2.+"
+    "de.sciss"      %% "span"            % spanVersion
   )
 )
 
@@ -94,7 +98,7 @@ lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitem
   description := "Bitemporal expression types for SoundProcesses",
   libraryDependencies ++= Seq(
     "de.sciss"      %% "scalacollider"  % scalaColliderVersion,
-    "de.sciss"      %% "numbers"        % "0.1.+",
+    "de.sciss" %% "scalaosc" % scalaOSCVersion,  // make sure latest version comes in
     "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
     "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
     "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion % "test"
@@ -105,7 +109,8 @@ lazy val lucresynth = project.in(file("synth")).settings(
   description := "Transactional extension for ScalaCollider",
   libraryDependencies ++= Seq(
     "de.sciss" %% "lucreevent-core" % lucreEventVersion,
-    "de.sciss" %% "scalacollider"   % scalaColliderVersion
+    "de.sciss" %% "scalacollider"   % scalaColliderVersion,
+    "de.sciss" %% "scalaosc" % scalaOSCVersion
   )
 )
 

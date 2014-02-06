@@ -36,59 +36,62 @@ class GraphemeSpec extends ConfluentEventSpec {
     }
 
     // adding constants
-      system.step { implicit tx =>
-         val g = gH()
+    system.step { implicit tx =>
+      val g = gH()
 
-         g.add( e1 )
-         obs.assertEquals(
-            Update( g, Vec( Segment.Const( Span.from( 0L ), Vec( 441.0 ))))
-         )
-         obs.clear()
+      g.add(e1)
+      obs.assertEquals(
+        Update(g, Vec(Segment.Const(Span.from(0L), Vec(441.0))))
+      )
+      obs.clear()
 
-         g.add( e2 )
-         val s0_10000 = Segment.Curve( Span( 0L, 10000L ), Vec( (441.0, 882.0, exponential) ))
-         obs.assertEquals(
-            Update( g, Vec( s0_10000,
-                                Segment.Const( Span.from( 10000L ), Vec( 882.0 ))))
-         )
-         obs.clear()
+      g.add(e2)
+      val s0_10000 = Segment.Curve(Span(0L, 10000L), Vec((441.0, 882.0, exponential)))
+      obs.assertEquals(
+        Update(g, Vec(s0_10000,
+          Segment.Const(Span.from(10000L), Vec(882.0))))
+      )
+      obs.clear()
 
-         g.add( e3 )
-         obs.assertEquals(
-            Update( g, Vec( Segment.Const( Span( 10000L, 20000L ), Vec( 882.0 )), // no curve if channel mismatch
-                                Segment.Const( Span.from( 20000L ), Vec( 123.4, 567.8 ))))
-         )
-         obs.clear()
+      g.add(e3)
+      obs.assertEquals(
+        Update(g, Vec(
+          Segment.Const(Span(10000L, 20000L), Vec(882.0)), // no curve if channel mismatch
+          Segment.Const(Span.from(20000L)   , Vec(123.4, 567.8))))
+      )
+      obs.clear()
 
-         g.add( e4 )
-         obs.assertEquals(
-            Update( g, Vec( Segment.Curve( Span( 20000L, 30000L ), Vec( (123.4, 987.6, welch), (567.8, 543.2, step) )),
-                                Segment.Const( Span.from( 30000L ), Vec( 987.6, 543.2 ))))
-         )
-         obs.clear()
+      g.add(e4)
+      obs.assertEquals(
+        Update(g, Vec(Segment.Curve(Span(20000L, 30000L), Vec((123.4, 987.6, welch), (567.8, 543.2, step))),
+          Segment.Const(Span.from(30000L), Vec(987.6, 543.2))))
+      )
+      obs.clear()
 
-         // override a stereo signal with a mono signal
-         g.add( e5 )
-         obs.assertEquals(
-            Update( g, Vec( Segment.Curve( Span( 10000L, 20000L ), Vec( (882.0, 500.0, parametric(-4f)))),
-                                Segment.Const( Span( 20000L, 30000L ), Vec( 500.0 ))))
-         )
-         obs.clear()
+      // override a stereo signal with a mono signal
+      g.add(e5)
+      val s1 = Segment.Curve(Span(10000L, 20000L), Vec((882.0, 500.0, parametric(-4f))))
+      obs.assertEquals(
+        Update(g, Vec(s1,
+          Segment.Const(Span(20000L, 30000L), Vec(500.0))))
+      )
+      obs.clear()
 
-         assert(  g.segment(    -1L ) === None )
-         assert(  g.segment(     0L ) === Some( s0_10000 ))
-         assert(  g.segment(  9999L ) === Some( s0_10000 ))
-         assert( (g.segment( 10000L ) === Some( s0_10000 )).isDefined )
+      assert(  g.segment(    -1L ) === None )
+      assert(  g.segment(     0L ) === Some( s0_10000 ))
+      assert(  g.segment(  9999L ) === Some( s0_10000 ))
+      // assert( (g.segment( 10000L ) === Some( s0_10000 )) /* .isDefined */ )
+      assert(g.segment(10000L) === Some(s1))
 
-         assert( g.debugList() === List(
-            s0_10000,
-            Segment.Curve( Span( 10000L, 20000L ), Vec( (882.0, 500.0, parametric( -4f )))),
-            Segment.Const( Span( 20000L, 30000L ), Vec( 500.0 )),
-            Segment.Const( Span.from( 30000L ), Vec( 987.6, 543.2 ))
-         ))
-      }
+      assert(g.debugList() === List(
+        s0_10000,
+        Segment.Curve(Span(10000L, 20000L), Vec((882.0, 500.0, parametric(-4f)))),
+        Segment.Const(Span(20000L, 30000L), Vec(500.0)),
+        Segment.Const(Span.from(30000L), Vec(987.6, 543.2))
+      ))
+    }
 
-      // removals
+    // removals
       system.step { implicit tx =>
          val g = gH()
 //         println( g.debugList() )
