@@ -24,9 +24,9 @@ object SoundProcesses {
     require(isPowerOfTwo(value) && value >= 8192 && value <= 131072,
       "Must be a power of two and in (8192, 131072) : " + value)
 
-  private var cueBufSz = 32768
-  def cueBufferSize: Int = cueBufSz
-  def cueBufferSize_=(value: Int) {
+  private var cueBufSz = 32768                // XXX TODO: unused?
+  def cueBufferSize: Int = cueBufSz           // XXX TODO: unused?
+  def cueBufferSize_=(value: Int): Unit = {   // XXX TODO: unused?
     validateCueBufferSize(value)
     cueBufSz = value
   }

@@ -21,21 +21,24 @@ object Buffer {
   private var cueBufSz = 32768
 
   def defaultCueBufferSize: Int = cueBufSz
-  def defaultCueBufferSize_=(value: Int) {
-    validateCueBufferSize(value)
+  def defaultCueBufferSize_=(value: Int): Unit = {
+    validateCueBufferSize(64, value)
     cueBufSz = value
   }
 
   private def isPowerOfTwo(value: Int) = (value & (value - 1)) == 0
 
-  private def validateCueBufferSize(value: Int): Unit =
-    require(isPowerOfTwo(value) && value >= 8192 && value <= 131072,
-      "Must be a power of two and in (8192, 131072) : " + value)
+  private def validateCueBufferSize(server: Server, value: Int): Unit =
+    validateCueBufferSize(server.config.blockSize, value)
 
+  private def validateCueBufferSize(minSize: Int, value: Int): Unit = {
+    require(isPowerOfTwo(value) && value >= minSize && value <= 131072,
+      s"Must be a power of two and in ($minSize, 131072): $value")
+  }
 
   def diskIn(server: Server)(path: String, startFrame: Long = 0L, numFrames: Int = defaultCueBufferSize,
                              numChannels: Int = 1)(implicit tx: Txn): Buffer = {
-    validateCueBufferSize(numFrames)
+    validateCueBufferSize(server, numFrames)
     val res = create(server, closeOnDisposal = true)
     // res.allocRead(path, startFrame = startFrame, numFrames = numFrames)
     res.alloc(numFrames = numFrames, numChannels = numChannels)
@@ -46,7 +49,7 @@ object Buffer {
   def diskOut(server: Server)(path: String, fileType: AudioFileType = AudioFileType.AIFF,
                               sampleFormat: SampleFormat = SampleFormat.Float,
                               numFrames: Int = defaultCueBufferSize, numChannels: Int = 1)(implicit tx: Txn): Buffer = {
-    validateCueBufferSize(numFrames)
+    validateCueBufferSize(server, numFrames)
     val res = create(server, closeOnDisposal = true)
     res.alloc(numFrames = numFrames, numChannels = numChannels)
     res.record(path, fileType, sampleFormat)

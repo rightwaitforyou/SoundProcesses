@@ -2,19 +2,19 @@ lazy val logicalName = "SoundProcesses"
 
 name                      := logicalName + "-full"
 
-version in ThisBuild      := "2.1.0"
+version      in ThisBuild := "2.1.1"
 
 organization in ThisBuild := "de.sciss"
 
-homepage in ThisBuild     := Some(url("https://github.com/Sciss/" + logicalName))
+homepage     in ThisBuild := Some(url("https://github.com/Sciss/" + logicalName))
 
 description               := "A framework for creating and managing ScalaCollider based sound processes"
 
-licenses in ThisBuild     := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
+licenses     in ThisBuild := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
 scalaVersion in ThisBuild := "2.10.3"
 
-resolvers in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
+resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 lazy val lucreCoreVersion       = "2.0.1+"
 

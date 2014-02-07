@@ -72,7 +72,7 @@ final class AudioArtifactWriter private (synth: Synth, val bus: AudioBus, segm: 
     val dur       = (fStop - fStart) / spec.sampleRate
     import numbers.Implicits._
     // println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
-    val bufSize   = (Buffer.defaultCueBufferSize * factor).toInt.nextPowerOfTwo min (server.peer.config.blockSize << 1)
+    val bufSize   = (Buffer.defaultCueBufferSize * factor).toInt.nextPowerOfTwo max (server.peer.config.blockSize << 1)
     val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = bus.numChannels, numFrames = bufSize)
     val args0     = List[ControlSetMap]("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
     val args      = if (factor == 1.0) args0 else ("speed" -> factor: ControlSetMap) :: args0
