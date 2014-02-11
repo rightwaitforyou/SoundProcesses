@@ -14,12 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.synth.{ControlBus, DynamicBusUser, Buffer, Synth, Resource, Txn}
+import de.sciss.lucre.synth.{ControlBus, Buffer, Synth, Resource, Txn}
 import de.sciss.synth.{addToHead, ControlSetMap, SynthGraph}
 
 object AudioArtifactScalarWriter {
-  def apply(bus: ControlBus, audioVal: Grapheme.Value.Audio)
-           (implicit tx: Txn): AudioArtifactScalarWriter = {
+  def apply(bus: ControlBus, audioVal: Grapheme.Value.Audio)(implicit tx: Txn): Resource = {
     val numChannels = audioVal.spec.numChannels
     val sg  = SynthGraph {
       import de.sciss.synth._
@@ -34,38 +33,32 @@ object AudioArtifactScalarWriter {
       FreeSelf.kr(Impulse.kr(0))  // note: doesn't work: `DC.kr(1)`
     }
     val synth = Synth(bus.server, sg, nameHint = Some("audio-artifact"))
-    val res = new AudioArtifactScalarWriter(synth, bus, audioVal)
-    res.britzelAdd()
+    val res = new Impl(synth, bus, audioVal)
+    res.play()
     res
   }
-}
-final class AudioArtifactScalarWriter private (synth: Synth, val bus: ControlBus, audioVal: Grapheme.Value.Audio)
-  extends DynamicBusUser with Resource.Source {
 
-  def resource(implicit tx: Txn) = synth
+  private final class Impl(synth: Synth, bus: ControlBus, audioVal: Grapheme.Value.Audio)
+    extends Resource.Proxy {
 
-  def server = synth.server
+    protected def resourcePeer: Resource = synth
 
-  def add()(implicit tx: Txn) = ()
+    def play()(implicit tx: Txn): Unit = {
+      val file      = audioVal.artifact
+      val path      = file.getAbsolutePath
+      val target    = server.defaultGroup // XXX
+      val rb        = Buffer(server)(numFrames = 1, numChannels = bus.numChannels)
+      rb.read(path, fileStartFrame = audioVal.offset, numFrames = 1)
+      val args      = List[ControlSetMap]("buf" -> rb.id, "amp" -> audioVal.gain)
 
-  def britzelAdd()(implicit tx: Txn): Unit = {
-    val file      = audioVal.artifact
-    val path      = file.getAbsolutePath
-    val target    = server.defaultGroup // XXX
-    val rb        = Buffer(server)(numFrames = 1, numChannels = bus.numChannels)
-    rb.read(path, fileStartFrame = audioVal.offset, numFrames = 1)
-    val args      = List[ControlSetMap]("buf" -> rb.id, "amp" -> audioVal.gain)
+      // val rs = rd.play(target = target, args = args, buffers = rb :: Nil)
+      synth.play(target = target, args = args, addAction = addToHead, dependencies = rb :: Nil)
 
-    // val rs = rd.play(target = target, args = args, buffers = rb :: Nil)
-    synth.play(target = target, args = args, addAction = addToHead, dependencies = rb :: Nil)
+      synth.onEndTxn { implicit tx =>
+        rb.dispose()
+      }
 
-    synth.onEndTxn { implicit tx =>
-      rb   .dispose() // XXX TODO: why was this not in the code before? Is this causing any trouble?
-      synth.dispose()
+      synth.write(bus -> "out")
     }
-
-    synth.write(bus -> "out")
   }
-
-  def remove()(implicit tx: Txn): Unit = if (synth.isOnline) synth.free()
 }

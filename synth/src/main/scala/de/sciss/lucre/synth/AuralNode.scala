@@ -40,7 +40,8 @@ object AuralNode {
     extends AuralNode {
 
     private val groupsRef = Ref[Option[AllGroups]](None)
-    private var busUsers  = List.empty[DynamicBusUser]
+    private var users     = List.empty[DynamicUser]
+    private var resources = List.empty[Resource]
     private var inBuses   = Map.empty[String, AudioBus]
 
     override def toString = s"AuralProc($synth, outs = ${outBuses.mkString("(", ", ", ")")}, " +
@@ -107,16 +108,21 @@ object AuralNode {
     def stop()(implicit tx: Txn): Unit = {
       val node = groupOption.getOrElse(synth)
       node.free()
-      busUsers.foreach(_.remove())
+      if (users    .nonEmpty) users    .foreach(_.remove ())
+      if (resources.nonEmpty) resources.foreach(_.dispose())
       NodeGraph.removeNode(this)
     }
 
     def getInputBus (key: String): Option[AudioBus] = inBuses .get(key)
     def getOutputBus(key: String): Option[AudioBus] = outBuses.get(key)
 
-    def setBusUsers(users: List[DynamicBusUser]): Unit = busUsers = users
+    def init(users: List[DynamicUser], resources: List[Resource]): Unit = {
+      this.users      = users
+      this.resources  = resources
+    }
 
-    def addInputBus (key: String, bus: AudioBus): Unit = inBuses  += key -> bus
+    def addInputBus (key: String, bus: AudioBus): Unit = inBuses += key -> bus
+
     // def addOutputBus(key: String, bus: AudioBus): Unit = outBuses += key -> bus
 
     // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
@@ -144,10 +150,10 @@ sealed trait AuralNode /* extends Writer */ {
   def getInputBus (key: String): Option[AudioBus]
   def getOutputBus(key: String): Option[AudioBus]
 
-  /** Warning: This is strictly for the builder to update the bus users, and it must be
+  /** Warning: This is strictly for the builder to update the users, and it must be
     * called within the same transaction that the aural proc was created.
     */
-  private[sciss] def setBusUsers(users: List[DynamicBusUser]): Unit
+  private[sciss] def init(users: List[DynamicUser], resources: List[Resource]): Unit
 
   // ditto
   private[sciss] def addInputBus(key: String, bus: AudioBus): Unit

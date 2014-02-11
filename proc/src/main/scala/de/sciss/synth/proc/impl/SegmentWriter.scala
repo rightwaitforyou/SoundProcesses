@@ -21,13 +21,13 @@ import de.sciss.synth.{addToHead, ControlSetMap, SynthGraph}
 
 object SegmentWriter {
   def apply(bus: AudioBus, segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
-           (implicit tx: Txn): SegmentWriter = {
+           (implicit tx: Txn): Resource = {
 
     val (usesShape, sg) = graph(segm)
     val synth = Synth(bus.server, sg, nameHint = Some("grapheme-segm"))
     // val bus   = RichBus.audio(server, segm.numChannels)
-    val res = new SegmentWriter(synth, usesShape, bus, segm, time, sampleRate)
-    res.britzelAdd()
+    val res = new Impl(synth, usesShape, bus, segm, time, sampleRate)
+    res.play()
     res
   }
 
@@ -69,33 +69,26 @@ object SegmentWriter {
     }
     (usesShape, sg)
   }
-}
-final class SegmentWriter private (synth: Synth, usesShape: Boolean, val bus: AudioBus,
-                                   segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
-  extends DynamicBusUser with Resource.Source {
 
-  def resource(implicit tx: Txn) = synth
+  private final class Impl(synth: Synth, usesShape: Boolean, bus: AudioBus,
+                           segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
+    extends Resource.Proxy {
 
-  def server = synth.server
+    protected def resourcePeer: Resource = synth
 
-  def add()(implicit tx: Txn) = ()
+    def play()(implicit tx: Txn): Unit = {
+      type Ctl = List[ControlSetMap]
 
-  def britzelAdd()(implicit tx: Txn): Unit = {
-    type Ctl = List[ControlSetMap]
+      val target    = server.defaultGroup // XXX
+      val durSecs   = segm.span.length / sampleRate
+      val (vStart, vStop, vShape) = segm.values.unzip3
+      val ctl0: Ctl = List("start" -> vStart.map(_.toFloat), "stop" -> vStop.map(_.toFloat), "dur" -> durSecs)
+      val ctl1: Ctl = if (usesShape) "shape" -> vShape.map(_.id.toFloat) :: ctl0 else ctl0
+      val args: Ctl = if (usesShape) "curve" -> vShape.map { case parametric(c) => c; case _ => 0f } :: ctl1 else ctl1
 
-    val target    = server.defaultGroup // XXX
-    val durSecs   = segm.span.length / sampleRate
-    val (vStart, vStop, vShape) = segm.values.unzip3
-    val ctl0: Ctl = List("start" -> vStart.map(_.toFloat), "stop" -> vStop.map(_.toFloat), "dur" -> durSecs)
-    val ctl1: Ctl = if (usesShape) "shape" -> vShape.map(_.id.toFloat) :: ctl0 else ctl0
-    val args: Ctl = if (usesShape) "curve" -> vShape.map { case parametric(c) => c; case _ => 0f } :: ctl1 else ctl1
+      synth.play(target = target, args = args, addAction = addToHead, dependencies = Nil)
 
-    synth.play(target = target, args = args, addAction = addToHead, dependencies = Nil)
-
-    synth.write(bus -> "out")
-  }
-
-  def remove()(implicit tx: Txn): Unit = {
-    synth.free()
+      synth.write(bus -> "out")
+    }
   }
 }

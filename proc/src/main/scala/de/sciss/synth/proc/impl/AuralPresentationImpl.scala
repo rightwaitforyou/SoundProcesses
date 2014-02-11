@@ -27,7 +27,7 @@ import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.Scan.Link
 import scala.util.control.NonFatal
-import de.sciss.lucre.synth.{Buffer, Bus, AudioBus, NodeGraph, AuralNode, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
+import de.sciss.lucre.synth.{DynamicUser, Buffer, Bus, AudioBus, NodeGraph, AuralNode, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
 import de.sciss.synth.{addToHead, ControlSetMap}
 
@@ -193,9 +193,12 @@ object AuralPresentationImpl {
 
       val nameHint      = p.attributes[Attribute.String](ProcKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
+      // users are elements which must be added after the aural proc synth is started, and removed when it stops
+      var users         = List.empty[DynamicUser]
+      // resources are dependencies in terms of synth bundle spawning, and will be disposed by the aural proc
+      var deps          = List.empty[Resource]
 
       // ---- handle input buses ----
-      var busUsers      = List.empty[DynamicBusUser]
       val span          = timed.span.value
       var setMap        = Vec[ControlSetMap](
         graph.Time    .key -> time / sampleRate,
@@ -210,7 +213,6 @@ object AuralPresentationImpl {
       )
 
       // ---- attributes ----
-      var deps          = List.empty[Resource.Source]
       val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) attrNames.foreach { n =>
         val ctlName = graph.attribute.controlName(n)
@@ -243,10 +245,10 @@ object AuralPresentationImpl {
             require(numCh <= 4096, s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
             val b      = Bus.control(server, numCh)
             val res    = BusNodeSetter.mapper(ctlName, b, synth)
-            busUsers ::= res
+            users ::= res
             val w      = AudioArtifactScalarWriter(b, audioElem.value)
             deps     ::= w
-            busUsers ::= w
+            // users ::= w
 
           case a => sys.error(s"Cannot cast attribute $a to a scalar value")
         }
@@ -255,22 +257,27 @@ object AuralPresentationImpl {
       // ---- streams ----
       val streamNames = ugen.streamIns
       if (streamNames.nonEmpty) streamNames.foreach { n =>
-        p.attributes.get(n).fold {
-
+        val ctlName     = graph.stream.controlName(n)
+        val (buf, gain) = p.attributes.get(n).fold[(Buffer, Float)] {
+          // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
+          // So instead of aborting when the attribute is not set, fall back to zero
+          val _buf = Buffer(server)(numFrames = Buffer.defaultCueBufferSize, numChannels = 1)
+          (_buf, 0f)
         } {
           case a: Attribute.AudioGrapheme[S] =>
-            val ctlName   = graph.stream.controlName(n)
             val audioElem = a.peer
             val spec      = audioElem.spec
             val file      = audioElem.artifact.value
             val offset    = audioElem.offset.value
-            val gain      = audioElem.gain.value
-            val buf       = Buffer.diskIn(server)(
-              path = file.getAbsolutePath, startFrame = offset, numChannels = spec.numChannels)
-            setMap :+= (ctlName -> Seq(buf.id, gain.toFloat): ControlSetMap)
+            val _gain     = audioElem.gain.value
+            val _buf      = Buffer.diskIn(server)(path = file.getAbsolutePath, startFrame = offset,
+                                                  numChannels = spec.numChannels)
+            (_buf, _gain.toFloat)
 
           case a => sys.error(s"Cannot use attribute $a as an audio stream")
         }
+        setMap      :+= (ctlName -> Seq(buf.id, gain): ControlSetMap)
+        deps        ::= buf
       }
 
       import Grapheme.Segment
@@ -294,7 +301,7 @@ object AuralPresentationImpl {
               BusNodeSetter.reader(inCtlName, b, synth)
             else
               BusNodeSetter.mapper(inCtlName, b, synth)
-            busUsers ::= res
+            users ::= res
             aural.addInputBus(key, res.bus)
             res
           }
@@ -328,14 +335,14 @@ object AuralPresentationImpl {
                       val bm     = lazyInBus
                       val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
                       deps     ::= w
-                      busUsers ::= w
+                      // users ::= w
 
                     case audio: Segment.Audio =>
                       ensureChannels(audio.numChannels)
                       val bm     = lazyInBus
                       val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
                       deps     ::= w
-                      busUsers ::= w
+                      // users    ::= w
                   }
 
                 case Link.Scan(peer) =>
@@ -355,8 +362,7 @@ object AuralPresentationImpl {
                         val edge    = NodeGraph.Edge(srcAural, srcKey, aural, key)
                         val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
                         deps      ::= link
-                        // deps      ::= srcAural.group()
-                        busUsers  ::= link
+                        users     ::= link
                       }
                   }
               }
@@ -369,7 +375,7 @@ object AuralPresentationImpl {
         case (key, out) =>
           val bw     = BusNodeSetter.writer(scan.outControlName(key), out.bus, synth)
           val bOut   = bw.bus
-          busUsers :+= bw
+          users :+= bw
 
           p.scans.get(key).foreach { scan =>
             scan.sinks.foreach {
@@ -386,7 +392,7 @@ object AuralPresentationImpl {
                       val edge    = NodeGraph.Edge(aural, key, sinkAural, sinkKey)
                       val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn)
                       deps      ::= link
-                      busUsers  ::= link
+                      users     ::= link
                     }
                 }
 
@@ -397,11 +403,10 @@ object AuralPresentationImpl {
 
       // busUsers.foreach(_.add())
 
-      aural.setBusUsers(busUsers)
+      aural.init(users, deps)
       // wrap as AuralProc and save it in the identifier map for later lookup
-      val deps1 = deps.map(_.resource)
-      synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps1)
-      busUsers.foreach(_.add())
+      synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps)
+      if (users.nonEmpty) users.foreach(_.add())
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
       log(s"launched $timed -> $aural (${hashCode.toHexString})")
