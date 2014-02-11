@@ -255,7 +255,9 @@ object AuralPresentationImpl {
       // ---- streams ----
       val streamNames = ugen.streamIns
       if (streamNames.nonEmpty) streamNames.foreach { n =>
-        p.attributes.get(n).map {
+        p.attributes.get(n).fold {
+
+        } {
           case a: Attribute.AudioGrapheme[S] =>
             val ctlName   = graph.stream.controlName(n)
             val audioElem = a.peer
