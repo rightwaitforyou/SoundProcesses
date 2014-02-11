@@ -40,6 +40,8 @@ object stream {
       }
   }
 
+  // ---- ugen wrappers ----
+
   case class DiskIn(rate: Rate, key: String, loop: synth.GE) extends GE {
     override def productPrefix  = "stream$DiskIn"
 
@@ -52,6 +54,27 @@ object stream {
 
     protected def makeUGen(numChannels: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
       ugen.VDiskIn(rate, numChannels = numChannels, buf = buf, speed = speed, loop = loop) * gain
+  }
+
+  case class BufChannels(rate: Rate, key: String) extends GE {
+    override def productPrefix  = "stream$BufChannels"
+
+    protected def makeUGen(numChannels: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
+      ugen.BufChannels(rate, buf) // or just Constant(numChannels), ha?
+  }
+
+  case class BufRateScale(rate: Rate, key: String) extends GE {
+    override def productPrefix  = "stream$BufRateScale"
+
+    protected def makeUGen(numChannels: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
+      ugen.BufRateScale(rate, buf)
+  }
+
+  case class BufSampleRate(rate: Rate, key: String) extends GE {
+    override def productPrefix  = "stream$BufSampleRate"
+
+    protected def makeUGen(numChannels: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
+      ugen.BufSampleRate(rate, buf)
   }
 }
 final case class stream(key: String)
