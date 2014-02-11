@@ -57,6 +57,11 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
   /** This method should only be invoked by the `graph.attribute.In` instances. It registers a control input. */
   def addAttributeIn(key: String): Int
 
+  /** This method should only be invoked by the `graph.stream.X` instances. It registers a control input
+    * for a streaming buffer.
+    */
+  def addStreamIn(key: String): Int
+
   /** This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along
     * with the number of channels written to it.
     */
@@ -72,7 +77,11 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
     */
   def scanOuts: Map[String, Int]
 
+  /** Returns the attribute keys for scalar controls as seen during expansion of the synth graph. */
   def attributeIns: Set[String]
+
+  /** Returns the attribute keys for streaming buffers as seen during expansion of the synth graph. */
+  def streamIns: Set[String]
 
   /** Current set of missing scan inputs. This may shrink during incremental build, and will be empty when
     * `tryBuild` returns `true`.

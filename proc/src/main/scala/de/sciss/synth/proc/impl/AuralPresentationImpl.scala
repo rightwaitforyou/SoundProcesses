@@ -27,7 +27,7 @@ import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.Scan.Link
 import scala.util.control.NonFatal
-import de.sciss.lucre.synth.{Bus, AudioBus, NodeGraph, AuralNode, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
+import de.sciss.lucre.synth.{Buffer, Bus, AudioBus, NodeGraph, AuralNode, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
 import de.sciss.synth.{addToHead, ControlSetMap}
 
@@ -208,48 +208,66 @@ object AuralPresentationImpl {
           case _ => Double.PositiveInfinity
         })
       )
+
+      // ---- attributes ----
       var deps          = List.empty[Resource.Source]
       val attrNames     = ugen.attributeIns
-      if (attrNames.nonEmpty) {
-        // println(s"Attributes used: ${attrNames.mkString(", ")}")
-        attrNames.foreach { n =>
-          val ctlName = graph.attribute.controlName(n)
-          p.attributes.get(n).map {
-            case a: Attribute.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
-            case a: Attribute.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
-            case a: Attribute.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSetMap)
-            case a: Attribute.FadeSpec[S] =>
-              val spec = a.peer.value
-              // dur, shape-id, shape-curvature, floor
-              val values = Vec(
-                (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
-                  case parametric(c)  => c
-                  case _              => 0f
-                }, spec.floor
-              )
-              setMap :+= (ctlName -> values: ControlSetMap)
-            case a: Attribute.DoubleVec[S] =>
-              val values = a.peer.value.map(_.toFloat)
-              setMap :+= (ctlName -> values: ControlSetMap)
-            case a: Attribute.AudioGrapheme[S] =>
-              val audioVal  = a.peer
-              val spec      = audioVal.spec
-              //              require(spec.numChannels == 1 || spec.numFrames == 1,
-              //                s"Audio grapheme ${a.peer} must have either 1 channel or 1 frame to be used as scalar attribute")
-              require(spec.numFrames == 1, s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
-              //              val numChL = if (spec.numChannels == 1) spec.numFrames else spec.numChannels
-              //              require(numChL <= 4096, s"Audio grapheme size ($numChL) must be <= 4096 to be used as scalar attribute")
-              val numCh  = spec.numChannels // numChL.toInt
-              require(numCh <= 4096, s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
-              val b      = Bus.control(server, numCh)
-              val res    = BusNodeSetter.mapper(ctlName, b, synth)
-              busUsers ::= res
-              val w      = AudioArtifactScalarWriter(b, audioVal.value)
-              deps     ::= w
-              busUsers ::= w
+      if (attrNames.nonEmpty) attrNames.foreach { n =>
+        val ctlName = graph.attribute.controlName(n)
+        p.attributes.get(n).foreach {
+          case a: Attribute.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
+          case a: Attribute.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
+          case a: Attribute.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSetMap)
+          case a: Attribute.FadeSpec[S] =>
+            val spec = a.peer.value
+            // dur, shape-id, shape-curvature, floor
+            val values = Vec(
+              (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+                case parametric(c)  => c
+                case _              => 0f
+              }, spec.floor
+            )
+            setMap :+= (ctlName -> values: ControlSetMap)
+          case a: Attribute.DoubleVec[S] =>
+            val values = a.peer.value.map(_.toFloat)
+            setMap :+= (ctlName -> values: ControlSetMap)
+          case a: Attribute.AudioGrapheme[S] =>
+            val audioElem = a.peer
+            val spec      = audioElem.spec
+            //              require(spec.numChannels == 1 || spec.numFrames == 1,
+            //                s"Audio grapheme ${a.peer} must have either 1 channel or 1 frame to be used as scalar attribute")
+            require(spec.numFrames == 1, s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
+            //              val numChL = if (spec.numChannels == 1) spec.numFrames else spec.numChannels
+            //              require(numChL <= 4096, s"Audio grapheme size ($numChL) must be <= 4096 to be used as scalar attribute")
+            val numCh  = spec.numChannels // numChL.toInt
+            require(numCh <= 4096, s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
+            val b      = Bus.control(server, numCh)
+            val res    = BusNodeSetter.mapper(ctlName, b, synth)
+            busUsers ::= res
+            val w      = AudioArtifactScalarWriter(b, audioElem.value)
+            deps     ::= w
+            busUsers ::= w
 
-            case a => sys.error(s"Cannot cast attribute $a to a scalar value")
-          }
+          case a => sys.error(s"Cannot cast attribute $a to a scalar value")
+        }
+      }
+
+      // ---- streams ----
+      val streamNames = ugen.streamIns
+      if (streamNames.nonEmpty) streamNames.foreach { n =>
+        p.attributes.get(n).map {
+          case a: Attribute.AudioGrapheme[S] =>
+            val ctlName   = graph.stream.controlName(n)
+            val audioElem = a.peer
+            val spec      = audioElem.spec
+            val file      = audioElem.artifact.value
+            val offset    = audioElem.offset.value
+            val gain      = audioElem.gain.value
+            val buf       = Buffer.diskIn(server)(
+              path = file.getAbsolutePath, startFrame = offset, numChannels = spec.numChannels)
+            setMap :+= (ctlName -> Seq(buf.id, gain.toFloat): ControlSetMap)
+
+          case a => sys.error(s"Cannot use attribute $a as an audio stream")
         }
       }
 
@@ -257,6 +275,7 @@ object AuralPresentationImpl {
       val outBuses      = builder.outputs
       val aural         = AuralNode(synth, outBuses.mapValues(_.bus))
 
+      // ---- scans ----
       ugen.scanIns.foreach {
         case (key, scanIn) =>
           val numCh = scanIn.numChannels
@@ -424,13 +443,12 @@ object AuralPresentationImpl {
       }
 
     // called by UGenGraphBuilderImpl
-    def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int = {
+    def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int =
       timed.value.attributes.get(key).fold(1) {
         case a: Attribute.DoubleVec[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: Attribute.AudioGrapheme[S]  => a.peer.spec.numChannels
         case _ => 1
       }
-    }
 
     // called by UGenGraphBuilderImpl
     def scanInNumChannels(timed: TimedProc[S], time: Long, key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
@@ -442,7 +460,7 @@ object AuralPresentationImpl {
 
           case Link.Scan(peer) =>
             val sourceOpt = scanMap.get(peer.id)
-            val busOpt = sourceOpt.flatMap {
+            val busOpt    = sourceOpt.flatMap {
               case (sourceKey, idH) =>
                 val sourceTimedID = idH()
                 getOutputBus(sourceTimedID, sourceKey)
@@ -617,27 +635,8 @@ object AuralPresentationImpl {
       }
     }
 
-    //      def procGraphChanged( timed: TimedProc[ S ], newGraph: SynthGraph )( implicit tx: S#Tx ): Unit = {
-    //         viewMap.get( timed.id ) match {
-    //            case Some( aural ) =>
-    //               implicit val ptx = ProcTxn()( tx.peer )
-    //               logConfig( "aural graph changed " + timed.value )
-    //               aural.graph_=( newGraph )
-    //            case _ =>
-    //               println( "WARNING: could not find aural view for proc " + timed.value )
-    //         }
-    //      }
-
     def procUpdated(timed: TimedProc[S], change: Transport.Proc.Update[S])(implicit tx: S#Tx): Unit = {
       // XXX TODO !
-      //         viewMap.get( timed.id ) match {
-      //            case Some( aural ) =>
-      //               implicit val ptx = ProcTxn()( tx.peer )
-      //               logConfig( "aural freq changed " + timed.value )
-      //               aural.addParams( changes )
-      //            case _ =>
-      //               println( "WARNING: could not find aural view for proc " + timed.value )
-      //         }
     }
   }
 }

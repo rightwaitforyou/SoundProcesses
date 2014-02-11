@@ -22,9 +22,10 @@ import annotation.elidable._
 import de.sciss.lucre.synth.Sys
 
 package object proc {
-  type ProcGroup[S <: Sys[S]] = BiGroup[S, Proc[S], Proc.Update[S]]
-  type TimedProc[S <: Sys[S]] = BiGroup.TimedElem[S, Proc[S]]
+  type ProcGroup    [S <: Sys[S]] = BiGroup[S, Proc[S], Proc.Update[S]]
+  type TimedProc    [S <: Sys[S]] = BiGroup.TimedElem[S, Proc[S]]
   type ProcTransport[S <: Sys[S]] = Transport[S, Proc[S], Transport.Proc.Update[S]]  // Proc.Update[ S ]
+
   type Param = Double
 
   private lazy val logHeader = new SimpleDateFormat("[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US)

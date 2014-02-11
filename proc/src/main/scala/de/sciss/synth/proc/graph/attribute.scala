@@ -25,7 +25,7 @@ object attribute {
     override def productPrefix  = "attribute$In"
     override def toString       = s"""attribute("$key").ir($default)"""
 
-    def makeUGens: UGenInLike = {
+    def makeUGens: UGenInLike =
       UGenGraph.builder match {
         case b: UGenGraphBuilder[_] =>
           val numCh   = b.addAttributeIn(key)
@@ -35,7 +35,6 @@ object attribute {
 
         case _ => UGenGraphBuilder.outsideOfContext()
       }
-    }
   }
 }
 final case class attribute(key: String) {

@@ -41,6 +41,7 @@ private[proc] object UGenGraphBuilderImpl {
     var scanIns     = Map.empty[String, UGenGraphBuilder.ScanIn]
     var missingIns  = Set.empty[MissingIn[S]]
     var attributeIns= Set.empty[String]
+    var streamIns   = Set.empty[String]
 
     def addScanIn(key: String, numChannels: Int): Int = {
       val fixed = numChannels >= 0
@@ -64,6 +65,12 @@ private[proc] object UGenGraphBuilderImpl {
       res
     }
 
+    def addStreamIn(key: String): Int = {
+      val res       = aural.attrNumChannels(timed = timed, key = key)(tx)
+      streamIns    += key
+      res
+    }
+
     def tryBuild(): Boolean = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]
       missingIns        = Set.empty
@@ -79,6 +86,7 @@ private[proc] object UGenGraphBuilderImpl {
             val savedScanOuts       = scanOuts
             val savedScanIns        = scanIns
             val savedAttrs          = attributeIns
+            val savedStreams        = streamIns
             try {
               elem.force(builder)
               someSucceeded = true
@@ -91,8 +99,9 @@ private[proc] object UGenGraphBuilderImpl {
                 scanOuts            = savedScanOuts
                 scanIns             = savedScanIns
                 attributeIns        = savedAttrs
+                streamIns           = savedStreams
                 missingElems      :+= elem
-                missingIns         += miss.asInstanceOf[MissingIn[S]] // XXX TODO yukk
+                missingIns         += miss.asInstanceOf[MissingIn[S]] // XXX TODO not cool
             }
           }
         }
