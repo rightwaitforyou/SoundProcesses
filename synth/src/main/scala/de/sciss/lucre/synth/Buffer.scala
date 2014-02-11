@@ -39,9 +39,9 @@ object Buffer {
   def diskIn(server: Server)(path: String, startFrame: Long = 0L, numFrames: Int = defaultCueBufferSize,
                              numChannels: Int = 1)(implicit tx: Txn): Buffer = {
     validateCueBufferSize(server, numFrames)
-    val res = create(server, closeOnDisposal = true)
+    val res = create(server, numFrames = numFrames, numChannels = numChannels, closeOnDisposal = true)
     // res.allocRead(path, startFrame = startFrame, numFrames = numFrames)
-    res.alloc(numFrames = numFrames, numChannels = numChannels)
+    res.alloc()
     res.cue(path, fileStartFrame = startFrame)
     res
   }
@@ -50,33 +50,36 @@ object Buffer {
                               sampleFormat: SampleFormat = SampleFormat.Float,
                               numFrames: Int = defaultCueBufferSize, numChannels: Int = 1)(implicit tx: Txn): Buffer = {
     validateCueBufferSize(server, numFrames)
-    val res = create(server, closeOnDisposal = true)
-    res.alloc(numFrames = numFrames, numChannels = numChannels)
+    val res = create(server, numFrames = numFrames, numChannels = numChannels, closeOnDisposal = true)
+    res.alloc()
     res.record(path, fileType, sampleFormat)
     res
   }
 
   def fft(server: Server)(size: Int)(implicit tx: Txn): Modifiable = {
     require(size >= 2 && isPowerOfTwo(size), "Must be a power of two and >= 2 : " + size)
-    val res = create(server)
-    res.alloc(numFrames = size, numChannels = 1)
+    val res = create(server, numFrames = size, numChannels = 1)
+    res.alloc()
     res
   }
 
   def apply(server: Server)(numFrames: Int, numChannels: Int = 1)(implicit tx: Txn): Modifiable = {
-    val res = create(server)
-    res.alloc(numFrames = numFrames, numChannels = numChannels)
+    val res = create(server, numFrames = numFrames, numChannels = numChannels)
+    res.alloc()
     res
   }
 
-  private def create(server: Server, closeOnDisposal: Boolean = false)(implicit tx: Txn): BufferImpl = {
+  private def create(server: Server, numFrames: Int, numChannels: Int, closeOnDisposal: Boolean = false)
+                    (implicit tx: Txn): BufferImpl = {
     val id    = server.allocBuffer()
     val peer  = SBuffer(server.peer, id)
-    new BufferImpl(server, peer)(closeOnDisposal)
+    new BufferImpl(server, peer)(numFrames = numFrames, numChannels = numChannels, closeOnDisposal = closeOnDisposal)
   }
 
   trait Modifiable extends Buffer {
     def zero()(implicit tx: Txn): Unit
+
+    def fill(index: Int, num: Int, value: Float)(implicit tx: Txn): Unit
 
     def read(path: String, fileStartFrame: Long = 0L, numFrames: Int = -1, bufStartFrame: Int = 0)
             (implicit tx: Txn): Unit
@@ -86,4 +89,7 @@ object Buffer {
 trait Buffer extends Resource {
   def peer: SBuffer
   def id: Int
+
+  def numChannels: Int
+  def numFrames  : Int
 }

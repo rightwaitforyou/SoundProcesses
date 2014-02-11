@@ -27,7 +27,7 @@ import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.Scan.Link
 import scala.util.control.NonFatal
-import de.sciss.lucre.synth.{DynamicUser, Buffer, Bus, AudioBus, NodeGraph, AuralNode, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
+import de.sciss.lucre.synth.{DynamicUser, Buffer, Bus, AudioBus, NodeGraph, AuralNode, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
 import de.sciss.synth.{addToHead, ControlSetMap}
 import de.sciss.numbers
@@ -266,11 +266,13 @@ object AuralPresentationImpl {
             val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
             val bufDur    = 1.5 * maxSpeed
             val minSz     = (2 * server.config.blockSize * math.max(1.0, maxSpeed)).toInt
-            val bestSz    = (bufDur * sampleRate).toInt
+            val bestSz    = math.max(minSz, (bufDur * sampleRate).toInt)
             import numbers.Implicits._
-            math.max(minSz, bestSz).nextPowerOfTwo
+            val bestSzHi  = bestSz.nextPowerOfTwo
+            val bestSzLo  = bestSzHi >> 1
+            if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
           }
-          val (buf, gain) = p.attributes.get(n).fold[(Buffer, Float)] {
+          val (rb, gain) = p.attributes.get(n).fold[(Buffer, Float)] {
             // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
             // So instead of aborting when the attribute is not set, fall back to zero
             val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
@@ -279,21 +281,30 @@ object AuralPresentationImpl {
             case a: Attribute.AudioGrapheme[S] =>
               val audioElem = a.peer
               val spec      = audioElem.spec
-              val file      = audioElem.artifact.value
+              val path      = audioElem.artifact.value.getAbsolutePath
               val offset    = audioElem.offset  .value
               val _gain     = audioElem.gain    .value
-              val _buf      = Buffer.diskIn(server)(
-                path          = file.getAbsolutePath,
-                startFrame    = offset,
-                numFrames     = bufSize,
-                numChannels   = spec.numChannels
-              )
+              val interp    = info.interp
+              val _buf      = if (interp == 4) {
+                Buffer.diskIn(server)(
+                  path          = path,
+                  startFrame    = offset,
+                  numFrames     = bufSize,
+                  numChannels   = spec.numChannels
+                )
+              } else {
+                val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
+                val trig = new StreamBuffer(key = n, idx = idx, synth = synth, buf = __buf, path = path,
+                                            fileFrames = spec.numFrames, interp = interp)
+                trig.install()
+                __buf
+              }
               (_buf, _gain.toFloat)
 
             case a => sys.error(s"Cannot use attribute $a as an audio stream")
           }
-          setMap      :+= (ctlName -> Seq(buf.id, gain): ControlSetMap)
-          deps        ::= buf
+          setMap      :+= (ctlName -> Seq(rb.id, gain): ControlSetMap)
+          deps        ::= rb
         }
       }
 

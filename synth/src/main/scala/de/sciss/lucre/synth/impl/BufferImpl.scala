@@ -17,7 +17,8 @@ package impl
 import de.sciss.synth.{Buffer => SBuffer}
 import de.sciss.synth.io.{SampleFormat, AudioFileType}
 
-final case class BufferImpl(server: Server, peer: SBuffer)(closeOnDisposal: Boolean)
+final case class BufferImpl(server: Server, peer: SBuffer)
+                           (val numFrames: Int, val numChannels: Int, closeOnDisposal: Boolean)
   extends ResourceImpl with Buffer.Modifiable {
   //   val isAlive:    State = State(                this, "isAlive", init = true )
   //   val isOnline:   State = State.and( isAlive )( this, "isOnline", init = false )
@@ -25,7 +26,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)(closeOnDisposal: Bool
 
   def id: Int = peer.id
 
-  def alloc(numFrames: Int, numChannels: Int = 1)(implicit tx: Txn): Unit = {
+  def alloc()(implicit tx: Txn): Unit = {
     requireOffline()
     require(numFrames >= 0 && numChannels >= 0, s"numFrames ($numFrames) and numChannels ($numChannels) must be >= 0")
     tx.addMessage(this, peer.allocMsg(numFrames = numFrames, numChannels = numChannels), audible = false)
@@ -33,7 +34,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)(closeOnDisposal: Bool
   }
 
   /** Allocates and reads the buffer content once (closes the file). */
-  def allocRead(path: String, startFrame: Long, numFrames: Int)(implicit tx: Txn): Unit = {
+  def allocRead(path: String, startFrame: Long)(implicit tx: Txn): Unit = {
     requireOffline()
     require(startFrame <= 0x7FFFFFFFL, s"Cannot encode start frame >32 bit ($startFrame)")
     require(numFrames >= 0, s"numFrames ($numFrames) must be >= 0")
@@ -82,6 +83,16 @@ final case class BufferImpl(server: Server, peer: SBuffer)(closeOnDisposal: Bool
   def zero()(implicit tx: Txn): Unit = {
     requireOnline()
     tx.addMessage(this, peer.zeroMsg, audible = false)
+  }
+
+  /** Clears the buffer contents. */
+  def fill(index: Int, num: Int, value: Float)(implicit tx: Txn): Unit = {
+    val size = numFrames * numChannels
+    if (index < 0         ) throw new IllegalArgumentException (s"index ($index) must be >= 0")
+    if (num   < 0         ) throw new IllegalArgumentException (s"num ($num) must be >= 0")
+    if (index + num > size) throw new IndexOutOfBoundsException(s"index ($index) + num ($num) > size ($size)")
+    requireOnline()
+    tx.addMessage(this, peer.fillMsg(index = index, num = num, value = value), audible = false) // XXX TODO audible?
   }
 
   def dispose()(implicit tx: Txn): Unit = {
