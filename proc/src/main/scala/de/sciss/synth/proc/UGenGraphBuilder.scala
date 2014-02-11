@@ -40,6 +40,13 @@ private[proc] object UGenGraphBuilder {
     Impl(aural, timed, time)
 
   case class ScanIn(numChannels: Int, fixed: Boolean)
+
+  object StreamIn {
+    val empty = StreamIn(0.0, 0)
+  }
+  case class StreamIn(maxSpeed: Double, interp: Int) {
+    def isEmpty: Boolean = interp == 0
+  }
 }
 private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
   import UGenGraphBuilder._
@@ -59,8 +66,10 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
 
   /** This method should only be invoked by the `graph.stream.X` instances. It registers a control input
     * for a streaming buffer.
+    *
+    * @return tuple consisting of `_1` number of channel, and `_2` control name index
     */
-  def addStreamIn(key: String): Int
+  def addStreamIn(key: String, info: StreamIn): (Int, Int)
 
   /** This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along
     * with the number of channels written to it.
@@ -80,8 +89,15 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
   /** Returns the attribute keys for scalar controls as seen during expansion of the synth graph. */
   def attributeIns: Set[String]
 
-  /** Returns the attribute keys for streaming buffers as seen during expansion of the synth graph. */
-  def streamIns: Set[String]
+  /** Returns the attribute keys and settings for streaming buffers as seen during expansion of the synth graph.
+    * The same attribute may be streamed multiple times, possibly with different settings. The settings are
+    * given as maximum rate factors (re server sample rate) and interpolation settings.
+    *
+    * It is also possible that info-only UGens (e.g. `BufChannels`) use such an attribute. In that case, the
+    * key would be contained in the map, but the value list is empty. All stream users use a named control
+    * of two channels (buffer-id and gain factor), appending an incremental integer index to its name.
+    */
+  def streamIns: Map[String, List[StreamIn]]
 
   /** Current set of missing scan inputs. This may shrink during incremental build, and will be empty when
     * `tryBuild` returns `true`.

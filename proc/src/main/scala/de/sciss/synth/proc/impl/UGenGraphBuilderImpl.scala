@@ -38,15 +38,15 @@ private[proc] object UGenGraphBuilderImpl {
     private var controlProxies: ISet[ControlProxyLike] = g.controlProxies
 
     var scanOuts    = Map.empty[String, Int]
-    var scanIns     = Map.empty[String, UGenGraphBuilder.ScanIn]
+    var scanIns     = Map.empty[String, ScanIn]
     var missingIns  = Set.empty[MissingIn[S]]
     var attributeIns= Set.empty[String]
-    var streamIns   = Set.empty[String]
+    var streamIns   = Map.empty[String, List[StreamIn]]
 
     def addScanIn(key: String, numChannels: Int): Int = {
       val fixed = numChannels >= 0
       val res   = aural.scanInNumChannels(timed = timed, time = time, key = key, numChannels = numChannels)(tx)
-      scanIns  += key -> UGenGraphBuilder.ScanIn(numChannels = res, fixed = fixed)
+      scanIns  += key -> ScanIn(numChannels = res, fixed = fixed)
       res
     }
 
@@ -65,11 +65,22 @@ private[proc] object UGenGraphBuilderImpl {
       res
     }
 
-    def addStreamIn(key: String): Int = {
-      val res       = aural.attrNumChannels(timed = timed, key = key)(tx)
-      streamIns    += key
-      res
+    def addStreamIn(key: String, info: StreamIn): (Int, Int) = {
+      val numCh = aural.attrNumChannels(timed = timed, key = key)(tx)
+      val idx   = if (info.isEmpty) {
+        if (!streamIns.contains(key)) streamIns += key -> Nil
+        0
+      } else {
+        val oldValue = streamIns.getOrElse(key, Nil)
+        streamIns += key -> (info :: oldValue)
+        oldValue.size
+      }
+      (numCh, idx)
     }
+
+    //    def addStreamIn(key: String): Unit = if (!streamIns.contains(key)) {
+    //      streamIns += key -> Nil
+    //    }
 
     def tryBuild(): Boolean = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]

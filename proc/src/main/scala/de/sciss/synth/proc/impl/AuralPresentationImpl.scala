@@ -30,6 +30,7 @@ import scala.util.control.NonFatal
 import de.sciss.lucre.synth.{DynamicUser, Buffer, Bus, AudioBus, NodeGraph, AuralNode, DynamicBusUser, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
 import de.sciss.synth.{addToHead, ControlSetMap}
+import de.sciss.numbers
 
 object AuralPresentationImpl {
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -256,28 +257,44 @@ object AuralPresentationImpl {
 
       // ---- streams ----
       val streamNames = ugen.streamIns
-      if (streamNames.nonEmpty) streamNames.foreach { n =>
-        val ctlName     = graph.stream.controlName(n)
-        val (buf, gain) = p.attributes.get(n).fold[(Buffer, Float)] {
-          // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
-          // So instead of aborting when the attribute is not set, fall back to zero
-          val _buf = Buffer(server)(numFrames = Buffer.defaultCueBufferSize, numChannels = 1)
-          (_buf, 0f)
-        } {
-          case a: Attribute.AudioGrapheme[S] =>
-            val audioElem = a.peer
-            val spec      = audioElem.spec
-            val file      = audioElem.artifact.value
-            val offset    = audioElem.offset.value
-            val _gain     = audioElem.gain.value
-            val _buf      = Buffer.diskIn(server)(path = file.getAbsolutePath, startFrame = offset,
-                                                  numChannels = spec.numChannels)
-            (_buf, _gain.toFloat)
+      if (streamNames.nonEmpty) streamNames.foreach { case (n, infos0) =>
+        val infos = if (infos0.isEmpty) UGenGraphBuilder.StreamIn.empty :: Nil else infos0
 
-          case a => sys.error(s"Cannot use attribute $a as an audio stream")
+        infos.zipWithIndex.foreach { case (info, idx) =>
+          val ctlName     = graph.stream.controlName(n, idx)
+          val bufSize     = if (info.isEmpty) server.config.blockSize else {
+            val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
+            val bufDur    = 1.5 * maxSpeed
+            val minSz     = (2 * server.config.blockSize * math.max(1.0, maxSpeed)).toInt
+            val bestSz    = (bufDur * sampleRate).toInt
+            import numbers.Implicits._
+            math.max(minSz, bestSz).nextPowerOfTwo
+          }
+          val (buf, gain) = p.attributes.get(n).fold[(Buffer, Float)] {
+            // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
+            // So instead of aborting when the attribute is not set, fall back to zero
+            val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
+            (_buf, 0f)
+          } {
+            case a: Attribute.AudioGrapheme[S] =>
+              val audioElem = a.peer
+              val spec      = audioElem.spec
+              val file      = audioElem.artifact.value
+              val offset    = audioElem.offset  .value
+              val _gain     = audioElem.gain    .value
+              val _buf      = Buffer.diskIn(server)(
+                path          = file.getAbsolutePath,
+                startFrame    = offset,
+                numFrames     = bufSize,
+                numChannels   = spec.numChannels
+              )
+              (_buf, _gain.toFloat)
+
+            case a => sys.error(s"Cannot use attribute $a as an audio stream")
+          }
+          setMap      :+= (ctlName -> Seq(buf.id, gain): ControlSetMap)
+          deps        ::= buf
         }
-        setMap      :+= (ctlName -> Seq(buf.id, gain): ControlSetMap)
-        deps        ::= buf
       }
 
       import Grapheme.Segment
