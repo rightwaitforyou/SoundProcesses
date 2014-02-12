@@ -26,10 +26,10 @@ object AudioArtifactScalarWriter {
       val buf   = "buf".ir
       val out   = "out".kr
       val amp   = "amp".kr(1)
-      val sig0  = BufRd.ir(numChannels, buf = buf, loop = 0, interp = 1)
+      val sig0  = BufRd.kr(numChannels, buf = buf, loop = 0, interp = 1)
       val sig   = sig0 * amp
       // Line.kr(start = 0, end = 0, dur = dur, doneAction = freeSelf)
-      Out.ir(out, sig)
+      Out.kr(out, sig)            // note: doesn't work: `Out.ir(...)`
       FreeSelf.kr(Impulse.kr(0))  // note: doesn't work: `DC.kr(1)`
     }
     val synth = Synth(bus.server, sg, nameHint = Some("audio-artifact"))
