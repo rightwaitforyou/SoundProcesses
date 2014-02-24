@@ -19,82 +19,88 @@ import evt.{Targets, Sys}
 import annotation.switch
 import expr.Expr
 import de.sciss.serial.{DataOutput, DataInput}
+import de.sciss.lucre.bitemp.BiType
 
 object Ints extends BiTypeImpl[Int] {
   final val typeID = 2
 
-  /* protected */ def readValue(in: DataInput): Int = in.readInt()
+  def readValue (            in : DataInput ): Int  = in .readInt()
+  def writeValue(value: Int, out: DataOutput): Unit = out.writeInt(value)
 
-  /* protected */ def writeValue(value: Int, out: DataOutput): Unit = out.writeInt(value)
+  lazy val install: Unit = {
+    registerOp(IntTuple1s)
+    registerOp(IntTuple2s)
+  }
 
-  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                            (implicit tx: S#Tx): ExN[S] = {
-    (cookie: @switch) match {
-      case 1 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
-        val opID = in.readInt()
-        import UnaryOp._
-        val op: Op[_] = (opID: @switch) match {
-          // ---- Int ----
-          case Neg    .id => Neg
-          case BitNot .id => BitNot
-          case Abs    .id => Abs
-          case Signum .id => Signum
-          case Squared.id => Squared
-          case Cubed  .id => Cubed
+  private[this] object IntTuple1s extends BiType.TupleReader[Int] {
+    final val arity = 1
+    final val opLo  = UnaryOp.Neg  .id
+    final val opHi  = UnaryOp.Cubed.id
 
-          case _ => sys.error("Invalid operation id " + opID)
-        }
-        op.read(in, access, targets)
-      //            val _1 = readExpr( in, access )
-      //            new Tuple1( typeID, op, targets, _1 )
+    val name = "Int-Int Ops"
 
-      case 2 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
-        val opID = in.readInt()
-        import BinaryOp._
-        val op: Op = (opID: @switch) match {
-          case Plus               .id => Plus
-          case Minus              .id => Minus
-          case Times              .id => Times
-          case IDiv               .id => IDiv
-          //               case 4 => Div
-          //               case 5 => Mod
-          //      case 6 => Eq
-          //      case 7 => Neq
-          //      case 8 => Lt
-          //      case 9 => Gt
-          //      case 10 => Leq
-          //      case 11 => Geq
-          case Min                .id => Min
-          case Max                .id => Max
-          case BitAnd             .id => BitAnd
-          case BitOr              .id => BitOr
-          case BitXor             .id => BitXor
-          // case 17 => Lcm
-          // case 18 => Gcd
-          //               case 19 => Round
-          //               case 20 => Roundup
-          case ShiftLeft          .id => ShiftLeft
-          case ShiftRight         .id => ShiftRight
-          case UnsignedShiftRight .id => UnsignedShiftRight
-          case Absdif             .id => Absdif
-          //               case 42 => Clip2
-          //               case 44 => Fold2
-          //               case 45 => Wrap2
-        }
-        val _1 = readExpr(in, access)
-        val _2 = readExpr(in, access)
-        new Tuple2(typeID, op, targets, _1, _2)
-
-      //         case 3 =>
-      //            readProjection[ S ]( in, access, targets )
-
-      case _ => sys.error("Invalid cookie " + cookie)
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Int] = {
+      import UnaryOp._
+      val op: Op[_] = (opID: @switch) match {
+        case Neg    .id => Neg
+        case BitNot .id => BitNot
+        case Abs    .id => Abs
+        case Signum .id => Signum
+        case Squared.id => Squared
+        case Cubed  .id => Cubed
+      }
+      op.read(in, access, targets)
     }
   }
+
+  private[this] object IntTuple2s extends BiType.TupleReader[Int] {
+    final val arity = 2
+    final val opLo  = BinaryOp.Plus  .id
+    final val opHi  = BinaryOp.Absdif.id
+
+    val name = "Int-Int Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Int] = {
+      import BinaryOp._
+      val op: Op = (opID: @switch) match {
+        case Plus               .id => Plus
+        case Minus              .id => Minus
+        case Times              .id => Times
+        case IDiv               .id => IDiv
+        //               case 4 => Div
+        //               case 5 => Mod
+        //      case 6 => Eq
+        //      case 7 => Neq
+        //      case 8 => Lt
+        //      case 9 => Gt
+        //      case 10 => Leq
+        //      case 11 => Geq
+        case Min                .id => Min
+        case Max                .id => Max
+        case BitAnd             .id => BitAnd
+        case BitOr              .id => BitOr
+        case BitXor             .id => BitXor
+        // case 17 => Lcm
+        // case 18 => Gcd
+        //               case 19 => Round
+        //               case 20 => Roundup
+        case ShiftLeft          .id => ShiftLeft
+        case ShiftRight         .id => ShiftRight
+        case UnsignedShiftRight .id => UnsignedShiftRight
+        case Absdif             .id => Absdif
+        //               case 42 => Clip2
+        //               case 44 => Fold2
+        //               case 45 => Wrap2
+      }
+      val _1 = readExpr(in, access)
+      val _2 = readExpr(in, access)
+      new Tuple2(typeID, op, targets, _1, _2)
+    }
+  }
+
+  // ---- operators ----
 
   object UnaryOp {
     /* sealed */ trait Op[T1] extends Tuple1Op[T1] {

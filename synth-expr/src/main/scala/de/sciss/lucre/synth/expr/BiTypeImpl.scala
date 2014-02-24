@@ -30,20 +30,36 @@ trait BiTypeImpl[A] extends BiType[A] {
   final def longType    : BiType[Long    ] = Longs
   final def spanLikeType: BiType[SpanLike] = SpanLikes
 
-  private[this] var extUnary = Array.empty[BiType.TupleReader[A]]
+  private[this] val exts = new Array[Array[BiType.TupleReader[A]]](2)
+  exts(0) = new Array[BiType.TupleReader[A]](0)
+  exts(1) = new Array[BiType.TupleReader[A]](0)
 
   /** This method is not thread-safe. We assume extensions are registered upon application start only! */
-  final def registerUnaryOp(reader: BiType.TupleReader[A]): Unit = {
+  final def registerOp(reader: BiType.TupleReader[A]): Unit = {
+    val arity = reader.arity
+    require (arity > 0 && arity <= exts.length, s"Unsupported arity $arity")
     val opLo = reader.opLo
     val opHi = reader.opHi
-    require (opLo < opHi, s"Lo ($opLo) must be less than hi ($opHi)")
-    val idx0  = extUnary.indexWhere(_.opLo >= opHi)
-    val idx   = if (idx0 < 0) extUnary.length else idx0
+    require (opLo <= opHi, s"Lo ($opLo) must be less than or equal hi ($opHi)")
+    val extsA = exts(arity - 1)
+    val idx0  = extsA.indexWhere(_.opLo > opHi)
+    val idx   = if (idx0 < 0) extsA.length else idx0
     if (idx > 0) {
-      val pred = extUnary(idx - 1)
-      require(pred.opHi <= opLo, s"Extension overlap for $pred versus $reader")
+      val pred = extsA(idx - 1)
+      require(pred.opHi < opLo, s"Extension overlap for $pred versus $reader")
     }
-    extUnary = extUnary.patch(idx, reader :: Nil, 0)
+    exts(arity - 1) = extsA.patch(idx, reader :: Nil, 0)
+  }
+
+  /** The default implementation reads a type `Int` requiring to match `typeID`, followed by an operator id `Int`
+    * which will be resolved using `readOpExtension`.
+    */
+  protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                            (implicit tx: S#Tx): ExN[S] = {
+    val tpe  = in.readInt()
+    require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
+    val opID = in.readInt()
+    readOpExtension(cookie, opID, in, access, targets)
   }
 
   private[this] def findExt(coll: Array[BiType.TupleReader[A]], op: Int): Int = {
@@ -56,7 +72,7 @@ trait BiTypeImpl[A] extends BiType[A] {
     }) {
       val ext = coll(index)
       if (ext.opLo <= op) {
-        if (ext.opHi > op) return index
+        if (ext.opHi >= op) return index
         low = index + 1
       } else {
         high = index - 1
@@ -65,11 +81,13 @@ trait BiTypeImpl[A] extends BiType[A] {
     -1
   }
 
-  final protected def readUnaryOpExtension[S <: evt.Sys[S]](op: Int, in: DataInput, access: S#Acc,
-                                                            targets: evt.Targets[S])(implicit tx: S#Tx): ExN[S] = {
-    val idx = findExt(extUnary, op)
-    require(idx >= 0, s"Unknown extension unary operator $op")
-    val ext = extUnary(idx)
+  final protected def readOpExtension[S <: evt.Sys[S]](arity: Int, op: Int, in: DataInput, access: S#Acc,
+                                                       targets: evt.Targets[S])(implicit tx: S#Tx): ExN[S] = {
+    if (arity > exts.length) sys.error(s"Unknown extension $arity-ary operator $op")
+    val extA  = exts(arity - 1)
+    val idx   = findExt(extA, op)
+    require(idx >= 0, s"Unknown extension $arity-ary operator $op")
+    val ext = extA(idx)
     ext.readTuple(op, in, access, targets)
   }
 }

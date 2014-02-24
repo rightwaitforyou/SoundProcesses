@@ -7,6 +7,7 @@ import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.proc.{ExprImplicits, Confluent}
 import de.sciss.lucre.synth.expr.{Longs, Ints}
 import de.sciss.lucre.stm.store.BerkeleyDB
+import de.sciss.lucre.synth.expr
 
 trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
   type S = Confluent
@@ -16,6 +17,8 @@ trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
   implicit final protected val IntType  = Ints
   implicit final protected val LongType = Longs
   final protected val imp = ExprImplicits[S]
+
+  expr.initTypes()
 
   final def withFixture(test: OneArgTest): Outcome = {
     val system = Confluent(BerkeleyDB.tmp())

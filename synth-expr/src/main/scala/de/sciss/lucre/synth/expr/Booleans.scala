@@ -21,18 +21,10 @@ import de.sciss.serial.{DataOutput, DataInput}
 object Booleans extends BiTypeImpl[Boolean] {
   final val typeID = 6
 
-  def readValue(in: DataInput): Boolean = in.readBoolean()
+  def readValue (                in : DataInput ): Boolean  = in .readBoolean()
+  def writeValue(value: Boolean, out: DataOutput): Unit     = out.writeBoolean(value)
 
-  def writeValue(value: Boolean, out: DataOutput): Unit = out.writeBoolean(value)
+  lazy val install: Unit = ()
 
-  final class Ops[S <: Sys[S]](ex: Ex[S]) {
-
-  }
-
-  // ---- protected ----
-
-  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])(implicit tx: S#Tx): ExN[S] =
-  //   case 3 =>
-  //      readCursor[ S ]( in, access, targets )
-    sys.error("Invalid cookie " + cookie)
+  final class Ops[S <: Sys[S]](ex: Ex[S])
 }

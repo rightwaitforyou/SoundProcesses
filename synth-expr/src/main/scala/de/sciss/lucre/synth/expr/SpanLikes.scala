@@ -20,13 +20,18 @@ import expr.Expr
 import annotation.switch
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.{DataOutput, DataInput}
+import de.sciss.lucre.bitemp.BiType
 
 object SpanLikes extends BiTypeImpl[SpanLike] {
   final val typeID = 9
 
-  /* protected */ def readValue(in: DataInput): SpanLike = SpanLike.read(in)
+  def readValue (                 in : DataInput ): SpanLike  = SpanLike.read (in )
+  def writeValue(value: SpanLike, out: DataOutput): Unit      = value   .write(out)
 
-  /* protected */ def writeValue(value: SpanLike, out: DataOutput): Unit = value.write(out)
+  lazy val install: Unit = {
+    registerOp(SpanLikeTuple1s)
+    registerOp(SpanLikeTuple2s)
+  }
 
   def newExpr[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
     BinaryOp.Apply(start, stop)
@@ -36,6 +41,45 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
 
   def until[S <: Sys[S]](stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
     UnaryOp.Until(stop)
+
+  private[this] object SpanLikeTuple1s extends BiType.TupleReader[SpanLike] {
+    final val arity = 1
+    final val opLo  = UnaryOp.From .id
+    final val opHi  = UnaryOp.Until.id
+
+    val name = "Long-SpanLike Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, SpanLike] = {
+      import UnaryOp._
+      val op: Op[_] = (opID: @switch) match {
+        case From .id => From
+        case Until.id => Until
+        case _ => sys.error(s"Invalid operation id $opID")
+      }
+      op.read(in, access, targets)
+    }
+  }
+
+  private[this] object SpanLikeTuple2s extends BiType.TupleReader[SpanLike] {
+    final val arity = 2
+    final val opLo  = BinaryOp.Apply.id
+    final val opHi  = BinaryOp.Shift.id
+
+    val name = "Int-Int Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, SpanLike] = {
+      import BinaryOp._
+      val op: Op[_, _] = (opID: @switch) match {
+        case Apply.id => Apply
+        case Shift.id => Shift
+      }
+      op.read(in, access, targets)
+    }
+  }
+
+  // ---- operators ----
 
   final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     // ---- binary ----
@@ -146,37 +190,4 @@ object SpanLikes extends BiTypeImpl[SpanLike] {
       def value(a: SpanLike, b: Long): SpanLike = a.shift(b)
     }
   }
-
-  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                            (implicit tx: S#Tx): ExN[S] =
-    (cookie: @switch) match {
-      case 1 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
-        val opID = in.readInt()
-        import UnaryOp._
-        val op: Op[_] = (opID: @switch) match {
-          case From.id  => From
-          case Until.id => Until
-          case _ => sys.error(s"Invalid operation id $opID")
-        }
-        op.read(in, access, targets)
-
-      case 2 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
-        val opID = in.readInt()
-        import BinaryOp._
-        val op: Op[_, _] = (opID: @switch) match {
-          case Apply.id => Apply
-          case Shift.id => Shift
-          case _ => sys.error(s"Invalid operation id $opID")
-        }
-        op.read(in, access, targets)
-
-      //         case 3 =>
-      //            readProjection[ S ]( in, access, targets )
-
-      case _ => sys.error(s"Invalid cookie $cookie")
-    }
 }

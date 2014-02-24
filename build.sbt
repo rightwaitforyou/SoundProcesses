@@ -56,10 +56,10 @@ initialCommands in console :=
      |}
      |import de.sciss.synth._; import ugen._; import proc._
      |import de.sciss.lucre.stm.InMemory
-     |import de.sciss.lucre.expr.{Expr, LinkedList}
+     |import de.sciss.lucre.expr.Expr
      |import de.sciss.span.Span
      |import de.sciss.lucre.{event => evt}
-     |import expr.{Ints, Longs, Doubles, Spans}
+     |import de.sciss.lucre.synth.expr.{Ints, Longs, Doubles, Spans}
      |println("To disable result types:\n :power\n :wrap shortResults\n: silent")""".stripMargin +
    "\nprintln(\"\"\"" +
    """

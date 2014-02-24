@@ -19,13 +19,57 @@ import evt.{Targets, Sys}
 import expr.Expr
 import de.sciss.span.Span
 import de.sciss.serial.{DataOutput, DataInput}
+import scala.annotation.switch
+import de.sciss.lucre.bitemp.BiType
 
 object Spans extends BiTypeImpl[Span] {
   final val typeID = 10
 
-  def readValue(in: DataInput): Span = Span.read(in)
-
+  def readValue (             in : DataInput ): Span = Span .read (in )
   def writeValue(value: Span, out: DataOutput): Unit = value.write(out)
+
+  lazy val install: Unit = {
+    Longs.registerOp(LongTuple1s)
+    this .registerOp(SpanTuple2s)
+  }
+
+  private[this] object LongTuple1s extends BiType.TupleReader[Long] {
+    final val arity = 1
+    final val opLo  = UnaryOp.Start .id
+    final val opHi  = UnaryOp.Length.id
+
+    val name = "Span-Long Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Long] = {
+      import UnaryOp._
+      val op: LongOp = (opID: @switch) match {
+        // ---- Span ----
+        case Start  .id => Start
+        case Stop   .id => Stop
+        case Length .id => Length
+      }
+      op.read(in, access, targets)
+    }
+  }
+
+  private[this] object SpanTuple2s extends BiType.TupleReader[Span] {
+    final val arity = 2
+    final val opLo  = BinaryOp.Apply.id
+    final val opHi  = BinaryOp.Shift.id
+
+    val name = "Int-Int Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Span] = {
+      import BinaryOp._
+      val op: Op[_, _] = (opID: @switch) match {
+        case Apply.id => Apply
+        case Shift.id => Shift
+      }
+      op.read(in, access, targets)
+    }
+  }
 
   def apply[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
     (start, stop) match {
@@ -37,33 +81,15 @@ object Spans extends BiTypeImpl[Span] {
   // XXX TODO: fold constants
   final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     // ---- unary ----
-    def start : Expr[S, Long] = UnaryOp.Start(ex)
-    def stop  : Expr[S, Long] = UnaryOp.Stop(ex)
+    def start : Expr[S, Long] = UnaryOp.Start (ex)
+    def stop  : Expr[S, Long] = UnaryOp.Stop  (ex)
     def length: Expr[S, Long] = UnaryOp.Length(ex)
 
     // ---- binary ----
     def shift(delta: Expr[S, Long]): Ex[S] = BinaryOp.Shift(ex, delta)
   }
 
-  // ---- protected ----
-
-  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                                (implicit tx: S#Tx): ExN[S] = cookie match {
-    case 2 => // binary ops
-      val tpe = in.readInt()
-      require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
-      val opID  = in.readInt()
-      import BinaryOp._
-      val op    = opID match {
-        case Apply.id => Apply
-        case _        => sys.error(s"Invalid operation id $opID")
-      }
-      val _1 = Longs.readExpr(in, access)
-      val _2 = Longs.readExpr(in, access)
-      new Tuple2(typeID, op, targets, _1, _2)
-
-    case _        => sys.error(s"Invalid cookie $cookie")
-  }
+  // ----- operators -----
 
   object UnaryOp {
     //      sealed trait OpLike[ T1 ] {
@@ -106,7 +132,7 @@ object Spans extends BiTypeImpl[Span] {
   }
 
   private object BinaryOp {
-    sealed trait OpLike[T1, T2] {
+    sealed trait Op[T1, T2] {
       def toString[S <: Sys[S]](_1: Expr[S, T1], _2: Expr[S, T2]): String = s"${_1}.$name(${_2})"
 
       def name: String = {
@@ -115,9 +141,11 @@ object Spans extends BiTypeImpl[Span] {
         val i  = cn.lastIndexOf('$', sz - 2) + 1
         "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
       }
+
+      def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])(implicit tx: S#Tx): Tuple2[S, T1, T2]
     }
 
-    sealed abstract class LongSpanOp(val id: Int) extends Tuple2Op[Span, Long] with OpLike[Span, Long] {
+    sealed abstract class LongSpanOp(val id: Int) extends Tuple2Op[Span, Long] with Op[Span, Long] {
       final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
                                      (implicit tx: S#Tx): Tuple2[S, Span, Long] = {
         val _1 = readExpr(in, access)
@@ -135,10 +163,17 @@ object Spans extends BiTypeImpl[Span] {
       def value(a: Span, b: Long): Span = a.shift(b)
     }
 
-    object Apply extends Tuple2Op[Long, Long] {
+    object Apply extends Tuple2Op[Long, Long] with Op[Long, Long] {
       final val id = 0
       def value(a: Long, b: Long): Span = Span(a, b)
-      def toString[S1 <: Sys[S1]](_1: Expr[S1, Long], _2: Expr[S1, Long]): String = s"Span(${_1}, ${_2})"
+      override def toString[S1 <: Sys[S1]](_1: Expr[S1, Long], _2: Expr[S1, Long]): String = s"Span(${_1}, ${_2})"
+
+      def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
+                           (implicit tx: S#Tx): Tuple2[S, Long, Long] = {
+        val _1 = Longs.readExpr(in, access)
+        val _2 = Longs.readExpr(in, access)
+        new Tuple2(typeID, this, targets, _1, _2)
+      }
     }
   }
 }

@@ -14,128 +14,138 @@
 package de.sciss.lucre.synth
 package expr
 
-import de.sciss.lucre.{stm, event => evt}
+import de.sciss.lucre.{event => evt}
 import annotation.switch
 import de.sciss.numbers
 import de.sciss.serial.{DataInput, DataOutput}
 import de.sciss.lucre.expr.Expr
 import evt.Sys
+import de.sciss.lucre.bitemp.BiType
 
 object Doubles extends BiTypeImpl[Double] {
   final val typeID = 5
 
-  def readValue(in: DataInput): Double = in.readDouble()
+  def readValue (               in : DataInput ): Double  = in .readDouble()
+  def writeValue(value: Double, out: DataOutput): Unit    = out.writeDouble(value)
 
-  def writeValue(value: Double, out: DataOutput): Unit = out.writeDouble(value)
+  lazy val install: Unit = {
+    registerOp(DoubleTuple1s)
+    registerOp(DoubleTuple2s)
+  }
 
-  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                (implicit tx: S#Tx): ExN[S] = {
-    (cookie: @switch) match {
-      case 1 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
-        val opID = in.readInt()
-        import UnaryOp._
-        val op: Op = (opID: @switch) match {
-          case Neg        .id => Neg
-          case Abs        .id => Abs
-          case Ceil       .id => Ceil
-          case Floor      .id => Floor
-          case Frac       .id => Frac
-          case Signum     .id => Signum
-          case Squared    .id => Squared
-          // case Cubed      .id => Cubed
-          case Sqrt       .id => Sqrt
-          case Exp        .id => Exp
-          case Reciprocal .id => Reciprocal
-          case Midicps    .id => Midicps
-          case Cpsmidi    .id => Cpsmidi
-          case Midiratio  .id => Midiratio
-          case Ratiomidi  .id => Ratiomidi
-          case Dbamp      .id => Dbamp
-          case Ampdb      .id => Ampdb
-          case Octcps     .id => Octcps
-          case Cpsoct     .id => Cpsoct
-          case Log        .id => Log
-          case Log2       .id => Log2
-          case Log10      .id => Log10
-          case Sin        .id => Sin
-          case Cos        .id => Cos
-          case Tan        .id => Tan
-          case Asin       .id => Asin
-          case Acos       .id => Acos
-          case Atan       .id => Atan
-          case Sinh       .id => Sinh
-          case Cosh       .id => Cosh
-          case Tanh       .id => Tanh
-          case _ => sys.error("Invalid operation id " + opID)
-        }
-        val _1 = readExpr(in, access)
-        new Tuple1(typeID, op, targets, _1)
+  private[this] object DoubleTuple1s extends BiType.TupleReader[Double] {
+    final val arity = 1
+    final val opLo  = UnaryOp.Neg .id
+    final val opHi  = UnaryOp.Tanh.id
 
-      case 2 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
-        val opID = in.readInt()
-        import BinaryOp._
-        val op: Op = (opID: @switch) match {
-          case Plus   .id => Plus
-          case Minus  .id => Minus
-          case Times  .id => Times
-          //      case 3 => IDiv
-          case Div    .id => Div
-          case Mod    .id => Mod
-          //      case 6 => Eq
-          //      case 7 => Neq
-          //      case 8 => Lt
-          //      case 9 => Gt
-          //      case 10 => Leq
-          //      case 11 => Geq
-          case Min    .id => Min
-          case Max    .id => Max
-          //      case 14 => BitAnd
-          //      case 15 => BitOr
-          //      case 16 => BitXor
-          // case 17 => Lcm
-          // case 18 => Gcd
-          case RoundTo  .id => RoundTo
-          case RoundUpTo.id => RoundUpTo
-          case Trunc  .id => Trunc
-          case Atan2  .id => Atan2
-          case Hypot  .id => Hypot
-          case Hypotx .id => Hypotx
-          case Pow    .id => Pow
-          // case 26 => <<
-          // case 27 => >>
-          // case 28 => UnsgnRghtShft
-          // case 29 => Fill
-          //      case 30 => Ring1
-          //      case 31 => Ring2
-          //      case 32 => Ring3
-          //      case 33 => Ring4
-          case Difsqr .id => Difsqr
-          case Sumsqr .id => Sumsqr
-          case Sqrsum .id => Sqrsum
-          case Sqrdif .id => Sqrdif
-          case Absdif .id => Absdif
-          // case Thresh .id => Thresh
-          //      case 40 => Amclip
-          //      case 41 => Scaleneg
-          case Clip2.id => Clip2
-          //      case 43 => Excess
-          case Fold2.id => Fold2
-          case Wrap2.id=> Wrap2
-        }
-        val _1 = readExpr(in, access)
-        val _2 = readExpr(in, access)
-        new Tuple2(typeID, op, targets, _1, _2)
+    val name = "Double-Double Ops"
 
-      //         case 3 =>
-      //            readProjection[ S ]( in, access, targets )
-
-      case _ => sys.error("Invalid cookie " + cookie)
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Double] = {
+      import UnaryOp._
+      val op: Op = (opID: @switch) match {
+        case Neg        .id => Neg
+        case Abs        .id => Abs
+        case Ceil       .id => Ceil
+        case Floor      .id => Floor
+        case Frac       .id => Frac
+        case Signum     .id => Signum
+        case Squared    .id => Squared
+        // case Cubed      .id => Cubed
+        case Sqrt       .id => Sqrt
+        case Exp        .id => Exp
+        case Reciprocal .id => Reciprocal
+        case Midicps    .id => Midicps
+        case Cpsmidi    .id => Cpsmidi
+        case Midiratio  .id => Midiratio
+        case Ratiomidi  .id => Ratiomidi
+        case Dbamp      .id => Dbamp
+        case Ampdb      .id => Ampdb
+        case Octcps     .id => Octcps
+        case Cpsoct     .id => Cpsoct
+        case Log        .id => Log
+        case Log2       .id => Log2
+        case Log10      .id => Log10
+        case Sin        .id => Sin
+        case Cos        .id => Cos
+        case Tan        .id => Tan
+        case Asin       .id => Asin
+        case Acos       .id => Acos
+        case Atan       .id => Atan
+        case Sinh       .id => Sinh
+        case Cosh       .id => Cosh
+        case Tanh       .id => Tanh
+      }
+      val _1 = readExpr(in, access)
+      new Tuple1(typeID, op, targets, _1)
     }
   }
+
+  private[this] object DoubleTuple2s extends BiType.TupleReader[Double] {
+    final val arity = 2
+    final val opLo  = BinaryOp.Plus .id
+    final val opHi  = BinaryOp.Wrap2.id
+
+    val name = "Double-Double Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Double] = {
+      import BinaryOp._
+      val op: Op = (opID: @switch) match {
+        case Plus   .id => Plus
+        case Minus  .id => Minus
+        case Times  .id => Times
+        //      case 3 => IDiv
+        case Div    .id => Div
+        case Mod    .id => Mod
+        //      case 6 => Eq
+        //      case 7 => Neq
+        //      case 8 => Lt
+        //      case 9 => Gt
+        //      case 10 => Leq
+        //      case 11 => Geq
+        case Min    .id => Min
+        case Max    .id => Max
+        //      case 14 => BitAnd
+        //      case 15 => BitOr
+        //      case 16 => BitXor
+        // case 17 => Lcm
+        // case 18 => Gcd
+        case RoundTo  .id => RoundTo
+        case RoundUpTo.id => RoundUpTo
+        case Trunc  .id => Trunc
+        case Atan2  .id => Atan2
+        case Hypot  .id => Hypot
+        case Hypotx .id => Hypotx
+        case Pow    .id => Pow
+        // case 26 => <<
+        // case 27 => >>
+        // case 28 => UnsgnRghtShft
+        // case 29 => Fill
+        //      case 30 => Ring1
+        //      case 31 => Ring2
+        //      case 32 => Ring3
+        //      case 33 => Ring4
+        case Difsqr .id => Difsqr
+        case Sumsqr .id => Sumsqr
+        case Sqrsum .id => Sqrsum
+        case Sqrdif .id => Sqrdif
+        case Absdif .id => Absdif
+        // case Thresh .id => Thresh
+        //      case 40 => Amclip
+        //      case 41 => Scaleneg
+        case Clip2.id => Clip2
+        //      case 43 => Excess
+        case Fold2.id => Fold2
+        case Wrap2.id => Wrap2
+      }
+      val _1 = readExpr(in, access)
+      val _2 = readExpr(in, access)
+      new Tuple2(typeID, op, targets, _1, _2)
+    }
+  }
+
+  // ----- operators -----
 
   private object UnaryOp {
 

@@ -24,15 +24,20 @@ import de.sciss.lucre.bitemp.BiType
 object Longs extends BiTypeImpl[Long] {
   final val typeID = 3
 
-  def readValue(in: DataInput): Long = in.readLong()
-
+  def readValue (             in : DataInput ): Long = in .readLong()
   def writeValue(value: Long, out: DataOutput): Unit = out.writeLong(value)
 
-  private[this] object LongTuple1s extends BiType.TupleReader[Long] {
-    final val opLo = UnaryOp.Neg  .id
-    final val opHi = UnaryOp.Cubed.id + 1
+  lazy val install: Unit = {
+    registerOp(LongTuple1s)
+    registerOp(LongTuple2s)
+  }
 
-    val name = "Long-Long Unary Ops"
+  private[this] object LongTuple1s extends BiType.TupleReader[Long] {
+    final val arity = 1
+    final val opLo  = UnaryOp.Neg  .id
+    final val opHi  = UnaryOp.Cubed.id
+
+    val name = "Long-Long Ops"
 
     def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                               (implicit tx: S#Tx): Expr.Node[S, Long] = {
@@ -49,70 +54,55 @@ object Longs extends BiTypeImpl[Long] {
       op.read(in, access, targets)
     }
   }
-  registerUnaryOp(LongTuple1s)
 
-  /*
-          // ---- Span ----
-          case Spans.UnaryOp.Start  .id => Spans.UnaryOp.Start
-          case Spans.UnaryOp.Stop   .id => Spans.UnaryOp.Stop
-          case Spans.UnaryOp.Length .id => Spans.UnaryOp.Length
-   */
+  private[this] object LongTuple2s extends BiType.TupleReader[Long] {
+    final val arity = 2
+    final val opLo  = BinaryOp.Plus  .id
+    final val opHi  = BinaryOp.Absdif.id
 
-  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                            (implicit tx: S#Tx): ExN[S] = {
-    (cookie: @switch) match {
-      case 1 =>
-        val tpe  = in.readInt()
-        require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
-        val opID = in.readInt()
-        readUnaryOpExtension(opID, in, access, targets)
+    val name = "Long-Long Ops"
 
-      case 2 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
-        val opID = in.readInt()
-        import BinaryOp._
-        val op: Op = (opID: @switch) match {
-          case Plus   .id => Plus
-          case Minus  .id => Minus
-          case Times  .id => Times
-          case IDiv   .id => IDiv
-          //               case 4 => Div
-          //               case 5 => Mod
-          //      case 6 => Eq
-          //      case 7 => Neq
-          //      case 8 => Lt
-          //      case 9 => Gt
-          //      case 10 => Leq
-          //      case 11 => Geq
-          case Min    .id => Min
-          case Max    .id => Max
-          case BitAnd .id => BitAnd
-          case BitOr  .id => BitOr
-          case BitXor .id => BitXor
-          // case 17 => Lcm
-          // case 18 => Gcd
-          //               case 19 => Round
-          //               case 20 => Roundup
-          //               case 26 => <<
-          //               case 27 => >>
-          //               case 28 => >>>
-          case Absdif .id => Absdif
-          //               case 42 => Clip2
-          //               case 44 => Fold2
-          //               case 45 => Wrap2
-          case _ => sys.error(s"Invalid operation id $opID")
-        }
-        val _1 = readExpr(in, access)
-        val _2 = readExpr(in, access)
-        new Tuple2(typeID, op, targets, _1, _2)
-
-      //         case 3 =>
-      //            readProjection[ S ]( in, access, targets )
-
-      case _ => sys.error(s"Invalid cookie $cookie")
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Long] = {
+      import BinaryOp._
+      val op: Op = (opID: @switch) match {
+        // ---- Long ----
+        case Plus   .id => Plus
+        case Minus  .id => Minus
+        case Times  .id => Times
+        case IDiv   .id => IDiv
+        //               case 4 => Div
+        //               case 5 => Mod
+        //      case 6 => Eq
+        //      case 7 => Neq
+        //      case 8 => Lt
+        //      case 9 => Gt
+        //      case 10 => Leq
+        //      case 11 => Geq
+        case Min    .id => Min
+        case Max    .id => Max
+        case BitAnd .id => BitAnd
+        case BitOr  .id => BitOr
+        case BitXor .id => BitXor
+        // case 17 => Lcm
+        // case 18 => Gcd
+        //               case 19 => Round
+        //               case 20 => Roundup
+        //               case 26 => <<
+        //               case 27 => >>
+        //               case 28 => >>>
+        case Absdif .id => Absdif
+        //               case 42 => Clip2
+        //               case 44 => Fold2
+        //               case 45 => Wrap2
+      }
+      val _1 = readExpr(in, access)
+      val _2 = readExpr(in, access)
+      new Tuple2(typeID, op, targets, _1, _2)
     }
-   }
+  }
+
+  // ---- operators ----
 
   object UnaryOp {
     trait Op[T1] extends Tuple1Op[T1] {
@@ -129,7 +119,7 @@ object Longs extends BiTypeImpl[Long] {
       def name: String = {
         val cn = getClass.getName
         val sz = cn.length
-        val i = cn.lastIndexOf('$', sz - 2) + 1
+        val i  = cn.lastIndexOf('$', sz - 2) + 1
         "" + cn.charAt(i).toLower + cn.substring(i + 1, if (cn.charAt(sz - 1) == '$') sz - 1 else sz)
       }
     }

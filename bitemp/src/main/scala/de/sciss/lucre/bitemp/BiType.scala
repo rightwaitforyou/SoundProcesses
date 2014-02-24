@@ -23,13 +23,17 @@ object BiType {
   trait TupleReader[+A] {
     def name: String
 
-    val opLo: Int
-    val opHi: Int
+    /** Arity of the operator */
+    val arity: Int
+    /** Lowest id of handled operators */
+    val opLo : Int
+    /** Highest id of handled operators. Note: This value is _inclusive_ */
+    val opHi : Int
 
     def readTuple[S <: evt.Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                   (implicit tx: S#Tx): expr.Expr.Node[S, A]
 
-    override def toString = s"$name [lo = $opLo, hi = $opHi]"
+    override def toString = s"$name [$arity-ary, lo = $opLo, hi = $opHi]"
   }
 }
 /** Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object. */

@@ -31,17 +31,17 @@ package object expr {
 
   /** Initializes types and thus installs some type extensions. */
   def initTypes(): Unit = {
-    Booleans
-    Curves
-    Doubles
-    Ints
-    Longs
-    SpanLikes
-    Spans
-    Strings
+    Booleans  .install
+    Curves    .install
+    Doubles   .install
+    Ints      .install
+    Longs     .install
+    SpanLikes .install
+    Spans     .install
+    Strings   .install
 
-    DoubleVec
-    IntVec
-    LongVec
+    DoubleVec .install
+    IntVec    .install
+    LongVec   .install
   }
 }

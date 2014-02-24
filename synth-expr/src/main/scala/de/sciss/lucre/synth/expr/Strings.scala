@@ -18,13 +18,39 @@ import de.sciss.lucre.{event => evt}
 import evt.{Targets, Sys}
 import de.sciss.serial.{DataInput, DataOutput}
 import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.bitemp.BiType
+import scala.annotation.switch
 
 object Strings extends BiTypeImpl[String] {
   final val typeID = 8
 
-  def readValue(in: DataInput): String = in.readUTF()
+  def readValue (               in : DataInput ): String  = in .readUTF()
+  def writeValue(value: String, out: DataOutput): Unit    = out.writeUTF(value)
 
-  def writeValue(value: String, out: DataOutput): Unit = out.writeUTF(value)
+  lazy val install: Unit = {
+    registerOp(StringTuple2s)
+  }
+
+  private[this] object StringTuple2s extends BiType.TupleReader[String] {
+    final val arity = 2
+    final val opLo  = BinaryOp.Append.id
+    final val opHi  = BinaryOp.Append.id
+
+    val name = "Long-Long Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, String] = {
+      import BinaryOp._
+      val op: Op = (opID: @switch) match {
+        case Append.id => Append
+      }
+      val _1 = readExpr(in, access)
+      val _2 = readExpr(in, access)
+      new Tuple2(typeID, op, targets, _1, _2)
+    }
+  }
+
+  // ----- operators -----
 
   final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     private type E = Ex[S]
@@ -57,41 +83,6 @@ object Strings extends BiTypeImpl[String] {
     case object Append extends Op {
       final val id = 0
       def value(a: String, b: String): String = a + b
-    }
-  }
-
-  // ---- protected ----
-
-  def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                            (implicit tx: S#Tx): ExN[S] = {
-    cookie /* : @switch */ match {
-      //         case 1 =>
-      //            val tpe  = in.readInt()
-      //            require( tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")" )
-      //            val opID = in.readInt()
-      //            import UnaryOp._
-      //            val op: Op = (opID: @switch) match {
-      //               case _  => sys.error( "Invalid operation id " + opID )
-      //            }
-      //            val _1 = readExpr( in, access )
-      //            new Tuple1( typeID, op, targets, _1 )
-
-      case 2 =>
-        val tpe = in.readInt()
-        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
-        val opID = in.readInt()
-        import BinaryOp._
-        val op: Op = opID /*: @switch */ match {
-          case Append.id => Append
-        }
-        val _1 = readExpr(in, access)
-        val _2 = readExpr(in, access)
-        new Tuple2(typeID, op, targets, _1, _2)
-
-      //         case 3 =>
-      //            readProjection[ S ]( in, access, targets )
-
-      case _ => sys.error("Invalid cookie " + cookie)
     }
   }
 }

@@ -256,11 +256,13 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   private final val emptyCookie   = 2
   private final val tapeCookie    = 3
 
-  def readValue(in: DataInput): SynthGraph = ValueSerializer.read(in)
+  def readValue (                   in : DataInput ): SynthGraph  = ValueSerializer.read (       in )
+  def writeValue(value: SynthGraph, out: DataOutput): Unit        = ValueSerializer.write(value, out)
 
-  def writeValue(value: SynthGraph, out: DataOutput): Unit = ValueSerializer.write(value, out)
+  lazy val install: Unit = ()
 
-  protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+  // XXX TODO: not cool. Should use `1` to `3` for cookies
+  override protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                       (implicit tx: S#Tx): ReprNode[S] =
     (cookie: @switch) match {
       case `oldTapeCookie` | `emptyCookie` | `tapeCookie` => new Predefined(targets, cookie)

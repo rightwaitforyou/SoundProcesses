@@ -14,6 +14,8 @@ class BiPinSpec extends ConfluentEventSpec {
 
   import imp._
 
+  initTypes()
+
   "BiPin" should "notify observers about all relevant collection events" in { system =>
     val obs = new Observation[S]
     val bipH = system.step { implicit tx =>

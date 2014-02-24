@@ -57,10 +57,10 @@ object FadeSpec {
     //    def longType    : BiType[Long    ] = Longs
     //    def spanLikeType: BiType[SpanLike] = SpanLikes
 
-    def readValue(in: DataInput): Value = Value.serializer.read(in)
+    def readValue (              in : DataInput ): Value  = Value.serializer.read (       in )
+    def writeValue(value: Value, out: DataOutput): Unit   = Value.serializer.write(value, out)
 
-    def writeValue(value: Value, out: DataOutput): Unit =
-      Value.serializer.write(value, out)
+    lazy val install: Unit = ()
 
     def apply[S <: evt.Sys[S]](numFrames: Expr[S, Long], shape: Expr[S, Curve], floor: Expr[S, Double])
                               (implicit tx: S#Tx): Elem[S] = {
@@ -74,7 +74,8 @@ object FadeSpec {
         case _ => None
       }
 
-    protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+    // XXX TODO: not cool. Should use `1` for `elemCookie`
+    override protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                               (implicit tx: S#Tx): ReprNode[S] = {
       require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
       val numFrames = Longs  .readExpr(in, access)
