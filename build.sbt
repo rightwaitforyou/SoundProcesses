@@ -32,7 +32,7 @@ lazy val spanVersion            = "1.2.+"
 
 lazy val scalaOSCVersion        = "1.1.2+"  // bug fix version, somehow doesn't come in automatically
 
-retrieveManaged in ThisBuild := true
+// retrieveManaged in ThisBuild := true
 
 scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature")   // "-Xelide-below", "INFO"
 

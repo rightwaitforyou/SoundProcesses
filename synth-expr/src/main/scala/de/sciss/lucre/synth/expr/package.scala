@@ -28,4 +28,20 @@ package object expr {
 
     def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): S#ID = tx.readID(in, access)
   }
+
+  /** Initializes types and thus installs some type extensions. */
+  def initTypes(): Unit = {
+    Booleans
+    Curves
+    Doubles
+    Ints
+    Longs
+    SpanLikes
+    Spans
+    Strings
+
+    DoubleVec
+    IntVec
+    LongVec
+  }
 }

@@ -19,41 +19,53 @@ import evt.{Targets, Sys}
 import annotation.switch
 import expr.Expr
 import de.sciss.serial.{DataOutput, DataInput}
+import de.sciss.lucre.bitemp.BiType
 
 object Longs extends BiTypeImpl[Long] {
   final val typeID = 3
 
-  /* protected */ def readValue(in: DataInput): Long = in.readLong()
+  def readValue(in: DataInput): Long = in.readLong()
 
-  /* protected */ def writeValue(value: Long, out: DataOutput): Unit = out.writeLong(value)
+  def writeValue(value: Long, out: DataOutput): Unit = out.writeLong(value)
+
+  private[this] object LongTuple1s extends BiType.TupleReader[Long] {
+    final val opLo = UnaryOp.Neg  .id
+    final val opHi = UnaryOp.Cubed.id + 1
+
+    val name = "Long-Long Unary Ops"
+
+    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                              (implicit tx: S#Tx): Expr.Node[S, Long] = {
+      import UnaryOp._
+      val op: Op[_] = (opID: @switch) match {
+        // ---- Long ----
+        case Neg    .id => Neg
+        case BitNot .id => BitNot
+        case Abs    .id => Abs
+        case Signum .id => Signum
+        case Squared.id => Squared
+        case Cubed  .id => Cubed
+      }
+      op.read(in, access, targets)
+    }
+  }
+  registerUnaryOp(LongTuple1s)
+
+  /*
+          // ---- Span ----
+          case Spans.UnaryOp.Start  .id => Spans.UnaryOp.Start
+          case Spans.UnaryOp.Stop   .id => Spans.UnaryOp.Stop
+          case Spans.UnaryOp.Length .id => Spans.UnaryOp.Length
+   */
 
   def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                             (implicit tx: S#Tx): ExN[S] = {
     (cookie: @switch) match {
       case 1 =>
         val tpe  = in.readInt()
-        require(tpe == typeID, "Invalid type id (found " + tpe + ", required " + typeID + ")")
+        require(tpe == typeID, s"Invalid type id (found $tpe, required $typeID)")
         val opID = in.readInt()
-        import UnaryOp._
-        val op: Op[_] = (opID: @switch) match {
-          // ---- Long ----
-          case Neg    .id => Neg
-          case BitNot .id => BitNot
-          case Abs    .id => Abs
-          case Signum .id => Signum
-          case Squared.id => Squared
-          case Cubed  .id => Cubed
-
-          // ---- Span ----
-          case Spans.UnaryOp.Start  .id => Spans.UnaryOp.Start
-          case Spans.UnaryOp.Stop   .id => Spans.UnaryOp.Stop
-          case Spans.UnaryOp.Length .id => Spans.UnaryOp.Length
-
-          case _ => sys.error(s"Invalid operation id $opID")
-        }
-        op.read(in, access, targets)
-        //            val _1 = readExpr( in, access )
-        //            new Tuple1( typeID, op, targets, _1 )
+        readUnaryOpExtension(opID, in, access, targets)
 
       case 2 =>
         val tpe = in.readInt()
@@ -132,14 +144,6 @@ object Longs extends BiTypeImpl[Long] {
       }
     }
 
-    //      sealed abstract class SpanOp( val id: Int ) extends Op[ Span ] {
-    //         final def read[ S <: Sys[ S ]]( in: DataInput, access: S#Acc, targets: Targets[ S ])
-    //                                       ( implicit tx: S#Tx ) : Tuple1[ S, Span ] = {
-    //            val _1 = Spans.readExpr( in, access )
-    //            new Tuple1( typeID, this, targets, _1 )
-    //         }
-    //      }
-
     case object Neg extends LongOp {
       final val id = 0
       def value(a: Long): Long = -a
@@ -200,12 +204,6 @@ object Longs extends BiTypeImpl[Long] {
 
       override def toString[S <: Sys[S]](_1: Ex[S], _2: Ex[S]): String = s"(${_1} $name ${_2})"
     }
-
-    //      sealed trait MathStyle {
-    //         def name: String
-    //         override def toString[ S <: Sys[ S ]]( _1: Ex[ S ], _2: Ex[ S ]) : String =
-    //            "(" + _1 + " " + name + " " + _2 + ")"
-    //      }
 
     case object Plus extends Op with Infix {
       final val id = 0
@@ -281,22 +279,24 @@ object Longs extends BiTypeImpl[Long] {
     //      }
   }
 
-   final class Ops[ S <: Sys[ S ]]( ex: Ex[ S ])( implicit tx: S#Tx ) {
-      private type E = Ex[ S ]
+  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+    private type E = Ex[S]
 
-      import UnaryOp._
-      def unary_- : E            = Neg( ex )
-      def unary_~ : E	         = BitNot( ex )
+    import UnaryOp._
 
-      import BinaryOp._
-      def +( b: E ) : E          = Plus( ex, b )
-      def -( b: E ) : E          = Minus( ex, b )
-      def *( b: E ) : E          = Times( ex, b )
-      def /( b: E ) : E          = IDiv( ex, b )
-      def &( b: E ) : E          = BitAnd( ex, b )
-      def |( b: E ) : E          = BitOr( ex, b )
-      def ^( b: E ) : E          = BitXor( ex, b )
-   }
+    def unary_- : E = Neg   (ex)
+    def unary_~ : E = BitNot(ex)
+
+    import BinaryOp._
+
+    def + (b: E): E = Plus  (ex, b)
+    def - (b: E): E = Minus (ex, b)
+    def * (b: E): E = Times (ex, b)
+    def / (b: E): E = IDiv  (ex, b)
+    def & (b: E): E = BitAnd(ex, b)
+    def | (b: E): E = BitOr (ex, b)
+    def ^ (b: E): E = BitXor(ex, b)
+  }
 
   final class RichOps[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
     private type E = Ex[S]

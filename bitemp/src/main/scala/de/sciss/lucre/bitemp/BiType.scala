@@ -17,10 +17,22 @@ package bitemp
 import expr.Type
 import de.sciss.span.SpanLike
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
+import de.sciss.lucre.{event => evt}
 
-/**
- * Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object.
- */
+object BiType {
+  trait TupleReader[+A] {
+    def name: String
+
+    val opLo: Int
+    val opHi: Int
+
+    def readTuple[S <: evt.Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                  (implicit tx: S#Tx): expr.Expr.Node[S, A]
+
+    override def toString = s"$name [lo = $opLo, hi = $opHi]"
+  }
+}
+/** Extends `Type` with a an expression form which acts as a cursor on a bi-temporal object. */
 trait BiType[A] extends Type[A] {
   def typeID: Int
 
