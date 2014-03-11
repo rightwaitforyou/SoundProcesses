@@ -3,20 +3,19 @@ package proc
 
 import de.sciss.lucre.{stm, bitemp, expr, event => evt}
 import stm.Cursor
-import bitemp.{BiExpr, BiType, BiGroup}
-import expr.Expr
+import bitemp.{BiExpr, BiGroup}
+import de.sciss.lucre.expr.{ExprType, Expr}
 import java.awt.EventQueue
 import de.sciss.synth.io.AudioFile
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.Serializer
 import de.sciss.synth.Curve.linear
 
-import de.sciss.synth
+import de.sciss.{lucre, synth}
 import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.SynthGraph
 import de.sciss.lucre.synth.{InMemory, Sys}
-import de.sciss.lucre.synth.expr.{Longs, SpanLikes}
 
 object VisTest {
   def apply(): VisTest[InMemory, InMemory] = {
@@ -75,7 +74,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   object Implicits {
     //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
-    implicit         val spanLikes : BiType[SpanLike] = SpanLikes
+    implicit         val spanLikes : ExprType[SpanLike] = bitemp.SpanLike
     implicit private val procSer   : Serializer[S#Tx, S#Acc, Proc[S]] = Proc.serializer[S]
     implicit         val procVarSer: Serializer[S#Tx, S#Acc, PG     ] =
       BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](_.changed)
@@ -86,7 +85,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
   import Implicits._
 
   lazy val access: S#Entry[Acc] = system.root { implicit tx =>
-    implicit def longType = Longs
+    implicit def longType = lucre.expr.Long
     val g = ProcGroup.Modifiable[S]
     g.changed.react { _ => upd =>
       println("Group observed: " + upd)

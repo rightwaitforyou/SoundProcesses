@@ -14,7 +14,7 @@
 package de.sciss.lucre
 package bitemp
 
-import expr.Expr
+import de.sciss.lucre.expr.{ExprType1, Expr}
 import de.sciss.lucre.{event => evt}
 import evt.Targets
 import de.sciss.serial.{DataOutput, DataInput}
@@ -23,30 +23,30 @@ import de.sciss.model.Change
 
 object BiExpr {
   def apply[S <: evt.Sys[S], A](time: Expr[S, Long], mag: Expr[S, A])
-                               (implicit tx: S#Tx, magType: BiType[A]): BiExpr[S, A] = (time, mag) match {
+                               (implicit tx: S#Tx, magType: ExprType1[A]): BiExpr[S, A] = (time, mag) match {
     case (Expr.Const(timeVal), Expr.Const(magVal)) =>
       ConstImpl(timeVal, magVal)
     case _ =>
       val targets = evt.Targets.partial[S] // XXX TODO partial?
-      new EventImpl(targets, time, mag)
+      new EventImpl[S, A](targets, time, mag)
   }
 
   def unapply[S <: evt.Sys[S], A](expr: BiExpr[S, A]): Option[(Expr[S, Long], Expr[S, A])] =
     Some((expr.time, expr.mag))
 
   //   implicit def fromTuple[ S <: evt.Sys[ S ], A, A1, T ]( tuple: (T, A1) )
-  //                                                        ( implicit tx: S#Tx, magType: BiType[ A ],
+  //                                                        ( implicit tx: S#Tx, magType: ExprType[ A ],
   //                                                          timeView: T => Expr[ S, Long ],
   //                                                          magView: A1 => Expr[ S, A ]) : BiExpr[ S, A ] =
   //      apply[ S, A ]( timeView( tuple._1 ), magView( tuple._2 ))
 
   //  implicit def fromTuple[S <: evt.Sys[S], T, A](tuple: (T, A))(implicit tx: S#Tx, timeView: T => Expr[S, Long],
-  //    magView: A => Expr[S, A], magType: BiType[A]): BiExpr[S, A] = apply(tuple._1, tuple._2)
+  //    magView: A => Expr[S, A], magType: ExprType[A]): BiExpr[S, A] = apply(tuple._1, tuple._2)
 
-  implicit def serializer[S <: evt.Sys[S], A](implicit magType: BiType[A]): evt.Serializer[S, BiExpr[S, A]] =
+  implicit def serializer[S <: evt.Sys[S], A](implicit magType: ExprType1[A]): evt.Serializer[S, BiExpr[S, A]] =
     new Ser
 
-  private final class Ser[S <: evt.Sys[S], A](implicit magType: BiType[A])
+  private final class Ser[S <: evt.Sys[S], A](implicit magType: ExprType1[A])
     extends evt.EventLikeSerializer[S, BiExpr[S, A]] {
 
     def readConstant(in: DataInput)(implicit tx: S#Tx): BiExpr[S, A] = {
@@ -57,15 +57,15 @@ object BiExpr {
 
     def read(in: DataInput, access: S#Acc, targets: Targets[S])
             (implicit tx: S#Tx): BiExpr[S, A] with evt.Node[S] = {
-      val time = magType.longType.readExpr(in, access)
-      val mag = magType.readExpr(in, access)
-      new EventImpl(targets, time, mag)
+      val time  = expr.Long.read(in, access)
+      val mag   = magType  .read(in, access)
+      new EventImpl[S, A](targets, time, mag)
     }
   }
 
   private final class EventImpl[S <: evt.Sys[S], A](protected val targets: evt.Targets[S],
                                                     val time: Expr[S, Long], val mag: Expr[S, A])
-                                                   (implicit magType: BiType[A])
+                                                   (implicit magType: ExprType1[A])
     extends BiExpr[S, A] with expr.impl.NodeImpl[S, (Long, A)] {
     override def toString() = "(" + time + " -> " + mag + ")"
 
@@ -111,7 +111,7 @@ object BiExpr {
     protected def reader: evt.Reader[S, Expr[S, (Long, A)]] = serializer
   }
 
-  private final case class ConstImpl[S <: evt.Sys[S], A](timeVal: Long, magVal: A)(implicit magType: BiType[A])
+  private final case class ConstImpl[S <: evt.Sys[S], A](timeVal: Long, magVal: A)(implicit magType: ExprType1[A])
     extends BiExpr[S, A] with expr.impl.ConstImpl[S, (Long, A)] {
 
     protected def constValue: (Long, A) = timeVal -> magVal
@@ -120,12 +120,12 @@ object BiExpr {
     def magValue (implicit tx: S#Tx) = magVal
 
     protected def writeData(out: DataOutput): Unit = {
-      out.writeLong(timeVal)
+      out    .writeLong (timeVal)
       magType.writeValue(magVal, out)
     }
 
-    def time: Expr[S, Long] = magType.longType.newConst(timeVal)
-    def mag : Expr[S, A   ] = magType         .newConst(magVal )
+    def time: Expr[S, Long] = expr.Long.newConst(timeVal)
+    def mag : Expr[S, A   ] = magType  .newConst(magVal )
   }
 }
 

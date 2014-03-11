@@ -16,10 +16,9 @@ package synth
 package proc
 
 import lucre.{event => evt, bitemp, expr}
-import expr.Expr
-import bitemp.{BiType, BiExpr}
+import de.sciss.lucre.expr.{ExprType1, Expr}
+import bitemp.BiExpr
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.lucre.synth.expr.{Doubles, SpanLikes, Longs}
 import annotation.switch
 import impl.{GraphemeImpl => Impl}
 import synth.io.AudioFileSpec
@@ -45,7 +44,7 @@ object Grapheme {
   private final val audioCookie = 2
 
   object Value {
-    implicit val biType: BiType[Value] = Elem
+    implicit val biType: ExprType1[Value] = Elem
 
     implicit object serializer extends ImmutableSerializer[Value] {
       def write(v: Value, out: DataOutput): Unit = v.write(out)
@@ -172,10 +171,10 @@ object Grapheme {
     def isDefined: Boolean
   }
 
-  object Elem extends BiType[Value] {
+  object Elem extends expr.impl.ExprTypeImplA[Value] {
     final val typeID = 11
 
-    object Curve extends expr.Type[Value.Curve] {
+    object Curve extends expr.impl.ExprTypeImplA[Value.Curve] {
       final val typeID = 12
 
       def apply[S <: Sys[S]](values: (Expr[S, Double], synth.Curve)*)(implicit tx: S#Tx): Curve[S] = {
@@ -206,7 +205,7 @@ object Grapheme {
                                                                 (implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
         val sz      = in.readInt()
         val values  = Vec.fill(sz) {
-          val mag   = Doubles.readExpr(in, access)
+          val mag   = lucre.expr.Double.read(in, access)
           val shape = synth.Curve.serializer.read(in)
           (mag, shape)
         }
@@ -215,7 +214,7 @@ object Grapheme {
     }
     sealed trait Curve[S <: evt.Sys[S]] extends Elem[S] with Expr[S, Value.Curve]
 
-    object Audio extends expr.Type[Value.Audio] {
+    object Audio extends expr.impl.ExprTypeImplA[Value.Audio] {
       final val typeID = 13
 
       def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: Expr[S, Long], gain: Expr[S, Double])
@@ -247,8 +246,8 @@ object Grapheme {
                                                              (implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
         val artifact  = Artifact.read(in, access)
         val spec      = AudioFileSpec.Serializer.read(in)
-        val offset    = Longs.readExpr(in, access)
-        val gain      = Doubles.readExpr(in, access)
+        val offset    = lucre.expr.Long  .read(in, access)
+        val gain      = lucre.expr.Double.read(in, access)
         new AudioImpl(targets, artifact, spec, offset, gain)
       }
     }
@@ -301,7 +300,9 @@ object Grapheme {
               nowVals    += mv -> shape
             }
         }
-        Curve.change(Value.Curve(beforeVals.result(): _*), Value.Curve(nowVals.result(): _*))
+        val before  = Value.Curve(beforeVals.result(): _*)
+        val now     = Value.Curve(nowVals.result(): _*)
+        if (before == now) None else Some(model.Change(before, now))
       }
 
       protected def reader = Curve.serializer[S]
@@ -364,8 +365,9 @@ object Grapheme {
           (gv, gv)
         }
 
-        Audio.change(Value.Audio(artBefore, spec, offsetBefore, gainBefore),
-                     Value.Audio(artNow   , spec, offsetNow   , gainNow   ))
+        val before  = Value.Audio(artBefore, spec, offsetBefore, gainBefore)
+        val now     = Value.Audio(artNow   , spec, offsetNow   , gainNow   )
+        if (before == now) None else Some(model.Change(before, now))
       }
 
       protected def reader = Audio.serializer[S]
@@ -383,8 +385,8 @@ object Grapheme {
 
     // ---- bi-type ----
 
-    def longType    : BiType[Long    ] = Longs
-    def spanLikeType: BiType[SpanLike] = SpanLikes
+    //    def longType    : BiType[Long    ] = Longs
+    //    def spanLikeType: BiType[SpanLike] = SpanLikes
 
     def readValue(in: DataInput): Value = Value.serializer.read(in)
     def writeValue(value: Value, out: DataOutput): Unit =value.write(out)

@@ -16,33 +16,40 @@ package de.sciss.lucre.synth.expr
 import scala.collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.{ImmutableSerializer, DataOutput, DataInput}
 import de.sciss.lucre.event.{Targets, Sys}
-import de.sciss.lucre.bitemp.BiType
+import de.sciss.lucre.expr.ExprType
+import de.sciss.lucre.expr
+import de.sciss.lucre
 
-trait VecLikeType[A] extends BiTypeImpl[Vec[A]] {
-  def element: BiType[A]
+trait VecLikeType[A] extends expr.impl.ExprTypeImplA[Vec[A]] {
+  def element: ExprType[A]
 
-  private[this] lazy val valueSer = ImmutableSerializer.indexedSeq[A](element.ValueSer)
+  // XXX TODO: this should be provided by ExprTypeImpl
+  private[this] object ElemValueSer extends ImmutableSerializer[A] {
+    def read (      in : DataInput ): A     = element.readValue (   in )
+    def write(v: A, out: DataOutput): Unit  = element.writeValue(v, out)
+  }
+  private[this] lazy val valueSer = ImmutableSerializer.indexedSeq[A](ElemValueSer) // (element.ValueSer)
 
   final def readValue (               in : DataInput ): Vec[A]  = valueSer.read(in)
   final def writeValue(value: Vec[A], out: DataOutput): Unit    = valueSer.write(value, out)
 
-  lazy val install: Unit = ()
+  // lazy val install: Unit = ()
 }
 
 object IntVec extends VecLikeType[Int] {
-  final val element = Ints
+  final val element = lucre.expr.Int
 
-  final val typeID = 0x2000 | Ints.typeID
+  final val typeID = 0x2000 | lucre.expr.Int.typeID
 }
 
 object LongVec extends VecLikeType[Long] {
-  final val element = Longs
+  final val element = lucre.expr.Long
 
-  final val typeID = 0x2000 | Longs.typeID
+  final val typeID = 0x2000 | lucre.expr.Long .typeID
 }
 
 object DoubleVec extends VecLikeType[Double] {
-  final val element = Doubles
+  final val element = lucre.expr.Double
 
-  final val typeID = 0x2000 | Doubles.typeID
+  final val typeID = 0x2000 | lucre.expr.Double.typeID
 }

@@ -6,12 +6,12 @@ import collection.immutable.{IndexedSeq => Vec}
 import lucre.expr.Expr
 import span.Span
 import de.sciss.synth.Curve.linear
-import de.sciss.lucre.synth.expr.{Longs, Doubles}
 
-/**
- * To run only this suite:
- *
- * test-only de.sciss.synth.proc.ScanSpec
+/*
+ To run only this suite:
+
+ test-only de.sciss.synth.proc.ScanSpec
+
  */
 class ScanSpec extends ConfluentEventSpec {
   import imp._
@@ -95,8 +95,8 @@ class ScanSpec extends ConfluentEventSpec {
       obs.clear()
 
       scan.removeSource(grSource)
-      val timeVar = Longs  .newVar[S](3000L)
-      val ampVar  = Doubles.newVar[S](9876.0)
+      val timeVar = lucre.expr.Long  .newVar[S](3000L)
+      val ampVar  = lucre.expr.Double.newVar[S](9876.0)
       gr.add(timeVar, curve(ampVar)) // should not be observed
       val grSourceNew = Scan.Link.Grapheme(gr)
       scan.addSource(grSourceNew) // should be observed

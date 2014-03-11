@@ -3,8 +3,8 @@ package proc
 
 import de.sciss.span.Span
 import de.sciss.synth.Curve.{exponential, linear}
-import de.sciss.lucre.synth.expr.Curves
 import de.sciss.lucre.stm.store.BerkeleyDB
+import de.sciss.lucre
 
 object FadeTest extends App {
   type S = Durable
@@ -26,11 +26,11 @@ object FadeTest extends App {
 
     // val spat = Proc[S]
     // val spatIn = spat.scans.add("in")
-    // spatIn.addSink()
+    // spatIn.addSink()lucre.synth.expr.
 
     val proc        = Proc[S]
-    val fadeExprIn  = FadeSpec.Elem(44100, Curves.newConst(linear     ),   0.0    ) // FadeSpec.Value(44100, linShape)
-    val fadeExprOut = FadeSpec.Elem(44100, Curves.newConst(exponential), -40.dbamp) // FadeSpec.Value(44100, linShape)
+    val fadeExprIn  = FadeSpec.Elem(44100, lucre.synth.expr.Curve.newConst(linear     ),   0.0    ) // FadeSpec.Value(44100, linShape)
+    val fadeExprOut = FadeSpec.Elem(44100, lucre.synth.expr.Curve.newConst(exponential), -40.dbamp) // FadeSpec.Value(44100, linShape)
     proc.attributes.put("fadeIn" , Attribute.FadeSpec(fadeExprIn ))
     proc.attributes.put("fadeOut", Attribute.FadeSpec(fadeExprOut))
     proc.graph() = SynthGraph {

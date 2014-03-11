@@ -15,11 +15,10 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{event => evt}
+import de.sciss.lucre.{event => evt, expr}
 import lucre.expr.Expr
 import serial.{DataOutput, DataInput, ImmutableSerializer}
 import de.sciss.lucre.event.{Pull, Targets}
-import de.sciss.lucre.synth.expr.{Curves, Doubles, BiTypeImpl, Longs}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
 
@@ -48,7 +47,7 @@ object FadeSpec {
   }
   final case class Value(numFrames: Long, curve: Curve = linear, floor: Float = 0f)
 
-  object Elem extends BiTypeImpl[Value] {
+  object Elem extends expr.impl.ExprTypeImpl[Value] {
     final val typeID = 14
 
     // 0 reserved for variables
@@ -60,7 +59,7 @@ object FadeSpec {
     def readValue (              in : DataInput ): Value  = Value.serializer.read (       in )
     def writeValue(value: Value, out: DataOutput): Unit   = Value.serializer.write(value, out)
 
-    lazy val install: Unit = ()
+    // lazy val install: Unit = ()
 
     def apply[S <: evt.Sys[S]](numFrames: Expr[S, Long], shape: Expr[S, Curve], floor: Expr[S, Double])
                               (implicit tx: S#Tx): Elem[S] = {
@@ -75,12 +74,12 @@ object FadeSpec {
       }
 
     // XXX TODO: not cool. Should use `1` for `elemCookie`
-    override protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                                              (implicit tx: S#Tx): ReprNode[S] = {
+    override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                              (implicit tx: S#Tx): Ex[S] with evt.Node[S] = {
       require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
-      val numFrames = Longs  .readExpr(in, access)
-      val shape     = Curves .readExpr(in, access)
-      val floor     = Doubles.readExpr(in, access)
+      val numFrames = lucre      .expr.Long  .read(in, access)
+      val shape     = lucre.synth.expr.Curve .read(in, access)
+      val floor     = lucre      .expr.Double.read(in, access)
       new Impl(targets, numFrames, shape, floor)
     }
 

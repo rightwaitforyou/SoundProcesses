@@ -24,13 +24,13 @@ import proc.Grapheme.Segment
 import annotation.tailrec
 import de.sciss.span.Span
 import de.sciss.serial.{DataOutput, DataInput}
-import de.sciss.lucre.synth.expr.Longs
+import de.sciss.lucre
 import de.sciss.lucre.synth.InMemory
 
 object GraphemeImpl {
   import Grapheme.{Elem, TimedElem, Value, Modifiable}
 
-  private implicit val timeEx = Longs
+  private implicit val timeEx = lucre.expr.Long
 
   def read[S <: synth.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = {
     serializer[S].read(in, access)

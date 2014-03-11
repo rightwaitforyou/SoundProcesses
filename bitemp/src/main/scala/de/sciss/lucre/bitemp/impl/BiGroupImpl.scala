@@ -76,24 +76,21 @@ object BiGroupImpl {
   }
 
   def serializer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])(
-    implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-    spanType: Type[SpanLike]): evt.NodeSerializer[S, BiGroup[S, Elem, U]] = new Ser(eventView)
+      implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem]): evt.NodeSerializer[S, BiGroup[S, Elem, U]] =
+    new Ser(eventView)
 
   def modifiableSerializer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])(
-    implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-    spanType: Type[SpanLike]): evt.NodeSerializer[S, BiGroup.Modifiable[S, Elem, U]] = new ModSer(eventView)
+    implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem]): evt.NodeSerializer[S, BiGroup.Modifiable[S, Elem, U]] =
+    new ModSer(eventView)
 
   def readModifiable[S <: Sys[S], Elem, U](in: DataInput, access: S#Acc, eventView: Elem => EventLike[S, U])
-                                          (implicit tx: S#Tx, elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-                                           spanType: Type[SpanLike]): BiGroup.Modifiable[S, Elem, U] = {
-
+              (implicit tx: S#Tx, elemSerializer: Serializer[S#Tx, S#Acc, Elem]): BiGroup.Modifiable[S, Elem, U] = {
     val targets = evt.Targets.read[S](in, access)
     read(in, access, targets, eventView)
   }
 
   private class Ser[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])
-                                         (implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-                                          spanType: Type[SpanLike])
+                                         (implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem])
     extends evt.NodeSerializer[S, BiGroup[S, Elem, U]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): BiGroup[S, Elem, U] = {
       BiGroupImpl.read(in, access, targets, eventView)
@@ -101,8 +98,7 @@ object BiGroupImpl {
   }
 
   private class ModSer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])
-                                            (implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-                                             spanType: Type[SpanLike])
+                                            (implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem])
     extends evt.NodeSerializer[S, BiGroup.Modifiable[S, Elem, U]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): BiGroup.Modifiable[S, Elem, U] = {
       BiGroupImpl.read(in, access, targets, eventView)
@@ -166,8 +162,7 @@ object BiGroupImpl {
 
   private abstract class Impl[S <: Sys[S], Elem, U](protected val targets: evt.Targets[S],
                                                     val eventView: Elem => EventLike[S, U])
-                                                   (implicit val elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-                                                    val spanType: Type[SpanLike])
+                                                   (implicit val elemSerializer: Serializer[S#Tx, S#Acc, Elem])
     extends Modifiable[S, Elem, U] {
 
     group =>
@@ -184,8 +179,8 @@ object BiGroupImpl {
 
     implicit object TimedSer extends evt.NodeSerializer[S, TimedElemImpl[S, Elem, U]] {
       def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): TimedElemImpl[S, Elem, U] = {
-        val span  = spanType.readExpr(in, access)
-        val value = elemSerializer.read(in, access)
+        val span  = bitemp.SpanLike .read(in, access)
+        val value = elemSerializer  .read(in, access)
         new TimedElemImpl(group, targets, span, value)
       }
     }
@@ -501,9 +496,7 @@ object BiGroupImpl {
   }
 
   def newModifiable[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])(
-    implicit tx: S#Tx, elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-    spanType: Type[SpanLike]): Modifiable[S, Elem, U] = {
-
+      implicit tx: S#Tx, elemSerializer: Serializer[S#Tx, S#Acc, Elem]): Modifiable[S, Elem, U] =
     new Impl(evt.Targets[S], eventView) {
       group =>
 
@@ -511,17 +504,14 @@ object BiGroupImpl {
         SkipOctree.empty[S, TwoDim, LeafImpl[S, Elem, U]](MAX_SQUARE) // ( tx, view, space, )
       }
     }
-  }
 
   private def read[S <: Sys[S], Elem, U](in: DataInput, access: S#Acc, targets: evt.Targets[S],
                                          eventView: Elem => EventLike[S, U])
                                         (implicit tx: S#Tx,
-                                         elemSerializer: Serializer[S#Tx, S#Acc, Elem],
-                                         spanType: Type[SpanLike]): Impl[S, Elem, U] = {
+                                         elemSerializer: Serializer[S#Tx, S#Acc, Elem]): Impl[S, Elem, U] =
     new Impl(targets, eventView) {
       val tree: Tree[S, Elem, U] = {
         SkipOctree.read[S, TwoDim, LeafImpl[S, Elem, U]](in, access)
       }
     }
-  }
 }

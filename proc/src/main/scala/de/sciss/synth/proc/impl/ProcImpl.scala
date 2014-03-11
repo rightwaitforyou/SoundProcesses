@@ -17,7 +17,6 @@ package impl
 
 import de.sciss.lucre.{event => evt, data, bitemp}
 import evt.{Event, impl => evti}
-import bitemp.BiType
 import data.SkipList
 import annotation.switch
 import collection.breakOut
@@ -25,12 +24,13 @@ import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import language.higherKinds
 import de.sciss.lucre.synth.{InMemory, Sys}
-import de.sciss.lucre.synth.expr.Doubles
+import de.sciss.lucre.expr.ExprType1
+import de.sciss.lucre
 
 object ProcImpl {
   private final val SER_VERSION = 0x5073  // was "Pr"
 
-  implicit val paramType: BiType[Param] = Doubles
+  implicit val paramType: ExprType1[Param] = lucre.expr.Double
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Proc[S] = new New[S]
 

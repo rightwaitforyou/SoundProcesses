@@ -1,5 +1,5 @@
 /*
- *  Strings.scala
+ *  StringExtensions.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -15,57 +15,55 @@ package de.sciss.lucre.synth
 package expr
 
 import de.sciss.lucre.{event => evt}
-import evt.{Targets, Sys}
+import de.sciss.lucre.event.{Node, Targets, Sys}
 import de.sciss.serial.{DataInput, DataOutput}
-import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.bitemp.BiType
+import de.sciss.lucre.expr.{Type, Expr}
 import scala.annotation.switch
+import de.sciss.lucre
 
-object Strings extends BiTypeImpl[String] {
-  final val typeID = 8
+object StringExtensions  {
+  import de.sciss.lucre.expr.String.{newConst, read, typeID, registerExtension}
 
-  def readValue (               in : DataInput ): String  = in .readUTF()
-  def writeValue(value: String, out: DataOutput): Unit    = out.writeUTF(value)
+  private[this] type Ex[S <: Sys[S]] = Expr[S, String]
 
-  lazy val install: Unit = {
-    registerOp(StringTuple2s)
-  }
+  registerExtension(2, StringTuple2s)
 
-  private[this] object StringTuple2s extends BiType.TupleReader[String] {
+  private[this] object StringTuple2s extends Type.Extension1[({type Repr[~ <: Sys[~]] = Expr[~, String]})#Repr] {
     final val arity = 2
     final val opLo  = BinaryOp.Append.id
     final val opHi  = BinaryOp.Append.id
 
     val name = "Long-Long Ops"
 
-    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                              (implicit tx: S#Tx): Expr.Node[S, String] = {
+    def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                  (implicit tx: S#Tx): Expr.Node[S, String] = {
       import BinaryOp._
       val op: Op = (opID: @switch) match {
         case Append.id => Append
       }
-      val _1 = readExpr(in, access)
-      val _2 = readExpr(in, access)
-      new Tuple2(typeID, op, targets, _1, _2)
+      val _1 = read(in, access)
+      val _2 = read(in, access)
+      new impl.Tuple2(lucre.expr.String, typeID, op, targets, _1, _2)
     }
   }
 
   // ----- operators -----
 
-  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class Ops[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
+    import me.{`this` => ex}
     private type E = Ex[S]
 
     import BinaryOp._
 
-    def ++(b: E): E = Append(ex, b)
+    def ++(b: E)(implicit tx: S#Tx): E = Append(ex, b)
   }
 
   private object BinaryOp {
-    sealed abstract class Op extends Tuple2Op[String, String] {
+    sealed abstract class Op extends impl.Tuple2Op[String, String, String] {
       def id: Int
       final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
         case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
-        case _                                => new Tuple2(typeID, this, Targets.partial[S], a, b)
+        case _                                => new impl.Tuple2(lucre.expr.String, typeID, this, Targets.partial[S], a, b)
       }
 
       def value(a: String, b: String): String

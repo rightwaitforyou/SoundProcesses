@@ -13,7 +13,7 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.synth.expr.Strings
+import de.sciss.lucre
 import de.sciss.lucre.synth.Sys
 
 object Implicits {
@@ -22,7 +22,7 @@ object Implicits {
       proc.attributes[Attribute.String](ProcKeys.attrName).fold("<unnamed>")(_.value)
 
     def name_=(value: String)(implicit tx: S#Tx): Unit = {
-      proc.attributes.put(ProcKeys.attrName, Attribute.String(Strings.newConst(value)))
+      proc.attributes.put(ProcKeys.attrName, Attribute.String(lucre.expr.String.newConst(value)))
     }
   }
 }

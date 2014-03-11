@@ -20,9 +20,9 @@ lazy val lucreCoreVersion       = "2.0.1+"
 
 lazy val lucreDataVersion       = "2.2.1+"   // debugSanitize!
 
-lazy val lucreEventVersion      = "2.5.+"
+lazy val lucreEventVersion      = "2.6.+"
 
-lazy val lucreConfluentVersion  = "2.6.+"
+lazy val lucreConfluentVersion  = "2.7.+"
 
 lazy val scalaColliderVersion   = "1.10.1+"
 

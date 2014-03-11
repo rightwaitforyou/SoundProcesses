@@ -2,11 +2,13 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.expr.Expr
 import de.sciss.ConfluentEventSpec
-import de.sciss.lucre.synth.expr.Ints
+import de.sciss.lucre
 
-/** To run only this suite:
-  *
-  * test-only de.sciss.synth.proc.AttributesSpec
+/*
+  To run only this suite:
+
+  test-only de.sciss.synth.proc.AttributesSpec
+
   */
 class AttributesSpec extends ConfluentEventSpec {
   import imp._
@@ -14,7 +16,7 @@ class AttributesSpec extends ConfluentEventSpec {
   "Attributes" should "serialize and deserialize" in { system =>
     val pH = system.step { implicit tx =>
       val p = Proc[S]
-      p.attributes.put("foo", Attribute.Int(Ints.newVar(1234)))
+      p.attributes.put("foo", Attribute.Int(lucre.expr.Int.newVar(1234)))
       tx.newHandle(p)
     }
 

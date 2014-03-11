@@ -1,5 +1,5 @@
 /*
- *  Longs.scala
+ *  LongExtensions.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -15,32 +15,29 @@ package de.sciss.lucre.synth
 package expr
 
 import de.sciss.lucre.{event => evt, expr}
-import evt.{Targets, Sys}
+import de.sciss.lucre.event.{Node, Targets, Sys}
 import annotation.switch
-import expr.Expr
+import de.sciss.lucre.expr.{Type, Expr}
 import de.sciss.serial.{DataOutput, DataInput}
-import de.sciss.lucre.bitemp.BiType
+import de.sciss.lucre
 
-object Longs extends BiTypeImpl[Long] {
-  final val typeID = 3
+object LongExtensions /* extends BiTypeImpl[Long] */ {
+  import de.sciss.lucre.expr.Long.{newConst, read, typeID, registerExtension}
 
-  def readValue (             in : DataInput ): Long = in .readLong()
-  def writeValue(value: Long, out: DataOutput): Unit = out.writeLong(value)
+  private[this] type Ex[S <: Sys[S]] = Expr[S, Long]
 
-  lazy val install: Unit = {
-    registerOp(LongTuple1s)
-    registerOp(LongTuple2s)
-  }
+  registerExtension(1, LongTuple1s)
+  registerExtension(2, LongTuple2s)
 
-  private[this] object LongTuple1s extends BiType.TupleReader[Long] {
+  private[this] object LongTuple1s extends Type.Extension1[({type Repr[~ <: Sys[~]] = Expr[~, Long]})#Repr] {
     final val arity = 1
     final val opLo  = UnaryOp.Neg  .id
     final val opHi  = UnaryOp.Cubed.id
 
     val name = "Long-Long Ops"
 
-    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                              (implicit tx: S#Tx): Expr.Node[S, Long] = {
+    def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                  (implicit tx: S#Tx): Expr.Node[S, Long] = {
       import UnaryOp._
       val op: Op[_] = (opID: @switch) match {
         // ---- Long ----
@@ -55,15 +52,15 @@ object Longs extends BiTypeImpl[Long] {
     }
   }
 
-  private[this] object LongTuple2s extends BiType.TupleReader[Long] {
+  private[this] object LongTuple2s extends Type.Extension1[({type Repr[~ <: Sys[~]] = Expr[~, Long]})#Repr] {
     final val arity = 2
     final val opLo  = BinaryOp.Plus  .id
     final val opHi  = BinaryOp.Absdif.id
 
     val name = "Long-Long Ops"
 
-    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                              (implicit tx: S#Tx): Expr.Node[S, Long] = {
+    def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                  (implicit tx: S#Tx): Expr.Node[S, Long] = {
       import BinaryOp._
       val op: Op = (opID: @switch) match {
         // ---- Long ----
@@ -96,24 +93,24 @@ object Longs extends BiTypeImpl[Long] {
         //               case 44 => Fold2
         //               case 45 => Wrap2
       }
-      val _1 = readExpr(in, access)
-      val _2 = readExpr(in, access)
-      new Tuple2(typeID, op, targets, _1, _2)
+      val _1 = read(in, access)
+      val _2 = read(in, access)
+      new impl.Tuple2(lucre.expr.Long, typeID, op, targets, _1, _2)
     }
   }
 
   // ---- operators ----
 
   object UnaryOp {
-    trait Op[T1] extends Tuple1Op[T1] {
+    trait Op[T1] extends impl.Tuple1Op[Long, T1] {
       def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
-                           (implicit tx: S#Tx): Tuple1[S, T1]
+                           (implicit tx: S#Tx): impl.Tuple1[S, Long, T1]
 
       def toString[S <: Sys[S]](_1: Expr[S, T1]): String = s"${_1}.$name"
 
       def apply[S <: Sys[S]](a: Expr[S, T1])(implicit tx: S#Tx): Ex[S] = a match {
         case Expr.Const(c)  => newConst(value(c))
-        case _              => new Tuple1(typeID, this, Targets.partial[S], a)
+        case _              => new impl.Tuple1(lucre.expr.Long, typeID, this, Targets.partial[S], a)
       }
 
       def name: String = {
@@ -128,9 +125,9 @@ object Longs extends BiTypeImpl[Long] {
       // def id: Int
 
       final def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: Targets[S])
-                                 (implicit tx: S#Tx): Tuple1[S, Long] = {
-        val _1 = readExpr(in, access)
-        new Tuple1(typeID, this, targets, _1)
+                                 (implicit tx: S#Tx): impl.Tuple1[S, Long, Long] = {
+        val _1 = lucre.expr.Long.read(in, access)
+        new impl.Tuple1(lucre.expr.Long, typeID, this, targets, _1)
       }
     }
 
@@ -171,10 +168,10 @@ object Longs extends BiTypeImpl[Long] {
   }
 
   private object BinaryOp {
-    sealed trait Op extends Tuple2Op[Long, Long] {
+    sealed trait Op extends impl.Tuple2Op[Long, Long, Long] {
       final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
         case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
-        case _                                => new Tuple2(typeID, this, Targets.partial[S], a, b)
+        case _                                => new impl.Tuple2(lucre.expr.Long, typeID, this, Targets.partial[S], a, b)
       }
 
       def value(a: Long, b: Long): Long
@@ -269,43 +266,45 @@ object Longs extends BiTypeImpl[Long] {
     //      }
   }
 
-  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class Ops[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
+    import me.{`this` => ex}
     private type E = Ex[S]
 
     import UnaryOp._
 
-    def unary_- : E = Neg   (ex)
-    def unary_~ : E = BitNot(ex)
+    def unary_- (implicit tx: S#Tx): E = Neg   (ex)
+    def unary_~ (implicit tx: S#Tx): E = BitNot(ex)
 
     import BinaryOp._
 
-    def + (b: E): E = Plus  (ex, b)
-    def - (b: E): E = Minus (ex, b)
-    def * (b: E): E = Times (ex, b)
-    def / (b: E): E = IDiv  (ex, b)
-    def & (b: E): E = BitAnd(ex, b)
-    def | (b: E): E = BitOr (ex, b)
-    def ^ (b: E): E = BitXor(ex, b)
+    def + (b: E)(implicit tx: S#Tx): E = Plus  (ex, b)
+    def - (b: E)(implicit tx: S#Tx): E = Minus (ex, b)
+    def * (b: E)(implicit tx: S#Tx): E = Times (ex, b)
+    def / (b: E)(implicit tx: S#Tx): E = IDiv  (ex, b)
+    def & (b: E)(implicit tx: S#Tx): E = BitAnd(ex, b)
+    def | (b: E)(implicit tx: S#Tx): E = BitOr (ex, b)
+    def ^ (b: E)(implicit tx: S#Tx): E = BitXor(ex, b)
   }
 
-  final class RichOps[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class RichOps[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
+    import me.{`this` => ex}
     private type E = Ex[S]
 
     import UnaryOp._
 
-    def abs     : E = Abs     (ex)
+    def abs     (implicit tx: S#Tx): E = Abs     (ex)
 
     // def toLong : E	         = UnOp( 'asLong, ex )
     // def toInteger : E	      = UnOp( 'asInteger, ex )
-    def signum  : E = Signum  (ex)
-    def squared : E = Squared (ex)
-    def cubed   : E = Cubed   (ex)
+    def signum  (implicit tx: S#Tx): E = Signum  (ex)
+    def squared (implicit tx: S#Tx): E = Squared (ex)
+    def cubed   (implicit tx: S#Tx): E = Cubed   (ex)
 
     import BinaryOp._
 
-    def min   (b: E): E = Min   (ex, b)
-    def max   (b: E): E = Max   (ex, b)
-    def absdif(b: E): E = Absdif(ex, b)
+    def min   (b: E)(implicit tx: S#Tx): E = Min   (ex, b)
+    def max   (b: E)(implicit tx: S#Tx): E = Max   (ex, b)
+    def absdif(b: E)(implicit tx: S#Tx): E = Absdif(ex, b)
 
     //      def clip2( b: E ) : E      = Clip2( ex, b )
     //      def fold2( b: E ) : E      = Fold2( ex, b )

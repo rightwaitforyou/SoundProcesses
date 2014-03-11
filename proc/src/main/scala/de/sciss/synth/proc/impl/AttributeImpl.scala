@@ -22,7 +22,6 @@ import serial.{DataInput, DataOutput, Writable}
 import stm.Disposable
 import expr.{Expr => _Expr}
 import de.sciss.lucre.synth.InMemory
-import de.sciss.lucre.synth.expr.{Strings, Booleans, Doubles, Ints}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.higherKinds
 
@@ -36,11 +35,11 @@ object AttributeImpl {
   // ---- Int ----
 
   object Int extends Companion[Attribute.Int] {
-    final val typeID = Ints.typeID
+    final val typeID = lucre.expr.Int.typeID
 
     def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): Attribute.Int[S] with evt.Node[S] = {
-      val peer = Ints.readExpr(in, access)
+      val peer = lucre.expr.Int.read(in, access)
       new IntImpl(targets, peer)
     }
 
@@ -56,7 +55,7 @@ object AttributeImpl {
 
     def mkCopy()(implicit tx: S#Tx): Attribute.Int[S] = {
       val newPeer = peer match {
-        case _Expr.Var(vr) => Ints.newVar(vr())
+        case _Expr.Var(vr) => lucre.expr.Int.newVar(vr())
         case _ => peer
       }
       Int(newPeer)
@@ -66,11 +65,11 @@ object AttributeImpl {
   // ---- Double ----
 
   object Double extends Companion[Attribute.Double] {
-    final val typeID = Doubles.typeID
+    final val typeID = lucre.expr.Double.typeID
 
     def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): Attribute.Double[S] with evt.Node[S] = {
-      val peer = Doubles.readExpr(in, access)
+      val peer = lucre.expr.Double.read(in, access)
       new DoubleImpl(targets, peer)
     }
 
@@ -86,7 +85,7 @@ object AttributeImpl {
 
     def mkCopy()(implicit tx: S#Tx): Attribute.Double[S] = {
       val newPeer = peer match {
-        case _Expr.Var(vr) => Doubles.newVar(vr())
+        case _Expr.Var(vr) => lucre.expr.Double.newVar(vr())
         case _ => peer
       }
       Double(newPeer)
@@ -96,11 +95,11 @@ object AttributeImpl {
   // ---- Boolean ----
 
   object Boolean extends Companion[Attribute.Boolean] {
-    final val typeID = Booleans.typeID
+    final val typeID = lucre.expr.Boolean.typeID
 
     def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): Attribute.Boolean[S] with evt.Node[S] = {
-      val peer = Booleans.readExpr(in, access)
+      val peer = lucre.expr.Boolean.read(in, access)
       new BooleanImpl(targets, peer)
     }
 
@@ -116,7 +115,7 @@ object AttributeImpl {
 
     def mkCopy()(implicit tx: S#Tx): Attribute.Boolean[S] = {
       val newPeer = peer match {
-        case _Expr.Var(vr) => Booleans.newVar(vr())
+        case _Expr.Var(vr) => lucre.expr.Boolean.newVar(vr())
         case _ => peer
       }
       Boolean(newPeer)
@@ -126,11 +125,11 @@ object AttributeImpl {
   // ---- String ----
 
   object String extends Companion[Attribute.String] {
-    val typeID = Strings.typeID
+    val typeID = lucre.expr.String.typeID
 
     def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): Attribute.String[S] with evt.Node[S] = {
-      val peer = Strings.readExpr(in, access)
+      val peer = lucre.expr.String.read(in, access)
       new StringImpl(targets, peer)
     }
 
@@ -146,7 +145,7 @@ object AttributeImpl {
 
     def mkCopy()(implicit tx: S#Tx): Attribute.String[S] = {
       val newPeer = peer match {
-        case _Expr.Var(vr) => Strings.newVar(vr())
+        case _Expr.Var(vr) => lucre.expr.String.newVar(vr())
         case _ => peer
       }
       String(newPeer)
@@ -160,7 +159,7 @@ object AttributeImpl {
 
     def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): Attribute.FadeSpec[S] with evt.Node[S] = {
-      val peer = _FadeSpec.Elem.readExpr(in, access)
+      val peer = _FadeSpec.Elem.read(in, access)
       new FadeSpecImpl(targets, peer)
     }
 
@@ -190,7 +189,7 @@ object AttributeImpl {
 
     def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): Attribute.DoubleVec[S] with evt.Node[S] = {
-      val peer = _DoubleVec.readExpr(in, access)
+      val peer = _DoubleVec.read(in, access)
       new DoubleVecImpl(targets, peer)
     }
 
@@ -221,7 +220,7 @@ object AttributeImpl {
     def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): Attribute.AudioGrapheme[S] with evt.Node[S] = {
       // val peer = Grapheme.Elem.Audio.readExpr(in, access)
-      val peer = Grapheme.Elem.Audio.readExpr(in, access) match {
+      val peer = Grapheme.Elem.Audio.read(in, access) match {
         case a: Grapheme.Elem.Audio[S] => a
         case other => sys.error(s"Expected a Grapheme.Elem.Audio, but found $other")  // XXX TODO
       }

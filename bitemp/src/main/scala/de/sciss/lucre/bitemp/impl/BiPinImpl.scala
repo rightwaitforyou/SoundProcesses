@@ -23,6 +23,7 @@ import collection.breakOut
 import annotation.switch
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.model
+import expr.ExprType1
 
 object BiPinImpl {
   import BiPin.{Leaf, Modifiable}
@@ -31,10 +32,10 @@ object BiPinImpl {
 
   // ~private def opNotSupported: Nothing = sys.error("Operation not supported")
 
-  private implicit def leafSerializer[S <: Sys[S], A](implicit biType: BiType[A]): Serializer[S#Tx, S#Acc, Leaf[S, A]] =
+  private implicit def leafSerializer[S <: Sys[S], A](implicit biType: ExprType1[A]): Serializer[S#Tx, S#Acc, Leaf[S, A]] =
     new LeafSer
 
-  private final class LeafSer[S <: Sys[S], A](implicit biType: BiType[A]) extends Serializer[S#Tx, S#Acc, Leaf[S, A]] {
+  private final class LeafSer[S <: Sys[S], A](implicit biType: ExprType1[A]) extends Serializer[S#Tx, S#Acc, Leaf[S, A]] {
     def write(leaf: BiPin.Leaf[S, A], out: DataOutput): Unit = {
       val sz = leaf.size
       out.writeInt(sz)
@@ -51,32 +52,32 @@ object BiPinImpl {
     }
   }
 
-  def newModifiable[S <: Sys[S], A](implicit tx: S#Tx, biType: BiType[A]): Modifiable[S, A] = {
+  def newModifiable[S <: Sys[S], A](implicit tx: S#Tx, biType: ExprType1[A]): Modifiable[S, A] = {
     val tree: Tree[S, A] = SkipList.Map.empty[S, Long, Leaf[S, A]]()
     new Impl(evt.Targets.partial[S], tree) // XXX TODO partial?
   }
 
-  def serializer[S <: Sys[S], A](implicit biType: BiType[A]): evt.Serializer[S, BiPin[S, A]] =
+  def serializer[S <: Sys[S], A](implicit biType: ExprType1[A]): evt.Serializer[S, BiPin[S, A]] =
     new Ser[S, A, BiPin[S, A]]
 
-  def modifiableSerializer[S <: Sys[S], A](implicit biType: BiType[A]): evt.Serializer[S, BiPin.Modifiable[S, A]] =
+  def modifiableSerializer[S <: Sys[S], A](implicit biType: ExprType1[A]): evt.Serializer[S, BiPin.Modifiable[S, A]] =
     new Ser[S, A, BiPin.Modifiable[S, A]]
 
-  def readModifiable[S <: Sys[S], A](in: DataInput, access: S#Acc)(implicit tx: S#Tx, biType: BiType[A]): BiPin.Modifiable[S, A] = {
+  def readModifiable[S <: Sys[S], A](in: DataInput, access: S#Acc)(implicit tx: S#Tx, biType: ExprType1[A]): BiPin.Modifiable[S, A] = {
     val targets = evt.Targets.read[S](in, access)
     readImpl(in, access, targets)
   }
 
-  def read[S <: Sys[S], A](in: DataInput, access: S#Acc)(implicit tx: S#Tx, biType: BiType[A]): BiPin[S, A] =
+  def read[S <: Sys[S], A](in: DataInput, access: S#Acc)(implicit tx: S#Tx, biType: ExprType1[A]): BiPin[S, A] =
     readModifiable(in, access)
 
   private def readImpl[S <: Sys[S], A](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                      (implicit tx: S#Tx, biType: BiType[A]): Impl[S, A] = {
+                                      (implicit tx: S#Tx, biType: ExprType1[A]): Impl[S, A] = {
     val tree: Tree[S, A] = SkipList.Map.read[S, Long, Leaf[S, A]](in, access)
     new Impl(targets, tree)
   }
 
-  private class Ser[S <: Sys[S], A, Repr >: Impl[S, A] <: BiPin[S, A]](implicit biType: BiType[A])
+  private class Ser[S <: Sys[S], A, Repr >: Impl[S, A] <: BiPin[S, A]](implicit biType: ExprType1[A])
     extends Serializer[S#Tx, S#Acc, Repr] with evt.Reader[S, Repr] {
     def write(v: Repr, out: DataOutput) {
       v.write(out)
@@ -92,7 +93,7 @@ object BiPinImpl {
     }
   }
 
-  //   private class ModSer[ S <: Sys[ S ], A ]( implicit biType: BiType[ A ])
+  //   private class ModSer[ S <: Sys[ S ], A ]( implicit biType: ExprType1[ A ])
   //   extends evt.NodeSerializer[ S, BiPin.Modifiable[ S, A ]] {
   //      def read( in: DataInput, access: S#Acc, targets: evt.Targets[ S ])( implicit tx: S#Tx ) : BiPin.Modifiable[ S, A ] with evt.Node[ S ] = {
   //         BiPinImpl.readImpl( in, access, targets)
@@ -100,7 +101,7 @@ object BiPinImpl {
   //   }
 
   private final class Impl[S <: Sys[S], A](protected val targets: evt.Targets[S], tree: Tree[S, A])
-                                          (implicit biType: BiType[A])
+                                          (implicit biType: ExprType1[A])
     extends Modifiable[S, A] with evt.Node[S] {
     //   with evt.Compound[ S, Impl[ S, A ], Impl.type ]
     //   with evt.Trigger.Impl[ S, BiPin.Update[ S, A ], BiPin.Update[ S, A ], BiPin[ S, A ]]
@@ -111,7 +112,7 @@ object BiPinImpl {
     private type ElemChange = model.Change[(Long, A)]
 
     //      protected def tree: Tree[ S, A ]
-    //      implicit protected def biType: BiType[ A ]
+    //      implicit protected def biType: ExprType1[ A ]
 
     override def toString() = "BiPin" + tree.id
 

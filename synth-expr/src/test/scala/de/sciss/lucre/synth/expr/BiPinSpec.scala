@@ -4,10 +4,13 @@ import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.model.Change
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.bitemp.{BiExpr, BiPin}
+import de.sciss.lucre
 
-/** To run only this suite:
-  *
-  * test-only de.sciss.lucre.bitemp.expr.BiPinSpec
+/*
+  To run only this suite:
+
+  test-only de.sciss.lucre.bitemp.expr.BiPinSpec
+
   */
 class BiPinSpec extends ConfluentEventSpec {
   type IntEx = Expr[S, Int]
@@ -147,8 +150,8 @@ class BiPinSpec extends ConfluentEventSpec {
         res
       }
 
-      implicit val intVarSer  = Ints.varSerializer[ S ]
-      implicit val longVarSer = Longs.varSerializer[ S ]
+      implicit val intVarSer  = lucre.expr.Int .varSerializer[ S ]
+      implicit val longVarSer = lucre.expr.Long.varSerializer[ S ]
 
 //      confluent.showLog = true
 
@@ -156,8 +159,8 @@ class BiPinSpec extends ConfluentEventSpec {
          // partial currently broken
 //         val time = Longs.newVar[ S ]( 10000L )
 //         val expr = Ints.newVar[ S ]( 4 )
-         val time = Longs.newConfluentVar[ S ]( 10000L )
-         val expr = Ints.newConfluentVar[ S ]( 4 )
+         val time = lucre.expr.Long.newVar /* newConfluentVar */[ S ]( 10000L )
+         val expr = lucre.expr.Int .newVar /* newConfluentVar */[ S ]( 4 )
          val th   = tx.newHandle( time -> 3 : BiExpr[ S, Int ])
          val eh   = tx.newHandle( 30000L -> expr : BiExpr[ S, Int ])
          (th, eh)

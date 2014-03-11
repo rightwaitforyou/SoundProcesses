@@ -4,7 +4,6 @@ package proc
 
 import de.sciss.span.Span
 import de.sciss.lucre.synth.{InMemory, Sys}
-import de.sciss.lucre.synth.expr.{Longs, Ints}
 
 object ThesisExamples extends App {
   playScans()
@@ -24,8 +23,8 @@ object ThesisExamples extends App {
     val imp = ExprImplicits[S]
     import imp._
 
-    val bus       = Ints .newVar[S](    0)
-    val fadeInLen = Longs.newVar[S](44100)
+    val bus       = lucre.expr.Int .newVar[S](    0)
+    val fadeInLen = lucre.expr.Long.newVar[S](44100)
     val fadeIn    = FadeSpec.Elem(fadeInLen, Curve.sine, 0.0)
     proc.attributes.put("bus"    , Attribute.Int     (bus   ))
     proc.attributes.put("mute"   , Attribute.Boolean (false ))

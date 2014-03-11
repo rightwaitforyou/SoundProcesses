@@ -21,6 +21,7 @@ import evt.{EventLike, Sys}
 import stm.Disposable
 import de.sciss.serial.{Writable, Serializer, DataInput}
 import de.sciss.model
+import expr.ExprType1
 
 object BiPin {
   final case class Update[S <: Sys[S], A](pin: BiPin[S, A], changes: Vec[Change[S, A]])
@@ -46,14 +47,14 @@ object BiPin {
     }
 
     def read[S <: Sys[S], A](in: DataInput, access: S#Acc)
-                            (implicit tx: S#Tx, biType: BiType[A]): Modifiable[S, A] = {
+                            (implicit tx: S#Tx, biType: ExprType1[A]): Modifiable[S, A] = {
       Impl.readModifiable[S, A](in, access)
     }
 
-    def apply[S <: Sys[S], A](implicit tx: S#Tx, biType: BiType[A]): Modifiable[S, A] =
+    def apply[S <: Sys[S], A](implicit tx: S#Tx, biType: ExprType1[A]): Modifiable[S, A] =
       Impl.newModifiable[S, A]
 
-    def serializer[S <: Sys[S], A](implicit biType: BiType[A]): Serializer[S#Tx, S#Acc, BiPin.Modifiable[S, A]] =
+    def serializer[S <: Sys[S], A](implicit biType: ExprType1[A]): Serializer[S#Tx, S#Acc, BiPin.Modifiable[S, A]] =
       Impl.modifiableSerializer[S, A]
   }
 
@@ -64,11 +65,11 @@ object BiPin {
   }
 
   def read[S <: Sys[S], A](in: DataInput, access: S#Acc)
-                          (implicit tx: S#Tx, biType: BiType[A]): BiPin[S, A] = {
+                          (implicit tx: S#Tx, biType: ExprType1[A]): BiPin[S, A] = {
     Impl.read[S, A](in, access)
   }
 
-  def serializer[S <: Sys[S], A](implicit biType: BiType[A]): Serializer[S#Tx, S#Acc, BiPin[S, A]] =
+  def serializer[S <: Sys[S], A](implicit biType: ExprType1[A]): Serializer[S#Tx, S#Acc, BiPin[S, A]] =
     Impl.serializer[S, A]
 }
 

@@ -13,17 +13,16 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.{event => evt, expr}
 import evt.{Targets, Sys}
 import scala.annotation.switch
 import de.sciss.model
 import de.sciss.synth.{Lazy, MaybeRate, SynthGraph}
 import de.sciss.serial.{ImmutableSerializer, DataOutput, DataInput}
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.synth.expr.BiTypeImpl
 import de.sciss.synth.ugen.{ControlProxyLike, Constant}
 
-object SynthGraphs extends BiTypeImpl[SynthGraph] {
+object SynthGraphs extends expr.impl.ExprTypeImpl[SynthGraph] {
   final val typeID = 16
 
 /** A serializer for synth graphs. */
@@ -261,9 +260,11 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
 
   lazy val install: Unit = ()
 
+
+
   // XXX TODO: not cool. Should use `1` to `3` for cookies
-  override protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                                      (implicit tx: S#Tx): ReprNode[S] =
+  override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                      (implicit tx: S#Tx): Ex[S] with evt.Node[S] =
     (cookie: @switch) match {
       case `oldTapeCookie` | `emptyCookie` | `tapeCookie` => new Predefined(targets, cookie)
 

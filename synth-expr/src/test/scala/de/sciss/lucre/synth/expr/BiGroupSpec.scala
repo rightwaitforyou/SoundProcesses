@@ -2,7 +2,7 @@ package de.sciss.lucre.synth.expr
 
 import de.sciss.lucre.expr.Expr
 import de.sciss.span.{SpanLike, Span}
-import de.sciss.lucre.event
+import de.sciss.lucre.{bitemp, event}
 import collection.immutable.{IndexedSeq => Vec}
 import scala.annotation.tailrec
 import de.sciss.lucre.bitemp.BiGroup
@@ -71,7 +71,7 @@ class BiGroupSpec extends ConfluentEventSpec {
     )
 
     val dummy = event.Dummy[S, Unit]
-    implicit val sl = SpanLikes
+    implicit val sl = bitemp.SpanLike
 
     def withSpans(spanLikes: Vec[SpanLike]): Unit = {
       val spans = spanLikes.collect {

@@ -6,7 +6,7 @@ import bitemp.BiGroup
 import expr.Expr
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.lucre.synth.InMemory
-import de.sciss.lucre.synth.expr.{SpanLikes, Longs}
+import de.sciss.lucre
 
 object BiGroupTest {
   def apply(): BiGroupTest[InMemory] = new BiGroupTest(InMemory())
@@ -15,7 +15,7 @@ class BiGroupTest[S <: evt.Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
   def t[A](fun: S#Tx => A): A = cursor.step(fun)
 
   val bi = t { implicit tx =>
-    implicit def longType = Longs
+    implicit def longType = lucre.expr.Long
     val res = BiGroup.Expr.Modifiable[S, Long]
     res.changed.react { _ => upd =>
       println("Observed: " + upd)
@@ -28,14 +28,14 @@ class BiGroupTest[S <: evt.Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
 
   def addValVar(span: SpanLike = Span(33, 44), init: Long = 66): Expr.Var[S, Long] =
     t { implicit tx =>
-      val elem = Longs.newVar[S](init)
+      val elem = lucre.expr.Long.newVar[S](init)
       bi.add(span, elem)
       elem
     }
 
   def addKeyVar(init: SpanLike = Span(33, 44), elem: Long = 77): Expr.Var[S, SpanLike] =
     t { implicit tx =>
-      val span = SpanLikes.newVar[S](init)
+      val span = bitemp.SpanLike.newVar[S](init)
       bi.add(span, elem)
       span
     }

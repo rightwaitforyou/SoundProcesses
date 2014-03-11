@@ -6,14 +6,15 @@ import org.scalatest.{Outcome, Matchers, fixture}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.{confluent, stm}
 import de.sciss.lucre.confluent.reactive.ConfluentReactive
+import de.sciss.lucre
 
 trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
   type S = ConfluentReactive
   type D = S#D
   type FixtureParam = confluent.Cursor[S, D]
 
-  implicit final protected val IntType  = Ints
-  implicit final protected val LongType = Longs
+  implicit final protected val IntType  = lucre.expr.Int
+  implicit final protected val LongType = lucre.expr.Long
   final protected val imp = ExprImplicits[S]
 
   final def withFixture(test: OneArgTest): Outcome = {

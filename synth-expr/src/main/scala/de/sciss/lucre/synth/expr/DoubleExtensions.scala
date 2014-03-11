@@ -1,5 +1,5 @@
 /*
- *  Doubles.scala
+ *  DoubleExtensions.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -14,34 +14,32 @@
 package de.sciss.lucre.synth
 package expr
 
+import de.sciss.lucre
 import de.sciss.lucre.{event => evt}
 import annotation.switch
 import de.sciss.numbers
 import de.sciss.serial.{DataInput, DataOutput}
-import de.sciss.lucre.expr.Expr
-import evt.Sys
-import de.sciss.lucre.bitemp.BiType
+import de.sciss.lucre.expr.{Type, Expr}
+import de.sciss.lucre.event.{Node, Targets, Sys}
 
-object Doubles extends BiTypeImpl[Double] {
-  final val typeID = 5
+object DoubleExtensions {
+  import de.sciss.lucre.expr.Double.{newConst, read, typeID, registerExtension}
 
-  def readValue (               in : DataInput ): Double  = in .readDouble()
-  def writeValue(value: Double, out: DataOutput): Unit    = out.writeDouble(value)
+  private[this] type Ex[S <: Sys[S]] = Expr[S, Double]
 
-  lazy val install: Unit = {
-    registerOp(DoubleTuple1s)
-    registerOp(DoubleTuple2s)
-  }
+  registerExtension(1, DoubleTuple1s)
+  registerExtension(2, DoubleTuple2s)
 
-  private[this] object DoubleTuple1s extends BiType.TupleReader[Double] {
+  private[this] object DoubleTuple1s extends Type.Extension1[({type Repr[~ <: Sys[~]] = Expr[~, Double]})#Repr] {
     final val arity = 1
     final val opLo  = UnaryOp.Neg .id
     final val opHi  = UnaryOp.Tanh.id
 
     val name = "Double-Double Ops"
 
-    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                              (implicit tx: S#Tx): Expr.Node[S, Double] = {
+
+    def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                  (implicit tx: S#Tx): Expr.Node[S, Double] = {
       import UnaryOp._
       val op: Op = (opID: @switch) match {
         case Neg        .id => Neg
@@ -76,20 +74,20 @@ object Doubles extends BiTypeImpl[Double] {
         case Cosh       .id => Cosh
         case Tanh       .id => Tanh
       }
-      val _1 = readExpr(in, access)
-      new Tuple1(typeID, op, targets, _1)
+      val _1 = read(in, access)
+      new impl.Tuple1(lucre.expr.Double, typeID, op, targets, _1)
     }
   }
 
-  private[this] object DoubleTuple2s extends BiType.TupleReader[Double] {
+  private[this] object DoubleTuple2s extends Type.Extension1[({type Repr[~ <: Sys[~]] = Expr[~, Double]})#Repr] {
     final val arity = 2
     final val opLo  = BinaryOp.Plus .id
     final val opHi  = BinaryOp.Wrap2.id
 
     val name = "Double-Double Ops"
 
-    def readTuple[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                              (implicit tx: S#Tx): Expr.Node[S, Double] = {
+    def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                  (implicit tx: S#Tx): Expr.Node[S, Double] = {
       import BinaryOp._
       val op: Op = (opID: @switch) match {
         case Plus   .id => Plus
@@ -139,9 +137,9 @@ object Doubles extends BiTypeImpl[Double] {
         case Fold2.id => Fold2
         case Wrap2.id => Wrap2
       }
-      val _1 = readExpr(in, access)
-      val _2 = readExpr(in, access)
-      new Tuple2(typeID, op, targets, _1, _2)
+      val _1 = read(in, access)
+      val _2 = read(in, access)
+      new impl.Tuple2(lucre.expr.Double, typeID, op, targets, _1, _2)
     }
   }
 
@@ -151,11 +149,11 @@ object Doubles extends BiTypeImpl[Double] {
 
     import de.sciss.numbers.{DoubleFunctions => rd}
 
-    sealed abstract class Op extends Tuple1Op[Double] {
+    sealed abstract class Op extends impl.Tuple1Op[Double, Double] {
       def id: Int
       final def apply[S <: Sys[S]](a: Ex[S])(implicit tx: S#Tx): Ex[S] = a match {
         case Expr.Const(c)  => newConst(value(c))
-        case _              => new Tuple1(typeID, this, evt.Targets.partial[S], a)
+        case _              => new impl.Tuple1(lucre.expr.Double, typeID, this, evt.Targets.partial[S], a)
       }
 
       //         def value( a: Double ) : Double
@@ -352,11 +350,11 @@ object Doubles extends BiTypeImpl[Double] {
 
     import numbers.{DoubleFunctions => rd}
 
-    sealed abstract class Op extends Tuple2Op[Double, Double] {
+    sealed abstract class Op extends impl.Tuple2Op[Double, Double, Double] {
       def id: Int
       final def apply[S <: Sys[S]](a: Ex[S], b: Ex[S])(implicit tx: S#Tx): Ex[S] = (a, b) match {
         case (Expr.Const(ca), Expr.Const(cb)) => newConst(value(ca, cb))
-        case _                                => new Tuple2(typeID, this, evt.Targets.partial[S], a, b)
+        case _                                => new impl.Tuple2(lucre.expr.Double, typeID, this, evt.Targets.partial[S], a, b)
       }
 
       def value(a: Double, b: Double): Double
@@ -538,12 +536,13 @@ object Doubles extends BiTypeImpl[Double] {
     //      case object Firstarg       extends Op( 46 )
   }
 
-  final class Ops[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class Ops[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
+    import me.{`this` => ex}
     private type E = Ex[S]
 
     import UnaryOp._
 
-    def unary_- : E = Neg(ex)
+    def unary_- (implicit tx: S#Tx): E = Neg(ex)
 
     // def bitNot : E	         = BitNot.make( ex )
     // def toDouble : E	         = UnOp.make( 'asDouble, ex )
@@ -551,50 +550,52 @@ object Doubles extends BiTypeImpl[Double] {
 
     import BinaryOp._
 
-    def +(b: E): E = Plus(ex, b)
+    def +(b: E)(implicit tx: S#Tx): E = Plus(ex, b)
 
-    def -(b: E): E = Minus(ex, b)
+    def -(b: E)(implicit tx: S#Tx): E = Minus(ex, b)
 
-    def *(b: E): E = Times(ex, b)
+    def *(b: E)(implicit tx: S#Tx): E = Times(ex, b)
 
-    def /(b: E): E = Div(ex, b)
+    def /(b: E)(implicit tx: S#Tx): E = Div(ex, b)
   }
 
-  final class RichOps[S <: Sys[S]](ex: Ex[S])(implicit tx: S#Tx) {
+  final class RichOps[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
+    import me.{`this` => ex}
+
     private type E = Ex[S]
 
     import UnaryOp._
 
-    def abs       : E = Abs       (ex)
-    def ceil      : E = Ceil      (ex)
-    def floor     : E = Floor     (ex)
-    def frac      : E = Frac      (ex)
-    def signum    : E = Signum    (ex)
-    def squared   : E = Squared   (ex)
+    def abs       (implicit tx: S#Tx): E = Abs       (ex)
+    def ceil      (implicit tx: S#Tx): E = Ceil      (ex)
+    def floor     (implicit tx: S#Tx): E = Floor     (ex)
+    def frac      (implicit tx: S#Tx): E = Frac      (ex)
+    def signum    (implicit tx: S#Tx): E = Signum    (ex)
+    def squared   (implicit tx: S#Tx): E = Squared   (ex)
     // def cubed     : E = Cubed     (ex)
-    def sqrt      : E = Sqrt      (ex)
-    def exp       : E = Exp       (ex)
-    def reciprocal: E = Reciprocal(ex)
-    def midicps   : E = Midicps   (ex)
-    def cpsmidi   : E = Cpsmidi   (ex)
-    def midiratio : E = Midiratio (ex)
-    def ratiomidi : E = Ratiomidi (ex)
-    def dbamp     : E = Dbamp     (ex)
-    def ampdb     : E = Ampdb     (ex)
-    def octcps    : E = Octcps    (ex)
-    def cpsoct    : E = Cpsoct    (ex)
-    def log       : E = Log       (ex)
-    def log2      : E = Log2      (ex)
-    def log10     : E = Log10     (ex)
-    def sin       : E = Sin       (ex)
-    def cos       : E = Cos       (ex)
-    def tan       : E = Tan       (ex)
-    def asin      : E = Asin      (ex)
-    def acos      : E = Acos      (ex)
-    def atan      : E = Atan      (ex)
-    def sinh      : E = Sinh      (ex)
-    def cosh      : E = Cosh      (ex)
-    def tanh      : E = Tanh      (ex)
+    def sqrt      (implicit tx: S#Tx): E = Sqrt      (ex)
+    def exp       (implicit tx: S#Tx): E = Exp       (ex)
+    def reciprocal(implicit tx: S#Tx): E = Reciprocal(ex)
+    def midicps   (implicit tx: S#Tx): E = Midicps   (ex)
+    def cpsmidi   (implicit tx: S#Tx): E = Cpsmidi   (ex)
+    def midiratio (implicit tx: S#Tx): E = Midiratio (ex)
+    def ratiomidi (implicit tx: S#Tx): E = Ratiomidi (ex)
+    def dbamp     (implicit tx: S#Tx): E = Dbamp     (ex)
+    def ampdb     (implicit tx: S#Tx): E = Ampdb     (ex)
+    def octcps    (implicit tx: S#Tx): E = Octcps    (ex)
+    def cpsoct    (implicit tx: S#Tx): E = Cpsoct    (ex)
+    def log       (implicit tx: S#Tx): E = Log       (ex)
+    def log2      (implicit tx: S#Tx): E = Log2      (ex)
+    def log10     (implicit tx: S#Tx): E = Log10     (ex)
+    def sin       (implicit tx: S#Tx): E = Sin       (ex)
+    def cos       (implicit tx: S#Tx): E = Cos       (ex)
+    def tan       (implicit tx: S#Tx): E = Tan       (ex)
+    def asin      (implicit tx: S#Tx): E = Asin      (ex)
+    def acos      (implicit tx: S#Tx): E = Acos      (ex)
+    def atan      (implicit tx: S#Tx): E = Atan      (ex)
+    def sinh      (implicit tx: S#Tx): E = Sinh      (ex)
+    def cosh      (implicit tx: S#Tx): E = Cosh      (ex)
+    def tanh      (implicit tx: S#Tx): E = Tanh      (ex)
 
     // def rand : E              = UnOp.make( 'rand, ex )
     // def rand2 : E             = UnOp.make( 'rand2, ex )
@@ -620,34 +621,34 @@ object Doubles extends BiTypeImpl[Double] {
 
     import BinaryOp._
 
-    def min     (b: E): E = Min     (ex, b)
-    def max     (b: E): E = Max     (ex, b)
-    def round   (b: E): E = RoundTo   (ex, b)
-    def roundup (b: E): E = RoundUpTo (ex, b)
-    def trunc   (b: E): E = Trunc   (ex, b)
-    def atan2   (b: E): E = Atan2   (ex, b)
-    def hypot   (b: E): E = Hypot   (ex, b)
-    def hypotx  (b: E): E = Hypotx  (ex, b)
-    def pow     (b: E): E = Pow     (ex, b)
+    def min     (b: E)(implicit tx: S#Tx): E = Min     (ex, b)
+    def max     (b: E)(implicit tx: S#Tx): E = Max     (ex, b)
+    def round   (b: E)(implicit tx: S#Tx): E = RoundTo   (ex, b)
+    def roundup (b: E)(implicit tx: S#Tx): E = RoundUpTo (ex, b)
+    def trunc   (b: E)(implicit tx: S#Tx): E = Trunc   (ex, b)
+    def atan2   (b: E)(implicit tx: S#Tx): E = Atan2   (ex, b)
+    def hypot   (b: E)(implicit tx: S#Tx): E = Hypot   (ex, b)
+    def hypotx  (b: E)(implicit tx: S#Tx): E = Hypotx  (ex, b)
+    def pow     (b: E)(implicit tx: S#Tx): E = Pow     (ex, b)
 
     //      def ring1( b: E ) : E     = Ring1.make( ex, b )
     //      def ring2( b: E ) : E     = Ring2.make( ex, b )
     //      def ring3( b: E ) : E     = Ring3.make( ex, b )
     //      def ring4( b: E ) : E     = Ring4.make( ex, b )
-    def difsqr  (b: E): E = Difsqr  (ex, b)
-    def sumsqr  (b: E): E = Sumsqr  (ex, b)
-    def sqrsum  (b: E): E = Sqrsum  (ex, b)
-    def sqrdif  (b: E): E = Sqrdif  (ex, b)
-    def absdif  (b: E): E = Absdif  (ex, b)
+    def difsqr  (b: E)(implicit tx: S#Tx): E = Difsqr  (ex, b)
+    def sumsqr  (b: E)(implicit tx: S#Tx): E = Sumsqr  (ex, b)
+    def sqrsum  (b: E)(implicit tx: S#Tx): E = Sqrsum  (ex, b)
+    def sqrdif  (b: E)(implicit tx: S#Tx): E = Sqrdif  (ex, b)
+    def absdif  (b: E)(implicit tx: S#Tx): E = Absdif  (ex, b)
     // def thresh  (b: E): E = Thresh  (ex, b)
 
     //      def amclip( b: E ) : E    = Amclip.make( ex, b )
     //      def scaleneg( b: E ) : E  = Scaleneg.make( ex, b )
-    def clip2   (b: E): E = Clip2   (ex, b)
+    def clip2   (b: E)(implicit tx: S#Tx): E = Clip2   (ex, b)
 
     //      def excess( b: E ) : E    = Excess.make( ex, b )
-    def fold2   (b: E): E = Fold2   (ex, b)
-    def wrap2   (b: E): E = Wrap2   (ex, b)
+    def fold2   (b: E)(implicit tx: S#Tx): E = Fold2   (ex, b)
+    def wrap2   (b: E)(implicit tx: S#Tx): E = Wrap2   (ex, b)
 
     // def firstarg( b: Double ) : Double  = d
 

@@ -20,14 +20,13 @@ import evt.EventLike
 import de.sciss.span.SpanLike
 import de.sciss.serial.{Serializer, DataInput}
 import de.sciss.lucre.synth.Sys
-import de.sciss.lucre.synth.expr.SpanLikes
 
 object ProcGroup {
   type Update[S <: Sys[S]] = BiGroup.Update[S, Proc[S], Proc.Update[S]]
 
   type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Proc[S], Proc.Update[S]]
 
-  private implicit val spanType: Type[SpanLike] = SpanLikes
+  // private implicit val spanType: Type[SpanLike] = SpanLikes
 
   private def eventView[S <: Sys[S]](proc: Proc[S]): EventLike[S, Proc.Update[S]] = proc.changed
 
