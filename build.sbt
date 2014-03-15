@@ -16,7 +16,7 @@ scalaVersion in ThisBuild := "2.10.3"
 
 resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-lazy val lucreCoreVersion       = "2.0.1+"
+lazy val lucreCoreVersion       = "2.0.2+"
 
 lazy val lucreDataVersion       = "2.2.1+"   // debugSanitize!
 

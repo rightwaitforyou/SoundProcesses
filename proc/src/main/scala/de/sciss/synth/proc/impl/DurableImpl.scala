@@ -23,7 +23,7 @@ import de.sciss.lucre.synth.impl.TxnFullImpl
 private[proc] object DurableImpl {
   def apply(factory: DataStoreFactory[DataStore], mainName: String, eventName: String): Durable = {
     val mainStore   = factory.open(mainName)
-    val eventStore  = factory.open(eventName)
+    val eventStore  = factory.open(eventName, overwrite = true)
     new System(mainStore, eventStore)
   }
 
