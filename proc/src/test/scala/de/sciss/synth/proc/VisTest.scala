@@ -238,11 +238,11 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
   def aural() {
     if (auralVar.single().isDefined) return
 
-    val as = AuralSystem.start()
     t { implicit tx =>
+      val as = AuralSystem.start()
       implicit val itx = tx.peer
       implicit val _artifactStore = artifactStore
-      auralVar() = Some(AuralPresentation.runTx[S](trans, as))
+      auralVar() = Some(AuralPresentation.run[S](trans, as))
     }
   }
 

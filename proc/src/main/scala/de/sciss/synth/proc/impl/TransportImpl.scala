@@ -15,7 +15,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, synth, stm, bitemp, data}
+import de.sciss.lucre.{stm, bitemp, data}
 import stm.{Disposable, IdentifierMap, Cursor}
 import bitemp.BiGroup
 import data.SkipList
@@ -23,7 +23,7 @@ import collection.immutable.{IndexedSeq => Vec}
 import concurrent.stm.{Ref, Txn => ScalaTxn, TxnLocal}
 import java.util.concurrent.TimeUnit
 import java.text.SimpleDateFormat
-import proc.{logTransport => log}
+import proc.{logTransport => logT}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.{model => m}
@@ -181,7 +181,7 @@ object TransportImpl {
   private final class Observation[S <: Sys[S], I <: stm.Sys[I]](impl: Impl[S, I], val fun: S#Tx => Update[S] => Unit)
     extends Disposable[S#Tx] {
 
-    override def toString = impl.toString + ".react@" + hashCode().toHexString
+    override def toString = s"$impl.react@${hashCode().toHexString}"
 
     def dispose()(implicit tx: S#Tx): Unit = impl.removeObservation(this)
   }
@@ -232,21 +232,21 @@ object TransportImpl {
     protected def logicalTime_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
 
     protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit = {
-      log("scheduled: logicalDelay = " + logicalDelay)
+      logT(s"scheduled: logicalDelay = $logicalDelay")
       submitRef.set(new OfflineStep(logicalNow, logicalDelay, schedValid))(tx.peer)
     }
 
     def step()(implicit tx: S#Tx): Unit = {
-      val subm = submitRef.swap(offlineEmptyStep)(tx.peer)
-      import subm._
+      val submit = submitRef.swap(offlineEmptyStep)(tx.peer)
+      import submit._
       if (schedValid >= 0) {
         eventReached(logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid)
       }
     }
 
     def stepTarget(implicit tx: S#Tx): Option[Long] = {
-      val subm = submitRef()(tx.peer)
-      import subm._
+      val submit = submitRef()(tx.peer)
+      import submit._
       // if (schedValid >= 0) Some(logicalNow + logicalDelay) else None
       if (schedValid >= 0) {
         implicit val itx: I#Tx = tx
@@ -288,12 +288,12 @@ object TransportImpl {
     protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit = {
       val jitter      = sysMicros() - logicalNow
       val actualDelay = math.max(0L, logicalDelay - jitter)
-      log("scheduled: logicalDelay = " + logicalDelay + ", actualDelay = " + actualDelay)
+      logT(s"scheduled: logicalDelay = $logicalDelay, actualDelay = $actualDelay")
       ScalaTxn.afterCommit(_ => {
-        // log("(after commit)")
+        // logT("(after commit)")
         SoundProcesses.pool.schedule(new Runnable {
           def run(): Unit = {
-            log("scheduled: execute")
+            logT("scheduled: execute")
             cursor.step { implicit tx =>
               eventReached(logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid)
             }
@@ -381,7 +381,7 @@ object TransportImpl {
 
       // this is crucial to eliminate drift: since we reached the scheduled event, do not
       // let the cpuTime txn-local determine a new free wheeling time, but set it to the
-      // time we targetted at; then in the next scheduleNext call, the jitter is properly
+      // time we targeted at; then in the next scheduleNext call, the jitter is properly
       // calculated.
       val newLogical = logicalNow + logicalDelay
       logicalTime_=(newLogical)
@@ -406,8 +406,8 @@ object TransportImpl {
     //  existed after info.frame but before info.nextTime which is in contraction to
     //  the definition of info.nextTime)
     //
-    // So in short: - (1) if update span contains `v`, perform add/remove and recalc new next
-    //              - (2) if info span contains update span's start, recalc new next
+    // So in short: - (1) if update span contains `v`, perform add/remove and recalculate new next
+    //              - (2) if info span contains update span's start, recalculate new next
 
     // returns: `true` if the changes are perceived (updates should be fired), else `false`
     private def u_addRemoveProcs(state      : GroupUpdateState,
@@ -466,20 +466,20 @@ object TransportImpl {
       //     (1) old span contains current time frame `v`, but new span not --> treat as removal
       //     (2) old span does not contain `v`, but new span does --> treat as addition
       //     (3) neither old nor new span contain `v`
-      //         --> info.span contains start point of either span? then recalc nextProcTime.
+      //         --> info.span contains start point of either span? then recalculate nextProcTime.
       //         (indeed we could call addRemoveProcs with empty lists for the procs, and a
       //          second span argument, which would be just Span.Void in the normal add/remove calls)
       //     (4) both old and new span contain `v`
       //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
 
-      val newFrame    = state.info.frame
+      val newFrame      = state.info.frame
 
-      val oldPercv    = oldSpan.contains(newFrame)
-      val newPercv    = newSpan.contains(newFrame)
-      val doFire      = oldPercv ^ newPercv                 // fire for cases (1) and (2)
+      val oldPerceived  = oldSpan.contains(newFrame)
+      val newPerceived  = newSpan.contains(newFrame)
+      val doFire        = oldPerceived ^ newPerceived             // fire for cases (1) and (2)
 
-      val procRemoved = if (oldPercv) Some(timed) else None // case (1)
-      val procAdded   = if (newPercv) Some(timed) else None // case (2)
+      val procRemoved = if (oldPerceived) Some(timed) else None   // case (1)
+      val procAdded   = if (newPerceived) Some(timed) else None   // case (2)
 
       // if the proc was active and is still active, we simplify by successive removal and (re-)addition
       u_addRemoveProcs(state, doFire = doFire, oldSpan = oldSpan, newSpan = newSpan,
@@ -495,9 +495,9 @@ object TransportImpl {
     }
 
     // adds a segment to the update to be fired (does not update the structure)
-    private def u_addSegments(state: GroupUpdateState, timed: TimedProc[S], key: String, segms: Vec[Grapheme.Segment])
+    private def u_addSegments(state: GroupUpdateState, timed: TimedProc[S], key: String, segments: Vec[Grapheme.Segment])
                              (implicit tx: S#Tx): Unit = {
-      val entry = key -> segms
+      val entry = key -> segments
       // try to re-use and update a previous grapheme changed message in the state
       state.procChanged.lastOption match {
         case Some((`timed`, GraphemesChanged(map))) =>
@@ -552,29 +552,29 @@ object TransportImpl {
       }
     }
 
-    // store a new scan connected to grapheme sources in the structure,
-    // given the already calculated segments
-    private def u_addScan2(state: GroupUpdateState, timed: TimedProc[S], key: String, segm: DefSeg)
-                          (implicit tx: S#Tx): Unit = {
-//      implicit val itx: I#Tx  = tx
-//      val id                  = timed.id
-//      val (staleID, keyMap1)  = gMap.get(id).getOrElse(id -> Map.empty[String, DefSegs])
-//      val entry               = key -> segms
-//      val newKeyMap1          = keyMap1 + entry
-//      gMap.put(id, staleID -> newKeyMap1)
-//      val time                = segms.map(_.span.start).min
-//      val skipMap             = gPrio.get(time).getOrElse(Map.empty)
-//      val keyMap2             = skipMap.getOrElse(staleID, Map.empty)
-//      val newKeyMap2          = keyMap2 + entry
-//      val newSkipMap          = skipMap + (staleID -> newKeyMap2)
-//      gPrio.add(time -> newSkipMap)
-//
-//      val needsNewGraphemeTime = time < state.info.nextGraphemeTime
-//      if (needsNewGraphemeTime) {
-//        //            assert( time > newFrame )
-//        state.info = state.info.copy1(nextGraphemeTime = time)
-//      }
-    }
+    //    // store a new scan connected to grapheme sources in the structure,
+    //    // given the already calculated segments
+    //    private def u_addScan2(state: GroupUpdateState, timed: TimedProc[S], key: String, segm: DefSeg)
+    //                          (implicit tx: S#Tx): Unit = {
+    ////      implicit val itx: I#Tx  = tx
+    ////      val id                  = timed.id
+    ////      val (staleID, keyMap1)  = gMap.get(id).getOrElse(id -> Map.empty[String, DefSegs])
+    ////      val entry               = key -> segments
+    ////      val newKeyMap1          = keyMap1 + entry
+    ////      gMap.put(id, staleID -> newKeyMap1)
+    ////      val time                = segments.map(_.span.start).min
+    ////      val skipMap             = gPrio.get(time).getOrElse(Map.empty)
+    ////      val keyMap2             = skipMap.getOrElse(staleID, Map.empty)
+    ////      val newKeyMap2          = keyMap2 + entry
+    ////      val newSkipMap          = skipMap + (staleID -> newKeyMap2)
+    ////      gPrio.add(time -> newSkipMap)
+    ////
+    ////      val needsNewGraphemeTime = time < state.info.nextGraphemeTime
+    ////      if (needsNewGraphemeTime) {
+    ////        //            assert( time > newFrame )
+    ////        state.info = state.info.copy1(nextGraphemeTime = time)
+    ////      }
+    //    }
 
     private def u_removeScan(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Unit = {
       val id = timed.id
@@ -594,7 +594,7 @@ object TransportImpl {
 
     //        AssociativeChange : we need to track the addition and removal of scans.
     //                            filter only those AssociativeKeys which are ScanKeys.
-    //                            track appearance or disappearence of graphemes as sources
+    //                            track appearance or disappearance of graphemes as sources
     //                            of these scans, and update structures
     // addendum: Meaning, _do not_ include segments in updates
     private def u_assocChange(state: GroupUpdateState, timed: TimedProc[S], change: Proc.AssociativeChange[S])
@@ -691,7 +691,7 @@ object TransportImpl {
         //     StateChange
         //        AssociativeChange : we need to track the addition and removal of scans.
         //                            filter only those AssociativeKeys which are ScanKeys.
-        //                            track appearance or disappearence of graphemes as sources
+        //                            track appearance or disappearance of graphemes as sources
         //                            of these scans, and update structures
         //        other StateChange : -
         //     ScanChange (carrying a Map[ String, Scan.Update[ S ]])
@@ -707,7 +707,7 @@ object TransportImpl {
         //     (1) old span contains current time frame `v`, but new span not --> treat as removal
         //     (2) old span does not contain `v`, but new span does --> treat as addition
         //     (3) neither old nor new span contain `v`
-        //         --> info.span contains start point of either span? then recalc nextProcTime.
+        //         --> info.span contains start point of either span? then recalculate nextProcTime.
         //         (indeed we could call addRemoveProcs with empty lists for the procs, and a
         //          second span argument, which would be just Span.Void in the normal add/remove calls)
         //     (4) both old and new span contain `v`
@@ -959,7 +959,7 @@ object TransportImpl {
       implicit val itx: I#Tx = tx
       val oldInfo           = infoVar()
       val oldFrame          = oldInfo.frame
-      log(s"advance(newFrame = $newFrame, isSeek = $isSeek, startPlay = $startPlay); oldInfo = $oldInfo")
+      logT(s"advance(newFrame = $newFrame, isSeek = $isSeek, startPlay = $startPlay); oldInfo = $oldInfo")
       // do not short cut and return; because we may want to enforce play and call `scheduleNext`
       //         if( newFrame == oldFrame ) return
 
@@ -1151,13 +1151,13 @@ object TransportImpl {
         nextGraphemeTime  = nextGraphemeTime
       )
       infoVar() = newInfo
-      log("advance - newInfo = " + newInfo)
+      logT("advance - newInfo = " + newInfo)
 
       if (procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty) {
         val upd = Transport.Advance(transport = impl, time = newFrame,
           isSeek = isSeek, isPlaying = newInfo.isRunning,
           added = procAdded, removed = procRemoved, changes = procUpdated)
-        logTransport("advance - fire " + upd)
+        logT("advance - fire " + upd)
         fire(upd)
       }
 

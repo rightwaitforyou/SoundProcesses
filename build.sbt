@@ -12,7 +12,7 @@ description               := "A framework for creating and managing ScalaCollide
 
 licenses     in ThisBuild := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion in ThisBuild := "2.11.0-RC3"
+scalaVersion in ThisBuild := "2.10.4"
 
 crossScalaVersions in ThisBuild := Seq("2.11.0-RC3", "2.10.4")
 
@@ -20,21 +20,21 @@ resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/
 
 lazy val lucreCoreVersion       = "2.0.3+"
 
-lazy val lucreDataVersion       = "2.2.3+"
+lazy val lucreDataVersion       = "2.2.2+"
 
 lazy val lucreEventVersion      = "2.6.+"
 
-lazy val lucreConfluentVersion  = "2.7.+"
+lazy val lucreConfluentVersion  = "2.6.+"
 
-lazy val scalaColliderVersion   = "1.11.+"
+lazy val scalaColliderVersion   = "1.11.1+"
 
-lazy val scalaTestVersion       = "2.1.2"
+lazy val scalaTestVersion       = "2.1.2+"
 
 lazy val spanVersion            = "1.2.+"
 
-lazy val scalaOSCVersion        = "1.1.3+"
+lazy val scalaOSCVersion        = "1.1.2+"
 
-// retrieveManaged in ThisBuild := true
+retrieveManaged in ThisBuild := true
 
 scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature")   // "-Xelide-below", "INFO"
 
@@ -61,7 +61,8 @@ initialCommands in console :=
      |import de.sciss.lucre.expr.Expr
      |import de.sciss.span.Span
      |import de.sciss.lucre.{event => evt}
-     |import de.sciss.lucre.synth.expr.{Ints, Longs, Doubles, Spans}
+     |import de.sciss.lucre.expr.{Int => IntEx, Long => LongEx, Double => DoubleEx}
+     |import de.sciss.lucre.bitemp.{Span => SpanEx}
      |println("To disable result types:\n :power\n :wrap shortResults\n: silent")""".stripMargin +
    "\nprintln(\"\"\"" +
    """
@@ -110,6 +111,7 @@ lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitem
 lazy val lucresynth = project.in(file("synth")).settings(
   description := "Transactional extension for ScalaCollider",
   libraryDependencies ++= Seq(
+    "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
     "de.sciss" %% "lucreevent-core" % lucreEventVersion,
     "de.sciss" %% "scalacollider"   % scalaColliderVersion,
     "de.sciss" %% "scalaosc" % scalaOSCVersion

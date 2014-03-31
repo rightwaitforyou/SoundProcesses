@@ -16,11 +16,15 @@ object PatchTest extends App {
     val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val _cursor: stm.Cursor[S] = cursor
     val auralSys = AuralSystem()
-    auralSys.whenStarted(_ => cursor.step { implicit tx =>
-      println("Aural System started.")
-      run[S, I](auralSys)
-    })
-    auralSys.start()
+    cursor.step {
+      implicit tx =>
+        auralSys.whenStarted(_ => cursor.step {
+          implicit tx =>
+            println("Aural System started.")
+            run[S, I](auralSys)
+        })
+        auralSys.start()
+    }
   }
 
   def run[S <: Sys[S], I <: stm.Sys[I]](auralSys: AuralSystem)
@@ -36,7 +40,7 @@ object PatchTest extends App {
     val group         = ProcGroup.Modifiable[S]
     val trans         = Transport[S, I](group)
     implicit val loc  = Artifact.Location.Modifiable.tmp[S]()
-    val ap            = AuralPresentation.runTx[S](trans, auralSys)
+    val ap            = AuralPresentation.run[S](trans, auralSys)
     ap.group.foreach {
       _.server.peer.dumpOSC()
     }

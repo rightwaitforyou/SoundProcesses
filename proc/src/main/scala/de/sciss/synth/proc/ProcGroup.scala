@@ -13,11 +13,9 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{bitemp, expr, event => evt}
+import de.sciss.lucre.{bitemp, event => evt}
 import bitemp.BiGroup
-import expr.Type
 import evt.EventLike
-import de.sciss.span.SpanLike
 import de.sciss.serial.{Serializer, DataInput}
 import de.sciss.lucre.synth.Sys
 

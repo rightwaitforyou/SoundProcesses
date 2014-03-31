@@ -82,21 +82,23 @@ object ScansTest extends App {
       val transp = Transport[S, I](group)
       auralSystem.foreach { as =>
         implicit val loc = Artifact.Location.Modifiable.tmp[S]()
-        AuralPresentation.runTx[S](transp, as)
+        AuralPresentation.run[S](transp, as)
       }
       transp.play()
     }
 
-    if (AURAL) {
-      val as = AuralSystem()
-      as.whenStarted { _ =>
-        cursor.step { implicit tx =>
-          body(Some(as))
+    cursor.step { implicit tx =>
+      if (AURAL) {
+        val as = AuralSystem()
+        as.whenStarted { _ =>
+          cursor.step { implicit tx =>
+            body(Some(as))
+          }
         }
-      }
-      as.start()
+        as.start()
 
-    } else cursor.step { implicit tx => body(None) }
+      } else body(None)
+    }
 
     //      Thread.sleep( 1000 )
   }

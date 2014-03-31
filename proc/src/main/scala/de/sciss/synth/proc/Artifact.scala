@@ -65,7 +65,7 @@ object Artifact {
         apply(dir)
       }
 
-      def apply[S <: Sys[S]](init: File)(implicit tx: S#Tx): Location.Modifiable[S] = Impl.newLocation(init)
+      def apply[S <: Sys[S]](init: File)(implicit tx: S#Tx): Location.Modifiable[S] = Impl.newLocation[S](init)
 
       implicit def serializer[S <: evt.Sys[S]]: Serializer[S#Tx, S#Acc, Location.Modifiable[S]] =
         Impl.modLocationSerializer

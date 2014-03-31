@@ -12,8 +12,7 @@
  */
 
 package de.sciss.lucre
-package bitemp
-package impl
+package bitemp.impl
 
 import de.sciss.lucre.{event => evt}
 import evt.{Event, EventLike, impl => evti, Sys}
@@ -23,11 +22,12 @@ import collection.breakOut
 import scala.annotation.{elidable, switch}
 import geom.{LongDistanceMeasure2D, LongPoint2DLike, LongPoint2D, LongSquare, LongSpace}
 import LongSpace.TwoDim
-import expr.{Expr, Type}
+import expr.Expr
 import de.sciss.span.{SpanLike, Span}
 import de.sciss.serial.{DataOutput, DataInput, Serializer}
 import de.sciss.lucre.geom.LongRectangle
 import de.sciss.{model => m}
+import de.sciss.lucre.bitemp.BiGroup
 
 object BiGroupImpl {
   import BiGroup.{Leaf, TimedElem, Modifiable}
@@ -50,11 +50,13 @@ object BiGroupImpl {
   // private def opNotSupported: Nothing = sys.error("Operation not supported")
 
   def verifyConsistency[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], reportOnly: Boolean)
-                                             (implicit tx: S#Tx): Vec[String] = group match {
-    case impl: Impl[S, Elem, U] => impl.treeHandle match {
-      case t: DeterministicSkipOctree[S, _, _] =>
-        DeterministicSkipOctree.verifyConsistency(t, reportOnly = reportOnly)
-      case _ => sys.error("Not a deterministic octree implementation")
+                                             (implicit tx: S#Tx): Vec[String] = {
+    group match {
+      case impl: Impl[S, Elem, U] => impl.treeHandle match {
+        case t: DeterministicSkipOctree[S, _, _] =>
+          DeterministicSkipOctree.verifyConsistency(t, reportOnly)
+        case _ => sys.error("Not a deterministic octree implementation")
+      }
     }
   }
 
@@ -107,8 +109,6 @@ object BiGroupImpl {
 
   // ... accepted are points with x > LRP || y > LRP ...
   private val advanceNNMetric = LongDistanceMeasure2D.nextSpanEvent(MAX_SQUARE)
-  //   private val advanceNNMetric   = LongDistanceMeasure2D.vehsybehc.exceptOrthant( 1 )
-
   private val regressNNMetric = LongDistanceMeasure2D.prevSpanEvent(MAX_SQUARE)
 
   private final class TimedElemImpl[S <: Sys[S], Elem, U](group                 : Impl[S, Elem, U],
@@ -226,10 +226,10 @@ object BiGroupImpl {
       }
 
       def +=(elem: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx): Unit =
-        elem ---> this
+        elem ---> (this: evt.Selector[S])
 
       def -=(elem: TimedElemImpl[S, Elem, U])(implicit tx: S#Tx): Unit =
-        elem -/-> this
+        elem -/-> (this: evt.Selector[S])
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
         val par = pull.parents(this)

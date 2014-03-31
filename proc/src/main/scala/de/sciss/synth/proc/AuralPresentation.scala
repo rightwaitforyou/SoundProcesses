@@ -21,11 +21,11 @@ import de.sciss.lucre.synth.{Sys, Group}
 object AuralPresentation {
   // ---- implementation forwards ----
 
-  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] =
-    Impl.run[S](transport, aural)
+  //  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] =
+  //    Impl.run[S](transport, aural)
 
-  def runTx[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] =
-    Impl.runTx[S](transport, aural)
+  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] =
+    Impl.run[S](transport, aural)
 
   private[proc] trait Running[S <: Sys[S]] {
     /** Queries the number of channel associated with a scanned input.

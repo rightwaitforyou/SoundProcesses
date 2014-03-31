@@ -19,7 +19,7 @@ import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal}
-import de.sciss.synth.proc.{logAural => log}
+import de.sciss.synth.proc.{logAural => logA}
 import UGenGraphBuilder.MissingIn
 import graph.scan
 import TxnExecutor.{defaultAtomic => atomic}
@@ -33,19 +33,19 @@ import de.sciss.synth.{addToHead, ControlSetMap}
 import de.sciss.numbers
 
 object AuralPresentationImpl {
-  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
-    val c = new Client[S](transport, aural)
-    aural.addClient(c)
-    atomic { implicit itx =>
-      implicit val ptx = Txn.wrap(itx)
-      aural.serverOption.foreach { s =>
-        ScalaTxn.afterCommit(_ => c.started(s))
-      }
-    }
-    c
-  }
+  //  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
+  //    val c = new Client[S](transport, aural)
+  //    aural.addClient(c)
+  //    atomic { implicit itx =>
+  //      implicit val ptx = Txn.wrap(itx)
+  //      aural.serverOption.foreach { s =>
+  //        ScalaTxn.afterCommit(_ => c.started(s))
+  //      }
+  //    }
+  //    c
+  //  }
 
-  def runTx[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] = {
+  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] = {
     val c = new Client[S](transport, aural)
     aural.addClient(c)
     aural.serverOption.foreach(c.startedTx)
@@ -60,20 +60,32 @@ object AuralPresentationImpl {
     private val running   = Ref(Option.empty[RunningImpl[S]])
     private val groupRef  = Ref(Option.empty[Group])
 
-    def dispose()(implicit tx: S#Tx) = () // XXX TODO dispose running
-
-    def stopped(): Unit = {
-      // implicit val itx: I#Tx = tx
+    def dispose()(implicit tx: S#Tx) = {
       aural.removeClient(this)
-      running.single() = None // XXX TODO dispose
+      val rOpt = running.swap(None)(tx.peer)
+      rOpt.foreach(_.dispose())
+    }
+
+    def stopped()(implicit tx: Txn): Unit = {
+      // aural.removeClient(this)
+      val rOpt = running.swap(None)(tx.peer)
+      rOpt.foreach { r =>
+        ScalaTxn.afterCommit { _ =>
+          transport.cursor.step { implicit tx =>
+            r.dispose()
+          }
+        } (tx.peer)
+      }
     }
 
     def group(implicit tx: S#Tx): Option[Group] = groupRef.get(tx.peer)
 
-    def started(server: Server): Unit =
-      transport.cursor.step { implicit tx =>
-        startedTx(server)
-      }
+    def started(server: Server)(implicit tx: Txn): Unit =
+      ScalaTxn.afterCommit { _ =>
+        transport.cursor.step { implicit tx =>
+          startedTx(server)
+        }
+      } (tx.peer)
 
     def stopAll(implicit tx: S#Tx): Unit =
       group.foreach(_.freeAll())
@@ -90,7 +102,7 @@ object AuralPresentationImpl {
       groupRef.set(Some(group))(tx.peer)
 
       val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
-      log(s"started (${booted.hashCode.toHexString})")
+      logA(s"started (${booted.hashCode.toHexString})")
       NodeGraph.addServer(server) // ( ProcTxn()( tx ))
 
       def t_play(time: Long)(implicit tx: S#Tx): Unit =
@@ -105,10 +117,10 @@ object AuralPresentationImpl {
 
       if (transport.isPlaying) t_play(transport.time)
 
-      transport.react { implicit tx => {
+      val tObs = transport.react { implicit tx => {
         // only when playing
         case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
-          log(s"at $time added ${added.mkString("[", ", ", "]")}; removed ${removed.mkString("[", ", ", "]")}; " +
+          logA(s"at $time added ${added.mkString("[", ", ", "]")}; removed ${removed.mkString("[", ", ", "]")}; " +
             s"changes? ${changes.nonEmpty} (${booted.hashCode.toHexString})")
           removed.foreach {
             timed => booted.procRemoved(timed)
@@ -128,6 +140,7 @@ object AuralPresentationImpl {
       }}
 
       implicit val itx = tx.peer
+      booted.transportObserver = tObs
       running() = Some(booted)
     }
   }
@@ -160,7 +173,10 @@ object AuralPresentationImpl {
   //                                               artifactStore: stm.Source[S#Tx, ArtifactStore[S]]
     extends AuralPresentation.Running[S] {
 
-    override def toString = "AuralPresentation.Running@" + hashCode.toHexString
+    override def toString = s"AuralPresentation.Running@${hashCode.toHexString}"
+
+    // for simplicity. must be set by within the transaction that creates the RunningImpl
+    var transportObserver: stm.Disposable[S#Tx] = _
 
     // ongoingBuild is a transaction local field storing a mutable object. This is
     // totally fine since a transaction is not shared across threads. the idea is
@@ -183,7 +199,7 @@ object AuralPresentationImpl {
       val ugen          = builder.ugen
       val timed         = ugen.timed
 
-      log(s"begin launch $timed (${hashCode.toHexString})")
+      logA(s"begin launch $timed (${hashCode.toHexString})")
 
       val ug            = ugen.finish   // finalise the ugen graph
       implicit val tx   = ugen.tx
@@ -437,7 +453,7 @@ object AuralPresentationImpl {
       if (users.nonEmpty) users.foreach(_.add())
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
-      log(s"launched $timed -> $aural (${hashCode.toHexString})")
+      logA(s"launched $timed -> $aural (${hashCode.toHexString})")
       viewMap.put(timed.id, aural)
     }
 
@@ -510,22 +526,24 @@ object AuralPresentationImpl {
       math.max(1, numCh)
     }
 
-    def dispose()(implicit tx: S#Tx): Unit =
+    def dispose()(implicit tx: S#Tx): Unit = {
       viewMap.dispose()
+      transportObserver.dispose()
+    }
 
     //      private def addFlush()( implicit ptx: Txn ) {
     //         ptx.beforeCommit( flush()( _ ))
     //      }
 
     private def addFlush()(implicit tx: S#Tx): Unit = {
-      log(s"addFlush (${hashCode.toHexString})")
+      logA(s"addFlush (${hashCode.toHexString})")
       tx.beforeCommit(flush()(_))
-      // concurrent.stm.Txn.afterRollback(status => log(s"rollback $status !!"))(tx.peer)
+      // concurrent.stm.Txn.afterRollback(status => logA(s"rollback $status !!"))(tx.peer)
     }
 
     def procAdded(time: Long, timed: TimedProc[S])(implicit tx: S#Tx): Unit = {
       // val name = timed.value.name.value
-      log(s"added $timed (${hashCode.toHexString})")
+      logA(s"added $timed (${hashCode.toHexString})")
 
       val timedID = timed.id
       val ugen    = UGenGraphBuilder(this, timed, time)
@@ -575,7 +593,7 @@ object AuralPresentationImpl {
       val ugen        = builder.ugen
       val isComplete  = ugen.tryBuild()
 
-      log(s"incremental ${ugen.timed}; completed? $isComplete (${hashCode.toHexString})")
+      logA(s"incremental ${ugen.timed}; completed? $isComplete (${hashCode.toHexString})")
 
       // detect which new scan outputs have been determined in the last iteration
       // (newOuts is a map from `name: String` to `numChannels Int`)
@@ -638,7 +656,7 @@ object AuralPresentationImpl {
         case Some(aural) =>
           viewMap.remove(timedID)
           //               implicit val ptx = ProcTxn()( tx )
-          log(s"removed $timed (${hashCode.toHexString})") // + " -- playing? " + aural.playing )
+          logA(s"removed $timed (${hashCode.toHexString})") // + " -- playing? " + aural.playing )
           aural.stop()
 
         case _ =>

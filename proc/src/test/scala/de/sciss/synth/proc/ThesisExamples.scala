@@ -85,12 +85,14 @@ object ThesisExamples extends App {
       Transport[S, S](group)
     }
 
-    val aural = AuralSystem.start()
-    AuralPresentation.run(transp, aural)
+    sys.step { implicit tx =>
+      val aural = AuralSystem.start()
+      AuralPresentation.run(transp, aural)
 
-    aural.whenStarted { _ =>
-      sys.step { implicit tx =>
-        transp.play()
+      aural.whenStarted { _ =>
+        sys.step { implicit tx =>
+          transp.play()
+        }
       }
     }
   }

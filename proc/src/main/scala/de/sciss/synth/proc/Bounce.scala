@@ -176,11 +176,11 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       }
 
       val server  = Server.offline(sCfg)
-      val aural   = AuralSystem.offline(server)
 
       val view = blocking {
         cursor.step { implicit tx =>
-          val _view   = AuralPresentation.runTx[S](transp, aural)
+          val aural   = AuralSystem.offline(server)
+          val _view   = AuralPresentation.run[S](transp, aural)
           config.init(tx, server)
           transp.seek(span.start)
           transp.play()

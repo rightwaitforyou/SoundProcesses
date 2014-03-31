@@ -151,6 +151,8 @@ trait TxnFullImpl[S <: Sys[S]] extends TxnImpl with Sys.Txn[S] {
 final class TxnPlainImpl(val peer: InTxn) extends TxnImpl {
   override def toString = "proc.Txn<plain>@" + hashCode().toHexString
 
+  def afterCommit(code: => Unit): Unit = ScalaTxn.afterCommit(_ => code)(peer)
+
   protected def markBundlesDirty(): Unit = {
     log("registering after commit handler")
     ScalaTxn.afterCommit(_ => flush())(peer)

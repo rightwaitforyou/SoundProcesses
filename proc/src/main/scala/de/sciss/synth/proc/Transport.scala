@@ -22,6 +22,7 @@ import data.Iterator
 import impl.{TransportImpl => Impl}
 import de.sciss.span.SpanLike
 import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.event.Observable
 
 object Transport {
   /** Creates a new realtime transport. The transport is positioned at time zero. */
@@ -98,7 +99,7 @@ object Transport {
   }
 }
 
-trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] {
+trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] with Observable[S#Tx, Transport.Update[S, Elem, U]] {
 
   def play()(implicit tx: S#Tx): Unit
   def stop()(implicit tx: S#Tx): Unit
@@ -112,8 +113,6 @@ trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] {
 
   /** Iterator over all processes which intersect with the current time. */
   def iterator(implicit tx: S#Tx): Iterator[S#Tx, (SpanLike, BiGroup.TimedElem[S, Elem])]
-
-  def react(fun: S#Tx => Transport.Update[S, Elem, U] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
 
   def cursor: stm.Cursor[S]
 }
