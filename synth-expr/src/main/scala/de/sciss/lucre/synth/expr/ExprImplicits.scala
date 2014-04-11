@@ -58,7 +58,8 @@ class ExprImplicits[S <: evt.Sys[S]] protected /* extends ExprImplicits.LowPrior
   implicit def longOps2(ex: Expr[S, Long]): LongExtensions.Ops[S] = new LongExtensions.Ops(ex)
 
   implicit def spanConst(s: Span): Expr[S, Span] = bitemp.Span.newConst(s)
-  implicit def spanOps(ex: Expr[S, Span]): SpanExtensions.Ops[S] = new SpanExtensions.Ops(ex)
+  implicit def spanOps (ex: Expr[S, Span]): SpanExtensions.Ops[S] = new SpanExtensions.Ops(ex)
+  implicit def spanOps2(s: Span.type): SpanExtensions.Ops2 = new SpanExtensions.Ops2(s)
   implicit def spanLikeConst(s: SpanLike): Expr[S, SpanLike] = bitemp.SpanLike.newConst(s)
   implicit def spanLikeOps(ex: Expr[S, SpanLike]): SpanLikeExtensions.Ops[S] = new SpanLikeExtensions.Ops(ex)
 

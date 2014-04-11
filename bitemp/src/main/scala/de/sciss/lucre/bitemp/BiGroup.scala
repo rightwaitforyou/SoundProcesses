@@ -18,7 +18,7 @@ import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.event.{Publisher, EventLike, Sys}
 import impl.{BiGroupImpl => Impl}
 import collection.immutable.{IndexedSeq => Vec}
-import expr.{Expr, Type, ExprType1}
+import expr.{Expr, ExprType1}
 import data.Iterator
 import de.sciss.span.{SpanLike => SpanLikeV}
 import de.sciss.serial.DataInput
@@ -125,17 +125,6 @@ trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] with Publisher[S, BiGrou
   import BiGroup.Leaf
 
   def modifiableOption: Option[BiGroup.Modifiable[S, Elem, U]]
-
-  //   /**
-  //    * Generates an iterator over all elements in the group which intersect (whose span contains)
-  //    * the current time as given by the implicit `chronos` argument.
-  //    *
-  //    * This methods makes no guarantees about the ordering of the returned iterator.
-  //    *
-  //    * @param chronos a reference to the current time cursor
-  //    * @return  a (possibly empty) iterator of the intersecting elements
-  //    */
-  //   def iterator( implicit tx: S#Tx, chronos: Chronos[ S ]) : txn.Iterator[ S#Tx, Leaf[ S, Elem ]]
 
   def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Leaf[S, Elem]]
 

@@ -13,17 +13,17 @@ import de.sciss.lucre
 class AttributesSpec extends ConfluentEventSpec {
   import imp._
 
-  "Attributes" should "serialize and deserialize" in { system =>
+  "Attrs" should "serialize and de-serialize" in { system =>
     val pH = system.step { implicit tx =>
       val p = Proc[S]
-      p.attributes.put("foo", Attribute.Int(lucre.expr.Int.newVar(1234)))
+      p.attributes.put("foo", Attr.Int(lucre.expr.Int.newVar(1234)))
       tx.newHandle(p)
     }
 
     system.step { implicit tx =>
       val p     = pH()
       // println(s"Keys found: ${p.attributes.keys.mkString(", ")}")
-      val expr  = p.attributes[Attribute.Int]("foo")
+      val expr  = p.attributes[Attr.Int]("foo")
       val v     = expr match {
         case Some(Expr.Var(vr)) => vr().value
         case _ => -1

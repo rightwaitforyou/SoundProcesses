@@ -18,11 +18,10 @@ import de.sciss.lucre.stm
 import stm.IdentifierMap
 import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{TxnExecutor, Ref, TxnLocal}
+import scala.concurrent.stm.{Ref, TxnLocal}
 import de.sciss.synth.proc.{logAural => logA}
 import UGenGraphBuilder.MissingIn
 import graph.scan
-import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.Scan.Link
@@ -129,7 +128,7 @@ object AuralPresentationImpl {
             case (timed, m) => booted.procUpdated(timed, m)
           }
           added.foreach { timed =>
-            val mute = timed.value.attributes[Attribute.Boolean]("mute").exists(_.value)
+            val mute = timed.value.attributes[Attr.Boolean]("mute").exists(_.value)
             if (!mute) booted.procAdded(time, timed)
           }
 
@@ -208,12 +207,12 @@ object AuralPresentationImpl {
       val time          = ugen.time
       val p             = timed.value
 
-      val nameHint      = p.attributes[Attribute.String](ProcKeys.attrName).map(_.value)
+      val nameHint      = p.attributes[Attr.String](ProcKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
       // users are elements which must be added after the aural proc synth is started, and removed when it stops
       var users         = List.empty[DynamicUser]
       // resources are dependencies in terms of synth bundle spawning, and will be disposed by the aural proc
-      var deps          = List.empty[Resource]
+      var dependencies  = List.empty[Resource]
 
       // ---- handle input buses ----
       val span          = timed.span.value
@@ -234,10 +233,10 @@ object AuralPresentationImpl {
       if (attrNames.nonEmpty) attrNames.foreach { n =>
         val ctlName = graph.attribute.controlName(n)
         p.attributes.get(n).foreach {
-          case a: Attribute.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
-          case a: Attribute.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
-          case a: Attribute.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSetMap)
-          case a: Attribute.FadeSpec[S] =>
+          case a: Attr.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
+          case a: Attr.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
+          case a: Attr.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSetMap)
+          case a: Attr.FadeSpec[S] =>
             val spec = a.peer.value
             // dur, shape-id, shape-curvature, floor
             val values = Vec(
@@ -247,10 +246,10 @@ object AuralPresentationImpl {
               }, spec.floor
             )
             setMap :+= (ctlName -> values: ControlSetMap)
-          case a: Attribute.DoubleVec[S] =>
+          case a: Attr.DoubleVec[S] =>
             val values = a.peer.value.map(_.toFloat)
             setMap :+= (ctlName -> values: ControlSetMap)
-          case a: Attribute.AudioGrapheme[S] =>
+          case a: Attr.AudioGrapheme[S] =>
             val audioElem = a.peer
             val spec      = audioElem.spec
             //              require(spec.numChannels == 1 || spec.numFrames == 1,
@@ -264,7 +263,7 @@ object AuralPresentationImpl {
             val res    = BusNodeSetter.mapper(ctlName, b, synth)
             users ::= res
             val w      = AudioArtifactScalarWriter(b, audioElem.value)
-            deps     ::= w
+            dependencies     ::= w
             // users ::= w
 
           case a => sys.error(s"Cannot cast attribute $a to a scalar value")
@@ -273,10 +272,10 @@ object AuralPresentationImpl {
 
       // ---- streams ----
       val streamNames = ugen.streamIns
-      if (streamNames.nonEmpty) streamNames.foreach { case (n, infos0) =>
-        val infos = if (infos0.isEmpty) UGenGraphBuilder.StreamIn.empty :: Nil else infos0
+      if (streamNames.nonEmpty) streamNames.foreach { case (n, infoSeq0) =>
+        val infoSeq = if (infoSeq0.isEmpty) UGenGraphBuilder.StreamIn.empty :: Nil else infoSeq0
 
-        infos.zipWithIndex.foreach { case (info, idx) =>
+        infoSeq.zipWithIndex.foreach { case (info, idx) =>
           val ctlName     = graph.stream.controlName(n, idx)
           val bufSize     = if (info.isEmpty) server.config.blockSize else {
             val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
@@ -294,7 +293,7 @@ object AuralPresentationImpl {
             val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
             (_buf, 0f)
           } {
-            case a: Attribute.AudioGrapheme[S] =>
+            case a: Attr.AudioGrapheme[S] =>
               val audioElem = a.peer
               val spec      = audioElem.spec
               val path      = audioElem.artifact.value.getAbsolutePath
@@ -319,8 +318,8 @@ object AuralPresentationImpl {
 
             case a => sys.error(s"Cannot use attribute $a as an audio stream")
           }
-          setMap      :+= (ctlName -> Seq(rb.id, gain): ControlSetMap)
-          deps        ::= rb
+          setMap      :+= (ctlName -> Seq[Float](rb.id, gain): ControlSetMap)
+          dependencies        ::= rb
         }
       }
 
@@ -378,14 +377,14 @@ object AuralPresentationImpl {
                       // println(s"segment : ${segm.span}")
                       val bm     = lazyInBus
                       val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
-                      deps     ::= w
+                      dependencies     ::= w
                       // users ::= w
 
                     case audio: Segment.Audio =>
                       ensureChannels(audio.numChannels)
                       val bm     = lazyInBus
                       val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
-                      deps     ::= w
+                      dependencies     ::= w
                       // users    ::= w
                   }
 
@@ -405,7 +404,7 @@ object AuralPresentationImpl {
                         ensureChannels(bOut.numChannels)
                         val edge    = NodeGraph.Edge(srcAural, srcKey, aural, key)
                         val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
-                        deps      ::= link
+                        dependencies      ::= link
                         users     ::= link
                       }
                   }
@@ -435,7 +434,7 @@ object AuralPresentationImpl {
                         s"Scan input changed number of channels (expected ${bOut.numChannels} but found ${bIn.numChannels})")
                       val edge    = NodeGraph.Edge(aural, key, sinkAural, sinkKey)
                       val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn)
-                      deps      ::= link
+                      dependencies      ::= link
                       users     ::= link
                     }
                 }
@@ -447,9 +446,9 @@ object AuralPresentationImpl {
 
       // busUsers.foreach(_.add())
 
-      aural.init(users, deps)
+      aural.init(users, dependencies)
       // wrap as AuralProc and save it in the identifier map for later lookup
-      synth.play(target = group, addAction = addToHead, args = setMap, dependencies = deps)
+      synth.play(target = group, addAction = addToHead, args = setMap, dependencies = dependencies)
       if (users.nonEmpty) users.foreach(_.add())
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
@@ -496,8 +495,8 @@ object AuralPresentationImpl {
     // called by UGenGraphBuilderImpl
     def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int =
       timed.value.attributes.get(key).fold(1) {
-        case a: Attribute.DoubleVec[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: Attribute.AudioGrapheme[S]  => a.peer.spec.numChannels
+        case a: Attr.DoubleVec[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: Attr.AudioGrapheme[S]  => a.peer.spec.numChannels
         case _ => 1
       }
 
@@ -602,7 +601,7 @@ object AuralPresentationImpl {
       }
       // if there were any, create rich audio buses for them, and store them in the builder's bus map.
       //    note that these buses initially do not have any real resources allocated, so it's safe to
-      //    forget about them and have them gc'ed if the process does not complete by the end of the txn.
+      //    forget about them and have them garbage-collected if the process does not complete by the end of the txn.
       if (newOuts.nonEmpty) {
         val newBuses = newOuts.mapValues(numCh => new OutputBuilder(Bus.audio(server, numCh)))
         builder.outputs ++= newBuses
@@ -661,7 +660,7 @@ object AuralPresentationImpl {
 
         case _ =>
           def warn(): Unit = {
-            val mute = timed.value.attributes[Attribute.Boolean]("mute").exists(_.value)
+            val mute = timed.value.attributes[Attr.Boolean]("mute").exists(_.value)
             if (!mute) println("WARNING: could not find aural view for " + timed)
           }
 

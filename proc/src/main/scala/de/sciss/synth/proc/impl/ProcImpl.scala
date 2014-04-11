@@ -48,7 +48,7 @@ object ProcImpl {
   }
 
   private type ScanEntry     [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan     [S], Scan     .Update[S]]
-  private type AttributeEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Attribute[S], Attribute.Update[S]]
+  private type AttrEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Attr[S], Attr.Update[S]]
 
   private type I = InMemory
 
@@ -62,14 +62,14 @@ object ProcImpl {
     val valueSerializer = Scan.serializer[I]
   }
 
-  implicit def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Attribute[S], Attribute.Update[S]] =
-     anyAttributeEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Attribute[S], Attribute.Update[S]]]
+  implicit def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Attr[S], Attr.Update[S]] =
+     anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Attr[S], Attr.Update[S]]]
 
-  private val anyAttributeEntryInfo = new KeyMapImpl.ValueInfo[I, String, Attribute[I], Attribute.Update[I]] {
-    def valueEvent(value: Attribute[I]) = value.changed
+  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Attr[I], Attr.Update[I]] {
+    def valueEvent(value: Attr[I]) = value.changed
 
     val keySerializer   = ImmutableSerializer.String
-    val valueSerializer = Attribute.serializer[I]
+    val valueSerializer = Attr.serializer[I]
   }
 
   private sealed trait Impl[S <: Sys[S]]
@@ -78,7 +78,7 @@ object ProcImpl {
 
     import Proc._
 
-    protected def attributeMap: SkipList.Map[S, String, AttributeEntry[S]]
+    protected def attributeMap: SkipList.Map[S, String, AttrEntry[S]]
     protected def scanMap     : SkipList.Map[S, String, ScanEntry[S]]
 
     //    final def graph(implicit tx: S#Tx): Expr[S, SynthGraph] = _graph()
@@ -121,12 +121,12 @@ object ProcImpl {
       final protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
     }
 
-    object attributes extends Attributes.Modifiable[S] with KeyMap[Attribute[S], Attribute.Update[S], Proc.Update[S]] {
+    object attributes extends AttrMap.Modifiable[S] with KeyMap[Attr[S], Attr.Update[S], Proc.Update[S]] {
       final val slot = 0
 
-      protected def wrapKey(key: String) = AttributeKey(key)
+      protected def wrapKey(key: String) = AttrKey(key)
 
-      def put(key: String, value: Attribute[S])(implicit tx: S#Tx): Unit = add(key, value)
+      def put(key: String, value: Attr[S])(implicit tx: S#Tx): Unit = add(key, value)
 
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
 
@@ -135,7 +135,7 @@ object ProcImpl {
         if (changes.isEmpty) None
         else Some(Proc.Update(proc,
           changes.map({
-            case (key, u) => Proc.AttributeChange(key, u.element, u.change)
+            case (key, u) => Proc.AttrChange(key, u.element, u.change)
           })(breakOut)))
       }
 
@@ -143,8 +143,8 @@ object ProcImpl {
 
       protected def valueInfo = attributeEntryInfo[S]
 
-      def apply[Attr[~ <: Sys[~]] <: Attribute[_]](key: String)(implicit tx: S#Tx,
-                                                      tag: reflect.ClassTag[Attr[S]]): Option[Attr[S]#Peer] =
+      def apply[A[~ <: Sys[~]] <: Attr[_]](key: String)(implicit tx: S#Tx,
+                                                      tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
         get(key) match {
           // cf. stackoverflow #16377741
           case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
@@ -266,7 +266,7 @@ object ProcImpl {
     protected val targets       = evt.Targets[S](tx0)
     val graph                   = SynthGraphs.newVar(SynthGraphs.empty)
     protected val scanMap       = SkipList.Map.empty[S, String, ScanEntry[S]]
-    protected val attributeMap  = SkipList.Map.empty[S, String, AttributeEntry[S]]
+    protected val attributeMap  = SkipList.Map.empty[S, String, AttrEntry[S]]
   }
 
   private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S])
@@ -279,7 +279,7 @@ object ProcImpl {
     }
 
     val graph                   = SynthGraphs.readVar(in, access)
-    protected val attributeMap  = SkipList.Map.read[S, String, AttributeEntry[S]](in, access)
+    protected val attributeMap  = SkipList.Map.read[S, String, AttrEntry[S]](in, access)
     protected val scanMap       = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
   }
 }

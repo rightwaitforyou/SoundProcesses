@@ -34,7 +34,7 @@ object StreamTest extends App {
       val artifact = loc.add(file)
       val eAudio = Grapheme.Elem.Audio[S](artifact, spec, offset = 0L, gain = 2.0)
 
-      proc.attributes.put("disk", Attribute.AudioGrapheme(eAudio))
+      proc.attributes.put("disk", Attr.AudioGrapheme(eAudio))
 
       proc.graph() = SynthGraph {
         import ugen._

@@ -70,12 +70,15 @@ object SpanExtensions  {
     }
   }
 
-  def apply[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
-    (start, stop) match {
-      case (Expr.Const(startC), Expr.Const(stopC)) => newConst(span.Span(startC, stopC))
-      case _ =>
-        new impl.Tuple2(bitemp.Span, BinaryOp.Apply.id, BinaryOp.Apply, Targets.partial[S], start, stop)
-    }
+  final class Ops2(val `this`: Span.type) extends AnyVal { me =>
+    import me.{`this` => ex}
+    def apply[S <: Sys[S]](start: Expr[S, Long], stop: Expr[S, Long])(implicit tx: S#Tx): Ex[S] =
+      (start, stop) match {
+        case (Expr.Const(startC), Expr.Const(stopC)) => newConst(span.Span(startC, stopC))
+        case _ =>
+          new impl.Tuple2(bitemp.Span, BinaryOp.Apply.id, BinaryOp.Apply, Targets.partial[S], start, stop)
+      }
+  }
 
   // XXX TODO: fold constants
   final class Ops[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>

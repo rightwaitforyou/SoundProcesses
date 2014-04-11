@@ -58,7 +58,7 @@ object Proc {
     override def toString = s"[scan: $name]"
   }
 
-  final case class AttributeKey(name: String) extends AssociativeKey {
+  final case class AttrKey(name: String) extends AssociativeKey {
     override def toString = s"[attribute: $name]"
   }
 
@@ -67,9 +67,9 @@ object Proc {
     override def toString = s"ScanChange($key, $scan, $changes)"
   }
 
-  final case class AttributeChange[S <: Sys[S]](key: String, attribute: Attribute[S], change: Any)
+  final case class AttrChange[S <: Sys[S]](key: String, attribute: Attr[S], change: Any)
     extends Change[S] {
-    override def toString = s"AttributeChange($key, $attribute, $change)"
+    override def toString = s"AttrChange($key, $attribute, $change)"
   }
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
@@ -81,5 +81,5 @@ trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {
   def scans     : Scans     .Modifiable[S]
 
   /** The scalar attributes of the process. */
-  def attributes: Attributes.Modifiable[S]
+  def attributes: AttrMap.Modifiable[S]
 }
