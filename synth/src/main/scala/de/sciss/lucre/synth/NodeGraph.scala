@@ -166,7 +166,7 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
 
   def reduceFutures(futures: Vec[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
     futures match {
-      case Vec()        => Future.successful()
+      case Vec()        => Future.successful(())
       case Vec(single)  => single
       case more         => Future.reduce(futures)((_, _) => ())
     }

@@ -78,7 +78,7 @@ object MixTest extends App {
               transp.play()
           }
           new Thread {
-            override def run() {
+            override def run(): Unit = {
               Thread.sleep(10 * 1000L)
               sys.exit()
             }

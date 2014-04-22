@@ -19,7 +19,7 @@ object ThesisExamples extends App {
     Out.ar(bus, sig * amp)
   }
 
-  def configure[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx) {
+  def configure[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx): Unit = {
     val imp = ExprImplicits[S]
     import imp._
 
@@ -68,7 +68,7 @@ object ThesisExamples extends App {
     (p1, p2)
   }
 
-  def playScans() {
+  def playScans(): Unit = {
     type S            = InMemory
     implicit val sys  = InMemory()
 

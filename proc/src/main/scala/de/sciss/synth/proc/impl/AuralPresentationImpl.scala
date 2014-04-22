@@ -28,7 +28,7 @@ import de.sciss.synth.proc.Scan.Link
 import scala.util.control.NonFatal
 import de.sciss.lucre.synth.{DynamicUser, Buffer, Bus, AudioBus, NodeGraph, AuralNode, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
-import de.sciss.synth.{addToHead, ControlSetMap}
+import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.numbers
 
 object AuralPresentationImpl {
@@ -216,7 +216,7 @@ object AuralPresentationImpl {
 
       // ---- handle input buses ----
       val span          = timed.span.value
-      var setMap        = Vec[ControlSetMap](
+      var setMap        = Vec[ControlSet](
         graph.Time    .key -> time / sampleRate,
         graph.Offset  .key -> (span match {
           case Span.HasStart(start) => (time - start) / sampleRate
@@ -233,9 +233,9 @@ object AuralPresentationImpl {
       if (attrNames.nonEmpty) attrNames.foreach { n =>
         val ctlName = graph.attribute.controlName(n)
         p.attributes.get(n).foreach {
-          case a: Attr.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
-          case a: Attr.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSetMap)
-          case a: Attr.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSetMap)
+          case a: Attr.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
+          case a: Attr.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
+          case a: Attr.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
           case a: Attr.FadeSpec[S] =>
             val spec = a.peer.value
             // dur, shape-id, shape-curvature, floor
@@ -245,10 +245,10 @@ object AuralPresentationImpl {
                 case _              => 0f
               }, spec.floor
             )
-            setMap :+= (ctlName -> values: ControlSetMap)
+            setMap :+= (ctlName -> values: ControlSet)
           case a: Attr.DoubleVec[S] =>
             val values = a.peer.value.map(_.toFloat)
-            setMap :+= (ctlName -> values: ControlSetMap)
+            setMap :+= (ctlName -> values: ControlSet)
           case a: Attr.AudioGrapheme[S] =>
             val audioElem = a.peer
             val spec      = audioElem.spec
@@ -318,7 +318,7 @@ object AuralPresentationImpl {
 
             case a => sys.error(s"Cannot use attribute $a as an audio stream")
           }
-          setMap      :+= (ctlName -> Seq[Float](rb.id, gain): ControlSetMap)
+          setMap      :+= (ctlName -> Seq[Float](rb.id, gain): ControlSet)
           dependencies        ::= rb
         }
       }
@@ -352,7 +352,7 @@ object AuralPresentationImpl {
           // note: if not found, stick with default
 
           // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
-          //           we cannot use ControlSetMap any more, but need other mechanism
+          //           we cannot use ControlSet any more, but need other mechanism
           p.scans.get(key).foreach { scan =>
             val src = scan.sources
             // if (src.isEmpty) {
@@ -365,11 +365,11 @@ object AuralPresentationImpl {
                     // again if not found... stick with default
                     case const: Segment.Const =>
                       ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-                      //                        setMap :+= ((key -> const.numChannels) : ControlSetMap)
+                      //                        setMap :+= ((key -> const.numChannels) : ControlSet)
                       setMap :+= (if (const.numChannels == 1) {
-                        ControlSetMap.Single(inCtlName, const.values.head .toFloat )
+                        ControlSet.Value (inCtlName, const.values.head .toFloat )
                       } else {
-                        ControlSetMap.Multi (inCtlName, const.values.map(_.toFloat))
+                        ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
                       })
 
                     case segm: Segment.Curve =>

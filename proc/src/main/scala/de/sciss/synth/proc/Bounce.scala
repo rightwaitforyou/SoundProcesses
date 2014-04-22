@@ -188,7 +188,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
         }
       }
 
-      @tailrec def loop() {
+      @tailrec def loop(): Unit = {
         Await.result(server.committed(), Duration.Inf)
         val keepPlaying = blocking {
           cursor.step { implicit tx =>
@@ -250,7 +250,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
       val dur = span.length / sampleRate
 
       val procArgs    = sCfg.toNonRealtimeArgs
-      val procBuilder = Process(procArgs, Some(new File(sCfg.programPath).getParentFile))
+      val procBuilder = Process(procArgs, Some(new File(sCfg.program).getParentFile))
 
       if (DEBUG) {
         println("---- BOUNCE: scsynth ----")
@@ -265,7 +265,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
           if (line.startsWith("nextOSCPacket")) {
             val time = line.substring(14).toFloat
             val prog = time / dur
-            progress(prog.toFloat)
+            progress = prog
             try {
               checkAborted()
             } catch {

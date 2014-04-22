@@ -13,7 +13,7 @@
 
 package de.sciss.lucre.synth
 
-import de.sciss.synth.{Node => SNode, ControlABusMap, ControlKBusMap, ControlSetMap}
+import de.sciss.synth.{Node => SNode, ControlABusMap, ControlKBusMap, ControlSet}
 
 trait Node extends Resource {
   // ---- abstract ----
@@ -43,10 +43,10 @@ trait Node extends Resource {
 
   def free(audible: Boolean = true)(implicit tx: Txn): Unit
 
-  def set (audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit
-  def setn(audible: Boolean, pairs: ControlSetMap*)(implicit tx: Txn): Unit
+  def set (audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit
+  def setn(audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit
 
-  //   def setIfOnline( pairs: ControlSetMap* )( implicit tx: Txn ) : Unit
+  //   def setIfOnline( pairs: ControlSet* )( implicit tx: Txn ) : Unit
 
   def mapn (audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn): Unit
   def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn): Unit

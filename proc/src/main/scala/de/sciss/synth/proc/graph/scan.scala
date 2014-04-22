@@ -77,7 +77,7 @@ object scan {
 
     override def toString = s"""scan("$key") := $in"""
 
-    protected def makeUGens {
+    protected def makeUGens: Unit = {
       val bus = outControlName(key).kr
       unwrap(Vector(bus.expand) ++ in.expand.outputs)
     }

@@ -129,7 +129,7 @@ object Grapheme {
 
       def numChannels = spec.numChannels
 
-      def write(out: DataOutput) {
+      def write(out: DataOutput): Unit = {
         out.writeByte(audioCookie)
         out.writeUTF(artifact.getPath) // artifact.write(out)
         AudioFileSpec.Serializer.write(spec, out)

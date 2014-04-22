@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.synth.{ControlBus, Buffer, Synth, Resource, Txn}
-import de.sciss.synth.{addToHead, ControlSetMap, SynthGraph}
+import de.sciss.synth.{addToHead, ControlSet, SynthGraph}
 
 object AudioArtifactScalarWriter {
   def apply(bus: ControlBus, audioVal: Grapheme.Value.Audio)(implicit tx: Txn): Resource = {
@@ -49,7 +49,7 @@ object AudioArtifactScalarWriter {
       val target    = server.defaultGroup // XXX
       val rb        = Buffer(server)(numFrames = 1, numChannels = bus.numChannels)
       rb.read(path, fileStartFrame = audioVal.offset, numFrames = 1)
-      val args      = List[ControlSetMap]("buf" -> rb.id, "amp" -> audioVal.gain)
+      val args      = List[ControlSet]("buf" -> rb.id, "amp" -> audioVal.gain)
 
       // val rs = rd.play(target = target, args = args, buffers = rb :: Nil)
       synth.play(target = target, args = args, addAction = addToHead, dependencies = rb :: Nil)

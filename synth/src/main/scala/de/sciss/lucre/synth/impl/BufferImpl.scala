@@ -14,7 +14,7 @@
 package de.sciss.lucre.synth
 package impl
 
-import de.sciss.synth.{Buffer => SBuffer}
+import de.sciss.synth.{Buffer => SBuffer, FillRange}
 import de.sciss.synth.io.{SampleFormat, AudioFileType}
 
 final case class BufferImpl(server: Server, peer: SBuffer)
@@ -92,7 +92,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     if (num   < 0         ) throw new IllegalArgumentException (s"num ($num) must be >= 0")
     if (index + num > size) throw new IndexOutOfBoundsException(s"index ($index) + num ($num) > size ($size)")
     requireOnline()
-    tx.addMessage(this, peer.fillMsg(index = index, num = num, value = value), audible = false) // XXX TODO audible?
+    tx.addMessage(this, peer.fillMsg(FillRange(index = index, num = num, value = value)), audible = false) // XXX TODO audible?
   }
 
   def dispose()(implicit tx: Txn): Unit = {

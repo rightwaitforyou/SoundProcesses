@@ -15,7 +15,7 @@ package de.sciss.lucre
 package synth
 
 import collection.immutable.{Seq => ISeq}
-import de.sciss.synth.{UGenGraph, addToHead, AddAction, ControlSetMap, SynthGraph, Synth => SSynth}
+import de.sciss.synth.{UGenGraph, addToHead, AddAction, ControlSet, SynthGraph, Synth => SSynth}
 import impl.{SynthImpl => Impl}
 
 object Synth {
@@ -25,7 +25,7 @@ object Synth {
   }
 
   def play(graph: SynthGraph, nameHint: Option[String] = None)
-          (target: Node, args: ISeq[ControlSetMap] = Nil, addAction: AddAction = addToHead,
+          (target: Node, args: ISeq[ControlSet] = Nil, addAction: AddAction = addToHead,
             dependencies: List[Resource] = Nil)(implicit tx: Txn): Synth = {
     val res = apply(target.server, graph, nameHint)
     res.play(target, args, addAction, dependencies)
@@ -50,6 +50,6 @@ trait Synth extends Node {
 
   def definition: SynthDef
 
-  /* private[synth] */ def play(target: Node, args: ISeq[ControlSetMap], addAction: AddAction, dependencies: List[Resource])
+  /* private[synth] */ def play(target: Node, args: ISeq[ControlSet], addAction: AddAction, dependencies: List[Resource])
                          (implicit tx: Txn): Unit
 }

@@ -1,7 +1,7 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{stm, bitemp, expr, event => evt}
+import de.sciss.lucre.{stm, bitemp, event => evt}
 import stm.Cursor
 import bitemp.{BiExpr, BiGroup}
 import de.sciss.lucre.expr.{ExprType, Expr}
@@ -20,7 +20,7 @@ import de.sciss.lucre.synth.{InMemory, Sys}
 object VisTest {
   def apply(): VisTest[InMemory, InMemory] = {
     implicit val system = InMemory()
-    new VisTest(system)
+    new VisTest[InMemory, InMemory](system)
   }
 
   def baseDir   = new File(sys.props("user.home"), "sound_processes")
@@ -29,7 +29,7 @@ object VisTest {
 
   def inMem(): VisTest[InMemory, InMemory] = {
     implicit val system = InMemory()
-    new VisTest(system)
+    new VisTest[InMemory, InMemory](system)
   }
 
   //   def conf() : VisTest[ Confluent ] = {
@@ -40,13 +40,13 @@ object VisTest {
   //      new VisTest( system )
   //   }
 
-  def wipe(sure: Boolean = false) {
+  def wipe(sure: Boolean = false): Unit = {
     if (!sure) return
     dataDir.listFiles().foreach(_.delete())
     dataDir.delete()
   }
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     //      TemporalObjects.showConfluentLog = true
     //val vis = VisTest.conf()
     val vis = VisTest.inMem()
@@ -160,37 +160,30 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     group.nearestEventBefore(time)
   }
 
-  def clear() {
+  def clear(): Unit =
     t { implicit tx =>
       group.clear()
     }
-  }
 
-  def add(span: SpanLike = Span(3 * 44100, 6 * 44100), name: String = "Proc") {
+  def add(span: SpanLike = Span(3 * 44100, 6 * 44100), name: String = "Proc"): Unit =
     t { implicit tx =>
       val p = proc(name)
       group.add(span, p)
     }
-  }
 
-  def play() {
+  def play(): Unit =
     t { implicit tx => trans.play() }
-  }
 
-  def stop() {
+  def stop(): Unit =
     t { implicit tx => trans.stop() }
-  }
 
-  def rewind() {
-    seek(0L)
-  }
+  def rewind(): Unit = seek(0L)
 
-  def seek(pos: Long) {
+  def seek(pos: Long): Unit =
     t { implicit tx =>
       trans.stop()
       trans.seek(pos)
     }
-  }
 
   def within(span: SpanLike) = t { implicit tx =>
     group.intersect(span).toIndexedSeq
@@ -200,13 +193,10 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     group.rangeSearch(start, stop).toIndexedSeq
   }
 
-  def defer(thunk: => Unit) {
+  def defer(thunk: => Unit): Unit =
     EventQueue.invokeLater(new Runnable {
-      def run() {
-        thunk
-      }
+      def run(): Unit = thunk
     })
-  }
 
   //   private var frameVar: JFrame = null
   //   def frame = frameVar
@@ -235,7 +225,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   private val auralVar = STMRef(Option.empty[AuralPresentation[S]])
 
-  def aural() {
+  def aural(): Unit = {
     if (auralVar.single().isDefined) return
 
     t { implicit tx =>
@@ -248,11 +238,10 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   def pr(time: Long = 4 * 44100)(implicit tx: S#Tx) = group.intersect(time).next._2.head.value
 
-  def addFreq(time: Expr[S, Long] = 0, freq: Expr[S, Param]) {
+  def addFreq(time: Expr[S, Long] = 0, freq: Expr[S, Param]): Unit =
     t { implicit tx =>
       addFreq2(time -> curve(freq))
     }
-  }
 
   def audioFile(path: String)(implicit tx: S#Tx): Grapheme.Value.Audio = {
     val f = new File(path)
@@ -264,11 +253,10 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     Grapheme.Value.Audio(artifact.value, spec, offset, gain)
   }
 
-  def addAudio(time: Expr[S, Long] = 0, freq: Grapheme.Value.Audio) {
+  def addAudio(time: Expr[S, Long] = 0, freq: Grapheme.Value.Audio): Unit =
     t { implicit tx =>
       addFreq2(time -> freq)
     }
-  }
 
   def audioTest()(implicit tx: S#Tx): Proc[S] = {
     val af = audioFile("283_7WTConWhiteCCRsmpLp.aif")

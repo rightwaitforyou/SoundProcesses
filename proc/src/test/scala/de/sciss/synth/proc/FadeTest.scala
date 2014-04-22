@@ -60,7 +60,7 @@ object FadeTest extends App {
               transp.play()
           }
           new Thread {
-            override def run() {
+            override def run(): Unit = {
               Thread.sleep(5 * 1000L)
               if (twice) {
                 println("\nSecond iteration\n")

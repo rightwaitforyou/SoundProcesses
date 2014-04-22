@@ -39,7 +39,7 @@ object ScansTest extends App {
   //      InMemory()
   //   }
 
-  def preliminaryTest() {
+  def preliminaryTest(): Unit = {
     ???
     //      val sys  = makeSys()
     //      val scan = sys.step { implicit tx =>
@@ -70,12 +70,12 @@ object ScansTest extends App {
     ////      }
   }
 
-  def run[S <: Sys[S], I <: stm.Sys[I]]()(implicit system: S, cursor: stm.Cursor[S], bridge: S#Tx => I#Tx) {
+  def run[S <: Sys[S], I <: stm.Sys[I]]()(implicit system: S, cursor: stm.Cursor[S], bridge: S#Tx => I#Tx): Unit = {
     //      implicit val sys = makeSys()
     //      val imp  = ExprImplicits[ S ]
     //      import imp._
 
-    def body(auralSystem: Option[AuralSystem])(implicit tx: S#Tx) {
+    def body(auralSystem: Option[AuralSystem])(implicit tx: S#Tx): Unit = {
       val group = ProcGroup.Modifiable[S]
       test(group)
       //            transp.playing_=( true )
@@ -103,7 +103,7 @@ object ScansTest extends App {
     //      Thread.sleep( 1000 )
   }
 
-  def test[S <: Sys[S]](group: ProcGroup.Modifiable[S])(implicit tx: S#Tx) {
+  def test[S <: Sys[S]](group: ProcGroup.Modifiable[S])(implicit tx: S#Tx): Unit = {
     proc.showLog = true
 
     val imp = ExprImplicits[S]

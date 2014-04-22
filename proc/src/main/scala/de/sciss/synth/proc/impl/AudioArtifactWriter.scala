@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.synth.{AudioBus, Buffer, Synth, Resource, Txn}
-import de.sciss.synth.{addToHead, ControlSetMap, SynthGraph}
+import de.sciss.synth.{addToHead, ControlSet, SynthGraph}
 import de.sciss.span.Span
 import de.sciss.numbers
 
@@ -72,8 +72,8 @@ object AudioArtifactWriter {
       // println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
       val bufSize   = (Buffer.defaultCueBufferSize * factor).toInt.nextPowerOfTwo max (server.peer.config.blockSize << 1)
       val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = bus.numChannels, numFrames = bufSize)
-      val args0     = List[ControlSetMap]("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
-      val args      = if (factor == 1.0) args0 else ("speed" -> factor: ControlSetMap) :: args0
+      val args0     = List[ControlSet]("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
+      val args      = if (factor == 1.0) args0 else ("speed" -> factor: ControlSet) :: args0
 
       synth.play(target = target, args = args, addAction = addToHead, dependencies = rb :: Nil)
 

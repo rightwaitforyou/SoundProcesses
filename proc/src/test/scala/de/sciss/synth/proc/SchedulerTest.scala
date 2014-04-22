@@ -10,32 +10,28 @@ object SchedulerTest extends App {
 
    def t[ A ]( fun: InTxn => A ) = TxnExecutor.defaultAtomic( fun )
 
-   def schedule( delay: Long )( code: InTxn => Unit )( implicit tx: InTxn ) {
+  def schedule(delay: Long)(code: InTxn => Unit)(implicit tx: InTxn): Unit = {
       val v          = valid()
       val logical    = txnTime()
       val jitter     = System.currentTimeMillis() - logical
       val effective  = math.max( 0L, delay - jitter )
       ScalaTxn.afterCommit { _ =>
          pool.schedule( new Runnable {
-            def run() { t { implicit tx =>
+            def run(): Unit = t { implicit tx =>
                if( v == valid() ) {
                   txnTime() = logical + delay
                   code( tx )
                }
-            }}
+            }
          }, effective, TimeUnit.MILLISECONDS )
       }
    }
 
-   def stop()( implicit tx: InTxn ) {
-      valid += 1
-   }
+  def stop()(implicit tx: InTxn): Unit = valid += 1
 
-   def io( code: => Unit )( implicit tx: InTxn ) {
-      ScalaTxn.afterCommit( _ => code )
-   }
+  def io(code: => Unit)(implicit tx: InTxn): Unit = ScalaTxn.afterCommit(_ => code)
 
-   println( "Run." )
+  println("Run.")
    t { implicit tx =>
       io( println( "0.0\"" ))
       schedule( 1000 ) { implicit tx =>

@@ -79,9 +79,8 @@ object BiPinImpl {
 
   private class Ser[S <: Sys[S], A, Repr >: Impl[S, A] <: BiPin[S, A]](implicit biType: ExprType1[A])
     extends Serializer[S#Tx, S#Acc, Repr] with evt.Reader[S, Repr] {
-    def write(v: Repr, out: DataOutput) {
-      v.write(out)
-    }
+
+    def write(v: Repr, out: DataOutput): Unit = v.write(out)
 
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Repr with evt.Node[S] = {
       BiPinImpl.readImpl(in, access, targets)
@@ -147,11 +146,10 @@ object BiPinImpl {
       //         def connect()(implicit tx: S#Tx) = ()
       //         def disconnect()(implicit tx: S#Tx) = ()
 
-      private def foreach(fun: Elem => Unit)(implicit tx: S#Tx) {
+      private def foreach(fun: Elem => Unit)(implicit tx: S#Tx): Unit =
         tree.iterator.foreach {
           case (_, seq) => seq.foreach(fun)
         }
-      }
 
       def connect   ()(implicit tx: S#Tx): Unit = foreach(+=) // XXX TODO: verify point in time
       def disconnect()(implicit tx: S#Tx): Unit = foreach(-=)

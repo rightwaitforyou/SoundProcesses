@@ -68,7 +68,8 @@ object ServerImpl {
       val res   = _bundles
       _bundles  = Vector.empty
       val res1  = if (res.isEmpty || !addDefaultGroup) res else {
-        val b   = osc.Bundle(res.head.timetag, message.GroupNew(message.GroupNew.Info(1, addToHead.id, 0)))
+        val b   = osc.Bundle(res.head.timetag,
+          message.GroupNew(message.GroupNew.Data(groupID = 1, addAction = addToHead.id, targetID = 0)))
         b +: res
       }
       res1
@@ -90,7 +91,7 @@ object ServerImpl {
 
     def !!(bndl: osc.Bundle): Future[Unit] = {
       addBundle(bndl)
-      Future.successful()
+      Future.successful(())
     }
 
     // caller must have `sync`

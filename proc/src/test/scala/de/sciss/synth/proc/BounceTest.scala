@@ -52,9 +52,7 @@ object BounceTest extends App {
   import ExecutionContext.Implicits.global
 
   val t = new Thread {
-    override def run() {
-      this.synchronized(this.wait())
-    }
+    override def run(): Unit = this.synchronized(this.wait())
   }
   t.start()
 

@@ -17,7 +17,7 @@ package impl
 import de.sciss.synth.Curve.parametric
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.lucre.synth.{DynamicBusUser, AudioBus, Synth, Resource, Txn}
-import de.sciss.synth.{addToHead, ControlSetMap, SynthGraph}
+import de.sciss.synth.{addToHead, ControlSet, SynthGraph}
 
 object SegmentWriter {
   def apply(bus: AudioBus, segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
@@ -77,7 +77,7 @@ object SegmentWriter {
     protected def resourcePeer: Resource = synth
 
     def play()(implicit tx: Txn): Unit = {
-      type Ctl = List[ControlSetMap]
+      type Ctl = List[ControlSet]
 
       val target    = server.defaultGroup // XXX
       val durSecs   = segm.span.length / sampleRate

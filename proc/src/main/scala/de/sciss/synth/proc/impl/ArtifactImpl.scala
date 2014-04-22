@@ -185,7 +185,7 @@ object ArtifactImpl {
 
     def child(implicit tx: S#Tx): Child = Child(_child())
 
-    def child_=(value: Child)(implicit tx: S#Tx) {
+    def child_=(value: Child)(implicit tx: S#Tx): Unit = {
       val oldP  = _child()
       val newP  = value.path
       if (oldP != newP) {

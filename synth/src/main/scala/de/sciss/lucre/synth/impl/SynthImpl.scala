@@ -15,14 +15,14 @@ package de.sciss.lucre.synth
 package impl
 
 import scala.collection.immutable.{Seq => ISeq}
-import de.sciss.synth.{Synth => SSynth, AddAction, ControlSetMap}
+import de.sciss.synth.{Synth => SSynth, AddAction, ControlSet}
 
 final case class SynthImpl(peer: SSynth, definition: SynthDef) extends NodeImpl with Synth {
   override def toString = s"Synth(id=${peer.id}, def=${definition.name})"
 
   def server: Server = definition.server
 
-  def play(target: Node, args: ISeq[ControlSetMap], addAction: AddAction, dependencies: List[Resource])
+  def play(target: Node, args: ISeq[ControlSet], addAction: AddAction, dependencies: List[Resource])
           (implicit tx: Txn): Unit = {
 
     val s = server

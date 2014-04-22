@@ -6,7 +6,7 @@ SoundProcesses is an extension for ScalaCollider to describe, create and manage 
 
 ## building
 
-SoundProcesses builds with sbt 0.13 and Scala 2.10. The dependencies should be downloaded automatically from maven central repository.
+SoundProcesses builds with sbt 0.13 and Scala 2.11, 2.10. The dependencies should be downloaded automatically from maven central repository.
 
 ## linking
 
@@ -16,7 +16,7 @@ The following dependency is necessary:
     
     "de.sciss" %% "soundprocesses" % v
 
-The current version `v` is `"2.1.1+"`.
+The current version `v` is `"2.2.+"`.
 The following sub modules are available:
 
     "de.sciss" %% "lucrebitemp"     % v     // bi-temporal data structures

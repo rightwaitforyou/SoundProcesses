@@ -28,7 +28,7 @@ object PatchTest extends App {
   }
 
   def run[S <: Sys[S], I <: stm.Sys[I]](auralSys: AuralSystem)
-                                       (implicit tx: S#Tx, cursor: stm.Cursor[S], bridge: S#Tx => I#Tx) {
+                                       (implicit tx: S#Tx, cursor: stm.Cursor[S], bridge: S#Tx => I#Tx): Unit = {
 
     val imp = ExprImplicits[S]
     import imp._
