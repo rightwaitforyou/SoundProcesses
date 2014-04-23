@@ -83,7 +83,7 @@ trait KeyMapImpl[S <: evt.Sys[S], Key, Value, ValueUpd] {
   /** Wrap the given set of added and removed keys in an appropriate update message
     * and dispatch it.
     */
-  protected def fire(added: Set[Key], removed: Set[Key])(implicit tx: S#Tx): Unit
+  protected def fire(added: Option[(Key, Value)], removed: Option[(Key, Value)])(implicit tx: S#Tx): Unit
 
   /** A helper object providing key and value serialization and an event view of the value. */
   protected implicit def valueInfo: Info
@@ -101,31 +101,25 @@ trait KeyMapImpl[S <: evt.Sys[S], Key, Value, ValueUpd] {
     val con = isConnected
     val tgt = evt.Targets[S] // XXX TODO : partial?
     val n = new KeyMapImpl.Entry(tgt, key, value)
-    val setRemoved: Set[Key] = map.add(key -> n) match {
-      case Some(oldNode) =>
-        if (con) this -= oldNode
-        Set(key)
-      case _ => Set.empty
+    val optRemoved: Option[(Key, Value)] = map.add(key -> n).map { oldNode =>
+      if (con) this -= oldNode
+      key -> oldNode.value
     }
     if (con) {
       this += n
-      fire(added = Set(key), removed = setRemoved)
+      fire(added = Some(key -> value), removed = optRemoved)
     }
   }
 
-  final def remove(key: Key)(implicit tx: S#Tx): Boolean = {
-    map.remove(key) match {
-      case Some(oldNode) =>
-        val con = isConnected
-        if (con) {
-          this -= oldNode
-          fire(added = Set.empty, removed = Set(key))
-        }
-        true
-
-      case _ => false
+  final def remove(key: Key)(implicit tx: S#Tx): Boolean =
+    map.remove(key).exists { oldNode =>
+      val con = isConnected
+      if (con) {
+        this -= oldNode
+        fire(added = None, removed = Some(key -> oldNode.value))
+      }
+      true
     }
-  }
 
   @inline private def +=(entry: Entry)(implicit tx: S#Tx): Unit = entry ---> this
   @inline private def -=(entry: Entry)(implicit tx: S#Tx): Unit = entry -/-> this

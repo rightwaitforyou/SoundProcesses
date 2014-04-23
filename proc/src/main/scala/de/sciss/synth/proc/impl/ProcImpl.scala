@@ -62,7 +62,7 @@ object ProcImpl {
     val valueSerializer = Scan.serializer[I]
   }
 
-  implicit def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]] =
+  implicit private def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]] =
      anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]]]
 
   private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Elem[I], Elem.Update[I]] {
@@ -108,14 +108,20 @@ object ProcImpl {
 
       // ---- keymapimpl details ----
 
-      final protected def fire(added: Set[String], removed: Set[String])(implicit tx: S#Tx): Unit = {
-        val seqAdd: Vec[Proc.StateChange[S]] = added  .map(key => Proc.AssociationAdded  [S](wrapKey(key)))(breakOut)
-        val seqRem: Vec[Proc.StateChange[S]] = removed.map(key => Proc.AssociationRemoved[S](wrapKey(key)))(breakOut)
+      final protected def fire(added: Option[(String, Value)], removed: Option[(String, Value)])
+                              (implicit tx: S#Tx): Unit = {
+        val b = Vector.newBuilder[Proc.StateChange[S]]
+        b.sizeHint(2)
         // convention: first the removals, then the additions. thus, overwriting a key yields
         // successive removal and addition of the same key.
-        val seq = if (seqAdd.isEmpty) seqRem else if (seqRem.isEmpty) seqAdd else seqRem ++ seqAdd
+        removed.foreach { tup =>
+          b += Proc.AssociationRemoved[S](wrapKey(tup._1))
+        }
+        added.foreach {  tup =>
+          b += Proc.AssociationAdded[S](wrapKey(tup._1))
+        }
 
-        StateEvent(Proc.Update(proc, seq))
+        StateEvent(Proc.Update(proc, b.result()))
       }
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty

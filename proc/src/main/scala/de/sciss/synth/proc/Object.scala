@@ -56,9 +56,9 @@ object Object {
   * `Image`, `Figure`, `DecoratedElem`, `Concept`
   */
 trait Object[S <: Sys[S]] extends evt.Publisher[S, Object.Update[S]] with evt.Node[S] {
-  type E <: Elem[S]
+  // type E <: Elem[S]
 
   def attributes: AttrMap.Modifiable[S]
 
-  def element: E
+  def element: Elem[S] // E
 }

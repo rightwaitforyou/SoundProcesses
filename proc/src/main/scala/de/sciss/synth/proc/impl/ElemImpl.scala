@@ -548,6 +548,8 @@ object ElemImpl {
 
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Elem[S]] = anySer.asInstanceOf[Ser[S]]
 
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] = serializer[S].read(in, access)
+
   private final val anySer = new Ser[InMemory]
 
   private final val sync = new AnyRef

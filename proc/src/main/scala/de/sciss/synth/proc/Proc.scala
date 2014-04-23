@@ -47,7 +47,7 @@ object Proc {
 
   /** An associative change is either adding or removing an association */
   sealed trait AssociativeChange[S <: Sys[S]] extends StateChange[S] {
-    def key: AssociativeKey
+    def key: AssociativeKey // XXX TODO: we have the values now as well
   }
   final case class AssociationAdded  [S <: Sys[S]](key: AssociativeKey) extends AssociativeChange[S]
   final case class AssociationRemoved[S <: Sys[S]](key: AssociativeKey) extends AssociativeChange[S]

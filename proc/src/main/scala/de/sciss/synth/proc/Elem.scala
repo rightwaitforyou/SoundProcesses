@@ -15,10 +15,10 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{event => evt, stm}
+import lucre.{event => evt}
 import lucre.expr.Expr
 import evt.Sys
-import de.sciss.lucre.stm.{Disposable, Mutable}
+import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.event.Publisher
 import proc.impl.{ElemImpl => Impl}
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -162,6 +162,8 @@ object Elem {
   // ----------------- Serializer -----------------
 
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Elem[S]] = Impl.serializer[S]
+
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] = Impl.read(in, access)
 
   trait Extension {
     /** Unique type identifier */
