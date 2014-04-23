@@ -562,7 +562,8 @@ object ElemImpl {
     DoubleVec       .typeID -> DoubleVec       ,
     AudioGrapheme   .typeID -> AudioGrapheme   ,
     ArtifactLocation.typeID -> ArtifactLocation,
-    ProcGroup       .typeID -> ProcGroup
+    ProcGroup       .typeID -> ProcGroup       ,
+    FolderImpl      .typeID -> FolderImpl
   )
 
   def registerExtension(ext: Elem.Extension): Unit = sync.synchronized {
