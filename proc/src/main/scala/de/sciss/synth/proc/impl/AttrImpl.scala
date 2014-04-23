@@ -30,7 +30,7 @@ object AttrImpl {
   import Attr.Update
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec}
+  import proc.{FadeSpec => _FadeSpec, Artifact => _Artifact}
   import lucre.synth.expr.{DoubleVec => _DoubleVec}
 
   // ---- Int ----
@@ -64,7 +64,7 @@ object AttrImpl {
     extends Passive[S] with IntImpl[S]
 
   final class IntActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Int])
-    extends Expr[S, _Int] with IntImpl[S] {
+    extends Active[S] with IntImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.Int[S] = {
       val newPeer = peer match {
@@ -106,7 +106,7 @@ object AttrImpl {
     extends Passive[S] with LongImpl[S]
 
   final class LongActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Long])
-    extends Expr[S, _Long] with LongImpl[S] {
+    extends Active[S] with LongImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.Long[S] = {
       val newPeer = peer match {
@@ -148,7 +148,7 @@ object AttrImpl {
     extends Passive[S] with DoubleImpl[S]
 
   final class DoubleActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Double])
-    extends Expr[S, _Double] with DoubleImpl[S] {
+    extends Active[S] with DoubleImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.Double[S] = {
       val newPeer = peer match {
@@ -190,7 +190,7 @@ object AttrImpl {
     extends Passive[S] with BooleanImpl[S]
 
   final class BooleanActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Boolean])
-    extends Expr[S, _Boolean] with BooleanImpl[S] {
+    extends Active[S] with BooleanImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.Boolean[S] = {
       val newPeer = peer match {
@@ -232,7 +232,7 @@ object AttrImpl {
     extends Passive[S] with StringImpl[S]
 
   final class StringActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _String])
-    extends Expr[S, _String] with StringImpl[S] {
+    extends Active[S] with StringImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.String[S] = {
       val newPeer = peer match {
@@ -274,7 +274,7 @@ object AttrImpl {
     extends Passive[S] with FadeSpecImpl[S]
 
   final class FadeSpecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _FadeSpec.Value])
-    extends Expr[S, _FadeSpec.Value] with FadeSpecImpl[S] {
+    extends Active[S] with FadeSpecImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.FadeSpec[S] = {
       val newPeer = peer match {
@@ -317,7 +317,7 @@ object AttrImpl {
     extends Passive[S] with DoubleVecImpl[S]
 
   final class DoubleVecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, Vec[_Double]])
-    extends Expr[S, Vec[_Double]] with DoubleVecImpl[S] {
+    extends Active[S] with DoubleVecImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.DoubleVec[S] = {
       val newPeer = peer match {
@@ -328,7 +328,7 @@ object AttrImpl {
     }
   }
 
-  // ---- DoubleVec ----
+  // ---- AudioGrapheme ----
 
   object AudioGrapheme extends Companion[Attr.AudioGrapheme] {
     val typeID = Grapheme.Elem.Audio.typeID
@@ -369,7 +369,7 @@ object AttrImpl {
 
   final class AudioGraphemeActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
                                                    val peer: Grapheme.Elem.Audio[S])
-    extends Expr[S, Grapheme.Value.Audio] with AudioGraphemeImpl[S] {
+    extends Active[S] with AudioGraphemeImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): Attr.AudioGrapheme[S] = {
       val newPeer = peer
@@ -379,6 +379,41 @@ object AttrImpl {
       //      }
       AudioGrapheme(newPeer)
     }
+  }
+
+  // ---- ArtifactLocation ----
+
+  object ArtifactLocation extends Companion[Attr.ArtifactLocation] {
+    val typeID = 0x10003 // _Artifact.Location.typeID
+
+    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                   (implicit tx: S#Tx): Attr.ArtifactLocation[S] with evt.Node[S] = {
+      val peer = _Artifact.Location.read(in, access)
+      new ArtifactLocationActiveImpl(targets, peer)
+    }
+
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Attr.ArtifactLocation[S] =
+      sys.error("Constant Artifact.Location not supported")
+
+    def apply[S <: Sys[S]](peer: _Artifact.Location[S])(implicit tx: S#Tx): Attr.ArtifactLocation[S] =
+      new ArtifactLocationActiveImpl(evt.Targets[S], peer)
+  }
+
+  trait ArtifactLocationImpl[S <: Sys[S]] extends Attr.ArtifactLocation[S] {
+    final def typeID = ArtifactLocation.typeID
+    final def prefix = "ArtifactLocation"
+  }
+
+  //  final class AudioGraphemeConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, Grapheme.Value.Audio])
+  //    extends Passive[S] with AudioGraphemeImpl[S]
+
+  final class ArtifactLocationActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+                                                      val peer: _Artifact.Location[S])
+    extends Active[S] with ArtifactLocationImpl[S] {
+
+    protected def peerEvent = peer.changed
+
+    def mkCopy()(implicit tx: S#Tx): Attr.ArtifactLocation[S] = ArtifactLocation(peer)
   }
 
   // ---------- Impl ----------
@@ -432,18 +467,6 @@ object AttrImpl {
     // ---- events ----
 
     final protected def reader: evt.Reader[S, Attr[S]] = serializer
-
-    //    final protected def foldUpdate(sum: Option[Update[S]], inc: Update[S]): Option[Update[S]] = sum match {
-    //      case Some(prev) => Some(prev.copy(changes = prev.changes ++ inc.changes))
-    //      case _          => Some(inc)
-    //    }
-
-    //    trait EventImpl
-    //      extends evt.impl.EventImpl[S, Any, Attr[S]] with evt.InvariantEvent[S, Any, Attr[S]] {
-    //
-    //      final protected def reader: evt.Reader[S, Attr[S]] = self.reader
-    //      final def node: Attr[S] with evt.Node[S] = self
-    //    }
   }
 
   trait Passive[S <: Sys[S]]
@@ -462,7 +485,10 @@ object AttrImpl {
     extends Basic[S] with evt.Node[S] {
     self =>
 
-    protected def peerEvent: evt.EventLike[S, Any]
+    type Peer <: evt.Publisher[S, Any] with Writable with Disposable[S#Tx]
+    // private def peerEvent = peer.changed
+
+    // protected def peerEvent: evt.EventLike[S, Any]
 
     override def toString() = s"Attr.${prefix}$id"
 
@@ -478,17 +504,12 @@ object AttrImpl {
       final val slot = 0
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Update[S]] = {
-        pull(peerEvent).map(ch => Update(self, ch))
+        pull(peer.changed).map(ch => Update(self, ch))
       }
 
-      def connect   ()(implicit tx: S#Tx): Unit = peerEvent ---> this
-      def disconnect()(implicit tx: S#Tx): Unit = peerEvent -/-> this
+      def connect   ()(implicit tx: S#Tx): Unit = peer.changed ---> this
+      def disconnect()(implicit tx: S#Tx): Unit = peer.changed -/-> this
     }
-  }
-
-  trait Expr[S <: Sys[S], A] extends Active[S] {
-    type Peer <: _Expr[S, A]
-    final protected def peerEvent = peer.changed
   }
 
   // ----------------- Serializer -----------------
@@ -507,7 +528,8 @@ object AttrImpl {
     String          .typeID -> String       ,
     FadeSpec        .typeID -> FadeSpec     ,
     DoubleVec       .typeID -> DoubleVec    ,
-    AudioGrapheme   .typeID -> AudioGrapheme
+    AudioGrapheme   .typeID -> AudioGrapheme,
+    ArtifactLocation.typeID -> ArtifactLocation
   )
 
   def registerExtension(ext: Attr.Extension): Unit = sync.synchronized {
