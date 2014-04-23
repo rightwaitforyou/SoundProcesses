@@ -16,14 +16,14 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, data, bitemp}
-import evt.{Event, impl => evti}
+import evt.{Event, impl => evti, Sys}
 import data.SkipList
 import annotation.switch
 import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import language.higherKinds
-import de.sciss.lucre.synth.{InMemory, Sys}
+import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.expr.ExprType1
 import de.sciss.lucre
 
@@ -48,7 +48,7 @@ object ProcImpl {
   }
 
   private type ScanEntry     [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan     [S], Scan     .Update[S]]
-  private type AttrEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Attr[S], Attr.Update[S]]
+  private type AttrEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Elem[S], Elem.Update[S]]
 
   private type I = InMemory
 
@@ -62,14 +62,14 @@ object ProcImpl {
     val valueSerializer = Scan.serializer[I]
   }
 
-  implicit def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Attr[S], Attr.Update[S]] =
-     anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Attr[S], Attr.Update[S]]]
+  implicit def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]] =
+     anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]]]
 
-  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Attr[I], Attr.Update[I]] {
-    def valueEvent(value: Attr[I]) = value.changed
+  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Elem[I], Elem.Update[I]] {
+    def valueEvent(value: Elem[I]) = value.changed
 
     val keySerializer   = ImmutableSerializer.String
-    val valueSerializer = Attr.serializer[I]
+    val valueSerializer = Elem.serializer[I]
   }
 
   private sealed trait Impl[S <: Sys[S]]
@@ -121,12 +121,12 @@ object ProcImpl {
       final protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
     }
 
-    object attributes extends AttrMap.Modifiable[S] with KeyMap[Attr[S], Attr.Update[S], Proc.Update[S]] {
+    object attributes extends AttrMap.Modifiable[S] with KeyMap[Elem[S], Elem.Update[S], Proc.Update[S]] {
       final val slot = 0
 
       protected def wrapKey(key: String) = AttrKey(key)
 
-      def put(key: String, value: Attr[S])(implicit tx: S#Tx): Unit = add(key, value)
+      def put(key: String, value: Elem[S])(implicit tx: S#Tx): Unit = add(key, value)
 
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
 
@@ -143,7 +143,7 @@ object ProcImpl {
 
       protected def valueInfo = attributeEntryInfo[S]
 
-      def apply[A[~ <: Sys[~]] <: Attr[_]](key: String)(implicit tx: S#Tx,
+      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,
                                                       tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
         get(key) match {
           // cf. stackoverflow #16377741

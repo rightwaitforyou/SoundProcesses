@@ -21,8 +21,7 @@ import collection.immutable.{IndexedSeq => Vec}
 import data.Iterator
 import impl.{TransportImpl => Impl}
 import de.sciss.span.SpanLike
-import de.sciss.lucre.synth.Sys
-import de.sciss.lucre.event.Observable
+import de.sciss.lucre.event.{Observable, Sys}
 
 object Transport {
   /** Creates a new realtime transport. The transport is positioned at time zero. */

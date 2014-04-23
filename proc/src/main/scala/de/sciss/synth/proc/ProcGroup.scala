@@ -15,9 +15,8 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.{bitemp, event => evt}
 import bitemp.BiGroup
-import evt.EventLike
+import evt.{EventLike, Sys}
 import de.sciss.serial.{Serializer, DataInput}
-import de.sciss.lucre.synth.Sys
 
 object ProcGroup {
   type Update[S <: Sys[S]] = BiGroup.Update[S, Proc[S], Proc.Update[S]]

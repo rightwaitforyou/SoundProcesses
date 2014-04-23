@@ -13,13 +13,13 @@
 
 package de.sciss.synth
 
-import de.sciss.lucre.bitemp
+import de.sciss.lucre.{bitemp, event => evt}
 import bitemp.BiGroup
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
 import annotation.elidable
 import annotation.elidable._
-import de.sciss.lucre.synth.Sys
+import evt.Sys
 
 package object proc {
   type ProcGroup    [S <: Sys[S]] = BiGroup[S, Proc[S], Proc.Update[S]]

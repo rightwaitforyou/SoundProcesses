@@ -15,7 +15,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{stm, bitemp, data}
+import de.sciss.lucre.{stm, bitemp, data, event => evt}
 import stm.{Disposable, IdentifierMap, Cursor}
 import bitemp.BiGroup
 import data.SkipList
@@ -27,7 +27,7 @@ import proc.{logTransport => logT}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.{model => m}
-import de.sciss.lucre.synth.Sys
+import evt.Sys
 
 object TransportImpl {
   import Grapheme.Segment

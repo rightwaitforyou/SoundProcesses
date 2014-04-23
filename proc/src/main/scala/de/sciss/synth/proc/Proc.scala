@@ -20,7 +20,7 @@ import impl.{ProcImpl => Impl}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.DataInput
 import de.sciss.model
-import de.sciss.lucre.synth.Sys
+import evt.Sys
 import de.sciss.lucre.event.Publisher
 
 object Proc {
@@ -67,7 +67,7 @@ object Proc {
     override def toString = s"ScanChange($key, $scan, $changes)"
   }
 
-  final case class AttrChange[S <: Sys[S]](key: String, attribute: Attr[S], change: Any)
+  final case class AttrChange[S <: Sys[S]](key: String, attribute: Elem[S], change: Any)
     extends Change[S] {
     override def toString = s"AttrChange($key, $attribute, $change)"
   }

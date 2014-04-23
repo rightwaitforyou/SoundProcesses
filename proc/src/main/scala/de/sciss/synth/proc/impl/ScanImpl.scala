@@ -16,13 +16,13 @@ package proc
 package impl
 
 import de.sciss.lucre.{event => evt, data, expr}
-import evt.{impl => evti, Event}
+import evt.{impl => evti, Event, Sys}
 import annotation.switch
 import expr.List
 import proc.Scan
 import de.sciss.serial.{DataOutput, Serializer, DataInput}
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.lucre.synth.{InMemory, Sys}
+import de.sciss.lucre.synth.InMemory
 
 object ScanImpl {
   import Scan.Link

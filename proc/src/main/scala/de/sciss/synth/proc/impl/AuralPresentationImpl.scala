@@ -128,7 +128,7 @@ object AuralPresentationImpl {
             case (timed, m) => booted.procUpdated(timed, m)
           }
           added.foreach { timed =>
-            val mute = timed.value.attributes[Attr.Boolean]("mute").exists(_.value)
+            val mute = timed.value.attributes[Elem.Boolean]("mute").exists(_.value)
             if (!mute) booted.procAdded(time, timed)
           }
 
@@ -207,7 +207,7 @@ object AuralPresentationImpl {
       val time          = ugen.time
       val p             = timed.value
 
-      val nameHint      = p.attributes[Attr.String](ProcKeys.attrName).map(_.value)
+      val nameHint      = p.attributes[Elem.String](ProcKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
       // users are elements which must be added after the aural proc synth is started, and removed when it stops
       var users         = List.empty[DynamicUser]
@@ -233,10 +233,10 @@ object AuralPresentationImpl {
       if (attrNames.nonEmpty) attrNames.foreach { n =>
         val ctlName = graph.attribute.controlName(n)
         p.attributes.get(n).foreach {
-          case a: Attr.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
-          case a: Attr.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
-          case a: Attr.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
-          case a: Attr.FadeSpec[S] =>
+          case a: Elem.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
+          case a: Elem.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
+          case a: Elem.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
+          case a: Elem.FadeSpec[S] =>
             val spec = a.peer.value
             // dur, shape-id, shape-curvature, floor
             val values = Vec(
@@ -246,10 +246,10 @@ object AuralPresentationImpl {
               }, spec.floor
             )
             setMap :+= (ctlName -> values: ControlSet)
-          case a: Attr.DoubleVec[S] =>
+          case a: Elem.DoubleVec[S] =>
             val values = a.peer.value.map(_.toFloat)
             setMap :+= (ctlName -> values: ControlSet)
-          case a: Attr.AudioGrapheme[S] =>
+          case a: Elem.AudioGrapheme[S] =>
             val audioElem = a.peer
             val spec      = audioElem.spec
             //              require(spec.numChannels == 1 || spec.numFrames == 1,
@@ -293,7 +293,7 @@ object AuralPresentationImpl {
             val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
             (_buf, 0f)
           } {
-            case a: Attr.AudioGrapheme[S] =>
+            case a: Elem.AudioGrapheme[S] =>
               val audioElem = a.peer
               val spec      = audioElem.spec
               val path      = audioElem.artifact.value.getAbsolutePath
@@ -495,8 +495,8 @@ object AuralPresentationImpl {
     // called by UGenGraphBuilderImpl
     def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int =
       timed.value.attributes.get(key).fold(1) {
-        case a: Attr.DoubleVec[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: Attr.AudioGrapheme[S]  => a.peer.spec.numChannels
+        case a: Elem.DoubleVec[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: Elem.AudioGrapheme[S]  => a.peer.spec.numChannels
         case _ => 1
       }
 
@@ -660,7 +660,7 @@ object AuralPresentationImpl {
 
         case _ =>
           def warn(): Unit = {
-            val mute = timed.value.attributes[Attr.Boolean]("mute").exists(_.value)
+            val mute = timed.value.attributes[Elem.Boolean]("mute").exists(_.value)
             if (!mute) println("WARNING: could not find aural view for " + timed)
           }
 

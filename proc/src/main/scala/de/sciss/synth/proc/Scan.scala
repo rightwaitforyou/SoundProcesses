@@ -21,7 +21,7 @@ import language.implicitConversions
 import de.sciss.serial.DataInput
 import de.sciss.lucre.stm.Identifiable
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.lucre.synth.Sys
+import evt.Sys
 
 object Scan {
   object Link {

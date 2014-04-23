@@ -19,7 +19,7 @@ import de.sciss.lucre.{event => evt, synth, bitemp}
 import bitemp.BiPin
 import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
-import evt.{Event, impl => evti}
+import evt.{Event, impl => evti, Sys}
 import proc.Grapheme.Segment
 import annotation.tailrec
 import de.sciss.span.Span
@@ -32,25 +32,25 @@ object GraphemeImpl {
 
   private implicit val timeEx = lucre.expr.Long
 
-  def read[S <: synth.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = {
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = {
     serializer[S].read(in, access)
   }
 
-  def readModifiable[S <: synth.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme.Modifiable[S] = {
+  def readModifiable[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme.Modifiable[S] = {
     modifiableSerializer[S].read(in, access)
   }
 
-  implicit def serializer[S <: synth.Sys[S]]: evt.NodeSerializer[S, Grapheme[S]] =
+  implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Grapheme[S]] =
     anySer.asInstanceOf[evt.NodeSerializer[S, Grapheme[S]]]
 
-  implicit def modifiableSerializer[S <: synth.Sys[S]]: evt.NodeSerializer[S, Grapheme.Modifiable[S]] =
+  implicit def modifiableSerializer[S <: Sys[S]]: evt.NodeSerializer[S, Grapheme.Modifiable[S]] =
     anySer.asInstanceOf[evt.NodeSerializer[S, Grapheme.Modifiable[S]]] // whatever...
 
   private val anySer = new Ser[InMemory]
 
   //   private val anyModSer   = new ModSer[ evt.InMemory ]
 
-  private final class Ser[S <: synth.Sys[S]] extends evt.NodeSerializer[S, Grapheme[S]] {
+  private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Grapheme[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Grapheme[S] = {
       implicit val elemType = Elem // .serializer[ S ]
       val pin = BiPin.Modifiable.read[S, Value](in, access)
@@ -66,7 +66,7 @@ object GraphemeImpl {
   //      }
   //   }
 
-  def modifiable[S <: synth.Sys[S]](implicit tx: S#Tx): Modifiable[S] = {
+  def modifiable[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = {
     val targets = evt.Targets[S] // XXX TODO: partial?
     implicit val elemType = Elem
     val pin = BiPin.Modifiable[S, Value]
@@ -75,7 +75,7 @@ object GraphemeImpl {
 
   // ---- actual implementation ----
 
-  private final class Impl[S <: synth.Sys[S]](protected val targets: evt.Targets[S],
+  private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
                                         pin: BiPin.Modifiable[S, Grapheme.Value])
     extends Modifiable[S] with evti.StandaloneLike[S, Grapheme.Update[S], Grapheme[S]] {
     graph =>

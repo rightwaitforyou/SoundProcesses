@@ -23,12 +23,12 @@ import annotation.switch
 import impl.{GraphemeImpl => Impl}
 import synth.io.AudioFileSpec
 import de.sciss.lucre.event.Publisher
-import span.{SpanLike, Span}
+import span.Span
 import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 import java.io.File
 import language.implicitConversions
 import de.sciss.{model => m}
-import de.sciss.lucre.synth.Sys
+import evt.Sys
 
 object Grapheme {
   // If necessary for some views, we could eventually add the Elems, too,
