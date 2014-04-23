@@ -17,11 +17,12 @@ package proc
 
 import lucre.{event => evt, stm}
 import lucre.expr.Expr
-import stm.Mutable
+import de.sciss.lucre.stm.{Disposable, Mutable}
 import de.sciss.lucre.event.Publisher
 import proc.impl.{AttrImpl => Impl}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.{higherKinds, implicitConversions}
+import de.sciss.serial.{DataInput, Writable}
 
 object Attr {
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
@@ -132,8 +133,24 @@ object Attr {
   // ----------------- Serializer -----------------
 
   implicit def serializer[S <: evt.Sys[S]]: evt.Serializer[S, Attr[S]] = Impl.serializer[S]
+
+  trait Extension {
+    /** Unique type identifier */
+    def typeID: scala.Int
+
+    /** Read identified active attribute */
+    def readIdentified[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                      (implicit tx: S#Tx): Attr[S] with evt.Node[S]
+
+    /** Read identified constant attribute */
+    def readIdentifiedConstant[S <: evt.Sys[S]](in: DataInput)(implicit tx: S#Tx): Attr[S]
+  }
+
+  def registerExtension(ext: Extension): Unit = Impl.registerExtension(ext)
 }
-trait Attr[S <: evt.Sys[S]] extends Mutable[S#ID, S#Tx] with Publisher[S, Attr.Update[S]] {
+trait Attr[S <: evt.Sys[S]]
+  extends Writable with Disposable[S#Tx] /* Mutable[S#ID, S#Tx] */ with Publisher[S, Attr.Update[S]] {
+
   type Peer
 
   /** The actual object wrapped by the element. */
