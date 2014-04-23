@@ -259,7 +259,7 @@ object ProcImpl {
       scanMap     .dispose()
     }
 
-    override def toString() = "Proc" + id
+    override def toString() = s"Proc$id"
   }
 
   private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {

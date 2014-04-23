@@ -16,11 +16,19 @@ package de.sciss.synth.proc
 import de.sciss.lucre.{event => evt}
 import evt.Sys
 import scala.collection.immutable.{IndexedSeq => Vec}
+import impl.{ObjectImpl => Impl}
+import de.sciss.serial.DataInput
 
 object Object {
+  // ---- factory ----
+
+  def apply[S <: Sys[S]](elem: Elem[S])(implicit tx: S#Tx): Object[S] = Impl(elem)
+
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Object[S] = Impl.read(in, access)
+
   // ---- serializer ----
 
-  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Object[S]] = ???
+  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Object[S]] = Impl.serializer[S]
 
   // ---- updates ----
 
@@ -30,10 +38,14 @@ object Object {
   /** A change is either a state change, or a scan or a grapheme change */
   sealed trait Change[S <: Sys[S]]
 
-  final case class AttrChange[S <: Sys[S]](key: String, value: Elem[S], change: Any)
-    extends Change[S] {
-    override def toString = s"AttrChange($key, $value, $change)"
+  sealed trait AttrUpdate[S <: Sys[S]] extends Change[S] {
+    def key  : String
+    def value: Elem[S]
   }
+
+  final case class AttrAdded  [S <: Sys[S]](key: String, value: Elem[S]) extends AttrUpdate[S]
+  final case class AttrRemoved[S <: Sys[S]](key: String, value: Elem[S]) extends AttrUpdate[S]
+  final case class AttrChange [S <: Sys[S]](key: String, value: Elem[S], change: Any) extends AttrUpdate[S]
 
   final case class ElemChange[S <: Sys[S]](change: Any) extends Change[S]
 }
