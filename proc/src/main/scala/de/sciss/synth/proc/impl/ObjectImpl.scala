@@ -22,6 +22,7 @@ import scala.collection.breakOut
 import scala.annotation.switch
 import de.sciss.lucre.synth.InMemory
 import scala.language.higherKinds
+import scala.reflect.ClassTag
 
 object ObjectImpl {
   def apply[S <: Sys[S]](elem: Elem[S])(implicit tx: S#Tx): Object[S] = {
@@ -134,13 +135,18 @@ object ObjectImpl {
 
       protected def valueInfo = attributeEntryInfo[S]
 
-      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,
-                                                        tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
-        get(key) match {
-          // cf. stackoverflow #16377741
-          case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
-          case _          => None
+      def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]] =
+        get(key).flatMap { elem =>
+          tag.unapply(elem.peer)
         }
+
+//      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,
+//                                                        tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
+//        get(key) match {
+//          // cf. stackoverflow #16377741
+//          case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
+//          case _          => None
+//        }
     }
 
     private object ChangeEvent

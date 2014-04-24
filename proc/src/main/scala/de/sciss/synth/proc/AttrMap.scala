@@ -23,7 +23,7 @@ import de.sciss.lucre.event.Sys
 
 object AttrMap {
   trait Modifiable[S <: Sys[S]] extends AttrMap[S] {
-    def put(key: String, value: El[S])(implicit tx: S#Tx): Unit
+    def put(key: String, value: Elem[S])(implicit tx: S#Tx): Unit
     def remove(key: String)(implicit tx: S#Tx): Boolean
   }
 }
@@ -39,8 +39,8 @@ trait AttrMap[S <: Sys[S]] {
   def expr[A](key: String)(implicit tx: S#Tx, tag: ClassTag[Expr[S, A]]): Option[Expr[S, A]] =
     apply[({type Ex[~ <: Sys[~]] = Expr[~, A]})#Ex](key)
 
-  def get(key: String)(implicit tx: S#Tx): Option[El[S]]
+  def get(key: String)(implicit tx: S#Tx): Option[Elem[S]]
   def contains(key: String)(implicit tx: S#Tx): Boolean
   def keys(implicit tx: S#Tx): Set[String]
-  def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, (String, El[S])]
+  def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, (String, Elem[S])]
 }

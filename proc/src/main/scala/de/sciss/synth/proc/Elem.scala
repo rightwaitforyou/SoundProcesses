@@ -30,14 +30,18 @@ object Elem {
   import java.lang.{String => _String}
   import proc.{FadeSpec => _FadeSpec, Artifact => _Artifact, ProcGroup => _ProcGroup}
 
-  final case class Update[S <: Sys[S], +A[~ <: Sys[~]]](element: Elem[S, A], change: Any)
+  final case class Update[S <: Sys[S]](element: Elem[S], change: Any)
 
-  type Expr[S <: Sys[S], A] = Elem[S, ({type E[~ <: Sys[~]] = _Expr[~, A]})#E]
+  // {type E[~ <: Sys[~]] = _Expr[~, A]})#E]
+
+  type Expr[S <: Sys[S], A] = Elem[S] {
+    type Peer[~ <: Sys[~]] = _Expr[~, A]
+  }
 
   // ----------------- Int -----------------
 
   //  object Int {
-  //    def apply[S <: Sys[S]](peer: Expr[_Int])(implicit tx: S#Tx): Int[S] = ??? // Impl.Int(peer)
+  //    def apply[S <: Sys[S]](peer: Expr[_Int])(implicit tx: S#Tx): Int[S] = Impl.Int(peer)
   //
   //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Int[S]] = Impl.Int.serializer[S]
   //  }
@@ -51,7 +55,7 @@ object Elem {
   // ----------------- Long -----------------
 
   //  object Long {
-  //    def apply[S <: Sys[S]](peer: Expr[_Long])(implicit tx: S#Tx): Long[S] = ??? // Impl.Long(peer)
+  //    def apply[S <: Sys[S]](peer: Expr[_Long])(implicit tx: S#Tx): Long[S] = Impl.Long(peer)
   //
   //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Long[S]] = Impl.Long.serializer[S]
   //  }
@@ -65,7 +69,7 @@ object Elem {
   // ----------------- Double -----------------
 
   //  object Double {
-  //    def apply[S <: Sys[S]](peer: Expr[_Double])(implicit tx: S#Tx): Double[S] = ??? // Impl.Double(peer)
+  //    def apply[S <: Sys[S]](peer: Expr[_Double])(implicit tx: S#Tx): Double[S] = Impl.Double(peer)
   //
   //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Double[S]] = Impl.Double.serializer[S]
   //  }
@@ -168,9 +172,9 @@ object Elem {
 
   // ----------------- Serializer -----------------
 
-  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Elem[S, Any]] = ??? // Impl.serializer[S]
+  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Elem[S]] = Impl.serializer[S]
 
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S, Any] = ??? // Impl.read(in, access)
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] = Impl.read(in, access)
 
   trait Extension {
     /** Unique type identifier */
@@ -178,19 +182,23 @@ object Elem {
 
     /** Read identified active element */
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                      (implicit tx: S#Tx): Elem[S, Any] with evt.Node[S]
+                                      (implicit tx: S#Tx): Elem[S] with evt.Node[S]
 
     /** Read identified constant element */
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Elem[S, Any]
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Elem[S]
   }
 
-  def registerExtension(ext: Extension): Unit = ??? // Impl.registerExtension(ext)
+  def registerExtension(ext: Extension): Unit = Impl.registerExtension(ext)
 }
-trait Elem[S <: Sys[S], A[~ <: Sys[~]]]
-  extends Writable with Disposable[S#Tx] /* Mutable[S#ID, S#Tx] */ with Publisher[S, Elem.Update[S, A]] {
+trait Elem[S <: Sys[S]]
+  extends Writable with Disposable[S#Tx] /* Mutable[S#ID, S#Tx] */ with Publisher[S, Elem.Update[S]] { me =>
+
+  type Peer
 
   /** The actual object wrapped by the element. */
-  def apply(): A[S]
+  val peer: Peer
 
-  def mkCopy()(implicit tx: S#Tx): Elem[S, A]
+  import me.{Peer => Peer0}
+
+  def mkCopy()(implicit tx: S#Tx): Elem[S] { type Peer = Peer0 }
 }

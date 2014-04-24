@@ -16,30 +16,30 @@ package impl
 
 import de.sciss.lucre.{event => evt, expr}
 import evt.Sys
-import de.sciss.serial
 import de.sciss.serial.DataInput
 
-object FolderImpl extends Elem.Extension {
+object FolderImpl extends ElemImpl.Companion[Folder] {
   final val typeID = 0x10000
 
   def empty[S <: Sys[S]]()(implicit tx: S#Tx): Folder[S] =
     apply(expr.List.Modifiable[S, Object[S], Object.Update[S]])
 
-  def apply[S <: Sys[S]](peer: Folder.Peer[S])(implicit tx: S#Tx): Folder[S] = ???
-
-  implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Folder[S]] = ???
+  def apply[S <: Sys[S]](peer: Folder.Peer[S])(implicit tx: S#Tx): Folder[S] = {
+    val targets = evt.Targets[S]
+    new Impl[S](targets, peer)
+  }
 
   // ---- Elem.Extension ----
   /** Read identified active element */
   def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                 (implicit tx: S#Tx): Elem[S] with evt.Node[S] = {
-    ???
+                                 (implicit tx: S#Tx): Folder[S] with evt.Node[S] = {
+    val peer = expr.List.Modifiable.read[S, Object[S], Object.Update[S]](in, access)
+    new Impl[S](targets, peer)
   }
 
   /** Read identified constant element */
-  def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Elem[S] = {
-    ???
-  }
+  def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Folder[S] =
+    sys.error("Constant Folder not supported")
 
   // ---- implementation ----
 

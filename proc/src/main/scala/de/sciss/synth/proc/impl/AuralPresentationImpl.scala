@@ -233,12 +233,12 @@ object AuralPresentationImpl {
       val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) attrNames.foreach { n =>
         val ctlName = graph.attribute.controlName(n)
-        p.attributes.get(n).map(_.apply()).foreach {
-          case a: Expr[S, Int    ] => setMap :+= (ctlName -> a.value.toFloat: ControlSet)
-          case a: Expr[S, Double ] => setMap :+= (ctlName -> a.value.toFloat: ControlSet)
-          case a: Expr[S, Boolean] => setMap :+= (ctlName -> (if (a.value) 1f else 0f): ControlSet)
-          case a: FadeSpec.Elem[S] =>
-            val spec = a.value
+        p.attributes.get(n).foreach {
+          case a: IntElem     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
+          case a: DoubleElem  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
+          case a: BooleanElem [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
+          case a: FadeSpecElem[S] =>
+            val spec = a.peer.value
             // dur, shape-id, shape-curvature, floor
             val values = Vec(
               (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
@@ -247,11 +247,11 @@ object AuralPresentationImpl {
               }, spec.floor
             )
             setMap :+= (ctlName -> values: ControlSet)
-          case a: Expr[S, Vec[Double]] =>
-            val values = a.value.map(_.toFloat)
+          case a: DoubleVecElem[S] =>
+            val values = a.peer.value.map(_.toFloat)
             setMap :+= (ctlName -> values: ControlSet)
-          case audioElem: Grapheme.Audio[S] =>
-            // val audioElem = a.peer
+          case a: AudioGraphemeElem[S] =>
+            val audioElem = a.peer
             val spec      = audioElem.spec
             //              require(spec.numChannels == 1 || spec.numFrames == 1,
             //                s"Audio grapheme ${a.peer} must have either 1 channel or 1 frame to be used as scalar attribute")
@@ -294,7 +294,7 @@ object AuralPresentationImpl {
             val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
             (_buf, 0f)
           } {
-            case a: Elem.AudioGrapheme[S] =>
+            case a: AudioGraphemeElem[S] =>
               val audioElem = a.peer
               val spec      = audioElem.spec
               val path      = audioElem.artifact.value.getAbsolutePath
@@ -496,8 +496,8 @@ object AuralPresentationImpl {
     // called by UGenGraphBuilderImpl
     def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int =
       timed.value.attributes.get(key).fold(1) {
-        case a: Elem.DoubleVec[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: Elem.AudioGrapheme[S]  => a.peer.spec.numChannels
+        case a: DoubleVecElem[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: AudioGraphemeElem[S]  => a.peer.spec.numChannels
         case _ => 1
       }
 
@@ -661,7 +661,7 @@ object AuralPresentationImpl {
 
         case _ =>
           def warn(): Unit = {
-            val mute = timed.value.attributes[Elem.Boolean]("mute").exists(_.value)
+            val mute = timed.value.attributes.expr[Boolean]("mute").exists(_.value)
             if (!mute) println("WARNING: could not find aural view for " + timed)
           }
 

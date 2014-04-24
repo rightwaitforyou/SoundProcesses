@@ -15,7 +15,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, data, bitemp}
+import de.sciss.lucre.{event => evt, data}
 import evt.{Event, impl => evti, Sys}
 import data.SkipList
 import annotation.switch
@@ -26,6 +26,7 @@ import language.higherKinds
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.expr.ExprType1
 import de.sciss.lucre
+import scala.reflect.ClassTag
 
 object ProcImpl {
   private final val SER_VERSION = 0x5073  // was "Pr"
@@ -149,13 +150,18 @@ object ProcImpl {
 
       protected def valueInfo = attributeEntryInfo[S]
 
-      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,
-                                                      tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
-        get(key) match {
-          // cf. stackoverflow #16377741
-          case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
-          case _          => None
+      def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]] =
+        get(key).flatMap { elem =>
+          tag.unapply(elem.peer)
         }
+
+//      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,
+//                                                      tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
+//        get(key) match {
+//          // cf. stackoverflow #16377741
+//          case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
+//          case _          => None
+//        }
     }
 
     object scans extends Scans.Modifiable[S] with KeyMap[Scan[S], Scan.Update[S], Proc.Update[S]] {

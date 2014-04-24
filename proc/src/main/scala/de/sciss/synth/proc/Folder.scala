@@ -29,3 +29,4 @@ object Folder {
   implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Folder[S]] =
     Impl.serializer[S]
 }
+trait Folder[S <: Sys[S]] extends Elem[S] { type Peer = Folder.Peer[S] }

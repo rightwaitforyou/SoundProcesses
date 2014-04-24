@@ -16,14 +16,14 @@ class AttributesSpec extends ConfluentEventSpec {
   "Attrs" should "serialize and de-serialize" in { system =>
     val pH = system.step { implicit tx =>
       val p = Proc[S]
-      p.attributes.put("foo", Elem.Int(lucre.expr.Int.newVar(1234)))
+      p.attributes.put("foo", IntElem(lucre.expr.Int.newVar(1234)))
       tx.newHandle(p)
     }
 
     system.step { implicit tx =>
       val p     = pH()
       // println(s"Keys found: ${p.attributes.keys.mkString(", ")}")
-      val expr  = p.attributes[Elem.Int]("foo")
+      val expr  = p.attributes.expr[Int]("foo")
       val v     = expr match {
         case Some(Expr.Var(vr)) => vr().value
         case _ => -1
