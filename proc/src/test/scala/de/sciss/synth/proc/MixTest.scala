@@ -1,10 +1,11 @@
 package de.sciss.synth.proc
 
-import de.sciss.synth.{ugen, SynthGraph}
+import de.sciss.synth.{proc, ugen, SynthGraph}
 import de.sciss.span.Span
 import ugen._
 import Predef.{any2stringadd => _, _}
 import de.sciss.lucre.synth.InMemory
+import proc.Implicits._
 
 object MixTest extends App {
 
@@ -36,9 +37,9 @@ object MixTest extends App {
       val procIn = Proc[S]
       val procOut2 = Proc[S]
 
-      procOut1.name = "proc-out1"
-      procOut2.name = "proc-out2"
-      procIn.name = "proc-in"
+      procOut1.attr.name = "proc-out1"
+      procOut2.attr.name = "proc-out2"
+      procIn.attr.name = "proc-in"
 
       val out1 = procOut1.scans.add("out")
       val in = procIn.scans.add("in")

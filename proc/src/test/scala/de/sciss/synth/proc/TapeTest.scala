@@ -6,6 +6,7 @@ import java.io.File
 import de.sciss.span.Span
 import de.sciss.synth.Curve.{step, linear}
 import de.sciss.lucre.stm.store.BerkeleyDB
+import proc.Implicits._
 
 object TapeTest extends App {
   type S = Durable
@@ -34,7 +35,7 @@ object TapeTest extends App {
       // spatIn.addSink()
 
       val proc = Proc[S]
-      proc.name = "tape"
+      proc.attr.name = "tape"
       val sAudio = proc.scans.add("sig")
       val file = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
       val spec = AudioFile.readSpec(file)
@@ -49,7 +50,7 @@ object TapeTest extends App {
       gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, step)))
       gSpat.add(4.seconds -> Grapheme.Value.Curve((1.0, linear)))
 
-      proc.attributes.put("freq", DoubleElem(200.0))
+      proc.attr.put("freq", DoubleElem(200.0))
 
       proc.graph() = SynthGraph {
         import ugen._

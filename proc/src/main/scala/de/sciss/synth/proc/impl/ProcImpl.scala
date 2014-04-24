@@ -128,7 +128,7 @@ object ProcImpl {
       final protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
     }
 
-    object attributes extends AttrMap.Modifiable[S] with KeyMap[Elem[S], Elem.Update[S], Proc.Update[S]] {
+    object attr extends AttrMap.Modifiable[S] with KeyMap[Elem[S], Elem.Update[S], Proc.Update[S]] {
       final val slot = 0
 
       protected def wrapKey(key: String) = AttrKey(key)
@@ -208,13 +208,13 @@ object ProcImpl {
 
       def connect   ()(implicit tx: S#Tx): Unit = {
         graph.changed ---> this
-        attributes    ---> this
+        attr    ---> this
         scans         ---> this
         StateEvent    ---> this
       }
       def disconnect()(implicit tx: S#Tx): Unit = {
         graph.changed -/-> this
-        attributes    -/-> this
+        attr    -/-> this
         scans         -/-> this
         StateEvent    -/-> this
       }
@@ -223,7 +223,7 @@ object ProcImpl {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
         val graphCh  = graph.changed
         val graphOpt = if (pull.contains(graphCh   )) pull(graphCh   ) else None
-        val attrOpt  = if (pull.contains(attributes)) pull(attributes) else None
+        val attrOpt  = if (pull.contains(attr)) pull(attr) else None
         val scansOpt = if (pull.contains(scans     )) pull(scans     ) else None
         val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
 
@@ -246,7 +246,7 @@ object ProcImpl {
     final def select(slot: Int /*, invariant: Boolean */): Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
       // case graphemes .slot => graphemes
-      case attributes.slot => attributes
+      case attr.slot => attr
       case scans     .slot => scans
       case StateEvent.slot => StateEvent
     }

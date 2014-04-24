@@ -19,7 +19,7 @@ import impl.{FolderImpl => Impl}
 import de.sciss.serial
 
 object Folder {
-  type Peer[S <: Sys[S]] = expr.List.Modifiable[S, Object[S], Object.Update[S]]
+  type Peer[S <: Sys[S]] = expr.List.Modifiable[S, Obj[S], Obj.Update[S]]
 
   def empty[S <: Sys[S]]()(implicit tx: S#Tx): Folder[S] = Impl.empty[S]()
 

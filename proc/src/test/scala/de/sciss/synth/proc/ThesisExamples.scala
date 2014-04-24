@@ -26,9 +26,9 @@ object ThesisExamples extends App {
     val bus       = lucre.expr.Int .newVar[S](    0)
     val fadeInLen = lucre.expr.Long.newVar[S](44100)
     val fadeIn    = FadeSpec.Elem(fadeInLen, Curve.sine, 0.0)
-    proc.attributes.put("bus"    , IntElem     (bus   ))
-    proc.attributes.put("mute"   , BooleanElem (false ))
-    proc.attributes.put("fade-in", FadeSpecElem(fadeIn))
+    proc.attr.put("bus"    , IntElem     (bus   ))
+    proc.attr.put("mute"   , BooleanElem (false ))
+    proc.attr.put("fade-in", FadeSpecElem(fadeIn))
     proc.graph()  = sg
 
     bus()       = 1       // adjust bus

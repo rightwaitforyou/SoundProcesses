@@ -129,7 +129,7 @@ object AuralPresentationImpl {
             case (timed, m) => booted.procUpdated(timed, m)
           }
           added.foreach { timed =>
-            val mute = timed.value.attributes.expr[Boolean]("mute").exists(_.value)
+            val mute = timed.value.attr.expr[Boolean]("mute").exists(_.value)
             if (!mute) booted.procAdded(time, timed)
           }
 
@@ -208,7 +208,7 @@ object AuralPresentationImpl {
       val time          = ugen.time
       val p             = timed.value
 
-      val nameHint      = p.attributes.expr[String](ProcKeys.attrName).map(_.value)
+      val nameHint      = p.attr.expr[String](ProcKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
       // users are elements which must be added after the aural proc synth is started, and removed when it stops
       var users         = List.empty[DynamicUser]
@@ -233,7 +233,7 @@ object AuralPresentationImpl {
       val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) attrNames.foreach { n =>
         val ctlName = graph.attribute.controlName(n)
-        p.attributes.get(n).foreach {
+        p.attr.get(n).foreach {
           case a: IntElem     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
           case a: DoubleElem  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
           case a: BooleanElem [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
@@ -288,7 +288,7 @@ object AuralPresentationImpl {
             val bestSzLo  = bestSzHi >> 1
             if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
           }
-          val (rb, gain) = p.attributes.get(n).fold[(Buffer, Float)] {
+          val (rb, gain) = p.attr.get(n).fold[(Buffer, Float)] {
             // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
             // So instead of aborting when the attribute is not set, fall back to zero
             val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
@@ -495,7 +495,7 @@ object AuralPresentationImpl {
 
     // called by UGenGraphBuilderImpl
     def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int =
-      timed.value.attributes.get(key).fold(1) {
+      timed.value.attr.get(key).fold(1) {
         case a: DoubleVecElem[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: AudioGraphemeElem[S]  => a.peer.spec.numChannels
         case _ => 1
@@ -661,7 +661,7 @@ object AuralPresentationImpl {
 
         case _ =>
           def warn(): Unit = {
-            val mute = timed.value.attributes.expr[Boolean]("mute").exists(_.value)
+            val mute = timed.value.attr.expr[Boolean]("mute").exists(_.value)
             if (!mute) println("WARNING: could not find aural view for " + timed)
           }
 

@@ -81,5 +81,5 @@ trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {
   def scans     : Scans     .Modifiable[S]
 
   /** The scalar attributes of the process. */
-  def attributes: AttrMap.Modifiable[S]
+  def attr: AttrMap.Modifiable[S]
 }

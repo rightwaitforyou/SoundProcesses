@@ -22,7 +22,7 @@ object FolderImpl extends ElemImpl.Companion[Folder] {
   final val typeID = 0x10000
 
   def empty[S <: Sys[S]]()(implicit tx: S#Tx): Folder[S] =
-    apply(expr.List.Modifiable[S, Object[S], Object.Update[S]])
+    apply(expr.List.Modifiable[S, Obj[S], Obj.Update[S]])
 
   def apply[S <: Sys[S]](peer: Folder.Peer[S])(implicit tx: S#Tx): Folder[S] = {
     val targets = evt.Targets[S]
@@ -33,7 +33,7 @@ object FolderImpl extends ElemImpl.Companion[Folder] {
   /** Read identified active element */
   def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                  (implicit tx: S#Tx): Folder[S] with evt.Node[S] = {
-    val peer = expr.List.Modifiable.read[S, Object[S], Object.Update[S]](in, access)
+    val peer = expr.List.Modifiable.read[S, Obj[S], Obj.Update[S]](in, access)
     new Impl[S](targets, peer)
   }
 

@@ -4,9 +4,8 @@ package proc
 import de.sciss.synth.io.AudioFile
 import java.io.File
 import de.sciss.span.Span
-import de.sciss.synth.Curve.{step, linear}
-import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.InMemory
+import proc.Implicits._
 
 object StreamTest extends App {
   type S = InMemory
@@ -26,7 +25,7 @@ object StreamTest extends App {
       import Implicits._
 
       val proc = Proc[S]
-      proc.name = "tape"
+      proc.attr.name = "tape"
       val file = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
       val spec = AudioFile.readSpec(file)
       // val vAudio    = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
@@ -34,7 +33,7 @@ object StreamTest extends App {
       val artifact = loc.add(file)
       val eAudio = Grapheme.Elem.Audio[S](artifact, spec, offset = 0L, gain = 2.0)
 
-      proc.attributes.put("disk", AudioGraphemeElem(eAudio))
+      proc.attr.put("disk", AudioGraphemeElem(eAudio))
 
       proc.graph() = SynthGraph {
         import ugen._

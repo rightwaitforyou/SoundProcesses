@@ -25,16 +25,16 @@ import scala.language.higherKinds
 import scala.reflect.ClassTag
 
 object ObjectImpl {
-  def apply[S <: Sys[S]](elem: Elem[S])(implicit tx: S#Tx): Object[S] = {
+  def apply[S <: Sys[S], E1 <: Elem[S]](elem: E1)(implicit tx: S#Tx): Obj[S] { type E = E1 } = {
     val targets = evt.Targets[S]
     val map     = SkipList.Map.empty[S, String, AttrEntry[S]]
-    new Impl[S](targets, elem, map)
+    new Impl[S, E1](targets, elem, map)
   }
 
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Object[S] =
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
     serializer[S].read(in, access)
 
-  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Object[S]] = anySer.asInstanceOf[Ser[S]]
+  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Obj[S]] = anySer.asInstanceOf[Ser[S]]
 
   // ---- implementation ----
 
@@ -44,12 +44,12 @@ object ObjectImpl {
 
   private val anySer = new Ser[I]
 
-  private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Object[S]] {
+  private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Obj[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
-            (implicit tx: S#Tx): Object[S] with evt.Node[S] = {
+            (implicit tx: S#Tx): Obj[S] with evt.Node[S] = {
       val elem  = Elem.read(in, access)
       val map   = SkipList.Map.read[S, String, AttrEntry[S]](in, access, SkipList.NoKeyObserver)
-      new Impl(targets, elem, map)
+      new Impl[S, Elem[S]](targets, elem, map)
     }
   }
 
@@ -64,39 +64,41 @@ object ObjectImpl {
     val valueSerializer = Elem.serializer[I]
   }
 
-  private final class Impl[S <: Sys[S] /*, E1 */](protected val targets: evt.Targets[S], val element: Elem[S],
+  private final class Impl[S <: Sys[S], E1 <: Elem[S]](protected val targets: evt.Targets[S], val elem: E1,
                                                   attributeMap: SkipList.Map[S, String, AttrEntry[S]])
-    extends Object[S] {
+    extends Obj[S] {
     obj =>
+
+    type E = E1
 
     protected def disposeData()(implicit tx: S#Tx): Unit =
       attributeMap.dispose()
 
     protected def writeData(out: DataOutput): Unit = {
-      element     .write(out)
+      elem     .write(out)
       attributeMap.write(out)
     }
 
     // ---- events ----
 
     sealed trait ObjectEvent {
-      final protected def reader: evt.Reader[S, Object[S]] = ObjectImpl.serializer
-      final def node: Object[S] with evt.Node[S] = obj
+      final protected def reader: evt.Reader[S, Obj[S]] = ObjectImpl.serializer
+      final def node: Obj[S] with evt.Node[S] = obj
     }
 
     private object StateEvent
-      extends evt.impl.TriggerImpl[S, Object.Update[S], Object[S]]
-      with evt.InvariantEvent     [S, Object.Update[S], Object[S]]
-      with evt.impl.Root          [S, Object.Update[S]]
+      extends evt.impl.TriggerImpl[S, Obj.Update[S], Obj[S]]
+      with evt.InvariantEvent     [S, Obj.Update[S], Obj[S]]
+      with evt.impl.Root          [S, Obj.Update[S]]
       with ObjectEvent {
 
       final val slot = 2
     }
 
-    object attributes
+    object attr
       extends AttrMap.Modifiable[S]
-      with evt.impl.EventImpl[S, Object.Update[S], Object[S]]
-      with evt.InvariantEvent[S, Object.Update[S], Object[S]]
+      with evt.impl.EventImpl[S, Obj.Update[S], Obj[S]]
+      with evt.InvariantEvent[S, Obj.Update[S], Obj[S]]
       with ObjectEvent
       with impl.KeyMapImpl[S, String, Elem[S], Elem.Update[S]] {
 
@@ -104,16 +106,16 @@ object ObjectImpl {
 
       final protected def fire(added: Option[(String, Elem[S])], removed: Option[(String, Elem[S])])
                               (implicit tx: S#Tx): Unit = {
-        val b = Vector.newBuilder[Object.AttrUpdate[S]]
+        val b = Vector.newBuilder[Obj.AttrUpdate[S]]
         // convention: first the removals, then the additions. thus, overwriting a key yields
         // successive removal and addition of the same key.
         removed.foreach { tup =>
-          b += Object.AttrRemoved(tup._1, tup._2)
+          b += Obj.AttrRemoved(tup._1, tup._2)
         }
         added.foreach { tup =>
-          b += Object.AttrAdded(tup._1, tup._2)
+          b += Obj.AttrAdded(tup._1, tup._2)
         }
-        StateEvent(Object.Update(obj, b.result()))
+        StateEvent(Obj.Update(obj, b.result()))
       }
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = obj.targets.nonEmpty
@@ -122,12 +124,12 @@ object ObjectImpl {
 
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Object.Update[S]] = {
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.Update[S]] = {
         val changes = foldUpdate(pull)
         if (changes.isEmpty) None
-        else Some(Object.Update(obj,
+        else Some(Obj.Update(obj,
           changes.map({
-            case (key, u) => Object.AttrChange(key, u.element, u.change)
+            case (key, u) => Obj.AttrChange(key, u.element, u.change)
           })(breakOut)))
       }
 
@@ -150,23 +152,23 @@ object ObjectImpl {
     }
 
     private object ChangeEvent
-      extends evt.impl.EventImpl[S, Object.Update[S], Object[S]]
-      with evt.InvariantEvent   [S, Object.Update[S], Object[S]]
+      extends evt.impl.EventImpl[S, Obj.Update[S], Obj[S]]
+      with evt.InvariantEvent   [S, Obj.Update[S], Obj[S]]
       with ObjectEvent {
 
       final val slot = 3
 
       def connect   ()(implicit tx: S#Tx): Unit = {
-        attributes    ---> this
+        attr    ---> this
         StateEvent    ---> this
       }
       def disconnect()(implicit tx: S#Tx): Unit = {
-        attributes    -/-> this
+        attr    -/-> this
         StateEvent    -/-> this
       }
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Object.Update[S]] = {
-        val attrOpt  = if (pull.contains(attributes)) pull(attributes) else None
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.Update[S]] = {
+        val attrOpt  = if (pull.contains(attr)) pull(attr) else None
         val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
 
         if (attrOpt.isEmpty) {
@@ -184,10 +186,10 @@ object ObjectImpl {
 
     def select(slot: Int): Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
-      case attributes .slot => attributes
+      case attr .slot => attr
       case StateEvent .slot => StateEvent
     }
 
-    def changed: Event[S, Object.Update[S], Object[S]] = ChangeEvent
+    def changed: Event[S, Obj.Update[S], Obj[S]] = ChangeEvent
   }
 }
