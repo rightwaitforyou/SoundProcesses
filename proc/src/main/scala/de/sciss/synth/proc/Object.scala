@@ -39,15 +39,20 @@ object Object {
   sealed trait Change[S <: Sys[S]]
 
   sealed trait AttrUpdate[S <: Sys[S]] extends Change[S] {
-    def key  : String
+    def key: String
+
     def value: Elem[S]
   }
 
-  final case class AttrAdded  [S <: Sys[S]](key: String, value: Elem[S]) extends AttrUpdate[S]
+  final case class AttrAdded[S <: Sys[S]](key: String, value: Elem[S]) extends AttrUpdate[S]
+
   final case class AttrRemoved[S <: Sys[S]](key: String, value: Elem[S]) extends AttrUpdate[S]
-  final case class AttrChange [S <: Sys[S]](key: String, value: Elem[S], change: Any) extends AttrUpdate[S]
+
+  final case class AttrChange[S <: Sys[S]](key: String, value: Elem[S], change: Any) extends AttrUpdate[S]
 
   final case class ElemChange[S <: Sys[S]](change: Any) extends Change[S]
+
+  type Typed[S <: Sys[S], E1[~ <: Sys[~]] <: Elem[~]] = Object[S] { type E = E1[S] }
 }
 /** Objects are attributed elements.
   * If you find a better name than `Object`, let me know! No fizz-buzz though, must be con- and precise.
@@ -56,9 +61,9 @@ object Object {
   * `Image`, `Figure`, `DecoratedElem`, `Concept`
   */
 trait Object[S <: Sys[S]] extends evt.Publisher[S, Object.Update[S]] with evt.Node[S] {
-  // type E <: Elem[S]
+  type E <: Elem[S]
 
   def attributes: AttrMap.Modifiable[S]
 
-  def element: Elem[S] // E
+  def element: E
 }
