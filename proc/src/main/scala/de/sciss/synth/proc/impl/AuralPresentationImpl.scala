@@ -30,6 +30,7 @@ import de.sciss.lucre.synth.{DynamicUser, Buffer, Bus, AudioBus, NodeGraph, Aura
 import scala.concurrent.stm.{Txn => ScalaTxn}
 import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.numbers
+import de.sciss.lucre.expr.Expr
 
 object AuralPresentationImpl {
   //  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
@@ -128,7 +129,7 @@ object AuralPresentationImpl {
             case (timed, m) => booted.procUpdated(timed, m)
           }
           added.foreach { timed =>
-            val mute = timed.value.attributes[Elem.Boolean]("mute").exists(_.value)
+            val mute = timed.value.attributes.expr[Boolean]("mute").exists(_.value)
             if (!mute) booted.procAdded(time, timed)
           }
 
@@ -207,7 +208,7 @@ object AuralPresentationImpl {
       val time          = ugen.time
       val p             = timed.value
 
-      val nameHint      = p.attributes[Elem.String](ProcKeys.attrName).map(_.value)
+      val nameHint      = p.attributes.expr[String](ProcKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
       // users are elements which must be added after the aural proc synth is started, and removed when it stops
       var users         = List.empty[DynamicUser]
@@ -232,12 +233,12 @@ object AuralPresentationImpl {
       val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) attrNames.foreach { n =>
         val ctlName = graph.attribute.controlName(n)
-        p.attributes.get(n).foreach {
-          case a: Elem.Int     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
-          case a: Elem.Double  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
-          case a: Elem.Boolean [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
-          case a: Elem.FadeSpec[S] =>
-            val spec = a.peer.value
+        p.attributes.get(n).map(_.apply()).foreach {
+          case a: Expr[S, Int    ] => setMap :+= (ctlName -> a.value.toFloat: ControlSet)
+          case a: Expr[S, Double ] => setMap :+= (ctlName -> a.value.toFloat: ControlSet)
+          case a: Expr[S, Boolean] => setMap :+= (ctlName -> (if (a.value) 1f else 0f): ControlSet)
+          case a: FadeSpec.Elem[S] =>
+            val spec = a.value
             // dur, shape-id, shape-curvature, floor
             val values = Vec(
               (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
@@ -246,11 +247,11 @@ object AuralPresentationImpl {
               }, spec.floor
             )
             setMap :+= (ctlName -> values: ControlSet)
-          case a: Elem.DoubleVec[S] =>
-            val values = a.peer.value.map(_.toFloat)
+          case a: Expr[S, Vec[Double]] =>
+            val values = a.value.map(_.toFloat)
             setMap :+= (ctlName -> values: ControlSet)
-          case a: Elem.AudioGrapheme[S] =>
-            val audioElem = a.peer
+          case audioElem: Grapheme.Audio[S] =>
+            // val audioElem = a.peer
             val spec      = audioElem.spec
             //              require(spec.numChannels == 1 || spec.numFrames == 1,
             //                s"Audio grapheme ${a.peer} must have either 1 channel or 1 frame to be used as scalar attribute")

@@ -67,7 +67,7 @@ object Proc {
     override def toString = s"ScanChange($key, $scan, $changes)"
   }
 
-  final case class AttrChange[S <: Sys[S]](key: String, attribute: Elem[S], change: Any)
+  final case class AttrChange[S <: Sys[S]](key: String, attribute: El[S], change: Any)
     extends Change[S] {
     override def toString = s"AttrChange($key, $attribute, $change)"
   }
