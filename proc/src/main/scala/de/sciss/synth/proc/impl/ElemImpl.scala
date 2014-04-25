@@ -565,7 +565,7 @@ object ElemImpl {
     AudioGrapheme   .typeID -> AudioGrapheme   ,
     ArtifactLocation.typeID -> ArtifactLocation,
     ProcGroup       .typeID -> ProcGroup       ,
-    FolderImpl      .typeID -> FolderImpl
+    FolderElemImpl      .typeID -> FolderElemImpl
   )
 
   def registerExtension(ext: Elem.Extension): Unit = sync.synchronized {

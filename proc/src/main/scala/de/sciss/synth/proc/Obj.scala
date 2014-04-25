@@ -17,7 +17,7 @@ import de.sciss.lucre.{event => evt}
 import evt.Sys
 import scala.collection.immutable.{IndexedSeq => Vec}
 import impl.{ObjectImpl => Impl}
-import de.sciss.serial.DataInput
+import de.sciss.serial.{Serializer, DataInput}
 import scala.language.higherKinds
 
 object Obj {
@@ -28,9 +28,18 @@ object Obj {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] = Impl.read(in, access)
 
+  def readT[S <: Sys[S], E1[~ <: Sys[~]] <: Elem[~]](in: DataInput, access: S#Acc)
+                                                    (implicit tx: S#Tx,
+                                                     peer: Serializer[S#Tx, S#Acc, E1[S]]): Obj[S] { type E = E1[S] } =
+      Impl.readT[S, E1](in, access)
+
   // ---- serializer ----
 
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Obj[S]] = Impl.serializer[S]
+
+  implicit def typedSerializer[S <: Sys[S], E1 <: Elem[S]](
+    implicit peer: Serializer[S#Tx, S#Acc, E1]): evt.Serializer[S, Obj[S] { type E = E1 }] =
+      Impl.typedSerializer[S, E1]
 
   // ---- updates ----
 

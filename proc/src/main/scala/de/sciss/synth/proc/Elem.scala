@@ -15,160 +15,22 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.lucre.{event => evt, expr}
+import de.sciss.lucre.{event => evt}
 import evt.Sys
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.event.Publisher
 import proc.impl.{ElemImpl => Impl}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.{higherKinds, implicitConversions}
-import de.sciss.serial.{DataInput, Writable}
-import expr.{Expr => _Expr}
+import de.sciss.serial.{Serializer, DataInput, Writable}
+import de.sciss.lucre.expr.Expr
 
 object Elem {
-  import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
-  import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec, Artifact => _Artifact, ProcGroup => _ProcGroup}
-
   final case class Update[S <: Sys[S]](element: Elem[S], change: Any)
 
-  // {type E[~ <: Sys[~]] = _Expr[~, A]})#E]
-
   type Expr[S <: Sys[S], A] = Elem[S] {
-    type Peer[~ <: Sys[~]] = _Expr[~, A]
+    type Peer[~ <: Sys[~]] = de.sciss.lucre.expr.Expr[~, A]
   }
-
-  // ----------------- Int -----------------
-
-  //  object Int {
-  //    def apply[S <: Sys[S]](peer: Expr[_Int])(implicit tx: S#Tx): Int[S] = Impl.Int(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Int[S]] = Impl.Int.serializer[S]
-  //  }
-  // type Int[S <: Sys[S]] = Elem[S, Expr[_Int]]
-
-  //  trait Int[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Expr[S, _Int]
-  //    def mkCopy()(implicit tx: S#Tx): Int[S]
-  //  }
-
-  // ----------------- Long -----------------
-
-  //  object Long {
-  //    def apply[S <: Sys[S]](peer: Expr[_Long])(implicit tx: S#Tx): Long[S] = Impl.Long(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Long[S]] = Impl.Long.serializer[S]
-  //  }
-  //  type Long[S <: Sys[S]] = Elem[S, Expr[_Long]]
-
-  //  trait Long[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Expr[S, _Long]
-  //    def mkCopy()(implicit tx: S#Tx): Long[S]
-  //  }
-
-  // ----------------- Double -----------------
-
-  //  object Double {
-  //    def apply[S <: Sys[S]](peer: Expr[_Double])(implicit tx: S#Tx): Double[S] = Impl.Double(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Double[S]] = Impl.Double.serializer[S]
-  //  }
-
-  //  trait Double[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Expr[S, _Double]
-  //    def mkCopy()(implicit tx: S#Tx): Double[S]
-  //  }
-
-  // ----------------- Boolean -----------------
-
-  //  object Boolean {
-  //    def apply[S <: Sys[S]](peer: Expr[S, _Boolean])(implicit tx: S#Tx): Boolean[S] = Impl.Boolean(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, Boolean[S]] = Impl.Boolean.serializer[S]
-  //  }
-  //  trait Boolean[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Expr[S, _Boolean]
-  //    def mkCopy()(implicit tx: S#Tx): Boolean[S]
-  //  }
-
-  // ----------------- String -----------------
-
-  //  object String {
-  //    def apply[S <: Sys[S]](peer: Expr[S, _String])(implicit tx: S#Tx): String[S] = Impl.String(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, String[S]] = Impl.String.serializer[S]
-  //  }
-  //  trait String[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Expr[S, _String]
-  //    def mkCopy()(implicit tx: S#Tx): String[S]
-  //  }
-
-  // ----------------- FadeSpec -----------------
-
-  //  object FadeSpec {
-  //    def apply[S <: Sys[S]](peer: Expr[S, _FadeSpec.Value])(implicit tx: S#Tx): FadeSpec[S] = Impl.FadeSpec(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, FadeSpec[S]] = Impl.FadeSpec.serializer[S]
-  //  }
-  //  trait FadeSpec[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Expr[S, _FadeSpec.Value]
-  //    def mkCopy()(implicit tx: S#Tx): FadeSpec[S]
-  //  }
-
-  // ----------------- DoubleVec -----------------
-
-  //  object DoubleVec {
-  //    def apply[S <: Sys[S]](peer: Expr[S, Vec[_Double]])(implicit tx: S#Tx): DoubleVec[S] = Impl.DoubleVec(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, DoubleVec[S]] =
-  //      Impl.DoubleVec.serializer[S]
-  //  }
-  //  trait DoubleVec[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Expr[S, Vec[_Double]]
-  //    def mkCopy()(implicit tx: S#Tx): DoubleVec[S]
-  //  }
-
-  // ----------------- AudioGrapheme -----------------
-
-  //  object AudioGrapheme {
-  //    def apply[S <: Sys[S]](peer: Grapheme.Elem.Audio[S])(implicit tx: S#Tx): AudioGrapheme[S] =
-  //      Impl.AudioGrapheme(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, AudioGrapheme[S]] =
-  //      Impl.AudioGrapheme.serializer[S]
-  //  }
-  //  trait AudioGrapheme[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = Grapheme.Elem.Audio[S]
-  //    def mkCopy()(implicit tx: S#Tx): AudioGrapheme[S]
-  //  }
-
-  // ----------------- ArtifactLocation -----------------
-
-  //  object ArtifactLocation {
-  //    def apply[S <: Sys[S]](peer: _Artifact.Location[S])(implicit tx: S#Tx): ArtifactLocation[S] =
-  //      Impl.ArtifactLocation(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, ArtifactLocation[S]] =
-  //      Impl.ArtifactLocation.serializer[S]
-  //  }
-  //  trait ArtifactLocation[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = _Artifact.Location[S]
-  //    def mkCopy()(implicit tx: S#Tx): ArtifactLocation[S]
-  //  }
-
-  // ----------------- ProcGroup -----------------
-
-  //  object ProcGroup {
-  //    def apply[S <: Sys[S]](peer: _ProcGroup[S])(implicit tx: S#Tx): ProcGroup[S] =
-  //      Impl.ProcGroup(peer)
-  //
-  //    implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, ProcGroup[S]] =
-  //      Impl.ProcGroup.serializer[S]
-  //  }
-  //  trait ProcGroup[S <: Sys[S]] extends Elem[S] {
-  //    type Peer = _ProcGroup[S]
-  //    def mkCopy()(implicit tx: S#Tx): ProcGroup[S]
-  //  }
 
   // ----------------- Serializer -----------------
 
@@ -202,3 +64,145 @@ trait Elem[S <: Sys[S]]
 
   def mkCopy()(implicit tx: S#Tx): Elem[S] { type Peer = Peer0 }
 }
+
+// ---- elements ----
+
+object IntElem {
+  def apply[S <: Sys[S]](peer: Expr[S, Int])(implicit tx: S#Tx): IntElem[S] =
+    proc.impl.ElemImpl.Int(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, IntElem]] =
+      if (obj.elem.isInstanceOf[IntElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, IntElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, IntElem[S]] = Impl.Int.serializer[S]
+}
+trait IntElem[S <: Sys[S]] extends Elem[S] { type Peer = Expr[S, Int] }
+
+object DoubleElem {
+  def apply[S <: Sys[S]](peer: Expr[S, Double])(implicit tx: S#Tx): DoubleElem[S] =
+    proc.impl.ElemImpl.Double(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, DoubleElem]] =
+      if (obj.elem.isInstanceOf[DoubleElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, DoubleElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, DoubleElem[S]] = Impl.Double.serializer[S]
+}
+trait DoubleElem[S <: Sys[S]] extends Elem[S] { type Peer = Expr[S, Double] }
+
+object LongElem {
+  def apply[S <: Sys[S]](peer: Expr[S, Long])(implicit tx: S#Tx): LongElem[S] =
+    proc.impl.ElemImpl.Long(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, LongElem]] =
+      if (obj.elem.isInstanceOf[LongElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, LongElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, LongElem[S]] = Impl.Long.serializer[S]
+}
+trait LongElem[S <: Sys[S]] extends Elem[S] { type Peer = Expr[S, Long] }
+
+object BooleanElem {
+  def apply[S <: Sys[S]](peer: Expr[S, Boolean])(implicit tx: S#Tx): BooleanElem[S] =
+    proc.impl.ElemImpl.Boolean(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, BooleanElem]] =
+      if (obj.elem.isInstanceOf[BooleanElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, BooleanElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, BooleanElem[S]] = Impl.Boolean.serializer[S]
+}
+trait BooleanElem[S <: Sys[S]] extends Elem[S] { type Peer = Expr[S, Boolean] }
+
+object StringElem {
+  def apply[S <: Sys[S]](peer: Expr[S, String])(implicit tx: S#Tx): StringElem[S] =
+    proc.impl.ElemImpl.String(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, StringElem]] =
+      if (obj.elem.isInstanceOf[StringElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, StringElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, StringElem[S]] = Impl.String.serializer[S]
+}
+trait StringElem[S <: Sys[S]] extends Elem[S] { type Peer = Expr[S, String] }
+
+object FadeSpecElem {
+  def apply[S <: Sys[S]](peer: Expr[S, FadeSpec.Value])(implicit tx: S#Tx): FadeSpecElem[S] =
+    proc.impl.ElemImpl.FadeSpec(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, FadeSpecElem]] =
+      if (obj.elem.isInstanceOf[FadeSpecElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, FadeSpecElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, FadeSpecElem[S]] = Impl.FadeSpec.serializer[S]
+}
+trait FadeSpecElem[S <: Sys[S]] extends Elem[S] { type Peer = Expr[S, FadeSpec.Value] } // FadeSpec.Elem[S]
+
+object DoubleVecElem {
+  def apply[S <: Sys[S]](peer: Expr[S, Vec[Double]])(implicit tx: S#Tx): DoubleVecElem[S] =
+    proc.impl.ElemImpl.DoubleVec(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, DoubleVecElem]] =
+      if (obj.elem.isInstanceOf[DoubleVecElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, DoubleVecElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, DoubleVecElem[S]] = Impl.DoubleVec.serializer[S]
+}
+trait DoubleVecElem[S <: Sys[S]] extends Elem[S] { type Peer = Expr[S, Vec[Double]] }
+
+object AudioGraphemeElem {
+  def apply[S <: Sys[S]](peer: Grapheme.Elem.Audio[S])(implicit tx: S#Tx): AudioGraphemeElem[S] =
+    proc.impl.ElemImpl.AudioGrapheme(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, AudioGraphemeElem]] =
+      if (obj.elem.isInstanceOf[AudioGraphemeElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, AudioGraphemeElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, AudioGraphemeElem[S]] = Impl.AudioGrapheme.serializer[S]
+}
+trait AudioGraphemeElem[S <: Sys[S]] extends Elem[S] { type Peer = Grapheme.Elem.Audio[S] }
+
+object ArtifactLocationElem {
+  def apply[S <: Sys[S]](peer: Artifact.Location[S])(implicit tx: S#Tx): ArtifactLocationElem[S] =
+    proc.impl.ElemImpl.ArtifactLocation(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ArtifactLocationElem]] =
+      if (obj.elem.isInstanceOf[ArtifactLocationElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ArtifactLocationElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactLocationElem[S]] = Impl.ArtifactLocation.serializer[S]
+}
+trait ArtifactLocationElem[S <: Sys[S]] extends Elem[S] { type Peer = Artifact.Location[S] }
+
+object ProcGroupElem {
+  def apply[S <: Sys[S]](peer: ProcGroup[S])(implicit tx: S#Tx): ProcGroupElem[S] =
+    proc.impl.ElemImpl.ProcGroup(peer)
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ProcGroupElem]] =
+      if (obj.elem.isInstanceOf[ProcGroupElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ProcGroupElem]])
+      else None
+  }
+
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroupElem[S]] = Impl.ProcGroup.serializer[S]
+}
+trait ProcGroupElem[S <: Sys[S]] extends Elem[S] { type Peer = ProcGroup[S] }

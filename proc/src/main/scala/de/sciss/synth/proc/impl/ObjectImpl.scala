@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.{event => evt}
 import evt.{Event, Sys}
-import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
+import de.sciss.serial.{Serializer, DataOutput, ImmutableSerializer, DataInput}
 import de.sciss.lucre.data.SkipList
 import scala.collection.breakOut
 import scala.annotation.switch
@@ -34,7 +34,15 @@ object ObjectImpl {
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
     serializer[S].read(in, access)
 
+  def readT[S <: Sys[S], E1[~ <: Sys[~]] <: Elem[~]](in: DataInput, access: S#Acc)
+                                                    (implicit tx: S#Tx,
+                                                     peer: Serializer[S#Tx, S#Acc, E1[S]]): Obj[S] { type E = E1[S] } =
+    typedSerializer[S, E1[S]].read(in, access)
+
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Obj[S]] = anySer.asInstanceOf[Ser[S]]
+
+  implicit def typedSerializer[S <: Sys[S], E1 <: Elem[S]](
+    implicit peer: Serializer[S#Tx, S#Acc, E1]): evt.Serializer[S, Obj[S] { type E = E1 }] = new TypedSer[S, E1]
 
   // ---- implementation ----
 
@@ -50,6 +58,17 @@ object ObjectImpl {
       val elem  = Elem.read(in, access)
       val map   = SkipList.Map.read[S, String, AttrEntry[S]](in, access, SkipList.NoKeyObserver)
       new Impl[S, Elem[S]](targets, elem, map)
+    }
+  }
+
+  private final class TypedSer[S <: Sys[S], E1 <: Elem[S]](implicit peer: Serializer[S#Tx, S#Acc, E1])
+    extends evt.NodeSerializer[S, Obj[S] { type E = E1 }] {
+
+    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
+            (implicit tx: S#Tx): Obj[S] with evt.Node[S] { type E = E1 } = {
+      val elem  = peer.read(in, access)
+      val map   = SkipList.Map.read[S, String, AttrEntry[S]](in, access, SkipList.NoKeyObserver)
+      new Impl[S, E1](targets, elem, map)
     }
   }
 
