@@ -94,7 +94,7 @@ object ObjectImpl {
       attributeMap.dispose()
 
     protected def writeData(out: DataOutput): Unit = {
-      elem     .write(out)
+      elem        .write(out)
       attributeMap.write(out)
     }
 
@@ -178,34 +178,31 @@ object ObjectImpl {
       final val slot = 3
 
       def connect   ()(implicit tx: S#Tx): Unit = {
-        attr    ---> this
-        StateEvent    ---> this
+        attr         ---> this
+        elem.changed ---> this
+        StateEvent   ---> this
       }
       def disconnect()(implicit tx: S#Tx): Unit = {
-        attr    -/-> this
-        StateEvent    -/-> this
+        attr         -/-> this
+        elem.changed -/-> this
+        StateEvent   -/-> this
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.Update[S]] = {
-        val attrOpt  = if (pull.contains(attr)) pull(attr) else None
-        val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
+        val b = Vector.newBuilder[Obj.Change[S]]
+        if (pull.contains(attr     )) pull(attr       ).foreach(e => b ++= e.changes)
+        val elemCh = elem.changed
+        if (pull.contains(elemCh))     pull(elemCh    ).foreach(e => b  += Obj.ElemChange(e.change))
+        if (pull.contains(StateEvent)) pull(StateEvent).foreach(e => b ++= e.changes)
 
-        if (attrOpt.isEmpty) {
-          stateOpt
-        } else if (stateOpt.isEmpty) {
-          attrOpt
-        } else {
-          val attr  = attrOpt.get
-          val state = stateOpt.get
-          val comb  = attr.copy(changes = attr.changes ++ state.changes)
-          Some(comb)
-        }
+        val changes = b.result()
+        if (changes.nonEmpty) Some(Obj.Update(obj, changes)) else None
       }
     }
 
     def select(slot: Int): Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
-      case attr .slot => attr
+      case attr       .slot => attr
       case StateEvent .slot => StateEvent
     }
 
