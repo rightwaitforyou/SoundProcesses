@@ -195,7 +195,7 @@ object Grapheme {
 
       def writeValue(v: Value.Curve, out: DataOutput): Unit = v.write(out)
 
-      protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
+      override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
                                                targets: evt.Targets[S])(implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
         require(cookie == curveCookie, s"Unexpected cookie $cookie")
         readIdentifiedTuple(in, access, targets)
@@ -236,7 +236,7 @@ object Grapheme {
 
       def writeValue(v: Value.Audio, out: DataOutput): Unit = v.write(out)
 
-      protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
+      override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
                                            targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
         require(cookie == audioCookie, s"Unexpected cookie $cookie")
         readIdentifiedTuple(in, access, targets)
@@ -261,6 +261,7 @@ object Grapheme {
     private final class CurveImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
                                                    val values: Vec[(Expr[S, Double], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
+
       def value(implicit tx: S#Tx): Value.Curve = {
         val v = values.map {
           case (mag, shape) => mag.value -> shape
@@ -324,6 +325,7 @@ object Grapheme {
                                                    val spec: AudioFileSpec, val offset: Expr[S, Long],
                                                    val gain: Expr[S, Double])
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
+
       def value(implicit tx: S#Tx): Value.Audio = {
         val artVal    = artifact.value
         val offsetVal = offset  .value
@@ -346,24 +348,24 @@ object Grapheme {
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Audio]] = {
         val artEvt = artifact.changed
         val artOpt = if (pull.contains(artEvt)) pull(artEvt) else None
-        val (artBefore, artNow) = artOpt.map(_.toTuple).getOrElse {
+        val (artBefore, artNow) = artOpt.fold({
           val art = artifact.value
           (art, art)
-        }
+        })(_.toTuple)
 
         val offsetEvt = offset.changed
         val offsetOpt = if (pull.contains(offsetEvt)) pull(offsetEvt) else None
-        val (offsetBefore, offsetNow) = offsetOpt.map(_.toTuple).getOrElse {
+        val (offsetBefore, offsetNow) = offsetOpt.fold({
           val ov = offset.value
           (ov, ov)
-        }
+        })(_.toTuple)
 
         val gainEvt = gain.changed
         val gainOpt = if (pull.contains(gainEvt)) pull(gainEvt) else None
-        val (gainBefore, gainNow) = gainOpt.map(_.toTuple).getOrElse {
+        val (gainBefore, gainNow) = gainOpt.fold({
           val gv = gain.value
           (gv, gv)
-        }
+        })(_.toTuple)
 
         val before  = Value.Audio(artBefore, spec, offsetBefore, gainBefore)
         val now     = Value.Audio(artNow   , spec, offsetNow   , gainNow   )
@@ -389,9 +391,9 @@ object Grapheme {
     //    def spanLikeType: BiType[SpanLike] = SpanLikes
 
     def readValue(in: DataInput): Value = Value.serializer.read(in)
-    def writeValue(value: Value, out: DataOutput): Unit =value.write(out)
+    def writeValue(value: Value, out: DataOutput): Unit = value.write(out)
 
-    protected def readTuple[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+    override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                             (implicit tx: S#Tx): Elem[S] with evt.Node[S] = {
       (cookie: @switch) match {
         case `curveCookie` => Curve.readIdentifiedTuple(in, access, targets)

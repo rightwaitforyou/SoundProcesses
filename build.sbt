@@ -32,6 +32,8 @@ lazy val scalaTestVersion       = "2.1.3"
 
 lazy val spanVersion            = "1.2.1"
 
+lazy val fileUtilVersion        = "1.1.1"
+
 retrieveManaged in ThisBuild := true
 
 scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature", "-Xfuture")   // "-Xelide-below", "INFO"
@@ -127,7 +129,8 @@ lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucres
     libraryDependencies ++= Seq(
       "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
       "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
-      "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test"
+      "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
+      "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test"
     )
   )
 
