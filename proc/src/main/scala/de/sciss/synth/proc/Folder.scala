@@ -19,7 +19,6 @@ import impl.{FolderElemImpl => Impl}
 import de.sciss.serial
 import de.sciss.synth.proc
 import de.sciss.serial.{Serializer, DataInput}
-import scala.collection.immutable.{IndexedSeq => Vec}
 
 object Folder {
   def apply[S <: Sys[S]](implicit tx: S#Tx): Folder[S] = expr.List.Modifiable[S, Obj[S], Obj.Update[S]]
@@ -28,11 +27,12 @@ object Folder {
     expr.List.Modifiable.read[S, Obj[S], Obj.Update[S]](in, access)
 
   // private[Folder] type _Update[S <: Sys[S]] = expr.List.Update[S, _Element[S], _Element.Update[S]]
-  type Update[S <: Sys[S]] = Vec[Change[S]]
-  sealed trait Change[S <: Sys[S]] { def obj: Obj[S] }
-  final case class Added  [S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
-  final case class Removed[S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
-  final case class Element[S <: Sys[S]](obj: Obj[S], update: Obj.Update[S]) extends Change[S]
+
+  //  type Update[S <: Sys[S]] = Vec[Change[S]]
+  //  sealed trait Change[S <: Sys[S]] { def obj: Obj[S] }
+  //  final case class Added  [S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
+  //  final case class Removed[S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
+  //  final case class Element[S <: Sys[S]](obj: Obj[S], update: Obj.Update[S, Any]) extends Change[S]
 
   implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Folder[S]] =
     anySer.asInstanceOf[Serializer[S#Tx, S#Acc, Folder[S]]]
@@ -61,4 +61,8 @@ object FolderElem {
   implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, FolderElem[S]] =
     Impl.serializer[S]
 }
-trait FolderElem[S <: Sys[S]] extends Elem[S] { type Peer = Folder[S] }
+trait FolderElem[S <: Sys[S]] extends Elem[S] {
+  type Peer       = Folder[S]
+  // type PeerUpdate = Folder.Update[S]
+  type PeerUpdate = expr.List.Update[S, Obj[S], Obj.Update[S]] // XXX TODO: make alias Folder.Update
+}

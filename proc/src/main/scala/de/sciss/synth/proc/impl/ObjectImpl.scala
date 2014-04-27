@@ -27,7 +27,7 @@ import scala.reflect.ClassTag
 object ObjectImpl {
   def apply[S <: Sys[S], E1 <: Elem[S]](elem: E1)(implicit tx: S#Tx): Obj[S] { type E = E1 } = {
     val targets = evt.Targets[S]
-    val map     = SkipList.Map.empty[S, String, AttrEntry[S]]
+    val map     = SkipList.Map.empty[S, String, AttrEntry[S, E1#PeerUpdate]]
     new Impl[S, E1](targets, elem, map)
   }
 
@@ -48,7 +48,7 @@ object ObjectImpl {
 
   private type I = InMemory
 
-  private type AttrEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Elem[S], Elem.Update[S]]
+  private type AttrEntry[S <: Sys[S], Upd] = KeyMapImpl.Entry[S, String, Elem[S], Elem.Update[S, Upd]]
 
   private val anySer = new Ser[I]
 
@@ -56,7 +56,7 @@ object ObjectImpl {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
             (implicit tx: S#Tx): Obj[S] with evt.Node[S] = {
       val elem  = Elem.read(in, access)
-      val map   = SkipList.Map.read[S, String, AttrEntry[S]](in, access, SkipList.NoKeyObserver)
+      val map   = SkipList.Map.read[S, String, AttrEntry[S, Elem[S]#PeerUpdate]](in, access, SkipList.NoKeyObserver)
       new Impl[S, Elem[S]](targets, elem, map)
     }
   }
@@ -67,16 +67,16 @@ object ObjectImpl {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
             (implicit tx: S#Tx): Obj[S] with evt.Node[S] { type E = E1 } = {
       val elem  = peer.read(in, access)
-      val map   = SkipList.Map.read[S, String, AttrEntry[S]](in, access, SkipList.NoKeyObserver)
+      val map   = SkipList.Map.read[S, String, AttrEntry[S, E1#PeerUpdate]](in, access, SkipList.NoKeyObserver)
       new Impl[S, E1](targets, elem, map)
     }
   }
 
   // XXX TODO: DRY - this is shared with ProcImpl
-  implicit private def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]] =
-    anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]]]
+  implicit private def attributeEntryInfo[S <: Sys[S], Upd]: KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S, Upd]] =
+    anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S, Upd]]]
 
-  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Elem[I], Elem.Update[I]] {
+  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Elem[I], Elem.Update[I, Any]] {
     def valueEvent(value: Elem[I]) = value.changed
 
     val keySerializer   = ImmutableSerializer.String
@@ -84,7 +84,7 @@ object ObjectImpl {
   }
 
   private final class Impl[S <: Sys[S], E1 <: Elem[S]](protected val targets: evt.Targets[S], val elem: E1,
-                                                  attributeMap: SkipList.Map[S, String, AttrEntry[S]])
+                                                  attributeMap: SkipList.Map[S, String, AttrEntry[S, E1#PeerUpdate]])
     extends Obj[S] {
     obj =>
 
@@ -106,9 +106,9 @@ object ObjectImpl {
     }
 
     private object StateEvent
-      extends evt.impl.TriggerImpl[S, Obj.Update[S], Obj[S]]
-      with evt.InvariantEvent     [S, Obj.Update[S], Obj[S]]
-      with evt.impl.Root          [S, Obj.Update[S]]
+      extends evt.impl.TriggerImpl[S, Obj.UpdateT[S, E], Obj[S]]
+      with evt.InvariantEvent     [S, Obj.UpdateT[S, E], Obj[S]]
+      with evt.impl.Root          [S, Obj.UpdateT[S, E]]
       with ObjectEvent {
 
       final val slot = 2
@@ -116,10 +116,10 @@ object ObjectImpl {
 
     object attr
       extends AttrMap.Modifiable[S]
-      with evt.impl.EventImpl[S, Obj.Update[S], Obj[S]]
-      with evt.InvariantEvent[S, Obj.Update[S], Obj[S]]
+      with evt.impl.EventImpl[S, Obj.UpdateT[S, E], Obj[S]]
+      with evt.InvariantEvent[S, Obj.UpdateT[S, E], Obj[S]]
       with ObjectEvent
-      with impl.KeyMapImpl[S, String, Elem[S], Elem.Update[S]] {
+      with impl.KeyMapImpl[S, String, Elem[S], Elem.Update[S, E#PeerUpdate]] {
 
       final val slot = 0
 
@@ -134,7 +134,7 @@ object ObjectImpl {
         added.foreach { tup =>
           b += Obj.AttrAdded(tup._1, tup._2)
         }
-        StateEvent(Obj.Update(obj, b.result()))
+        StateEvent(Obj.UpdateT(obj, b.result()))
       }
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = obj.targets.nonEmpty
@@ -143,10 +143,10 @@ object ObjectImpl {
 
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.Update[S]] = {
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.UpdateT[S, E]] = {
         val changes = foldUpdate(pull)
         if (changes.isEmpty) None
-        else Some(Obj.Update(obj,
+        else Some(Obj.UpdateT(obj,
           changes.map({
             case (key, u) => Obj.AttrChange(key, u.element, u.change)
           })(breakOut)))
@@ -154,7 +154,7 @@ object ObjectImpl {
 
       protected def map: SkipList.Map[S, String, Entry] = attributeMap
 
-      protected def valueInfo = attributeEntryInfo[S]
+      protected def valueInfo = attributeEntryInfo[S, E#PeerUpdate]
 
       def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]] =
         get(key).flatMap { elem =>
@@ -171,8 +171,8 @@ object ObjectImpl {
     }
 
     private object ChangeEvent
-      extends evt.impl.EventImpl[S, Obj.Update[S], Obj[S]]
-      with evt.InvariantEvent   [S, Obj.Update[S], Obj[S]]
+      extends evt.impl.EventImpl[S, Obj.UpdateT[S, E], Obj[S]]
+      with evt.InvariantEvent   [S, Obj.UpdateT[S, E], Obj[S]]
       with ObjectEvent {
 
       final val slot = 3
@@ -188,15 +188,15 @@ object ObjectImpl {
         StateEvent   -/-> this
       }
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.Update[S]] = {
-        val b = Vector.newBuilder[Obj.Change[S]]
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.UpdateT[S, E]] = {
+        val b = Vector.newBuilder[Obj.Change[S, E#PeerUpdate]]
         if (pull.contains(attr     )) pull(attr       ).foreach(e => b ++= e.changes)
         val elemCh = elem.changed
         if (pull.contains(elemCh))     pull(elemCh    ).foreach(e => b  += Obj.ElemChange(e.change))
         if (pull.contains(StateEvent)) pull(StateEvent).foreach(e => b ++= e.changes)
 
         val changes = b.result()
-        if (changes.nonEmpty) Some(Obj.Update(obj, changes)) else None
+        if (changes.nonEmpty) Some(Obj.UpdateT(obj, changes)) else None
       }
     }
 
@@ -206,6 +206,6 @@ object ObjectImpl {
       case StateEvent .slot => StateEvent
     }
 
-    def changed: Event[S, Obj.Update[S], Obj[S]] = ChangeEvent
+    def changed: Event[S, Obj.UpdateT[S, E], Obj[S]] = ChangeEvent
   }
 }

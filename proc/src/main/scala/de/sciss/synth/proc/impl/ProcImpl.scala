@@ -26,7 +26,6 @@ import language.higherKinds
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.expr.ExprType1
 import de.sciss.lucre
-import scala.reflect.ClassTag
 
 object ProcImpl {
   private final val SER_VERSION = 0x5073  // was "Pr"
@@ -48,8 +47,7 @@ object ProcImpl {
       new Read(in, access, targets)
   }
 
-  private type ScanEntry     [S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan     [S], Scan     .Update[S]]
-  private type AttrEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Elem[S], Elem.Update[S]]
+  private type ScanEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan[S], Scan.Update[S]]
 
   private type I = InMemory
 
@@ -63,35 +61,13 @@ object ProcImpl {
     val valueSerializer = Scan.serializer[I]
   }
 
-  implicit private def attributeEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]] =
-     anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S]]]
-
-  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Elem[I], Elem.Update[I]] {
-    def valueEvent(value: Elem[I]) = value.changed
-
-    val keySerializer   = ImmutableSerializer.String
-    val valueSerializer = Elem.serializer[I]
-  }
-
   private sealed trait Impl[S <: Sys[S]]
     extends Proc[S] {
     proc =>
 
     import Proc._
 
-    protected def attributeMap: SkipList.Map[S, String, AttrEntry[S]]
-    protected def scanMap     : SkipList.Map[S, String, ScanEntry[S]]
-
-    //    final def graph(implicit tx: S#Tx): Expr[S, SynthGraph] = _graph()
-    //
-    //    final def graph_=(g: Expr[S, SynthGraph])(implicit tx: S#Tx): Unit = {
-    //      val old = _graph()
-    //      if (old != g) {
-    //        _graph() = g
-    //        val ch = evt.Change(old.value, g.value)
-    //        if (ch.isSignificant) StateEvent(Proc.Update(proc, Vector(GraphChange(ch))))
-    //      }
-    //    }
+    protected def scanMap: SkipList.Map[S, String, ScanEntry[S]]
 
     // ---- key maps ----
 
@@ -100,74 +76,34 @@ object ProcImpl {
       final def node: Proc[S] with evt.Node[S] = proc
     }
 
-    sealed trait KeyMap[Value, ValueUpd, OuterUpd]
-      extends evti.EventImpl [S, OuterUpd, Proc[S]]
-      with evt.InvariantEvent[S, OuterUpd, Proc[S]]
+    object scans
+      extends Scans.Modifiable[S]
+      with evti.EventImpl [S, Proc.Update[S], Proc[S]]
+      with evt.InvariantEvent[S, Proc.Update[S], Proc[S]]
       with ProcEvent
-      with impl.KeyMapImpl[S, String, Value, ValueUpd] {
-      protected def wrapKey(key: String): Proc.AssociativeKey
+      with impl.KeyMapImpl[S, String, Scan[S], Scan.Update[S]] {
 
-      // ---- keymapimpl details ----
+      // ---- key-map-impl details ----
 
-      final protected def fire(added: Option[(String, Value)], removed: Option[(String, Value)])
+      final protected def fire(added: Option[(String, Scan[S])], removed: Option[(String, Scan[S])])
                               (implicit tx: S#Tx): Unit = {
-        val b = Vector.newBuilder[Proc.StateChange[S]]
+        val b = Vector.newBuilder[Proc.ScanMapChange[S]]
         b.sizeHint(2)
         // convention: first the removals, then the additions. thus, overwriting a key yields
         // successive removal and addition of the same key.
         removed.foreach { tup =>
-          b += Proc.AssociationRemoved[S](wrapKey(tup._1))
+          b += Proc.ScanRemoved[S](tup._1, tup._2)
         }
         added.foreach {  tup =>
-          b += Proc.AssociationAdded[S](wrapKey(tup._1))
+          b += Proc.ScanAdded[S](tup._1, tup._2)
         }
 
         StateEvent(Proc.Update(proc, b.result()))
       }
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
-    }
 
-    object attr extends AttrMap.Modifiable[S] with KeyMap[Elem[S], Elem.Update[S], Proc.Update[S]] {
-      final val slot = 0
-
-      protected def wrapKey(key: String) = AttrKey(key)
-
-      def put(key: String, value: Elem[S])(implicit tx: S#Tx): Unit = add(key, value)
-
-      def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
-
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
-        val changes = foldUpdate(pull)
-        if (changes.isEmpty) None
-        else Some(Proc.Update(proc,
-          changes.map({
-            case (key, u) => Proc.AttrChange(key, u.element, u.change)
-          })(breakOut)))
-      }
-
-      protected def map: SkipList.Map[S, String, Entry] = attributeMap
-
-      protected def valueInfo = attributeEntryInfo[S]
-
-      def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]] =
-        get(key).flatMap { elem =>
-          tag.unapply(elem.peer)
-        }
-
-//      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,
-//                                                      tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
-//        get(key) match {
-//          // cf. stackoverflow #16377741
-//          case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
-//          case _          => None
-//        }
-    }
-
-    object scans extends Scans.Modifiable[S] with KeyMap[Scan[S], Scan.Update[S], Proc.Update[S]] {
       final val slot = 1
-
-      protected def wrapKey(key: String) = ScanKey(key)
 
       def add(key: String)(implicit tx: S#Tx): Scan[S] =
         get(key).getOrElse {
@@ -208,13 +144,11 @@ object ProcImpl {
 
       def connect   ()(implicit tx: S#Tx): Unit = {
         graph.changed ---> this
-        attr    ---> this
         scans         ---> this
         StateEvent    ---> this
       }
       def disconnect()(implicit tx: S#Tx): Unit = {
         graph.changed -/-> this
-        attr    -/-> this
         scans         -/-> this
         StateEvent    -/-> this
       }
@@ -223,18 +157,14 @@ object ProcImpl {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
         val graphCh  = graph.changed
         val graphOpt = if (pull.contains(graphCh   )) pull(graphCh   ) else None
-        val attrOpt  = if (pull.contains(attr)) pull(attr) else None
         val scansOpt = if (pull.contains(scans     )) pull(scans     ) else None
         val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
 
         val seq0 = graphOpt.fold(Vec.empty[Change[S]]) { u =>
           Vector(GraphChange(u))
         }
-        val seq1 = attrOpt.fold(seq0) { u =>
+        val seq2 = scansOpt.fold(seq0) { u =>
           if (seq0.isEmpty) u.changes else seq0 ++ u.changes
-        }
-        val seq2 = scansOpt.fold(seq1) { u =>
-          if (seq1.isEmpty) u.changes else seq1 ++ u.changes
         }
         val seq3 = stateOpt.fold(seq2) { u =>
           if (seq2.isEmpty) u.changes else seq2 ++ u.changes
@@ -245,10 +175,8 @@ object ProcImpl {
 
     final def select(slot: Int /*, invariant: Boolean */): Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
-      // case graphemes .slot => graphemes
-      case attr.slot => attr
-      case scans     .slot => scans
-      case StateEvent.slot => StateEvent
+      case scans      .slot => scans
+      case StateEvent .slot => StateEvent
     }
 
     //      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
@@ -256,18 +184,12 @@ object ProcImpl {
 
     final protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
-      // name_#     .write(out)
       graph       .write(out)
-      // graphemeMap .write(out)
-      attributeMap.write(out)
       scanMap     .write(out)
     }
 
     final protected def disposeData()(implicit tx: S#Tx): Unit = {
-      // name_#     .dispose()
       graph       .dispose()
-      // graphemeMap.dispose()
-      attributeMap.dispose()
       scanMap     .dispose()
     }
 
@@ -278,7 +200,6 @@ object ProcImpl {
     protected val targets       = evt.Targets[S](tx0)
     val graph                   = SynthGraphs.newVar(SynthGraphs.empty)
     protected val scanMap       = SkipList.Map.empty[S, String, ScanEntry[S]]
-    protected val attributeMap  = SkipList.Map.empty[S, String, AttrEntry[S]]
   }
 
   private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S])
@@ -291,7 +212,6 @@ object ProcImpl {
     }
 
     val graph                   = SynthGraphs.readVar(in, access)
-    protected val attributeMap  = SkipList.Map.read[S, String, AttrEntry[S]](in, access)
     protected val scanMap       = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
   }
 }

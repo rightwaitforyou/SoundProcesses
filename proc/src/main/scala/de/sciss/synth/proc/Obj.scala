@@ -44,24 +44,25 @@ object Obj {
   // ---- updates ----
 
   /** An update is a sequence of changes */
-  final case class Update[S <: Sys[S]](proc: Obj[S], changes: Vec[Change[S]])
+  final case class UpdateT[S <: Sys[S], +E1 <: Elem[S]](proc: Obj[S] { type E = E1 },
+                                                        changes: Vec[Change[S, E1#PeerUpdate]])
+
+  type Update[S <: Sys[S]] = UpdateT[S, Elem[S]] // (proc: Obj[S], changes: Vec[Change[S, Upd]])
 
   /** A change is either a state change, or a scan or a grapheme change */
-  sealed trait Change[S <: Sys[S]]
+  sealed trait Change[S <: Sys[S], +Upd]
 
-  sealed trait AttrUpdate[S <: Sys[S]] extends Change[S] {
+  sealed trait AttrUpdate[S <: Sys[S]] extends Change[S, Nothing] {
     def key: String
-
     def elem: Elem[S]
   }
 
   final case class AttrAdded  [S <: Sys[S]](key: String, elem: Elem[S]) extends AttrUpdate[S]
-
   final case class AttrRemoved[S <: Sys[S]](key: String, elem: Elem[S]) extends AttrUpdate[S]
 
   final case class AttrChange [S <: Sys[S]](key: String, elem: Elem[S], change: Any) extends AttrUpdate[S]
 
-  final case class ElemChange [S <: Sys[S]](change: Any) extends Change[S]
+  final case class ElemChange [S <: Sys[S], Upd](change: Upd) extends Change[S, Upd]
 
   type T[S <: Sys[S], E1[~ <: Sys[~]] <: Elem[~]] = Obj[S] { type E = E1[S] }
 
@@ -82,4 +83,6 @@ trait Obj[S <: Sys[S]] extends evt.Publisher[S, Obj.Update[S]] with evt.Node[S] 
   def attr: AttrMap.Modifiable[S]
 
   def elem: E
+
+  override def changed: evt.EventLike[S, Obj.UpdateT[S, E]]
 }

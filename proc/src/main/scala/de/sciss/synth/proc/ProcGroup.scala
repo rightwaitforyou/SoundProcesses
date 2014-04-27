@@ -19,29 +19,26 @@ import evt.{EventLike, Sys}
 import de.sciss.serial.{Serializer, DataInput}
 
 object ProcGroup {
-  type Update[S <: Sys[S]] = BiGroup.Update[S, Proc[S], Proc.Update[S]]
+  type Update    [S <: Sys[S]] = BiGroup.Update    [S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]]
+  type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]]
 
-  type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Proc[S], Proc.Update[S]]
-
-  // private implicit val spanType: Type[SpanLike] = SpanLikes
-
-  private def eventView[S <: Sys[S]](proc: Proc[S]): EventLike[S, Proc.Update[S]] = proc.changed
+  private def eventView[S <: Sys[S]](proc: Obj.T[S, ProcElem]): EventLike[S, Obj.UpdateT[S, ProcElem[S]]] =
+    proc.changed
 
   object Modifiable {
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] =
-      BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](eventView)
+      BiGroup.Modifiable.serializer[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](eventView)
 
     def apply[S <: Sys[S]](implicit tx: S#Tx): ProcGroup.Modifiable[S] =
-      BiGroup.Modifiable[S, Proc[S], Proc.Update[S]](eventView)
+      BiGroup.Modifiable[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](eventView)
 
     def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup.Modifiable[S] =
-      BiGroup.Modifiable.read[S, Proc[S], Proc.Update[S]](in, access, eventView)
+      BiGroup.Modifiable.read[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](in, access, eventView)
   }
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup[S] =
-    BiGroup.Modifiable.read[S, Proc[S], Proc.Update[S]](in, access, eventView)
+    BiGroup.Modifiable.read[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](in, access, eventView)
 
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup[S]] = {
-    BiGroup.serializer[S, Proc[S], Proc.Update[S]](eventView)
-  }
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup[S]] =
+    BiGroup.serializer[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](eventView)
 }

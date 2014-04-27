@@ -32,7 +32,6 @@ import evt.Sys
 object TransportImpl {
   import Grapheme.Segment
   import Segment.{Defined => DefSeg}
-  import Transport.Proc.{GraphemesChanged, Changed => ProcChanged}
 
   private type DefSegs = Vec[DefSeg]
 
@@ -176,7 +175,7 @@ object TransportImpl {
       sys.error("Operation not supported")
   }
 
-  private type Update[S <: Sys[S]] = Transport.Update[S, Proc[S], Transport.Proc.Update[S]]
+  private type Update[S <: Sys[S]] = Transport.Update[S, Obj.T[S, ProcElem], Transport.Proc.Update[S]]
 
   private final class Observation[S <: Sys[S], I <: stm.Sys[I]](impl: Impl[S, I], val fun: S#Tx => Update[S] => Unit)
     extends Disposable[S#Tx] {
@@ -307,7 +306,7 @@ object TransportImpl {
   // ------------------------------------------------
 
   private sealed trait Impl[S <: Sys[S], I <: stm.Sys[I]]
-    extends Transport[S, Proc[S], Transport.Proc.Update[S]] {
+    extends Transport[S, Obj.T[S, ProcElem], Transport.Proc.Update[S]] {
     impl =>
 
     private implicit final val procGroupSer = ProcGroup.serializer[S]
@@ -500,11 +499,11 @@ object TransportImpl {
       val entry = key -> segments
       // try to re-use and update a previous grapheme changed message in the state
       state.procChanged.lastOption match {
-        case Some((`timed`, GraphemesChanged(map))) =>
-          val newMap = GraphemesChanged[S](map + entry)
+        case Some((`timed`, Transport.Proc.GraphemesChanged(map))) =>
+          val newMap = Transport.Proc.GraphemesChanged[S](map + entry)
           state.procChanged = state.procChanged.init :+ (timed -> newMap)
         case _ =>
-          val map = GraphemesChanged[S](Map(entry))
+          val map = Transport.Proc.GraphemesChanged[S](Map(entry))
           state.procChanged :+= timed -> map
       }
     }
@@ -597,19 +596,20 @@ object TransportImpl {
     //                            track appearance or disappearance of graphemes as sources
     //                            of these scans, and update structures
     // addendum: Meaning, _do not_ include segments in updates
-    private def u_assocChange(state: GroupUpdateState, timed: TimedProc[S], change: Proc.AssociativeChange[S])
-                             (implicit tx: S#Tx): Unit = {
+    private def u_scanMapChange(state: GroupUpdateState, timed: TimedProc[S], change: Proc.ScanMapChange[S])
+                               (implicit tx: S#Tx): Unit = {
       change match {
-        case Proc.AssociationAdded(Proc.ScanKey(key)) =>
-          val proc = timed.value
-          proc.scans.get(key).foreach {
-            scan => u_addScan(state, timed, key, scan)
-          }
+        case Proc.ScanAdded(key, scan) =>
+          //          val proc = timed.value
+          //          proc.scans.get(key).foreach {
+          //            scan => u_addScan(state, timed, key, scan)
+          //          }
+          u_addScan(state, timed, key, scan)
 
-        case Proc.AssociationRemoved(Proc.ScanKey(key)) =>
+        case Proc.ScanRemoved(key, scan) =>
           u_removeScan(timed, key)
 
-        case _ =>
+        // case _ =>
       }
     }
 
@@ -659,7 +659,8 @@ object TransportImpl {
     }
 
     // a change in the transported group has been observed.
-    private def biGroupUpdate(groupUpd: BiGroup.Update[S, Proc[S], Proc.Update[S]])(implicit tx: S#Tx): Unit = {
+    private def biGroupUpdate(groupUpd: BiGroup.Update[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]])
+                             (implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
       val state = {
         val info0     = infoVar()
@@ -714,30 +715,36 @@ object TransportImpl {
         //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
 
         case BiGroup.ElementMutated(timed, procUpd) if gMap.contains(timed.id) =>
-          def forward(u: Proc.Change[S]): Unit =
-            state.procChanged :+= timed -> ProcChanged(u)
+          def forward(u: Transport.Proc.Update[S]): Unit =
+            state.procChanged :+= timed -> u
 
           procUpd.changes.foreach {
-            case assoc: Proc.AssociativeChange[S] =>
-              forward(assoc)
-              u_assocChange(state, timed, assoc)
+            case peUpd @ Obj.ElemChange(pUpd) =>
+              pUpd.changes.foreach {
+                case assoc: Proc.ScanMapChange[S] =>
+                  forward(Transport.Proc.ElemChanged(assoc))
+                  u_scanMapChange(state, timed, assoc)
 
-            case sc @ Proc.ScanChange(key, scan, scanChanges) =>
-              val flt = scanChanges.filter {
-                case Scan.GraphemeChange(grapheme, graphCh) =>
-                  u_graphemeChange(state, timed, key, scan, grapheme, graphCh)
-                  false // scan changes are filtered and prepared already by u_scanSourceUpdate
+                case sc @ Proc.ScanChange(key, scan, scanChanges) =>
+                  val flt = scanChanges.filter {
+                    case Scan.GraphemeChange(grapheme, graphCh) =>
+                      u_graphemeChange(state, timed, key, scan, grapheme, graphCh)
+                      false // scan changes are filtered and prepared already by u_scanSourceUpdate
 
-                case u: Scan.SourceChange[S] =>
-                  u_scanSourceChange(state, timed, key, scan)
-                  true
+                    case u: Scan.SourceChange[S] =>
+                      u_scanSourceChange(state, timed, key, scan)
+                      true
 
-                case _ => true // SinkAdded, SinkRemoved
+                    case _ => true // SinkAdded, SinkRemoved
+                  }
+                  if (flt.nonEmpty) forward(Transport.Proc.ElemChanged(sc.copy(changes = flt)))
+
+                case gc: Proc.GraphChange[S] =>
+                  forward(Transport.Proc.ElemChanged(gc))
               }
-              if (flt.nonEmpty) forward(sc.copy(changes = flt))
 
-            case other => // StateChange other than AssociativeChange, or GraphemeChange
-              forward(other)
+            case attr: Obj.AttrUpdate[S] =>
+              forward(Transport.Proc.AttrChanged(attr))
           }
 
         case BiGroup.ElementMoved(timed, m.Change(oldSpan, newSpan)) if gMap.contains(timed.id) =>
@@ -925,7 +932,7 @@ object TransportImpl {
       val id          = timed.id
       val proc        = timed.value
 
-      val scansIt     = proc.scans.iterator.flatMap {
+      val scansIt     = proc.elem.peer.scans.iterator.flatMap {
         case (key, scan) => mkScanCache(key, scan, newFrame).map(key -> _)
       }
 
@@ -1106,8 +1113,9 @@ object TransportImpl {
             val id  = timed.id
             val p   = timed.value
             gMap.get(id).foreach { procCache =>
-              var scanMap = Map.empty[String, ScanCache[S]] // this will be the new map
-              p.scans.iterator.foreach {
+              var scanMap         = Map.empty[String, ScanCache[S]] // this will be the new map
+              val scans: Scans[S] = p.elem.peer.scans
+              scans.iterator.foreach {
                 case (key, scan) =>
                   scan.sources.foreach {
                     case Scan.Link.Grapheme(peer) =>
@@ -1126,7 +1134,7 @@ object TransportImpl {
         }
 
         procUpdated = updMap.map {
-          case (timed, map) => timed -> GraphemesChanged[S](map)
+          case (timed, map) => timed -> Transport.Proc.GraphemesChanged[S](map)
         }
       }
 

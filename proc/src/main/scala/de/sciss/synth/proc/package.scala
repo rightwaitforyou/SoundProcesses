@@ -20,16 +20,14 @@ import java.util.{Date, Locale}
 import annotation.elidable
 import annotation.elidable._
 import evt.Sys
-import de.sciss.lucre.expr.Expr
-import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.higherKinds
 import scala.language.existentials
 
 
 package object proc {
-  type ProcGroup    [S <: Sys[S]] = BiGroup[S, Proc[S], Proc.Update[S]]
-  type TimedProc    [S <: Sys[S]] = BiGroup.TimedElem[S, Proc[S]]
-  type ProcTransport[S <: Sys[S]] = Transport[S, Proc[S], Transport.Proc.Update[S]]  // Proc.Update[ S ]
+  type ProcGroup    [S <: Sys[S]] = BiGroup[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]]
+  type TimedProc    [S <: Sys[S]] = BiGroup.TimedElem[S, Obj.T[S, ProcElem]]
+  type ProcTransport[S <: Sys[S]] = Transport[S, Obj.T[S, ProcElem], Transport.Proc.Update[S]]  // Proc.Update[ S ]
 
   type Param = Double
 

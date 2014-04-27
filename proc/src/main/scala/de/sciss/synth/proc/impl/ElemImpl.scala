@@ -30,7 +30,7 @@ object ElemImpl {
   import Elem.Update
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec, Artifact => _Artifact, ProcGroup => _ProcGroup}
+  import proc.{FadeSpec => _FadeSpec, Artifact => _Artifact, ProcGroup => _ProcGroup, Proc => _Proc}
   import lucre.synth.expr.{DoubleVec => _DoubleVec}
 
   // ---- Int ----
@@ -448,6 +448,38 @@ object ElemImpl {
     def mkCopy()(implicit tx: S#Tx): ProcGroupElem[S] = ProcGroup(peer)
   }
 
+  // ---- Proc ----
+
+  object Proc extends Companion[ProcElem] {
+    val typeID = _Proc.typeID
+
+    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                   (implicit tx: S#Tx): ProcElem[S] with evt.Node[S] = {
+      val peer = _Proc.read(in, access)
+      new ProcActiveImpl(targets, peer)
+    }
+
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ProcElem[S] =
+      sys.error("Constant ProcGroup not supported")
+
+    def apply[S <: Sys[S]](peer: _Proc[S])(implicit tx: S#Tx): ProcElem[S] =
+      new ProcActiveImpl(evt.Targets[S], peer)
+  }
+
+  trait ProcImpl[S <: Sys[S]] extends ProcElem[S] {
+    final def typeID = Proc.typeID
+    final def prefix = "Proc"
+  }
+
+  final class ProcActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+                                               val peer: _Proc[S])
+    extends Active[S] with ProcImpl[S] {
+
+    protected def peerEvent = peer.changed
+
+    def mkCopy()(implicit tx: S#Tx): ProcElem[S] = Proc(peer) // XXX TODO
+  }
+
   // ---------- Impl ----------
 
   trait Companion[E[S <: Sys[S]] <: Elem[S]] extends Elem.Extension {
@@ -506,7 +538,7 @@ object ElemImpl {
 
     final def mkCopy()(implicit tx: S#Tx): this.type = this
 
-    final def changed: EventLike[S, Update[S]] = evt.Dummy[S, Update[S]]
+    final def changed: EventLike[S, Update[S, PeerUpdate]] = evt.Dummy[S, Update[S, PeerUpdate]]
 
     override def toString() = s"Elem.${prefix}($peer)"
 
@@ -517,7 +549,7 @@ object ElemImpl {
     extends Basic[S] with evt.Node[S] {
     self =>
 
-    type Peer <: evt.Publisher[S, Any] with Writable with Disposable[S#Tx]
+    type Peer <: evt.Publisher[S, PeerUpdate] with Writable with Disposable[S#Tx]
     // private def peerEvent = peer.changed
 
     // protected def peerEvent: evt.EventLike[S, Any]
@@ -527,15 +559,15 @@ object ElemImpl {
     def select(slot: Int): Event[S, Any, Any] = changed
 
     object changed
-      extends evt.impl.EventImpl[S, Update[S], Elem[S]]
-      with evt.InvariantEvent   [S, Update[S], Elem[S]] {
+      extends evt.impl.EventImpl[S, Update[S, PeerUpdate], Elem[S]]
+      with evt.InvariantEvent   [S, Update[S, PeerUpdate], Elem[S]] {
 
       final protected def reader: evt.Reader[S, Elem[S]] = self.reader
       final def node: Elem[S] with evt.Node[S] = self
 
       final val slot = 0
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Update[S]] = {
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Update[S, PeerUpdate]] = {
         pull(peer.changed).map(ch => Update(self, ch))
       }
 

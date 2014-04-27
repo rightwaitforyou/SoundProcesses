@@ -22,6 +22,7 @@ import data.Iterator
 import impl.{TransportImpl => Impl}
 import de.sciss.span.SpanLike
 import de.sciss.lucre.event.{Observable, Sys}
+import proc.{Proc => _Proc}
 
 object Transport {
   /** Creates a new realtime transport. The transport is positioned at time zero. */
@@ -41,7 +42,7 @@ object Transport {
 
   /** Creates a new offline transport. The transport is not positioned. */
   def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
-    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Offline[S, Proc[S], Transport.Proc.Update[S]] =
+    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Offline[S, _Proc[S], Transport.Proc.Update[S]] =
     Impl.offline[S, I](group, sampleRate)
 
   /**
@@ -93,7 +94,8 @@ object Transport {
   object Proc {
     sealed trait Update[S <: Sys[S]]
 
-    final case class Changed[S <: Sys[S]](peer: proc.Proc.Change[S])                        extends Update[S]
+    final case class AttrChanged     [S <: Sys[S]](peer: Obj.AttrUpdate[S])                 extends Update[S]
+    final case class ElemChanged     [S <: Sys[S]](peer: _Proc.Change[S])                   extends Update[S]
     final case class GraphemesChanged[S <: Sys[S]](map: Map[String, Vec[Grapheme.Segment]]) extends Update[S]
   }
 }
