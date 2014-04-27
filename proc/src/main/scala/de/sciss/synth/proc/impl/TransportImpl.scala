@@ -46,7 +46,8 @@ object TransportImpl {
   }
 
   def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double)(
-    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] = {
+    implicit tx: S#Tx, cursor: Cursor[S],
+    bridge: S#Tx => I#Tx): Transport.Offline[S, Obj.T[S, ProcElem], Transport.Proc.Update[S]] = {
 
     val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[S, I](group)
     val t = new Offline[S, I](groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar)
@@ -222,7 +223,7 @@ object TransportImpl {
           protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
           protected val obsVar: I#Var[Vec[Observation[S, I]]])
          (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
-    extends Impl[S, I] with Transport.Offline[S, Proc[S], Transport.Proc.Update[S]] {
+    extends Impl[S, I] with Transport.Offline[S, Obj.T[S, ProcElem], Transport.Proc.Update[S]] {
 
     private val submitRef = Ref(offlineEmptyStep)
     private val timeRef   = Ref(0L)

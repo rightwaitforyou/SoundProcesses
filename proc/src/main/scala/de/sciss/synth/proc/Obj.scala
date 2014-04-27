@@ -44,10 +44,10 @@ object Obj {
   // ---- updates ----
 
   /** An update is a sequence of changes */
-  final case class UpdateT[S <: Sys[S], +E1 <: Elem[S]](proc: Obj[S] { type E = E1 },
-                                                        changes: Vec[Change[S, E1#PeerUpdate]])
+  final case class UpdateT[S <: Sys[S], E1 <: Elem[S]](proc: Obj[S] { type E = E1 },
+                                                       changes: Vec[Change[S, E1#PeerUpdate]])
 
-  type Update[S <: Sys[S]] = UpdateT[S, Elem[S]] // (proc: Obj[S], changes: Vec[Change[S, Upd]])
+  type Update[S <: Sys[S]] = UpdateT[S, _ <: Elem[S]] // (proc: Obj[S], changes: Vec[Change[S, Upd]])
 
   /** A change is either a state change, or a scan or a grapheme change */
   sealed trait Change[S <: Sys[S], +Upd]
