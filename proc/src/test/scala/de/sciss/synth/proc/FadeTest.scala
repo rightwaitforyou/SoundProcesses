@@ -31,11 +31,13 @@ object FadeTest extends App {
       // val spatIn = spat.scans.add("in")
       // spatIn.addSink()lucre.synth.expr.
 
-      val proc = Proc[S]
+      val proc  = Proc[S]
+      val peer  = ProcElem(proc)
+      val obj   = Obj(peer)
       val fadeExprIn  = FadeSpec.Elem(44100, lucre.synth.expr.Curve.newConst(linear), 0.0) // FadeSpec.Value(44100, linShape)
       val fadeExprOut = FadeSpec.Elem(44100, lucre.synth.expr.Curve.newConst(exponential), -40.dbamp) // FadeSpec.Value(44100, linShape)
-      proc.attr.put("fadeIn" , FadeSpecElem(fadeExprIn))
-      proc.attr.put("fadeOut", FadeSpecElem(fadeExprOut))
+      obj.attr.put("fadeIn" , FadeSpecElem(fadeExprIn))
+      obj.attr.put("fadeOut", FadeSpecElem(fadeExprOut))
       proc.graph() = SynthGraph {
         import ugen._
         val noise = PinkNoise.ar
@@ -44,7 +46,7 @@ object FadeTest extends App {
         Out.ar(0, Pan2.ar(sig))
       }
       val group = ProcGroup.Modifiable[S]
-      group.add(Span(1.seconds, 4.seconds), proc)
+      group.add(Span(1.seconds, 4.seconds), obj)
 
       import Durable.inMemory
       val transp = Transport[S, I](group)

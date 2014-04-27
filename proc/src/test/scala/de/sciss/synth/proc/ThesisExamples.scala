@@ -26,9 +26,10 @@ object ThesisExamples extends App {
     val bus       = lucre.expr.Int .newVar[S](    0)
     val fadeInLen = lucre.expr.Long.newVar[S](44100)
     val fadeIn    = FadeSpec.Elem(fadeInLen, Curve.sine, 0.0)
-    proc.attr.put("bus"    , IntElem     (bus   ))
-    proc.attr.put("mute"   , BooleanElem (false ))
-    proc.attr.put("fade-in", FadeSpecElem(fadeIn))
+    val obj       = Obj(ProcElem(proc))
+    obj.attr.put("bus"    , IntElem     (bus   ))
+    obj.attr.put("mute"   , BooleanElem (false ))
+    obj.attr.put("fade-in", FadeSpecElem(fadeIn))
     proc.graph()  = sg
 
     bus()       = 1       // adjust bus
@@ -37,7 +38,7 @@ object ThesisExamples extends App {
 
   import ugen._
 
-  def scans[S <: Sys[S]]()(implicit tx: S#Tx): (Proc[S], Proc[S]) = {
+  def scans[S <: Sys[S]]()(implicit tx: S#Tx): (Obj.T[S, ProcElem], Obj.T[S, ProcElem]) = {
     val imp = ExprImplicits[S]
     import imp._
 
@@ -48,6 +49,8 @@ object ThesisExamples extends App {
 
     val p1        = Proc[S]
     val p2        = Proc[S]
+    val obj1      = Obj(ProcElem(p1))
+    val obj2      = Obj(ProcElem(p2))
 
     val sMute     = p1.scans.add("mute")
     sMute addSource Scan.Link.Grapheme(gMute)
@@ -65,7 +68,7 @@ object ThesisExamples extends App {
       Out.ar(0, Pan2.ar(sig, LFSaw.ar(1)))
     }
 
-    (p1, p2)
+    (obj1, obj2)
   }
 
   def playScans(): Unit = {

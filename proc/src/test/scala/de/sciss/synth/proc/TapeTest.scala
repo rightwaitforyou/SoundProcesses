@@ -34,8 +34,9 @@ object TapeTest extends App {
       // val spatIn = spat.scans.add("in")
       // spatIn.addSink()
 
-      val proc = Proc[S]
-      proc.attr.name = "tape"
+      val proc  = Proc[S]
+      val obj   = Obj(ProcElem(proc))
+      obj.attr.name = "tape"
       val sAudio = proc.scans.add("sig")
       val file = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
       val spec = AudioFile.readSpec(file)
@@ -50,7 +51,7 @@ object TapeTest extends App {
       gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, step)))
       gSpat.add(4.seconds -> Grapheme.Value.Curve((1.0, linear)))
 
-      proc.attr.put("freq", DoubleElem(200.0))
+      obj.attr.put("freq", DoubleElem(200.0))
 
       proc.graph() = SynthGraph {
         import ugen._
@@ -62,7 +63,7 @@ object TapeTest extends App {
         Out.ar(0, Pan2.ar(sig, spat))
       }
       val group = ProcGroup.Modifiable[S]
-      group.add(Span(1.seconds, 4.seconds), proc)
+      group.add(Span(1.seconds, 4.seconds), obj)
 
       import Durable.inMemory
       val transp = Transport[S, I](group)

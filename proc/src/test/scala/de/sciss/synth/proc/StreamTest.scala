@@ -24,8 +24,9 @@ object StreamTest extends App {
       import expr._
       import Implicits._
 
-      val proc = Proc[S]
-      proc.attr.name = "tape"
+      val proc  = Proc[S]
+      val obj   = Obj(ProcElem(proc))
+      obj.attr.name = "tape"
       val file = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
       val spec = AudioFile.readSpec(file)
       // val vAudio    = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
@@ -33,7 +34,7 @@ object StreamTest extends App {
       val artifact = loc.add(file)
       val eAudio = Grapheme.Elem.Audio[S](artifact, spec, offset = 0L, gain = 2.0)
 
-      proc.attr.put("disk", AudioGraphemeElem(eAudio))
+      obj.attr.put("disk", AudioGraphemeElem(eAudio))
 
       proc.graph() = SynthGraph {
         import ugen._
@@ -41,7 +42,7 @@ object StreamTest extends App {
         Out.ar(0, sig)
       }
       val group = ProcGroup.Modifiable[S]
-      group.add(Span.from(0L), proc)
+      group.add(Span.from(0L), obj)
 
       val transp = Transport[S, I](group)
 

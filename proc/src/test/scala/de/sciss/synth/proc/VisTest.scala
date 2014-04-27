@@ -10,12 +10,12 @@ import de.sciss.synth.io.AudioFile
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.Serializer
 import de.sciss.synth.Curve.linear
-
 import de.sciss.{lucre, synth}
 import java.io.File
 import concurrent.stm.{Txn => STMTxn, Ref => STMRef}
 import synth.SynthGraph
 import de.sciss.lucre.synth.{InMemory, Sys}
+import proc.Implicits._
 
 object VisTest {
   def apply(): VisTest[InMemory, InMemory] = {
@@ -69,7 +69,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
   }
 
   //   private type PG = ProcGroup.Modifiable[ S ]
-  private type PG = BiGroup.Modifiable[S, Proc[S], Proc.Update[S]]
+  private type PG = ProcGroup.Modifiable[S] // BiGroup.Modifiable[S, Proc[S], Proc.Update[S]]
   type Acc = (PG, Artifact.Location.Modifiable[S])
 
   object Implicits {
@@ -77,7 +77,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     implicit         val spanLikes : ExprType[SpanLike] = bitemp.SpanLike
     implicit private val procSer   : Serializer[S#Tx, S#Acc, Proc[S]] = Proc.serializer[S]
     implicit         val procVarSer: Serializer[S#Tx, S#Acc, PG     ] =
-      BiGroup.Modifiable.serializer[S, Proc[S], Proc.Update[S]](_.changed)
+      ProcGroup.Modifiable.serializer[S] // , Proc[S], Proc.Update[S]](_.changed)
     //      implicit val accessTransport: Acc => Transport[ S, Proc[ S ]] = _._2
     //      implicit val transportSer: Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] = ?? // Transport.serializer[ S ]( cursor )
   }
@@ -120,7 +120,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) = Grapheme.Elem.Curve(amp -> shape)
 
-  def proc(name: String)(implicit tx: S#Tx): Proc[S] = {
+  def proc(name: String)(implicit tx: S#Tx): Obj.T[S, ProcElem] = {
     // implicit val chr: Chronos[S] = Chronos(0L)
     val p = Proc[S]
     // p.name_=( name )
@@ -149,7 +149,9 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     //      p.trigger( "silence" )
 
     //      p.playing_=( true )
-    p
+    val obj = Obj(ProcElem(p))
+    obj.attr.name = name
+    obj
   }
 
   def next(time: Long): Option[Long] = t { implicit tx =>
@@ -258,20 +260,19 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
       addFreq2(time -> freq)
     }
 
-  def audioTest()(implicit tx: S#Tx): Proc[S] = {
+  def audioTest()(implicit tx: S#Tx): Obj.T[S, ProcElem] = {
     val af = audioFile("283_7WTConWhiteCCRsmpLp.aif")
 
     t { implicit tx =>
-      val p = Proc[S]
-      // p.name_=( "AudioFilePlayer" )
-      p.graph() = SynthGraph {
+      val p = proc("AudioFilePlayer")
+      p.elem.peer.graph() = SynthGraph {
         import synth._
         import ugen._
         val in = graph.scan.In("in")
         Out.ar(0, in * SinOsc.ar(3))
       }
-      val g = Grapheme.Modifiable[S]
-      val scan = p.scans.add("in")
+      val g     = Grapheme.Modifiable[S]
+      val scan  = p.elem.peer.scans.add("in")
       scan.addSource(Scan.Link.Grapheme(g))
 
       g.add(0L -> af)
@@ -281,7 +282,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
   }
 
   private def addFreq2(value: BiExpr[S, Grapheme.Value])(implicit tx: S#Tx): Unit =
-    pr().scans.get("freq").foreach { scan =>
+    pr().elem.peer.scans.get("freq").foreach { scan =>
       scan.sources.foreach {
         case Scan.Link.Grapheme(Grapheme.Modifiable(peer)) => peer.add(value)
         case _ =>

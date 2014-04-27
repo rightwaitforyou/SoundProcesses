@@ -20,9 +20,11 @@ class AttributesSpec extends ConfluentEventSpec {
 
   "Attrs" should "serialize and de-serialize" in { system =>
     val pH = system.step { implicit tx =>
-      val p = Proc[S]
-      p.attr.put("foo", IntElem(lucre.expr.Int.newVar(1234)))
-      tx.newHandle(p)
+      val p     = Proc[S]
+      val peer  = ProcElem(p)
+      val obj   = Obj(peer)
+      obj.attr.put("foo", IntElem(lucre.expr.Int.newVar(1234)))
+      tx.newHandle(obj)
     }
 
     system.step { implicit tx =>

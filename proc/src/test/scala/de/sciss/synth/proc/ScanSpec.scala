@@ -31,8 +31,8 @@ class ScanSpec extends ConfluentEventSpec {
 
     val grH = system.step { implicit tx =>
       val p = ph()
-      p.scans.add   ("amp")
-      p.scans.add   ("freq")
+      val scan1 = p.scans.add   ("amp")
+      val scan2 = p.scans.add   ("freq")
       p.scans.remove("amp")
       val gr = Grapheme.Modifiable[S]
       // p.graphemes.add( "test", gr )
@@ -41,9 +41,9 @@ class ScanSpec extends ConfluentEventSpec {
 
       // val gr2 = Grapheme.Modifiable[S]
       obs.assertEquals(
-        Proc.Update[S](p, Vec(Proc.AssociationAdded  (Proc.ScanKey("amp" )))),
-        Proc.Update[S](p, Vec(Proc.AssociationAdded  (Proc.ScanKey("freq")))),
-        Proc.Update[S](p, Vec(Proc.AssociationRemoved(Proc.ScanKey("amp" ))))
+        Proc.Update[S](p, Vec(Proc.ScanAdded  ("amp" , scan1))),
+        Proc.Update[S](p, Vec(Proc.ScanAdded  ("freq", scan2))),
+        Proc.Update[S](p, Vec(Proc.ScanRemoved("amp" , scan1)))
         // Proc.Update( p, Vec( Proc.AssociationAdded( Proc.GraphemeKey( "test" )))),
         // Proc.Update( p, Vec( Proc.AssociationRemoved( Proc.GraphemeKey( "test" )))),
         // Proc.Update( p, Vec( Proc.AssociationAdded( Proc.GraphemeKey( "gr" ))))

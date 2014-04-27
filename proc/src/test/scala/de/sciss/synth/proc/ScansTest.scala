@@ -118,8 +118,8 @@ object ScansTest extends App {
     val t1 = 1 /* 4 */ * 44100L // XXX TODO eventually should appear later
     val t2 = 1 * 44100L // XXX TODO must currently be greater than current transport position
 
-    group.add(Span.from(t1), p1)
-    group.add(Span.from(t2), p2)
+    group.add(Span.from(t1), Obj(ProcElem(p1)))
+    group.add(Span.from(t2), Obj(ProcElem(p2)))
 
     p1.scans.add("out")
     p2.scans.add("freq")

@@ -10,15 +10,16 @@ import span.Span
 import de.sciss.synth.Curve.linear
 import de.sciss.lucre.synth.InMemory
 
-/** To run only this suite:
-  *
-  * test-only de.sciss.synth.proc.TransportSpec
+/*
+  To run only this suite:
+
+  test-only de.sciss.synth.proc.TransportSpec
+
   */
 class TransportSpec extends ConfluentEventSpec {
 
   import Transport.Advance
   import Grapheme.Segment
-  import Transport.Proc.{GraphemesChanged, Changed => ProcChanged}
 
   type I = InMemory
 
@@ -44,15 +45,17 @@ class TransportSpec extends ConfluentEventSpec {
     system.step { implicit tx =>
       val pg = pgH()
       val p1 = Proc[S]
+      val o1 = Obj(ProcElem(p1))
       val g1 = Grapheme.Modifiable[S]
       p1.scans.add("freq").addSource(Scan.Link.Grapheme(g1))
       p1.scans.add("egal")
       g1.add(7000L -> curve(441.0))
       val p2 = Proc[S]
+      val o2 = Obj(ProcElem(p2))
       val g2 = Grapheme.Modifiable[S]
       p2.scans.add("amp").addSource(Scan.Link.Grapheme(g2))
-      val pt1 = pg.add(Span(0L, 10000L), p1)
-      val pt2 = pg.add(Span(5000L, 20000L), p2)
+      val pt1 = pg.add(Span(   0L, 10000L), o1)
+      val pt2 = pg.add(Span(5000L, 20000L), o2)
       obs.assertEquals(
         Advance(t, time = 0L, isSeek = false, isPlaying = false, added = Vec(pt1))
       )
@@ -77,7 +80,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 7000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> GraphemesChanged[S](Map("freq" -> Vec(Segment.Const(Span.from(7000L), Vec(441.0))))))
+          Vec(pt1 -> Transport.Proc.GraphemesChanged[S](Map("freq" -> Vec(Segment.Const(Span.from(7000L), Vec(441.0))))))
         )
       )
       obs.clear()
@@ -134,10 +137,11 @@ class TransportSpec extends ConfluentEventSpec {
     system.step { implicit tx =>
       val pg = pgH()
       val p1 = Proc[S]
+      val o1 = Obj(ProcElem(p1))
       val g1 = Grapheme.Modifiable[S]
       //         p1.scans.add( "freq" ).source_=( Some( Scan.Link.Grapheme( g1 )))
       g1.add(7000L -> curve(441.0))
-      val pt1 = pg.add(Span(-1000L, 10000L), p1)
+      val pt1 = pg.add(Span(-1000L, 10000L), o1)
       obs.assertEquals(
         Advance(t, time = 0L, isSeek = false, isPlaying = false, added = Vec(pt1))
       )
@@ -161,10 +165,10 @@ class TransportSpec extends ConfluentEventSpec {
 
       obs.assertEquals(
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> ProcChanged[S](
-            Proc.AssociationAdded(Proc.ScanKey("freq"))))),
+          Vec(pt1 -> Transport.Proc.ElemChanged[S](
+            Proc.ScanAdded("freq", scan)))),
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> ProcChanged[S](
+          Vec(pt1 -> Transport.Proc.ElemChanged[S](
             Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded(source)))
           ))
         )
@@ -176,10 +180,10 @@ class TransportSpec extends ConfluentEventSpec {
 
       t.elapse(0.1) // t now at 2000 frames
       val a0 = Advance(t, time = 2000L, isSeek = false, isPlaying = true)
-      p1.scans.add("egal")
+      val scanEgal = p1.scans.add("egal")
       obs.assertEquals(
-        a0.copy(changes = Vec(pt1 -> ProcChanged[S](
-          Proc.AssociationAdded(Proc.ScanKey("egal")))))
+        a0.copy(changes = Vec(pt1 -> Transport.Proc.ElemChanged[S](
+          Proc.ScanAdded("egal", scanEgal))))
       )
       obs.clear()
 
@@ -190,10 +194,10 @@ class TransportSpec extends ConfluentEventSpec {
       // )
       // obs.clear()
 
-      p1.scans.remove( "egal" )
+      p1.scans.remove("egal")
       obs.assertEquals(
-        a0.copy(changes = Vec(pt1 -> ProcChanged[S](
-          Proc.AssociationRemoved(Proc.ScanKey("egal")))))
+        a0.copy(changes = Vec(pt1 -> Transport.Proc.ElemChanged[S](
+          Proc.ScanRemoved("egal", scanEgal))))
       )
       obs.clear()
 
@@ -208,7 +212,7 @@ class TransportSpec extends ConfluentEventSpec {
           // pt1 -> ProcChanged(
           //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, Vec( segm )))
           // ),
-          pt1 -> GraphemesChanged[S](
+          pt1 -> Transport.Proc.GraphemesChanged[S](
             Map("freq" -> Vec(segm))
           )
         ))

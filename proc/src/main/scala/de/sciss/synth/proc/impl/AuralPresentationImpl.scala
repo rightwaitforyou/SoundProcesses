@@ -354,7 +354,7 @@ object AuralPresentationImpl {
 
           // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
           //           we cannot use ControlSet any more, but need other mechanism
-          p.scans.get(key).foreach { scan =>
+          p.elem.peer.scans.get(key).foreach { scan =>
             val src = scan.sources
             // if (src.isEmpty) {
               if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
@@ -421,7 +421,7 @@ object AuralPresentationImpl {
           val bOut   = bw.bus
           users :+= bw
 
-          p.scans.get(key).foreach { scan =>
+          p.elem.peer.scans.get(key).foreach { scan =>
             scan.sinks.foreach {
               case Link.Scan(peer) =>
                 scanMap.get(peer.id).foreach {
@@ -503,7 +503,8 @@ object AuralPresentationImpl {
 
     // called by UGenGraphBuilderImpl
     def scanInNumChannels(timed: TimedProc[S], time: Long, key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
-      val numCh = timed.value.scans.get(key).fold(0) { scan =>
+      val proc    = timed.value.elem.peer
+      val numCh   = proc.scans.get(key).fold(0) { scan =>
         val chans = scan.sources.toList.map {
           case Link.Grapheme(peer) =>
             val chansOpt = peer.valueAt(time).map(_.numChannels)
@@ -568,7 +569,8 @@ object AuralPresentationImpl {
       // only the Scan which in turn doesn't currently carry
       // key and proc information, so it can't be recovered
       // otherwise; in the future this may change)
-      val scans = timed.value.scans
+      val proc  = timed.value.elem.peer
+      val scans = proc.scans
       scans.iterator.foreach {
         case (key, scan) =>
           import de.sciss.lucre.synth.expr.IdentifierSerializer
@@ -623,7 +625,8 @@ object AuralPresentationImpl {
       val retry = if (newOuts.nonEmpty) {
         // the retried entries are those whose missing scan ins contain
         // any of the newly determined scan outs
-        val scans = ugen.timed.value.scans
+        val proc  = ugen.timed.value.elem.peer
+        val scans = proc.scans
         val keys: Set[MissingIn[S]] = newOuts.flatMap({
           case (key, _) =>
             val scanOpt = scans.get(key)
@@ -681,7 +684,8 @@ object AuralPresentationImpl {
       }
 
       // remove auxiliary scan map (see procAdded)
-      val scans = timed.value.scans
+      val proc  = timed.value.elem.peer
+      val scans = proc.scans
       scans.iterator.foreach {
         case (key, scan) =>
           scanMap.remove(scan.id)

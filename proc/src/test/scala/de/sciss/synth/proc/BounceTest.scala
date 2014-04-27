@@ -21,12 +21,14 @@ object BounceTest extends App {
     import expr._
 
     val proc      = Proc[S]
+    val peer      = ProcElem(proc)
+    val obj       = Obj(peer)
     proc.graph() = SynthGraph {
       import ugen._
       Out.ar(0, SinOsc.ar(440))
     }
     val group     = ProcGroup.Modifiable[S]
-    group.add(Span(4410, 8820), proc)
+    group.add(Span(4410, 8820), obj)
     import ProcGroup.serializer
     tx.newHandle(group: ProcGroup[S])
   }
