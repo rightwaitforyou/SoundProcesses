@@ -16,7 +16,8 @@ The following dependency is necessary:
     
     "de.sciss" %% "soundprocesses" % v
 
-The current version `v` is `"2.2.+"`.
+The current version `v` is `"2.3.+"`.
+
 The following sub modules are available:
 
     "de.sciss" %% "lucrebitemp"     % v     // bi-temporal data structures

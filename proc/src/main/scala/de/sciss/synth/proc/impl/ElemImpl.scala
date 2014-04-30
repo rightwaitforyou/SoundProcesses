@@ -259,9 +259,13 @@ object ElemImpl {
       new FadeSpecConstImpl[S](peer)
     }
 
-    def apply[S <: Sys[S]](peer: _Expr[S, _FadeSpec.Value])(implicit tx: S#Tx): FadeSpecElem[S] = peer match {
-      case c: _Expr.Const[S, _FadeSpec.Value] => new FadeSpecConstImpl(c)
-      case _                                  => new FadeSpecActiveImpl(evt.Targets[S], peer)
+    def apply[S <: Sys[S]](peer: _Expr[S, _FadeSpec.Value])(implicit tx: S#Tx): FadeSpecElem[S] = {
+      import _FadeSpec.Value
+      peer match {
+        // note: using _FadeSpec.Value produces a bug in Scala 2.10; import Value instead
+        case c: _Expr.Const[S, Value] => new FadeSpecConstImpl(c)
+        case _                        => new FadeSpecActiveImpl(evt.Targets[S], peer)
+      }
     }
   }
 
