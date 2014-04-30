@@ -34,10 +34,10 @@ private[proc] object UGenGraphBuilderImpl {
 
     import UGenGraphBuilder._
 
-    override def toString = "proc.UGenGraph.Builder@" + hashCode.toHexString
+    override def toString = s"proc.UGenGraph.Builder@${hashCode.toHexString}"
 
-    private var remaining: Vec[Lazy]               = g.sources
-    private var controlProxies: ISet[ControlProxyLike] = g.controlProxies
+    private var remaining     : Vec [Lazy]              = g.sources
+    private var controlProxies: ISet[ControlProxyLike]  = g.controlProxies
 
     var scanOuts    = Map.empty[String, Int]
     var scanIns     = Map.empty[String, ScanIn]
@@ -53,12 +53,14 @@ private[proc] object UGenGraphBuilderImpl {
     }
 
     def addScanOut(key: String, numChannels: Int): Unit =
-      scanOuts.get(key) match {
-        case Some(prevChans) =>
-          require(numChannels == prevChans, "Cannot write multiple times to the same scan (" + key +
-            ") using different number of channels (" + prevChans + ", " + numChannels + ")")
-        case _ =>
-          scanOuts += key -> numChannels
+      scanOuts.get(key).fold {
+        scanOuts += key -> numChannels
+      } { prevChans =>
+          if (numChannels != prevChans) {
+            val s1 = s"Cannot write multiple times to the same scan ($key)"
+            val s2 = s"using different number of channels ($prevChans, $numChannels)"
+            sys.error(s"$s1 $s2")
+          }
       }
 
     def addAttributeIn(key: String): Int = {
@@ -79,10 +81,6 @@ private[proc] object UGenGraphBuilderImpl {
       }
       (numCh, idx)
     }
-
-    //    def addStreamIn(key: String): Unit = if (!streamIns.contains(key)) {
-    //      streamIns += key -> Nil
-    //    }
 
     def tryBuild(): Boolean = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]
@@ -122,7 +120,7 @@ private[proc] object UGenGraphBuilderImpl {
           remaining        = g.sources
           controlProxies ++= g.controlProxies
         } else {
-          remaining = Vector.empty
+          remaining        = Vector.empty
         }
       }
 

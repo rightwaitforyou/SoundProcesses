@@ -7,10 +7,11 @@ import org.scalatest.FunSpec
 import de.sciss.serial.{DataInput, DataOutput}
 import de.sciss.synth.Curve.cubed
 
-/**
- * To run only this suite:
- *
- * test-only de.sciss.synth.proc.SynthGraphSerializationSpec
+/*
+  To run only this suite:
+
+  test-only de.sciss.synth.proc.SynthGraphSerializationSpec
+
  */
 class SynthGraphSerializationSpec extends FunSpec {
   var dfs = Map.empty[String, SynthGraph]
@@ -254,6 +255,23 @@ class SynthGraphSerializationSpec extends FunSpec {
       }
     ), roomSize = 1) / 384
     WrapOut(res)
+  }
+
+  //////////////////////////////////////////////////////////////////////////
+  // SysSon problem patch
+
+  dfs += "SysSon-Test" -> SynthGraph {
+    val v = LFDNoise3.ar(0.1).linexp(-1, 1, 1e-5, 1)
+    val n = 32
+    var mix: GE = 0
+    for (i <- 0 until n) {
+      val freq = LFDNoise3.ar(LFDNoise3.ar(v).linexp(-1, 1, 1e-4, 0.01)).linexp(-1, 1, 64, 16000)
+      val sin = SinOsc.ar(freq)
+      val mul = LFDNoise3.ar(LFDNoise3.ar(v).linexp(-1, 1, 1e-4, 1)).linexp(-1, 1, 0.001, 1)
+      mix += sin * mul
+    }
+    val sig = OnePole.ar(mix / n * 2, 0.95)
+    Out.ar(0, Pan2.ar(sig))
   }
 
   dfs.foreach { case (name, graph) =>
