@@ -21,6 +21,7 @@ import de.sciss.synth.{Lazy, MaybeRate, SynthGraph}
 import de.sciss.serial.{ImmutableSerializer, DataOutput, DataInput}
 import de.sciss.lucre.expr.Expr
 import de.sciss.synth.ugen.{ControlProxyLike, Constant}
+import java.util
 
 object SynthGraphs extends expr.impl.ExprTypeImpl[SynthGraph] {
   final val typeID = 16
@@ -29,11 +30,16 @@ object SynthGraphs extends expr.impl.ExprTypeImpl[SynthGraph] {
 object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   private final val SER_VERSION = 0x5347
 
-  private final class RefMapOut {
-    var map   = Map.empty[Product, Int]
-    // val map   = collection.mutable.Map.empty[Product, Int] // not faster than immutable map!
-    var count = 0
-  }
+  // private final class RefMapOut {
+  // var map   = Map.empty[Product, Int]
+  // val map   = collection.mutable.Map.empty[Product, Int] // not faster than immutable map!
+  // var count = 0
+  // }
+
+    // we use an identity hash map, because we do _not_
+    // want to alias objects in the serialization; the input
+    // is an in-memory object graph.
+  private type RefMapOut = util.IdentityHashMap[Product, Integer]
 
   private final class RefMapIn {
     var map   = Map.empty[Int, Product]
@@ -42,23 +48,25 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   }
 
   private def writeProduct(p: Product, out: DataOutput, ref: RefMapOut): Unit = {
-    val id0 = ref.map.getOrElse(p, -1)
-    if (id0 >= 0) {
+    val id0Ref = ref.get(p)
+    // val id0 = ref.map.getOrElse(p, -1)
+    if (id0Ref != null) {
       out.writeByte('<')
-      out.writeInt(id0)
+      out.writeInt(id0Ref)
       return
     }
     out.writeByte('P')
     val pck     = p.getClass.getPackage.getName
     val prefix  = p.productPrefix
-    val name    = if (pck == "de.sciss.synth.ugen") prefix else pck + "." + prefix
+    val name    = if (pck == "de.sciss.synth.ugen") prefix else s"$pck.$prefix"
     out.writeUTF(name)
     out.writeShort(p.productArity)
     p.productIterator.foreach(writeElem(_, out, ref))
 
-    val id     = ref.count
-    ref.map   += ((p, id))
-    ref.count  = id + 1
+    val id     = ref.size() // count
+    // ref.map   += ((p, id))
+    // ref.count  = id + 1
+    ref.put(p, id)
   }
 
   private def writeElemSeq(xs: Seq[Any], out: DataOutput, ref: RefMapOut): Unit = {
@@ -102,28 +110,8 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
 
   def write(v: SynthGraph, out: DataOutput): Unit = {
     out.writeShort(SER_VERSION)
-    //    val t1    = System.nanoTime()
-    //    val p1    = out.position
-    //    writeOld(v, out)
-    //    val t2    = System.nanoTime()
-    //    val p2    = out.position
     writeNew(v, out)
-    //    val t3    = System.nanoTime()
-    //    val p3    = out.position
-    //    val timOld    = t2 - t1
-    //    val timNew    = t3 - t2
-    //    val spcOld    = p2 - p1
-    //    val spcNew    = p3 - p2
-    //    val timeRel   = timNew.toDouble/timOld.toDouble*100
-    //    val spaceRel  = spcNew.toDouble/spcOld.toDouble*100
-    //    println(f"<<< writ >>> time ${timOld/1000}%5d vs. ${timNew/1000}%5d ($timeRel%5.1f%); space $spcOld%5d vs. $spcNew%5d ($spaceRel%5.1f%)")
   }
-
-  //  private def writeOld(v: SynthGraph, out: DataOutput): Unit = {
-  //    val oos = new java.io.ObjectOutputStream(out.asOutputStream)
-  //    oos.writeObject(v)
-  //    oos.flush()
-  //  }
 
   private def writeNew(v: SynthGraph, out: DataOutput): Unit = {
     val ref = new RefMapOut
@@ -151,9 +139,9 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
       elems(i) = readElem(in, ref).asInstanceOf[AnyRef]
       i += 1
     }
-    val className = if (Character.isUpperCase(prefix.charAt(0))) "de.sciss.synth.ugen." + prefix else prefix
+    val className = if (Character.isUpperCase(prefix.charAt(0))) s"de.sciss.synth.ugen.$prefix" else prefix
     // cf. stackoverflow #3039822
-    val companion = Class.forName(className + "$").getField("MODULE$").get(null)
+    val companion = Class.forName(s"$className$$").getField("MODULE$").get(null)
     //    val m         = companion.getClass.getMethods.find(_.getName == "apply")
     //      .getOrElse(sys.error(s"No apply method found on $companion"))
     val ms        = companion.getClass.getMethods
@@ -194,23 +182,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   def read(in: DataInput): SynthGraph = {
     val cookie  = in.readShort()
     require(cookie == SER_VERSION, s"Unexpected cookie $cookie")
-
-    //    val t1    = System.nanoTime()
-    //    val p1    = in.position
-    //    val res1  = readOld(in)
-    //    val t2    = System.nanoTime()
-    //    val p2    = in.position
     val res2  = readNew(in)
-    //    val t3    = System.nanoTime()
-    //    val p3    = in.position
-    //    val timOld    = t2 - t1
-    //    val timNew    = t3 - t2
-    //    val spcOld    = p2 - p1
-    //    val spcNew    = p3 - p2
-    //    val timeRel   = timNew.toDouble/timOld.toDouble*100
-    //    val spaceRel  = spcNew.toDouble/spcOld.toDouble*100
-    //    println(f"<<< read >>> time ${timOld/1000}%5d vs. ${timNew/1000}%5d ($timeRel%5.1f%); space $spcOld%5d vs. $spcNew%5d ($spaceRel%5.1f%)")
-
     res2
   }
 
@@ -259,8 +231,6 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   def writeValue(value: SynthGraph, out: DataOutput): Unit        = ValueSerializer.write(value, out)
 
   lazy val install: Unit = ()
-
-
 
   // XXX TODO: not cool. Should use `1` to `3` for cookies
   override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
