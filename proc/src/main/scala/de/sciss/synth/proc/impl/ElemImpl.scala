@@ -521,8 +521,6 @@ object ElemImpl {
 
     type Peer <: Writable with Disposable[S#Tx]
 
-    protected def typeID: Int
-
     final protected def writeData(out: DataOutput): Unit = {
       out.writeInt(typeID)
       peer.write(out)

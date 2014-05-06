@@ -54,6 +54,8 @@ object Elem {
 trait Elem[S <: Sys[S]]
   extends Writable with Disposable[S#Tx] /* Mutable[S#ID, S#Tx] */ with evt.Publisher[S, Elem.Update[S, Any]] { me =>
 
+  def typeID: Int
+
   type Peer
   type PeerUpdate
 
