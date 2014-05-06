@@ -28,13 +28,21 @@ object Folder {
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Folder[S] =
     expr.List.Modifiable.read[S, Obj[S], Obj.Update[S]](in, access)
 
-  // private[Folder] type _Update[S <: Sys[S]] = expr.List.Update[S, _Element[S], _Element.Update[S]]
+  type Update[S <: Sys[S]] = expr.List.Update[S, Obj[S], Obj.Update[S]]
 
-  type Changes[S <: Sys[S]] = Vec[Change[S]]
-  sealed trait Change[S <: Sys[S]] { def obj: Obj[S] }
-  final case class Added  [S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
-  final case class Removed[S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
-  final case class Element[S <: Sys[S]](obj: Obj[S], update: Obj.Update[S]) extends Change[S]
+  //  type Changes[S <: Sys[S]] = Vec[Change[S]]
+  //  sealed trait Change[S <: Sys[S]] { def obj: Obj[S] }
+  //  final case class Added  [S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
+  //  final case class Removed[S <: Sys[S]](idx: Int, obj: Obj[S]) extends Change[S]
+  //  final case class Element[S <: Sys[S]](obj: Obj[S], update: Obj.Update[S]) extends Change[S]
+
+  type Change[S <: Sys[S]]  = expr.List.Change[S, Obj[S], Obj.Update[S]]
+  type Added [S <: Sys[S]]  = expr.List.Added[S, Obj[S]]
+  val Added                 = expr.List.Added
+  type Removed[S <: Sys[S]] = expr.List.Removed[S, Obj[S]]
+  val Removed               = expr.List.Removed
+  type Element[S <: Sys[S]] = expr.List.Element[S, Obj[S], Obj.Update[S]]
+  val Element               = expr.List.Element
 
   implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Folder[S]] =
     anySer.asInstanceOf[Serializer[S#Tx, S#Acc, Folder[S]]]
@@ -66,5 +74,5 @@ object FolderElem {
 trait FolderElem[S <: Sys[S]] extends Elem[S] {
   type Peer       = Folder[S]
   // type PeerUpdate = Folder.Update[S]
-  type PeerUpdate = expr.List.Update[S, Obj[S], Obj.Update[S]] // XXX TODO: make alias Folder.Update
+  type PeerUpdate = Folder.Update[S]
 }
