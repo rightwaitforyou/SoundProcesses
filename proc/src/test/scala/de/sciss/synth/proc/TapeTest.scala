@@ -35,7 +35,7 @@ object TapeTest extends App {
       // spatIn.addSink()
 
       val proc  = Proc[S]
-      val obj   = Obj(ProcElem(proc))
+      val obj   = Obj(Proc.Elem(proc))
       obj.attr.name = "tape"
       val sAudio = proc.scans.add("sig")
       val file = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")

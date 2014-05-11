@@ -61,7 +61,7 @@ class ScanSpec extends ConfluentEventSpec {
     }
 
     def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) =
-      Grapheme.Elem.Curve(amp -> shape)
+      Grapheme.Expr.Curve(amp -> shape)
 
     system.step { implicit tx =>
       val p = ph()

@@ -18,37 +18,37 @@ import de.sciss.lucre.{event => evt, expr}
 import evt.Sys
 import de.sciss.serial.DataInput
 
-object FolderElemImpl extends ElemImpl.Companion[FolderElem] {
+object FolderElemImpl extends ElemImpl.Companion[Folder.Elem] {
   final val typeID = 0x10000
 
   //  def empty[S <: Sys[S]]()(implicit tx: S#Tx): FolderElem[S] =
   //    apply(expr.List.Modifiable[S, Obj[S], Obj.Update[S]])
 
-  def apply[S <: Sys[S]](peer: Folder[S])(implicit tx: S#Tx): FolderElem[S] = {
+  def apply[S <: Sys[S]](peer: Folder[S])(implicit tx: S#Tx): Folder.Elem[S] = {
     val targets = evt.Targets[S]
     new Impl[S](targets, peer)
   }
 
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): FolderElem[S] =
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Folder.Elem[S] =
     serializer[S].read(in, access)
 
   // ---- Elem.Extension ----
   /** Read identified active element */
   def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                 (implicit tx: S#Tx): FolderElem[S] with evt.Node[S] = {
+                                 (implicit tx: S#Tx): Folder.Elem[S] with evt.Node[S] = {
     val peer = expr.List.Modifiable.read[S, Obj[S], Obj.Update[S]](in, access)
     new Impl[S](targets, peer)
   }
 
   /** Read identified constant element */
-  def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): FolderElem[S] =
+  def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Folder.Elem[S] =
     sys.error("Constant Folder not supported")
 
   // ---- implementation ----
 
   private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
                                         val peer: Folder[S])
-    extends FolderElem[S]
+    extends Folder.Elem[S]
     with ElemImpl.Active[S] {
 
     def typeID = FolderElemImpl.typeID
@@ -57,6 +57,6 @@ object FolderElemImpl extends ElemImpl.Companion[FolderElem] {
     // XXX TODO: not nice
     override def toString() = s"$prefix$id"
 
-    def mkCopy()(implicit tx: S#Tx): FolderElem[S] = FolderElemImpl(peer) // XXX TODO - copy list?
+    def mkCopy()(implicit tx: S#Tx): Folder.Elem[S] = FolderElemImpl(peer) // XXX TODO - copy list?
   }
 }

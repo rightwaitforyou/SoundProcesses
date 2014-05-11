@@ -25,14 +25,14 @@ object StreamTest extends App {
       import Implicits._
 
       val proc  = Proc[S]
-      val obj   = Obj(ProcElem(proc))
+      val obj   = Obj(Proc.Elem(proc))
       obj.attr.name = "tape"
       val file = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
       val spec = AudioFile.readSpec(file)
       // val vAudio    = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
-      val loc = Artifact.Location.Modifiable[S](file.getParentFile)
+      val loc = ArtifactLocation.Modifiable[S](file.getParentFile)
       val artifact = loc.add(file)
-      val eAudio = Grapheme.Elem.Audio[S](artifact, spec, offset = 0L, gain = 2.0)
+      val eAudio = Grapheme.Expr.Audio[S](artifact, spec, offset = 0L, gain = 2.0)
 
       obj.attr.put("disk", AudioGraphemeElem(eAudio))
 

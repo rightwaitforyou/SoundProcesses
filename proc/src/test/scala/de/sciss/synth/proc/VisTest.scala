@@ -70,7 +70,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   //   private type PG = ProcGroup.Modifiable[ S ]
   private type PG = ProcGroup.Modifiable[S] // BiGroup.Modifiable[S, Proc[S], Proc.Update[S]]
-  type Acc = (PG, Artifact.Location.Modifiable[S])
+  type Acc = (PG, ArtifactLocation.Modifiable[S])
 
   object Implicits {
     //      implicit def procVarSer: Serializer[ S#Tx, S#Acc, PG ] = ProcGroup.Modifiable.serializer[ S ]
@@ -90,7 +90,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     g.changed.react { _ => upd =>
       println("Group observed: " + upd)
     }
-    val loc = Artifact.Location.Modifiable[S](VisTest.audioDir)
+    val loc = ArtifactLocation.Modifiable[S](VisTest.audioDir)
     g -> loc
   }
 
@@ -118,9 +118,9 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   def grapheme(implicit tx: S#Tx): Grapheme.Modifiable[S] = Grapheme.Modifiable[S]
 
-  def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) = Grapheme.Elem.Curve(amp -> shape)
+  def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) = Grapheme.Expr.Curve(amp -> shape)
 
-  def proc(name: String)(implicit tx: S#Tx): Obj.T[S, ProcElem] = {
+  def proc(name: String)(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
     // implicit val chr: Chronos[S] = Chronos(0L)
     val p = Proc[S]
     // p.name_=( name )
@@ -149,7 +149,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
     //      p.trigger( "silence" )
 
     //      p.playing_=( true )
-    val obj = Obj(ProcElem(p))
+    val obj = Obj(Proc.Elem(p))
     obj.attr.name = name
     obj
   }
@@ -260,7 +260,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
       addFreq2(time -> freq)
     }
 
-  def audioTest()(implicit tx: S#Tx): Obj.T[S, ProcElem] = {
+  def audioTest()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
     val af = audioFile("283_7WTConWhiteCCRsmpLp.aif")
 
     t { implicit tx =>

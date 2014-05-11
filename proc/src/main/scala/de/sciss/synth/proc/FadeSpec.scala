@@ -16,38 +16,36 @@ package synth
 package proc
 
 import de.sciss.lucre.{event => evt, expr}
-import lucre.expr.Expr
-import serial.{DataOutput, DataInput, ImmutableSerializer}
+import lucre.expr.{Expr => _Expr}
+import de.sciss.serial.{Serializer, DataOutput, DataInput, ImmutableSerializer}
 import de.sciss.lucre.event.{Pull, Targets}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
+import evt.Sys
 
 object FadeSpec {
   private final val COOKIE = 0x4664 // 'Fd'
 
-  object Value {
-    implicit object serializer extends ImmutableSerializer[Value] {
-      def write(v: Value, out: DataOutput): Unit = {
-        import v._
-        out.writeShort(COOKIE)
-        out.writeLong (numFrames)
-        Curve.serializer.write(curve, out)
-        out.writeFloat(floor)
-      }
+  implicit object serializer extends ImmutableSerializer[FadeSpec] {
+    def write(v: FadeSpec, out: DataOutput): Unit = {
+      import v._
+      out.writeShort(COOKIE)
+      out.writeLong (numFrames)
+      Curve.serializer.write(curve, out)
+      out.writeFloat(floor)
+    }
 
-      def read(in: DataInput): Value = {
-        val cookie = in.readShort()
-        require(cookie == COOKIE, s"Unexpected cookie $cookie, expected $COOKIE")
-        val numFrames = in.readLong()
-        val curve     = Curve.serializer.read(in)
-        val floor     = in.readFloat()
-        Value(numFrames = numFrames, curve = curve, floor = floor)
-      }
+    def read(in: DataInput): FadeSpec = {
+      val cookie = in.readShort()
+      require(cookie == COOKIE, s"Unexpected cookie $cookie, expected $COOKIE")
+      val numFrames = in.readLong()
+      val curve     = Curve.serializer.read(in)
+      val floor     = in.readFloat()
+      FadeSpec(numFrames = numFrames, curve = curve, floor = floor)
     }
   }
-  final case class Value(numFrames: Long, curve: Curve = linear, floor: Float = 0f)
 
-  object Elem extends expr.impl.ExprTypeImpl[Value] {
+  object Expr extends expr.impl.ExprTypeImpl[FadeSpec] {
     final val typeID = 14
 
     // 0 reserved for variables
@@ -56,25 +54,25 @@ object FadeSpec {
     //    def longType    : BiType[Long    ] = Longs
     //    def spanLikeType: BiType[SpanLike] = SpanLikes
 
-    def readValue (              in : DataInput ): Value  = Value.serializer.read (       in )
-    def writeValue(value: Value, out: DataOutput): Unit   = Value.serializer.write(value, out)
+    def readValue (                 in : DataInput ): FadeSpec  = FadeSpec.serializer.read (       in )
+    def writeValue(value: FadeSpec, out: DataOutput): Unit      = FadeSpec.serializer.write(value, out)
 
     // lazy val install: Unit = ()
 
-    def apply[S <: evt.Sys[S]](numFrames: Expr[S, Long], shape: Expr[S, Curve], floor: Expr[S, Double])
-                              (implicit tx: S#Tx): Elem[S] = {
+    def apply[S <: Sys[S]](numFrames: _Expr[S, Long], shape: _Expr[S, Curve], floor: _Expr[S, Double])
+                              (implicit tx: S#Tx): Expr[S] = {
       val targets = Targets.partial[S] // XXX TODO partial?
       new Impl(targets, numFrames, shape, floor)
     }
 
-    def unapply[S <: evt.Sys[S]](expr: Elem[S]): Option[(Expr[S, Long], Expr[S, Curve], Expr[S, Double])] =
+    def unapply[S <: Sys[S]](expr: Expr[S]): Option[(_Expr[S, Long], _Expr[S, Curve], _Expr[S, Double])] =
       expr match {
         case impl: Impl[S] => Some((impl.numFrames, impl.shape, impl.floor))
         case _ => None
       }
 
     // XXX TODO: not cool. Should use `1` for `elemCookie`
-    override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+    override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                               (implicit tx: S#Tx): Ex[S] with evt.Node[S] = {
       require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
       val numFrames = lucre      .expr.Long  .read(in, access)
@@ -83,17 +81,17 @@ object FadeSpec {
       new Impl(targets, numFrames, shape, floor)
     }
 
-    private final class Impl[S <: evt.Sys[S]](protected val targets: Targets[S],
-                                              val numFrames: Expr[S, Long],
-                                              val shape: Expr[S, Curve],
-                                              val floor: Expr[S, Double])
-      extends lucre.expr.impl.NodeImpl[S, Value] with Elem[S] {
+    private final class Impl[S <: Sys[S]](protected val targets: Targets[S],
+                                              val numFrames: _Expr[S, Long],
+                                              val shape: _Expr[S, Curve],
+                                              val floor: _Expr[S, Double])
+      extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Expr[S] {
 
-      def value(implicit tx: S#Tx) = Value(numFrames.value, shape.value, floor.value.toFloat)
+      def value(implicit tx: S#Tx) = FadeSpec(numFrames.value, shape.value, floor.value.toFloat)
 
-      protected def reader = Elem.serializer[S]
+      protected def reader = Expr.serializer[S]
 
-      def pullUpdate(pull: Pull[S])(implicit tx: S#Tx): Option[m.Change[Value]] = {
+      def pullUpdate(pull: Pull[S])(implicit tx: S#Tx): Option[m.Change[FadeSpec]] = {
         val framesEvt = numFrames.changed
         val framesChO = if (pull.contains(framesEvt)) pull(framesEvt) else None
         val shapeEvt  = shape.changed
@@ -118,8 +116,8 @@ object FadeSpec {
           m.Change(floorV, floorV)
         }
 
-        val before  = Value(framesCh.before, shapeCh.before, floorCh.before.toFloat)
-        val now     = Value(framesCh.now,    shapeCh.now,    floorCh.now   .toFloat)
+        val before  = FadeSpec(framesCh.before, shapeCh.before, floorCh.before.toFloat)
+        val now     = FadeSpec(framesCh.now,    shapeCh.now,    floorCh.now   .toFloat)
 
         Some(m.Change(before, now))
       }
@@ -144,5 +142,26 @@ object FadeSpec {
       }
     }
   }
-  sealed trait Elem[S <: evt.Sys[S]] extends Expr[S, FadeSpec.Value]
+  sealed trait Expr[S <: Sys[S]] extends _Expr[S, FadeSpec]
+  
+  // ---- Elem ----
+
+  object Elem {
+    def apply[S <: Sys[S]](peer: _Expr[S, FadeSpec])(implicit tx: S#Tx): FadeSpec.Elem[S] =
+      proc.impl.ElemImpl.FadeSpec(peer)
+
+    object Obj {
+      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, FadeSpec.Elem]] =
+        if (obj.elem.isInstanceOf[FadeSpec.Elem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, FadeSpec.Elem]])
+        else None
+    }
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, FadeSpec.Elem[S]] =
+      proc.impl.ElemImpl.FadeSpec.serializer[S]
+  }
+  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
+    type Peer       = _Expr[S, FadeSpec]
+    type PeerUpdate = model.Change[FadeSpec]
+  } // FadeSpec.Elem[S]
 }
+final case class FadeSpec(numFrames: Long, curve: Curve = linear, floor: Float = 0f)

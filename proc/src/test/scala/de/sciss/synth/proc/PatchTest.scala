@@ -39,7 +39,7 @@ object PatchTest extends App {
 
     val group         = ProcGroup.Modifiable[S]
     val trans         = Transport[S, I](group)
-    implicit val loc  = Artifact.Location.Modifiable.tmp[S]()
+    implicit val loc  = ArtifactLocation.Modifiable.tmp[S]()
     val ap            = AuralPresentation.run[S](trans, auralSys)
     ap.group.foreach {
       _.server.peer.dumpOSC()
@@ -65,8 +65,8 @@ object PatchTest extends App {
 
     p2in.addSource(Scan.Link.Scan(p1out))
 
-    group.add(Span.from(0L), Obj(ProcElem(p1)))
-    group.add(Span.from((2.5 * 44100L).toLong), Obj(ProcElem(p2))) // begin when sine wave is at positive peak
+    group.add(Span.from(0L), Obj(Proc.Elem(p1)))
+    group.add(Span.from((2.5 * 44100L).toLong), Obj(Proc.Elem(p2))) // begin when sine wave is at positive peak
 
     trans.play()
   }

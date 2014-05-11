@@ -15,15 +15,13 @@ package de.sciss
 package synth
 package proc
 
-import impl.{ArtifactImpl => Impl}
+import de.sciss.synth.proc.impl.{ArtifactImpl => Impl}
 import serial.{Serializer, DataInput}
-import lucre.{stm, data, expr}
-import stm.Mutable
+import lucre.expr
 import java.io.File
-import de.sciss.lucre.event.{Sys, Publisher}
+import de.sciss.lucre.event.Sys
 import expr.Expr
 import scala.annotation.tailrec
-import de.sciss.model
 
 object Artifact {
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] = Impl.read(in, access)
@@ -54,60 +52,6 @@ object Artifact {
     Child(cf.getPath)
   }
 
-  object Location {
-    object Modifiable {
-      def tmp[S <: Sys[S]]()(implicit tx: S#Tx): Location.Modifiable[S] = {
-        val dir   = File.createTempFile("artifacts", "tmp")
-        dir.delete()
-        dir.mkdir()
-        dir.deleteOnExit()
-        apply(dir)
-      }
-
-      def apply[S <: Sys[S]](init: File)(implicit tx: S#Tx): Location.Modifiable[S] = Impl.newLocation[S](init)
-
-      implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Location.Modifiable[S]] =
-        Impl.modLocationSerializer
-
-      def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location.Modifiable[S] =
-        Impl.readModLocation[S](in, access)
-    }
-    trait Modifiable[S <: Sys[S]] extends Location[S] {
-      /** Registers a significant artifact with the system. That is,
-        * stores the artifact, which should have a real resource
-        * association, as belonging to the system.
-        *
-        * @param file   the file to turn into a registered artifact
-        */
-      def add(file: File)(implicit tx: S#Tx): Artifact.Modifiable[S]
-      def remove(artifact: Artifact[S])(implicit tx: S#Tx): Unit
-
-      def directory_=(value: File)(implicit tx: S#Tx): Unit
-    }
-
-    sealed trait Update[S <: Sys[S]] {
-      def location: Location[S]
-    }
-    final case class Added[S <: Sys[S]](location: Location[S], idx: Int, artifact: Artifact[S])
-      extends Update[S]
-
-    final case class Removed[S <: Sys[S]](location: Location[S], idx: Int, artifact: Artifact[S])
-      extends Update[S]
-
-    final case class Moved[S <: Sys[S]](location: Location[S], change: model.Change[File]) extends Update[S]
-
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Location[S]] = Impl.locationSerializer
-
-    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] =
-      Impl.readLocation[S](in, access)
-  }
-  trait Location[S <: Sys[S]] extends Mutable[S#ID, S#Tx] with Publisher[S, Location.Update[S]] {
-    def directory(implicit tx: S#Tx): File
-    def iterator (implicit tx: S#Tx): data.Iterator[S#Tx, Artifact[S]]
-
-    def modifiableOption: Option[Location.Modifiable[S]]
-  }
-
   type Value = File
 
   // sealed trait Update[S <: Sys[S]]
@@ -131,7 +75,7 @@ object Artifact {
 
 trait Artifact[S <: Sys[S]] extends Expr[S, Artifact.Value] /* Mutable[S#ID, S#Tx] */ {
   import Artifact._
-  def location: Location[S]
+  def location: ArtifactLocation[S]
   def modifiableOption: Option[Modifiable[S]]
   def child(implicit tx: S#Tx): Child
 }

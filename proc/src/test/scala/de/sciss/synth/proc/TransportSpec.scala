@@ -28,7 +28,7 @@ class TransportSpec extends ConfluentEventSpec {
   import imp._
 
   def curve(amp: Expr[S, Double], shape: Curve = Curve.linear)(implicit tx: S#Tx) =
-    Grapheme.Elem.Curve(amp -> shape)
+    Grapheme.Expr.Curve(amp -> shape)
 
   "Transport" should "notify observers about all relevant events" in { implicit system =>
     val obs = new Observation[S]
@@ -45,13 +45,13 @@ class TransportSpec extends ConfluentEventSpec {
     system.step { implicit tx =>
       val pg = pgH()
       val p1 = Proc[S]
-      val o1 = Obj(ProcElem(p1))
+      val o1 = Obj(Proc.Elem(p1))
       val g1 = Grapheme.Modifiable[S]
       p1.scans.add("freq").addSource(Scan.Link.Grapheme(g1))
       p1.scans.add("egal")
       g1.add(7000L -> curve(441.0))
       val p2 = Proc[S]
-      val o2 = Obj(ProcElem(p2))
+      val o2 = Obj(Proc.Elem(p2))
       val g2 = Grapheme.Modifiable[S]
       p2.scans.add("amp").addSource(Scan.Link.Grapheme(g2))
       val pt1 = pg.add(Span(   0L, 10000L), o1)
@@ -137,7 +137,7 @@ class TransportSpec extends ConfluentEventSpec {
     system.step { implicit tx =>
       val pg = pgH()
       val p1 = Proc[S]
-      val o1 = Obj(ProcElem(p1))
+      val o1 = Obj(Proc.Elem(p1))
       val g1 = Grapheme.Modifiable[S]
       //         p1.scans.add( "freq" ).source_=( Some( Scan.Link.Grapheme( g1 )))
       g1.add(7000L -> curve(441.0))

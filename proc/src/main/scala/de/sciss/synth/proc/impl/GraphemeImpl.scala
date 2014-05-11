@@ -28,7 +28,7 @@ import de.sciss.lucre
 import de.sciss.lucre.synth.InMemory
 
 object GraphemeImpl {
-  import Grapheme.{Elem, TimedElem, Value, Modifiable}
+  import Grapheme.{Expr, TimedElem, Value, Modifiable}
 
   private implicit val timeEx = lucre.expr.Long
 
@@ -52,7 +52,7 @@ object GraphemeImpl {
 
   private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Grapheme[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Grapheme[S] = {
-      implicit val elemType = Elem // .serializer[ S ]
+      implicit val elemType = Expr // .serializer[ S ]
       val pin = BiPin.Modifiable.read[S, Value](in, access)
       new Impl(targets, pin)
     }
@@ -68,7 +68,7 @@ object GraphemeImpl {
 
   def modifiable[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = {
     val targets = evt.Targets[S] // XXX TODO: partial?
-    implicit val elemType = Elem
+    implicit val elemType = Expr
     val pin = BiPin.Modifiable[S, Value]
     new Impl(targets, pin)
   }

@@ -30,7 +30,7 @@ object ElemImpl {
   import Elem.Update
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec, Artifact => _Artifact, ProcGroup => _ProcGroup, Proc => _Proc}
+  import proc.{FadeSpec => _FadeSpec, ArtifactLocation => _ArtifactLocation, ProcGroup => _ProcGroup, Proc => _Proc}
   import lucre.synth.expr.{DoubleVec => _DoubleVec}
 
   // ---- Int ----
@@ -245,44 +245,43 @@ object ElemImpl {
 
   // ---- FadeSpec ----
 
-  object FadeSpec extends Companion[FadeSpecElem] {
-    final val typeID = _FadeSpec.Elem.typeID
+  object FadeSpec extends Companion[_FadeSpec.Elem] {
+    final val typeID = _FadeSpec.Expr.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                       (implicit tx: S#Tx): FadeSpecElem[S] with evt.Node[S] = {
-      val peer = _FadeSpec.Elem.read(in, access)
+                                       (implicit tx: S#Tx): _FadeSpec.Elem[S] with evt.Node[S] = {
+      val peer = _FadeSpec.Expr.read(in, access)
       new FadeSpecActiveImpl(targets, peer)
     }
 
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): FadeSpecElem[S] = {
-      val peer = _FadeSpec.Elem.readConst[S](in)
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _FadeSpec.Elem[S] = {
+      val peer = _FadeSpec.Expr.readConst[S](in)
       new FadeSpecConstImpl[S](peer)
     }
 
-    def apply[S <: Sys[S]](peer: _Expr[S, _FadeSpec.Value])(implicit tx: S#Tx): FadeSpecElem[S] = {
-      import _FadeSpec.Value
+    def apply[S <: Sys[S]](peer: _Expr[S, _FadeSpec])(implicit tx: S#Tx): _FadeSpec.Elem[S] = {
       peer match {
-        // note: using _FadeSpec.Value produces a bug in Scala 2.10; import Value instead
-        case c: _Expr.Const[S, Value] => new FadeSpecConstImpl(c)
-        case _                        => new FadeSpecActiveImpl(evt.Targets[S], peer)
+        // note: using _FadeSpec produces a bug in Scala 2.10; import Value instead
+        case c: _Expr.Const[S, _FadeSpec] => new FadeSpecConstImpl(c)
+        case _                            => new FadeSpecActiveImpl(evt.Targets[S], peer)
       }
     }
   }
 
-  trait FadeSpecImpl[S <: Sys[S]] extends FadeSpecElem[S] {
+  trait FadeSpecImpl[S <: Sys[S]] extends _FadeSpec.Elem[S] {
     final def typeID = FadeSpec.typeID
     final def prefix = "FadeSpec"
   }
 
-  final class FadeSpecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _FadeSpec.Value])
+  final class FadeSpecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _FadeSpec])
     extends Passive[S] with FadeSpecImpl[S]
 
-  final class FadeSpecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _FadeSpec.Value])
+  final class FadeSpecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _FadeSpec])
     extends Active[S] with FadeSpecImpl[S] {
 
-    def mkCopy()(implicit tx: S#Tx): FadeSpecElem[S] = {
+    def mkCopy()(implicit tx: S#Tx): _FadeSpec.Elem[S] = {
       val newPeer = peer match {
-        case _Expr.Var(vr) => _FadeSpec.Elem.newVar(vr())
+        case _Expr.Var(vr) => _FadeSpec.Expr.newVar(vr())
         case _ => peer
       }
       FadeSpec(newPeer)
@@ -335,13 +334,13 @@ object ElemImpl {
   // ---- AudioGrapheme ----
 
   object AudioGrapheme extends Companion[AudioGraphemeElem] {
-    val typeID = Grapheme.Elem.Audio.typeID
+    val typeID = Grapheme.Expr.Audio.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                        (implicit tx: S#Tx): AudioGraphemeElem[S] with evt.Node[S] = {
       // val peer = Grapheme.Elem.Audio.readExpr(in, access)
-      val peer = Grapheme.Elem.Audio.read(in, access) match {
-        case a: Grapheme.Elem.Audio[S] => a
+      val peer = Grapheme.Expr.Audio.read(in, access) match {
+        case a: Grapheme.Expr.Audio[S] => a
         case other => sys.error(s"Expected a Grapheme.Elem.Audio, but found $other")  // XXX TODO
       }
       new AudioGraphemeActiveImpl(targets, peer)
@@ -353,7 +352,7 @@ object ElemImpl {
       sys.error("Constant Grapheme.Elem.Value not supported")
     }
 
-    def apply[S <: Sys[S]](peer: Grapheme.Elem.Audio[S])(implicit tx: S#Tx): AudioGraphemeElem[S] = {
+    def apply[S <: Sys[S]](peer: Grapheme.Expr.Audio[S])(implicit tx: S#Tx): AudioGraphemeElem[S] = {
       // peer match {
       //  case c: _Expr.Const[S, Grapheme.Value.Audio] =>
       //    new AudioGraphemeConstImpl(c)
@@ -372,7 +371,7 @@ object ElemImpl {
   //    extends Passive[S] with AudioGraphemeImpl[S]
 
   final class AudioGraphemeActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
-                                                   val peer: Grapheme.Elem.Audio[S])
+                                                   val peer: Grapheme.Expr.Audio[S])
     extends Active[S] with AudioGraphemeImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): AudioGraphemeElem[S] = {
@@ -387,23 +386,23 @@ object ElemImpl {
 
   // ---- ArtifactLocation ----
 
-  object ArtifactLocation extends Companion[ArtifactLocationElem] {
-    val typeID = 0x10003 // _Artifact.Location.typeID
+  object ArtifactLocation extends Companion[_ArtifactLocation.Elem] {
+    val typeID = 0x10003 // _ArtifactLocation.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): ArtifactLocationElem[S] with evt.Node[S] = {
-      val peer = _Artifact.Location.read(in, access)
+                                   (implicit tx: S#Tx): _ArtifactLocation.Elem[S] with evt.Node[S] = {
+      val peer = _ArtifactLocation.read(in, access)
       new ArtifactLocationActiveImpl(targets, peer)
     }
 
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ArtifactLocationElem[S] =
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _ArtifactLocation.Elem[S] =
       sys.error("Constant Artifact.Location not supported")
 
-    def apply[S <: Sys[S]](peer: _Artifact.Location[S])(implicit tx: S#Tx): ArtifactLocationElem[S] =
+    def apply[S <: Sys[S]](peer: _ArtifactLocation[S])(implicit tx: S#Tx): _ArtifactLocation.Elem[S] =
       new ArtifactLocationActiveImpl(evt.Targets[S], peer)
   }
 
-  trait ArtifactLocationImpl[S <: Sys[S]] extends ArtifactLocationElem[S] {
+  trait ArtifactLocationImpl[S <: Sys[S]] extends _ArtifactLocation.Elem[S] {
     final def typeID = ArtifactLocation.typeID
     final def prefix = "ArtifactLocation"
   }
@@ -412,33 +411,33 @@ object ElemImpl {
   //    extends Passive[S] with AudioGraphemeImpl[S]
 
   final class ArtifactLocationActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
-                                                      val peer: _Artifact.Location[S])
+                                                      val peer: _ArtifactLocation[S])
     extends Active[S] with ArtifactLocationImpl[S] {
 
     protected def peerEvent = peer.changed
 
-    def mkCopy()(implicit tx: S#Tx): ArtifactLocationElem[S] = ArtifactLocation(peer)
+    def mkCopy()(implicit tx: S#Tx): _ArtifactLocation.Elem[S] = ArtifactLocation(peer)
   }
 
   // ---- ProcGroup ----
 
-  object ProcGroup extends Companion[ProcGroupElem] {
+  object ProcGroup extends Companion[_ProcGroup.Elem] {
     val typeID = 0x10001 // _ProcGroup.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): ProcGroupElem[S] with evt.Node[S] = {
+                                   (implicit tx: S#Tx): _ProcGroup.Elem[S] with evt.Node[S] = {
       val peer = _ProcGroup.read(in, access)
       new ProcGroupActiveImpl(targets, peer)
     }
 
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ProcGroupElem[S] =
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _ProcGroup.Elem[S] =
       sys.error("Constant ProcGroup not supported")
 
-    def apply[S <: Sys[S]](peer: _ProcGroup[S])(implicit tx: S#Tx): ProcGroupElem[S] =
+    def apply[S <: Sys[S]](peer: _ProcGroup[S])(implicit tx: S#Tx): _ProcGroup.Elem[S] =
       new ProcGroupActiveImpl(evt.Targets[S], peer)
   }
 
-  trait ProcGroupImpl[S <: Sys[S]] extends ProcGroupElem[S] {
+  trait ProcGroupImpl[S <: Sys[S]] extends _ProcGroup.Elem[S] {
     final def typeID = ProcGroup.typeID
     final def prefix = "ProcGroup"
   }
@@ -449,28 +448,28 @@ object ElemImpl {
 
     protected def peerEvent = peer.changed
 
-    def mkCopy()(implicit tx: S#Tx): ProcGroupElem[S] = ProcGroup(peer)
+    def mkCopy()(implicit tx: S#Tx): _ProcGroup.Elem[S] = ProcGroup(peer)
   }
 
   // ---- Proc ----
 
-  object Proc extends Companion[ProcElem] {
+  object Proc extends Companion[_Proc.Elem] {
     val typeID = _Proc.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): ProcElem[S] with evt.Node[S] = {
+                                   (implicit tx: S#Tx): _Proc.Elem[S] with evt.Node[S] = {
       val peer = _Proc.read(in, access)
       new ProcActiveImpl(targets, peer)
     }
 
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ProcElem[S] =
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _Proc.Elem[S] =
       sys.error("Constant ProcGroup not supported")
 
-    def apply[S <: Sys[S]](peer: _Proc[S])(implicit tx: S#Tx): ProcElem[S] =
+    def apply[S <: Sys[S]](peer: _Proc[S])(implicit tx: S#Tx): _Proc.Elem[S] =
       new ProcActiveImpl(evt.Targets[S], peer)
   }
 
-  trait ProcImpl[S <: Sys[S]] extends ProcElem[S] {
+  trait ProcImpl[S <: Sys[S]] extends _Proc.Elem[S] {
     final def typeID = Proc.typeID
     final def prefix = "Proc"
   }
@@ -481,7 +480,7 @@ object ElemImpl {
 
     protected def peerEvent = peer.changed
 
-    def mkCopy()(implicit tx: S#Tx): ProcElem[S] = Proc(peer) // XXX TODO
+    def mkCopy()(implicit tx: S#Tx): _Proc.Elem[S] = Proc(peer) // XXX TODO
   }
 
   // ---------- Impl ----------
@@ -542,7 +541,7 @@ object ElemImpl {
 
     final def changed: EventLike[S, Update[S, PeerUpdate]] = evt.Dummy[S, Update[S, PeerUpdate]]
 
-    override def toString() = s"Elem.${prefix}($peer)"
+    override def toString = s"Elem.$prefix($peer)"
 
     final def dispose()(implicit tx: S#Tx): Unit = disposeData()
   }

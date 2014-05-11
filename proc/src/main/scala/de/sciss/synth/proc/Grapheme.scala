@@ -16,7 +16,7 @@ package synth
 package proc
 
 import lucre.{event => evt, bitemp, expr}
-import de.sciss.lucre.expr.{ExprType1, Expr}
+import de.sciss.lucre.expr.{ExprType1, Expr => _Expr}
 import bitemp.BiExpr
 import collection.immutable.{IndexedSeq => Vec}
 import annotation.switch
@@ -44,7 +44,7 @@ object Grapheme {
   private final val audioCookie = 2
 
   object Value {
-    implicit val biType: ExprType1[Value] = Elem
+    implicit val biType: ExprType1[Value] = Expr
 
     implicit object serializer extends ImmutableSerializer[Value] {
       def write(v: Value, out: DataOutput): Unit = v.write(out)
@@ -171,18 +171,18 @@ object Grapheme {
     def isDefined: Boolean
   }
 
-  object Elem extends expr.impl.ExprTypeImplA[Value] {
+  object Expr extends expr.impl.ExprTypeImplA[Value] {
     final val typeID = 11
 
     object Curve extends expr.impl.ExprTypeImplA[Value.Curve] {
       final val typeID = 12
 
-      def apply[S <: Sys[S]](values: (Expr[S, Double], synth.Curve)*)(implicit tx: S#Tx): Curve[S] = {
+      def apply[S <: Sys[S]](values: (_Expr[S, Double], synth.Curve)*)(implicit tx: S#Tx): Curve[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new CurveImpl(targets, values.toIndexedSeq)
       }
 
-      def unapplySeq[S <: Sys[S]](expr: Elem[S]): Option[Seq[(Expr[S, Double], synth.Curve)]] = {
+      def unapplySeq[S <: Sys[S]](expr: Expr[S]): Option[Seq[(_Expr[S, Double], synth.Curve)]] = {
         if (expr.isInstanceOf[CurveImpl[_]]) {
           val c = expr.asInstanceOf[CurveImpl[S]]
           Some(c.values)
@@ -212,18 +212,18 @@ object Grapheme {
         new CurveImpl(targets, values)
       }
     }
-    sealed trait Curve[S <: evt.Sys[S]] extends Elem[S] with Expr[S, Value.Curve]
+    sealed trait Curve[S <: evt.Sys[S]] extends Expr[S] with _Expr[S, Value.Curve]
 
     object Audio extends expr.impl.ExprTypeImplA[Value.Audio] {
       final val typeID = 13
 
-      def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: Expr[S, Long], gain: Expr[S, Double])
+      def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: _Expr[S, Long], gain: _Expr[S, Double])
                                 (implicit tx: S#Tx): Audio[S] = {
         val targets = evt.Targets.partial[S] // XXX TODO partial?
         new AudioImpl(targets, artifact, spec, offset, gain)
       }
 
-      def unapply[S <: Sys[S]](expr: Elem[S]): Option[(Artifact[S], AudioFileSpec, Expr[S, Long], Expr[S, Double])] = {
+      def unapply[S <: Sys[S]](expr: Expr[S]): Option[(Artifact[S], AudioFileSpec, _Expr[S, Long], _Expr[S, Double])] = {
         if (expr.isInstanceOf[AudioImpl[_]]) {
           val a = expr.asInstanceOf[AudioImpl[S]]
           Some((a.artifact, a.spec, a.offset, a.gain))
@@ -251,15 +251,15 @@ object Grapheme {
         new AudioImpl(targets, artifact, spec, offset, gain)
       }
     }
-    sealed trait Audio[S <: evt.Sys[S]] extends Elem[S] with Expr[S, Value.Audio] {
+    sealed trait Audio[S <: evt.Sys[S]] extends Expr[S] with _Expr[S, Value.Audio] {
       def artifact: Artifact[S]
-      def offset  : Expr[S, Long  ]
-      def gain    : Expr[S, Double]
+      def offset  : _Expr[S, Long  ]
+      def gain    : _Expr[S, Double]
       def spec    : AudioFileSpec
     }
 
     private final class CurveImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
-                                                   val values: Vec[(Expr[S, Double], synth.Curve)])
+                                                   val values: Vec[(_Expr[S, Double], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
 
       def value(implicit tx: S#Tx): Value.Curve = {
@@ -322,8 +322,8 @@ object Grapheme {
     }
 
     private final class AudioImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
-                                                   val spec: AudioFileSpec, val offset: Expr[S, Long],
-                                                   val gain: Expr[S, Double])
+                                                   val spec: AudioFileSpec, val offset: _Expr[S, Long],
+                                                   val gain: _Expr[S, Double])
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
 
       def value(implicit tx: S#Tx): Value.Audio = {
@@ -394,7 +394,7 @@ object Grapheme {
     def writeValue(value: Value, out: DataOutput): Unit = value.write(out)
 
     override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                            (implicit tx: S#Tx): Elem[S] with evt.Node[S] = {
+                                            (implicit tx: S#Tx): Expr[S] with evt.Node[S] = {
       (cookie: @switch) match {
         case `curveCookie` => Curve.readIdentifiedTuple(in, access, targets)
         case `audioCookie` => Audio.readIdentifiedTuple(in, access, targets)
@@ -404,7 +404,7 @@ object Grapheme {
   }
 
   //  type Elem[S <: Sys[S]] = Expr[S, Value]
-  sealed trait Elem[S <: evt.Sys[S]] extends Expr[S, Value]
+  sealed trait Expr[S <: evt.Sys[S]] extends _Expr[S, Value]
 
   type TimedElem[S <: evt.Sys[S]] = BiExpr[S, Value]
 

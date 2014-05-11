@@ -237,7 +237,7 @@ object AuralPresentationImpl {
           case a: IntElem     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
           case a: DoubleElem  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
           case a: BooleanElem [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
-          case a: FadeSpecElem[S] =>
+          case a: FadeSpec.Elem[S] =>
             val spec = a.peer.value
             // dur, shape-id, shape-curvature, floor
             val values = Vec(

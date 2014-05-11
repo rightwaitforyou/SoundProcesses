@@ -18,7 +18,7 @@ import de.sciss.lucre.{event => evt, expr}
 import expr.Expr
 import impl.{ProcImpl => Impl}
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.serial.DataInput
+import de.sciss.serial.{Serializer, DataInput}
 import de.sciss.model
 import evt.Sys
 import de.sciss.lucre.event.Publisher
@@ -56,7 +56,25 @@ object Proc {
     extends Change[S] {
     override def toString = s"ScanChange($key, $scan, $changes)"
   }
-}
+
+  // ---- Elem ----
+
+  object Elem {
+    def apply[S <: Sys[S]](peer: Proc[S])(implicit tx: S#Tx): Proc.Elem[S] =
+      proc.impl.ElemImpl.Proc(peer)
+
+    object Obj {
+      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, Proc.Elem]] =
+        if (obj.elem.isInstanceOf[Proc.Elem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, Proc.Elem]])
+        else None
+    }
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Proc.Elem[S]] = proc.impl.ElemImpl.Proc.serializer[S]
+  }
+  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
+    type Peer       = Proc[S]
+    type PeerUpdate = Proc.Update[S]
+  }}
 /** The `Proc` trait is the basic entity representing a sound process. */
 trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */

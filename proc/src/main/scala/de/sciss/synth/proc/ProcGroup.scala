@@ -17,28 +17,51 @@ import de.sciss.lucre.{bitemp, event => evt}
 import bitemp.BiGroup
 import evt.{EventLike, Sys}
 import de.sciss.serial.{Serializer, DataInput}
+import de.sciss.synth.proc
 
 object ProcGroup {
-  type Update    [S <: Sys[S]] = BiGroup.Update    [S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]]
-  type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]]
+  type Update    [S <: Sys[S]] = BiGroup.Update    [S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
+  type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
 
-  private def eventView[S <: Sys[S]](proc: Obj.T[S, ProcElem]): EventLike[S, Obj.UpdateT[S, ProcElem[S]]] =
+  private def eventView[S <: Sys[S]](proc: Obj.T[S, Proc.Elem]): EventLike[S, Obj.UpdateT[S, Proc.Elem[S]]] =
     proc.changed
 
   object Modifiable {
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] =
-      BiGroup.Modifiable.serializer[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](eventView)
+      BiGroup.Modifiable.serializer[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](eventView)
 
     def apply[S <: Sys[S]](implicit tx: S#Tx): ProcGroup.Modifiable[S] =
-      BiGroup.Modifiable[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](eventView)
+      BiGroup.Modifiable[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](eventView)
 
     def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup.Modifiable[S] =
-      BiGroup.Modifiable.read[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](in, access, eventView)
+      BiGroup.Modifiable.read[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](in, access, eventView)
   }
 
+
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup[S] =
-    BiGroup.Modifiable.read[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](in, access, eventView)
+    BiGroup.Modifiable.read[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](in, access, eventView)
 
   implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup[S]] =
-    BiGroup.serializer[S, Obj.T[S, ProcElem], Obj.UpdateT[S, ProcElem[S]]](eventView)
+    BiGroup.serializer[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](eventView)
+
+  // ---- Elem ----
+
+  object Elem {
+    def apply[S <: Sys[S]](peer: ProcGroup[S])(implicit tx: S#Tx): ProcGroup.Elem[S] =
+      proc.impl.ElemImpl.ProcGroup(peer)
+
+    object Obj {
+      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ProcGroup.Elem]] =
+        if (obj.elem.isInstanceOf[ProcGroup.Elem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ProcGroup.Elem]])
+        else None
+    }
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Elem[S]] =
+      proc.impl.ElemImpl.ProcGroup.serializer[S]
+  }
+  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
+    type Peer       = ProcGroup[S]
+    type PeerUpdate = ProcGroup.Update[S]
+  }
+
 }

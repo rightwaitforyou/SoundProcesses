@@ -31,5 +31,5 @@ object ExprImplicits {
   */
 class ExprImplicits[S <: evt.Sys[S]] protected extends de.sciss.lucre.synth.expr.ExprImplicits[S] {
   implicit def synthGraphConst(s: SynthGraph    ): Expr[S, SynthGraph    ] = SynthGraphs  .newConst(s)
-  implicit def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Elem.newConst(v)
+  implicit def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Expr.newConst(v)
 }

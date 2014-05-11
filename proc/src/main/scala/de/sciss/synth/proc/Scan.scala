@@ -82,18 +82,17 @@ object Scan {
                                                    changes: Vec[Grapheme.Segment]) extends Change[S]
 }
 
-/**
- * A `Scan` represents a real-time signal which can either function as a reader linked to another scan
- * which functions as its source or a grapheme, or it functions as a writer sinking into a grapheme
- * or another scan. Scans are situated with a process (`Proc`) and identified by a unique name, also
- * known as key. A scan can write to any number of targets, and be synchronised to one or multiple
- * source (if the number of sources is greater than one, they are mixed together).
- *
- * If not synchronised to a source, the owner process' graph may feed a signal into it, using
- * `graph.scan.Out`.
- *
- * A scan's event forwards updates from any of its sources, but does not observe its sinks.
- */
+/** A `Scan` represents a real-time signal which can either function as a reader linked to another scan
+  * which functions as its source or a grapheme, or it functions as a writer sinking into a grapheme
+  * or another scan. Scans are situated with a process (`Proc`) and identified by a unique name, also
+  * known as key. A scan can write to any number of targets, and be synchronised to one or multiple
+  * source (if the number of sources is greater than one, they are mixed together).
+  *
+  * If not synchronised to a source, the owner process' graph may feed a signal into it, using
+  * `graph.scan.Out`.
+  *
+  * A scan's event forwards updates from any of its sources, but does not observe its sinks.
+  */
 trait Scan[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Scan.Update[S]] {
   import Scan._
 

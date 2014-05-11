@@ -21,7 +21,7 @@ object BounceTest extends App {
     import expr._
 
     val proc      = Proc[S]
-    val peer      = ProcElem(proc)
+    val peer      = Proc.Elem(proc)
     val obj       = Obj(peer)
     proc.graph() = SynthGraph {
       import ugen._

@@ -7,7 +7,7 @@ import de.sciss.lucre.event.Sys
   */
 object TypeInferenceAndImplicitResolution {
   def test[S <: Sys[S]]()(implicit tx: S#Tx): Unit = {
-    val graph: Grapheme.Elem.Audio[S] = sys.error("Not necessary for compilation")
+    val graph: Grapheme.Expr.Audio[S] = sys.error("Not necessary for compilation")
     val peer  = AudioGraphemeElem(graph)
     val obj   = Obj(peer)
     val ph    = tx.newHandle(peer)

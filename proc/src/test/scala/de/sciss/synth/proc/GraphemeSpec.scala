@@ -13,7 +13,7 @@ import de.sciss.synth.Curve.{parametric, step, welch, sine, exponential, linear}
 class GraphemeSpec extends ConfluentEventSpec {
   import imp._
 
-  import Grapheme.{Value, Modifiable, Update, Segment, Elem, TimedElem}
+  import Grapheme.{Value, Modifiable, Update, Segment, Expr, TimedElem}
 
   "Grapheme" should "notify observers about all relevant events" in { system =>
     val obs = new Observation[S]
@@ -131,17 +131,17 @@ class GraphemeSpec extends ConfluentEventSpec {
       val g       = gH()
       val time1   = lucre.expr.Long  .newVar[S](0L)
       val mag1    = lucre.expr.Double.newVar[S](1234.5)
-      val value1  = Elem.Curve(mag1 -> linear)
+      val value1  = Expr.Curve(mag1 -> linear)
       val elem1: TimedElem[S] = time1 -> value1
 
       val time2   = lucre.expr.Long  .newVar[S](10000L)
       val mag2    = lucre.expr.Double.newVar[S](6789.0)
-      val value2  = Elem.Curve(mag2 -> linear)
+      val value2  = Expr.Curve(mag2 -> linear)
       val elem2: TimedElem[S] = time2 -> value2
 
       val time3   = time2 + 1000L
       val mag3    = mag1 + 1000.0
-      val value3  = Elem.Curve(mag3 -> linear)
+      val value3  = Expr.Curve(mag3 -> linear)
       val elem3: TimedElem[S] = time3 -> value3
 
       g.add(elem1)

@@ -159,23 +159,6 @@ trait StringElem[S <: Sys[S]] extends Elem[S] {
   type PeerUpdate = model.Change[String]
 }
 
-object FadeSpecElem {
-  def apply[S <: Sys[S]](peer: Expr[S, FadeSpec.Value])(implicit tx: S#Tx): FadeSpecElem[S] =
-    proc.impl.ElemImpl.FadeSpec(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, FadeSpecElem]] =
-      if (obj.elem.isInstanceOf[FadeSpecElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, FadeSpecElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, FadeSpecElem[S]] = Impl.FadeSpec.serializer[S]
-}
-trait FadeSpecElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Expr[S, FadeSpec.Value]
-  type PeerUpdate = model.Change[FadeSpec.Value]
-} // FadeSpec.Elem[S]
-
 object DoubleVecElem {
   def apply[S <: Sys[S]](peer: Expr[S, Vec[Double]])(implicit tx: S#Tx): DoubleVecElem[S] =
     proc.impl.ElemImpl.DoubleVec(peer)
@@ -194,7 +177,7 @@ trait DoubleVecElem[S <: Sys[S]] extends Elem[S] {
 }
 
 object AudioGraphemeElem {
-  def apply[S <: Sys[S]](peer: Grapheme.Elem.Audio[S])(implicit tx: S#Tx): AudioGraphemeElem[S] =
+  def apply[S <: Sys[S]](peer: Grapheme.Expr.Audio[S])(implicit tx: S#Tx): AudioGraphemeElem[S] =
     proc.impl.ElemImpl.AudioGrapheme(peer)
 
   object Obj {
@@ -206,57 +189,6 @@ object AudioGraphemeElem {
   implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, AudioGraphemeElem[S]] = Impl.AudioGrapheme.serializer[S]
 }
 trait AudioGraphemeElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Grapheme.Elem.Audio[S]
+  type Peer       = Grapheme.Expr.Audio[S]
   type PeerUpdate = model.Change[Grapheme.Value.Audio]
-}
-
-object ArtifactLocationElem {
-  def apply[S <: Sys[S]](peer: Artifact.Location[S])(implicit tx: S#Tx): ArtifactLocationElem[S] =
-    proc.impl.ElemImpl.ArtifactLocation(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ArtifactLocationElem]] =
-      if (obj.elem.isInstanceOf[ArtifactLocationElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ArtifactLocationElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactLocationElem[S]] = Impl.ArtifactLocation.serializer[S]
-}
-trait ArtifactLocationElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Artifact.Location[S]
-  type PeerUpdate = Artifact.Location.Update[S]
-}
-
-object ProcGroupElem {
-  def apply[S <: Sys[S]](peer: ProcGroup[S])(implicit tx: S#Tx): ProcGroupElem[S] =
-    proc.impl.ElemImpl.ProcGroup(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ProcGroupElem]] =
-      if (obj.elem.isInstanceOf[ProcGroupElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ProcGroupElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroupElem[S]] = Impl.ProcGroup.serializer[S]
-}
-trait ProcGroupElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = ProcGroup[S]
-  type PeerUpdate = ProcGroup.Update[S]
-}
-
-object ProcElem {
-  def apply[S <: Sys[S]](peer: Proc[S])(implicit tx: S#Tx): ProcElem[S] =
-    proc.impl.ElemImpl.Proc(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ProcElem]] =
-      if (obj.elem.isInstanceOf[ProcElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ProcElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcElem[S]] = Impl.Proc.serializer[S]
-}
-trait ProcElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Proc[S]
-  type PeerUpdate = Proc.Update[S]
 }

@@ -42,7 +42,7 @@ object Transport {
 
   /** Creates a new offline transport. The transport is not positioned. */
   def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
-    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Offline[S, Obj.T[S, ProcElem], Transport.Proc.Update[S]] =
+    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Offline[S, Obj.T[S, _Proc.Elem], Transport.Proc.Update[S]] =
     Impl.offline[S, I](group, sampleRate)
 
   /**

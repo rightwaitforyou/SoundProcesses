@@ -25,11 +25,11 @@ object ThesisExamples extends App {
 
     val bus       = lucre.expr.Int .newVar[S](    0)
     val fadeInLen = lucre.expr.Long.newVar[S](44100)
-    val fadeIn    = FadeSpec.Elem(fadeInLen, Curve.sine, 0.0)
-    val obj       = Obj(ProcElem(proc))
-    obj.attr.put("bus"    , IntElem     (bus   ))
-    obj.attr.put("mute"   , BooleanElem (false ))
-    obj.attr.put("fade-in", FadeSpecElem(fadeIn))
+    val fadeIn    = FadeSpec.Expr(fadeInLen, Curve.sine, 0.0)
+    val obj       = Obj(Proc.Elem(proc))
+    obj.attr.put("bus"    , IntElem      (bus   ))
+    obj.attr.put("mute"   , BooleanElem  (false ))
+    obj.attr.put("fade-in", FadeSpec.Elem(fadeIn))
     proc.graph()  = sg
 
     bus()       = 1       // adjust bus
@@ -38,7 +38,7 @@ object ThesisExamples extends App {
 
   import ugen._
 
-  def scans[S <: Sys[S]]()(implicit tx: S#Tx): (Obj.T[S, ProcElem], Obj.T[S, ProcElem]) = {
+  def scans[S <: Sys[S]]()(implicit tx: S#Tx): (Obj.T[S, Proc.Elem], Obj.T[S, Proc.Elem]) = {
     val imp = ExprImplicits[S]
     import imp._
 
@@ -49,8 +49,8 @@ object ThesisExamples extends App {
 
     val p1        = Proc[S]
     val p2        = Proc[S]
-    val obj1      = Obj(ProcElem(p1))
-    val obj2      = Obj(ProcElem(p2))
+    val obj1      = Obj(Proc.Elem(p1))
+    val obj2      = Obj(Proc.Elem(p2))
 
     val sMute     = p1.scans.add("mute")
     sMute addSource Scan.Link.Grapheme(gMute)

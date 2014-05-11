@@ -20,13 +20,13 @@ import de.sciss.serial.{DataOutput, DataInput}
 import lucre.{event => evt, data, expr}
 import java.io.File
 import expr.List
-import proc.Artifact.Location.Update
 import evt.{EventLike, NodeSerializer}
 import de.sciss.synth.proc.Artifact.Modifiable
 import de.sciss.model.Change
 
 object ArtifactImpl {
-  import Artifact.{Child, Location}
+  import Artifact.Child
+  import proc.{ArtifactLocation => Location}
 
   private final val SER_VERSION = 0x4172
 
@@ -35,12 +35,11 @@ object ArtifactImpl {
   def apply[S <: evt.Sys[S]](location: Location[S], child: Child)(implicit tx: S#Tx): Artifact.Modifiable[S] = {
     val targets = evt.Targets[S]
     val _child  = tx.newVar(targets.id, child.path)
-    new Impl(targets, location, _child)
+    new Impl[S](targets, location, _child)
   }
 
-  def copy[S <: evt.Sys[S]](from: Artifact[S])(implicit tx: S#Tx): Artifact.Modifiable[S] = {
-    apply(from.location, from.child)
-  }
+  def copy[S <: evt.Sys[S]](from: Artifact[S])(implicit tx: S#Tx): Artifact.Modifiable[S] =
+    apply[S](from.location, from.child)
 
   def read[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Artifact[S] =
     serializer[S].read(in, access)
@@ -60,7 +59,7 @@ object ArtifactImpl {
       require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
       val location  = readLocation(in, access)
       val _child    = tx.readVar[String](targets.id, in)
-      new Impl(targets, location, _child)
+      new Impl[S](targets, location, _child)
     }
   }
 
@@ -70,7 +69,7 @@ object ArtifactImpl {
       require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
       val location  = readLocation(in, access)
       val _child    = tx.readVar[String](targets.id, in)
-      new Impl(targets, location, _child)
+      new Impl[S](targets, location, _child)
     }
   }
 
@@ -80,7 +79,7 @@ object ArtifactImpl {
     val targets   = evt.Targets[S]
     val directory = tx.newVar(targets.id, init)
     val artifacts = List.Modifiable[S, Artifact[S]]
-    new LocationImpl(targets, directory, artifacts)
+    new LocationImpl[S](targets, directory, artifacts)
   }
 
   def readLocation[S <: evt.Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Location[S] =
@@ -103,7 +102,7 @@ object ArtifactImpl {
     require(cookie == SER_VERSION, s"Version mismatch. Expected $SER_VERSION but found $cookie")
     val directory = tx.readVar[File](targets.id, in)
     val artifacts = List.Modifiable.read[S, Artifact[S]](in, access)
-    new LocationImpl(targets, directory, artifacts)
+    new LocationImpl[S](targets, directory, artifacts)
   }
 
   private final class LocSer[S <: evt.Sys[S]] extends NodeSerializer[S, Location[S]] {
@@ -130,7 +129,7 @@ object ArtifactImpl {
 
     def modifiableOption: Option[Location.Modifiable[S]] = Some(this)
 
-    def changed: EventLike[S, Update[S]] = this
+    def changed: EventLike[S, Location.Update[S]] = this
 
     def directory(implicit tx: S#Tx): File = _directory()
     def directory_=(value: File)(implicit tx: S#Tx): Unit = {
@@ -199,7 +198,7 @@ object ArtifactImpl {
     protected def inputEvent: EventLike[S, Location.Update[S]] = location.changed
 
     protected def foldUpdate(generated: Option[Change[File]],
-                             input: Update[S])(implicit tx: S#Tx): Option[Change[File]] =
+                             input: Location.Update[S])(implicit tx: S#Tx): Option[Change[File]] =
       generated.orElse {
         input match {
           case Location.Moved(_, Change(oldBase, newBase)) =>

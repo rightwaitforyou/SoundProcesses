@@ -38,7 +38,7 @@ class UGenGraphBuilderSpec extends ConfluentEventSpec {
     val poH = system.step { implicit tx =>
       val p     = Proc[S]
       p.graph() = SynthGraphs.newConst[S](g0)
-      val obj   = Obj(ProcElem(p))
+      val obj   = Obj(Proc.Elem(p))
       tx.newHandle(obj)
     }
 
@@ -49,7 +49,7 @@ class UGenGraphBuilderSpec extends ConfluentEventSpec {
 
       val timedID   = tx.newID()
       val timedSpan = de.sciss.lucre.bitemp.SpanLike.newConst[S](Span(0L, 1000L))
-      val timed     = BiGroup.TimedElem[S, Obj.T[S, ProcElem]](timedID, timedSpan, poH())
+      val timed     = BiGroup.TimedElem[S, Obj.T[S, Proc.Elem]](timedID, timedSpan, poH())
 
       info("---- expanding using default builder ----")
       val u0  = DefaultUGenGraphBuilderFactory.build(g0)

@@ -34,13 +34,13 @@ object MixTest extends App {
       import expr._
 
       val procOut1  = Proc[S]
-      val peerOut1  = ProcElem(procOut1)
+      val peerOut1  = Proc.Elem(procOut1)
       val objOut1   = Obj(peerOut1)
       val procIn    = Proc[S]
-      val peerIn    = ProcElem(procIn)
+      val peerIn    = Proc.Elem(procIn)
       val objIn     = Obj(peerIn)
       val procOut2  = Proc[S]
-      val peerOut2  = ProcElem(procOut2)
+      val peerOut2  = Proc.Elem(procOut2)
       val objOut2   = Obj(peerOut2)
 
       objOut1.attr.name = "proc-out1"
