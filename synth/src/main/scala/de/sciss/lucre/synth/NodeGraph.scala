@@ -15,11 +15,17 @@ package de.sciss.lucre
 package synth
 
 import concurrent.stm.{Ref, TMap, InTxn, TSet}
-import de.sciss.synth.{SynthDef => SSynthDef, addAfter, addBefore, UGen, SynthGraph, UGenGraph, message}
+import de.sciss.synth.{SynthDef => SSynthDef, _}
 import de.sciss.{synth, osc}
 import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.{ExecutionContext, Promise, Future}
 import de.sciss.synth.ugen.Constant
+import de.sciss.synth.ugen.ControlUGenOutProxy
+import de.sciss.synth.ugen.UGenOutProxy
+import java.util
+import scala.Some
+import de.sciss.synth.ugen.Constant
+import de.sciss.synth.message
 import de.sciss.synth.ugen.ControlUGenOutProxy
 import de.sciss.synth.ugen.UGenOutProxy
 
@@ -331,21 +337,30 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
     }
   }
 
+  private final case class UGenEq(name: String, rate: Rate, specialIndex: Int, var inputs: Any, outputRates: Vec[Rate])
+
   final class GraphEquality(val graph: UGenGraph) extends Proxy {
-    private def mapUGen(ugen: UGen): Any = {
+    private def mapUGen(ugen: UGen, map: util.IdentityHashMap[UGen, UGenEq]): Any = {
+      val ex  = map.get(ugen); if (ex != null) return ex
+      val res = UGenEq(ugen.name, ugen.rate, ugen.specialIndex, (), ugen.outputRates)
+      map.put(ugen, res)
+      log(s"GraphEquality.self - mapUGen($ugen)")
       val inStruct = ugen.inputs.map {
         //         case up: UGenProxy => mapUGen( up.source )
-        case ugen: UGen.SingleOut => mapUGen(ugen)
-        case UGenOutProxy(source, outputIndex: Int) => (mapUGen(source), outputIndex)
-        case ctl: ControlUGenOutProxy => ctl
-        case c: Constant => c
+        case ugen1: UGen.SingleOut      => mapUGen(ugen1, map)
+        case proxy: UGenOutProxy        => (mapUGen(proxy.source, map), proxy.outputIndex)
+        case ctl  : ControlUGenOutProxy => ctl
+        case c    : Constant            => c
       }
-      (ugen.name, ugen.rate, ugen.specialIndex, inStruct, ugen.outputRates)
+      res.inputs = inStruct
+      res
     }
 
     val self: Any = {
+      val map = new util.IdentityHashMap[UGen, UGenEq]
+      log("GraphEquality.self")
       val uStructs = graph.ugens.map { rich =>
-        (mapUGen(rich.ugen), rich.inputSpecs)
+        (mapUGen(rich.ugen, map), rich.inputSpecs)
       }
 
       (graph.constants, graph.controlValues, graph.controlNames, uStructs)

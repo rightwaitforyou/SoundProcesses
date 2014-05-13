@@ -43,25 +43,24 @@ object ProcGroup {
 
   implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup[S]] =
     BiGroup.serializer[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](eventView)
+}
 
-  // ---- Elem ----
+// ---- Elem ----
 
-  object Elem {
-    def apply[S <: Sys[S]](peer: ProcGroup[S])(implicit tx: S#Tx): ProcGroup.Elem[S] =
-      proc.impl.ElemImpl.ProcGroup(peer)
+object ProcGroupElem {
+  def apply[S <: Sys[S]](peer: ProcGroup[S])(implicit tx: S#Tx): ProcGroupElem[S] =
+    proc.impl.ElemImpl.ProcGroup(peer)
 
-    object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ProcGroup.Elem]] =
-        if (obj.elem.isInstanceOf[ProcGroup.Elem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ProcGroup.Elem]])
-        else None
-    }
-
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Elem[S]] =
-      proc.impl.ElemImpl.ProcGroup.serializer[S]
-  }
-  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
-    type Peer       = ProcGroup[S]
-    type PeerUpdate = ProcGroup.Update[S]
+  object Obj {
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ProcGroupElem]] =
+      if (obj.elem.isInstanceOf[ProcGroupElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ProcGroupElem]])
+      else None
   }
 
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroupElem[S]] =
+    proc.impl.ElemImpl.ProcGroup.serializer[S]
+}
+trait ProcGroupElem[S <: Sys[S]] extends proc.Elem[S] {
+  type Peer       = ProcGroup[S]
+  type PeerUpdate = ProcGroup.Update[S]
 }

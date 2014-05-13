@@ -60,7 +60,7 @@ class AttributesSpec extends ConfluentEventSpec {
       p.attr.put("audio"  , AudioGraphemeElem(Grapheme.Expr.Audio(art, spec, offset = n, gain = d)))
       p.attr.put("loc",     ArtifactLocation.Elem(loc))
       val group = ProcGroup.Modifiable[S]
-      p.attr.put("group",   ProcGroup.Elem(group))
+      p.attr.put("group",   ProcGroupElem(group))
       implicit val groupSer = ProcGroup.Modifiable.serializer[S]
       tx.newHandle(group)
     }

@@ -421,23 +421,23 @@ object ElemImpl {
 
   // ---- ProcGroup ----
 
-  object ProcGroup extends Companion[_ProcGroup.Elem] {
+  object ProcGroup extends Companion[ProcGroupElem] {
     val typeID = 0x10001 // _ProcGroup.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): _ProcGroup.Elem[S] with evt.Node[S] = {
+                                   (implicit tx: S#Tx): ProcGroupElem[S] with evt.Node[S] = {
       val peer = _ProcGroup.read(in, access)
       new ProcGroupActiveImpl(targets, peer)
     }
 
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _ProcGroup.Elem[S] =
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ProcGroupElem[S] =
       sys.error("Constant ProcGroup not supported")
 
-    def apply[S <: Sys[S]](peer: _ProcGroup[S])(implicit tx: S#Tx): _ProcGroup.Elem[S] =
+    def apply[S <: Sys[S]](peer: _ProcGroup[S])(implicit tx: S#Tx): ProcGroupElem[S] =
       new ProcGroupActiveImpl(evt.Targets[S], peer)
   }
 
-  trait ProcGroupImpl[S <: Sys[S]] extends _ProcGroup.Elem[S] {
+  trait ProcGroupImpl[S <: Sys[S]] extends ProcGroupElem[S] {
     final def typeID = ProcGroup.typeID
     final def prefix = "ProcGroup"
   }
@@ -448,7 +448,7 @@ object ElemImpl {
 
     protected def peerEvent = peer.changed
 
-    def mkCopy()(implicit tx: S#Tx): _ProcGroup.Elem[S] = ProcGroup(peer)
+    def mkCopy()(implicit tx: S#Tx): ProcGroupElem[S] = ProcGroup(peer)
   }
 
   // ---- Proc ----
