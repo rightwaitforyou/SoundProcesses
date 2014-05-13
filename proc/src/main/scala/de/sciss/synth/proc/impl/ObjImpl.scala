@@ -1,5 +1,5 @@
 /*
- *  ObjectImpl.scala
+ *  ObjImpl.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -24,10 +24,10 @@ import de.sciss.lucre.synth.InMemory
 import scala.language.higherKinds
 import scala.reflect.ClassTag
 
-object ObjectImpl {
+object ObjImpl {
   def apply[S <: Sys[S], E1 <: Elem[S]](elem: E1)(implicit tx: S#Tx): Obj[S] { type E = E1 } = {
     val targets = evt.Targets[S]
-    val map     = SkipList.Map.empty[S, String, AttrEntry[S, E1#PeerUpdate]]
+    val map     = SkipList.Map.empty[S, String, AttrEntry[S, E1]]
     new Impl[S, E1](targets, elem, map)
   }
 
@@ -48,7 +48,8 @@ object ObjectImpl {
 
   private type I = InMemory
 
-  private type AttrEntry[S <: Sys[S], Upd] = KeyMapImpl.Entry[S, String, Elem[S], Elem.Update[S, Upd]]
+  // private type AttrEntry[S <: Sys[S], Upd] = KeyMapImpl.Entry[S, String, Obj[S], Elem.Update[S, Upd]]
+  private type AttrEntry[S <: Sys[S], E <: Elem[S]] = KeyMapImpl.Entry[S, String, Obj[S], Obj.UpdateT[S, E]]
 
   private val anySer = new Ser[I]
 
@@ -56,7 +57,7 @@ object ObjectImpl {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
             (implicit tx: S#Tx): Obj[S] with evt.Node[S] = {
       val elem  = Elem.read(in, access)
-      val map   = SkipList.Map.read[S, String, AttrEntry[S, Elem[S]#PeerUpdate]](in, access, SkipList.NoKeyObserver)
+      val map   = SkipList.Map.read[S, String, AttrEntry[S, Elem[S]]](in, access, SkipList.NoKeyObserver)
       new Impl[S, Elem[S]](targets, elem, map)
     }
   }
@@ -67,24 +68,24 @@ object ObjectImpl {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
             (implicit tx: S#Tx): Obj[S] with evt.Node[S] { type E = E1 } = {
       val elem  = peer.read(in, access)
-      val map   = SkipList.Map.read[S, String, AttrEntry[S, E1#PeerUpdate]](in, access, SkipList.NoKeyObserver)
+      val map   = SkipList.Map.read[S, String, AttrEntry[S, E1]](in, access, SkipList.NoKeyObserver)
       new Impl[S, E1](targets, elem, map)
     }
   }
 
   // XXX TODO: DRY - this is shared with ProcImpl
-  implicit private def attributeEntryInfo[S <: Sys[S], Upd]: KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S, Upd]] =
-    anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Elem[S], Elem.Update[S, Upd]]]
+  implicit private def attributeEntryInfo[S <: Sys[S], E <: Elem[S]]: KeyMapImpl.ValueInfo[S, String, Obj[S], Obj.UpdateT[S, E]] =
+    anyAttrEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Obj[S], Obj.UpdateT[S, E]]]
 
-  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Elem[I], Elem.Update[I, Any]] {
-    def valueEvent(value: Elem[I]) = value.changed
+  private val anyAttrEntryInfo = new KeyMapImpl.ValueInfo[I, String, Obj[I], Obj.Update[I]] {
+    def valueEvent(value: Obj[I]) = value.changed
 
     val keySerializer   = ImmutableSerializer.String
-    val valueSerializer = Elem.serializer[I]
+    val valueSerializer = Obj.serializer[I] // Elem.serializer[I]
   }
 
   private final class Impl[S <: Sys[S], E1 <: Elem[S]](protected val targets: evt.Targets[S], val elem: E1,
-                                                  attributeMap: SkipList.Map[S, String, AttrEntry[S, E1#PeerUpdate]])
+                                                       attributeMap: SkipList.Map[S, String, AttrEntry[S, E1]])
     extends Obj[S] {
     obj =>
 
@@ -101,7 +102,7 @@ object ObjectImpl {
     // ---- events ----
 
     sealed trait ObjectEvent {
-      final protected def reader: evt.Reader[S, Obj[S]] = ObjectImpl.serializer
+      final protected def reader: evt.Reader[S, Obj[S]] = ObjImpl.serializer
       final def node: Obj[S] with evt.Node[S] = obj
     }
 
@@ -119,11 +120,12 @@ object ObjectImpl {
       with evt.impl.EventImpl[S, Obj.UpdateT[S, E], Obj[S]]
       with evt.InvariantEvent[S, Obj.UpdateT[S, E], Obj[S]]
       with ObjectEvent
-      with impl.KeyMapImpl[S, String, Elem[S], Elem.Update[S, E#PeerUpdate]] {
+      // with impl.KeyMapImpl[S, String, Obj[S], Elem.Update[S, E#PeerUpdate]]
+      with impl.KeyMapImpl[S, String, Obj[S], Obj.UpdateT[S, E]] {
 
       final val slot = 0
 
-      final protected def fire(added: Option[(String, Elem[S])], removed: Option[(String, Elem[S])])
+      final protected def fire(added: Option[(String, Obj[S])], removed: Option[(String, Obj[S])])
                               (implicit tx: S#Tx): Unit = {
         val b = Vector.newBuilder[Obj.AttrUpdate[S]]
         // convention: first the removals, then the additions. thus, overwriting a key yields
@@ -139,7 +141,7 @@ object ObjectImpl {
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = obj.targets.nonEmpty
 
-      def put(key: String, value: Elem[S])(implicit tx: S#Tx): Unit = add(key, value)
+      def put(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = add(key, value)
 
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
 
@@ -148,17 +150,17 @@ object ObjectImpl {
         if (changes.isEmpty) None
         else Some(Obj.UpdateT(obj,
           changes.map({
-            case (key, u) => Obj.AttrChange(key, u.element, u.change)
+            case (key, u) => Obj.AttrChange(key, u.obj, u.changes)
           })(breakOut)))
       }
 
       protected def map: SkipList.Map[S, String, Entry] = attributeMap
 
-      protected def valueInfo = attributeEntryInfo[S, E#PeerUpdate]
+      protected def valueInfo = attributeEntryInfo[S, E]
 
       def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]] =
-        get(key).flatMap { elem =>
-          tag.unapply(elem.peer)
+        get(key).flatMap { obj =>
+          tag.unapply(obj.elem.peer)
         }
 
 //      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,

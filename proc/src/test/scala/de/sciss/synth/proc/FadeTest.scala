@@ -36,8 +36,8 @@ object FadeTest extends App {
       val obj   = Obj(peer)
       val fadeExprIn  = FadeSpec.Expr(44100, lucre.synth.expr.Curve.newConst(linear), 0.0) // FadeSpec.Value(44100, linShape)
       val fadeExprOut = FadeSpec.Expr(44100, lucre.synth.expr.Curve.newConst(exponential), -40.dbamp) // FadeSpec.Value(44100, linShape)
-      obj.attr.put("fadeIn" , FadeSpec.Elem(fadeExprIn))
-      obj.attr.put("fadeOut", FadeSpec.Elem(fadeExprOut))
+      obj.attr.put("fadeIn" , Obj(FadeSpec.Elem(fadeExprIn)))
+      obj.attr.put("fadeOut", Obj(FadeSpec.Elem(fadeExprOut)))
       proc.graph() = SynthGraph {
         import ugen._
         val noise = PinkNoise.ar

@@ -23,6 +23,7 @@ object ProcGroup {
   type Update    [S <: Sys[S]] = BiGroup.Update    [S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
   type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
 
+
   private def eventView[S <: Sys[S]](proc: Obj.T[S, Proc.Elem]): EventLike[S, Obj.UpdateT[S, Proc.Elem[S]]] =
     proc.changed
 

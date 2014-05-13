@@ -51,7 +51,7 @@ object TapeTest extends App {
       gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, step)))
       gSpat.add(4.seconds -> Grapheme.Value.Curve((1.0, linear)))
 
-      obj.attr.put("freq", DoubleElem(200.0))
+      obj.attr.put("freq", Obj(DoubleElem(200.0)))
 
       proc.graph() = SynthGraph {
         import ugen._

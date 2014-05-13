@@ -23,7 +23,7 @@ class AttributesSpec extends ConfluentEventSpec {
       val p     = Proc[S]
       val peer  = Proc.Elem(p)
       val obj   = Obj(peer)
-      obj.attr.put("foo", IntElem(lucre.expr.Int.newVar(1234)))
+      obj.attr.put("foo", Obj(IntElem(lucre.expr.Int.newVar(1234))))
       tx.newHandle(obj)
     }
 
@@ -45,22 +45,22 @@ class AttributesSpec extends ConfluentEventSpec {
 
     val pgH = system.step { implicit tx =>
       val p = pH()
-      p.attr.put("int"    , IntElem    (lucre.expr.Int    .newConst(5678 )))
+      p.attr.put("int"    , Obj(IntElem    (lucre.expr.Int    .newConst(5678 ))))
       val d = lucre.expr.Double .newConst[S](123.4)
-      p.attr.put("double" , DoubleElem (d))
+      p.attr.put("double" , Obj(DoubleElem (d)))
       val n = lucre.expr.Long   .newConst[S](1234L)
-      p.attr.put("long"   , LongElem   (n))
-      p.attr.put("boolean", BooleanElem(lucre.expr.Boolean.newConst(true )))
-      p.attr.put("string" , StringElem (lucre.expr.String .newConst("123")))
+      p.attr.put("long"   , Obj(LongElem   (n)))
+      p.attr.put("boolean", Obj(BooleanElem(lucre.expr.Boolean.newConst(true ))))
+      p.attr.put("string" , Obj(StringElem (lucre.expr.String .newConst("123"))))
 
-      p.attr.put("fade"   , FadeSpec.Elem(FadeSpec.Expr.newConst(fade)))
-      p.attr.put("d-vec"  , DoubleVecElem(DoubleVec.newConst(Vec(1.2, 3.4, 5.6))))
+      p.attr.put("fade"   , Obj(FadeSpec.Elem(FadeSpec.Expr.newConst(fade))))
+      p.attr.put("d-vec"  , Obj(DoubleVecElem(DoubleVec.newConst(Vec(1.2, 3.4, 5.6)))))
       val loc = ArtifactLocation.Modifiable[S](file("foo"))
       val art = loc.add(file("foo") / "bar")
-      p.attr.put("audio"  , AudioGraphemeElem(Grapheme.Expr.Audio(art, spec, offset = n, gain = d)))
-      p.attr.put("loc",     ArtifactLocation.Elem(loc))
+      p.attr.put("audio"  , Obj(AudioGraphemeElem(Grapheme.Expr.Audio(art, spec, offset = n, gain = d))))
+      p.attr.put("loc",     Obj(ArtifactLocation.Elem(loc)))
       val group = ProcGroup.Modifiable[S]
-      p.attr.put("group",   ProcGroupElem(group))
+      p.attr.put("group",   Obj(ProcGroupElem(group)))
       implicit val groupSer = ProcGroup.Modifiable.serializer[S]
       tx.newHandle(group)
     }
