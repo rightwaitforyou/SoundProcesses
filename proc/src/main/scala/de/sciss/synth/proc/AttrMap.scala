@@ -40,6 +40,7 @@ trait AttrMap[S <: Sys[S]] {
     apply[({type Ex[~ <: Sys[~]] = Expr[~, A]})#Ex](key)
 
   def get     (key: String)(implicit tx: S#Tx): Option[Obj[S]]
+  def getElem (key: String)(implicit tx: S#Tx): Option[Elem[S]]
   def contains(key: String)(implicit tx: S#Tx): Boolean
 
   def keys    (implicit tx: S#Tx): Set[String]

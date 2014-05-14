@@ -141,6 +141,8 @@ object ObjImpl {
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = obj.targets.nonEmpty
 
+      def getElem(key: String)(implicit tx: S#Tx): Option[Elem[S]] = get(key).map(_.elem) // something more efficient?
+
       def put(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = add(key, value)
 
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
