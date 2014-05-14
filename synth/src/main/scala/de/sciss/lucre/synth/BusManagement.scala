@@ -24,16 +24,15 @@ sealed trait Bus {
 }
 
 object AudioBus {
-  /**
-   *    A consumer reading or writing from an audio bus.
-   *    Since a AudioBus is a meta structure, the
-   *    underlying audio bus may change due to optimization.
-   *    In this case the consumer is asked to update its
-   *    data. Also initial bus allocation is lazy, therefore
-   *    when adding the user as reader or writer, the
-   *    bus implementation will push its initial allocation
-   *    information to the user.
-   */
+  /** A consumer reading or writing from an audio bus.
+    * Since a AudioBus is a meta structure, the
+    * underlying audio bus may change due to optimization.
+    * In this case the consumer is asked to update its
+    * data. Also initial bus allocation is lazy, therefore
+    * when adding the user as reader or writer, the
+    * bus implementation will push its initial allocation
+    * information to the user.
+    */
   trait User /* extends Bus.User */ {
     def busChanged(peer: SAudioBus)(implicit tx: Txn): Unit
   }
@@ -44,54 +43,50 @@ trait AudioBus extends Bus with AudioRated {
 
   def busOption(implicit tx: Txn): Option[SAudioBus]
 
-  /**
-   *    Adds a reading consumer to the bus. Note that
-   *    the readers are kept in a Set and this method doesn't
-   *    currently check whether the set already contains
-   *    the reader. Adding the same reader more than once
-   *    will cause malbehaviour.
-   *
-   *    As a consequence, the user's busChanged method is
-   *    invoked with the current bus. The current bus may
-   *    change due to the addition. In this case, busChanged
-   *    is called on all other currently registered users.
-   */
+  /** Adds a reading consumer to the bus. Note that
+    * the readers are kept in a Set and this method doesn't
+    * currently check whether the set already contains
+    * the reader. Adding the same reader more than once
+    * will cause malfunction.
+    *
+    * As a consequence, the user's busChanged method is
+    * invoked with the current bus. The current bus may
+    * change due to the addition. In this case, busChanged
+    * is called on all other currently registered users.
+    */
   def addReader(u: User)(implicit tx: Txn): Unit
 
-  /**
-   *    Adds a writing consumer to the bus. Note that
-   *    the writers are kept in a Set and this method doesn't
-   *    currently check whether the set already contains
-   *    the writer. Adding the same writer more than once
-   *    will cause malbehaviour.
-   *
-   *    As a consequence, the user's busChanged method is
-   *    invoked with the current bus. The current bus may
-   *    change due to the addition. In this case, busChanged
-   *    is called on all other currently registered users.
-   */
+  /** Adds a writing consumer to the bus. Note that
+    * the writers are kept in a Set and this method doesn't
+    * currently check whether the set already contains
+    * the writer. Adding the same writer more than once
+    * will cause malfunction.
+    *
+    * As a consequence, the user's busChanged method is
+    * invoked with the current bus. The current bus may
+    * change due to the addition. In this case, busChanged
+    * is called on all other currently registered users.
+    */
   def addWriter(u: User)(implicit tx: Txn): Unit
 
-  /**
-   *    Removes a reading consumer from the bus. It is
-   *    safe to call this method, passing in a user which
-   *    has already been previously removed.
-   *
-   *    The current bus may change due to the removal.
-   *    In this case, busChanged is called on all
-   *    remaining registered users.
-   */
+  /** Removes a reading consumer from the bus. It is
+    * safe to call this method, passing in a user which
+    * has already been previously removed.
+    *
+    * The current bus may change due to the removal.
+    * In this case, busChanged is called on all
+    * remaining registered users.
+    */
   def removeReader(u: User)(implicit tx: Txn): Unit
 
-  /**
-   *    Removes a writing consumer from the bus. It is
-   *    safe to call this method, passing in a user which
-   *    has already been previously removed.
-   *
-   *    The current bus may change due to the removal.
-   *    In this case, busChanged is called on all
-   *    remaining registered users.
-   */
+  /** Removes a writing consumer from the bus. It is
+    * safe to call this method, passing in a user which
+    * has already been previously removed.
+    *
+    * The current bus may change due to the removal.
+    * In this case, busChanged is called on all
+    * remaining registered users.
+    */
   def removeWriter(u: User)(implicit tx: Txn): Unit
 }
 
@@ -106,42 +101,38 @@ trait ControlBus extends Bus with ControlRated {
 
   def busOption(implicit tx: Txn): Option[SControlBus]
 
-  /**
-   *    Adds a reading consumer to the bus. Note that
-   *    the readers are kept in a Set and this method doesn't
-   *    currently check whether the set already contains
-   *    the reader. Adding the same reader more than once
-   *    will cause malbehaviour.
-   *
-   *    As a consequence, the user's busChanged method is
-   *    invoked with the current bus.
-   */
+  /** Adds a reading consumer to the bus. Note that
+    * the readers are kept in a Set and this method doesn't
+    * currently check whether the set already contains
+    * the reader. Adding the same reader more than once
+    * will cause malfunction.
+    *
+    * As a consequence, the user's busChanged method is
+    * invoked with the current bus.
+    */
   def addReader(u: User)(implicit tx: Txn): Unit
 
-  /**
-   *    Adds a writing consumer to the bus. Note that
-   *    the writers are kept in a Set and this method doesn't
-   *    currently check whether the set already contains
-   *    the writer. Adding the same writer more than once
-   *    will cause malbehaviour.
-   *
-   *    As a consequence, the user's busChanged method is
-   *    invoked with the current bus.
-   */
+  /** Adds a writing consumer to the bus. Note that
+    * the writers are kept in a Set and this method doesn't
+    * currently check whether the set already contains
+    * the writer. Adding the same writer more than once
+    * will cause malfunction.
+    *
+    * As a consequence, the user's busChanged method is
+    * invoked with the current bus.
+    */
   def addWriter(u: User)(implicit tx: Txn): Unit
 
-  /**
-   *    Removes a reading consumer from the bus. It is
-   *    safe to call this method, passing in a user which
-   *    has already been previously removed.
-   */
+  /** Removes a reading consumer from the bus. It is
+    * safe to call this method, passing in a user which
+    * has already been previously removed.
+    */
   def removeReader(u: User)(implicit tx: Txn): Unit
 
-  /**
-   *    Removes a writing consumer from the bus. It is
-   *    safe to call this method, passing in a user which
-   *    has already been previously removed.
-   */
+  /** Removes a writing consumer from the bus. It is
+    * safe to call this method, passing in a user which
+    * has already been previously removed.
+    */
   def removeWriter(u: User)(implicit tx: Txn): Unit
 }
 
@@ -150,24 +141,22 @@ object Bus {
   //      def busChanged( bus: Bus )( implicit tx: Txn ) : Unit
   //   }
 
-  /**
-   *    Constructs a new audio bus proxy for use in a shared environment, where
-   *    there can be situations of semi-orphaned buses (only one reader or
-   *    only one writer left).
-   */
+  /** Constructs a new audio bus proxy for use in a shared environment, where
+    * there can be situations of semi-orphaned buses (only one reader or
+    * only one writer left).
+    */
   def audio  (server: Server, numChannels: Int): AudioBus   = new AudioImpl  (server, numChannels)
   def control(server: Server, numChannels: Int): ControlBus = new ControlImpl(server, numChannels)
 
-  /**
-   *    Constructs a new audio bus proxy for use in a short-term temporary fashion.
-   *    The implementation does not maintain dummy and empty buses for the case that
-   *    there is only one reader or only one writer. As a consequence, it should not
-   *    be used in such a scenario, as precious bus indices will be occupied. On the
-   *    other hand, this method is useful for internal temporary buses, because when
-   *    both a reader and a writer release the resource, there are no spurious
-   *    bus re-assignments causing further busChanged notifications (which would go
-   *    to concurrently freed nodes).
-   */
+  /** Constructs a new audio bus proxy for use in a short-term temporary fashion.
+    * The implementation does not maintain dummy and empty buses for the case that
+    * there is only one reader or only one writer. As a consequence, it should not
+    * be used in such a scenario, as precious bus indices will be occupied. On the
+    * other hand, this method is useful for internal temporary buses, because when
+    * both a reader and a writer release the resource, there are no spurious
+    * bus re-assignments causing further busChanged notifications (which would go
+    * to concurrently freed nodes).
+    */
   def tmpAudio(server: Server, numChannels: Int): AudioBus = new TempAudioImpl(server, numChannels)
 
   def soundIn(server: Server, numChannels: Int, offset: Int = 0): AudioBus = {
@@ -204,14 +193,14 @@ object Bus {
     final def alloc()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       useCount += 1
-      if (verbose) println(peer.toString + ".alloc -> " + useCount.get)
+      if (verbose) println(s"$peer.alloc -> ${useCount.get}")
     }
 
     // decrements use count and calls `remove` if that count reaches zero
     final def free()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val cnt = useCount.get - 1
-      if (verbose) println(peer.toString + ".free -> " + cnt)
+      if (verbose) println(s"$peer.free -> $cnt")
       require(cnt >= 0)
       useCount.set(cnt)
       if (cnt == 0) {

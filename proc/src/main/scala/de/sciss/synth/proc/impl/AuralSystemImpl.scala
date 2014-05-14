@@ -95,7 +95,7 @@ object AuralSystemImpl {
       def dispose()(implicit tx: Txn): Unit = {
         logA("Stopped server")
         NodeGraph.removeServer(server)
-        clients.get(tx.peer).foreach(_.stopped())
+        clients.get(tx.peer).foreach(_.auralStopped())
 
         afterCommit {
           val obs = listener.single.swap(None)
@@ -114,7 +114,7 @@ object AuralSystemImpl {
       def init()(implicit tx: Txn): Unit = {
         logA("Started server")
         NodeGraph.addServer(server)
-        clients.get(tx.peer).foreach(_.started(server))
+        clients.get(tx.peer).foreach(_.auralStarted(server))
 
         afterCommit {
           val list = server.peer.addListener {
@@ -181,12 +181,12 @@ object AuralSystemImpl {
         case StateRunning(server) => fun(server)
         case _ =>
           val c: Client = new Client {
-            def started(s: Server)(implicit tx: Txn): Unit = {
+            def auralStarted(s: Server)(implicit tx: Txn): Unit = {
               removeClient(this)
               fun(s)
             }
 
-            def stopped()(implicit tx: Txn) = ()
+            def auralStopped()(implicit tx: Txn) = ()
           }
           addClient(c)
       }

@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import collection.immutable.{IndexedSeq => Vec, Set => ISet}
-import de.sciss.synth.{UGenGraph, Lazy, SynthGraph}
+import de.sciss.synth.{ControlBus => SControlBus, UGenGraph, Lazy, SynthGraph}
 import de.sciss.synth.ugen.ControlProxyLike
 import de.sciss.lucre.synth.Sys
 
@@ -44,6 +44,8 @@ private[proc] object UGenGraphBuilderImpl {
     var missingIns  = Set.empty[MissingIn[S]]
     var attributeIns= Set.empty[String]
     var streamIns   = Map.empty[String, List[StreamIn]]
+
+    def sensorBus: SControlBus = aural.sensorBus
 
     def addScanIn(key: String, numChannels: Int): Int = {
       val fixed = numChannels >= 0

@@ -64,6 +64,8 @@ private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
   /** This method should only be invoked by the `graph.attribute.In` instances. It registers a control input. */
   def addAttributeIn(key: String): Int
 
+  def sensorBus: ControlBus
+
   /** This method should only be invoked by the `graph.stream.X` instances. It registers a control input
     * for a streaming buffer.
     *

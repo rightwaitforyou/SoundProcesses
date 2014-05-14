@@ -17,6 +17,7 @@ import de.sciss.lucre.stm
 import stm.Disposable
 import impl.{AuralPresentationImpl => Impl}
 import de.sciss.lucre.synth.{Sys, Group}
+import de.sciss.synth.{ControlBus => SControlBus}
 
 object AuralPresentation {
   // ---- implementation forwards ----
@@ -24,8 +25,9 @@ object AuralPresentation {
   //  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] =
   //    Impl.run[S](transport, aural)
 
-  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] =
-    Impl.run[S](transport, aural)
+  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, sensor: Option[SensorSystem] = None)
+                      (implicit tx: S#Tx): AuralPresentation[S] =
+    Impl.run[S](transport, aural, sensor)
 
   private[proc] trait Running[S <: Sys[S]] {
     /** Queries the number of channel associated with a scanned input.
@@ -49,6 +51,8 @@ object AuralPresentation {
       * @return             the number of channels for the attribute input
       */
     def attrNumChannels(timed: TimedProc[S], key: String)(implicit tx: S#Tx): Int
+
+    def sensorBus: SControlBus
   }
 
   final private[proc] case class MissingInfo[S <: Sys[S]](source: TimedProc[S], key: String) extends Throwable
@@ -57,4 +61,6 @@ trait AuralPresentation[S <: Sys[S]] extends Disposable[S#Tx] {
   def group(implicit tx: S#Tx): Option[Group]
 
   def stopAll(implicit tx: S#Tx): Unit
+
+  // def sensors(implicit tx: S#Tx): Unit
 }

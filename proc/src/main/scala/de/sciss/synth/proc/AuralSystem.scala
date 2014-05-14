@@ -32,8 +32,8 @@ object AuralSystem {
   }
 
   trait Client {
-    def started(s: Server)(implicit tx: Txn): Unit
-    def stopped()         (implicit tx: Txn): Unit
+    def auralStarted(s: Server)(implicit tx: Txn): Unit
+    def auralStopped()         (implicit tx: Txn): Unit
   }
 }
 /** An `AuralSystem` is the logical representation of a sound synthesis server, whether running or not.

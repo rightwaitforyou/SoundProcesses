@@ -15,11 +15,11 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import stm.IdentifierMap
+import de.sciss.lucre.stm.{TxnLike, IdentifierMap}
 import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TxnLocal}
-import de.sciss.synth.proc.{logAural => logA}
+import de.sciss.synth.proc.{logAural => logA, SensorSystem}
 import UGenGraphBuilder.MissingIn
 import graph.scan
 import de.sciss.span.Span
@@ -28,7 +28,7 @@ import de.sciss.synth.proc.Scan.Link
 import scala.util.control.NonFatal
 import de.sciss.lucre.synth.{DynamicUser, Buffer, Bus, AudioBus, NodeGraph, AuralNode, BusNodeSetter, AudioBusNodeSetter, Sys, Synth, Group, Server, Resource, Txn}
 import scala.concurrent.stm.{Txn => ScalaTxn}
-import de.sciss.synth.{addToHead, ControlSet}
+import de.sciss.synth.{ControlBus, addToHead, ControlSet}
 import de.sciss.numbers
 import de.sciss.lucre.expr.Expr
 
@@ -45,28 +45,31 @@ object AuralPresentationImpl {
   //    c
   //  }
 
-  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)(implicit tx: S#Tx): AuralPresentation[S] = {
-    val c = new Client[S](transport, aural)
+  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, sensor: Option[SensorSystem])
+                      (implicit tx: S#Tx): AuralPresentation[S] = {
+    val c = new Client[S](transport, aural, sensor)
     aural.addClient(c)
     aural.serverOption.foreach(c.startedTx)
+    sensor.foreach(_.addClient(c))
     c
   }
 
-  private final class Client[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem)
-    extends AuralPresentation[S] with AuralSystem.Client {
+  private final class Client[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, sensor: Option[SensorSystem])
+    extends AuralPresentation[S] with AuralSystem.Client with SensorSystem.Client {
 
-    override def toString = "AuralPresentation@" + hashCode.toHexString
+    override def toString = s"AuralPresentation@${hashCode.toHexString}"
 
     private val running   = Ref(Option.empty[RunningImpl[S]])
     private val groupRef  = Ref(Option.empty[Group])
 
-    def dispose()(implicit tx: S#Tx) = {
-      aural.removeClient(this)
-      val rOpt = running.swap(None)(tx.peer)
-      rOpt.foreach(_.dispose())
-    }
+    def auralStarted(server: Server)(implicit tx: Txn): Unit =
+      ScalaTxn.afterCommit { _ =>
+        transport.cursor.step { implicit tx =>
+          startedTx(server)
+        }
+      } (tx.peer)
 
-    def stopped()(implicit tx: Txn): Unit = {
+    def auralStopped()(implicit tx: Txn): Unit = {
       // aural.removeClient(this)
       val rOpt = running.swap(None)(tx.peer)
       rOpt.foreach { r =>
@@ -78,14 +81,26 @@ object AuralPresentationImpl {
       }
     }
 
-    def group(implicit tx: S#Tx): Option[Group] = groupRef.get(tx.peer)
+    def sensorsStarted(c: SensorSystem.Server)(implicit tx: TxnLike): Unit = ()
 
-    def started(server: Server)(implicit tx: Txn): Unit =
-      ScalaTxn.afterCommit { _ =>
-        transport.cursor.step { implicit tx =>
-          startedTx(server)
-        }
-      } (tx.peer)
+    def sensorsStopped()(implicit tx: TxnLike): Unit = ()
+
+    def sensorsUpdate(values: Vec[Float])(implicit tx: TxnLike): Unit = {
+      running.get(tx.peer).foreach { run =>
+        val msg = run.sensorBus.setnMsg(values)
+        run.server ! msg
+      }
+      // implicit val tx = Txn.wrap(txl.peer)
+    }
+
+    def dispose()(implicit tx: S#Tx) = {
+      aural.removeClient(this)
+      val rOpt = running.swap(None)(tx.peer)
+      rOpt.foreach(_.dispose())
+      sensor.foreach(_.removeClient(this))
+    }
+
+    def group(implicit tx: S#Tx): Option[Group] = groupRef.get(tx.peer)
 
     def stopAll(implicit tx: S#Tx): Unit =
       group.foreach(_.freeAll())
@@ -101,7 +116,10 @@ object AuralPresentationImpl {
       //         group.play( target = server.defaultGroup ) // ( ProcTxn()( tx ))
       groupRef.set(Some(group))(tx.peer)
 
-      val booted = new RunningImpl(server, group, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
+      val sensorBusI  = server.allocControlBus(16)
+      val sensorBus   = ControlBus(server.peer, sensorBusI, 16)
+
+      val booted = new RunningImpl(server, group, sensorBus, viewMap, scanMap, transport.sampleRate /*, artifactStore */)
       logA(s"started (${booted.hashCode.toHexString})")
       NodeGraph.addServer(server) // ( ProcTxn()( tx ))
 
@@ -166,7 +184,7 @@ object AuralPresentationImpl {
     override def toString = "OngoingBuild(missingMap = " + missingMap + ", idMap = " + idMap + ", seq = " + seq + ")"
   }
 
-  private final class RunningImpl[S <: Sys[S]](server: Server, group: Group,
+  private final class RunningImpl[S <: Sys[S]](val server: Server, group: Group, val sensorBus: ControlBus,
                                                viewMap: IdentifierMap[S#ID, S#Tx, AuralNode],
                                                scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])],
                                                sampleRate: Double)
@@ -517,10 +535,10 @@ object AuralPresentationImpl {
                 val sourceTimedID = idH()
                 getOutputBus(sourceTimedID, sourceKey)
             }
-            busOpt.map(_.numChannels).getOrElse {
+            busOpt.fold({
               if (numChannels < 0) throw MissingIn(peer)
               numChannels
-            }
+            })(_.numChannels)
         }
         if (chans.isEmpty) 0 else chans.max
       }
