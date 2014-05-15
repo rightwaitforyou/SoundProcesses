@@ -28,6 +28,7 @@ import de.sciss.span.{Span, SpanLike}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.{model => m}
 import evt.Sys
+import de.sciss.span.Span.SpanOrVoid
 
 object TransportImpl {
   import Grapheme.Segment
@@ -35,9 +36,9 @@ object TransportImpl {
 
   private type DefSegs = Vec[DefSeg]
 
-  def apply[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double)(
-    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): ProcTransport[S] = {
-
+  def apply[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double)
+                                         (implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx)
+  : Transport.Realtime[S, Obj.T[S, proc.Proc.Elem], Transport.Proc.Update[S]] = {
     val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[S, I](group)
     val t = new Realtime[S, I](groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar)
     t.init()
@@ -58,22 +59,22 @@ object TransportImpl {
   private def prepare[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S])
                                                    (implicit tx: S#Tx, bridge: S#Tx => I#Tx):
   (stm.Source[S#Tx, ProcGroup[S]],
-    I#Var[Info],
+    Ref[Info],
     IdentifierMap[S#ID, S#Tx, ProcCache[S]],
     SkipList.Map[I, Long,  Set[S#ID]],
     IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-    I#Var[Vec[Observation[S, I]]]) = {
+    Ref[Vec[Observation[S, I]]]) = {
 
     implicit val itx: I#Tx  = tx
-    val iid                 = itx.newID()
+    // val iid                 = itx.newID()
     implicit val infoSer    = dummySerializer[Info, I]
-    val infoVar             = itx.newVar(iid, Info.init) // ( dummySerializer )
+    val infoVar             = Ref(Info.init)
     val gMap                = tx.newInMemoryIDMap[ProcCache[S]] // (1)
     implicit val skipSer    = dummySerializer[Set[S#ID], I]
     val gPrio               = SkipList.Map.empty[I, Long, Set[S#ID]] // (2)
     val timedMap            = tx.newInMemoryIDMap[TimedProc[S]] // (3)
     implicit val obsSer     = dummySerializer[Vec[Observation[S, I]], I]
-    val obsVar              = itx.newVar(iid, Vec.empty[Observation[S, I]])
+    val obsVar              = Ref(Vec.empty[Observation[S, I]])
     val groupH              = tx.newHandle(group)(ProcGroup.serializer)
 
     (groupH, infoVar, gMap, gPrio, timedMap, obsVar)
@@ -92,6 +93,7 @@ object TransportImpl {
       state             = Stopped,
       nextProcTime      = Long.MinValue + 1,
       nextGraphemeTime  = Long.MinValue + 1,
+      nextLoopTime      = Long.MaxValue,
       valid             = -1
     )
   }
@@ -114,26 +116,32 @@ object TransportImpl {
     *                            is meant to silently abort.
     */
   private final case class Info private(cpuTime: Long, frame: Long, state: State, nextProcTime: Long,
-                                        nextGraphemeTime: Long, valid: Int) {
-    require(nextProcTime > frame && nextGraphemeTime > frame)
+                                        nextGraphemeTime: Long, nextLoopTime: Long, valid: Int) {
+    val nextTime: Long = {
+      // next time is the minimum of next proc and next grapheme time,
+      // and - if the loop is beyond the current location `frame` - the next loop time.
+      require(nextProcTime > frame && nextGraphemeTime > frame)
+      val m1 = math.min(nextProcTime, nextGraphemeTime)
+      if (nextLoopTime > frame) math.min(m1, nextLoopTime) else m1
+    }
 
     def copy(cpuTime: Long = cpuTime, frame: Long = frame, state: State = state,
-             nextProcTime: Long = nextProcTime, nextGraphemeTime: Long = nextGraphemeTime): Info =
+             nextProcTime: Long = nextProcTime, nextGraphemeTime: Long = nextGraphemeTime,
+             nextLoopTime: Long = nextLoopTime): Info =
       Info(cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
-        nextGraphemeTime = nextGraphemeTime, valid = valid + 1)
+        nextGraphemeTime = nextGraphemeTime, nextLoopTime = nextLoopTime, valid = valid + 1)
 
     // does not increment valid
     def copy1(cpuTime: Long = cpuTime, frame: Long = frame, state: State = state,
-              nextProcTime: Long = nextProcTime, nextGraphemeTime: Long = nextGraphemeTime): Info =
+              nextProcTime: Long = nextProcTime, nextGraphemeTime: Long = nextGraphemeTime,
+              nextLoopTime: Long = nextLoopTime): Info =
       Info(cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
-        nextGraphemeTime = nextGraphemeTime, valid = valid)
+        nextGraphemeTime = nextGraphemeTime, nextLoopTime = nextLoopTime, valid = valid)
 
     def incValid: Info = Info(cpuTime = cpuTime, frame = frame, state = state, nextProcTime = nextProcTime,
-      nextGraphemeTime = nextGraphemeTime, valid = valid + 1)
+      nextGraphemeTime = nextGraphemeTime, nextLoopTime = nextLoopTime, valid = valid + 1)
 
-    def isRunning = state == Playing
-
-    def nextTime = math.min(nextProcTime, nextGraphemeTime)
+    def isRunning: Boolean = state == Playing
 
     private def smartLong(n: Long): String = n match {
       case Long.MinValue => "-inf"
@@ -217,16 +225,18 @@ object TransportImpl {
   private final class Offline[S <: Sys[S], I <: stm.Sys[I]](
           protected val groupHandle: stm.Source[S#Tx, ProcGroup[S]],
           val sampleRate: Double,
-          protected val infoVar: I#Var[Info],
+          protected val infoVar: Ref[Info],
           protected val gMap: IdentifierMap[S#ID, S#Tx, ProcCache[S]],
           protected val gPrio: SkipList.Map[I, Long, Set[S#ID]],
           protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-          protected val obsVar: I#Var[Vec[Observation[S, I]]])
+          protected val obsVar: Ref[Vec[Observation[S, I]]])
          (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
     extends Impl[S, I] with Transport.Offline[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] {
 
     private val submitRef = Ref(offlineEmptyStep)
     private val timeRef   = Ref(0L)
+
+    protected def loop(implicit tx: S#Tx): SpanOrVoid = Span.Void
 
     protected def logicalTime             ()(implicit tx: S#Tx): Long = timeRef.get       (tx.peer)
     protected def logicalTime_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
@@ -245,18 +255,20 @@ object TransportImpl {
     }
 
     def stepTarget(implicit tx: S#Tx): Option[Long] = {
-      val submit = submitRef()(tx.peer)
+      implicit val ptx = tx.peer
+      val submit = submitRef()
       import submit._
       // if (schedValid >= 0) Some(logicalNow + logicalDelay) else None
       if (schedValid >= 0) {
-        implicit val itx: I#Tx = tx
+        // implicit val itx: I#Tx = tx
         val info = infoVar()
         if (info.valid == schedValid) Some(info.nextTime) else None
       } else None
     }
 
     def position(implicit tx: S#Tx): Long = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       val info = infoVar()
       info.frame
     }
@@ -274,16 +286,37 @@ object TransportImpl {
   private final class Realtime[S <: Sys[S], I <: stm.Sys[I]](
         protected val groupHandle: stm.Source[S#Tx, ProcGroup[S]],
         val sampleRate: Double,
-        protected val infoVar: I#Var[Info],
+        protected val infoVar: Ref[Info],
         protected val gMap: IdentifierMap[S#ID, S#Tx, ProcCache[S]],
         protected val gPrio: SkipList.Map[I, Long, Set[S#ID]],
         protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
-        protected val obsVar: I#Var[Vec[Observation[S, I]]])
+        protected val obsVar: Ref[Vec[Observation[S, I]]])
        (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
-    extends Impl[S, I] {
+    extends Impl[S, I] with Transport.Realtime[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] {
 
     protected def logicalTime             ()(implicit tx: S#Tx): Long = rt_cpuTime.get       (tx.peer)
     protected def logicalTime_=(value: Long)(implicit tx: S#Tx): Unit = rt_cpuTime.set(value)(tx.peer)
+
+    private val _loop = Ref(Span.Void: SpanOrVoid)
+
+    def loop(implicit tx: S#Tx): SpanOrVoid = _loop.get(tx.peer)
+
+    def loop_=(value: SpanOrVoid)(implicit tx: S#Tx): Unit = {
+      implicit val ptx = tx.peer
+      val old = _loop.swap(value)
+      if (value != old) {
+        val info0     = infoVar()
+        val newFrame  = calcCurrentTime(info0)
+        val loopStop  = value match {
+          case Span(_, stop)  => stop
+          case _              => Long.MaxValue
+        }
+        val infoNew   = info0.copy(cpuTime = logicalTime(), frame = newFrame, nextLoopTime = loopStop)
+        val isPly     = infoNew.isRunning
+        infoVar()     = infoNew
+        if (isPly) scheduleNext(infoNew)
+      }
+    }
 
     protected def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit = {
       val jitter      = sysMicros() - logicalNow
@@ -332,11 +365,13 @@ object TransportImpl {
 
     protected def groupHandle: stm.Source[S#Tx, ProcGroup[S]]
 
-    protected def infoVar: I#Var[Info]
+    protected def infoVar: Ref[Info]
 
-    protected def obsVar: I#Var[Vec[Observation[S, I]]]
+    protected def obsVar: Ref[Vec[Observation[S, I]]]
 
     protected implicit def trans: S#Tx => I#Tx
+
+    protected def loop(implicit tx: S#Tx): SpanOrVoid
 
     private final var groupObs: Disposable[S#Tx] = _
 
@@ -375,7 +410,8 @@ object TransportImpl {
       * @param expectedValid    the valid counter at the time of scheduling
       */
     final protected def eventReached(logicalNow: Long, logicalDelay: Long, expectedValid: Int)(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       val info = infoVar()
       if (info.valid != expectedValid) return // the scheduled task was invalidated by an intermediate stop or seek command
 
@@ -383,9 +419,21 @@ object TransportImpl {
       // let the cpuTime txn-local determine a new free wheeling time, but set it to the
       // time we targeted at; then in the next scheduleNext call, the jitter is properly
       // calculated.
-      val newLogical = logicalNow + logicalDelay
+      val newLogical  = logicalNow + logicalDelay
       logicalTime_=(newLogical)
-      advance(newFrame = info.nextTime)
+      val newFrame    = info.nextTime
+      if (newFrame == info.nextLoopTime) {
+        stop()
+        loop match {
+          case Span(start, _) =>
+            seek(start)
+            play()
+
+          case _ =>
+        }
+      } else {
+        advance(newFrame = newFrame)
+      }
     }
 
     protected def logicalTime()(implicit tx: S#Tx): Long
@@ -451,7 +499,7 @@ object TransportImpl {
       val nextGraphemeTime = if (perceived) {
         implicit val itx: I#Tx = tx
         val headOption = gPrio.ceil(Long.MinValue) // headOption method missing
-        headOption.map(_._1).getOrElse(Long.MaxValue)
+        headOption.fold(Long.MaxValue)(_._1)
       } else {
         oldInfo.nextGraphemeTime
       }
@@ -662,7 +710,8 @@ object TransportImpl {
     // a change in the transported group has been observed.
     private def biGroupUpdate(groupUpd: BiGroup.Update[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]])
                              (implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       val state = {
         val info0     = infoVar()
         val newFrame  = calcCurrentTime(info0)
@@ -766,13 +815,14 @@ object TransportImpl {
 
     final def dispose()(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       groupObs.dispose()
       infoVar() = Info.init // if there is pending scheduled tasks, they should abort gracefully
       //         infoVar.dispose()
       gMap    .dispose()
       gPrio   .dispose()
       timedMap.dispose()
-      obsVar  .dispose()
+      // obsVar  .dispose()
     }
 
     override def toString = s"Transport(group=$groupHandle)@${hashCode.toHexString}"
@@ -780,7 +830,7 @@ object TransportImpl {
     final def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, (SpanLike, TimedProc[S])] =
       group.intersect(time).flatMap(flatSpans)
 
-    private def calcCurrentTime(info: Info)(implicit tx: S#Tx): Long = {
+    final protected def calcCurrentTime(info: Info)(implicit tx: S#Tx): Long = {
       val startFrame = info.frame
       if (info.isRunning) {
         val logicalNow    = logicalTime()
@@ -793,7 +843,7 @@ object TransportImpl {
     }
 
     final def time(implicit tx: S#Tx): Long = {
-      implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       calcCurrentTime(infoVar())
     }
 
@@ -801,7 +851,8 @@ object TransportImpl {
     //      def playing_=( expr: Expr[ S, Boolean ])( implicit tx: S#Tx ): Unit = playingVar.set( expr )
 
     final def play()(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       val oldInfo = infoVar()
       if (oldInfo.isRunning) return
       val newInfo = oldInfo.copy(cpuTime = logicalTime(), state = Playing)
@@ -811,7 +862,8 @@ object TransportImpl {
     }
 
     final def stop()(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       val oldInfo = infoVar()
       if (!oldInfo.isRunning) return
 
@@ -825,13 +877,22 @@ object TransportImpl {
     }
 
     final def isPlaying(implicit tx: S#Tx): Boolean = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       infoVar().isRunning
     }
 
-    private def scheduleNext(info: Info)(implicit tx: S#Tx): Unit = {
+    final protected def scheduleNext(info: Info)(implicit tx: S#Tx): Unit = {
       //         implicit val itx  = tx.inMemory
       //         val info          = infoVar.get
+
+      //      val lp            = loop
+      //      val targetFrame0  = info.nextTime
+      //      val targetFrame   = if (!lp.contains(info.frame)) targetFrame0 else lp match {
+      //        case Span(_, stop)  => math.min(targetFrame0, stop)
+      //        case _              => targetFrame0
+      //      }
+
       val targetFrame = info.nextTime
 
       if ( /* !info.isRunning || */ targetFrame == Long.MaxValue) return
@@ -846,19 +907,22 @@ object TransportImpl {
     final def group(implicit tx: S#Tx): ProcGroup[S] = groupHandle() // tx.refresh( csrPos, groupStale )
 
     private def fire(update: Update[S])(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       val obs = obsVar()
       obs.foreach(_.fun(tx)(update))
     }
 
     final def removeObservation(obs: Observation[S, I])(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       obsVar.transform(_.filterNot(_ == obs))
     }
 
     final def react(fun: S#Tx => Update[S] => Unit)(implicit tx: S#Tx): Disposable[S#Tx] = {
-      implicit val itx: I#Tx = tx
+      // implicit val itx: I#Tx = tx
       val obs = new Observation[S, I](this, fun)
+      implicit val ptx = tx.peer
       obsVar.transform(_ :+ obs)
       obs
     }
@@ -965,6 +1029,7 @@ object TransportImpl {
       */
     private def advance(newFrame: Long, isSeek: Boolean = false, startPlay: Boolean = false)(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx = tx
+      implicit val ptx = tx.peer
       val oldInfo           = infoVar()
       val oldFrame          = oldInfo.frame
       logT(s"advance(newFrame = $newFrame, isSeek = $isSeek, startPlay = $startPlay); oldInfo = $oldInfo")
@@ -1147,7 +1212,7 @@ object TransportImpl {
 
       val nextGraphemeTime = if (needsNewGraphemeTime) {
         val headOption = gPrio.ceil(Long.MinValue) // headOption method missing
-        headOption.map(_._1).getOrElse(Long.MaxValue)
+        headOption.fold(Long.MaxValue)(_._1)
       } else {
         oldInfo.nextGraphemeTime
       }

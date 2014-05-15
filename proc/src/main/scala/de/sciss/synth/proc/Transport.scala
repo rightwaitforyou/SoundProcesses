@@ -23,13 +23,14 @@ import impl.{TransportImpl => Impl}
 import de.sciss.span.SpanLike
 import de.sciss.lucre.event.{Observable, Sys}
 import proc.{Proc => _Proc}
+import de.sciss.span.Span.SpanOrVoid
 
 object Transport {
   /** Creates a new realtime transport. The transport is positioned at time zero. */
   def apply[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)
                                          (implicit tx: S#Tx, cursor: Cursor[S],
-                                          bridge: S#Tx => I#Tx): ProcTransport[S] =
-    Impl[S, I](group, sampleRate)
+                                          bridge: S#Tx => I#Tx)
+  : Realtime[S, Obj.T[S, _Proc.Elem], Transport.Proc.Update[S]] = Impl[S, I](group, sampleRate)
 
   //   implicit def serializer[ S <: evt.Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
   //      Impl.serializer( cursor )
@@ -41,15 +42,14 @@ object Transport {
   }
 
   /** Creates a new offline transport. The transport is not positioned. */
-  def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)(
-    implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx): Offline[S, Obj.T[S, _Proc.Elem], Transport.Proc.Update[S]] =
-    Impl.offline[S, I](group, sampleRate)
+  def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)
+                                           (implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx)
+  : Offline[S, Obj.T[S, _Proc.Elem], Transport.Proc.Update[S]] = Impl.offline[S, I](group, sampleRate)
 
-  /**
-   * A transport sub-type which does not automatically advance in accordance
-   * to a real-time clock, but awaits manually stepping through. This can be
-   * used for offline-bouncing, debugging or unit testing purposes.
-   */
+  /** A transport sub-type which does not automatically advance in accordance
+    * to a real-time clock, but awaits manually stepping through. This can be
+    * used for offline-bouncing, debugging or unit testing purposes.
+    */
   trait Offline[S <: Sys[S], Elem, U] extends Transport[S, Elem, U] {
     /** Advances the transport to the next position (if there is any) */
     def step()(implicit tx: S#Tx): Unit
@@ -74,17 +74,25 @@ object Transport {
     def position(implicit tx: S#Tx): Long
   }
 
+  trait Realtime[S <: Sys[S], Elem, U] extends Transport[S, Elem, U] {
+    def loop  (implicit tx: S#Tx): SpanOrVoid
+    def loop_=(value: SpanOrVoid)(implicit tx: S#Tx): Unit
+  }
+
   final case class Advance[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long,
                                                  isSeek: Boolean, isPlaying: Boolean,
                                                  added:   Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
                                                  removed: Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
                                                  changes: Vec[(BiGroup.TimedElem[S, Elem], U)]  = Vec.empty)
     extends Update[S, Elem, U] {
-    override def toString =
-      "Advance(" + transport + ", " + time + ", isSeek = " + isSeek + ", isPlaying = " + isPlaying +
-        (if (added.nonEmpty) added.mkString(", added = [", ",", "]") else "") +
-        (if (removed.nonEmpty) removed.mkString(", removed = [", ",", "]") else "") +
-        (if (changes.nonEmpty) changes.mkString(", changes = [", ",", "]") else "") + ")"
+
+    override def toString = {
+      val addedSt   = if (added  .nonEmpty) added  .mkString(", added = [",   ",", "]") else ""
+      val removedSt = if (removed.nonEmpty) removed.mkString(", removed = [", ",", "]") else ""
+      val changesSt = if (changes.nonEmpty) changes.mkString(", changes = [", ",", "]") else ""
+
+      s"Advance($transport, $time, isSeek = $isSeek, isPlaying = $isPlaying$addedSt$removedSt$changesSt)"
+    }
   }
 
   final case class Play[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long) extends Update[S, Elem, U]
