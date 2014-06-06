@@ -19,33 +19,6 @@ import evt.{EventLike, Sys}
 import de.sciss.serial.{Serializer, DataInput}
 import de.sciss.synth.proc
 
-object ProcGroup {
-  type Update    [S <: Sys[S]] = BiGroup.Update    [S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
-  type Modifiable[S <: Sys[S]] = BiGroup.Modifiable[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
-
-
-  private def eventView[S <: Sys[S]](proc: Obj.T[S, Proc.Elem]): EventLike[S, Obj.UpdateT[S, Proc.Elem[S]]] =
-    proc.changed
-
-  object Modifiable {
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup.Modifiable[S]] =
-      BiGroup.Modifiable.serializer[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](eventView)
-
-    def apply[S <: Sys[S]](implicit tx: S#Tx): ProcGroup.Modifiable[S] =
-      BiGroup.Modifiable[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](eventView)
-
-    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup.Modifiable[S] =
-      BiGroup.Modifiable.read[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](in, access, eventView)
-  }
-
-
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): ProcGroup[S] =
-    BiGroup.Modifiable.read[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](in, access, eventView)
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ProcGroup[S]] =
-    BiGroup.serializer[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]](eventView)
-}
-
 // ---- Elem ----
 
 object ProcGroupElem {

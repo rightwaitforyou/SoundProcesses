@@ -576,6 +576,7 @@ object ElemImpl {
     DoubleVec       .typeID -> DoubleVec       ,
     AudioGrapheme   .typeID -> AudioGrapheme   ,
     ArtifactLocation.typeID -> ArtifactLocation,
+    Proc            .typeID -> Proc            ,
     ProcGroup       .typeID -> ProcGroup       ,
     FolderElemImpl  .typeID -> FolderElemImpl
   )
