@@ -25,7 +25,7 @@ import scala.language.existentials
 import de.sciss.serial.{DataInput, Serializer}
 
 package object proc {
-  type ProcGroup    [S <: Sys[S]] =  BiGroup[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
+  type ProcGroup    [S <: Sys[S]] = BiGroup[S, Obj.T[S, Proc.Elem], Obj.UpdateT[S, Proc.Elem[S]]]
   type TimedProc    [S <: Sys[S]] = BiGroup.TimedElem[S, Obj.T[S, Proc.Elem]]
   type ProcTransport[S <: Sys[S]] = Transport[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]]  // Proc.Update[ S ]
 
