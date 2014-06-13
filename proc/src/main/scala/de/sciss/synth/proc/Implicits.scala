@@ -38,7 +38,9 @@ object Implicits {
       val nameC = StringEx.newConst[S](value)
       attr.expr[String](ProcKeys.attrName) match {
         case Some(Expr.Var(vr)) => vr() = nameC
-        case _                  => attr.put(ProcKeys.attrName, Obj(StringElem[S](nameC)))
+        case _                  =>
+          val nameV = StringEx.newVar(nameC)
+          attr.put(ProcKeys.attrName, Obj(StringElem[S](nameV)))
       }
     }
   }

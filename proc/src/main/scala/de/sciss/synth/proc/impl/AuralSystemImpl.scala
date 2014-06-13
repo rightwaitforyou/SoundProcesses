@@ -15,9 +15,9 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.osc.Dump
-import scala.concurrent.stm.{TxnExecutor, Ref, Txn => ScalaTxn}
+import scala.concurrent.stm.{TxnExecutor, Ref}
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.synth.{Server => SServer, ServerLike => SServerLike, ServerConnection}
+import de.sciss.synth.{Server => SServer, ServerConnection}
 import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.lucre.synth.{NodeGraph, Server, Txn}
 import de.sciss.lucre.stm.Disposable
@@ -34,9 +34,14 @@ object AuralSystemImpl {
    * that calling atomic from within Txn.afterCommit
    * causes an exception. It seems this has to
    * do with the external decider being set?
+   *
+   * TODO: review
    */
   private def afterCommit(code: => Unit)(implicit tx: Txn): Unit = tx.afterCommit {
-    SoundProcesses.pool.submit(new Runnable() {
+    val exec = SoundProcesses.pool
+    // note: `isShutdown` is true during VM shutdown. In that case
+    // calling `submit` would throw an exception.
+    if (exec.isShutdown) code else exec.submit(new Runnable() {
       def run(): Unit = code
     })
   }
@@ -111,22 +116,26 @@ object AuralSystemImpl {
 
       private val listener = Ref(Option.empty[SServer.Listener])
 
+      // put this into a separate method because `atomic` will otherwise
+      // pick up an obsolete transaction in implicit scope
+      private def ac(): Unit = {
+        val list = server.peer.addListener {
+          case SServer.Offline =>
+            atomic { implicit itx =>
+              implicit val tx = Txn.wrap(itx)
+              state.swap(StateStopped).dispose()
+            }
+        }
+        val old = listener.single.swap(Some(list))
+        assert(old.isEmpty)
+      }
+
       def init()(implicit tx: Txn): Unit = {
         logA("Started server")
         NodeGraph.addServer(server)
         clients.get(tx.peer).foreach(_.auralStarted(server))
 
-        afterCommit {
-          val list = server.peer.addListener {
-            case SServer.Offline =>
-              atomic { implicit itx =>
-                implicit val tx = Txn.wrap(itx)
-                state.swap(StateStopped).dispose()
-              }
-          }
-          val old = listener.single.swap(Some(list))
-          assert(old.isEmpty)
-        }
+        afterCommit(ac())
       }
     }
 
