@@ -57,4 +57,6 @@ trait Node extends Resource {
   def moveToTail(audible: Boolean, group: Group)(implicit tx: Txn): Unit
   def moveBefore(audible: Boolean, target: Node)(implicit tx: Txn): Unit
   def moveAfter (audible: Boolean, target: Node)(implicit tx: Txn): Unit
+
+  def run(audible: Boolean, state: Boolean)(implicit tx: Txn): Unit
 }

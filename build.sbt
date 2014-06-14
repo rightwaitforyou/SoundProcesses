@@ -2,7 +2,7 @@ lazy val logicalName = "SoundProcesses"
 
 name                      := logicalName + "-full"
 
-version      in ThisBuild := "2.4.0-SNAPSHOT"
+version      in ThisBuild := "2.4.0"
 
 organization in ThisBuild := "de.sciss"
 
@@ -24,7 +24,7 @@ lazy val lucreDataVersion       = "2.2.3"
 
 lazy val lucreEventVersion      = "2.6.1"
 
-lazy val lucreConfluentVersion  = "2.8.0-SNAPSHOT"
+lazy val lucreConfluentVersion  = "2.8.0"
 
 lazy val scalaColliderVersion   = "1.12.0"
 
@@ -36,7 +36,10 @@ lazy val fileUtilVersion        = "1.1.1"
 
 retrieveManaged in ThisBuild := true
 
-scalacOptions in ThisBuild ++= Seq("-deprecation", "-unchecked", "-feature", "-Xfuture")   // "-Xelide-below", "INFO"
+scalacOptions in ThisBuild ++= {
+  val xs = Seq("-deprecation", "-unchecked", "-feature", "-Xfuture")
+  if (version.value endsWith "-SNAPSHOT") xs else xs ++ Seq("-Xelide-below", "INFO")
+}
 
 // SI-7481
 // scalacOptions += "-no-specialization"

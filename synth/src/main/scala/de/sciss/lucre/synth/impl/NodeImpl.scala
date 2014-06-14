@@ -209,4 +209,9 @@ trait NodeImpl extends ResourceImpl with Node {
     require(isOnline && target.isOnline, s"Both source $this and target $target must be online")
     tx.addMessage(this, peer.moveAfterMsg(target.peer), audible = audible, dependencies = target :: Nil)
   }
+
+  final def run(audible: Boolean, state: Boolean)(implicit tx: Txn): Unit = {
+    requireOnline()
+    tx.addMessage(this, peer.runMsg(state), audible = audible, dependencies = Nil)
+  }
 }
