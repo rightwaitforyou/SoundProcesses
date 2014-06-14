@@ -318,8 +318,7 @@ object AuralPresentationImpl {
               val path      = audioElem.artifact.value.getAbsolutePath
               val offset    = audioElem.offset  .value
               val _gain     = audioElem.gain    .value
-              val interp    = info.interp
-              val _buf      = if (interp == 4) {
+              val _buf      = if (info.isNative) {
                 Buffer.diskIn(server)(
                   path          = path,
                   startFrame    = offset,
@@ -329,7 +328,7 @@ object AuralPresentationImpl {
               } else {
                 val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
                 val trig = new StreamBuffer(key = n, idx = idx, synth = synth, buf = __buf, path = path,
-                                            fileFrames = spec.numFrames, interp = interp)
+                                            fileFrames = spec.numFrames, interp = info.interp)
                 trig.install()
                 __buf
               }

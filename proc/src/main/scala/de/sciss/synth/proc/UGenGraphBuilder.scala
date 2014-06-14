@@ -45,7 +45,15 @@ private[proc] object UGenGraphBuilder {
     val empty = StreamIn(0.0, 0)
   }
   case class StreamIn(maxSpeed: Double, interp: Int) {
+    /** Empty indicates that the stream is solely used for information
+      * purposes such as `BufChannels`.
+      */
     def isEmpty: Boolean = interp == 0
+
+    /** Native indicates that the stream will be transported by the UGen
+      * itself, i.e. via `DiskIn` or `VDiskIn`.
+      */
+    def isNative: Boolean = interp == -1
   }
 }
 private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
