@@ -34,7 +34,7 @@ class ScanSpec extends ConfluentEventSpec {
       val scan1 = p.scans.add   ("amp")
       val scan2 = p.scans.add   ("freq")
       p.scans.remove("amp")
-      val gr = Grapheme.Modifiable[S]
+      val gr = Grapheme.Modifiable[S](1)
       // p.graphemes.add( "test", gr )
       // p.graphemes.remove( "test" )
       // p.graphemes.add( "gr", gr )

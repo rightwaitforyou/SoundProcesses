@@ -41,11 +41,11 @@ object TapeTest extends App {
       val file = new File("/Users/hhrutz/Desktop/sciss2013/_creation/CCC/TrailersLostShadowsLim16bCutup.aif")
       val spec = AudioFile.readSpec(file)
       val vAudio = Grapheme.Value.Audio(file, spec, offset = 0L, gain = 2.0)
-      val gAudio = Grapheme.Modifiable[S]
+      val gAudio = Grapheme.Modifiable[S](spec.numChannels)
       gAudio.add((1 - 4.5).seconds -> vAudio) // ... çoit trop complexe ...
       sAudio.addSource(Scan.Link.Grapheme(gAudio))
 
-      val gSpat = Grapheme.Modifiable[S]
+      val gSpat = Grapheme.Modifiable[S](1)
       val sSpat = proc.scans.add("spat")
       sSpat.addSource(Scan.Link.Grapheme(gSpat))
       gSpat.add(1.seconds -> Grapheme.Value.Curve((-1.0, step)))

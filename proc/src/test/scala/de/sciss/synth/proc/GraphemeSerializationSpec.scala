@@ -14,7 +14,7 @@ import de.sciss.synth.Curve.step
 class GraphemeSerializationSpec extends ConfluentEventSpec {
   "Grapheme" should "serialize and deserialize" in { system =>
     val gH = system.step { implicit tx =>
-      val g = Grapheme.Modifiable[S]
+      val g = Grapheme.Modifiable[S](1)
       tx.newHandle(g)(Grapheme.Modifiable.serializer[S])
     }
 

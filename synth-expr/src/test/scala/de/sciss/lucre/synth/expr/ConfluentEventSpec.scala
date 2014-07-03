@@ -31,9 +31,8 @@ trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
   final class Observation[S <: stm.Sys[S]] {
     private val seqRef = TxnLocal(init = Vec.empty[Any])
 
-    def register(tx: S#Tx)(upd: Any): Unit = {
+    def register(tx: S#Tx)(upd: Any): Unit =
       seqRef.transform(_ :+ upd)(tx.peer)
-    }
 
     def assertEquals(expected: Any*)(implicit tx: S#Tx): Unit = {
       val ob = seqRef.get(tx.peer)
@@ -41,16 +40,12 @@ trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
         + "\n...but observed\n   " + ob.mkString("[", ", ", "]"))
     }
 
-    def clear()(implicit tx: S#Tx): Unit = {
+    def clear()(implicit tx: S#Tx): Unit =
       seqRef.set(Vector.empty)(tx.peer)
-    }
 
-    def assertEmpty()(implicit tx: S#Tx): Unit = {
-      assertEquals()
-    }
+    def assertEmpty()(implicit tx: S#Tx): Unit = assertEquals()
 
-    def print()(implicit tx: S#Tx): Unit = {
+    def print()(implicit tx: S#Tx): Unit =
       println(seqRef.get(tx.peer).mkString("[", ", ", "]"))
-    }
   }
 }

@@ -42,7 +42,7 @@ object ThesisExamples extends App {
     val imp = ExprImplicits[S]
     import imp._
 
-    val gMute     = Grapheme.Modifiable[S]
+    val gMute     = Grapheme.Modifiable[S](1)
     gMute.add(    0L -> Grapheme.Value.Curve(0.0 -> Curve.step))
     gMute.add(22050L -> Grapheme.Value.Curve(1.0 -> Curve.step))
     gMute.add(44100L -> Grapheme.Value.Curve(0.0 -> Curve.step))

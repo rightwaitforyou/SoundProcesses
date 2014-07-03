@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.synth.SynthGraph
 import de.sciss.synth.impl.DefaultUGenGraphBuilderFactory
 import de.sciss.ConfluentEventSpec
-import de.sciss.synth.proc.impl.UGenGraphBuilderImpl
+import de.sciss.synth.proc.impl.UGenGraphBuilderImplOLD
 import de.sciss.lucre.bitemp.BiGroup
 import de.sciss.span.Span
 
@@ -54,7 +54,7 @@ class UGenGraphBuilderSpec extends ConfluentEventSpec {
       info("---- expanding using default builder ----")
       val u0  = DefaultUGenGraphBuilderFactory.build(g0)
       info("---- expanding using sound processes builder ----")
-      val ub1 = UGenGraphBuilderImpl(null, timed, 0L)
+      val ub1 = UGenGraphBuilderImplOLD(null, timed, 0L)
       assert(ub1.tryBuild())
       val u1  = ub1.finish
 

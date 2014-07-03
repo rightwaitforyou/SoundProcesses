@@ -46,13 +46,13 @@ class TransportSpec extends ConfluentEventSpec {
       val pg = pgH()
       val p1 = Proc[S]
       val o1 = Obj(Proc.Elem(p1))
-      val g1 = Grapheme.Modifiable[S]
+      val g1 = Grapheme.Modifiable[S](1)
       p1.scans.add("freq").addSource(Scan.Link.Grapheme(g1))
       p1.scans.add("egal")
       g1.add(7000L -> curve(441.0))
       val p2 = Proc[S]
       val o2 = Obj(Proc.Elem(p2))
-      val g2 = Grapheme.Modifiable[S]
+      val g2 = Grapheme.Modifiable[S](1)
       p2.scans.add("amp").addSource(Scan.Link.Grapheme(g2))
       val pt1 = pg.add(Span(   0L, 10000L), o1)
       val pt2 = pg.add(Span(5000L, 20000L), o2)
@@ -138,7 +138,7 @@ class TransportSpec extends ConfluentEventSpec {
       val pg = pgH()
       val p1 = Proc[S]
       val o1 = Obj(Proc.Elem(p1))
-      val g1 = Grapheme.Modifiable[S]
+      val g1 = Grapheme.Modifiable[S](1)
       //         p1.scans.add( "freq" ).source_=( Some( Scan.Link.Grapheme( g1 )))
       g1.add(7000L -> curve(441.0))
       val pt1 = pg.add(Span(-1000L, 10000L), o1)

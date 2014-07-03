@@ -116,7 +116,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
   def artifactStore(implicit tx: S#Tx) = access()._2 // ._1
   // def loc( implicit tx: S#Tx )  = access()._2._2
 
-  def grapheme(implicit tx: S#Tx): Grapheme.Modifiable[S] = Grapheme.Modifiable[S]
+  def grapheme(implicit tx: S#Tx): Grapheme.Modifiable[S] = Grapheme.Modifiable[S](1)
 
   def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) = Grapheme.Expr.Curve(amp -> shape)
 
@@ -142,7 +142,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
       Out.ar(0, m)
     }
-    val g = Grapheme.Modifiable[S]
+    val g = Grapheme.Modifiable[S](1)
     val scan = p.scans.add("freq")
     scan.addSource(Scan.Link.Grapheme(g))
 
@@ -271,7 +271,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
         val in = graph.scan.In("in")
         Out.ar(0, in * SinOsc.ar(3))
       }
-      val g     = Grapheme.Modifiable[S]
+      val g     = Grapheme.Modifiable[S](af.numChannels)
       val scan  = p.elem.peer.scans.add("in")
       scan.addSource(Scan.Link.Grapheme(g))
 

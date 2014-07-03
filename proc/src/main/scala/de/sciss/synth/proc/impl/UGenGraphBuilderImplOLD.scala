@@ -20,7 +20,7 @@ import de.sciss.synth.{ControlBus => SControlBus, UGenGraph, Lazy, SynthGraph}
 import de.sciss.synth.ugen.ControlProxyLike
 import de.sciss.lucre.synth.Sys
 
-private[proc] object UGenGraphBuilderImpl {
+private[proc] object UGenGraphBuilderImplOLD {
   def apply[S <: Sys[S]](aural: AuralPresentation.Running[S], timed: TimedProc[S], time: Long)
                         (implicit tx: S#Tx): UGenGraphBuilderOLD[S] = {
     val proc = timed.value.elem.peer

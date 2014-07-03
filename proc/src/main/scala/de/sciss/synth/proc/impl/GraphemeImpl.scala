@@ -53,8 +53,9 @@ object GraphemeImpl {
   private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Grapheme[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Grapheme[S] = {
       implicit val elemType = Expr // .serializer[ S ]
-      val pin = BiPin.Modifiable.read[S, Value](in, access)
-      new Impl(targets, pin)
+      val numChannels = in.readInt()
+      val pin         = BiPin.Modifiable.read[S, Value](in, access)
+      new Impl(targets, numChannels, pin)
     }
   }
 
@@ -66,16 +67,16 @@ object GraphemeImpl {
   //      }
   //   }
 
-  def modifiable[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = {
+  def modifiable[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = {
     val targets = evt.Targets[S] // XXX TODO: partial?
     implicit val elemType = Expr
     val pin = BiPin.Modifiable[S, Value]
-    new Impl(targets, pin)
+    new Impl(targets, numChannels, pin)
   }
 
   // ---- actual implementation ----
 
-  private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
+  private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S], val numChannels: Int,
                                         pin: BiPin.Modifiable[S, Grapheme.Value])
     extends Modifiable[S] with evti.StandaloneLike[S, Grapheme.Update[S], Grapheme[S]] {
     graph =>
@@ -88,7 +89,15 @@ object GraphemeImpl {
 
     // ---- forwarding to pin ----
 
-    def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit     = pin.add(elem)
+    def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit     = {
+      val elemCh = elem.magValue.numChannels
+      if (elemCh != numChannels)
+        throw new IllegalArgumentException(
+          s"Trying to add element with $elemCh channels to grapheme with $numChannels channels"
+        )
+
+      pin.add(elem)
+    }
     def remove(elem: TimedElem[S])(implicit tx: S#Tx): Boolean  = pin.remove(elem)
 
     def clear()(implicit tx: S#Tx): Unit = pin.clear()
@@ -259,6 +268,9 @@ object GraphemeImpl {
     }
 
     protected def disposeData()(implicit tx: S#Tx): Unit = pin.dispose()
-    protected def writeData(out: DataOutput)      : Unit = pin.write(out)
+    protected def writeData(out: DataOutput)      : Unit = {
+      out.writeInt(numChannels)
+      pin.write(out)
+    }
   }
 }

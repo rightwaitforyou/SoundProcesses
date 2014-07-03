@@ -2,17 +2,19 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
+import de.sciss.lucre.synth.impl
 import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.synth._
 import de.sciss.processor.GenericProcessor
 import de.sciss.span.SpanLike
 import de.sciss.synth.impl.BasicUGenGraphBuilder
+import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{UGenGraph, UGen}
 import de.sciss.synth.proc.impl.UGenGraphBuilder.{MissingIn, ScanIn, StreamIn}
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{TxnUnknown, InTxn, TMap, Ref}
+import scala.concurrent.stm._
 
 object AuralProcImpl extends AuralObj.Factory {
   type E[S <: evt.Sys[S]] = Proc.Elem[S]
@@ -112,95 +114,57 @@ object AuralProcImpl extends AuralObj.Factory {
 
     def prepare()(implicit tx: S#Tx): GenericProcessor[Unit] = ???
 
-    private def tryBuild()(implicit tx: S#Tx): Unit = {
+    //    private def tryBuild()(implicit tx: S#Tx): Unit = {
+    //
+    //    }
 
-    }
+    private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]()
 
-    // ---- proc UGenGraphBuilder
-
-    /** This method should only be invoked by the `graph.scan.Elem` instances. It requests a scan input, and
-      * the method returns the corresponding number of channels, or throws a `MissingIn` exception which
-      * is then caught by the main builder body.
-      *
-      * @param  key           the scan input key
-      * @param  numChannels   a given number of channels (if `>= 0`) or `-1` in which case the number of channels
-      *                       is determined using the scan.
-      */
-    def addScanIn(key: String, numChannels: Int): Int = ???
-
-    /** This method should only be invoked by the `graph.attribute.In` instances. It registers a control input. */
-    def addAttributeIn(key: String): Int = {
-      implicit val tx = findTxn()
-      timed.value.attr.getElem(key).fold(1) {
-        case a: DoubleVecElem[S]      => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: AudioGraphemeElem[S]  => a.peer.spec.numChannels
-        case _ => 1
+    private def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
+      implicit val itx = tx.peer
+      if (procLoc.isInitialized) procLoc.get
+      else {
+        val proc = obj()
+        procLoc.set(proc)
+        proc
       }
     }
 
-    /** This method should only be invoked by the `graph.stream.X` instances. It registers a control input
-      * for a streaming buffer.
-      *
-      * @return tuple consisting of `_1` number of channel, and `_2` control name index
-      */
-    def addStreamIn(key: String, info: StreamIn): (Int, Int) = ???
-
-    /** This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along
-      * with the number of channels written to it.
-      */
-    def addScanOut(key: String, numChannels: Int): Unit = ???
-
-    // ---- UGenGraph.Builder
-
-    private def findTxn(): InTxn = concurrent.stm.Txn.findCurrent(TxnUnknown).get
-
-    def visit[U](ref: AnyRef, init: => U): U = {
-      implicit val tx = findTxn()
-      ubSrcMap.get(ref).getOrElse {
-        val exp = init
-        ubSrcMap.put(ref, exp)
-        exp
-      } .asInstanceOf[U]
+    // called by UGenGraphBuilderImpl
+    def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {
+      val procObj = procCached()
+      procObj.attr.getElem(key).fold(1) {
+        case a: DoubleVecElem[S]     => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
+        case _ => 1
+      }
     }
+    // called by UGenGraphBuilderImpl
+    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
+      val procObj = procCached()
+      val proc    = procObj.elem.peer
+      val numCh   = proc.scans.get(key).fold(0) { scan =>
+        val chans = scan.sources.toList.map {
+          case Link.Grapheme(peer) =>
+            // val chansOpt = peer.valueAt(time).map(_.numChannels)
+            // chansOpt.getOrElse(numChannels)
+            peer.numChannels
 
-    def addUGen(ugen: UGen): Unit = {
-      implicit val tx = findTxn()
-      ubUGens.transform(_ :+ ugen)
-    }
-
-    def addControl(values: Vec[Float], name: Option[String]): Int = {
-      implicit val tx = findTxn()
-      val specialIndex = ubCtlVals.getAndTransform(_ ++ values).size
-      name.foreach(n => ubCtlNames.transform(_ :+ n -> specialIndex))
-      specialIndex
-    }
-
-    private val ubUGens       = Ref(Vector.empty[UGen])
-    private val ubCtlVals     = Ref(Vector.empty[Float])
-    private val ubCtlNames    = Ref(Vector.empty[(String, Int)])
-    private val ubSrcMap      = TMap.empty[AnyRef, Any]
-
-    //    private val ubScanOuts    = TMap.empty[String, Int]
-    //    private val ubScanIns     = TMap.empty[String, ScanIn]
-    //    private val ubMissingIns  = Ref(Set.empty[MissingIn[S]])
-    //    private val ubAttrIns     = Ref(Set.empty[String])
-    //    private val ubStreamIns   = TMap.empty[String, List[StreamIn]]
-
-    private final class UGenBuilder(attr: AttrMap[S], ugens0: Vec[UGen], controlValues0: Vec[Float],
-                                    controlNames0: Vec[(String, Int)], sourceMap0: Map[AnyRef, Any])
-      extends BasicUGenGraphBuilder with UGenGraphBuilder {
-
-      override protected var ugens        : Vec[UGen]           = ugens0
-      override protected var controlValues: Vec[Float]          = controlValues0
-      override protected var controlNames : Vec[(String, Int)]  = controlNames0
-      override protected var sourceMap    : Map[AnyRef, Any]    = sourceMap0
-
-      def addScanIn  (key: String, numChannels: Int): Int = ???
-      def addScanOut (key: String, numChannels: Int): Unit = ???
-
-      def addStreamIn(key: String, info: StreamIn): (Int, Int) = ???
-
-      def addAttributeIn(key: String): Int = ???
+          case Link.Scan(peer) => ???
+//            val sourceOpt = scanMap.get(peer.id)
+//            val busOpt    = sourceOpt.flatMap {
+//              case (sourceKey, idH) =>
+//                val sourceTimedID = idH()
+//                getOutputBus(sourceTimedID, sourceKey)
+//            }
+//            busOpt.fold({
+//              if (numChannels < 0) throw MissingIn(peer)
+//              numChannels
+//            })(_.numChannels)
+        }
+        if (chans.isEmpty) 0 else chans.max
+      }
+      math.max(1, numCh)
     }
   }
 }

@@ -14,7 +14,7 @@
 package de.sciss.synth
 package proc
 
-import impl.{UGenGraphBuilderImpl => Impl}
+import impl.{UGenGraphBuilderImplOLD => Impl}
 import util.control.ControlThrowable
 import de.sciss.lucre.synth.Sys
 

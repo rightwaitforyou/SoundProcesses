@@ -415,7 +415,7 @@ object Grapheme {
   }
 
   object Modifiable {
-    def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S]
+    def apply[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S](numChannels)
 
     def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
       Impl.readModifiable(in, access)
@@ -446,6 +446,8 @@ trait Grapheme[S <: evt.Sys[S]] extends evt.Node[S] with Publisher[S, Grapheme.U
   def segment(time: Long)(implicit tx: S#Tx): Option[Segment.Defined]
 
   def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
+
+  def numChannels: Int
 
   def debugList()(implicit tx: S#Tx): List[Segment.Defined]
 }
