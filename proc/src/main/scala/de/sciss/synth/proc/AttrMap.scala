@@ -34,6 +34,12 @@ trait AttrMap[S <: Sys[S]] {
   //  def apply[A[~ <: Sys[~]] <: El[_]](key: String)(implicit tx: S#Tx,
   //                                                      tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer]
 
+  /** Tries to look up a value of a given peer type.
+    *
+    * @param key  the map key
+    * @tparam A   the peer type, e.g. `Proc` for an `Obj.T[S, Proc.Elem]`
+    * @return the unwrapped peer value, if an entry for the key exists and the value has the expected type
+    */
   def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]]
 
   def expr[A](key: String)(implicit tx: S#Tx, tag: ClassTag[Expr[S, A]]): Option[Expr[S, A]] =

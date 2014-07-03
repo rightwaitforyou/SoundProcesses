@@ -38,7 +38,7 @@ object TransportImpl {
 
   def apply[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double)
                                          (implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx)
-  : Transport.Realtime[S, Obj.T[S, proc.Proc.Elem], Transport.Proc.Update[S]] = {
+  : TransportOLD.Realtime[S, Obj.T[S, proc.Proc.Elem], TransportOLD.Proc.Update[S]] = {
     val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[S, I](group)
     val t = new Realtime[S, I](groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar)
     t.init()
@@ -48,7 +48,7 @@ object TransportImpl {
 
   def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double)(
     implicit tx: S#Tx, cursor: Cursor[S],
-    bridge: S#Tx => I#Tx): Transport.Offline[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] = {
+    bridge: S#Tx => I#Tx): TransportOLD.Offline[S, Obj.T[S, Proc.Elem], TransportOLD.Proc.Update[S]] = {
 
     val (groupH, infoVar, gMap, gPrio, timedMap, obsVar) = prepare[S, I](group)
     val t = new Offline[S, I](groupH, sampleRate, infoVar, gMap, gPrio, timedMap, obsVar)
@@ -184,7 +184,7 @@ object TransportImpl {
       sys.error("Operation not supported")
   }
 
-  private type Update[S <: Sys[S]] = Transport.Update[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]]
+  private type Update[S <: Sys[S]] = TransportOLD.Update[S, Obj.T[S, Proc.Elem], TransportOLD.Proc.Update[S]]
 
   private final class Observation[S <: Sys[S], I <: stm.Sys[I]](impl: Impl[S, I], val fun: S#Tx => Update[S] => Unit)
     extends Disposable[S#Tx] {
@@ -231,7 +231,7 @@ object TransportImpl {
           protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
           protected val obsVar: Ref[Vec[Observation[S, I]]])
          (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
-    extends Impl[S, I] with Transport.Offline[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] {
+    extends Impl[S, I] with TransportOLD.Offline[S, Obj.T[S, Proc.Elem], TransportOLD.Proc.Update[S]] {
 
     private val submitRef = Ref(offlineEmptyStep)
     private val timeRef   = Ref(0L)
@@ -292,7 +292,7 @@ object TransportImpl {
         protected val timedMap: IdentifierMap[S#ID, S#Tx, TimedProc[S]],
         protected val obsVar: Ref[Vec[Observation[S, I]]])
        (implicit val cursor: Cursor[S], protected val trans: S#Tx => I#Tx)
-    extends Impl[S, I] with Transport.Realtime[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] {
+    extends Impl[S, I] with TransportOLD.Realtime[S, Obj.T[S, Proc.Elem], TransportOLD.Proc.Update[S]] {
 
     protected def logicalTime             ()(implicit tx: S#Tx): Long = rt_cpuTime.get       (tx.peer)
     protected def logicalTime_=(value: Long)(implicit tx: S#Tx): Unit = rt_cpuTime.set(value)(tx.peer)
@@ -340,7 +340,7 @@ object TransportImpl {
   // ------------------------------------------------
 
   private sealed trait Impl[S <: Sys[S], I <: stm.Sys[I]]
-    extends Transport[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] {
+    extends TransportOLD[S, Obj.T[S, Proc.Elem], TransportOLD.Proc.Update[S]] {
     impl =>
 
     private implicit final val procGroupSer = ProcGroup.serializer[S]
@@ -379,7 +379,7 @@ object TransportImpl {
       var info: Info = info0
       var procAdded:   Vec[TimedProc[S]] = emptySeq
       var procRemoved: Vec[TimedProc[S]] = emptySeq
-      var procChanged: Vec[(TimedProc[S], Transport.Proc.Update[S])] = emptySeq
+      var procChanged: Vec[(TimedProc[S], TransportOLD.Proc.Update[S])] = emptySeq
 
       def shouldFire: Boolean = procAdded.nonEmpty || procRemoved.nonEmpty || procChanged.nonEmpty
 
@@ -387,7 +387,7 @@ object TransportImpl {
 
       def advanceMessage = {
         val isPly = info.isRunning
-        Transport.Advance(transport = impl, time = info.frame, isSeek = false, isPlaying = isPly,
+        TransportOLD.Advance(transport = impl, time = info.frame, isSeek = false, isPlaying = isPly,
           added = procAdded, removed = procRemoved, changes = procChanged)
       }
     }
@@ -548,11 +548,11 @@ object TransportImpl {
       val entry = key -> segments
       // try to re-use and update a previous grapheme changed message in the state
       state.procChanged.lastOption match {
-        case Some((`timed`, Transport.Proc.GraphemesChanged(map))) =>
-          val newMap = Transport.Proc.GraphemesChanged[S](map + entry)
+        case Some((`timed`, TransportOLD.Proc.GraphemesChanged(map))) =>
+          val newMap = TransportOLD.Proc.GraphemesChanged[S](map + entry)
           state.procChanged = state.procChanged.init :+ (timed -> newMap)
         case _ =>
-          val map = Transport.Proc.GraphemesChanged[S](Map(entry))
+          val map = TransportOLD.Proc.GraphemesChanged[S](Map(entry))
           state.procChanged :+= timed -> map
       }
     }
@@ -765,14 +765,14 @@ object TransportImpl {
         //         --> remove map entries (gMap -> gPrio), and rebuild them, then calc new next times
 
         case BiGroup.ElementMutated(timed, procUpd) if gMap.contains(timed.id) =>
-          def forward(u: Transport.Proc.Update[S]): Unit =
+          def forward(u: TransportOLD.Proc.Update[S]): Unit =
             state.procChanged :+= timed -> u
 
           procUpd.changes.foreach {
             case peUpd @ Obj.ElemChange(pUpd) =>
               pUpd.changes.foreach {
                 case assoc: Proc.ScanMapChange[S] =>
-                  forward(Transport.Proc.ElemChanged(assoc))
+                  forward(TransportOLD.Proc.ElemChanged(assoc))
                   u_scanMapChange(state, timed, assoc)
 
                 case sc @ Proc.ScanChange(key, scan, scanChanges) =>
@@ -787,14 +787,14 @@ object TransportImpl {
 
                     case _ => true // SinkAdded, SinkRemoved
                   }
-                  if (flt.nonEmpty) forward(Transport.Proc.ElemChanged(sc.copy(changes = flt)))
+                  if (flt.nonEmpty) forward(TransportOLD.Proc.ElemChanged(sc.copy(changes = flt)))
 
                 case gc: Proc.GraphChange[S] =>
-                  forward(Transport.Proc.ElemChanged(gc))
+                  forward(TransportOLD.Proc.ElemChanged(gc))
               }
 
             case attr: Obj.AttrUpdate[S] =>
-              forward(Transport.Proc.AttrChanged(attr))
+              forward(TransportOLD.Proc.AttrChanged(attr))
           }
 
         case BiGroup.ElementMoved(timed, m.Change(oldSpan, newSpan)) if gMap.contains(timed.id) =>
@@ -857,7 +857,7 @@ object TransportImpl {
       if (oldInfo.isRunning) return
       val newInfo = oldInfo.copy(cpuTime = logicalTime(), state = Playing)
       infoVar()   = newInfo
-      fire(Transport.Play(impl, newInfo.frame))
+      fire(TransportOLD.Play(impl, newInfo.frame))
       scheduleNext(newInfo)
     }
 
@@ -869,7 +869,7 @@ object TransportImpl {
 
       val newInfo = oldInfo.copy(cpuTime = logicalTime(), frame = calcCurrentTime(oldInfo), state = Stopped)
       infoVar() = newInfo
-      fire(Transport.Stop(impl, newInfo.frame))
+      fire(TransportOLD.Stop(impl, newInfo.frame))
     }
 
     final def seek(time: Long)(implicit tx: S#Tx): Unit = {
@@ -1042,7 +1042,7 @@ object TransportImpl {
 
       var procAdded:   Vec[TimedProc[S]] = emptySeq
       var procRemoved: Vec[TimedProc[S]] = emptySeq
-      var procUpdated: Vec[(TimedProc[S], Transport.Proc.Update[S])] = emptySeq
+      var procUpdated: Vec[(TimedProc[S], TransportOLD.Proc.Update[S])] = emptySeq
 
       // algorithm [A] or [B]
       if (needsNewProcTime) {
@@ -1200,7 +1200,7 @@ object TransportImpl {
         }
 
         procUpdated = updMap.map {
-          case (timed, map) => timed -> Transport.Proc.GraphemesChanged[S](map)
+          case (timed, map) => timed -> TransportOLD.Proc.GraphemesChanged[S](map)
         }
       }
 
@@ -1228,7 +1228,7 @@ object TransportImpl {
       logT("advance - newInfo = " + newInfo)
 
       if (procAdded.nonEmpty || procRemoved.nonEmpty || procUpdated.nonEmpty) {
-        val upd = Transport.Advance(transport = impl, time = newFrame,
+        val upd = TransportOLD.Advance(transport = impl, time = newFrame,
           isSeek = isSeek, isPlaying = newInfo.isRunning,
           added = procAdded, removed = procRemoved, changes = procUpdated)
         logT("advance - fire " + upd)

@@ -189,7 +189,7 @@ trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] with Publisher[S, BiGrou
     *
     * @param time the time instant for which to gather the events
     * @return  a tuple of two iterators. the first iterator (`_1`) contains the events which
-    *          start at the query time, the second iterator (_2) contains the event which
+    *          start at the query time, the second iterator (`_2`) contains the event which
     *          stop at the query time
     */
   def eventsAt(time: Long)(implicit tx: S#Tx): (Iterator[S#Tx, Leaf[S, Elem]], Iterator[S#Tx, Leaf[S, Elem]])

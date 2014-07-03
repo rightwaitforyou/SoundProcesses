@@ -17,7 +17,7 @@ package graph
 
 import de.sciss.synth
 import synth.ugen.Constant
-import de.sciss.synth.proc.impl.StreamBuffer
+import de.sciss.synth.proc.impl.{UGenGraphBuilder, StreamBuffer}
 
 // XXX TODO: ought to go into an `impl` package
 private[proc] object stream {

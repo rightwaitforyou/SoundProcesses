@@ -85,7 +85,7 @@ object ThesisExamples extends App {
       group.add(span, p1)
       group.add(span, p2)
 
-      Transport[S, S](group)
+      TransportOLD[S, S](group)
     }
 
     sys.step { implicit tx =>

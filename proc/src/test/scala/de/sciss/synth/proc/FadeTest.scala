@@ -49,7 +49,7 @@ object FadeTest extends App {
       group.add(Span(1.seconds, 4.seconds), obj)
 
       import Durable.inMemory
-      val transp = Transport[S, I](group)
+      val transp = TransportOLD[S, I](group)
 
       aural.whenStarted {
         s =>

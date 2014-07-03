@@ -1,5 +1,5 @@
 /*
- *  Transport.scala
+ *  TransportOLD.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -25,18 +25,18 @@ import de.sciss.lucre.event.{Observable, Sys}
 import proc.{Proc => _Proc}
 import de.sciss.span.Span.SpanOrVoid
 
-object Transport {
+object TransportOLD {
   /** Creates a new realtime transport. The transport is positioned at time zero. */
   def apply[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)
                                          (implicit tx: S#Tx, cursor: Cursor[S],
                                           bridge: S#Tx => I#Tx)
-  : Realtime[S, Obj.T[S, _Proc.Elem], Transport.Proc.Update[S]] = Impl[S, I](group, sampleRate)
+  : Realtime[S, Obj.T[S, _Proc.Elem], TransportOLD.Proc.Update[S]] = Impl[S, I](group, sampleRate)
 
   //   implicit def serializer[ S <: evt.Sys[ S ]]( implicit cursor: Cursor[ S ]): Serializer[ S#Tx, S#Acc, ProcTransport[ S ]] =
   //      Impl.serializer( cursor )
 
   sealed trait Update[S <: Sys[S], Elem, U] {
-    def transport: Transport[S, Elem, U]
+    def transport: TransportOLD[S, Elem, U]
 
     def time: Long
   }
@@ -44,13 +44,13 @@ object Transport {
   /** Creates a new offline transport. The transport is not positioned. */
   def offline[S <: Sys[S], I <: stm.Sys[I]](group: ProcGroup[S], sampleRate: Double = 44100)
                                            (implicit tx: S#Tx, cursor: Cursor[S], bridge: S#Tx => I#Tx)
-  : Offline[S, Obj.T[S, _Proc.Elem], Transport.Proc.Update[S]] = Impl.offline[S, I](group, sampleRate)
+  : Offline[S, Obj.T[S, _Proc.Elem], TransportOLD.Proc.Update[S]] = Impl.offline[S, I](group, sampleRate)
 
   /** A transport sub-type which does not automatically advance in accordance
     * to a real-time clock, but awaits manually stepping through. This can be
     * used for offline-bouncing, debugging or unit testing purposes.
     */
-  trait Offline[S <: Sys[S], Elem, U] extends Transport[S, Elem, U] {
+  trait Offline[S <: Sys[S], Elem, U] extends TransportOLD[S, Elem, U] {
     /** Advances the transport to the next position (if there is any) */
     def step()(implicit tx: S#Tx): Unit
 
@@ -74,12 +74,12 @@ object Transport {
     def position(implicit tx: S#Tx): Long
   }
 
-  trait Realtime[S <: Sys[S], Elem, U] extends Transport[S, Elem, U] {
+  trait Realtime[S <: Sys[S], Elem, U] extends TransportOLD[S, Elem, U] {
     def loop  (implicit tx: S#Tx): SpanOrVoid
     def loop_=(value: SpanOrVoid)(implicit tx: S#Tx): Unit
   }
 
-  final case class Advance[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long,
+  final case class Advance[S <: Sys[S], Elem, U](transport: TransportOLD[S, Elem, U], time: Long,
                                                  isSeek: Boolean, isPlaying: Boolean,
                                                  added:   Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
                                                  removed: Vec[ BiGroup.TimedElem[S, Elem]]      = Vec.empty,
@@ -95,8 +95,8 @@ object Transport {
     }
   }
 
-  final case class Play[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long) extends Update[S, Elem, U]
-  final case class Stop[S <: Sys[S], Elem, U](transport: Transport[S, Elem, U], time: Long) extends Update[S, Elem, U]
+  final case class Play[S <: Sys[S], Elem, U](transport: TransportOLD[S, Elem, U], time: Long) extends Update[S, Elem, U]
+  final case class Stop[S <: Sys[S], Elem, U](transport: TransportOLD[S, Elem, U], time: Long) extends Update[S, Elem, U]
 
   // particular update for ProcTransport
   object Proc {
@@ -108,7 +108,8 @@ object Transport {
   }
 }
 
-trait Transport[S <: Sys[S], Elem, U] extends Disposable[S#Tx] with Observable[S#Tx, Transport.Update[S, Elem, U]] {
+trait TransportOLD[S <: Sys[S], Elem, U]
+  extends Disposable[S#Tx] with Observable[S#Tx, TransportOLD.Update[S, Elem, U]] {
 
   def play()(implicit tx: S#Tx): Unit
   def stop()(implicit tx: S#Tx): Unit

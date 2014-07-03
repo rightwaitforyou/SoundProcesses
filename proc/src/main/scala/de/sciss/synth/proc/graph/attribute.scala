@@ -15,6 +15,8 @@ package de.sciss.synth
 package proc
 package graph
 
+import de.sciss.synth.proc.impl.UGenGraphBuilder
+
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 object attribute {

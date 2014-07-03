@@ -44,7 +44,7 @@ object StreamTest extends App {
       val group = ProcGroup.Modifiable[S]
       group.add(Span.from(0L), obj)
 
-      val transp = Transport[S, I](group)
+      val transp = TransportOLD[S, I](group)
 
       aural.whenStarted {
         s =>

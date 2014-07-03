@@ -1,5 +1,5 @@
 /*
- *  UGenGraphBuilder.scala
+ *  UGenGraphBuilderOLD.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -18,7 +18,7 @@ import impl.{UGenGraphBuilderImpl => Impl}
 import util.control.ControlThrowable
 import de.sciss.lucre.synth.Sys
 
-private[proc] object UGenGraphBuilder {
+private[proc] object UGenGraphBuilderOLD {
   def outsideOfContext() = sys.error("Expansion out of context")
 
   /** An exception thrown when during incremental build an input is required for which the underlying source
@@ -36,7 +36,7 @@ private[proc] object UGenGraphBuilder {
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
   def apply[S <: Sys[S]](aural: AuralPresentation.Running[S], timed: TimedProc[S], time: Long)
-                        (implicit tx: S#Tx): UGenGraphBuilder[S] =
+                        (implicit tx: S#Tx): UGenGraphBuilderOLD[S] =
     Impl(aural, timed, time)
 
   case class ScanIn(numChannels: Int, fixed: Boolean)
@@ -56,8 +56,8 @@ private[proc] object UGenGraphBuilder {
     def isNative: Boolean = interp == -1
   }
 }
-private[proc] trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
-  import UGenGraphBuilder._
+private[proc] trait UGenGraphBuilderOLD[S <: Sys[S]] extends UGenGraph.Builder {
+  import UGenGraphBuilderOLD._
 
   /** This method should only be invoked by the `graph.scan.Elem` instances. It requests a scan input, and
     * the method returns the corresponding number of channels, or throws a `MissingIn` exception which

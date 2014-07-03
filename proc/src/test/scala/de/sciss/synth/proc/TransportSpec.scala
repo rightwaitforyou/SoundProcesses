@@ -18,7 +18,7 @@ import de.sciss.lucre.synth.InMemory
   */
 class TransportSpec extends ConfluentEventSpec {
 
-  import Transport.Advance
+  import TransportOLD.Advance
   import Grapheme.Segment
 
   type I = InMemory
@@ -34,7 +34,7 @@ class TransportSpec extends ConfluentEventSpec {
     val obs = new Observation[S]
     val (pgH, t) = system.step { implicit tx =>
       val pg  = ProcGroup.Modifiable[S]
-      val _t  = Transport.offline[S, I](pg, 10000.0) // ( tx, inMemory )
+      val _t  = TransportOLD.offline[S, I](pg, 10000.0) // ( tx, inMemory )
       _t.seek(0L)
       _t.react(obs.register)
       val res = tx.newHandle(pg)(ProcGroup.Modifiable.serializer[S])
@@ -63,7 +63,7 @@ class TransportSpec extends ConfluentEventSpec {
 
       t.play()
       obs.assertEquals(
-        Transport.Play(t, 0L)
+        TransportOLD.Play(t, 0L)
       )
       obs.clear()
 
@@ -80,7 +80,7 @@ class TransportSpec extends ConfluentEventSpec {
       t.step()
       obs.assertEquals(
         Advance(t, time = 7000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> Transport.Proc.GraphemesChanged[S](Map("freq" -> Vec(Segment.Const(Span.from(7000L), Vec(441.0))))))
+          Vec(pt1 -> TransportOLD.Proc.GraphemesChanged[S](Map("freq" -> Vec(Segment.Const(Span.from(7000L), Vec(441.0))))))
         )
       )
       obs.clear()
@@ -126,7 +126,7 @@ class TransportSpec extends ConfluentEventSpec {
     val obs = new Observation[S]
     val (pgH, t) = system.step { implicit tx =>
       val pg = ProcGroup.Modifiable[S]
-      val _t = Transport.offline[S, I](pg, 10000.0) // ( tx, inMemory )
+      val _t = TransportOLD.offline[S, I](pg, 10000.0) // ( tx, inMemory )
       _t.seek(0L)
       _t.react(obs.register)
       val res = tx.newHandle(pg)(ProcGroup.Modifiable.serializer[S])
@@ -149,7 +149,7 @@ class TransportSpec extends ConfluentEventSpec {
 
       t.play()
       obs.assertEquals(
-        Transport.Play(t, 0L)
+        TransportOLD.Play(t, 0L)
       )
       obs.clear()
 
@@ -165,10 +165,10 @@ class TransportSpec extends ConfluentEventSpec {
 
       obs.assertEquals(
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> Transport.Proc.ElemChanged[S](
+          Vec(pt1 -> TransportOLD.Proc.ElemChanged[S](
             Proc.ScanAdded("freq", scan)))),
         Advance(t, time = 1000L, isSeek = false, isPlaying = true, changes =
-          Vec(pt1 -> Transport.Proc.ElemChanged[S](
+          Vec(pt1 -> TransportOLD.Proc.ElemChanged[S](
             Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded(source)))
           ))
         )
@@ -182,7 +182,7 @@ class TransportSpec extends ConfluentEventSpec {
       val a0 = Advance(t, time = 2000L, isSeek = false, isPlaying = true)
       val scanEgal = p1.scans.add("egal")
       obs.assertEquals(
-        a0.copy(changes = Vec(pt1 -> Transport.Proc.ElemChanged[S](
+        a0.copy(changes = Vec(pt1 -> TransportOLD.Proc.ElemChanged[S](
           Proc.ScanAdded("egal", scanEgal))))
       )
       obs.clear()
@@ -196,7 +196,7 @@ class TransportSpec extends ConfluentEventSpec {
 
       p1.scans.remove("egal")
       obs.assertEquals(
-        a0.copy(changes = Vec(pt1 -> Transport.Proc.ElemChanged[S](
+        a0.copy(changes = Vec(pt1 -> TransportOLD.Proc.ElemChanged[S](
           Proc.ScanRemoved("egal", scanEgal))))
       )
       obs.clear()
@@ -212,7 +212,7 @@ class TransportSpec extends ConfluentEventSpec {
           // pt1 -> ProcChanged(
           //    Proc.GraphemeChange( "graph", Grapheme.Update( g1, Vec( segm )))
           // ),
-          pt1 -> Transport.Proc.GraphemesChanged[S](
+          pt1 -> TransportOLD.Proc.GraphemesChanged[S](
             Map("freq" -> Vec(segm))
           )
         ))

@@ -15,6 +15,8 @@ package de.sciss.synth
 package proc
 package graph
 
+import de.sciss.synth.proc.impl.UGenGraphBuilder
+
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.ugen.UGenInGroup
 

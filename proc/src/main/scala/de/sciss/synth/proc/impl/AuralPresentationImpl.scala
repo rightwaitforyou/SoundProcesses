@@ -20,7 +20,7 @@ import collection.breakOut
 import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TxnLocal}
 import de.sciss.synth.proc.{logAural => logA, SensorSystem}
-import UGenGraphBuilder.MissingIn
+import UGenGraphBuilderOLD.MissingIn
 import graph.scan
 import de.sciss.span.Span
 import de.sciss.synth.Curve.parametric
@@ -137,7 +137,7 @@ object AuralPresentationImpl {
 
       val tObs = transport.react { implicit tx => {
         // only when playing
-        case Transport.Advance(tr, time, isSeek, true, added, removed, changes) =>
+        case TransportOLD.Advance(tr, time, isSeek, true, added, removed, changes) =>
           logA(s"at $time added ${added.mkString("[", ", ", "]")}; removed ${removed.mkString("[", ", ", "]")}; " +
             s"changes? ${changes.nonEmpty} (${booted.hashCode.toHexString})")
           removed.foreach {
@@ -151,8 +151,8 @@ object AuralPresentationImpl {
             if (!mute) booted.procAdded(time, timed)
           }
 
-        case Transport.Play(tr, time) => t_play(time)
-        case Transport.Stop(tr, time) => t_stop(time)
+        case TransportOLD.Play(tr, time) => t_play(time)
+        case TransportOLD.Stop(tr, time) => t_stop(time)
 
         case _ =>
       }}
@@ -167,7 +167,7 @@ object AuralPresentationImpl {
     var sinks = List.empty[(String, AuralNode)]
   }
 
-  private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilder[S] /*, val name: String */) {
+  private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilderOLD[S] /*, val name: String */) {
     var outputs = Map.empty[String, OutputBuilder]
   }
 
@@ -181,7 +181,7 @@ object AuralPresentationImpl {
                                                 var idMap: Option[IdentifierMap[S#ID, S#Tx, AuralProcBuilder[S]]] =
                                                   None,
                                                 var seq: Vec[AuralProcBuilder[S]] = Vec.empty) {
-    override def toString = "OngoingBuild(missingMap = " + missingMap + ", idMap = " + idMap + ", seq = " + seq + ")"
+    override def toString = s"OngoingBuild(missingMap = $missingMap, idMap = $idMap, seq = $seq)"
   }
 
   private final class RunningImpl[S <: Sys[S]](val server: Server, group: Group, val sensorBus: ControlBus,
@@ -292,7 +292,7 @@ object AuralPresentationImpl {
       // ---- streams ----
       val streamNames = ugen.streamIns
       if (streamNames.nonEmpty) streamNames.foreach { case (n, infoSeq0) =>
-        val infoSeq = if (infoSeq0.isEmpty) UGenGraphBuilder.StreamIn.empty :: Nil else infoSeq0
+        val infoSeq = if (infoSeq0.isEmpty) UGenGraphBuilderOLD.StreamIn.empty :: Nil else infoSeq0
 
         infoSeq.zipWithIndex.foreach { case (info, idx) =>
           val ctlName     = graph.stream.controlName(n, idx)
@@ -564,7 +564,7 @@ object AuralPresentationImpl {
       logA(s"added $timed (${hashCode.toHexString})")
 
       val timedID = timed.id
-      val ugen    = UGenGraphBuilder(this, timed, time)
+      val ugen    = UGenGraphBuilderOLD(this, timed, time)
       val builder = new AuralProcBuilder(ugen /*, name */)
       val newTxn  = !ongoingBuild.isInitialized(tx.peer)
       if (newTxn) addFlush() // ( ProcTxn() )   // the next line (`ongoingBuild.get`) will initialise then
@@ -709,7 +709,7 @@ object AuralPresentationImpl {
       }
     }
 
-    def procUpdated(timed: TimedProc[S], change: Transport.Proc.Update[S])(implicit tx: S#Tx): Unit = {
+    def procUpdated(timed: TimedProc[S], change: TransportOLD.Proc.Update[S])(implicit tx: S#Tx): Unit = {
       // XXX TODO !
     }
   }

@@ -66,7 +66,7 @@ object TapeTest extends App {
       group.add(Span(1.seconds, 4.seconds), obj)
 
       import Durable.inMemory
-      val transp = Transport[S, I](group)
+      val transp = TransportOLD[S, I](group)
 
       //    val t = new Thread {
       //      override def run() {

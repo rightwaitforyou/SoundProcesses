@@ -170,7 +170,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
               Span(start, stop)
           }
 
-          val _transp = Transport.offline[S, I](group, sampleRate)
+          val _transp = TransportOLD.offline[S, I](group, sampleRate)
           (_span, _transp)
         }
       }

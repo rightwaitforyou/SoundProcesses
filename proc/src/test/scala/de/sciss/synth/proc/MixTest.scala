@@ -73,7 +73,7 @@ object MixTest extends App {
       group.add(Span(1.seconds, 8.seconds), objOut2)
 
       import Durable.inMemory
-      val transp = Transport[S, I](group)
+      val transp = TransportOLD[S, I](group)
 
       aural.whenStarted { s =>
         s.peer.dumpOSC()

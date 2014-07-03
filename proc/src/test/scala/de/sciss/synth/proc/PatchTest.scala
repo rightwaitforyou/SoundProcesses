@@ -38,7 +38,7 @@ object PatchTest extends App {
     proc.showAuralLog = true
 
     val group         = ProcGroup.Modifiable[S]
-    val trans         = Transport[S, I](group)
+    val trans         = TransportOLD[S, I](group)
     implicit val loc  = ArtifactLocation.Modifiable.tmp[S]()
     val ap            = AuralPresentation.run[S](trans, auralSys)
     ap.group.foreach {

@@ -98,7 +98,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   val (trans) = cursor.step { implicit tx =>
     val g = group
-    val tr = Transport[S, I](g)
+    val tr = TransportOLD[S, I](g)
     tr.react {
       _ => upd =>
         println("Transport observed: " + upd)

@@ -79,7 +79,7 @@ object ScansTest extends App {
       val group = ProcGroup.Modifiable[S]
       test(group)
       //            transp.playing_=( true )
-      val transp = Transport[S, I](group)
+      val transp = TransportOLD[S, I](group)
       auralSystem.foreach { as =>
         implicit val loc = ArtifactLocation.Modifiable.tmp[S]()
         AuralPresentation.run[S](transp, as)

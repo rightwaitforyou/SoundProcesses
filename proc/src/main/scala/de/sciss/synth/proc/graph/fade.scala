@@ -15,6 +15,7 @@ package de.sciss.synth
 package proc
 package graph
 
+import de.sciss.synth.proc.impl.UGenGraphBuilder
 import ugen._
 
 object Fade {
