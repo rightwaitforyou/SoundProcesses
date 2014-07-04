@@ -129,7 +129,7 @@ object AuralProcImpl extends AuralObj.Factory {
   }
 
   private final class Impl[S <: Sys[S]](data: AuralObj.ProcData[S])
-    extends AuralObj.Proc[S] {
+    extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
     // private def server: Server = ...
 
@@ -137,7 +137,7 @@ object AuralProcImpl extends AuralObj.Factory {
 
     def typeID: Int = Proc.typeID
 
-    def latencyEstimate(implicit tx: S#Tx): Long = ???
+    // def latencyEstimate(implicit tx: S#Tx): Long = ...
 
     //    private def addFlush()(implicit tx: S#Tx): Unit = {
     //      logA(s"addFlush (${hashCode.toHexString})")
@@ -207,9 +207,11 @@ object AuralProcImpl extends AuralObj.Factory {
     def play(time: SpanLike)(implicit tx: S#Tx): Unit = ???
     def stop(time: Long    )(implicit tx: S#Tx): Unit = ???
 
-    def isPrepared(implicit tx: S#Tx): Boolean = ???
+    // def isPrepared(implicit tx: S#Tx): Boolean = ...
 
-    def prepare()(implicit tx: S#Tx): GenericProcessor[Unit] = ???
+    def state(implicit tx: S#Tx): AuralObj.State = ???
+
+    def prepare()(implicit tx: S#Tx): Unit = ???
 
     //    private def tryBuild()(implicit tx: S#Tx): Unit = {
     //

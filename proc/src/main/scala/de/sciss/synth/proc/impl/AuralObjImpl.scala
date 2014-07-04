@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 package impl
 
-import AuralObj.Factory
+import de.sciss.synth.proc.AuralObj.{State, Factory}
 import de.sciss.lucre.synth.Sys
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.model.Model.Listener
@@ -84,7 +84,7 @@ object AuralObjImpl {
     }
 
     private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Obj[S]])
-      extends AuralObj[S] {
+      extends AuralObj[S] with DummyObservableImpl[S] {
       def typeID: Int = 0
 
       def isPrepared(implicit tx: S#Tx): Boolean = true
@@ -92,9 +92,11 @@ object AuralObjImpl {
       def stop(time: Long    )(implicit tx: S#Tx): Unit = ()
       def play(time: SpanLike)(implicit tx: S#Tx): Unit = ()
 
-      def latencyEstimate(implicit tx: S#Tx): Long = 0L
+      // def latencyEstimate(implicit tx: S#Tx): Long = 0L
 
-      def prepare()(implicit tx: S#Tx): GenericProcessor[Unit] = Generic.dummyPrep
+      def prepare()(implicit tx: S#Tx): Unit = () // Generic.dummyPrep
+
+      def state(implicit tx: S#Tx): AuralObj.State = AuralObj.Stopped
     }
   }
 
