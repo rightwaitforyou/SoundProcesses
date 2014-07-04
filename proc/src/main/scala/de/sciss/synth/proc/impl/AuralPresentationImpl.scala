@@ -164,7 +164,8 @@ object AuralPresentationImpl {
   }
 
   private final class OutputBuilder(val bus: AudioBus) {
-    var sinks = List.empty[(String, AuralNode)]
+    // XXX TODO: ha - this is not actually used:
+    // var sinks = List.empty[(String, AuralNode)]
   }
 
   private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilderOLD[S] /*, val name: String */) {

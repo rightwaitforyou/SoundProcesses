@@ -42,7 +42,7 @@ object NewAuralTest extends App {
     }
 
     cursor.step { implicit tx =>
-      println("AQUI")
+      println("--issue play--")
       view.play(Span.Void)
 
       tx.afterCommit {
