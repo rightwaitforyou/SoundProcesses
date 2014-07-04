@@ -14,13 +14,15 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{Server, Sys}
 import impl.{AuralContextImpl => Impl}
 
 object AuralContext {
-  def apply[S <: Sys[S]](implicit tx: S#Tx): AuralContext[S] = Impl[S]
+  def apply[S <: Sys[S]](server: Server)(implicit tx: S#Tx): AuralContext[S] = Impl(server)
 }
 trait AuralContext[S <: Sys[S]] {
+  def server: Server
+
   def acquire[A <: Disposable[S#Tx]](obj: Obj[S])(init: => A)(implicit tx: S#Tx): A
 
   def release(obj: Obj[S])(implicit tx: S#Tx): Unit

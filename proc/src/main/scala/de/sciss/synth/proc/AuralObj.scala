@@ -65,6 +65,8 @@ object AuralObj {
     def attrNumChannels(key: String)(implicit tx: S#Tx): Int
 
     def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
+
+    def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem]
   }
 
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
