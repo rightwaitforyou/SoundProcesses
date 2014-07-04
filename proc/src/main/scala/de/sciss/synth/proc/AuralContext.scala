@@ -25,6 +25,8 @@ trait AuralContext[S <: Sys[S]] {
 
   def release(obj: Obj[S])(implicit tx: S#Tx): Unit
 
-  def put[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit
-  def get[A](id: S#ID)(implicit tx: S#Tx): Option[A]
+  def get[A](obj: Obj[S])(implicit tx: S#Tx): Option[A]
+
+  def putAux[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit
+  def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A]
 }

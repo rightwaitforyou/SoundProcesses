@@ -37,7 +37,10 @@ object AuralProcImpl extends AuralObj.Factory {
     var outputs = Map.empty[String, OutputBuilder]
   }
 
-  private final class DataImpl[S <: Sys[S]](val obj: stm.Source[S#Tx, Obj.T[S, Proc.Elem]])
+  private type ObjSource[S <: Sys[S]] = stm.Source[S#Tx, Obj.T[S, Proc.Elem]]
+
+  private final class DataImpl[S <: Sys[S]](val obj: ObjSource[S])
+                                           (implicit context: AuralContext[S])
     extends AuralObj.ProcData[S] {
 
     private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]()
@@ -76,28 +79,44 @@ object AuralProcImpl extends AuralObj.Factory {
             // chansOpt.getOrElse(numChannels)
             peer.numChannels
 
-          case Link.Scan(peer) => ???
-          //            val sourceOpt = scanMap.get(peer.id)
-          //            val busOpt    = sourceOpt.flatMap {
-          //              case (sourceKey, idH) =>
-          //                val sourceTimedID = idH()
-          //                getOutputBus(sourceTimedID, sourceKey)
-          //            }
-          //            busOpt.fold({
-          //              if (numChannels < 0) throw MissingIn(peer)
-          //              numChannels
-          //            })(_.numChannels)
+          case Link.Scan(peer) =>
+            // val sourceOpt = scanMap.get(peer.id)
+            val sourceOpt = context.getAux[(String, ObjSource[S])](peer.id)
+            val busOpt    = sourceOpt.flatMap {
+              case (sourceKey, sourceObjH) =>
+                val sourceObj = sourceObjH()
+                getOutputBus(sourceObj, sourceKey)
+            }
+            busOpt.fold({
+              if (numChannels < 0) throw MissingIn(peer)
+              numChannels
+            })(_.numChannels)
         }
         if (chans.isEmpty) 0 else chans.max
       }
       math.max(1, numCh)
     }
+
+    private def getOutputBus(obj0: Obj.T[S, Proc.Elem], key: String)(implicit tx: S#Tx): Option[AudioBus] =
+      context.get(obj0) match {
+        case Some(data0) =>
+          ??? // data0.getOutputBus(key)
+        case _ =>
+          ???
+          //          assert(ongoingBuild.isInitialized(tx.peer))
+          //          val ob = ongoingBuild.get(tx.peer)
+          //          for {
+          //            map <- ob.idMap
+          //            pb  <- map.get(timedID)
+          //            out <- pb.outputs.get(key)
+          //          } yield out.bus
+      }
   }
 
   private final class Impl[S <: Sys[S]](data: AuralObj.ProcData[S])
     extends AuralObj.Proc[S] {
 
-    private def server: Server = ???
+    // private def server: Server = ...
 
     def obj: stm.Source[S#Tx, Obj.T[S, Proc.Elem]] = data.obj
 

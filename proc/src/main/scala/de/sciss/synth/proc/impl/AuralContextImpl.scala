@@ -45,6 +45,9 @@ object AuralContextImpl {
       e.data.asInstanceOf[A]
     }
 
+    def get[A](obj: Obj[S])(implicit tx: S#Tx): Option[A] =
+      objMap.get(obj.id).map(_.data.asInstanceOf[A])
+
     def release(obj: Obj[S])(implicit tx: S#Tx): Unit = {
       val id  = obj.id
       val e   = objMap.getOrElse(id, sys.error(s"No data cached for $obj"))
@@ -55,8 +58,8 @@ object AuralContextImpl {
       }
     }
 
-    def put[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit = auxMap.put(id, value)
+    def putAux[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit = auxMap.put(id, value)
 
-    def get[A](id: S#ID)(implicit tx: S#Tx): Option[A] = auxMap.get(id).asInstanceOf[Option[A]]
+    def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A] = auxMap.get(id).asInstanceOf[Option[A]]
   }
 }
