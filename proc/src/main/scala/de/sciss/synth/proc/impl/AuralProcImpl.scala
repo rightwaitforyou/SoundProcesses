@@ -10,8 +10,9 @@ import de.sciss.span.SpanLike
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{UGenGraph, UGen}
-import de.sciss.synth.proc.impl.UGenGraphBuilder.{MissingIn, ScanIn, StreamIn}
+import UGenGraphBuilder.{MissingIn, ScanIn, StreamIn}
 import de.sciss.synth.proc.{logAural => logA}
+import AuralObj.ProcData
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm._
@@ -23,7 +24,10 @@ object AuralProcImpl extends AuralObj.Factory {
 
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data = context.acquire[AuralObj.ProcData[S]](proc) {
-      new DataImpl(tx.newHandle(proc))
+      val ugenInit = UGenGraphBuilder.init(proc)
+      val data0 = new DataImpl(tx.newHandle(proc), ugenInit)
+      data0.tryBuild()
+      data0
     }
     val res = new Impl(data)
     res
@@ -39,14 +43,27 @@ object AuralProcImpl extends AuralObj.Factory {
 
   private type ObjSource[S <: Sys[S]] = stm.Source[S#Tx, Obj.T[S, Proc.Elem]]
 
-  private final class DataImpl[S <: Sys[S]](val obj: ObjSource[S])
-                                           (implicit context: AuralContext[S])
-    extends AuralObj.ProcData[S] {
+  private final class DataImpl[S <: Sys[S]](val obj: ObjSource[S], state0: UGenGraphBuilder.State[S])
+                                              (implicit context: AuralContext[S])
+    extends ProcData[S] {
 
-    private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]()
+    private val procLoc  = TxnLocal[Obj.T[S, Proc.Elem]]()
+    private val stateRef = Ref[UGenGraphBuilder.State[S]](state0)
 
     def dispose()(implicit tx: S#Tx): Unit = {
       // nothing yet
+    }
+
+    def state(implicit tx: S#Tx) = stateRef.get(tx.peer)
+
+    def tryBuild()(implicit tx: S#Tx): Unit = {
+      state match {
+        case s0: UGenGraphBuilder.Incomplete[S] =>
+          val s1 = s0.retry(this)
+          stateRef.set(s1)(tx.peer)
+
+        case s0: UGenGraphBuilder.Complete[S] => // nada
+      }
     }
 
     private def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
@@ -81,36 +98,34 @@ object AuralProcImpl extends AuralObj.Factory {
 
           case Link.Scan(peer) =>
             // val sourceOpt = scanMap.get(peer.id)
-            val sourceOpt = context.getAux[(String, ObjSource[S])](peer.id)
-            val busOpt    = sourceOpt.flatMap {
-              case (sourceKey, sourceObjH) =>
-                val sourceObj = sourceObjH()
-                getOutputBus(sourceObj, sourceKey)
+            val sourceOpt = context.getAux[(String, ProcData[S])](peer.id)
+            val chansOpt = sourceOpt.flatMap {
+              case (sourceKey, sourceData) =>
+                // val sourceObj = sourceObjH()
+                // getOutputBus(sourceObj, sourceKey)
+                sourceData.state.scanOuts.get(sourceKey)
             }
-            busOpt.fold({
-              if (numChannels < 0) throw MissingIn(peer)
-              numChannels
-            })(_.numChannels)
+            chansOpt.getOrElse(throw MissingIn(peer))
         }
         if (chans.isEmpty) 0 else chans.max
       }
       math.max(1, numCh)
     }
 
-    private def getOutputBus(obj0: Obj.T[S, Proc.Elem], key: String)(implicit tx: S#Tx): Option[AudioBus] =
-      context.get(obj0) match {
-        case Some(data0) =>
-          ??? // data0.getOutputBus(key)
-        case _ =>
-          ???
-          //          assert(ongoingBuild.isInitialized(tx.peer))
-          //          val ob = ongoingBuild.get(tx.peer)
-          //          for {
-          //            map <- ob.idMap
-          //            pb  <- map.get(timedID)
-          //            out <- pb.outputs.get(key)
-          //          } yield out.bus
-      }
+    //    private def getOutputBus(obj0: Obj.T[S, Proc.Elem], key: String)(implicit tx: S#Tx): Option[AudioBus] =
+    //      context.get(obj0) match {
+    //        case Some(data0) =>
+    //          ... // data0.getOutputBus(key)
+    //        case _ =>
+    //          ...
+    //          //          assert(ongoingBuild.isInitialized(tx.peer))
+    //          //          val ob = ongoingBuild.get(tx.peer)
+    //          //          for {
+    //          //            map <- ob.idMap
+    //          //            pb  <- map.get(timedID)
+    //          //            out <- pb.outputs.get(key)
+    //          //          } yield out.bus
+    //      }
   }
 
   private final class Impl[S <: Sys[S]](data: AuralObj.ProcData[S])

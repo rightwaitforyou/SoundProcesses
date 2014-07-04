@@ -15,7 +15,7 @@ package de.sciss.synth
 package proc
 package graph
 
-import de.sciss.synth.proc.impl.UGenGraphBuilder
+import de.sciss.synth.proc.UGenGraphBuilder
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
@@ -27,16 +27,13 @@ object attribute {
     override def productPrefix  = "attribute$In"
     override def toString       = s"""attribute("$key").ir($default)"""
 
-    def makeUGens: UGenInLike =
-      UGenGraph.builder match {
-        case b: UGenGraphBuilder[_] =>
-          val numCh   = b.addAttributeIn(key)
-          val ctlName = controlName(key)
-          val ctl     = if (numCh == 1) ctlName.ir(default) else ctlName.ir(Vec.fill(numCh)(default))
-          ctl.expand
-
-        case _ => UGenGraphBuilder.outsideOfContext()
-      }
+    def makeUGens: UGenInLike = {
+      val b = UGenGraphBuilder.get
+      val numCh   = b.addAttributeIn(key)
+      val ctlName = controlName(key)
+      val ctl     = if (numCh == 1) ctlName.ir(default) else ctlName.ir(Vec.fill(numCh)(default))
+      ctl.expand
+    }
   }
 }
 final case class attribute(key: String) {

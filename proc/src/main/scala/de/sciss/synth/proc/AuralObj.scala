@@ -20,7 +20,7 @@ import de.sciss.processor.{GenericProcessor, Processor}
 import de.sciss.span.SpanLike
 import de.sciss.synth.proc
 import language.higherKinds
-import impl.{AuralObjImpl => Impl}
+import de.sciss.synth.proc.impl.{AuralObjImpl => Impl}
 
 object AuralObj {
   import proc.{Proc => _Proc}
@@ -62,6 +62,8 @@ object AuralObj {
       * @return             the number of channels for the attribute input
       */
     def attrNumChannels(key: String)(implicit tx: S#Tx): Int
+
+    def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
   }
 
   trait Proc[S <: Sys[S]] extends AuralObj[S] {

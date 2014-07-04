@@ -17,7 +17,7 @@ package graph
 
 import de.sciss.synth
 import synth.ugen.Constant
-import de.sciss.synth.proc.impl.{UGenGraphBuilder, StreamBuffer}
+import de.sciss.synth.proc.impl.StreamBuffer
 
 // XXX TODO: ought to go into an `impl` package
 private[proc] object stream {
@@ -31,18 +31,15 @@ private[proc] object stream {
 
     protected def info: UGenGraphBuilder.StreamIn
 
-    def makeUGens: UGenInLike =
-      UGenGraph.builder match {
-        case b: UGenGraphBuilder[_] =>
-          val (numCh, idx)  = b.addStreamIn(key, info)
-          val ctlName       = controlName  (key, idx )
-          val ctl           = ctlName.ir(Seq(0, 0))
-          val buf           = ctl \ 0
-          val gain          = ctl \ 1
-          makeUGen(numChannels = numCh, idx = idx, buf = buf, gain = gain)
-
-        case _ => UGenGraphBuilder.outsideOfContext()
-      }
+    def makeUGens: UGenInLike = {
+      val b = UGenGraphBuilder.get
+      val (numCh, idx)  = b.addStreamIn(key, info)
+      val ctlName       = controlName  (key, idx )
+      val ctl           = ctlName.ir(Seq(0, 0))
+      val buf           = ctl \ 0
+      val gain          = ctl \ 1
+      makeUGen(numChannels = numCh, idx = idx, buf = buf, gain = gain)
+    }
   }
 }
 

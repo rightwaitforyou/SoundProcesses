@@ -15,7 +15,7 @@ package de.sciss.synth
 package proc
 package graph
 
-import de.sciss.synth.proc.impl.UGenGraphBuilder
+import de.sciss.synth.proc.UGenGraphBuilder
 
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.ugen.UGenInGroup
@@ -29,14 +29,10 @@ object scan {
     protected def numChannels: Int
 
     final def makeUGens: UGenInLike = {
-      UGenGraph.builder match {
-        case b: UGenGraphBuilder[_] =>
-          val numCh   = b.addScanIn(key, numChannels)
-          val ctlName = inControlName(key)
-          mkUGen(ctlName, numCh)
-
-        case _ => UGenGraphBuilder.outsideOfContext()
-      }
+      val b = UGenGraphBuilder.get
+      val numCh   = b.addScanIn(key, numChannels)
+      val ctlName = inControlName(key)
+      mkUGen(ctlName, numCh)
     }
 
     protected def mkUGen(ctlName: String, numCh: Int): UGenInLike
@@ -89,11 +85,8 @@ object scan {
       val busArg      = _args.head
       val sigArg      = _args.tail
       val numChannels = sigArg.size
-      UGenGraph.builder match {
-        case b: UGenGraphBuilder[_] =>
-          b.addScanOut(key, numChannels)
-        case other => UGenGraphBuilder.outsideOfContext()
-      }
+      val b = UGenGraphBuilder.get
+      b.addScanOut(key, numChannels)
       val sigArgAr = sigArg.map { ui =>
         if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, Vector(ui))
       }

@@ -15,7 +15,7 @@ package de.sciss.synth
 package proc
 package graph
 
-import de.sciss.synth.proc.impl.UGenGraphBuilder
+import de.sciss.synth.proc.UGenGraphBuilder
 import ugen._
 
 object Fade {
@@ -25,16 +25,12 @@ object Fade {
     def rate: Rate
 
     final def makeUGens: UGenInLike = {
-      UGenGraph.builder match {
-        case b: UGenGraphBuilder[_] =>
-          val off     = Offset.ir
-          val dur     = Duration.ir
-          val phase   = Line.ar(off, dur, dur - off /*, doneAction = freeSelf */)
-          val env     = mkEnv(b, dur)
-          IEnvGen.ar(env, phase)
-
-        case other => UGenGraphBuilder.outsideOfContext()
-      }
+      val b = UGenGraphBuilder.get
+      val off     = Offset.ir
+      val dur     = Duration.ir
+      val phase   = Line.ar(off, dur, dur - off /*, doneAction = freeSelf */)
+      val env     = mkEnv(b, dur)
+      IEnvGen.ar(env, phase)
     }
 
     /** Returns (dur, shape, floor) */
