@@ -26,7 +26,7 @@ object UGenGraphBuilder {
       * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
       * be stored in a `TxnLocal`, but not a full STM ref.
       */
-    def apply[S <: Sys[S]](aural: AuralObj.Proc[S], proc: Obj.T[S, Proc.Elem])
+    def apply[S <: Sys[S]](aural: AuralObj.ProcData[S], proc: Obj.T[S, Proc.Elem])
                           (implicit tx: S#Tx): State[S] = {
       val g = proc.elem.peer.graph.value
       val in = new IncompleteImpl[S](aural,
@@ -57,7 +57,7 @@ object UGenGraphBuilder {
   
   // ---- impl ----
 
-  private final class IncompleteImpl[S <: Sys[S]](val aural: AuralObj.Proc[S],
+  private final class IncompleteImpl[S <: Sys[S]](val aural: AuralObj.ProcData[S],
       val remaining     : Vec[Lazy],
       val controlProxies: Set[ControlProxyLike],
       val ugens         : Vec[UGen],

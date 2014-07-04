@@ -21,8 +21,12 @@ object AuralProcImpl extends AuralObj.Factory {
 
   def typeID = ElemImpl.Proc.typeID
 
-  def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): AuralObj.Proc[S] = {
-    ???
+  def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
+    val data = context.acquire[AuralObj.ProcData[S]](proc) {
+      new DataImpl(tx.newHandle(proc))
+    }
+    val res = new Impl(data)
+    res
   }
 
   private final class OutputBuilder(val bus: AudioBus) {
@@ -33,10 +37,69 @@ object AuralProcImpl extends AuralObj.Factory {
     var outputs = Map.empty[String, OutputBuilder]
   }
 
-  private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Obj.T[S, Proc.Elem]])
+  private final class DataImpl[S <: Sys[S]](val obj: stm.Source[S#Tx, Obj.T[S, Proc.Elem]])
+    extends AuralObj.ProcData[S] {
+
+    private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]()
+
+    def dispose()(implicit tx: S#Tx): Unit = {
+      // nothing yet
+    }
+
+    private def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
+      implicit val itx = tx.peer
+      if (procLoc.isInitialized) procLoc.get
+      else {
+        val proc = obj()
+        procLoc.set(proc)
+        proc
+      }
+    }
+
+    // called by UGenGraphBuilderImpl
+    def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {
+      val procObj = procCached()
+      procObj.attr.getElem(key).fold(1) {
+        case a: DoubleVecElem[S]     => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
+        case _ => 1
+      }
+    }
+    // called by UGenGraphBuilderImpl
+    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
+      val procObj = procCached()
+      val proc    = procObj.elem.peer
+      val numCh   = proc.scans.get(key).fold(0) { scan =>
+        val chans = scan.sources.toList.map {
+          case Link.Grapheme(peer) =>
+            // val chansOpt = peer.valueAt(time).map(_.numChannels)
+            // chansOpt.getOrElse(numChannels)
+            peer.numChannels
+
+          case Link.Scan(peer) => ???
+          //            val sourceOpt = scanMap.get(peer.id)
+          //            val busOpt    = sourceOpt.flatMap {
+          //              case (sourceKey, idH) =>
+          //                val sourceTimedID = idH()
+          //                getOutputBus(sourceTimedID, sourceKey)
+          //            }
+          //            busOpt.fold({
+          //              if (numChannels < 0) throw MissingIn(peer)
+          //              numChannels
+          //            })(_.numChannels)
+        }
+        if (chans.isEmpty) 0 else chans.max
+      }
+      math.max(1, numCh)
+    }
+  }
+
+  private final class Impl[S <: Sys[S]](data: AuralObj.ProcData[S])
     extends AuralObj.Proc[S] {
 
     private def server: Server = ???
+
+    def obj: stm.Source[S#Tx, Obj.T[S, Proc.Elem]] = data.obj
 
     def typeID: Int = Proc.typeID
 
@@ -108,7 +171,7 @@ object AuralProcImpl extends AuralObj.Factory {
     //    }
 
     def play(time: SpanLike)(implicit tx: S#Tx): Unit = ???
-    def stop(time: Long)(implicit tx: S#Tx): Unit = ???
+    def stop(time: Long    )(implicit tx: S#Tx): Unit = ???
 
     def isPrepared(implicit tx: S#Tx): Boolean = ???
 
@@ -117,54 +180,5 @@ object AuralProcImpl extends AuralObj.Factory {
     //    private def tryBuild()(implicit tx: S#Tx): Unit = {
     //
     //    }
-
-    private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]()
-
-    private def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
-      implicit val itx = tx.peer
-      if (procLoc.isInitialized) procLoc.get
-      else {
-        val proc = obj()
-        procLoc.set(proc)
-        proc
-      }
-    }
-
-    // called by UGenGraphBuilderImpl
-    def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {
-      val procObj = procCached()
-      procObj.attr.getElem(key).fold(1) {
-        case a: DoubleVecElem[S]     => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
-        case _ => 1
-      }
-    }
-    // called by UGenGraphBuilderImpl
-    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
-      val procObj = procCached()
-      val proc    = procObj.elem.peer
-      val numCh   = proc.scans.get(key).fold(0) { scan =>
-        val chans = scan.sources.toList.map {
-          case Link.Grapheme(peer) =>
-            // val chansOpt = peer.valueAt(time).map(_.numChannels)
-            // chansOpt.getOrElse(numChannels)
-            peer.numChannels
-
-          case Link.Scan(peer) => ???
-//            val sourceOpt = scanMap.get(peer.id)
-//            val busOpt    = sourceOpt.flatMap {
-//              case (sourceKey, idH) =>
-//                val sourceTimedID = idH()
-//                getOutputBus(sourceTimedID, sourceKey)
-//            }
-//            busOpt.fold({
-//              if (numChannels < 0) throw MissingIn(peer)
-//              numChannels
-//            })(_.numChannels)
-        }
-        if (chans.isEmpty) 0 else chans.max
-      }
-      math.max(1, numCh)
-    }
   }
 }

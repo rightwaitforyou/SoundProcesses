@@ -13,6 +13,7 @@
 
 package de.sciss.synth.proc
 
+import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.Sys
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.processor.{GenericProcessor, Processor}
@@ -29,19 +30,19 @@ object AuralObj {
 
     type E[~ <: evt.Sys[~]] <: Elem[~]
 
-    def apply[S <: Sys[S]](obj: Obj.T[S, E])(implicit tx: S#Tx): AuralObj[S]
+    def apply[S <: Sys[S]](obj: Obj.T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S]
   }
 
   def addFactory(f: Factory): Unit = Impl.addFactory(f)
 
   def factories: Iterable[Factory] = Impl.factories
 
-  def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx): AuralObj[S] = Impl(obj)
+  def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = Impl(obj)
 
   // --------------
 
-  trait Proc[S <: Sys[S]] extends AuralObj[S] {
-    override def obj: stm.Source[S#Tx, Obj.T[S, _Proc.Elem]]
+  trait ProcData[S <: Sys[S]] extends Disposable[S#Tx] {
+    def obj: stm.Source[S#Tx, Obj.T[S, _Proc.Elem]]
 
     /** Queries the number of channel associated with a scanned input.
       * Throws a control throwable when no value can be determined, making
@@ -53,14 +54,19 @@ object AuralObj {
       *
       * @return             the number of channels for the scan input at the given time
       */
-    private[proc] def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int
+    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int
 
     /** Queries the number of channels associated with an attribute input.
       * @param key          the attribute key
       *
       * @return             the number of channels for the attribute input
       */
-    private[proc] def attrNumChannels(key: String)(implicit tx: S#Tx): Int
+    def attrNumChannels(key: String)(implicit tx: S#Tx): Int
+  }
+
+  trait Proc[S <: Sys[S]] extends AuralObj[S] {
+    // def data: ProcData[S]
+    // override def obj: stm.Source[S#Tx, Obj.T[S, _Proc.Elem]]
   }
 }
 trait AuralObj[S <: Sys[S]] /* extends Observable[...] */ {

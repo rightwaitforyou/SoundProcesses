@@ -41,7 +41,7 @@ object AuralObjImpl {
 
   def factories: Iterable[Factory] = map.values
 
-  def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx): AuralObj[S] = {
+  def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
     val tid = obj.elem.typeID
     map.get(tid).fold(Generic(obj))(f => f(obj.asInstanceOf[Obj.T[S, f.E]]))
   }
@@ -105,7 +105,7 @@ object AuralObjImpl {
 
     def typeID = ElemImpl.AudioGrapheme.typeID
 
-    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx): AuralObj[S] = ???
+    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ???
   }
 
   // -------- Folder --------
@@ -115,7 +115,7 @@ object AuralObjImpl {
 
     def typeID  = FolderElemImpl.typeID
 
-    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx): AuralObj[S] = ???
+    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ???
   }
 
   // -------- Timeline --------
@@ -125,6 +125,6 @@ object AuralObjImpl {
 
     def typeID: Int = ??? // ElemImpl.Timeline.typeID
 
-    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx): AuralObj[S] = ???
+    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ???
   }
 }
