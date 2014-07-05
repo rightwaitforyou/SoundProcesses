@@ -18,6 +18,7 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{Bus, AudioBus, Sys}
 import de.sciss.model.Change
+import de.sciss.synth.proc.AuralObj
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.UGenGraphBuilder.MissingIn
@@ -90,6 +91,14 @@ object AuralProcDataImpl {
           case _ =>
         }
       }
+    }
+
+    def addView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = {
+
+    }
+
+    def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = {
+      
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {
