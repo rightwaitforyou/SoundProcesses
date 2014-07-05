@@ -28,12 +28,12 @@ import de.sciss.synth.proc.{logAural => logA}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm._
 
-object AuralProcImpl extends AuralObj.Factory {
-  type E[S <: evt.Sys[S]] = Proc.Elem[S]
+object AuralProcImpl {
+  // type E[S <: evt.Sys[S]] = Proc.Elem[S]
 
-  def typeID = ElemImpl.Proc.typeID
+  // def typeID = Proc.typeID
 
-  def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
+  def apply[S <: Sys[S]](proc: Proc.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data  = AuralProcDataImpl(proc)
     val res   = new Impl(data)
     // data.addView(res)
@@ -57,7 +57,7 @@ object AuralProcImpl extends AuralObj.Factory {
 
     import context.server
 
-    def obj: stm.Source[S#Tx, Obj.T[S, Proc.Elem]] = data.obj
+    def obj: stm.Source[S#Tx, Proc.Obj[S]] = data.obj
 
     def typeID: Int = Proc.typeID
 

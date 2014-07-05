@@ -64,8 +64,8 @@ object Proc {
       proc.impl.ElemImpl.Proc(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, Proc.Elem]] =
-        if (obj.elem.isInstanceOf[Proc.Elem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, Proc.Elem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Proc.Obj[S]] =
+        if (obj.elem.isInstanceOf[Proc.Elem[S]]) Some(obj.asInstanceOf[Proc.Obj[S]])
         else None
     }
 
@@ -74,7 +74,11 @@ object Proc {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Proc[S]
     type PeerUpdate = Proc.Update[S]
-  }}
+  }
+
+  /** Convenient short-cut */
+  type Obj[S <: Sys[S]] = proc.Obj.T[S, Proc.Elem]
+}
 /** The `Proc` trait is the basic entity representing a sound process. */
 trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */

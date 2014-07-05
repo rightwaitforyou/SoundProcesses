@@ -15,13 +15,13 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{NodeRef, AuralNode, AudioBus, Sys}
+import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
-import de.sciss.processor.{GenericProcessor, Processor}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc
+import de.sciss.synth.proc.Obj.T
 import language.higherKinds
-import de.sciss.synth.proc.impl.{AuralObjImpl => Impl}
+import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralProcImpl}
 
 object AuralObj {
   import proc.{Proc => _Proc}
@@ -68,7 +68,7 @@ object AuralObj {
 
     def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
 
-    def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem]
+    def procCached()(implicit tx: S#Tx): Obj.T[S, _Proc.Elem]
 
     def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
 
@@ -83,9 +83,17 @@ object AuralObj {
     def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit
   }
 
+  object Proc extends AuralObj.Factory {
+    type E[S <: evt.Sys[S]] = _Proc.Elem[S]
+
+    def typeID = _Proc.typeID
+
+    def apply[S <: Sys[S]](obj: _Proc.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] =
+      AuralProcImpl(obj)
+  }
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
     // def data: ProcData[S]
-    // override def obj: stm.Source[S#Tx, Obj.T[S, _Proc.Elem]]
+    override def obj: stm.Source[S#Tx, _Proc.Obj[S]]
   }
 
   sealed trait State

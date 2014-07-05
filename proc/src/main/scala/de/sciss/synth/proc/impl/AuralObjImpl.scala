@@ -49,7 +49,7 @@ object AuralObjImpl {
   private var map = scala.Predef.Map[Int, Factory](
     // AudioGrapheme   .typeID -> AudioGrapheme,
     // Folder          .typeID -> Folder,
-    Proc            .typeID -> AuralProcImpl
+    Proc            .typeID -> AuralObj.Proc // AuralProcImpl
     // Timeline        .typeID -> Timeline
     // Code            .typeID -> Code,
   )
@@ -60,28 +60,28 @@ object AuralObjImpl {
     def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx): AuralObj[S] =
       new Impl(tx.newHandle(obj))
 
-    private object dummyPrep extends GenericProcessor[Unit] {
-      private val peer = Future.successful(())
-
-      def abort(): Unit = ()
-      def progress: Double = 1.0
-
-      def removeListener(pf: Listener[Update[Unit, GenericProcessor[Unit]]]): Unit    = ()
-      def addListener   (pf: Listener[Update[Unit, GenericProcessor[Unit]]]): pf.type = pf
-
-      def isCompleted: Boolean = peer.isCompleted
-
-      def onComplete[U](f: Try[Unit] => U)(implicit executor: ExecutionContext): Unit =
-        peer.onComplete(f)
-
-      def value: Option[Try[Unit]] = peer.value
-
-      def result(atMost: Duration)(implicit permit: CanAwait): Unit = peer.result(atMost)
-      def ready (atMost: Duration)(implicit permit: CanAwait): this.type = {
-        peer.ready(atMost)
-        this
-      }
-    }
+    //    private object dummyPrep extends GenericProcessor[Unit] {
+    //      private val peer = Future.successful(())
+    //
+    //      def abort(): Unit = ()
+    //      def progress: Double = 1.0
+    //
+    //      def removeListener(pf: Listener[Update[Unit, GenericProcessor[Unit]]]): Unit    = ()
+    //      def addListener   (pf: Listener[Update[Unit, GenericProcessor[Unit]]]): pf.type = pf
+    //
+    //      def isCompleted: Boolean = peer.isCompleted
+    //
+    //      def onComplete[U](f: Try[Unit] => U)(implicit executor: ExecutionContext): Unit =
+    //        peer.onComplete(f)
+    //
+    //      def value: Option[Try[Unit]] = peer.value
+    //
+    //      def result(atMost: Duration)(implicit permit: CanAwait): Unit = peer.result(atMost)
+    //      def ready (atMost: Duration)(implicit permit: CanAwait): this.type = {
+    //        peer.ready(atMost)
+    //        this
+    //      }
+    //    }
 
     private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Obj[S]])
       extends AuralObj[S] with DummyObservableImpl[S] {
@@ -96,7 +96,7 @@ object AuralObjImpl {
 
       def prepare()(implicit tx: S#Tx): Unit = () // Generic.dummyPrep
 
-      def dispose()(implicit tx: S#Tx): Unit = ()
+      def dispose()(implicit tx: S#Tx): Unit = ???
 
       def state(implicit tx: S#Tx): AuralObj.State = AuralObj.Stopped
     }
