@@ -375,7 +375,7 @@ object AuralProcImpl extends AuralObj.Factory {
                     // builder.outputs that will handle these cases.
                     sourceView.getScanOutBus(sourceKey).foreach { bOut =>
                       ensureChannels(bOut.numChannels)
-                      val edge        = NodeGraph.Edge(srcAural, sourceKey, node, key)
+                      val edge        = ??? : NodeGraph.Edge // NodeGraph.Edge(srcAural, sourceKey, node, key)
                       val link        = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn.bus)
                       dependencies  ::= link
                       users         ::= link
@@ -437,8 +437,8 @@ object AuralProcImpl extends AuralObj.Factory {
     private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[(String, ProcData[S])] =
       context.getAux[(String, ProcData[S])](scan.id)
 
-    private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = playingRef.swap(Some(node)).foreach(_.stop())
-    private def freeNode()              (implicit tx: S#Tx): Unit = playingRef.swap(None      ).foreach(_.stop())
+    private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = playingRef.swap(Some(node))(tx.peer).foreach(_.stop())
+    private def freeNode()              (implicit tx: S#Tx): Unit = playingRef.swap(None      )(tx.peer).foreach(_.stop())
 
     private val playingRef = Ref(Option.empty[AuralNode])
   }

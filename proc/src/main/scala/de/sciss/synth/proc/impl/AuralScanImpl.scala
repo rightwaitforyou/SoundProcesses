@@ -169,8 +169,8 @@ object AuralScanImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       obs.dispose()
-      val sources0  = sources.swap(Set.empty)
-      val sinks0    = sinks  .swap(Set.empty)
+      val sources0  = sources.swap(Set.empty)(tx.peer)
+      val sinks0    = sinks  .swap(Set.empty)(tx.peer)
       disposeLinks()
       sources0.foreach(_.removeSink  (this))
       sinks0  .foreach(_.removeSource(this))

@@ -51,9 +51,11 @@ object AuralNode {
 
     def groupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).map(_.main)
 
+    def handle(implicit tx: Txn): Node = groupOption.getOrElse(synth)
+
     def group()(implicit tx: Txn): Group =
       groupOption.getOrElse {
-        val res = Group(server)
+        val res = Group(synth, addBefore) // i.e. occupy the same place as before
         group_=(res)
         res
       }
@@ -131,7 +133,7 @@ object AuralNode {
   }
 }
 
-sealed trait AuralNode /* extends Writer */ {
+sealed trait AuralNode extends NodeGraph.Node {
   def server: Server
 
   /** Retrieves the main group of the Proc, or returns None if a group has not yet been assigned. */

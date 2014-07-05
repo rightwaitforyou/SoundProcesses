@@ -96,6 +96,8 @@ object AuralObjImpl {
 
       def prepare()(implicit tx: S#Tx): Unit = () // Generic.dummyPrep
 
+      def dispose()(implicit tx: S#Tx): Unit = ()
+
       def state(implicit tx: S#Tx): AuralObj.State = AuralObj.Stopped
     }
   }

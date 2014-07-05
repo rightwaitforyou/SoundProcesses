@@ -98,7 +98,7 @@ object AuralProcDataImpl {
     }
 
     def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = {
-      
+
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {
@@ -174,6 +174,8 @@ object AuralProcDataImpl {
         case in: UGenGraphBuilder.Incomplete[S] if in.missingIns.contains(sinkKey) => tryBuild()
         case _ => // XXX TODO: if playing
       }
+
+    def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = ???
 
     def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
       implicit val itx = tx.peer
