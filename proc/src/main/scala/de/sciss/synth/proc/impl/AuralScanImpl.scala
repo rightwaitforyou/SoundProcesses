@@ -15,9 +15,9 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Bus, Synth, NodeGraph, AuralNode, AudioBus, Sys}
+import de.sciss.lucre.synth.{Bus, Synth, NodeGraph, NodeRef, AudioBus, Sys}
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.{addToHead, SynthGraph}
+import de.sciss.synth.{addBefore, addToHead, SynthGraph}
 
 import scala.concurrent.stm.{TMap, Ref}
 
@@ -67,10 +67,8 @@ object AuralScanImpl {
 
   // ----------------------------------
 
-  private def LinkNode[S <: Sys[S]](source: AuralScan[S], sourceNode: AuralNode,
-                                    sink  : AuralScan[S], sinkNode  : AuralNode)(implicit tx: S#Tx): LinkNode[S] = {
-    val edge      = NodeGraph.Edge(sourceNode, /* source.key, */ sinkNode /*, sink.key */)
-
+  private def LinkNode[S <: Sys[S]](source: AuralScan[S], sourceNode: NodeRef,
+                                    sink  : AuralScan[S], sinkNode  : NodeRef)(implicit tx: S#Tx): LinkNode[S] = {
     val sourceBus = source.bus
     val sinkBus   = sink  .bus
     val sourceCh  = sourceBus.numChannels
@@ -88,20 +86,25 @@ object AuralScanImpl {
       Out.ar("out".kr, sig)
     }
 
-    val synth = Synth(sourceBus.server, g, nameHint = Some(s"audio-link$numCh"))
-    synth.play(target = sinkNode.preGroup(), args = Nil, addAction = addToHead, dependencies = Nil)
+    val synth     = Synth(sourceBus.server, g, nameHint = Some(s"audio-link$numCh"))
+    val synthRef  = NodeRef(synth)
+    synth.play(target = sinkNode.node, args = Nil, addAction = addBefore, dependencies = Nil)
     synth.read (sourceBus -> "in" )
     synth.write(sinkBus   -> "out")
 
-    NodeGraph.addEdge(edge)
-    new LinkNode(edge, synth)
+    val edge1     = NodeGraph.Edge(sourceNode, synthRef)
+    val edge2     = NodeGraph.Edge(synthRef  , sinkNode)
+    NodeGraph.addEdge(edge1)
+    NodeGraph.addEdge(edge2)
+    new LinkNode(edge1, edge2, synth)
   }
-  private final class LinkNode[S <: Sys[S]](edge: NodeGraph.Edge, synth: Synth)
+  private final class LinkNode[S <: Sys[S]](edge1: NodeGraph.Edge, edge2: NodeGraph.Edge, synth: Synth)
     extends Disposable[S#Tx] {
 
     def dispose()(implicit tx: S#Tx): Unit = {
+      NodeGraph.removeEdge(edge1)
+      NodeGraph.removeEdge(edge2)
       synth.free()
-      NodeGraph.removeEdge(edge)
     }
   }
 
@@ -127,7 +130,7 @@ object AuralScanImpl {
       }
     }
 
-    private def tryLink(sourceNode: AuralNode, sink: AuralScan[S])(implicit tx: S#Tx): Unit =
+    private def tryLink(sourceNode: NodeRef, sink: AuralScan[S])(implicit tx: S#Tx): Unit =
       sink.node.foreach { sinkNode =>
         val link = LinkNode[S](this, sourceNode, sink, sinkNode)
         links.put(sink, link)(tx.peer)
@@ -144,11 +147,11 @@ object AuralScanImpl {
       }
     }
 
-    private val nodeRef = Ref(Option.empty[AuralNode])
+    private val nodeRef = Ref(Option.empty[NodeRef])
 
-    def node(implicit tx: S#Tx): Option[AuralNode] = nodeRef.get(tx.peer)
+    def node(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
 
-    def node_=(value: Option[AuralNode])(implicit tx: S#Tx): Unit = {
+    def node_=(value: Option[NodeRef])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       nodeRef() = value
       disposeLinks()

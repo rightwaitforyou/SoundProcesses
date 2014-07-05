@@ -26,10 +26,10 @@ object AudioLinkOLD {
     val synth     = Synth(sourceBus.server, sg, nameHint = Some("audio-link"))
     val synthRef  = NodeRef(synth)
 
-    val edge1 = NodeGraph.Edge(edge.source, synthRef )
-    val edge2 = NodeGraph.Edge(synthRef   , edge.sink)
+    val edge1     = NodeGraph.Edge(edge.source, synthRef )
+    val edge2     = NodeGraph.Edge(synthRef   , edge.sink)
 
-    val res   = new Impl(edge1, edge2, sourceBus, sinkBus, synth)
+    val res       = new Impl(edge1, edge2, sourceBus, sinkBus, synth)
     res.play()
     res
   }

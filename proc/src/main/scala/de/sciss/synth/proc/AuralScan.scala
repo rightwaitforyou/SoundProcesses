@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AuralNode, AudioBus, Sys}
+import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import impl.{AuralScanImpl => Impl}
 
 object AuralScan {
@@ -23,13 +23,13 @@ object AuralScan {
     Impl(view = view, key = key, scan = scan, numChannels = numChannels)
 
   trait Owned[S <: Sys[S]] extends AuralScan[S] {
-    def node_=(value: Option[AuralNode])(implicit tx: S#Tx): Unit
+    def node_=(value: Option[NodeRef])(implicit tx: S#Tx): Unit
   }
 
   //  sealed trait Update[S <: Sys[S]] {
   //    def view: AuralScan[S]
   //  }
-  //  case class NodeChanged[S <: Sys[S]](view: AuralScan[S], change: Change[Option[AuralNode]]) extends Update[S]
+  //  case class NodeChanged[S <: Sys[S]](view: AuralScan[S], change: Change[Option[NodeRef]]) extends Update[S]
 }
 trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] /* with Observable[S#Tx, AuralScan.Update[S]] */ {
   // def numChannels(implicit tx: S#Tx): Int
@@ -45,7 +45,7 @@ trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] /* with Observable[S#Tx, A
   def removeSource(view: AuralScan[S])(implicit tx: S#Tx): Unit
   def removeSink  (view: AuralScan[S])(implicit tx: S#Tx): Unit
 
-  def node(implicit tx: S#Tx): Option[AuralNode]
+  def node(implicit tx: S#Tx): Option[NodeRef]
 
   //  def sourceUpdated(view: AuralScan[S])(implicit tx: S#Tx): Unit
   //  def sinkUpdated  (view: AuralScan[S])(implicit tx: S#Tx): Unit

@@ -108,7 +108,6 @@ object AuralNode {
     }
 
     def stop()(implicit tx: Txn): Unit = {
-      val node = groupOption.getOrElse(synth)
       node.free()
       if (users    .nonEmpty) users    .foreach(_.remove ())
       if (resources.nonEmpty) resources.foreach(_.dispose())
