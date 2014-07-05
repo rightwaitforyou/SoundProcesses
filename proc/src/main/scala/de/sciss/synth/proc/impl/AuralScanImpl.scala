@@ -69,7 +69,7 @@ object AuralScanImpl {
 
   private def LinkNode[S <: Sys[S]](source: AuralScan[S], sourceNode: AuralNode,
                                     sink  : AuralScan[S], sinkNode  : AuralNode)(implicit tx: S#Tx): LinkNode[S] = {
-    val edge      = NodeGraph.Edge(sourceNode, source.key, sinkNode, sink.key)
+    val edge      = NodeGraph.Edge(sourceNode, /* source.key, */ sinkNode /*, sink.key */)
 
     val sourceBus = source.bus
     val sinkBus   = sink  .bus

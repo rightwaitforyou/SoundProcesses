@@ -19,7 +19,7 @@ import collection.mutable.{Set => MSet, Stack => MStack}
 object Topology {
   def empty[V, E <: Edge[V]] = apply[V, E](emptySeq, Set.empty)(0, Map.empty)
 
-  trait Edge[V] {
+  trait Edge[+V] {
     def sourceVertex: V
     def targetVertex: V
   }

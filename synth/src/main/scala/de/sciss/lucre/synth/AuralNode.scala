@@ -51,7 +51,7 @@ object AuralNode {
 
     def groupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).map(_.main)
 
-    def handle(implicit tx: Txn): Node = groupOption.getOrElse(synth)
+    def node(implicit tx: Txn): Node = groupOption.getOrElse(synth)
 
     def group()(implicit tx: Txn): Group =
       groupOption.getOrElse {
@@ -133,7 +133,7 @@ object AuralNode {
   }
 }
 
-sealed trait AuralNode extends NodeGraph.Node {
+sealed trait AuralNode extends NodeRef {
   def server: Server
 
   /** Retrieves the main group of the Proc, or returns None if a group has not yet been assigned. */

@@ -60,3 +60,16 @@ trait Node extends Resource {
 
   def run(audible: Boolean, state: Boolean)(implicit tx: Txn): Unit
 }
+
+object NodeRef {
+  def apply(n: Node): NodeRef = new Wrap(n)
+
+  private final case class Wrap(n: Node) extends NodeRef {
+    def node(implicit tx: Txn): Node = n
+    def server: Server = n.server
+  }
+}
+trait NodeRef {
+  def server: Server
+  def node(implicit tx: Txn): Node
+}

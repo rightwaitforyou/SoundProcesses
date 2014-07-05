@@ -29,12 +29,6 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
 
   var DEBUG = false
 
-  trait Node {
-    def server: Server
-    def handle(implicit tx: Txn): LNode
-    def preGroup()(implicit tx: Txn): Group // XXX TODO - legacy
-  }
-
   def reduceFutures(futures: Vec[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
     futures match {
       case Vec()        => Future.successful(())
@@ -42,8 +36,8 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
       case more         => Future.reduce(futures)((_, _) => ())
     }
 
-  final case class Edge(source: Node, sourceKey: String, sink: Node, sinkKey: String)
-    extends Topology.Edge[Node] {
+  final case class Edge(source: NodeRef /* , sourceKey: String */, sink: NodeRef /*, sinkKey: String */)
+    extends Topology.Edge[NodeRef] {
 
     def sourceVertex = source
     def targetVertex = sink
@@ -76,43 +70,43 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
   // commented out for debugging inspection
   private val worlds = TMap.empty[Server, NodeGraph]
 
-  def addNode(node: Node)(implicit tx: Txn): Unit = {
+  def addNode(node: NodeRef)(implicit tx: Txn): Unit = {
     val world = worlds(node.server)(tx.peer)
     world.addNode(node)
   }
 
-  def removeNode(node: Node)(implicit tx: Txn): Unit = {
+  def removeNode(node: NodeRef)(implicit tx: Txn): Unit = {
     val world = worlds(node.server)(tx.peer)
     world.removeNode(node)
   }
 
   def addEdge(edge: Edge)(implicit tx: Txn): Unit = {
-    val world                 = worlds(edge.sourceVertex.server)(tx.peer)
+    val world                 = worlds(edge.source.server)(tx.peer)
     val res                   = world.addEdge(edge)
     val (_, source, affected) = res.getOrElse(sys.error(s"Edge $edge is cyclic"))
 
     // if (verbose) println("NEW TOPO = " + newTopo + "; SOURCE = " + source + "; AFFECTED = " + affected)
     if (affected.isEmpty) return
 
-    val isAfter = source == edge.sourceVertex
+    val isAfter = source == edge.source
 
-    var succ = source.handle
+    var succ = source.node
     var pred: LNode = null
     val iter = affected.iterator
     while (iter.hasNext) {
       pred = succ
-      val g2 = iter.next().handle
+      val curr = iter.next().node
       if (isAfter) {
-        g2.moveAfter (audible = true, target = pred)
+        curr.moveAfter (audible = true, target = pred)
       } else {
-        g2.moveBefore(audible = true, target = pred)
+        curr.moveBefore(audible = true, target = pred)
       }
-      succ = g2
+      succ = curr
     }
   }
 
   def removeEdge(edge: Edge)(implicit tx: Txn): Unit = {
-    val world = worlds(edge.sourceVertex.server)(tx.peer)
+    val world = worlds(edge.source.server)(tx.peer)
     world.removeEdge(edge)
   }
 
@@ -213,21 +207,21 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
   }
 }
 final class NodeGraph(val server: Server) {
-  import NodeGraph.{Node => GNode, _}
+  import NodeGraph._
 
-  private type Topo = Topology[GNode, Edge]
+  private type Topo = Topology[NodeRef, Edge]
 
   val ugenGraphs = Ref(Map.empty[NodeGraph.GraphEquality, SynthDef])
 
   private val topologyRef = Ref[Topo](Topology.empty)
 
-  def addNode(node: GNode)(implicit tx: Txn): Unit =
+  def addNode(node: NodeRef)(implicit tx: Txn): Unit =
     topologyRef.transform(_.addVertex(node))(tx.peer)
 
-  def removeNode(node: GNode)(implicit tx: Txn): Unit =
+  def removeNode(node: NodeRef)(implicit tx: Txn): Unit =
     topologyRef.transform(_.removeVertex(node))(tx.peer)
 
-  def addEdge(edge: Edge)(implicit tx: Txn): Option[(Topo, GNode, Vec[GNode])] = {
+  def addEdge(edge: Edge)(implicit tx: Txn): Option[(Topo, NodeRef, Vec[NodeRef])] = {
     val res = topologyRef.get(tx.peer).addEdge(edge)
     res.foreach(tup => topologyRef.set(tup._1)(tx.peer))
     res

@@ -421,7 +421,7 @@ object AuralPresentationImpl {
                           sys.error(s"Source bus disappeared $srcTimedID -> $srcKey")
                         }
                         ensureChannels(bOut.numChannels)
-                        val edge    = NodeGraph.Edge(srcAural, srcKey, aural, key)
+                        val edge    = NodeGraph.Edge(srcAural, /* srcKey, */ aural /* , key */)
                         val link    = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn.bus)
                         dependencies      ::= link
                         users     ::= link
@@ -451,7 +451,7 @@ object AuralPresentationImpl {
                       }
                       require(bIn.numChannels == bOut.numChannels,
                         s"Scan input changed number of channels (expected ${bOut.numChannels} but found ${bIn.numChannels})")
-                      val edge    = NodeGraph.Edge(aural, key, sinkAural, sinkKey)
+                      val edge    = NodeGraph.Edge(aural, /* key, */ sinkAural /*, sinkKey */)
                       val link    = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn)
                       dependencies      ::= link
                       users     ::= link
