@@ -24,7 +24,7 @@ import scala.concurrent.stm.{TMap, Ref}
 
 object AuralScanImpl {
   def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], numChannels: Int)
-                        (implicit tx: S#Tx, context: AuralContext[S]): AuralScan[S] = {
+                        (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] = {
     import context.server
     val bus   = Bus.audio(server, numChannels = numChannels)
     val view  = new Impl[S](data = data, key = key, bus = bus)

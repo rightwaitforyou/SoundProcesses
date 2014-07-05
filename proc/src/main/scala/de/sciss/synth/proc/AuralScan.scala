@@ -18,8 +18,9 @@ import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import impl.{AuralScanImpl => Impl}
 
 object AuralScan {
+  /** Creates a new aural scan view and registers it with the context under `scan.id`. */
   def apply[S <: Sys[S]](data: AuralObj.ProcData[S], key: String, scan: Scan[S], numChannels: Int)
-                        (implicit tx: S#Tx, context: AuralContext[S]): AuralScan[S] =
+                        (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] =
     Impl(data = data, key = key, scan = scan, numChannels = numChannels)
 
   trait Owned[S <: Sys[S]] extends AuralScan[S] {

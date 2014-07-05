@@ -16,10 +16,9 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Server, Node, Txn, Group, NodeRef, AuralNode, Bus, AudioBus, Sys}
+import de.sciss.lucre.synth.{Node, Txn, Group, NodeRef, Bus, AudioBus, Sys}
 import de.sciss.model.Change
 import de.sciss.synth.addBefore
-import de.sciss.synth.proc.AuralObj
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.UGenGraphBuilder.MissingIn
@@ -111,10 +110,11 @@ object AuralProcDataImpl {
 
     import context.server
 
-    private val procLoc  = TxnLocal[Obj.T[S, Proc.Elem]]()
-    private val stateRef = Ref[UState[S]](state0)
+    private val stateRef  = Ref[UState[S]](state0)
+    private val nodeRef   = Ref(Option.empty[GroupImpl])
+    private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
 
-    // def server: Server = context.server
+    private val procLoc   = TxnLocal[Obj.T[S, Proc.Elem]]()   // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
 
@@ -124,9 +124,9 @@ object AuralProcDataImpl {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
             pCh.foreach {
               case Proc.GraphChange(Change(_, newGraph)) =>
-              case Proc.ScanAdded  (key, scan) =>
+              case Proc.ScanAdded(key, scan) =>
               case Proc.ScanRemoved(key, scan) =>
-              case Proc.ScanChange (key, scan, sCh) =>
+              case Proc.ScanChange(key, scan, sCh) =>
 
             }
           case _ =>
@@ -134,17 +134,17 @@ object AuralProcDataImpl {
       }
     }
 
-    private val nodeRef = Ref(Option.empty[GroupImpl])
-
     def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
 
-    private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
-      ???
-    }
+    private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit =
+      scanViews.foreach { case (_, view) =>
+        view.play(n)
+      } (tx.peer)
 
-    private def stopScans()(implicit tx: S#Tx): Unit = {
-      ???
-    }
+    private def stopScans()(implicit tx: S#Tx): Unit =
+      scanViews.foreach { case (_, view) =>
+        view.stop()
+      } (tx.peer)
 
     def addInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
@@ -175,7 +175,10 @@ object AuralProcDataImpl {
     //    }
 
     def dispose()(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
       procObserver.dispose()
+      scanViews.foreach { case (_, view) => view.dispose() }
+      scanViews.retain((_, _) => false) // no `clear` method
     }
 
     def state(implicit tx: S#Tx) = stateRef.get(tx.peer)
@@ -191,10 +194,12 @@ object AuralProcDataImpl {
       }
     }
 
-    private val outputBuses = TMap.empty[String, AudioBus]
+    // private val outputBuses = TMap.empty[String, AudioBus]
 
     private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
       if (before.scanOuts eq now.scanOuts) return
+
+      implicit val itx = tx.peer
 
       // detect which new scan outputs have been determined in the last iteration
       // (newOuts is a map from `name: String` to `numChannels Int`)
@@ -202,22 +207,22 @@ object AuralProcDataImpl {
         case (key, _) => before.scanOuts.contains(key)
       }
 
-      val newBuses = newOuts.map { case (key, numCh) =>
-        val bus = Bus.audio(server, numCh)
-        outputBuses.put(key, bus)(tx.peer)
-        (key, bus)
-      }
+      //      val newBuses = newOuts.map { case (key, numCh) =>
+      //        val bus   = Bus.audio(server, numCh)
+      //        outputBuses.put(key, bus)(tx.peer)
+      //        (key, bus)
+      //      }
 
       val scans = procCached().elem.peer.scans
-      newBuses.foreach { case (key, bus) =>
-        scans.get(key).foreach { scan =>
-          scan.sinks.foreach {
-            case Link.Scan(peer) =>
-              scanView(peer).foreach { case (sinkKey, sinkData) =>
-                sinkData.scanInBusChanged(sinkKey, bus)
-              }
-            case _ =>
+      newOuts.foreach { case (key, numCh) =>
+        scanViews.get(key).fold {
+          scans.get(key).foreach { scan =>
+            val view = AuralScan(data = this, key = key, scan = scan, numChannels = numCh)
+            scanViews.put(key, view)
           }
+        } { view =>
+          val numCh1 = view.bus.numChannels
+          if (numCh1 != numCh) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numCh)")
         }
       }
     }
@@ -246,7 +251,7 @@ object AuralProcDataImpl {
         case _ => // XXX TODO: if playing
       }
 
-    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus] = ???
+    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
 
     // def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = ...
 
@@ -260,8 +265,8 @@ object AuralProcDataImpl {
       }
     }
 
-    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[(String, ProcData[S])] =
-      context.getAux[(String, ProcData[S])](scan.id)
+    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[AuralScan[S]] =
+      context.getAux[AuralScan[S]](scan.id)
 
     // called by UGenGraphBuilderImpl
     def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {
@@ -286,11 +291,10 @@ object AuralProcDataImpl {
           case Link.Scan(peer) =>
             // val sourceOpt = scanMap.get(peer.id)
             val sourceOpt = scanView(peer)
-            val chansOpt = sourceOpt.flatMap {
-              case (sourceKey, sourceData) =>
-                // val sourceObj = sourceObjH()
-                // getOutputBus(sourceObj, sourceKey)
-                sourceData.state.scanOuts.get(sourceKey)
+            val chansOpt = sourceOpt.map { sourceView =>
+              // val sourceObj = sourceObjH()
+              // getOutputBus(sourceObj, sourceKey)
+              sourceView.bus.numChannels // data.state.scanOuts.get(sourceView.key)
             }
             chansOpt.getOrElse(throw MissingIn(key))
         }
