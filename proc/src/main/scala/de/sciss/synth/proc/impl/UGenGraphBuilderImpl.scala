@@ -46,7 +46,7 @@ object UGenGraphBuilderImpl {
       val scanIns       : Map[String, ScanIn],
       val attributeIns  : Set[String],
       val streamIns     : Map[String, List[StreamIn]],
-      val missingIns    : Set[MissingIn[S]]
+      val missingIns    : Set[String]
    )
     extends Incomplete[S] {
 
@@ -74,7 +74,7 @@ object UGenGraphBuilderImpl {
 
     private var scanOuts        = in.scanOuts
     private var scanIns         = in.scanIns
-    private var missingIns      = Set.empty[MissingIn[S]]
+    private var missingIns      = Set.empty[String]
     private var attributeIns    = in.attributeIns
     private var streamIns       = in.streamIns
 
@@ -136,7 +136,7 @@ object UGenGraphBuilderImpl {
               elem.force(builder)
               someSucceeded = true
             } catch {
-              case miss: MissingIn[_] =>
+              case MissingIn(sinkKey) =>
                 sourceMap           = savedSourceMap
                 controlNames        = savedControlNames
                 controlValues       = savedControlValues
@@ -146,7 +146,7 @@ object UGenGraphBuilderImpl {
                 attributeIns        = savedAttrs
                 streamIns           = savedStreams
                 missingElems      :+= elem
-                missingIns         += miss.asInstanceOf[MissingIn[S]] // XXX TODO not cool
+                missingIns         += sinkKey
             }
           }
         }

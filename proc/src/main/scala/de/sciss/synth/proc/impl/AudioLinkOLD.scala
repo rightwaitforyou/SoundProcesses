@@ -17,11 +17,11 @@ package impl
 import de.sciss.lucre.synth.{DynamicUser, AudioBus, NodeGraph, Synth, Resource, Txn}
 import de.sciss.synth.{addToHead, SynthGraph}
 
-object AudioLink {
+object AudioLinkOLD {
   def apply(edge: NodeGraph.Edge, sourceBus: AudioBus, sinkBus: AudioBus)
            (implicit tx: Txn): Resource with DynamicUser = {
     val numCh = sourceBus.numChannels
-    require(numCh == sinkBus.numChannels,  s"Source has $numCh channels while sink has ${sinkBus.numChannels}")
+    require(numCh == sinkBus.numChannels, s"Source has $numCh channels while sink has ${sinkBus.numChannels}")
     val sg    = graph(numCh)
     val synth = Synth(sourceBus.server, sg, nameHint = Some("audio-link"))
     val res   = new Impl(edge, sourceBus, sinkBus, synth)

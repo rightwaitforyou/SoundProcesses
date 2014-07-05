@@ -79,7 +79,7 @@ object Scan {
   }
 
   final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
-                                                   changes: Vec[Grapheme.Segment]) extends Change[S]
+                                               changes: Vec[Grapheme.Segment]) extends Change[S]
 }
 
 /** A `Scan` represents a real-time signal which can either function as a reader linked to another scan

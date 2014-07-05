@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.processor.{GenericProcessor, Processor}
 import de.sciss.span.SpanLike
@@ -67,6 +67,13 @@ object AuralObj {
     def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
 
     def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem]
+
+    def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
+
+    def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
+
+    def addView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
+    def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
   }
 
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
@@ -80,7 +87,7 @@ object AuralObj {
   case object Prepared  extends State
   case object Playing   extends State
 }
-trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] {
+trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Disposable[S#Tx] {
   def typeID: Int
 
   /** The view must store a handle to its underlying model. */
@@ -88,7 +95,7 @@ trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] {
 
   // def latencyEstimate(implicit tx: S#Tx): Long
 
-  def prepare()(implicit tx: S#Tx): Unit // GenericProcessor[Unit]
+  // def prepare()(implicit tx: S#Tx): Unit // GenericProcessor[Unit]
 
   // def isPrepared(implicit tx: S#Tx): Boolean
 

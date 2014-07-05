@@ -67,7 +67,7 @@ object Obj {
 
   type Update[S <: Sys[S]] = UpdateT[S, _ <: Elem[S]] // (proc: Obj[S], changes: Vec[Change[S, Upd]])
 
-  /** A change is either a state change, or a scan or a grapheme change */
+  /** A change is either a element state change, or an attribute change */
   sealed trait Change[S <: Sys[S], +Upd]
 
   sealed trait AttrUpdate[S <: Sys[S]] extends Change[S, Nothing] {

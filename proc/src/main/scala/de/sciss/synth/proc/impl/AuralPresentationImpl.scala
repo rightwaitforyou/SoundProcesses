@@ -422,7 +422,7 @@ object AuralPresentationImpl {
                         }
                         ensureChannels(bOut.numChannels)
                         val edge    = NodeGraph.Edge(srcAural, srcKey, aural, key)
-                        val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
+                        val link    = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn.bus)
                         dependencies      ::= link
                         users     ::= link
                       }
@@ -452,7 +452,7 @@ object AuralPresentationImpl {
                       require(bIn.numChannels == bOut.numChannels,
                         s"Scan input changed number of channels (expected ${bOut.numChannels} but found ${bIn.numChannels})")
                       val edge    = NodeGraph.Edge(aural, key, sinkAural, sinkKey)
-                      val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn)
+                      val link    = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn)
                       dependencies      ::= link
                       users     ::= link
                     }
@@ -624,7 +624,7 @@ object AuralPresentationImpl {
       //    note that these buses initially do not have any real resources allocated, so it's safe to
       //    forget about them and have them garbage-collected if the process does not complete by the end of the txn.
       if (newOuts.nonEmpty) {
-        val newBuses = newOuts.mapValues(numCh => new OutputBuilder(Bus.audio(server, numCh)))
+        val newBuses = newOuts.map { case (key, numCh) => (key, new OutputBuilder(Bus.audio(server, numCh))) }
         builder.outputs ++= newBuses
       }
 

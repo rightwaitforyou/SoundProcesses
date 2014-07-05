@@ -15,35 +15,85 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.synth.{Bus, AudioBus, Sys}
+import de.sciss.model.Change
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.UGenGraphBuilder.MissingIn
+import UGenGraphBuilder.{State => UState}
 
-import scala.concurrent.stm.{Ref, TxnLocal}
+import scala.collection.generic.CanBuildFrom
+import scala.concurrent.stm.{TMap, Ref, TxnLocal}
 
 object AuralProcDataImpl {
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
     context.acquire[AuralObj.ProcData[S]](proc) {
       val ugenInit = UGenGraphBuilder.init(proc)
       val data0 = new Impl(tx.newHandle(proc), ugenInit)
+      data0.init(proc)
       data0.tryBuild()
       data0
     }
 
   private type ObjSource[S <: Sys[S]] = stm.Source[S#Tx, Obj.T[S, Proc.Elem]]
 
-  private final class Impl[S <: Sys[S]](val obj: ObjSource[S], state0: UGenGraphBuilder.State[S])
+  private sealed trait MapEntryChange[+K, +V]
+  private case class MapEntryRemoved[K   ](key: K)                      extends MapEntryChange[K, Nothing]
+  private case class MapEntryAdded  [K, V](key: K, value : V)           extends MapEntryChange[K, V]
+  private case class MapEntryUpdated[K, V](key: K, before: V, after: V) extends MapEntryChange[K, V]
+
+  def mapEntryChanges[K, V, That](before: Map[K, V], after: Map[K, V], incremental: Boolean)
+                                 (implicit cbf: CanBuildFrom[Nothing, MapEntryChange[K, V], That]): That = {
+    val b = cbf() // .newBuilder[MapEntryChange[K, V]]
+    if (before eq after) return b.result()
+
+    if (!incremental) {
+      before.foreach { case (k, vb) =>
+        after.get(k) match {
+          case Some(va) if vb != va => b += MapEntryUpdated(k, vb, va)
+          case None                 => b += MapEntryRemoved(k)
+          case _ =>
+        }
+      }
+    }
+    after.foreach { case (k, va) =>
+      if (!before.contains(k)) b += MapEntryAdded(k, va)
+    }
+    b.result()
+  }
+
+  private final class Impl[S <: Sys[S]](val obj: ObjSource[S], state0: UState[S])
                                            (implicit context: AuralContext[S])
     extends ProcData[S] {
 
+    import context.server
+
     private val procLoc  = TxnLocal[Obj.T[S, Proc.Elem]]()
-    private val stateRef = Ref[UGenGraphBuilder.State[S]](state0)
+    private val stateRef = Ref[UState[S]](state0)
 
     // def server: Server = context.server
 
+    private var procObserver: Disposable[S#Tx] = _
+
+    def init(proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): Unit = {
+      procObserver = proc.changed.react { implicit tx => upd =>
+        upd.changes.foreach {
+          case Obj.ElemChange(Proc.Update(_, pCh)) =>
+            pCh.foreach {
+              case Proc.GraphChange(Change(_, newGraph)) =>
+              case Proc.ScanAdded  (key, scan) =>
+              case Proc.ScanRemoved(key, scan) =>
+              case Proc.ScanChange (key, scan, sCh) =>
+
+            }
+          case _ =>
+        }
+      }
+    }
+
     def dispose()(implicit tx: S#Tx): Unit = {
-      // nothing yet
+      procObserver.dispose()
     }
 
     def state(implicit tx: S#Tx) = stateRef.get(tx.peer)
@@ -53,10 +103,68 @@ object AuralProcDataImpl {
         case s0: UGenGraphBuilder.Incomplete[S] =>
           val s1 = s0.retry(this)
           stateRef.set(s1)(tx.peer)
+          buildAdvanced(before = s0, now = s1)
 
         case s0: UGenGraphBuilder.Complete[S] => // nada
       }
     }
+
+    private val outputBuses = TMap.empty[String, AudioBus]
+
+    private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
+      if (before.scanOuts eq now.scanOuts) return
+
+      // detect which new scan outputs have been determined in the last iteration
+      // (newOuts is a map from `name: String` to `numChannels Int`)
+      val newOuts = now.scanOuts.filterNot {
+        case (key, _) => before.scanOuts.contains(key)
+      }
+
+      val newBuses = newOuts.map { case (key, numCh) =>
+        val bus = Bus.audio(server, numCh)
+        outputBuses.put(key, bus)(tx.peer)
+        (key, bus)
+      }
+
+      val scans = procCached().elem.peer.scans
+      newBuses.foreach { case (key, bus) =>
+        scans.get(key).foreach { scan =>
+          scan.sinks.foreach {
+            case Link.Scan(peer) =>
+              scanView(peer).foreach { case (sinkKey, sinkData) =>
+                sinkData.scanInBusChanged(sinkKey, bus)
+              }
+            case _ =>
+          }
+        }
+      }
+    }
+
+
+
+    //    private def processStateChange(before: UState[S], now: UState[S], incremental: Boolean)(implicit tx: S#Tx): Unit = {
+
+
+    //    private def processStateChange(before: UState[S], now: UState[S], incremental: Boolean)(implicit tx: S#Tx): Unit = {
+    //      // attributeIns, scanIns, scanOuts, streamIns
+    //      // `ne` is cheap. try that before calculating the diffs
+    //
+    //      //      val scanInsCh = mapEntryChanges(before.scanIns, now.scanIns, incremental = incremental)
+    //      //      if (scanInsCh.nonEmpty) scanInsCh.foreach {
+    //      //        case MapEntryAdded(key, scan)
+    //      //      }
+    //      val scanOutsCh = mapEntryChanges(before.scanOuts, now.scanOuts, incremental = incremental)
+    //
+    //
+    //      ...
+    //      val newBuses = newOuts.mapValuesX(numCh => new OutputBuilder(Bus.audio(server, numCh)))
+    //    }
+
+    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit =
+      state match {
+        case in: UGenGraphBuilder.Incomplete[S] if in.missingIns.contains(sinkKey) => tryBuild()
+        case _ => // XXX TODO: if playing
+      }
 
     def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
       implicit val itx = tx.peer
@@ -67,6 +175,9 @@ object AuralProcDataImpl {
         proc
       }
     }
+
+    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[(String, ProcData[S])] =
+      context.getAux[(String, ProcData[S])](scan.id)
 
     // called by UGenGraphBuilderImpl
     def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {
@@ -90,14 +201,14 @@ object AuralProcDataImpl {
 
           case Link.Scan(peer) =>
             // val sourceOpt = scanMap.get(peer.id)
-            val sourceOpt = context.getAux[(String, ProcData[S])](peer.id)
+            val sourceOpt = scanView(peer)
             val chansOpt = sourceOpt.flatMap {
               case (sourceKey, sourceData) =>
                 // val sourceObj = sourceObjH()
                 // getOutputBus(sourceObj, sourceKey)
                 sourceData.state.scanOuts.get(sourceKey)
             }
-            chansOpt.getOrElse(throw MissingIn(peer))
+            chansOpt.getOrElse(throw MissingIn(key))
         }
         if (chans.isEmpty) 0 else chans.max
       }

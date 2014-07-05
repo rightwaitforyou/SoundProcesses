@@ -15,11 +15,12 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
+import de.sciss.lucre.synth.{NodeGraph, AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.numbers
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.Curve.parametric
+import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
@@ -35,6 +36,7 @@ object AuralProcImpl extends AuralObj.Factory {
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data  = AuralProcDataImpl(proc)
     val res   = new Impl(data)
+    data.addView(res)
     res
   }
 
@@ -50,7 +52,7 @@ object AuralProcImpl extends AuralObj.Factory {
 
   // ---------------------------------------------------------------------
 
-  private final class Impl[S <: Sys[S]](private val data: AuralObj.ProcData[S])(implicit context: AuralContext[S])
+  private final class Impl[S <: Sys[S]](private val data: ProcData[S])(implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
     import context.server
@@ -131,20 +133,33 @@ object AuralProcImpl extends AuralObj.Factory {
 
     def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
 
+    private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
+      val old = currentStateRef.swap(value)(tx.peer)
+      if (value != old) fire(value)
+    }
+
     def play(time: SpanLike)(implicit tx: S#Tx): Unit = {
       val oldTarget = targetStateRef.swap(AuralObj.Playing)(tx.peer)
       val curr      = state
       data.state match {
-        case s: UGenGraphBuilder.Complete[S] => launchProc(s, time)
+        case s: UGenGraphBuilder.Complete[S] =>
+          launchProc(s, time)
         case _ =>
       }
     }
 
     def stop(time: Long)(implicit tx: S#Tx): Unit = {
-
+      freeNode()
+      state = AuralObj.Stopped
     }
 
-    def prepare()(implicit tx: S#Tx): Unit = ???
+    // def prepare()(implicit tx: S#Tx): Unit = ...
+
+    def dispose()(implicit tx: S#Tx): Unit = {
+      freeNode()
+      data.removeView(this)
+      context.release(data.procCached())
+    }
 
     private def launchProc(ugen: UGenGraphBuilder.Complete[S], span: SpanLike)(implicit tx: S#Tx): Unit = {
       // val ugen          = builder.ugen
@@ -281,7 +296,7 @@ object AuralProcImpl extends AuralObj.Factory {
       import Grapheme.Segment
       // val outBuses      = builder.outputs
       // val aural         = AuralNode(synth, outBuses.mapValues(_.bus))
-      val aural         = AuralNode(synth, Map.empty)
+      val node = AuralNode(synth, Map.empty)
 
       // ---- scans ----
       ugen.scanIns.foreach {
@@ -301,7 +316,7 @@ object AuralProcImpl extends AuralObj.Factory {
             else
               BusNodeSetter.mapper(inCtlName, b, synth)
             users ::= res
-            aural.addInputBus(key, res.bus)
+            node.addInputBus(key, res.bus)
             res
           }
 
@@ -350,26 +365,22 @@ object AuralProcImpl extends AuralObj.Factory {
                   // users    ::= w
                 }
 
-              case Link.Scan(peer) => ???
-//                scanMap.get(peer.id).foreach {
-//                  case (srcKey, idH) =>
-//                    val srcTimedID  = idH()
-//                    val bIn         = lazyInBus
-//
-//                    // if the source isn't found (because it's probably in the ongoing build),
-//                    // we ignore that here; there is a symmetric counter part, looking for the
-//                    // builder.outputs that will handle these cases.
-//                    viewMap.get(srcTimedID).foreach { srcAural =>
-//                      val bOut    = srcAural.getOutputBus(srcKey).getOrElse {
-//                        sys.error(s"Source bus disappeared $srcTimedID -> $srcKey")
-//                      }
-//                      ensureChannels(bOut.numChannels)
-//                      val edge    = NodeGraph.Edge(srcAural, srcKey, aural, key)
-//                      val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn.bus)
-//                      dependencies      ::= link
-//                      users     ::= link
-//                    }
-//                }
+              case Link.Scan(peer) =>
+                scanView(peer).foreach {
+                  case (sourceKey, sourceView) =>
+                    val bIn         = lazyInBus
+
+                    // if the source isn't found (because it's probably in the ongoing build),
+                    // we ignore that here; there is a symmetric counter part, looking for the
+                    // builder.outputs that will handle these cases.
+                    sourceView.getScanOutBus(sourceKey).foreach { bOut =>
+                      ensureChannels(bOut.numChannels)
+                      val edge        = NodeGraph.Edge(srcAural, sourceKey, node, key)
+                      val link        = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn.bus)
+                      dependencies  ::= link
+                      users         ::= link
+                    }
+                }
             }
             // }
           }
@@ -412,14 +423,23 @@ object AuralProcImpl extends AuralObj.Factory {
       // XXX TODO
       val group = server.defaultGroup
 
-      aural.init(users, dependencies)
+      node.init(users, dependencies)
       // wrap as AuralProc and save it in the identifier map for later lookup
       synth.play(target = group, addAction = addToHead, args = setMap, dependencies = dependencies)
       if (users.nonEmpty) users.foreach(_.add())
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
-      logA(s"launched $p -> $aural (${hashCode.toHexString})")
-      // viewMap.put(timed.id, aural)
+      logA(s"launched $p -> $node (${hashCode.toHexString})")
+      setNode(node)
+      state = AuralObj.Playing
     }
+
+    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[(String, ProcData[S])] =
+      context.getAux[(String, ProcData[S])](scan.id)
+
+    private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = playingRef.swap(Some(node)).foreach(_.stop())
+    private def freeNode()              (implicit tx: S#Tx): Unit = playingRef.swap(None      ).foreach(_.stop())
+
+    private val playingRef = Ref(Option.empty[AuralNode])
   }
 }

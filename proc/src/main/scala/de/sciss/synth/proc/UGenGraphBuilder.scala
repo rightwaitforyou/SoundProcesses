@@ -19,10 +19,8 @@ object UGenGraphBuilder {
     *
     * This can be a case class because it is used only within the same transaction,
     * and thereby the `timed` argument does not become stale.
-    *
-    * @param scan    the scan which is the ''source'' of the required input
     */
-  final case class MissingIn[S <: Sys[S]](scan: Scan[S]) extends ControlThrowable
+  final case class MissingIn(sinkKey: String) extends ControlThrowable
 
     /** '''Note''': The resulting object is mutable, therefore must not be shared across threads and also must be
       * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
@@ -82,7 +80,7 @@ object UGenGraphBuilder {
     /** Current set of missing scan inputs. This may shrink during incremental build, and will be empty when
       * `tryBuild` returns `true`.
       */
-    def missingIns: Set[MissingIn[S]]
+    def missingIns: Set[String]
   }
 
   trait Complete[S <: Sys[S]] extends State[S] {
