@@ -36,7 +36,7 @@ object AuralProcImpl extends AuralObj.Factory {
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data  = AuralProcDataImpl(proc)
     val res   = new Impl(data)
-    data.addView(res)
+    // data.addView(res)
     res
   }
 
@@ -157,24 +157,15 @@ object AuralProcImpl extends AuralObj.Factory {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       freeNode()
-      data.removeView(this)
+      // data.removeView(this)
       context.release(data.procCached())
     }
 
     private def launchProc(ugen: UGenGraphBuilder.Complete[S], span: SpanLike)(implicit tx: S#Tx): Unit = {
-      // val ugen          = builder.ugen
-      // val timed         = ugen.timed
-
       val p             = data.procCached()
-
-      // logA(s"begin launch $timed (${hashCode.toHexString})")
       logA(s"begin launch $p (${hashCode.toHexString})")
-
       val ug            = ugen.result
       implicit val itx  = tx.peer
-
-      // val time          = ugen.time
-      // val p             = timed.value
 
       val nameHint      = p.attr.expr[String](ProcKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
@@ -185,7 +176,7 @@ object AuralProcImpl extends AuralObj.Factory {
 
       // ---- handle input buses ----
       // val span          = timed.span.value
-      var setMap        = Vec[ControlSet](
+//      var setMap        = Vec[ControlSet](
 //        graph.Time    .key -> time / sampleRate,
 //        graph.Offset  .key -> (span match {
 //          case Span.HasStart(start) => (time - start) / sampleRate
@@ -195,7 +186,8 @@ object AuralProcImpl extends AuralObj.Factory {
 //          case Span(start, stop)  => (stop - start) / sampleRate
 //          case _ => Double.PositiveInfinity
 //        })
-      )
+//      )
+      var setMap = Vector.empty[ControlSet]
 
       import Timeline.{SampleRate => sampleRate}
 
@@ -288,8 +280,8 @@ object AuralProcImpl extends AuralObj.Factory {
 
             case a => sys.error(s"Cannot use attribute $a as an audio stream")
           }
-          setMap      :+= (ctlName -> Seq[Float](rb.id, gain): ControlSet)
-          dependencies        ::= rb
+          setMap       :+= (ctlName -> Seq[Float](rb.id, gain): ControlSet)
+          dependencies ::= rb
         }
       }
 
@@ -299,6 +291,9 @@ object AuralProcImpl extends AuralObj.Factory {
       val node = AuralNode(synth, Map.empty)
 
       // ---- scans ----
+      // XXX TODO : this should all disappear
+      // and the missing bits should be added
+      // to AuralScan
       ugen.scanIns.foreach {
         case (key, scanIn) =>
           val numCh = scanIn.numChannels
@@ -309,8 +304,9 @@ object AuralProcImpl extends AuralObj.Factory {
           val inCtlName = graph.scan.inControlName(key)
           // var inBus     = Option.empty[AudioBusNodeSetter]
 
-          lazy val lazyInBus: AudioBusNodeSetter = {
-            val b      = Bus.audio(server, numCh)
+          def mkInBus(): AudioBusNodeSetter = {
+            val b      = data.getScanInBus(key) getOrElse Bus.audio(server, numCh)
+            // val b      = Bus.audio(server, numCh)
             val res    = if (scanIn.fixed)
               BusNodeSetter.reader(inCtlName, b, synth)
             else
@@ -333,7 +329,7 @@ object AuralProcImpl extends AuralObj.Factory {
           p.elem.peer.scans.get(key).foreach { scan =>
             val src = scan.sources
             // if (src.isEmpty) {
-            if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
+            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
             // } else {
             src.foreach {
               case Link.Grapheme(peer) =>
@@ -352,42 +348,44 @@ object AuralProcImpl extends AuralObj.Factory {
                   case segm: Segment.Curve =>
                     ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
                   // println(s"segment : ${segm.span}")
-                  val bm     = lazyInBus
+                  val bm     = mkInBus()
                     val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
                     dependencies     ::= w
                   // users ::= w
 
                   case audio: Segment.Audio =>
                     ensureChannels(audio.numChannels)
-                    val bm     = lazyInBus
+                    val bm     = mkInBus()
                     val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
                     dependencies     ::= w
                   // users    ::= w
                 }
 
               case Link.Scan(peer) =>
-                scanView(peer).foreach {
-                  case (sourceKey, sourceView) =>
-                    val bIn         = lazyInBus
+                // handles by AuralScan now
+                mkInBus()
 
-                    // if the source isn't found (because it's probably in the ongoing build),
-                    // we ignore that here; there is a symmetric counter part, looking for the
-                    // builder.outputs that will handle these cases.
-                    sourceView.getScanOutBus(sourceKey).foreach { bOut =>
-                      ensureChannels(bOut.numChannels)
-                      val edge        = ??? : NodeGraph.Edge // NodeGraph.Edge(srcAural, sourceKey, node, key)
-                      val link        = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn.bus)
-                      dependencies  ::= link
-                      users         ::= link
-                    }
-                }
+                //                scanView(peer).foreach {
+                //                  case (sourceKey, sourceView) =>
+                //                    val bIn         = lazyInBus
+                //
+                //                    // if the source isn't found (because it's probably in the ongoing build),
+                //                    // we ignore that here; there is a symmetric counter part, looking for the
+                //                    // builder.outputs that will handle these cases.
+                //                    sourceView.getScanOutBus(sourceKey).foreach { bOut =>
+                //                      ensureChannels(bOut.numChannels)
+                //                      val edge        = NodeGraph.Edge(srcAural, sourceKey, node, key)
+                //                      val link        = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn.bus)
+                //                      dependencies  ::= link
+                //                      users         ::= link
+                //                    }
+                //                }
             }
             // }
           }
       }
 
       // ---- handle output buses, and establish missing links to sinks ----
-      if (ugen.scanOuts.nonEmpty) ???
 //      builder.outputs.foreach {
 //        case (key, out) =>
 //          val bw     = BusNodeSetter.writer(scan.outControlName(key), out.bus, synth)
@@ -434,11 +432,16 @@ object AuralProcImpl extends AuralObj.Factory {
       state = AuralObj.Playing
     }
 
-    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[(String, ProcData[S])] =
-      context.getAux[(String, ProcData[S])](scan.id)
+    //    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[(String, ProcData[S])] =
+    //      context.getAux[(String, ProcData[S])](scan.id)
 
-    private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = playingRef.swap(Some(node))(tx.peer).foreach(_.stop())
-    private def freeNode()              (implicit tx: S#Tx): Unit = playingRef.swap(None      )(tx.peer).foreach(_.stop())
+    private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
+      playingRef.swap(Some(node))(tx.peer).foreach(_.stop())
+    }
+
+    private def freeNode()(implicit tx: S#Tx): Unit = {
+      playingRef.swap(None)(tx.peer).foreach(_.stop())
+    }
 
     private val playingRef = Ref(Option.empty[AuralNode])
   }

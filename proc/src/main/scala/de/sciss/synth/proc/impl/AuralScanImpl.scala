@@ -17,16 +17,17 @@ package impl
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{Bus, Synth, NodeGraph, NodeRef, AudioBus, Sys}
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.{addBefore, addToHead, SynthGraph}
+import de.sciss.synth.{addBefore, SynthGraph}
+import AuralObj.ProcData
 
 import scala.concurrent.stm.{TMap, Ref}
 
 object AuralScanImpl {
-  def apply[S <: Sys[S]](view: AuralObj.Proc[S], key: String, scan: Scan[S], numChannels: Int)
+  def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], numChannels: Int)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan[S] = {
     import context.server
     val bus   = Bus.audio(server, numChannels = numChannels)
-    val view  = new Impl[S](key = key, bus = bus)
+    val view  = new Impl[S](data = data, key = key, bus = bus)
     context.putAux(scan.id, view)
 
     scan.sources.foreach {
@@ -110,7 +111,7 @@ object AuralScanImpl {
 
   // ----------------------------------
 
-  private final class Impl[S <: Sys[S]](val key: String, val bus: AudioBus)
+  private final class Impl[S <: Sys[S]](val data: ProcData[S], val key: String, val bus: AudioBus)
     extends AuralScan.Owned[S]  {
 
     private val sources = Ref(Set.empty[AuralScan[S]])
@@ -125,13 +126,13 @@ object AuralScanImpl {
 
     def addSink(sink: AuralScan[S])(implicit tx: S#Tx): Unit = {
       sinks.transform(_ + sink)(tx.peer)
-      node.foreach { sourceNode =>
+      data.nodeOption.foreach { sourceNode =>
         tryLink(sourceNode, sink)
       }
     }
 
     private def tryLink(sourceNode: NodeRef, sink: AuralScan[S])(implicit tx: S#Tx): Unit =
-      sink.node.foreach { sinkNode =>
+      sink.data.nodeOption.foreach { sinkNode =>
         val link = LinkNode[S](this, sourceNode, sink, sinkNode)
         links.put(sink, link)(tx.peer)
       }
@@ -147,22 +148,14 @@ object AuralScanImpl {
       }
     }
 
-    private val nodeRef = Ref(Option.empty[NodeRef])
-
-    def node(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
-
-    def node_=(value: Option[NodeRef])(implicit tx: S#Tx): Unit = {
-      implicit val itx = tx.peer
-      nodeRef() = value
-      disposeLinks()
-      value.foreach { sourceNode =>
-        sinks().foreach { sink =>
-          tryLink(sourceNode, sink)
-        }
+    def play(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      stop()
+      sinks.get(tx.peer).foreach { sink =>
+        tryLink(n, sink)
       }
     }
 
-    private def disposeLinks()(implicit tx: S#Tx): Unit = {
+    def stop()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       if (!links.isEmpty) {
         links.foreach { case (_, link) => link.dispose() }
@@ -174,7 +167,7 @@ object AuralScanImpl {
       obs.dispose()
       val sources0  = sources.swap(Set.empty)(tx.peer)
       val sinks0    = sinks  .swap(Set.empty)(tx.peer)
-      disposeLinks()
+      stop()
       sources0.foreach(_.removeSink  (this))
       sinks0  .foreach(_.removeSource(this))
     }

@@ -16,8 +16,9 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Bus, AudioBus, Sys}
+import de.sciss.lucre.synth.{Server, Node, Txn, Group, NodeRef, AuralNode, Bus, AudioBus, Sys}
 import de.sciss.model.Change
+import de.sciss.synth.addBefore
 import de.sciss.synth.proc.AuralObj
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
@@ -64,8 +65,48 @@ object AuralProcDataImpl {
     b.result()
   }
 
+  // dynamically flips between single proc and multiple procs
+  // (wrapping them in one common group)
+  private final class GroupImpl(in0: NodeRef) extends NodeRef {
+    val server = in0.server
+
+    private val instancesRef  = Ref(in0 :: Nil)
+    private val nodeRef       = Ref(in0)
+
+    def node(implicit tx: Txn): Node = nodeRef.get(tx.peer).node
+
+    def addInstanceNode(n: NodeRef)(implicit tx: Txn): Unit = {
+      implicit val itx = tx.peer
+      val old = instancesRef.getAndTransform(n :: _)
+      old match {
+        case single :: Nil =>
+          val g = Group(single.node, addBefore)
+          nodeRef() = NodeRef(g)
+          single.node.moveToHead(audible = true, group = g)
+          n     .node.moveToHead(audible = true, group = g)
+
+        case _ =>
+      }
+    }
+
+    def removeInstanceNode(n: NodeRef)(implicit tx: Txn): Boolean = {
+      implicit val itx = tx.peer
+      val after = instancesRef.transformAndGet(_.filterNot(_ == n))
+      after match {
+        case single :: Nil =>
+          val group = nodeRef.swap(single).node
+          single.node.moveBefore(audible = true, target = group)
+          group.free(audible = true)
+          false
+
+        case Nil  => true
+        case _    => false
+      }
+    }
+  }
+
   private final class Impl[S <: Sys[S]](val obj: ObjSource[S], state0: UState[S])
-                                           (implicit context: AuralContext[S])
+                                       (implicit context: AuralContext[S])
     extends ProcData[S] {
 
     import context.server
@@ -93,13 +134,45 @@ object AuralProcDataImpl {
       }
     }
 
-    def addView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = {
+    private val nodeRef = Ref(Option.empty[GroupImpl])
 
+    def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
+
+    private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      ???
     }
 
-    def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = {
-
+    private def stopScans()(implicit tx: S#Tx): Unit = {
+      ???
     }
+
+    def addInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
+      nodeRef().fold {
+        val groupImpl = new GroupImpl(n)
+        nodeRef() = Some(groupImpl)
+        playScans(groupImpl)
+
+      } { groupImpl =>
+        groupImpl.addInstanceNode(n)
+      }
+    }
+
+    def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      val groupImpl = nodeRef.get(tx.peer).getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
+      if (groupImpl.removeInstanceNode(n)) {
+        nodeRef.set(None)(tx.peer)
+        stopScans()
+      }
+    }
+
+    //    def addView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = {
+    //
+    //    }
+    //
+    //    def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = {
+    //
+    //    }
 
     def dispose()(implicit tx: S#Tx): Unit = {
       procObserver.dispose()
@@ -149,8 +222,6 @@ object AuralProcDataImpl {
       }
     }
 
-
-
     //    private def processStateChange(before: UState[S], now: UState[S], incremental: Boolean)(implicit tx: S#Tx): Unit = {
 
 
@@ -175,7 +246,9 @@ object AuralProcDataImpl {
         case _ => // XXX TODO: if playing
       }
 
-    def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = ???
+    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus] = ???
+
+    // def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = ...
 
     def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
       implicit val itx = tx.peer

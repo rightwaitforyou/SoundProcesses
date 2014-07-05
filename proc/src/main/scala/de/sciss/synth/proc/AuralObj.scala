@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AudioBus, Sys}
+import de.sciss.lucre.synth.{NodeRef, AuralNode, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.processor.{GenericProcessor, Processor}
 import de.sciss.span.SpanLike
@@ -45,6 +45,8 @@ object AuralObj {
   trait ProcData[S <: Sys[S]] extends Disposable[S#Tx] {
     def obj: stm.Source[S#Tx, Obj.T[S, _Proc.Elem]]
 
+    def nodeOption(implicit tx: S#Tx): Option[NodeRef]
+
     /** Queries the number of channel associated with a scanned input.
       * Throws a control throwable when no value can be determined, making
       * the ugen graph builder mark the querying graph element as incomplete
@@ -70,10 +72,15 @@ object AuralObj {
 
     def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
 
-    def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
+    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus]
 
-    def addView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
-    def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
+    // def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
+
+    // def addView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
+    // def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
+
+    def addInstanceNode   (n: NodeRef)(implicit tx: S#Tx): Unit
+    def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit
   }
 
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
