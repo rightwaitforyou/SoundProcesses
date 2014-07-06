@@ -15,8 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{NodeGraph, AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
-import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
 import de.sciss.numbers
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.Curve.parametric

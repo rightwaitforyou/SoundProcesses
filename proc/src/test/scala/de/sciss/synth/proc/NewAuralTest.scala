@@ -13,6 +13,7 @@ object NewAuralTest extends App {
   val sys = Confluent(BerkeleyDB.tmp())
   val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
   implicit val _cursor: stm.Cursor[S] = cursor
+  showAuralLog = true
 
   val as = AuralSystem()
   cursor.step { implicit tx =>
