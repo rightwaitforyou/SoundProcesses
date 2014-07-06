@@ -72,19 +72,26 @@ object UGenGraphBuilder {
       * of two channels (buffer-id and gain factor), appending an incremental integer index to its name.
       */
     def streamIns: Map[String, List[StreamIn]]
+
+    def isComplete: Boolean
+
+    /** Current set of missing scan inputs. This may shrink during incremental build, and will be empty when
+      * the build is complete
+      */
+    def missingIns: Set[String]
   }
 
   trait Incomplete[S <: Sys[S]] extends State[S] {
     def retry(aural: AuralObj.ProcData[S])(implicit tx: S#Tx): State[S]
 
-    /** Current set of missing scan inputs. This may shrink during incremental build, and will be empty when
-      * `tryBuild` returns `true`.
-      */
-    def missingIns: Set[String]
+    final def isComplete = false
   }
 
   trait Complete[S <: Sys[S]] extends State[S] {
     def result: UGenGraph
+
+    final def isComplete = true
+    final def missingIns = Set.empty[String]
   }
 }
 trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {

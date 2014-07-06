@@ -25,6 +25,7 @@ import de.sciss.synth.proc.UGenGraphBuilder.{State => UState, Complete, Incomple
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.generic.CanBuildFrom
+import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{TMap, Ref, TxnLocal}
 
 object AuralProcDataImpl {
@@ -108,8 +109,6 @@ object AuralProcDataImpl {
                                        (implicit context: AuralContext[S])
     extends ProcData[S] {
 
-    import context.server
-
     private val stateRef  = Ref[UState[S]](state0)
     private val nodeRef   = Ref(Option.empty[GroupImpl])
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
@@ -124,9 +123,10 @@ object AuralProcDataImpl {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
             pCh.foreach {
               case Proc.GraphChange(Change(_, newGraph)) => newSynthGraph(newGraph)
-              case Proc.ScanAdded  (key, scan) => scanAdded  (key, scan)
-              case Proc.ScanRemoved(key, scan) => scanRemoved(key, scan)
-              case Proc.ScanChange (key, scan, sCh) => // handles by AuralScan
+              case Proc.ScanAdded  (key, scan)      => scanAdded  (key, scan)
+              case Proc.ScanRemoved(key, scan)      => scanRemoved(key, scan)
+              case Proc.ScanChange (key, scan, sCh) => scanChange (key, scan, sCh)
+
             }
           case _ =>
         }
@@ -151,18 +151,44 @@ object AuralProcDataImpl {
 
     private def scanAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       logA(s"ScanAdded  to   ${procCached()} ($key)")
-      val st = state
-      st.scanIns.get(key).foreach { in =>
-        val newCh = scanInNumChannels(scan)
-        if (newCh != in.numChannels) {
-          logA(s"...numChannels is $newCh but graph currently assumes ${in.numChannels}")
-          rebuild()
+      testInScan (key, scan)
+      testOutScan(key, scan)
+    }
+
+    // if a scan was added or a source was added to an existing scan,
+    // check if the scan is used as currently missing input. if so,
+    // try to build the ugen graph again.
+    private def testInScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
+      if (state.missingIns.contains(key)) {
+        val numCh = scanInNumChannels(scan)
+        // println(s"testInScan($key) -> numCh = $numCh")
+        if (numCh >= 0) { // the scan is ready to be used and was missing before
+          tryBuild()
+        }
+      }
+    }
+
+    private def testOutScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
+      state.scanOuts.get(key).foreach { numCh =>
+        scanViews.get(key)(tx.peer).fold[Unit] {
+          mkAuralScan(key, scan, numCh)
+        } { view =>
+          checkScanOutChannels(view, numCh)
         }
       }
     }
 
     private def scanRemoved(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       logA(s"ScanRemoved from ${procCached()} ($key)")
+    }
+
+    private def scanChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
+      logA(s"ScanChange in   ${procCached()} ($key)")
+      changes.foreach {
+        case Scan.SourceAdded(_) =>
+          testInScan(key, scan)
+        case _ =>
+      }
     }
 
     private def rebuild()(implicit tx: S#Tx): Unit = {
@@ -214,7 +240,10 @@ object AuralProcDataImpl {
     }
 
     private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
-      if (before.scanOuts eq now.scanOuts) return
+      if (before.scanOuts eq now.scanOuts) {
+        logA(s"buildAdvanced ${procCached()}; missingIns = ${now.missingIns.mkString(",")}")
+        return
+      }
 
       implicit val itx = tx.peer
 
@@ -224,27 +253,34 @@ object AuralProcDataImpl {
         case (key, _) => before.scanOuts.contains(key)
       }
 
-      logA(s"buildAdvanced ${procCached()}; newOuts = ${newOuts.mkString(",")}")
+      logA(s"buildAdvanced ${procCached()}; newOuts = ${newOuts.mkString(",")}; complete? ${now.isComplete}")
 
       val scans = procCached().elem.peer.scans
       newOuts.foreach { case (key, numCh) =>
         scanViews.get(key).fold {
           scans.get(key).foreach { scan =>
-            val view = AuralScan(data = this, key = key, scan = scan, numChannels = numCh)
-            scanViews.put(key, view)
+            mkAuralScan(key, scan, numCh)
           }
         } { view =>
-          val numCh1 = view.bus.numChannels
-          if (numCh1 != numCh) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numCh)")
+          checkScanOutChannels(view, numCh)
         }
       }
     }
 
-    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit =
-      state match {
-        case in: Incomplete[S] if in.missingIns.contains(sinkKey) => tryBuild()
-        case _ => // XXX TODO: if playing
-      }
+    private def mkAuralScan(key: String, scan: Scan[S], numChannels: Int)(implicit tx: S#Tx): AuralScan[S] = {
+      val view = AuralScan(data = this, key = key, scan = scan, numChannels = numChannels)
+      scanViews.put(key, view)(tx.peer)
+      view
+    }
+
+    private def checkScanOutChannels(view: AuralScan[S], numCh: Int): Unit = {
+      val numCh1 = view.bus.numChannels
+      if (numCh1 != numCh) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numCh)")
+    }
+
+    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit = {
+      if (state.missingIns.contains(sinkKey)) tryBuild()
+    }
 
     def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
 
@@ -290,9 +326,8 @@ object AuralProcDataImpl {
           peer.numChannels
 
         case Link.Scan(peer) =>
-          // val sourceOpt = scanMap.get(peer.id)
           val sourceOpt = scanView(peer)
-          val chansOpt = sourceOpt.map { sourceView =>
+          val chansOpt  = sourceOpt.map { sourceView =>
             // val sourceObj = sourceObjH()
             // getOutputBus(sourceObj, sourceKey)
             sourceView.bus.numChannels // data.state.scanOuts.get(sourceView.key)

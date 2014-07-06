@@ -19,6 +19,7 @@ import de.sciss.lucre.synth.{Bus, Synth, NodeGraph, NodeRef, AudioBus, Sys}
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{addBefore, SynthGraph}
 import AuralObj.ProcData
+import de.sciss.synth.proc.{logAural => logA}
 
 import scala.concurrent.stm.{TMap, Ref}
 
@@ -28,6 +29,7 @@ object AuralScanImpl {
     import context.server
     val bus   = Bus.audio(server, numChannels = numChannels)
     val view  = new Impl[S](data = data, key = key, bus = bus)
+    logA(s"AuralScan(${data.procCached()}, $key, numChannels = $numChannels)")
     context.putAux(scan.id, view)
 
     scan.sources.foreach {
@@ -164,6 +166,7 @@ object AuralScanImpl {
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {
+      logA(s"AuralScan dispose; ${data.procCached()}, $key")
       obs.dispose()
       val sources0  = sources.swap(Set.empty)(tx.peer)
       val sinks0    = sinks  .swap(Set.empty)(tx.peer)
