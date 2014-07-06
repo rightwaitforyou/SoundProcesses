@@ -24,7 +24,6 @@ import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.UGenGraphBuilder.{State => UState, Complete, Incomplete, MissingIn}
 import de.sciss.synth.proc.{logAural => logA}
 
-import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{TSet, TMap, Ref, TxnLocal}
 
@@ -40,30 +39,32 @@ object AuralProcDataImpl {
 
   private type ObjSource[S <: Sys[S]] = stm.Source[S#Tx, Obj.T[S, Proc.Elem]]
 
-  private sealed trait MapEntryChange[+K, +V]
-  private case class MapEntryRemoved[K   ](key: K)                      extends MapEntryChange[K, Nothing]
-  private case class MapEntryAdded  [K, V](key: K, value : V)           extends MapEntryChange[K, V]
-  private case class MapEntryUpdated[K, V](key: K, before: V, after: V) extends MapEntryChange[K, V]
-
-  def mapEntryChanges[K, V, That](before: Map[K, V], after: Map[K, V], incremental: Boolean)
-                                 (implicit cbf: CanBuildFrom[Nothing, MapEntryChange[K, V], That]): That = {
-    val b = cbf() // .newBuilder[MapEntryChange[K, V]]
-    if (before eq after) return b.result()
-
-    if (!incremental) {
-      before.foreach { case (k, vb) =>
-        after.get(k) match {
-          case Some(va) if vb != va => b += MapEntryUpdated(k, vb, va)
-          case None                 => b += MapEntryRemoved(k)
-          case _ =>
-        }
-      }
-    }
-    after.foreach { case (k, va) =>
-      if (!before.contains(k)) b += MapEntryAdded(k, va)
-    }
-    b.result()
-  }
+  //  private sealed trait MapEntryChange[+K, +V]
+  //  private case class MapEntryRemoved[K   ](key: K)                      extends MapEntryChange[K, Nothing]
+  //  private case class MapEntryAdded  [K, V](key: K, value : V)           extends MapEntryChange[K, V]
+  //  private case class MapEntryUpdated[K, V](key: K, before: V, after: V) extends MapEntryChange[K, V]
+  //
+  //  import scala.collection.generic.CanBuildFrom
+  //
+  //  def mapEntryChanges[K, V, That](before: Map[K, V], after: Map[K, V], incremental: Boolean)
+  //                                 (implicit cbf: CanBuildFrom[Nothing, MapEntryChange[K, V], That]): That = {
+  //    val b = cbf() // .newBuilder[MapEntryChange[K, V]]
+  //    if (before eq after) return b.result()
+  //
+  //    if (!incremental) {
+  //      before.foreach { case (k, vb) =>
+  //        after.get(k) match {
+  //          case Some(va) if vb != va => b += MapEntryUpdated(k, vb, va)
+  //          case None                 => b += MapEntryRemoved(k)
+  //          case _ =>
+  //        }
+  //      }
+  //    }
+  //    after.foreach { case (k, va) =>
+  //      if (!before.contains(k)) b += MapEntryAdded(k, va)
+  //    }
+  //    b.result()
+  //  }
 
   private def GroupImpl(name: String, in0: NodeRef)(implicit tx: Txn): GroupImpl = {
     val res = new GroupImpl(name, in0)
@@ -144,13 +145,15 @@ object AuralProcDataImpl {
         upd.changes.foreach {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
             pCh.foreach {
-              case Proc.GraphChange(Change(_, newGraph)) => newSynthGraph(newGraph)
-              case Proc.ScanAdded(key, scan) => scanAdded(key, scan)
-              case Proc.ScanRemoved(key, scan) => scanRemoved(key, scan)
-              case Proc.ScanChange(key, scan, sCh) => scanChange(key, scan, sCh)
-
+              case Proc.GraphChange(Change(_, newGraph))  => newSynthGraph(newGraph)
+              case Proc.ScanAdded  (key, scan)            => scanAdded  (key, scan)
+              case Proc.ScanRemoved(key, scan)            => scanRemoved(key, scan)
+              case Proc.ScanChange (key, scan, sCh)       => scanChange (key, scan, sCh)
             }
-          case _ =>
+
+          case Obj.AttrAdded  (key, value)                => attrAdded  (key, value)
+          case Obj.AttrRemoved(key, value)                => attrRemoved(key, value)
+          case Obj.AttrChange (key, value, aCh)           => attrChange (key, value, aCh)
         }
       }
     }
@@ -175,11 +178,52 @@ object AuralProcDataImpl {
       logA(s"--todo-- GraphChange ${procCached()}")
     }
 
+    // ---- scan events ----
+
     private def scanAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       logA(s"ScanAdded  to   ${procCached()} ($key)")
       testInScan (key, scan)
       testOutScan(key, scan)
     }
+
+    private def scanRemoved(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
+      logA(s"ScanRemoved from ${procCached()} ($key)")
+    }
+
+    private def scanChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
+      logA(s"ScanChange in   ${procCached()} ($key)")
+      changes.foreach {
+        case Scan.SourceAdded(_) =>
+          testInScan(key, scan)
+        case _ =>
+      }
+    }
+
+    // ---- attr events ----
+
+    private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AttrAdded  to   ${procCached()} ($key)")
+      logA("--todo---")
+      // testInScan (key, scan)
+      // testOutScan(key, scan)
+    }
+
+    private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AttrRemoved from ${procCached()} ($key)")
+      logA("--todo---")
+    }
+
+    private def attrChange(key: String, value: Obj[S], changes: Vec[Obj.Change[S, Any]])(implicit tx: S#Tx): Unit = {
+      logA(s"AttrChange in   ${procCached()} ($key)")
+      logA("--todo---")
+      //      changes.foreach {
+      //        case Scan.SourceAdded(_) =>
+      //          testInScan(key, scan)
+      //        case _ =>
+      //      }
+    }
+
+    // ----
 
     // if a scan was added or a source was added to an existing scan,
     // check if the scan is used as currently missing input. if so,
@@ -202,19 +246,6 @@ object AuralProcDataImpl {
         } { view =>
           checkScanNumChannels(view, numCh)
         }
-      }
-    }
-
-    private def scanRemoved(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
-      logA(s"ScanRemoved from ${procCached()} ($key)")
-    }
-
-    private def scanChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
-      logA(s"ScanChange in   ${procCached()} ($key)")
-      changes.foreach {
-        case Scan.SourceAdded(_) =>
-          testInScan(key, scan)
-        case _ =>
       }
     }
 
@@ -261,6 +292,10 @@ object AuralProcDataImpl {
 
     def state(implicit tx: S#Tx) = stateRef.get(tx.peer)
 
+    /* If the ugen graph is incomplete, tries to (incrementally)
+     * build it. Calls `buildAdvanced` with the old and new
+     * state then.
+     */
     def tryBuild()(implicit tx: S#Tx): Unit = {
       state match {
         case s0: Incomplete[S] =>
@@ -273,6 +308,15 @@ object AuralProcDataImpl {
       }
     }
 
+    /* Called after invoking `retry` on the ugen graph builder.
+     * The methods looks for new scan-ins and scan-outs used by
+     * the ugen graph, and creates aural-scans for them, or
+     * at least the bus-proxies if no matching entries exist
+     * in the proc's `scans` dictionary.
+     *
+     * If the now-state indicates that the ugen-graph is complete,
+     * it calls `play` on the proc-views whose target-state is to play.
+     */
     private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
 
@@ -339,6 +383,10 @@ object AuralProcDataImpl {
       }
     }
 
+    /* Creates a bus for the given scan, unless it already exists.
+     * Existing buses are checked for consistency with the given
+     * number-of-channels (throws an exception upon discrepancy).
+     */
     private def mkBus(key: String, numChannels: Int)(implicit tx: S#Tx): AudioBus = {
       implicit val itx = tx.peer
       val bus = scanBuses.get(key).getOrElse {
@@ -372,9 +420,9 @@ object AuralProcDataImpl {
       if (numCh1 != numCh) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numCh)")
     }
 
-    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit = {
-      if (state.missingIns.contains(sinkKey)) tryBuild()
-    }
+    //    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit = {
+    //      if (state.missingIns.contains(sinkKey)) tryBuild()
+    //    }
 
     // def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
 

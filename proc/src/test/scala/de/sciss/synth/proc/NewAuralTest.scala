@@ -129,6 +129,7 @@ object NewAuralTest extends App {
       view2.play()
       val proc1   = view1.obj()
       val proc2   = view2.obj()
+      val test = de.sciss.lucre.event.Peek.targets(proc2)
       // reversed steps
       val scanIn  = addScan(proc2, "in" )
       val scanOut = addScan(proc1, "out")
@@ -138,8 +139,20 @@ object NewAuralTest extends App {
     after(2.0) { implicit tx =>
       println("--issue play1--")
       view1.play()
+      val proc2   = view2.obj()
+      val test = de.sciss.lucre.event.Peek.targets(proc2)
 
-      stopAndQuit()
+      after(1.0) { implicit tx =>
+        val proc2 = view2.obj()
+        println("--adjust attribute--")
+        // XXX TODO - continue here. This doesn't fire an event,
+        // says proc2.targets.isEmpty?
+        val test = de.sciss.lucre.event.Peek.targets(proc2)
+        // asInstanceOf[de.sciss.lucre.event.Node[S]]
+        putDouble(proc2, "freq", 999)
+
+        stopAndQuit()
+      }
     }
   }
 

@@ -17,9 +17,7 @@ import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
-import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc
-import de.sciss.synth.proc.Obj.T
 import language.higherKinds
 import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralProcImpl}
 
@@ -43,8 +41,12 @@ object AuralObj {
   // --------------
 
   trait ProcData[S <: Sys[S]] extends Disposable[S#Tx] {
-    def obj: stm.Source[S#Tx, Obj.T[S, _Proc.Elem]]
+    def obj: stm.Source[S#Tx, _Proc.Obj[S]]
 
+    /** The node reference associated with the process. A `Some` value indicates that
+      * at least one instance view is playing, whereas a `None` value indicates that
+      * there is no actively playing instance view at the moment.
+      */
     def nodeOption(implicit tx: S#Tx): Option[NodeRef]
 
     /** Queries the number of channel associated with a scanned input.
@@ -68,9 +70,13 @@ object AuralObj {
 
     def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
 
+    /* The proc object may be needed multiple times during a transaction.
+     * The data instance is thus asked to provide a transaction-local
+     * cache for resolving the proc from its `stm.Source`.
+     */
     def procCached()(implicit tx: S#Tx): Obj.T[S, _Proc.Elem]
 
-    def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
+    // def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
 
     def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
 
