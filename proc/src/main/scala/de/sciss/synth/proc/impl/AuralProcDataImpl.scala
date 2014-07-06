@@ -109,11 +109,11 @@ object AuralProcDataImpl {
                                        (implicit context: AuralContext[S])
     extends ProcData[S] {
 
-    private val stateRef  = Ref[UState[S]](state0)
-    private val nodeRef   = Ref(Option.empty[GroupImpl])
+    private val stateRef = Ref[UState[S]](state0)
+    private val nodeRef = Ref(Option.empty[GroupImpl])
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
 
-    private val procLoc   = TxnLocal[Obj.T[S, Proc.Elem]]()   // cache-only purpose
+    private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
 
@@ -123,9 +123,9 @@ object AuralProcDataImpl {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
             pCh.foreach {
               case Proc.GraphChange(Change(_, newGraph)) => newSynthGraph(newGraph)
-              case Proc.ScanAdded  (key, scan)      => scanAdded  (key, scan)
-              case Proc.ScanRemoved(key, scan)      => scanRemoved(key, scan)
-              case Proc.ScanChange (key, scan, sCh) => scanChange (key, scan, sCh)
+              case Proc.ScanAdded(key, scan) => scanAdded(key, scan)
+              case Proc.ScanRemoved(key, scan) => scanRemoved(key, scan)
+              case Proc.ScanChange(key, scan, sCh) => scanChange(key, scan, sCh)
 
             }
           case _ =>
@@ -138,12 +138,12 @@ object AuralProcDataImpl {
     private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit =
       scanViews.foreach { case (_, view) =>
         view.play(n)
-      } (tx.peer)
+      }(tx.peer)
 
     private def stopScans()(implicit tx: S#Tx): Unit =
       scanViews.foreach { case (_, view) =>
         view.stop()
-      } (tx.peer)
+      }(tx.peer)
 
     private def newSynthGraph(g: SynthGraph)(implicit tx: S#Tx): Unit = {
       logA(s"--todo-- GraphChange ${procCached()}")
@@ -151,7 +151,7 @@ object AuralProcDataImpl {
 
     private def scanAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       logA(s"ScanAdded  to   ${procCached()} ($key)")
-      testInScan (key, scan)
+      testInScan(key, scan)
       testOutScan(key, scan)
     }
 
@@ -162,7 +162,8 @@ object AuralProcDataImpl {
       if (state.missingIns.contains(key)) {
         val numCh = scanInNumChannels(scan)
         // println(s"testInScan($key) -> numCh = $numCh")
-        if (numCh >= 0) { // the scan is ready to be used and was missing before
+        if (numCh >= 0) {
+          // the scan is ready to be used and was missing before
           tryBuild()
         }
       }
@@ -221,7 +222,7 @@ object AuralProcDataImpl {
     def dispose()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       procObserver.dispose()
-      scanViews.foreach { case (_, view) => view.dispose() }
+      scanViews.foreach { case (_, view) => view.dispose()}
       scanViews.retain((_, _) => false) // no `clear` method
     }
 
@@ -240,30 +241,40 @@ object AuralProcDataImpl {
     }
 
     private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
-      if (before.scanOuts eq now.scanOuts) {
+      if (now.missingIns.isEmpty) {
+        logA(s"buildAdvanced ${procCached()}; complete? ${now.isComplete}")
+      } else {
         logA(s"buildAdvanced ${procCached()}; missingIns = ${now.missingIns.mkString(",")}")
-        return
       }
 
-      implicit val itx = tx.peer
+      // handle newly visible outputs
+      if (before.scanOuts ne now.scanOuts) {
+        implicit val itx = tx.peer
 
-      // detect which new scan outputs have been determined in the last iteration
-      // (newOuts is a map from `name: String` to `numChannels Int`)
-      val newOuts = now.scanOuts.filterNot {
-        case (key, _) => before.scanOuts.contains(key)
-      }
-
-      logA(s"buildAdvanced ${procCached()}; newOuts = ${newOuts.mkString(",")}; complete? ${now.isComplete}")
-
-      val scans = procCached().elem.peer.scans
-      newOuts.foreach { case (key, numCh) =>
-        scanViews.get(key).fold {
-          scans.get(key).foreach { scan =>
-            mkAuralScan(key, scan, numCh)
-          }
-        } { view =>
-          checkScanOutChannels(view, numCh)
+        // detect which new scan outputs have been determined in the last iteration
+        // (newOuts is a map from `name: String` to `numChannels Int`)
+        val newOuts = now.scanOuts.filterNot {
+          case (key, _) => before.scanOuts.contains(key)
         }
+
+        logA(s"...newOuts = ${newOuts.mkString(",")}")
+
+        val scans = procCached().elem.peer.scans
+        newOuts.foreach { case (key, numCh) =>
+          scanViews.get(key).fold {
+            scans.get(key).foreach { scan =>
+              mkAuralScan(key, scan, numCh)
+            }
+          } { view =>
+            checkScanOutChannels(view, numCh)
+          }
+        }
+      }
+
+      now match {
+        case c: Complete[S] =>
+          println("--todo-- should check instances for playing")
+        case _ =>
       }
     }
 
