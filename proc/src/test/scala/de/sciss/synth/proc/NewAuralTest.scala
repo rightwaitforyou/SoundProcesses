@@ -27,7 +27,15 @@ object NewAuralTest extends App {
     implicit val context = cursor.step { implicit tx =>
       AuralContext[S](s)
     }
-    test2()
+    //////////////////////////////////////////////////////////////////////////////////////
+    args.headOption.getOrElse("?") match {
+      case "--test1" => test1()
+      case "--test2" => test2()
+      case "--test3" => test3()
+      case _         =>
+        println("WARNING: No option given, using --test3")
+        test3()
+    }
   }
 
   def after(secs: Double)(code: S#Tx => Unit): Unit = {
@@ -86,7 +94,57 @@ object NewAuralTest extends App {
       `this`.addSink(Scan.Link.Scan(that))
   }
 
+  //////////////////////////////////////////////////////////////////////////////////////
+  //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 3
+
+  def test3()(implicit context: AuralContext[S]): Unit = {
+    println("----test3----\n")
+
+    val (view1, view2) = cursor.step { implicit tx =>
+      val _view1 = proc {
+        val amp   = graph.attribute("amp").ir(0.0)
+        val noise = PinkNoise.ar(Seq(amp, amp))
+        graph.scan.Out("out", noise)
+      }
+      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
+      val proc1 = _view1.obj()
+      putDouble(proc1, "amp", 0.5)
+
+      val _view2 = proc {
+        val freq  = graph.attribute("freq").ir(440)
+        val in    = graph.scan.In("in")
+        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
+      }
+      val proc2 = _view2.obj()
+      putDouble(proc2, "freq", 666)
+
+      (_view1, _view2)
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      view1.play()
+      val proc1   = view1.obj()
+      val proc2   = view2.obj()
+      val scanOut = addScan(proc1, "out")
+      val scanIn  = addScan(proc2, "in" )
+      scanOut ~> scanIn
+    }
+
+    after(2.0) { implicit tx =>
+      view2.play()
+
+      stopAndQuit()
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////////// 2
+
   def test2()(implicit context: AuralContext[S]): Unit = {
+    println("----test2----\n")
+
     val (view1, view2) = cursor.step { implicit tx =>
       val _view1 = proc {
         val amp   = graph.attribute("amp").ir(0.0)
@@ -122,7 +180,11 @@ object NewAuralTest extends App {
     stopAndQuit()
   }
 
+  ////////////////////////////////////////////////////////////////////////////////////// 1
+
   def test1()(implicit context: AuralContext[S]): Unit = {
+    println("----test1----\n")
+
     val view = cursor.step { implicit tx =>
       val _view = proc {
         Out.ar(0, PinkNoise.ar(Seq(0.5, 0.5)))
