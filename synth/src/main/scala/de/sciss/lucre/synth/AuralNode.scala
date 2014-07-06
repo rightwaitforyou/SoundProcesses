@@ -36,7 +36,7 @@ object AuralNode {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl(synth: Synth, outBuses: Map[String, AudioBus])
+  private final class Impl(synth: Synth, private var outBuses: Map[String, AudioBus])
     extends AuralNode {
 
     private val groupsRef = Ref[Option[AllGroups]](None)
@@ -122,13 +122,8 @@ object AuralNode {
       this.resources  = resources
     }
 
-    def addInputBus (key: String, bus: AudioBus): Unit = inBuses += key -> bus
-
-    // def addOutputBus(key: String, bus: AudioBus): Unit = outBuses += key -> bus
-
-    // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit = {
-    //   ?
-    // }
+    def addInputBus (key: String, bus: AudioBus): Unit = inBuses  += key -> bus
+    def addOutputBus(key: String, bus: AudioBus): Unit = outBuses += key -> bus
   }
 }
 
@@ -157,7 +152,8 @@ sealed trait AuralNode extends NodeRef {
   private[sciss] def init(users: List[DynamicUser], resources: List[Resource]): Unit
 
   // ditto
-  private[sciss] def addInputBus(key: String, bus: AudioBus): Unit
+  private[sciss] def addInputBus (key: String, bus: AudioBus): Unit
+  private[sciss] def addOutputBus(key: String, bus: AudioBus): Unit
 
   // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
 }

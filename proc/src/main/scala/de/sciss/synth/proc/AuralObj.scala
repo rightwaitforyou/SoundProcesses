@@ -72,9 +72,10 @@ object AuralObj {
 
     def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
 
-    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus]
+    def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
 
-    // def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
+    //    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus]
+    //    def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
 
     def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
     def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit

@@ -335,7 +335,7 @@ object Bus {
   private final class AudioImpl(val server: Server, val numChannels: Int) extends BasicAudioImpl {
     import AudioBus.{User => AU}
 
-    override def toString = "sh-abus(numChannels=" + numChannels + ")@" + hashCode
+    override def toString = s"sh-abus_$numChannels@${hashCode().toHexString}"
 
     def addReader(u: AU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
@@ -474,7 +474,7 @@ object Bus {
   private final class TempAudioImpl(val server: Server, val numChannels: Int) extends BasicAudioImpl {
     import AudioBus.{User => AU}
 
-    override def toString = "tmp-abus(numChannels=" + numChannels + ")@" + hashCode
+    override def toString = s"tmp-abus_$numChannels@${hashCode().toHexString}"
 
     def addReader(u: AU)(implicit tx: Txn): Unit = add(readers, writers, u)
     def addWriter(u: AU)(implicit tx: Txn): Unit = add(writers, readers, u)
@@ -523,7 +523,7 @@ object Bus {
     private val readers = ScalaRef(Set.empty[CU])
     private val writers = ScalaRef(Set.empty[CU])
 
-    override def toString = "cbus(numChannels=" + numChannels + ")@" + hashCode
+    override def toString = s"cbus_$numChannels@${hashCode().toHexString}"
 
     def busOption(implicit tx: Txn) = {
       val bh = bus.get(tx.peer)

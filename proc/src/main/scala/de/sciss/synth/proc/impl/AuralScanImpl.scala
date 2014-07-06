@@ -24,10 +24,8 @@ import de.sciss.synth.proc.{logAural => logA}
 import scala.concurrent.stm.{TMap, Ref}
 
 object AuralScanImpl {
-  def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], numChannels: Int)
+  def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], bus: AudioBus)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] = {
-    import context.server
-    val bus   = Bus.audio(server, numChannels = numChannels)
     val view  = new Impl[S](data = data, key = key, bus = bus)
     logA(s"AuralScan(${data.procCached()}, $key, bus = $bus)")
     context.putAux(scan.id, view)

@@ -16,8 +16,7 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.impl.GroupImpl
-import de.sciss.lucre.synth.{NodeGraph, Node, Txn, Group, NodeRef, AudioBus, Sys}
+import de.sciss.lucre.synth.{Bus, NodeGraph, Node, Txn, Group, NodeRef, AudioBus, Sys}
 import de.sciss.model.Change
 import de.sciss.synth.{SynthGraph, addBefore}
 import de.sciss.synth.proc.AuralObj.ProcData
@@ -132,10 +131,11 @@ object AuralProcDataImpl {
 
     private val stateRef  = Ref[UState[S]](state0)
     private val nodeRef   = Ref(Option.empty[GroupImpl])
+    private val scanBuses = TMap.empty[String, AudioBus]
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews = TSet.empty[AuralObj.Proc[S]]
 
-    private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]() // cache-only purpose
+    private val procLoc   = TxnLocal[Obj.T[S, Proc.Elem]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
 
@@ -252,8 +252,12 @@ object AuralProcDataImpl {
       nodeRef.swap(None).foreach(_.dispose())
       procObserver.dispose()
       scanViews.foreach { case (_, view) => view.dispose()}
-      scanViews.retain((_, _) => false) // no `clear` method
+      clearMap(scanViews)
+      clearMap(scanBuses)
     }
+
+    private def clearMap[A, B](m: TMap[A, B])(implicit tx: S#Tx): Unit =
+      m.retain((_, _) => false)(tx.peer) // no `clear` method
 
     def state(implicit tx: S#Tx) = stateRef.get(tx.peer)
 
@@ -317,10 +321,17 @@ object AuralProcDataImpl {
       }
     }
 
+    /* Ensures that an aural-scan for a given key exists. If it exists,
+     * checks that the number of channels is correct. Otherwise, checks
+     * if a scan for the key exists. If yes, instantiates the aural-scan,
+     * if no, creates an audio-bus for later use.
+     */
     private def activateAuralScan(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
       scanViews.get(key)(tx.peer).fold {
         val scans = procCached().elem.peer.scans
-        scans.get(key).foreach { scan =>
+        scans.get(key).fold[Unit] {
+          mkBus(key, numChannels)
+        } { scan =>
           mkAuralScan(key, scan, numChannels)
         }
       } { view =>
@@ -328,13 +339,28 @@ object AuralProcDataImpl {
       }
     }
 
+    private def mkBus(key: String, numChannels: Int)(implicit tx: S#Tx): AudioBus = {
+      implicit val itx = tx.peer
+      val bus = scanBuses.get(key).getOrElse {
+        val res = Bus.audio(context.server, numChannels = numChannels)
+        scanBuses.put(key, res)
+        res
+      }
+      if (bus.numChannels != numChannels)
+        sys.error(s"Scan bus channels changed from ${bus.numChannels} to $numChannels")
+
+      bus
+    }
+
+    /* Creates a new aural scan */
     private def mkAuralScan(key: String, scan: Scan[S], numChannels: Int)(implicit tx: S#Tx): AuralScan[S] = {
-      val view = AuralScan(data = this, key = key, scan = scan, numChannels = numChannels)
+      val bus   = mkBus(key, numChannels)
+      val view  = AuralScan(data = this, key = key, scan = scan, bus = bus)
       scanViews.put(key, view)(tx.peer)
       // note: the view will iterate over the
       //       sources and sink itself upon initialization,
       //       and establish the playing links if found
-
+      //
       //      nodeOption.foreach { n =>
       //        view.play(n)
       //      }
@@ -350,7 +376,9 @@ object AuralProcDataImpl {
       if (state.missingIns.contains(sinkKey)) tryBuild()
     }
 
-    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
+    // def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
+
+    def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanBuses.get(key)(tx.peer)
 
     // def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = ...
 

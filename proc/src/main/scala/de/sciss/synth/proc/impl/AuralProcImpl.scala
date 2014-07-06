@@ -306,14 +306,15 @@ object AuralProcImpl {
           // var inBus     = Option.empty[AudioBusNodeSetter]
 
           def mkInBus(): AudioBusNodeSetter = {
-            val b      = data.getScanInBus(key) getOrElse Bus.audio(server, numCh)
+            val b      = data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
             // val b      = Bus.audio(server, numCh)
+            logA(s"addInputBus($key, $b) (${hashCode.toHexString})")
             val res    = if (scanIn.fixed)
               BusNodeSetter.reader(inCtlName, b, synth)
             else
               BusNodeSetter.mapper(inCtlName, b, synth)
             users ::= res
-            node.addInputBus(key, res.bus)
+            node.addInputBus(key, b)
             res
           }
 
@@ -363,62 +364,20 @@ object AuralProcImpl {
                   // users    ::= w
                 }
 
-              case Link.Scan(peer) =>
-                // handles by AuralScan now
-                mkInBus()
-
-                //                scanView(peer).foreach {
-                //                  case (sourceKey, sourceView) =>
-                //                    val bIn         = lazyInBus
-                //
-                //                    // if the source isn't found (because it's probably in the ongoing build),
-                //                    // we ignore that here; there is a symmetric counter part, looking for the
-                //                    // builder.outputs that will handle these cases.
-                //                    sourceView.getScanOutBus(sourceKey).foreach { bOut =>
-                //                      ensureChannels(bOut.numChannels)
-                //                      val edge        = NodeGraph.Edge(srcAural, sourceKey, node, key)
-                //                      val link        = AudioLinkOLD(edge, sourceBus = bOut, sinkBus = bIn.bus)
-                //                      dependencies  ::= link
-                //                      users         ::= link
-                //                    }
-                //                }
+              case Link.Scan(peer) => mkInBus()
             }
-            // }
           }
       }
 
       // ---- handle output buses, and establish missing links to sinks ----
-//      builder.outputs.foreach {
-//        case (key, out) =>
-//          val bw     = BusNodeSetter.writer(scan.outControlName(key), out.bus, synth)
-//          val bOut   = bw.bus
-//          users :+= bw
-//
-//          p.elem.peer.scans.get(key).foreach { scan =>
-//            scan.sinks.foreach {
-//              case Link.Scan(peer) =>
-//                scanMap.get(peer.id).foreach {
-//                  case (sinkKey, idH) =>
-//                    val sinkTimedID = idH()
-//                    viewMap.get(sinkTimedID).foreach { sinkAural =>
-//                      val bIn = sinkAural.getInputBus(sinkKey).getOrElse {
-//                        sys.error(s"Sink bus disappeared $sinkTimedID -> $sinkKey")
-//                      }
-//                      require(bIn.numChannels == bOut.numChannels,
-//                        s"Scan input changed number of channels (expected ${bOut.numChannels} but found ${bIn.numChannels})")
-//                      val edge    = NodeGraph.Edge(aural, key, sinkAural, sinkKey)
-//                      val link    = AudioLink(edge, sourceBus = bOut, sinkBus = bIn)
-//                      dependencies      ::= link
-//                      users     ::= link
-//                    }
-//                }
-//
-//              case _  =>
-//            }
-//          }
-//      }
-
-      // busUsers.foreach(_.add())
+      ugen.scanOuts.foreach { case (key, numCh) =>
+        val b      = data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
+        logA(s"addOutputBus($key, $b) (${hashCode.toHexString})")
+        val res    = BusNodeSetter.writer(graph.scan.outControlName(key), b, synth)
+        users ::= res
+        node.addOutputBus(key, b)
+        // res
+      }
 
       // XXX TODO
       val group = server.defaultGroup
