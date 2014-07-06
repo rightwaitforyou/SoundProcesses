@@ -32,9 +32,10 @@ object NewAuralTest extends App {
       case "--test1" => test1()
       case "--test2" => test2()
       case "--test3" => test3()
+      case "--test4" => test4()
       case _         =>
-        println("WARNING: No option given, using --test3")
-        test3()
+        println("WARNING: No option given, using --test4")
+        test4()
     }
   }
 
@@ -96,6 +97,51 @@ object NewAuralTest extends App {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 4
+
+  def test4()(implicit context: AuralContext[S]): Unit = {
+    println("----test4----\n")
+
+    val (view1, view2) = cursor.step { implicit tx =>
+      val _view1 = proc {
+        val amp   = graph.attribute("amp").ir(0.0)
+        val noise = PinkNoise.ar(Seq(amp, amp))
+        graph.scan.Out("out", noise)
+      }
+      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
+      val proc1 = _view1.obj()
+      putDouble(proc1, "amp", 0.5)
+
+      val _view2 = proc {
+        val freq  = graph.attribute("freq").ir(440)
+        val in    = graph.scan.In("in")
+        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
+      }
+      val proc2 = _view2.obj()
+      putDouble(proc2, "freq", 666)
+
+      (_view1, _view2)
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play2--")
+      view2.play()
+      val proc1   = view1.obj()
+      val proc2   = view2.obj()
+      // reversed steps
+      val scanIn  = addScan(proc2, "in" )
+      val scanOut = addScan(proc1, "out")
+      scanOut ~> scanIn
+    }
+
+    after(2.0) { implicit tx =>
+      println("--issue play1--")
+      view1.play()
+
+      stopAndQuit()
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 3
 
