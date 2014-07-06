@@ -29,7 +29,7 @@ object AudioLinkOLD {
     val edge1     = NodeGraph.Edge(edge.source, synthRef )
     val edge2     = NodeGraph.Edge(synthRef   , edge.sink)
 
-    val res       = new Impl(edge1, edge2, sourceBus, sinkBus, synth)
+    val res       = new Impl(edge1, edge2, sourceBus, sinkBus, synth, synthRef)
     res.play()
     res
   }
@@ -44,13 +44,14 @@ object AudioLinkOLD {
   }
 
   private final class Impl(edge1: NodeGraph.Edge, edge2: NodeGraph.Edge,
-                           sourceBus: AudioBus, sinkBus: AudioBus, synth: Synth)
+                           sourceBus: AudioBus, sinkBus: AudioBus, synth: Synth, synthRef: NodeRef)
     extends DynamicUser with Resource.Proxy {
 
     protected def resourcePeer: Resource = synth
 
     def add()(implicit tx: Txn): Unit = {
       // synth.moveToHead(audible = false, group = edge.sink.preGroup())
+      NodeGraph.addNode(synthRef)
       NodeGraph.addEdge(edge1)
       NodeGraph.addEdge(edge2)
     }
@@ -66,6 +67,7 @@ object AudioLinkOLD {
     def remove()(implicit tx: Txn): Unit = {
       NodeGraph.removeEdge(edge1)
       NodeGraph.removeEdge(edge2)
+      NodeGraph.removeNode(synthRef)
     }
   }
 }

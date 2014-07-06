@@ -29,7 +29,7 @@ object AuralScanImpl {
     import context.server
     val bus   = Bus.audio(server, numChannels = numChannels)
     val view  = new Impl[S](data = data, key = key, bus = bus)
-    logA(s"AuralScan(${data.procCached()}, $key, numChannels = $numChannels)")
+    logA(s"AuralScan(${data.procCached()}, $key, bus = $bus)")
     context.putAux(scan.id, view)
 
     scan.sources.foreach {
@@ -89,7 +89,7 @@ object AuralScanImpl {
       Out.ar("out".kr, sig)
     }
 
-    val synth     = Synth(sourceBus.server, g, nameHint = Some(s"audio-link$numCh"))
+    val synth     = Synth(sourceBus.server, g, nameHint = Some(s"a-link$numCh"))
     val synthRef  = NodeRef(synth)
     synth.play(target = sinkNode.node, args = Nil, addAction = addBefore, dependencies = Nil)
     synth.read (sourceBus -> "in" )
@@ -97,17 +97,21 @@ object AuralScanImpl {
 
     val edge1     = NodeGraph.Edge(sourceNode, synthRef)
     val edge2     = NodeGraph.Edge(synthRef  , sinkNode)
+    NodeGraph.addNode(synthRef)
     NodeGraph.addEdge(edge1)
     NodeGraph.addEdge(edge2)
-    new LinkNode(edge1, edge2, synth)
+    new LinkNode(edge1, edge2, synthRef)
   }
-  private final class LinkNode[S <: Sys[S]](edge1: NodeGraph.Edge, edge2: NodeGraph.Edge, synth: Synth)
+  private final class LinkNode[S <: Sys[S]](edge1: NodeGraph.Edge, edge2: NodeGraph.Edge, synthRef: NodeRef)
     extends Disposable[S#Tx] {
+
+    override def toString = s"LinkNode($edge1, $edge2, $synthRef)"
 
     def dispose()(implicit tx: S#Tx): Unit = {
       NodeGraph.removeEdge(edge1)
       NodeGraph.removeEdge(edge2)
-      synth.free()
+      NodeGraph.removeNode(synthRef)
+      synthRef.node.free()
     }
   }
 
@@ -123,10 +127,12 @@ object AuralScanImpl {
     private[AuralScanImpl] var obs: Disposable[S#Tx] = _
 
     def addSource(source: AuralScan[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AuralScan addSource   (${source.data.procCached()}, ${source.key}); ${data.procCached()}, $key")
       sources.transform(_ + source)(tx.peer)
     }
 
     def addSink(sink: AuralScan[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AuralScan addSink     (${sink.data.procCached()}, ${sink.key}); ${data.procCached()}, $key")
       sinks.transform(_ + sink)(tx.peer)
       data.nodeOption.foreach { sourceNode =>
         tryLink(sourceNode, sink)
@@ -136,14 +142,17 @@ object AuralScanImpl {
     private def tryLink(sourceNode: NodeRef, sink: AuralScan[S])(implicit tx: S#Tx): Unit =
       sink.data.nodeOption.foreach { sinkNode =>
         val link = LinkNode[S](this, sourceNode, sink, sinkNode)
+        logA(s"AuralScan link; ${data.procCached()}, link")
         links.put(sink, link)(tx.peer)
       }
 
     def removeSource(source: AuralScan[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AuralScan removeSource(${source.data.procCached()}, ${source.key}); ${data.procCached()}, $key")
       sources.transform(_ - source)(tx.peer)
     }
 
     def removeSink(sink: AuralScan[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AuralScan removeSink  (${sink.data.procCached()}, ${sink.key}); ${data.procCached()}, $key")
       sinks.transform(_ - sink)(tx.peer)
       links.remove(sink)(tx.peer).foreach { link =>
         link.dispose()
@@ -151,13 +160,19 @@ object AuralScanImpl {
     }
 
     def play(n: NodeRef)(implicit tx: S#Tx): Unit = {
-      stop()
+      logA(s"AuralScan play; ${data.procCached()}, $key")
+      stop1()
       sinks.get(tx.peer).foreach { sink =>
         tryLink(n, sink)
       }
     }
 
     def stop()(implicit tx: S#Tx): Unit = {
+      logA(s"AuralScan stop; ${data.procCached()}, $key")
+      stop1()
+    }
+
+    private def stop1()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       if (!links.isEmpty) {
         links.foreach { case (_, link) => link.dispose() }
@@ -170,7 +185,7 @@ object AuralScanImpl {
       obs.dispose()
       val sources0  = sources.swap(Set.empty)(tx.peer)
       val sinks0    = sinks  .swap(Set.empty)(tx.peer)
-      stop()
+      stop1()
       sources0.foreach(_.removeSink  (this))
       sinks0  .foreach(_.removeSource(this))
     }

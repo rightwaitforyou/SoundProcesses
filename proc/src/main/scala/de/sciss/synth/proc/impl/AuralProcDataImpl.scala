@@ -16,7 +16,8 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Node, Txn, Group, NodeRef, AudioBus, Sys}
+import de.sciss.lucre.synth.impl.GroupImpl
+import de.sciss.lucre.synth.{NodeGraph, Node, Txn, Group, NodeRef, AudioBus, Sys}
 import de.sciss.model.Change
 import de.sciss.synth.{SynthGraph, addBefore}
 import de.sciss.synth.proc.AuralObj.ProcData
@@ -65,10 +66,18 @@ object AuralProcDataImpl {
     b.result()
   }
 
+  private def GroupImpl(name: String, in0: NodeRef)(implicit tx: Txn): GroupImpl = {
+    val res = new GroupImpl(name, in0)
+    NodeGraph.addNode(res)
+    res
+  }
+
   // dynamically flips between single proc and multiple procs
   // (wrapping them in one common group)
-  private final class GroupImpl(in0: NodeRef) extends NodeRef {
+  private final class GroupImpl(name: String, in0: NodeRef) extends NodeRef {
     val server = in0.server
+
+    override def toString = name
 
     private val instancesRef  = Ref(in0 :: Nil)
     private val nodeRef       = Ref(in0)
@@ -99,9 +108,21 @@ object AuralProcDataImpl {
           group.free(audible = true)
           false
 
-        case Nil  => true
-        case _    => false
+        case Nil  =>
+          dispose()
+          true
+
+        case _ => false
       }
+    }
+
+    def dispose()(implicit tx: Txn): Unit = {
+      implicit val itx = tx.peer
+      if (instancesRef.swap(Nil).size > 1) {
+        val group = nodeRef.swap(null).node
+        group.free(audible = false)
+      }
+      NodeGraph.removeNode(this)
     }
   }
 
@@ -136,15 +157,19 @@ object AuralProcDataImpl {
 
     def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
 
-    private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit =
+    private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      logA(s"playScans ${procCached()}")
       scanViews.foreach { case (_, view) =>
         view.play(n)
       }(tx.peer)
+    }
 
-    private def stopScans()(implicit tx: S#Tx): Unit =
+    private def stopScans()(implicit tx: S#Tx): Unit = {
+      logA(s"stopScans ${procCached()}")
       scanViews.foreach { case (_, view) =>
         view.stop()
       }(tx.peer)
+    }
 
     private def newSynthGraph(g: SynthGraph)(implicit tx: S#Tx): Unit = {
       logA(s"--todo-- GraphChange ${procCached()}")
@@ -152,7 +177,7 @@ object AuralProcDataImpl {
 
     private def scanAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       logA(s"ScanAdded  to   ${procCached()} ($key)")
-      testInScan(key, scan)
+      testInScan (key, scan)
       testOutScan(key, scan)
     }
 
@@ -175,7 +200,7 @@ object AuralProcDataImpl {
         scanViews.get(key)(tx.peer).fold[Unit] {
           mkAuralScan(key, scan, numCh)
         } { view =>
-          checkScanOutChannels(view, numCh)
+          checkScanNumChannels(view, numCh)
         }
       }
     }
@@ -193,14 +218,15 @@ object AuralProcDataImpl {
       }
     }
 
-    private def rebuild()(implicit tx: S#Tx): Unit = {
-      logA(s"--todo-- rebuild ${procCached()}")
-    }
+    //    private def rebuild()(implicit tx: S#Tx): Unit = {
+    //      logA(s"--todo-- rebuild ${procCached()}")
+    //    }
 
     def addInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      logA(s"addInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       nodeRef().fold {
-        val groupImpl = new GroupImpl(n)
+        val groupImpl = GroupImpl(name = s"Group-NodeRef ${procCached()}", in0 = n)
         nodeRef() = Some(groupImpl)
         playScans(groupImpl)
 
@@ -210,6 +236,7 @@ object AuralProcDataImpl {
     }
 
     def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      logA(s"removeInstanceNode ${procCached()} : $n")
       val groupImpl = nodeRef.get(tx.peer).getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
       if (groupImpl.removeInstanceNode(n)) {
         nodeRef.set(None)(tx.peer)
@@ -222,6 +249,7 @@ object AuralProcDataImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
+      nodeRef.swap(None).foreach(_.dispose())
       procObserver.dispose()
       scanViews.foreach { case (_, view) => view.dispose()}
       scanViews.retain((_, _) => false) // no `clear` method
@@ -257,37 +285,63 @@ object AuralProcDataImpl {
         val newOuts = now.scanOuts.filterNot {
           case (key, _) => before.scanOuts.contains(key)
         }
-
         logA(s"...newOuts = ${newOuts.mkString(",")}")
 
-        val scans = procCached().elem.peer.scans
         newOuts.foreach { case (key, numCh) =>
-          scanViews.get(key).fold {
-            scans.get(key).foreach { scan =>
-              mkAuralScan(key, scan, numCh)
-            }
-          } { view =>
-            checkScanOutChannels(view, numCh)
-          }
+          activateAuralScan(key, numCh)
+        }
+      }
+
+      // handle newly visible inputs
+      if (before.scanIns ne now.scanIns) {
+        val newIns = now.scanIns.filterNot {
+          case (key, _) => before.scanIns.contains(key)
+        }
+        logA(s"...newIns  = ${newIns.mkString(",")}")
+
+        newIns.foreach { case (key, meta) =>
+          val numCh = meta.numChannels
+          activateAuralScan(key, numCh)
         }
       }
 
       now match {
         case c: Complete[S] =>
           procViews.foreach { view =>
-            if (view.targetState == AuralObj.Playing) view.play()
+            if (view.targetState == AuralObj.Playing) {
+              // ugen graph became ready and view wishes to play.
+              view.play()
+            }
           }
         case _ =>
+      }
+    }
+
+    private def activateAuralScan(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
+      scanViews.get(key)(tx.peer).fold {
+        val scans = procCached().elem.peer.scans
+        scans.get(key).foreach { scan =>
+          mkAuralScan(key, scan, numChannels)
+        }
+      } { view =>
+        checkScanNumChannels(view, numChannels)
       }
     }
 
     private def mkAuralScan(key: String, scan: Scan[S], numChannels: Int)(implicit tx: S#Tx): AuralScan[S] = {
       val view = AuralScan(data = this, key = key, scan = scan, numChannels = numChannels)
       scanViews.put(key, view)(tx.peer)
+      // note: the view will iterate over the
+      //       sources and sink itself upon initialization,
+      //       and establish the playing links if found
+
+      //      nodeOption.foreach { n =>
+      //        view.play(n)
+      //      }
       view
     }
 
-    private def checkScanOutChannels(view: AuralScan[S], numCh: Int): Unit = {
+    private def checkScanNumChannels(view: AuralScan[S], numCh: Int): Unit = {
       val numCh1 = view.bus.numChannels
       if (numCh1 != numCh) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numCh)")
     }

@@ -75,8 +75,9 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set
     val source	   = e.sourceVertex
     val target	   = e.targetVertex
     val upBound	   = vertices.indexOf(source)
+    if (upBound < 0) throw new IllegalArgumentException(s"Source vertex $source not found")
     val loBound	   = vertices.indexOf(target)
-    require(loBound >= 0 && upBound >= 0)
+    if (loBound < 0) throw new IllegalArgumentException(s"Target vertex $target not found")
     val newEdgeMap: Map[V, Set[E]] = edgeMap + (source -> (edgeMap.getOrElse(source, Set.empty) + e))
     val newEdgeSet = edges + e
 
@@ -126,8 +127,11 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set
     } else this
   }
 
+  /** Adds a new vertex to the set of unpositioned vertices. Throws an exception
+    * if the vertex had been added before.
+    */
   def addVertex(v: V): T = {
-    require(!vertices.contains(v))
+    if (vertices.contains(v)) throw new IllegalArgumentException(s"Vertex $v was already added")
     // XXX TEST
     //      copy( vertices.patch( unpositioned, Vec( v ), 0 ), unpositioned + 1 )
     copy(v +: vertices)(unpositioned + 1, edgeMap)

@@ -181,7 +181,7 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
       val ex  = map.get(ugen); if (ex != null) return ex
       val res = UGenEq(ugen.name, ugen.rate, ugen.specialIndex, (), ugen.outputRates)
       map.put(ugen, res)
-      log(s"GraphEquality.self - mapUGen($ugen)")
+      // log(s"GraphEquality.self - mapUGen($ugen)")
       val inStruct = ugen.inputs.map {
         //         case up: UGenProxy => mapUGen( up.source )
         case ugen1: UGen.SingleOut      => mapUGen(ugen1, map)
@@ -195,7 +195,7 @@ object NodeGraph /* MMM extends TxnModel[ NodeGraphUpdate ] */ {
 
     val self: Any = {
       val map = new java.util.IdentityHashMap[UGen, UGenEq]
-      log("GraphEquality.self")
+      // log("GraphEquality.self")
       val uStructs = graph.ugens.map { rich =>
         (mapUGen(rich.ugen, map), rich.inputSpecs)
       }
@@ -215,20 +215,27 @@ final class NodeGraph(val server: Server) {
 
   private val topologyRef = Ref[Topo](Topology.empty)
 
-  def addNode(node: NodeRef)(implicit tx: Txn): Unit =
+  def addNode(node: NodeRef)(implicit tx: Txn): Unit = {
+    log(s"NodeGraph.addNode($node)")
     topologyRef.transform(_.addVertex(node))(tx.peer)
+  }
 
-  def removeNode(node: NodeRef)(implicit tx: Txn): Unit =
+  def removeNode(node: NodeRef)(implicit tx: Txn): Unit = {
+    log(s"NodeGraph.removeNode($node)")
     topologyRef.transform(_.removeVertex(node))(tx.peer)
+  }
 
   def addEdge(edge: Edge)(implicit tx: Txn): Option[(Topo, NodeRef, Vec[NodeRef])] = {
+    log(s"NodeGraph.addEdge($edge)")
     val res = topologyRef.get(tx.peer).addEdge(edge)
     res.foreach(tup => topologyRef.set(tup._1)(tx.peer))
     res
   }
 
-  def removeEdge(edge: Edge)(implicit tx: Txn): Unit =
+  def removeEdge(edge: Edge)(implicit tx: Txn): Unit = {
+    log(s"NodeGraph.removeEdge($edge)")
     topologyRef.transform(_.removeEdge(edge))(tx.peer)
+  }
 
   private val msgStampRef     = Ref(0)
 

@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
+import de.sciss.lucre.synth.{NodeRef, AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
 import de.sciss.numbers
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.Curve.parametric
@@ -438,11 +438,17 @@ object AuralProcImpl {
     //      context.getAux[(String, ProcData[S])](scan.id)
 
     private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
-      playingRef.swap(Some(node))(tx.peer).foreach(_.stop())
+      playingRef.swap(Some(node))(tx.peer).foreach(freeNode1)
+      data.addInstanceNode(node)
     }
 
     private def freeNode()(implicit tx: S#Tx): Unit = {
-      playingRef.swap(None)(tx.peer).foreach(_.stop())
+      playingRef.swap(None)(tx.peer).foreach(freeNode1)
+    }
+
+    private def freeNode1(n: AuralNode)(implicit tx: S#Tx): Unit = {
+      data.removeInstanceNode(n)
+      n.stop()
     }
 
     private val playingRef = Ref(Option.empty[AuralNode])

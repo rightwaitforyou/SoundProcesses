@@ -67,6 +67,8 @@ object NodeRef {
   private final case class Wrap(n: Node) extends NodeRef {
     def node(implicit tx: Txn): Node = n
     def server: Server = n.server
+
+    override def toString = s"NodeRef($n)"
   }
 }
 trait NodeRef {
