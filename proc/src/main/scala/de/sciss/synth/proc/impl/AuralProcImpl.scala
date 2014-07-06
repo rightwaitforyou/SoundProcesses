@@ -137,17 +137,17 @@ object AuralProcImpl {
       if (value != old) fire(value)
     }
 
-    def play(time: SpanLike)(implicit tx: S#Tx): Unit = {
+    def play(/* time: SpanLike */)(implicit tx: S#Tx): Unit = {
       val oldTarget = targetStateRef.swap(AuralObj.Playing)(tx.peer)
       val curr      = state
       data.state match {
         case s: UGenGraphBuilder.Complete[S] =>
-          launchProc(s, time)
+          launchProc(s /*, time */)
         case _ =>
       }
     }
 
-    def stop(time: Long)(implicit tx: S#Tx): Unit = {
+    def stop(/* time: Long */)(implicit tx: S#Tx): Unit = {
       freeNode()
       state = AuralObj.Stopped
     }
@@ -160,7 +160,7 @@ object AuralProcImpl {
       context.release(data.procCached())
     }
 
-    private def launchProc(ugen: UGenGraphBuilder.Complete[S], span: SpanLike)(implicit tx: S#Tx): Unit = {
+    private def launchProc(ugen: UGenGraphBuilder.Complete[S] /*, span: SpanLike */)(implicit tx: S#Tx): Unit = {
       val p             = data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
       val ug            = ugen.result
@@ -318,10 +318,11 @@ object AuralProcImpl {
           // note: if not found, stick with default
 
           // XXX TODO:
-          val time = span match {
-            case hs: Span.HasStart => hs.start
-            case _ => 0L
-          }
+          //          val time = span match {
+          //            case hs: Span.HasStart => hs.start
+          //            case _ => 0L
+          //          }
+          val time = 0L
 
           // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
           //           we cannot use ControlSet any more, but need other mechanism

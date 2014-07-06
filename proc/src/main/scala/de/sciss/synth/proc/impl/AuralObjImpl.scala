@@ -89,8 +89,8 @@ object AuralObjImpl {
 
       def isPrepared(implicit tx: S#Tx): Boolean = true
 
-      def stop(time: Long    )(implicit tx: S#Tx): Unit = ()
-      def play(time: SpanLike)(implicit tx: S#Tx): Unit = ()
+      def stop(/* time: Long     */)(implicit tx: S#Tx): Unit = ()
+      def play(/* time: SpanLike */)(implicit tx: S#Tx): Unit = ()
 
       // def latencyEstimate(implicit tx: S#Tx): Long = 0L
 
