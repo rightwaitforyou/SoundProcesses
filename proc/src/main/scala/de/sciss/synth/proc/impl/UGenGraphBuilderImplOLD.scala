@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.synth.impl.BasicUGenGraphBuilder
+import de.sciss.synth.proc.UGenGraphBuilder.{StreamIn, ScanIn}
 import collection.immutable.{IndexedSeq => Vec, Set => ISet}
 import de.sciss.synth.{ControlBus => SControlBus, UGenGraph, Lazy, SynthGraph}
 import de.sciss.synth.ugen.ControlProxyLike
@@ -41,7 +42,7 @@ private[proc] object UGenGraphBuilderImplOLD {
 
     var scanOuts    = Map.empty[String, Int]
     var scanIns     = Map.empty[String, ScanIn]
-    var missingIns  = Set.empty[MissingIn[S]]
+    var missingInsOLD  = Set.empty[MissingIn[S]]
     var attributeIns= Set.empty[String]
     var streamIns   = Map.empty[String, List[StreamIn]]
 
@@ -86,7 +87,7 @@ private[proc] object UGenGraphBuilderImplOLD {
 
     def tryBuild(): Boolean = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]
-      missingIns        = Set.empty
+      missingInsOLD        = Set.empty
       var someSucceeded = false
       while (remaining.nonEmpty) {  // XXX TODO: this can go through many exceptions. perhaps should short circuit?
         val g = SynthGraph {
@@ -114,7 +115,7 @@ private[proc] object UGenGraphBuilderImplOLD {
                 attributeIns        = savedAttrs
                 streamIns           = savedStreams
                 missingElems      :+= elem
-                missingIns         += miss.asInstanceOf[MissingIn[S]] // XXX TODO not cool
+                missingInsOLD         += miss.asInstanceOf[MissingIn[S]] // XXX TODO not cool
             }
           }
         }

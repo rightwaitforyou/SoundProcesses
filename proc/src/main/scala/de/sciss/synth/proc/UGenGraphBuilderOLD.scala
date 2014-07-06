@@ -19,7 +19,7 @@ import util.control.ControlThrowable
 import de.sciss.lucre.synth.Sys
 
 private[proc] object UGenGraphBuilderOLD {
-  def outsideOfContext() = sys.error("Expansion out of context")
+  // def outsideOfContext() = sys.error("Expansion out of context")
 
   /** An exception thrown when during incremental build an input is required for which the underlying source
     * cannot yet be determined.
@@ -39,25 +39,25 @@ private[proc] object UGenGraphBuilderOLD {
                         (implicit tx: S#Tx): UGenGraphBuilderOLD[S] =
     Impl(aural, timed, time)
 
-  case class ScanIn(numChannels: Int, fixed: Boolean)
-
-  object StreamIn {
-    val empty = StreamIn(0.0, 0)
-  }
-  case class StreamIn(maxSpeed: Double, interp: Int) {
-    /** Empty indicates that the stream is solely used for information
-      * purposes such as `BufChannels`.
-      */
-    def isEmpty: Boolean = interp == 0
-
-    /** Native indicates that the stream will be transported by the UGen
-      * itself, i.e. via `DiskIn` or `VDiskIn`.
-      */
-    def isNative: Boolean = interp == -1
-  }
+  //  case class ScanIn(numChannels: Int, fixed: Boolean)
+  //
+  //  object StreamIn {
+  //    val empty = StreamIn(0.0, 0)
+  //  }
+  //  case class StreamIn(maxSpeed: Double, interp: Int) {
+  //    /** Empty indicates that the stream is solely used for information
+  //      * purposes such as `BufChannels`.
+  //      */
+  //    def isEmpty: Boolean = interp == 0
+  //
+  //    /** Native indicates that the stream will be transported by the UGen
+  //      * itself, i.e. via `DiskIn` or `VDiskIn`.
+  //      */
+  //    def isNative: Boolean = interp == -1
+  //  }
 }
-private[proc] trait UGenGraphBuilderOLD[S <: Sys[S]] extends UGenGraph.Builder {
-  import UGenGraphBuilderOLD._
+private[proc] trait UGenGraphBuilderOLD[S <: Sys[S]] extends UGenGraphBuilder[S] /* UGenGraph.Builder */ {
+  import UGenGraphBuilder._
 
   /** This method should only be invoked by the `graph.scan.Elem` instances. It requests a scan input, and
     * the method returns the corresponding number of channels, or throws a `MissingIn` exception which
@@ -112,7 +112,7 @@ private[proc] trait UGenGraphBuilderOLD[S <: Sys[S]] extends UGenGraph.Builder {
   /** Current set of missing scan inputs. This may shrink during incremental build, and will be empty when
     * `tryBuild` returns `true`.
     */
-  def missingIns: Set[MissingIn[S]]
+  def missingInsOLD: Set[UGenGraphBuilderOLD.MissingIn[S]]
 
   /** Determines whether the graph was fully build (`true`) or is incomplete (`false`) due to
     * missing inputs. Once this method returns `true`, it is safe to call `finish`.

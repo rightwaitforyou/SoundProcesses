@@ -293,7 +293,7 @@ object AuralPresentationImpl {
       // ---- streams ----
       val streamNames = ugen.streamIns
       if (streamNames.nonEmpty) streamNames.foreach { case (n, infoSeq0) =>
-        val infoSeq = if (infoSeq0.isEmpty) UGenGraphBuilderOLD.StreamIn.empty :: Nil else infoSeq0
+        val infoSeq = if (infoSeq0.isEmpty) UGenGraphBuilder.StreamIn.empty :: Nil else infoSeq0
 
         infoSeq.zipWithIndex.foreach { case (info, idx) =>
           val ctlName     = graph.stream.controlName(n, idx)
@@ -632,7 +632,7 @@ object AuralPresentationImpl {
       // (since missingMap is a map and the values are sets, it is safe to re-add existing entries)
       if (!isComplete) {
         var newMissing = ongoing.missingMap
-        ugen.missingIns.foreach { miss =>
+        ugen.missingInsOLD.foreach { miss =>
           newMissing += miss -> (newMissing.getOrElse(miss, Set.empty) + builder)
         }
         ongoing.missingMap = newMissing
