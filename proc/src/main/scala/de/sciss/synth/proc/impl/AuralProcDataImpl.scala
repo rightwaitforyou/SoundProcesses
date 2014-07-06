@@ -26,7 +26,7 @@ import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{TMap, Ref, TxnLocal}
+import scala.concurrent.stm.{TSet, TMap, Ref, TxnLocal}
 
 object AuralProcDataImpl {
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
@@ -109,9 +109,10 @@ object AuralProcDataImpl {
                                        (implicit context: AuralContext[S])
     extends ProcData[S] {
 
-    private val stateRef = Ref[UState[S]](state0)
-    private val nodeRef = Ref(Option.empty[GroupImpl])
+    private val stateRef  = Ref[UState[S]](state0)
+    private val nodeRef   = Ref(Option.empty[GroupImpl])
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
+    private val procViews = TSet.empty[AuralObj.Proc[S]]
 
     private val procLoc = TxnLocal[Obj.T[S, Proc.Elem]]() // cache-only purpose
 
@@ -216,8 +217,8 @@ object AuralProcDataImpl {
       }
     }
 
-    //    def addView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = ...
-    //    def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = ...
+    def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.add   (view)(tx.peer)
+    def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.remove(view)(tx.peer)
 
     def dispose()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
@@ -241,6 +242,8 @@ object AuralProcDataImpl {
     }
 
     private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
+
       if (now.missingIns.isEmpty) {
         logA(s"buildAdvanced ${procCached()}; complete? ${now.isComplete}")
       } else {
@@ -249,8 +252,6 @@ object AuralProcDataImpl {
 
       // handle newly visible outputs
       if (before.scanOuts ne now.scanOuts) {
-        implicit val itx = tx.peer
-
         // detect which new scan outputs have been determined in the last iteration
         // (newOuts is a map from `name: String` to `numChannels Int`)
         val newOuts = now.scanOuts.filterNot {
@@ -273,7 +274,9 @@ object AuralProcDataImpl {
 
       now match {
         case c: Complete[S] =>
-          println("--todo-- should check instances for playing")
+          procViews.foreach { view =>
+            if (view.targetState == AuralObj.Playing) view.play()
+          }
         case _ =>
       }
     }

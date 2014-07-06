@@ -35,7 +35,7 @@ object AuralProcImpl {
   def apply[S <: Sys[S]](proc: Proc.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data  = AuralProcDataImpl(proc)
     val res   = new Impl(data)
-    // data.addView(res)
+    data.addInstanceView(res)
     res
   }
 
@@ -130,7 +130,8 @@ object AuralProcImpl {
     private val currentStateRef = Ref[AuralObj.State](AuralObj.Stopped)
     private val targetStateRef  = Ref[AuralObj.State](AuralObj.Stopped)
 
-    def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
+    def state      (implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
+    def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer)
 
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
@@ -138,8 +139,8 @@ object AuralProcImpl {
     }
 
     def play(/* time: SpanLike */)(implicit tx: S#Tx): Unit = {
-      val oldTarget = targetStateRef.swap(AuralObj.Playing)(tx.peer)
-      val curr      = state
+      targetStateRef.set(AuralObj.Playing)(tx.peer)
+      // val curr      = state
       data.state match {
         case s: UGenGraphBuilder.Complete[S] =>
           launchProc(s /*, time */)
@@ -149,6 +150,7 @@ object AuralProcImpl {
 
     def stop(/* time: Long */)(implicit tx: S#Tx): Unit = {
       freeNode()
+      targetStateRef.set(AuralObj.Stopped)(tx.peer)
       state = AuralObj.Stopped
     }
 
@@ -156,7 +158,7 @@ object AuralProcImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       freeNode()
-      // data.removeView(this)
+      data.removeInstanceView(this)
       context.release(data.procCached())
     }
 

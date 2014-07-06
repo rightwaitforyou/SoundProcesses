@@ -76,8 +76,8 @@ object AuralObj {
 
     // def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
 
-    // def addView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
-    // def removeView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
+    def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
+    def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
 
     def addInstanceNode   (n: NodeRef)(implicit tx: S#Tx): Unit
     def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit
@@ -94,6 +94,8 @@ object AuralObj {
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
     // def data: ProcData[S]
     override def obj: stm.Source[S#Tx, _Proc.Obj[S]]
+
+    def targetState(implicit tx: S#Tx): AuralObj.State
   }
 
   sealed trait State
