@@ -124,16 +124,19 @@ object NewAuralTest extends App {
     }
 
     cursor.step { implicit tx =>
-      println("--issue play--")
+      println("--issue play1--")
       view1.play()
       val proc1   = view1.obj()
       val proc2   = view2.obj()
       val scanOut = addScan(proc1, "out")
       val scanIn  = addScan(proc2, "in" )
       scanOut ~> scanIn
+//      println("--issue play2--")
+//      view2.play()
     }
 
     after(2.0) { implicit tx =>
+      println("--issue play2--")
       view2.play()
 
       stopAndQuit()

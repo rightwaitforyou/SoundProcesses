@@ -132,16 +132,17 @@ object AuralScanImpl {
     def addSink(sink: AuralScan[S])(implicit tx: S#Tx): Unit = {
       logA(s"AuralScan addSink     (${sink.data.procCached()}, ${sink.key}); ${data.procCached()}, $key")
       sinks.transform(_ + sink)(tx.peer)
-      data.nodeOption.foreach { sourceNode =>
-        tryLink(sourceNode, sink)
-      }
+      sinkPlaying(sink)
     }
 
     private def tryLink(sourceNode: NodeRef, sink: AuralScan[S])(implicit tx: S#Tx): Unit =
       sink.data.nodeOption.foreach { sinkNode =>
-        val link = LinkNode[S](this, sourceNode, sink, sinkNode)
-        logA(s"AuralScan link; ${data.procCached()}, link")
-        links.put(sink, link)(tx.peer)
+        implicit val itx = tx.peer
+        if (!links.contains(sink)) {
+          val link = LinkNode[S](this, sourceNode, sink, sinkNode)
+          logA(s"AuralScan link; ${data.procCached()}, link")
+          links.put(sink, link)
+        }
       }
 
     def removeSource(source: AuralScan[S])(implicit tx: S#Tx): Unit = {
@@ -152,16 +153,18 @@ object AuralScanImpl {
     def removeSink(sink: AuralScan[S])(implicit tx: S#Tx): Unit = {
       logA(s"AuralScan removeSink  (${sink.data.procCached()}, ${sink.key}); ${data.procCached()}, $key")
       sinks.transform(_ - sink)(tx.peer)
-      links.remove(sink)(tx.peer).foreach { link =>
-        link.dispose()
-      }
+      sinkStopped(sink)
     }
 
     def play(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
       logA(s"AuralScan play; ${data.procCached()}, $key")
       stop1()
-      sinks.get(tx.peer).foreach { sink =>
+      sinks().foreach { sink =>
         tryLink(n, sink)
+      }
+      sources().foreach { source =>
+        source.sinkPlaying(this)
       }
     }
 
@@ -176,7 +179,20 @@ object AuralScanImpl {
         links.foreach { case (_, link) => link.dispose() }
         links.retain((_, _) => false) // no `clear` method
       }
+      sources().foreach { source =>
+        source.sinkStopped(this)
+      }
     }
+
+    def sinkPlaying(sink: AuralScan[S])(implicit tx: S#Tx): Unit =
+      data.nodeOption.foreach { sourceNode =>
+        tryLink(sourceNode, sink)
+      }
+
+    def sinkStopped(sink: AuralScan[S])(implicit tx: S#Tx): Unit =
+      links.remove(sink)(tx.peer).foreach { link =>
+        link.dispose()
+      }
 
     def dispose()(implicit tx: S#Tx): Unit = {
       logA(s"AuralScan dispose; ${data.procCached()}, $key")

@@ -53,6 +53,7 @@ trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] /* with Observable[S#Tx, A
 
   def data: AuralObj.ProcData[S]
 
-  //  def sourceUpdated(view: AuralScan[S])(implicit tx: S#Tx): Unit
-  //  def sinkUpdated  (view: AuralScan[S])(implicit tx: S#Tx): Unit
+  // def sourceUpdated(view: AuralScan[S])(implicit tx: S#Tx): Unit
+  def sinkStopped (view: AuralScan[S])(implicit tx: S#Tx): Unit
+  def sinkPlaying (view: AuralScan[S])(implicit tx: S#Tx): Unit
 }
