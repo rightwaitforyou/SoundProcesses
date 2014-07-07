@@ -18,7 +18,8 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{Bus, NodeGraph, Node, Txn, Group, NodeRef, AudioBus, Sys}
 import de.sciss.model.Change
-import de.sciss.synth.{SynthGraph, addBefore}
+import de.sciss.synth.Curve.parametric
+import de.sciss.synth.{ControlSet, SynthGraph, addBefore}
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.UGenGraphBuilder.{State => UState, Complete, Incomplete, MissingIn}
@@ -203,24 +204,29 @@ object AuralProcDataImpl {
 
     private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrAdded  to   ${procCached()} ($key)")
-      logA("--todo---")
-      // testInScan (key, scan)
-      // testOutScan(key, scan)
+      attrNodeSet(key, value)
     }
+
+    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
+      if (state.attributeIns.contains(key)) {
+        // XXX TODO -- we have to verify the number of channels
+        nodeOption.foreach { n =>
+          val set = attrControlSet(key, value.elem)
+          n.node.set(audible = true, pairs = set)
+        }
+      }
 
     private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
-      logA("--todo---")
+      // currently this is simply ignored
     }
 
     private def attrChange(key: String, value: Obj[S], changes: Vec[Obj.Change[S, Any]])(implicit tx: S#Tx): Unit = {
       logA(s"AttrChange in   ${procCached()} ($key)")
-      logA("--todo---")
-      //      changes.foreach {
-      //        case Scan.SourceAdded(_) =>
-      //          testInScan(key, scan)
-      //        case _ =>
-      //      }
+      // currently, instead of processing the changes
+      // for individual types, we'll just re-evaluate
+      // the value and set it that way
+      attrNodeSet(key, value)
     }
 
     // ----
@@ -362,6 +368,32 @@ object AuralProcDataImpl {
             }
           }
         case _ =>
+      }
+    }
+
+    def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet = {
+      val ctlName = graph.attribute.controlName(key)
+      import Timeline.{SampleRate => sampleRate}
+      value match {
+        case a: IntElem     [S] => ctlName -> a.peer.value.toFloat: ControlSet
+        case a: DoubleElem  [S] => ctlName -> a.peer.value.toFloat: ControlSet
+        case a: BooleanElem [S] => ctlName -> (if (a.peer.value) 1f else 0f): ControlSet
+        case a: FadeSpec.Elem[S] =>
+          val spec = a.peer.value
+          // dur, shape-id, shape-curvature, floor
+          val values = Vec(
+            (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+              case parametric(c)  => c
+              case _              => 0f
+            }, spec.floor
+          )
+          ctlName -> values: ControlSet
+        case a: DoubleVecElem[S] =>
+          val values = a.peer.value.map(_.toFloat)
+          ctlName -> values: ControlSet
+
+        case _ =>
+          sys.error(s"Cannot cast attribute $value to a scalar value")
       }
     }
 

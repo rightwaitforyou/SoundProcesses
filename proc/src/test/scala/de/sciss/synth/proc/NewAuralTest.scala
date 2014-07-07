@@ -129,7 +129,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       putDouble(proc1, "amp", 0.5)
 
       val _view2 = proc {
-        val freq  = graph.attribute("freq").ir(440)
+        val freq  = graph.attribute("freq").kr(440)
         val in    = graph.scan.In("in")
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
       }

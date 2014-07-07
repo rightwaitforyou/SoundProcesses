@@ -194,26 +194,10 @@ object AuralProcImpl {
 
       // ---- attributes ----
       val attrNames     = ugen.attributeIns
-      if (attrNames.nonEmpty) attrNames.foreach { n =>
-        val ctlName = graph.attribute.controlName(n)
-        p.attr.getElem(n).foreach {
-          case a: IntElem     [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
-          case a: DoubleElem  [S] => setMap :+= (ctlName -> a.peer.value.toFloat: ControlSet)
-          case a: BooleanElem [S] => setMap :+= (ctlName -> (if (a.peer.value) 1f else 0f): ControlSet)
-          case a: FadeSpec.Elem[S] =>
-            val spec = a.peer.value
-            // dur, shape-id, shape-curvature, floor
-            val values = Vec(
-              (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
-                case parametric(c)  => c
-                case _              => 0f
-              }, spec.floor
-            )
-            setMap :+= (ctlName -> values: ControlSet)
-          case a: DoubleVecElem[S] =>
-            val values = a.peer.value.map(_.toFloat)
-            setMap :+= (ctlName -> values: ControlSet)
+      if (attrNames.nonEmpty) attrNames.foreach { key =>
+        p.attr.getElem(key).foreach {
           case a: AudioGraphemeElem[S] =>
+            val ctlName   = graph.attribute.controlName(key)
             val audioElem = a.peer
             val spec      = audioElem.spec
             //              require(spec.numChannels == 1 || spec.numFrames == 1,
@@ -230,7 +214,7 @@ object AuralProcImpl {
             dependencies     ::= w
           // users ::= w
 
-          case a => sys.error(s"Cannot cast attribute $a to a scalar value")
+          case a => setMap :+= data.attrControlSet(key, a)
         }
       }
 
