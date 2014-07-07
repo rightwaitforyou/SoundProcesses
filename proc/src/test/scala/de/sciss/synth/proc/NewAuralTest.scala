@@ -2,17 +2,32 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.synth.Server
+import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.synth
 
 import scala.concurrent.stm.Txn
 
 object NewAuralTest extends App {
-  type S  = Confluent
-  type I  = S#I
-  val sys = Confluent(BerkeleyDB.tmp())
-  val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
-  implicit val _cursor: stm.Cursor[S] = cursor
+  val confluent = false   // currently test4 has a problem with event-variables in confluent
+
+  val name = args.headOption.getOrElse("?")
+
+  if (confluent) {
+    type S  = Confluent
+    type I  = S#I
+    val sys = Confluent(BerkeleyDB.tmp())
+    val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
+    new NewAuralTest[S](name)(cursor)
+
+  } else {
+    type S  = Durable
+    type I  = S#I
+    val sys = Durable(BerkeleyDB.tmp())
+    val cursor: stm.Cursor[S] = sys
+    new NewAuralTest[S](name)(cursor)
+  }
+}
+class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   showAuralLog = true
   // de.sciss.lucre.synth.showLog = true
 
@@ -28,7 +43,7 @@ object NewAuralTest extends App {
       AuralContext[S](s)
     }
     //////////////////////////////////////////////////////////////////////////////////////
-    args.headOption.getOrElse("?") match {
+    name match {
       case "--test1" => test1()
       case "--test2" => test2()
       case "--test3" => test3()
@@ -90,7 +105,7 @@ object NewAuralTest extends App {
     proc.elem.peer.scans.add(key)
   }
 
-  implicit class ScanOps(val `this`: Scan[S]) extends AnyVal {
+  implicit class ScanOps(val `this`: Scan[S]) /* extends AnyVal */ {
     def ~> (that: Scan[S])(implicit tx: S#Tx): Unit =
       `this`.addSink(Scan.Link.Scan(that))
   }
@@ -130,6 +145,7 @@ object NewAuralTest extends App {
       val proc1   = view1.obj()
       val proc2   = view2.obj()
       val test = de.sciss.lucre.event.Peek.targets(proc2)
+      println(s"---1, num-children is ${test.size}")
       // reversed steps
       val scanIn  = addScan(proc2, "in" )
       val scanOut = addScan(proc1, "out")
@@ -141,6 +157,7 @@ object NewAuralTest extends App {
       view1.play()
       val proc2   = view2.obj()
       val test = de.sciss.lucre.event.Peek.targets(proc2)
+      println(s"---2, num-children is ${test.size}")
 
       after(1.0) { implicit tx =>
         val proc2 = view2.obj()
@@ -148,6 +165,7 @@ object NewAuralTest extends App {
         // XXX TODO - continue here. This doesn't fire an event,
         // says proc2.targets.isEmpty?
         val test = de.sciss.lucre.event.Peek.targets(proc2)
+        println(s"---3, num-children is ${test.size}")
         // asInstanceOf[de.sciss.lucre.event.Node[S]]
         putDouble(proc2, "freq", 999)
 
