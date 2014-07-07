@@ -1,5 +1,5 @@
 /*
- *  TransportImpl.scala
+ *  TransportImplOLD.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -30,7 +30,7 @@ import de.sciss.{model => m}
 import evt.Sys
 import de.sciss.span.Span.SpanOrVoid
 
-object TransportImpl {
+object TransportImplOLD {
   import Grapheme.Segment
   import Segment.{Defined => DefSeg}
 

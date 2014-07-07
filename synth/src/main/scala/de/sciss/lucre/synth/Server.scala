@@ -60,6 +60,8 @@ object Server {
 trait Server {
   def peer: SServer
 
+  final def sampleRate: Double = peer.sampleRate
+
   implicit def executionContext: ExecutionContext
 
   // ---- transactional methods ----

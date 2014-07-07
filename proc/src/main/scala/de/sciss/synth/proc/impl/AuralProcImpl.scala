@@ -15,17 +15,14 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{NodeRef, AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
+import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
 import de.sciss.numbers
-import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
 
-import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm._
+import scala.concurrent.stm.Ref
 
 object AuralProcImpl {
   // type E[S <: evt.Sys[S]] = Proc.Elem[S]
@@ -190,8 +187,6 @@ object AuralProcImpl {
 //      )
       var setMap = Vector.empty[ControlSet]
 
-      import Timeline.{SampleRate => sampleRate}
-
       // ---- attributes ----
       val attrNames     = ugen.attributeIns
       if (attrNames.nonEmpty) attrNames.foreach { key =>
@@ -229,7 +224,7 @@ object AuralProcImpl {
             val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
             val bufDur    = 1.5 * maxSpeed
             val minSz     = (2 * server.config.blockSize * math.max(1.0, maxSpeed)).toInt
-            val bestSz    = math.max(minSz, (bufDur * sampleRate).toInt)
+            val bestSz    = math.max(minSz, (bufDur * server.sampleRate).toInt)
             import numbers.Implicits._
             val bestSzHi  = bestSz.nextPowerOfTwo
             val bestSzLo  = bestSzHi >> 1
@@ -334,18 +329,18 @@ object AuralProcImpl {
 
                   case segm: Segment.Curve =>
                     ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-                  // println(s"segment : ${segm.span}")
-                  val bm     = mkInBus()
-                    val w      = SegmentWriter(bm.bus, segm, time, sampleRate)
-                    dependencies     ::= w
-                  // users ::= w
+                    // println(s"segment : ${segm.span}")
+                    val bm          = mkInBus()
+                    val w           = SegmentWriter(bm.bus, segm, time, Timeline.SampleRate)
+                    dependencies  ::= w
+                    // users ::= w
 
                   case audio: Segment.Audio =>
                     ensureChannels(audio.numChannels)
-                    val bm     = mkInBus()
-                    val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
-                    dependencies     ::= w
-                  // users    ::= w
+                    val bm          = mkInBus()
+                    val w           = AudioArtifactWriter(bm.bus, audio, time, server.sampleRate)
+                    dependencies  ::= w
+                    // users    ::= w
                 }
 
               case Link.Scan(peer) => mkInBus()

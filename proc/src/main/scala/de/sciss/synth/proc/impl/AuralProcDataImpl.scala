@@ -373,7 +373,6 @@ object AuralProcDataImpl {
 
     def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet = {
       val ctlName = graph.attribute.controlName(key)
-      import Timeline.{SampleRate => sampleRate}
       value match {
         case a: IntElem     [S] => ctlName -> a.peer.value.toFloat: ControlSet
         case a: DoubleElem  [S] => ctlName -> a.peer.value.toFloat: ControlSet
@@ -382,7 +381,7 @@ object AuralProcDataImpl {
           val spec = a.peer.value
           // dur, shape-id, shape-curvature, floor
           val values = Vec(
-            (spec.numFrames / sampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+            (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
               case parametric(c)  => c
               case _              => 0f
             }, spec.floor

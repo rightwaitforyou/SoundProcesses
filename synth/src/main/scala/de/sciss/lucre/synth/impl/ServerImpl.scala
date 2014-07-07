@@ -54,14 +54,13 @@ object ServerImpl {
     private var _bundles      = Vector.empty[osc.Bundle]
     private var _commits      = Vector.empty[Future[Unit]]
 
-    private val sampleRate    = peer.sampleRate
     private def time: Double  = position / sampleRate
 
     def committed(): Future[Unit] = sync.synchronized {
-      val futs  = filteredCommits
-      _commits  = Vector.empty
+      val futures       = filteredCommits
+      _commits          = Vector.empty
       implicit val exec = peer.clientConfig.executionContext
-      NodeGraph.reduceFutures(futs)
+      NodeGraph.reduceFutures(futures)
     }
 
     def bundles(addDefaultGroup: Boolean): Vec[osc.Bundle] = sync.synchronized {

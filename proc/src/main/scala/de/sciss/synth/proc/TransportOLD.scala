@@ -19,7 +19,7 @@ import bitemp.BiGroup
 import stm.{Disposable, Cursor}
 import collection.immutable.{IndexedSeq => Vec}
 import data.Iterator
-import impl.{TransportImpl => Impl}
+import impl.{TransportImplOLD => Impl}
 import de.sciss.span.SpanLike
 import de.sciss.lucre.event.{Observable, Sys}
 import proc.{Proc => _Proc}

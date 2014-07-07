@@ -19,10 +19,10 @@ import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.synth.{ControlSet, proc}
 import language.higherKinds
-import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralProcImpl}
+import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralTimelineImpl, AuralProcImpl}
 
 object AuralObj {
-  import proc.{Proc => _Proc}
+  import proc.{Proc => _Proc, Timeline => _Timeline}
 
   trait Factory {
     def typeID: Int
@@ -38,7 +38,15 @@ object AuralObj {
 
   def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = Impl(obj)
 
-  // --------------
+  sealed trait State
+  case object Stopped   extends State
+  case object Preparing extends State
+  case object Prepared  extends State
+  case object Playing   extends State
+
+  // -------------- sub-types --------------
+
+  // ---- proc ----
 
   trait ProcData[S <: Sys[S]] extends Disposable[S#Tx] {
     def obj: stm.Source[S#Tx, _Proc.Obj[S]]
@@ -113,11 +121,19 @@ object AuralObj {
     def targetState(implicit tx: S#Tx): AuralObj.State
   }
 
-  sealed trait State
-  case object Stopped   extends State
-  case object Preparing extends State
-  case object Prepared  extends State
-  case object Playing   extends State
+  // ---- timeline ----
+
+  object Timeline extends AuralObj.Factory {
+    type E[S <: evt.Sys[S]] = _Timeline.Elem[S]
+
+    def typeID = _Timeline.typeID
+
+    def apply[S <: Sys[S]](obj: _Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] =
+      AuralTimelineImpl(obj)
+  }
+  trait Timeline[S <: Sys[S]] extends AuralObj[S] {
+    override def obj: stm.Source[S#Tx, _Timeline.Obj[S]]
+  }
 }
 trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Disposable[S#Tx] {
   def typeID: Int
