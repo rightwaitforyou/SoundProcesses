@@ -14,8 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.data.SkipList
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, IdentifierMap}
 import de.sciss.lucre.synth.{Server, Sys}
+import de.sciss.serial.ImmutableSerializer
 
 import scala.concurrent.stm.{TxnLocal, Ref}
 
@@ -23,15 +26,21 @@ object AuralContextImpl {
   def apply[S <: Sys[S]](server: Server)(implicit tx: S#Tx): AuralContext[S] = {
     val objMap  = tx.newInMemoryIDMap[Entry[S]]
     val auxMap  = tx.newInMemoryIDMap[Any]
-    new Impl[S](objMap, auxMap, server)
+    val system  = tx.system
+    // system.inMemoryTx
+    implicit val itx = system.inMemoryTx(tx)
+    implicit val fuckYourselfScalaImplicitResolution = ImmutableSerializer.set[Int]
+    val prio    = SkipList.Map.empty[system.I, Long, Set[Int]]()
+    new Impl[S, system.I](objMap, auxMap, prio, server)
   }
 
   private final class Entry[S <: Sys[S]](val data: Disposable[S#Tx]) {
     val count = Ref(0)
   }
 
-  private final class Impl[S <: Sys[S]](objMap: IdentifierMap[S#ID, S#Tx, Entry[S]],
+  private final class Impl[S <: Sys[S], I <: stm.Sys[I]](objMap: IdentifierMap[S#ID, S#Tx, Entry[S]],
                                         auxMap: IdentifierMap[S#ID, S#Tx, Any],
+                                        prio  : SkipList.Map [I , Long, Set[Int]],
                                         val server: Server)
     extends AuralContext[S] {
 

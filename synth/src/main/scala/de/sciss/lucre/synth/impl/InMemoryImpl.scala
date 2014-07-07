@@ -25,17 +25,22 @@ object InMemoryImpl {
     extends stm.impl.InMemoryImpl.TxnMixin[InMemory] with evt.impl.InMemoryImpl.TxnMixin[InMemory]
     with TxnFullImpl[InMemory] {
 
-    override def toString = "proc.InMemory#Tx@" + hashCode.toHexString
+    override def toString = s"proc.InMemory#Tx@${hashCode.toHexString}"
 
     def inMemory: InMemory#Tx = this
   }
 
-  private final class System extends stm.impl.InMemoryImpl.Mixin[InMemory]
-  with InMemory with ReactionMapImpl.Mixin[InMemory] {
+  private final class System
+    extends stm.impl.InMemoryImpl.Mixin[InMemory]
+    with InMemory with ReactionMapImpl.Mixin[InMemory] {
+
     private type S = InMemory
+
+    def inMemory = this
+    def inMemoryTx(tx: Tx): Tx = tx
 
     def wrap(peer: InTxn): S#Tx = new TxnImpl(this, peer)
 
-    override def toString = "proc.InMemory@" + hashCode.toHexString
+    override def toString = s"proc.InMemory@${hashCode.toHexString}"
   }
 }

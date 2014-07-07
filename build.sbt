@@ -1,12 +1,12 @@
 lazy val logicalName = "SoundProcesses"
 
-name                      := logicalName + "-full"
+name                      := s"$logicalName-full"
 
 version      in ThisBuild := "2.5.0-SNAPSHOT"
 
 organization in ThisBuild := "de.sciss"
 
-homepage     in ThisBuild := Some(url("https://github.com/Sciss/" + logicalName))
+homepage     in ThisBuild := Some(url(s"https://github.com/Sciss/$logicalName"))
 
 description               := "A framework for creating and managing ScalaCollider based sound processes"
 
@@ -18,13 +18,13 @@ crossScalaVersions in ThisBuild := Seq("2.11.1", "2.10.4")
 
 resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-lazy val lucreCoreVersion       = "2.0.4"
+lazy val lucreCoreVersion       = "2.1.0-SNAPSHOT"
 
-lazy val lucreDataVersion       = "2.2.3"
+lazy val lucreDataVersion       = "2.3.0-SNAPSHOT"
 
-lazy val lucreEventVersion      = "2.6.1"
+lazy val lucreEventVersion      = "2.7.0-SNAPSHOT"
 
-lazy val lucreConfluentVersion  = "2.8.0"
+lazy val lucreConfluentVersion  = "2.9.0-SNAPSHOT"
 
 lazy val scalaColliderVersion   = "1.12.0"
 
@@ -34,7 +34,7 @@ lazy val spanVersion            = "1.2.1"
 
 lazy val fileUtilVersion        = "1.1.1"
 
-retrieveManaged in ThisBuild := true
+// retrieveManaged in ThisBuild := true
 
 scalacOptions in ThisBuild ++= {
   val xs = Seq("-deprecation", "-unchecked", "-feature", "-Xfuture")

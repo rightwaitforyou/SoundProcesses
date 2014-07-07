@@ -42,7 +42,9 @@ private[proc] object DurableImpl {
     extends evt.impl.DurableImpl.DurableMixin[Durable, evt.InMemory] with Durable
     with evt.impl.ReactionMapImpl.Mixin[Durable] {
     private type S = Durable
+
     val inMemory: /* evt. */ InMemory = /* evt. */ InMemory()
+    def inMemoryTx(tx: Tx): I#Tx = tx.inMemory
 
     def wrap(peer: InTxn): S#Tx = new TxnImpl(this, peer)
 
