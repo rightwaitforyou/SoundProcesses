@@ -33,15 +33,18 @@ trait Scheduler[S <: Sys[S]] {
     */
   def time(implicit tx: S#Tx): Long
 
-  /** Opaque type to identify scheduled functions. */
-  type Token
+  //  /** Opaque type to identify scheduled functions. */
+  //  type Token
 
   /** Schedules the execution of a function at a given time. Time is given
     * as an "absolute" frame in the sense of `AuralContext.time`.
     * Returns a token that can be used to cancel the action.
+    * The token is `>= 0`.
     */
-  def schedule(time: Long)(fun: S#Tx => Unit)(implicit tx: S#Tx): Token
+  def schedule(time: Long)(fun: S#Tx => Unit)(implicit tx: S#Tx): Int /* Token */
 
-  /** Cancels a scheduled action. */
-  def cancel(token: Token)(implicit tx: S#Tx): Unit
+  /** Cancels a scheduled action.
+    * It is ok to use an old token that was already completed or cancelled.
+    */
+  def cancel(token: Int /* Token */)(implicit tx: S#Tx): Unit
 }

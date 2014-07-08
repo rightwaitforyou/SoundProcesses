@@ -31,7 +31,7 @@ object ElemImpl {
   import Elem.Update
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec, ArtifactLocation => _ArtifactLocation, ProcGroup => _ProcGroup, Proc => _Proc}
+  import proc.{FadeSpec => _FadeSpec, ArtifactLocation => _ArtifactLocation, ProcGroup => _ProcGroup, Proc => _Proc, Timeline => _Timeline}
   import lucre.synth.expr.{DoubleVec => _DoubleVec}
 
   // ---- Int ----
@@ -383,6 +383,38 @@ object ElemImpl {
     def mkCopy()(implicit tx: S#Tx): ProcGroupElem[S] = ProcGroup(peer) // XXX TODO
   }
 
+  // ---- Timeline ----
+
+  object Timeline extends Companion[_Timeline.Elem] {
+    val typeID = _Timeline.typeID
+
+    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                   (implicit tx: S#Tx): _Timeline.Elem[S] with evt.Node[S] = {
+      val peer = _Timeline.read(in, access)
+      new TimelineActiveImpl(targets, peer)
+    }
+
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _Timeline.Elem[S] =
+      sys.error("Constant Timeline not supported")
+
+    def apply[S <: Sys[S]](peer: _Timeline[S])(implicit tx: S#Tx): _Timeline.Elem[S] =
+      new TimelineActiveImpl(evt.Targets[S], peer)
+  }
+
+  trait TimelineImpl[S <: Sys[S]] extends _Timeline.Elem[S] {
+    final def typeID = Timeline.typeID
+    final def prefix = "Timeline"
+  }
+
+  final class TimelineActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+                                               val peer: _Timeline[S])
+    extends Active[S] with TimelineImpl[S] {
+
+    protected def peerEvent = peer.changed
+
+    def mkCopy()(implicit tx: S#Tx): _Timeline.Elem[S] = Timeline(peer) // XXX TODO
+  }
+
   // ---- Proc ----
 
   object Proc extends Companion[_Proc.Elem] {
@@ -578,6 +610,7 @@ object ElemImpl {
     ArtifactLocation.typeID -> ArtifactLocation,
     Proc            .typeID -> Proc            ,
     ProcGroup       .typeID -> ProcGroup       ,
+    Timeline        .typeID -> Timeline        ,
     FolderElemImpl  .typeID -> FolderElemImpl
   )
 

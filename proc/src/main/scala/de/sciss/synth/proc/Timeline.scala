@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.bitemp.BiGroup
 import de.sciss.lucre.event.Sys
-import de.sciss.serial.Serializer
+import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc
 
 object Timeline {
@@ -27,15 +27,17 @@ object Timeline {
   val  Update               = BiGroup.Update
 
   object Modifiable {
-
+    def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = ???
   }
-  trait Modifiable[S <: Sys[S]] extends BiGroup.Modifiable[S, proc.Obj[S], proc.Obj.Update[S]]
+  trait Modifiable[S <: Sys[S]] extends Timeline[S] with BiGroup.Modifiable[S, proc.Obj[S], proc.Obj.Update[S]]
 
   implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Timeline[S]] = ???
+  
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline[S] = ???
 
   object Elem {
     def apply[S <: Sys[S]](peer: Timeline[S])(implicit tx: S#Tx): Timeline.Elem[S] =
-      ??? // proc.impl.ElemImpl.Proc(peer)
+      proc.impl.ElemImpl.Timeline(peer)
 
     object Obj {
       def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Timeline.Obj[S]] =
@@ -43,7 +45,8 @@ object Timeline {
         else None
     }
 
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Timeline.Elem[S]] = ??? //proc.impl.ElemImpl.Proc.serializer[S]
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Timeline.Elem[S]] =
+      proc.impl.ElemImpl.Timeline.serializer[S]
   }
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Timeline[S]

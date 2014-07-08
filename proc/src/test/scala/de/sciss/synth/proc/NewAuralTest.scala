@@ -1,11 +1,13 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm
+import de.sciss.lucre.{bitemp, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.{Sys, Server}
+import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
 
 import scala.concurrent.stm.Txn
+import scala.language.implicitConversions
 
 object NewAuralTest extends App {
   val confluent = true   // currently test4 has a problem with event-variables in confluent
@@ -53,9 +55,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test2" => test2()
       case "--test3" => test3()
       case "--test4" => test4()
+      case "--test5" => test5()
       case _         =>
-        println("WARNING: No option given, using --test4")
-        test4()
+        println("WARNING: No option given, using --test5")
+        test5()
     }
   }
 
@@ -94,6 +97,13 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     _view
   }
 
+  def timeline()(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
+    val tl    = Timeline.Modifiable[S]
+    val tlObj = Obj(Timeline.Elem(tl))
+    val _view = AuralObj.Timeline(tlObj)
+    _view
+  }
+
   def putDouble(proc: Proc.Obj[S], key: String, value: Double)(implicit tx: S#Tx): Unit = {
     val imp = ExprImplicits[S]
     import imp._
@@ -115,8 +125,59 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       `this`.addSink(Scan.Link.Scan(that))
   }
 
+  implicit def timeRange(in: (Double, Double)): Span = {
+    val start = (in._1 * Timeline.SampleRate).toLong
+    val stop  = (in._2 * Timeline.SampleRate).toLong
+    Span(start, stop)
+  }
+
+  implicit class TimelineOps(tl: Timeline.Obj[S]) /* extends AnyVal */ {
+    def += (span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
+      val tlm = tl.elem.peer.modifiableOption.get  // yo
+      tlm.add(bitemp.SpanLike.newConst(span), obj)
+    }
+  }
+
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 5
+
+  def test5()(implicit context: AuralContext[S]): Unit = {
+    println("----test5----\n")
+
+    val tl = cursor.step { implicit tx =>
+      def mkProc() = proc {
+        val freq = graph.attribute("freq").ir(441)
+        val pan = graph.attribute("pan").ir(0.0)
+        val sig = Pan2.ar(SinOsc.ar(freq) * 0.1, pan)
+        Out.ar(0, sig)
+      }
+
+      val _view1 = mkProc()
+      putDouble(_view1.obj(), "pan", -1)
+      val _view2 = mkProc()
+      putDouble(_view2.obj(), "freq", 666)
+      putDouble(_view2.obj(), "pan", 1)
+
+      val _tl   = timeline()
+      val tlObj = _tl.obj()
+      tlObj += (1.0 -> 3.0, _view1.obj())
+      tlObj += (2.0 -> 4.0, _view2.obj())
+      _tl
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      tl.play()
+    }
+
+    after(5.0) { implicit tx =>
+      println("--issue stop--")
+      tl.stop()
+      stopAndQuit(1.0)
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 4
 

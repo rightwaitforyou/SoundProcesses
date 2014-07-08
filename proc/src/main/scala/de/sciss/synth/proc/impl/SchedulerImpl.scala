@@ -87,9 +87,10 @@ object SchedulerImpl {
     def cancel(token: Token)(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       implicit val itx: I#Tx = iSys(tx)
-      tokenMap.remove(token).fold {
-        Console.err.println(s"Trying to cancel an unregistered token $token")
-      } { sch =>
+      //      tokenMap.remove(token).fold {
+      //        Console.err.println(s"Trying to cancel an unregistered token $token")
+      //      } { sch =>
+      tokenMap.remove(token).foreach { sch =>
         val t     = sch.time
         val set0  = prio.get(t).getOrElse(
           throw new AssertionError(s"Token $token found but no entry at $t in priority queue")

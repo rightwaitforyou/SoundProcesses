@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.data.SkipOctree
-import de.sciss.lucre.geom.{LongRectangle, LongPoint2D, LongSquare, LongSpace}
+import de.sciss.lucre.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2D, LongSquare, LongSpace}
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.stm
 import de.sciss.lucre.synth.Sys
@@ -42,13 +42,17 @@ object AuralTimelineImpl {
     case Span.Void          => LongPoint2D(MAX_COORD, MIN_COORD) // ?? what to do with this case ?? forbid?
   }
 
-  private def searchSpanToPoint(span: SpanLike): LongPoint2D = span match {
-    case Span(start, stop)  => LongPoint2D(start,     stop         )
-    case Span.From(start)   => LongPoint2D(start,     MAX_COORD + 1)
-    case Span.Until(stop)   => LongPoint2D(MIN_COORD, stop         )
-    case Span.All           => LongPoint2D(MIN_COORD, MAX_COORD + 1)
-    case Span.Void          => LongPoint2D(MAX_COORD, MIN_COORD    ) // ?? what to do with this case ?? forbid?
-  }
+  //  private def searchSpanToPoint(span: SpanLike): LongPoint2D = span match {
+  //    case Span(start, stop)  => LongPoint2D(start,     stop         )
+  //    case Span.From(start)   => LongPoint2D(start,     MAX_COORD + 1)
+  //    case Span.Until(stop)   => LongPoint2D(MIN_COORD, stop         )
+  //    case Span.All           => LongPoint2D(MIN_COORD, MAX_COORD + 1)
+  //    case Span.Void          => LongPoint2D(MAX_COORD, MIN_COORD    ) // ?? what to do with this case ?? forbid?
+  //  }
+
+  // ... accepted are points with x > LRP || y > LRP ...
+  private val advanceNNMetric = LongDistanceMeasure2D.nextSpanEvent(MAX_SQUARE)
+  // private val regressNNMetric = LongDistanceMeasure2D.prevSpanEvent(MAX_SQUARE)
 
   def apply[S <: Sys[S]](tlObj: Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
     val tl                = tlObj.elem.peer
@@ -76,13 +80,13 @@ object AuralTimelineImpl {
         map.add(span -> views)
     }
 
-    val res = new Impl[S, I](tx.newHandle(tlObj), map)
+    val res = new Impl[S, I](tx.newHandle(tlObj), map, context.scheduler)
     res.init(tlObj)
     res
   }
 
   private final class Impl[S <: Sys[S], I <: stm.Sys[I]](val obj: stm.Source[S#Tx, Timeline.Obj[S]],
-      map: SkipOctree[I, LongSpace.TwoDim, Leaf[S]])(implicit iSys: S#Tx => I#Tx)
+      map: SkipOctree[I, LongSpace.TwoDim, Leaf[S]], sched: Scheduler[S])(implicit iSys: S#Tx => I#Tx)
     extends AuralObj.Timeline[S] with ObservableImpl[S, AuralObj.State] {
 
     def typeID: Int = Timeline.typeID
@@ -90,6 +94,7 @@ object AuralTimelineImpl {
     private val currentStateRef = Ref[AuralObj.State](AuralObj.Stopped)
     private val activeViews     = TSet.empty[AuralObj[S]]
     private var tlObserver: Disposable[S#Tx] = _
+    private val schedToken      = Ref(-1)   // -1 indicates no scheduled function
 
     def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
 
@@ -112,13 +117,48 @@ object AuralTimelineImpl {
       implicit val ptx = tx.peer
       implicit val itx: I#Tx = iSys(tx)
       val frame = 0L    // XXX TODO - eventually should be provided by the `play` method
-      intersect(frame).foreach { case (span, views) =>
+      val toStart = intersect(frame)
+      playViews(toStart)
+      scheduleNext(frame)
+      state = AuralObj.Playing
+    }
+
+    private def playViews(it: data.Iterator[I#Tx, Leaf[S]])(implicit tx: S#Tx): Unit = {
+      implicit val itx: I#Tx = iSys(tx)
+      if (it.hasNext) it.foreach { case (span, views) =>
         views.foreach { view =>
           view.play()
-          activeViews.add(view)
+          activeViews.add(view)(tx.peer)
         }
       }
-      state = AuralObj.Playing
+    }
+
+    private def stopViews(it: data.Iterator[I#Tx, Leaf[S]])(implicit tx: S#Tx): Unit = {
+      implicit val itx: I#Tx = iSys(tx)
+      if (it.hasNext) it.foreach { case (span, views) =>
+        views.foreach { view =>
+          view.stop()
+          activeViews.remove(view)(tx.peer)
+        }
+      }
+    }
+
+    private def scheduleNext(currentFrame: Long)(implicit tx: S#Tx): Unit = {
+      implicit val ptx = tx.peer
+      val targetFrame = nearestEventAfter(currentFrame)
+      if (targetFrame != Long.MinValue) {
+        val targetTime = sched.time + (targetFrame - currentFrame)
+        schedToken() = sched.schedule(targetTime) { implicit tx =>
+          eventReached(frame = targetFrame)
+        }
+      }
+    }
+
+    private def eventReached(frame: Long)(implicit tx: S#Tx): Unit = {
+      val (toStart, toStop) = eventsAt(frame)
+      playViews(toStart)
+      stopViews(toStop )
+      scheduleNext(frame)
     }
 
     def stop()(implicit tx: S#Tx): Unit = {
@@ -134,6 +174,7 @@ object AuralTimelineImpl {
     private def freeNodes()(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       activeViews.foreach(_.stop())
+      sched.cancel(schedToken())
       clearSet(activeViews)
     }
 
@@ -150,6 +191,33 @@ object AuralTimelineImpl {
       // start < query.stop && stop > query.start
       val shape = LongRectangle(MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start)
       rangeSearch(shape)
+    }
+
+    // this can be easily implemented with two rectangular range searches
+    // return: (things-that-start, things-that-stop)
+    private def eventsAt(frame: Long)(implicit tx: S#Tx): (data.Iterator[I#Tx, Leaf[S]], data.Iterator[I#Tx, Leaf[S]]) = {
+      val startShape = LongRectangle(frame, MIN_COORD, 1, MAX_SIDE)
+      val stopShape  = LongRectangle(MIN_COORD, frame, MAX_SIDE, 1)
+      (rangeSearch(startShape), rangeSearch(stopShape))
+    }
+
+    // Long.MinValue indicates _no event_
+    private def nearestEventAfter(frame: Long)(implicit tx: S#Tx): Long = {
+      implicit val itx: I#Tx = iSys(tx)
+      val point = LongPoint2D(frame, frame) // + 1
+      val span  = map.nearestNeighborOption(point, advanceNNMetric).map(_._1).getOrElse(Span.Void)
+      span match {
+        case sp @ Span.From(start) => assert(start >= frame, sp); start // else None
+        case sp @ Span.Until(stop) => assert(stop  >= frame, sp); stop  // else None
+        case sp @ Span(start, stop) =>
+          if (start >= frame) {
+            start
+          } else {
+            assert(stop >= frame, sp)
+            stop
+          }
+        case _ => Long.MinValue // All or Void
+      }
     }
 
     private def rangeSearch(shape: LongRectangle)(implicit tx: S#Tx): data.Iterator[I#Tx, Leaf[S]] = {
