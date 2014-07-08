@@ -34,6 +34,7 @@ class TransportSpec extends ConfluentEventSpec {
     val obs = new Observation[S]
     val (pgH, t) = system.step { implicit tx =>
       val pg  = ProcGroup.Modifiable[S]
+      implicit val iBridge = (t: S#Tx) => t.inMemory
       val _t  = TransportOLD.offline[S, I](pg, 10000.0) // ( tx, inMemory )
       _t.seek(0L)
       _t.react(obs.register)
@@ -126,6 +127,7 @@ class TransportSpec extends ConfluentEventSpec {
     val obs = new Observation[S]
     val (pgH, t) = system.step { implicit tx =>
       val pg = ProcGroup.Modifiable[S]
+      implicit val iBridge = (t: S#Tx) => t.inMemory
       val _t = TransportOLD.offline[S, I](pg, 10000.0) // ( tx, inMemory )
       _t.seek(0L)
       _t.react(obs.register)

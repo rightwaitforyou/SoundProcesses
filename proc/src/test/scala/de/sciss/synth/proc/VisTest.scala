@@ -84,7 +84,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
 
   import Implicits._
 
-  lazy val access: S#Entry[Acc] = system.root { implicit tx =>
+  lazy val access: stm.Source[S#Tx, Acc] = system.root { implicit tx =>
     implicit def longType = lucre.expr.Long
     val g = ProcGroup.Modifiable[S]
     g.changed.react { _ => upd =>

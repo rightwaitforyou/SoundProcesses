@@ -20,6 +20,12 @@ import impl.{SchedulerImpl => Impl}
 object Scheduler {
   def apply[S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): Scheduler[S] = Impl[S]
 }
+
+/** A `Scheduler` uses a logical frame clock to execute functions transactionally
+  * at specific times. It is parametrized in `S` in order to perform transactions,
+  * but it does not store any state that would need the scheduler to be handled
+  * with `stm.Source`. It can be safely stored in a regular value.
+  */
 trait Scheduler[S <: Sys[S]] {
   /** Logical time frame based on `Timeline.SampleRate` and with zero
     * corresponding to creation time. Frames elapsed with wall-clock

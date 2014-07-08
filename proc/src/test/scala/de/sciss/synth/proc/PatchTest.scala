@@ -18,9 +18,9 @@ object PatchTest extends App {
     val auralSys = AuralSystem()
     cursor.step {
       implicit tx =>
-        auralSys.whenStarted(_ => cursor.step {
-          implicit tx =>
+        auralSys.whenStarted(_ => cursor.step { implicit tx =>
             println("Aural System started.")
+            implicit val iBridge = sys.inMemoryTx _
             run[S, I](auralSys)
         })
         auralSys.start()

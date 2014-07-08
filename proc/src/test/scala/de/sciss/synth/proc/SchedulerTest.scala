@@ -1,57 +1,47 @@
 package de.sciss.synth.proc
 
 import java.util.concurrent.{TimeUnit, Executors}
+import de.sciss.lucre.synth.InMemory
+
 import concurrent.stm.{TxnLocal, Txn => ScalaTxn, TxnExecutor, InTxn, Ref => STMRef}
 
 object SchedulerTest extends App {
-  val pool    = Executors.newScheduledThreadPool(1)
-  val txnTime = TxnLocal(System.currentTimeMillis())
-  val valid   = STMRef(0)
+  type S = InMemory
+  implicit val cursor = InMemory()
+  showTransportLog = true
 
-  def t[A](fun: InTxn => A) = TxnExecutor.defaultAtomic(fun)
+  def frames(secs: Double) = (Timeline.SampleRate * secs).toLong
 
-  def schedule(delay: Long)(code: InTxn => Unit)(implicit tx: InTxn): Unit = {
-    val v          = valid()
-    val logical    = txnTime()
-    val jitter     = System.currentTimeMillis() - logical
-    val effective  = math.max(0L, delay - jitter)
-    ScalaTxn.afterCommit { _ =>
-      pool.schedule(new Runnable {
-        def run(): Unit = t { implicit tx =>
-          if (v == valid()) {
-            txnTime() = logical + delay
-            code(tx)
-          }
-        }
-      }, effective, TimeUnit.MILLISECONDS)
+  cursor.step { implicit tx =>
+    val sched = Scheduler[S]
+    val now   = sched.time
+    val token2 = sched.schedule(now + frames(2.0)) { implicit tx =>
+      println("After 2 seconds - should have been cancelled")
     }
-  }
-
-  def stop()(implicit tx: InTxn): Unit = valid += 1
-
-  def io(code: => Unit)(implicit tx: InTxn): Unit = ScalaTxn.afterCommit(_ => code)
-
-  println("Run.")
-  t { implicit tx =>
-    io(println("0.0\""))
-    schedule(1000) { implicit tx =>
-      io(println("1.0\""))
-      schedule(500) { implicit tx =>
-        io(println("1.5\""))
-        schedule(1500) { implicit tx =>
-          io {
-            println("3.0\" -- woop. should have been stopped")
-            //                  pool.shutdown()
-          }
-        }
+    sched.schedule(now + frames(4.0)) { implicit tx =>
+      println("After 4 seconds")
+    }
+    sched.schedule(now + frames(1.0)) { implicit tx =>
+      println("After 1 seconds")
+      val now1 = sched.time
+      println(s"Logically ${now1 - now} frames elapsed.")
+      sched.schedule(now1 + frames(2.0)) { implicit tx =>
+        println(s"After 1+2 seconds (txn hash ${tx.hashCode().toHexString})")
+        val now2 = sched.time
+        println(s"Logically ${now2 - now1} frames elapsed.")
       }
     }
-  }
-  t { implicit tx =>
-    schedule(2000) { implicit tx =>
-      io(println("(independant)"))
-      stop()
-      schedule(1000) { _ => pool.shutdown()}
+    sched.schedule(now + frames(3.0)) { implicit tx =>
+      println(s"After 3   seconds (txn hash ${tx.hashCode().toHexString})")
     }
+    sched.cancel(token2)
+  }
+
+  new Thread {
+    override def run(): Unit = {
+      Thread.sleep(5000)
+      println("Terminating.")
+    }
+    start()
   }
 }

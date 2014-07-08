@@ -11,56 +11,37 @@ import de.sciss.synth.proc
 import proc.{logTransport => logT}
 
 import scala.concurrent.stm.{Ref, TMap, TxnLocal}
+import scala.util.control.NonFatal
 
 object SchedulerImpl {
   def apply[S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): Scheduler[S] = {
     val system  = tx.system
-    // system.inMemoryTx
-    implicit val iSys = system.inMemoryTx _ // (tx)
+    implicit val iSys = system.inMemoryTx _
     implicit val itx  = iSys(tx)
     implicit val fuckYourselfScalaImplicitResolution = ImmutableSerializer.set[Int]
     val prio    = SkipList.Map.empty[system.I, Long, Set[Int]]()
     new Impl[S, system.I](prio)
   }
 
-  private object Info {
-    // the initial info is at minimum possible frame. that way, calling seek(0L) which initialise
-    // the structures properly
-    final val init: Info = apply(
-      issueTime   = 0L,
-      targetTime  = Long.MinValue + 1,
-      valid       = -1
-    )
-  }
-
-  /* Information about the current situation of the transport.
+  /* Information about the current situation of the scheduler.
    *
-   * @param issueTime          the CPU time in microseconds at which the info was last updated
-   * @param targetTime         the next frame greater than `frame` at which a significant event happens in terms
-   *                           of processes starting or stopping in the transport's group
-   * @param valid               a counter which is automatically incremented by the `copy` method, used to determine
-   *                            whether a scheduled runnable is still valid. the scheduler needs to read this value
-   *                            before scheduling the runnable, then after the runnable is invoked, the current
-   *                            info must be retrieved and its valid counter compared to the previously extracted
-   *                            valid value. if both are equal, the runnable should go on executing, otherwise it
-   *                            is meant to silently abort.
+   * @param issueTime          the CPU time in sample frames at which the info was last updated
+   * @param targetTime         the next frame at which a significant event happens in terms
    */
-  private final case class Info private(issueTime: Long, targetTime: Long, valid: Int) {
-    def copy(issueTime: Long = issueTime, targetTime: Long = targetTime): Info =
-      Info(issueTime = issueTime, targetTime = targetTime, valid = valid + 1)
+  private final class Info(val issueTime: Long, val targetTime: Long) {
+    def delay: Long = targetTime - issueTime
 
-    // does not increment valid
-    def copy1(issueTime: Long = issueTime, targetTime: Long = targetTime): Info =
-      Info(issueTime = issueTime, targetTime = targetTime, valid = valid)
-
-    def incValid: Info = copy1()
+    override def toString = s"[issueTime = $issueTime, targetTime = $targetTime]"
   }
 
+  // one can argue whether the values should be ordered, e.g. Seq[Int] instead of Set[Int],
+  // such that if two functions A and B are submitted after another for the same target time,
+  // then A would be executed before B. But currently we don't think this is an important aspect.
   private final class Impl[S <: Sys[S], I <: stm.Sys[I]](prio  : SkipList.Map [I , Long, Set[Int]])
                                                         (implicit cursor: stm.Cursor[S], iSys: S#Tx => I#Tx)
     extends Scheduler[S] {
 
-    private final class ScheduledFunction(val time: Long, fun: S#Tx => Unit)
+    private final class ScheduledFunction(val time: Long, val fun: S#Tx => Unit)
 
     type Token = Int
 
@@ -69,29 +50,62 @@ object SchedulerImpl {
     private val sampleRateN = 0.014112 // = Timeline.SampleRate * 1.0e-9
     private val tokenRef    = Ref(0)
     private val tokenMap    = TMap.empty[Int, ScheduledFunction]
-    private val infoVar     = Ref(Info.init)
+    private val infoVar     = Ref(new Info(issueTime = 0L, targetTime  = Long.MaxValue))
 
     def time(implicit tx: S#Tx): Long = timeRef.get(tx.peer)
     private def time_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
 
     // ---- scheduling ----
 
-    def schedule(time: Long)(fun: S#Tx => Unit)(implicit tx: S#Tx): Token = {
-      implicit val itx = tx.peer
-      val token = tokenRef.getAndTransform(_ + 1)
-      tokenMap.put(token, new ScheduledFunction(time, fun))
-      ???
+    def schedule(targetTime: Long)(fun: S#Tx => Unit)(implicit tx: S#Tx): Token = {
+      implicit val ptx  = tx.peer
+      implicit val itx: I#Tx = iSys(tx)
+      val t             = time
+      if (targetTime < t) throw new IllegalArgumentException(s"Cannot schedule in the past ($targetTime < $time)")
+      val token         = tokenRef.getAndTransform(_ + 1)
+      tokenMap.put(token, new ScheduledFunction(targetTime, fun))
+      val oldInfo       = infoVar()
+      val reschedule    = targetTime < oldInfo.targetTime
+
+      if (reschedule) {   // implies that prio does not have an entry at `timeClip` yet
+        prio.add(targetTime -> Set(token))
+      } else {
+        val newSet = prio.get(targetTime).fold(Set(token))(_ + token)
+        prio.add(targetTime -> newSet)
+      }
+
+      logT(s"schedule: token = $token, time = $t, target = $targetTime, submit? $reschedule")
+
+      if (reschedule) {
+        val newInfo = new Info(issueTime = t, targetTime = targetTime)
+        submit(newInfo)
+      }
+
       token
     }
 
     def cancel(token: Token)(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       implicit val itx: I#Tx = iSys(tx)
-      tokenMap.remove(token).foreach { sch =>
-        val t = sch.time
-        prio.get(t)
+      tokenMap.remove(token).fold {
+        Console.err.println(s"Trying to cancel an unregistered token $token")
+      } { sch =>
+        val t     = sch.time
+        val set0  = prio.get(t).getOrElse(
+          throw new AssertionError(s"Token $token found but no entry at $t in priority queue")
+        )
+        val set1  = set0 - token
+        if (set1.isEmpty) {
+          prio.remove(t)
+          // if entry became empty, see if it was
+          // scheduled; if so, re-submit
+          val info = infoVar()
+          if (info.targetTime == t) scheduleNext()
+
+        } else {
+          prio.add(t -> set1)
+        }
       }
-      ???
     }
 
     private def calcFrame(): Long = {
@@ -99,8 +113,6 @@ object SchedulerImpl {
       val delta = System.nanoTime() - timeZero
       (delta * sampleRateN).toLong
     }
-
-    // XXX TODO: `submit` should take `Info`
 
     /* Invoked to submit a schedule step either to a realtime scheduler or other mechanism.
      * When the step is performed, execution should be handed over to `eventReached`, passing
@@ -111,24 +123,23 @@ object SchedulerImpl {
      *                         (the event `happens` at `logicalNow + logicalDelay`)
      * @param schedValid       the valid counter at the time of scheduling
      */
-    private def submit(logicalNow: Long, logicalDelay: Long, schedValid: Int)(implicit tx: S#Tx): Unit = {
-      val jitter        = calcFrame() - logicalNow
-      val actualDelayN  = math.max(0L, ((logicalDelay - jitter) / sampleRateN).toLong)
-      logT(s"scheduled: logicalDelay = $logicalDelay, actualDelay = $actualDelayN")
+    private def submit(info: Info)(implicit tx: S#Tx): Unit = {
+      implicit val ptx  = tx.peer
+      infoVar()         = info
+      val jitter        = calcFrame() - info.issueTime
+      val actualDelayN  = math.max(0L, ((info.delay - jitter) / sampleRateN).toLong)
+      logT(s"scheduled: $info; logicalDelay = ${info.delay}, actualDelay = $actualDelayN")
       tx.afterCommit {
-        // logT("(after commit)")
         SoundProcesses.pool.schedule(new Runnable {
           def run(): Unit = {
-            logT(s"scheduled: execute $schedValid")
+            logT(s"scheduled: execute $info")
             cursor.step { implicit tx =>
-              eventReached(logicalNow = logicalNow, logicalDelay = logicalDelay, expectedValid = schedValid)
+              eventReached(info)
             }
           }
         }, actualDelayN, TimeUnit.NANOSECONDS)
       }
     }
-
-    // XXX TODO: `eventReached` should take `Info`
 
     /* Invoked from the `submit` body after the scheduled event is reached.
      *
@@ -136,51 +147,45 @@ object SchedulerImpl {
      * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
      * @param expectedValid    the valid counter at the time of scheduling
      */
-    private def eventReached(logicalNow: Long, logicalDelay: Long, expectedValid: Int)(implicit tx: S#Tx): Unit = {
-      // implicit val itx: I#Tx = tx
+    private def eventReached(info: Info)(implicit tx: S#Tx): Unit = {
+      implicit val itx: I#Tx  = iSys(tx)
       implicit val ptx = tx.peer
-      val info = infoVar()
-      if (info.valid != expectedValid) return // the scheduled task was invalidated by an intermediate stop or seek command
+      if (info != infoVar()) return // the scheduled task was invalidated by an intermediate stop or seek command
 
       // this is crucial to eliminate drift: since we reached the scheduled event, do not
-      // let the cpuTime txn-local determine a new free wheeling time, but set it to the
+      // let the timeRef txn-local determine a new free wheeling time, but set it to the
       // time we targeted at; then in the next scheduleNext call, the jitter is properly
       // calculated.
-      val newLogical  = logicalNow + logicalDelay
-      time            = newLogical
-      val newTime     = info.targetTime
-      advance(newTime)
+      val t = info.targetTime
+      time = t
+
+      prio.remove(t).foreach { tokens =>
+        tokens.foreach { token =>
+          tokenMap.remove(token).foreach { sched =>
+            try {
+              sched.fun(tx)
+            } catch {
+              case NonFatal(e) =>
+                Console.err.println(s"While executing scheduled function $token:")
+                e.printStackTrace()
+            }
+          }
+        }
+      }
+
+      scheduleNext()
     }
 
-    private def advance(newTime: Long)(implicit tx: S#Tx): Unit = {
+    // looks at the smallest time on the queue. if it exists, submits to peer scheduler
+    private def scheduleNext()(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx  = iSys(tx)
-      implicit val ptx        = tx.peer
-      val oldInfo             = infoVar()
-      // val oldTime             = oldInfo.issueTime
-      logT(s"advance(newTime = $newTime); oldInfo = $oldInfo")
-      // do not short cut and return; because we may want to enforce play and call `scheduleNext`
-      //         if( newFrame == oldFrame ) return
+      val headOption = prio.ceil(Long.MinValue) // headOption method missing
 
-      val headOption    = prio.ceil(Long.MinValue) // headOption method missing
-      val newTargetTime = headOption.fold(Long.MaxValue)(_._1)
-
-      val newInfo = oldInfo.copy(issueTime = time, targetTime = newTargetTime)
-      infoVar() = newInfo
-      logT(s"advance - newInfo = $newInfo")
-
-      scheduleNext(newInfo)
-    }
-
-    private def scheduleNext(info: Info)(implicit tx: S#Tx): Unit = {
-      val targetTime = info.targetTime
-
-      if (targetTime == Long.MaxValue) return
-
-      val logicalDelay  = targetTime - info.issueTime //  * microsPerSample).toLong
-      val logicalNow    = info.issueTime
-      val schedValid    = info.valid
-
-      submit(logicalNow = logicalNow, logicalDelay = logicalDelay, schedValid = schedValid)
+      headOption.foreach { case (newTargetTime, _) =>
+        val t       = time
+        val newInfo = new Info(issueTime = t, targetTime = newTargetTime)
+        submit(newInfo)
+      }
     }
   }
 }
