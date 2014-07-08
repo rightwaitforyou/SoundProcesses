@@ -14,42 +14,29 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.data.SkipList
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, IdentifierMap}
 import de.sciss.lucre.synth.{Server, Sys}
-import de.sciss.serial.ImmutableSerializer
 
-import scala.concurrent.stm.{TxnLocal, Ref}
+import scala.concurrent.stm.Ref
 
 object AuralContextImpl {
-  def apply[S <: Sys[S]](server: Server)(implicit tx: S#Tx): AuralContext[S] = {
+  def apply[S <: Sys[S]](server: Server)(implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralContext[S] = {
     val objMap  = tx.newInMemoryIDMap[Entry[S]]
     val auxMap  = tx.newInMemoryIDMap[Any]
-    val system  = tx.system
-    // system.inMemoryTx
-    implicit val itx = system.inMemoryTx(tx)
-    implicit val fuckYourselfScalaImplicitResolution = ImmutableSerializer.set[Int]
-    val prio    = SkipList.Map.empty[system.I, Long, Set[Int]]()
-    new Impl[S, system.I](objMap, auxMap, prio, server)
+    val sched   = Scheduler[S]
+    new Impl[S](objMap, auxMap, sched, server)
   }
 
   private final class Entry[S <: Sys[S]](val data: Disposable[S#Tx]) {
     val count = Ref(0)
   }
 
-  private final class Impl[S <: Sys[S], I <: stm.Sys[I]](objMap: IdentifierMap[S#ID, S#Tx, Entry[S]],
+  private final class Impl[S <: Sys[S]](objMap: IdentifierMap[S#ID, S#Tx, Entry[S]],
                                         auxMap: IdentifierMap[S#ID, S#Tx, Any],
-                                        prio  : SkipList.Map [I , Long, Set[Int]],
-                                        val server: Server)
+                                        val scheduler: Scheduler[S],
+                                        val server: Server)(implicit cursor: stm.Cursor[S])
     extends AuralContext[S] {
-
-    type Token = Int
-
-    private val timeZero    = System.nanoTime()
-    private val timeRef     = TxnLocal(calcFrame())
-    private val sampleRateN = 0.014112 // Timeline.SampleRate * 1.0e-9
-    private val tokenRef    = Ref(0)
 
     def acquire[A <: Disposable[S#Tx]](obj: Obj[S])(init: => A)(implicit tx: S#Tx): A = {
       val id = obj.id
@@ -77,23 +64,5 @@ object AuralContextImpl {
 
     def putAux[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit      = auxMap.put(id, value)
     def getAux[A](id: S#ID          )(implicit tx: S#Tx): Option[A] = auxMap.get(id).asInstanceOf[Option[A]]
-
-    def time(implicit tx: S#Tx): Long = timeRef.get(tx.peer)
-
-    def schedule(time: Long)(fun: S#Tx => Unit)(implicit tx: S#Tx): Token = {
-      val token = tokenRef.getAndTransform(_ + 1)(tx.peer)
-      ???
-      token
-    }
-
-    def cancel(token: Token)(implicit tx: S#Tx): Unit = {
-      ???
-    }
-
-    private def calcFrame(): Long = {
-      // 1 ns = 10^-9 s
-      val delta = System.nanoTime() - timeZero
-      (delta * sampleRateN).toLong
-    }
   }
 }
