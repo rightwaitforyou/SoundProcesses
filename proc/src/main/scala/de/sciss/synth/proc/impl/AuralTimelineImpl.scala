@@ -78,7 +78,7 @@ object AuralTimelineImpl {
           val obj = timed.value
           AuralObj(obj)
         }
-        logA(s"timeline - init. add $span -> $views")
+        // logA(s"timeline - init. add $span -> $views")
         map.add(span -> views)
     }
 
@@ -106,11 +106,26 @@ object AuralTimelineImpl {
     }
 
     def init(tl: Timeline.Obj[S])(implicit tx: S#Tx): Unit = {
-      tlObserver = tl.changed.react { implicit tx => upd =>
+      tlObserver = tl.elem.peer.changed.react { implicit tx => upd =>
         upd.changes.foreach {
-          case _ => // XXX TODO
+          case Timeline.Added  (span, timed)    => elemAdded  (span, timed)
+          case Timeline.Removed(span, timed)    => elemRemoved(span, timed)
+          case Timeline.Moved  (timed, spanCh)  =>
+            elemRemoved(spanCh.before, timed)
+            elemAdded  (spanCh.now   , timed)
+          case Timeline.Element(_, _) =>  // we don't care
         }
       }
+    }
+
+    private def elemAdded(span: SpanLike, timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = {
+      logA(s"timeline - elemAdded($span, ${timed.value})")
+      logA("--todo--")
+    }
+
+    private def elemRemoved(span: SpanLike, timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = {
+      logA(s"timeline - elemRemoved($span, ${timed.value})")
+      logA("--todo--")
     }
 
     def play()(implicit tx: S#Tx): Unit = {

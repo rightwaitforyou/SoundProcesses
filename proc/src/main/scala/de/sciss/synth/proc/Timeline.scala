@@ -62,6 +62,14 @@ object Timeline {
 
   /** Convenient short-cut */
   type Obj[S <: Sys[S]] = proc.Obj.T[S, Timeline.Elem]
+
+  // ---- events ----
+  val Added     = BiGroup.Added
+  val Removed   = BiGroup.Removed
+  val Moved     = BiGroup.ElementMoved
+  val Element   = BiGroup.ElementMutated
+
+  type Timed[S <: Sys[S]] = BiGroup.TimedElem[S, proc.Obj[S]]
 }
 trait Timeline[S <: Sys[S]] extends BiGroup[S, Obj[S], Obj.Update[S]] {
   override def modifiableOption: Option[Timeline.Modifiable[S]]
