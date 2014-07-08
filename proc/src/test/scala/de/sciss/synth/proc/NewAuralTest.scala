@@ -98,7 +98,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   }
 
   def timeline()(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
-    val tl    = Timeline.Modifiable[S]
+    val tl    = Timeline[S]
     val tlObj = Obj(Timeline.Elem(tl))
     val _view = AuralObj.Timeline(tlObj)
     _view

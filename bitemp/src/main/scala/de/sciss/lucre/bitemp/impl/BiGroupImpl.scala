@@ -44,8 +44,8 @@ object BiGroupImpl {
 
   //   private final case class Entry[ Elem ]( )
 
-  private type LeafImpl[S <: Sys[S], Elem, U] = (SpanLike, Vec[TimedElemImpl[S, Elem, U]])
-  private type Tree    [S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
+  type LeafImpl[S <: Sys[S], Elem, U] = (SpanLike, Vec[TimedElemImpl[S, Elem, U]])
+  type Tree    [S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
 
   // private def opNotSupported: Nothing = sys.error("Operation not supported")
 
@@ -102,6 +102,7 @@ object BiGroupImpl {
   private class ModSer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])
                                             (implicit elemSerializer: Serializer[S#Tx, S#Acc, Elem])
     extends evt.NodeSerializer[S, BiGroup.Modifiable[S, Elem, U]] {
+
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): BiGroup.Modifiable[S, Elem, U] = {
       BiGroupImpl.read(in, access, targets, eventView)
     }
@@ -111,7 +112,7 @@ object BiGroupImpl {
   private val advanceNNMetric = LongDistanceMeasure2D.nextSpanEvent(MAX_SQUARE)
   private val regressNNMetric = LongDistanceMeasure2D.prevSpanEvent(MAX_SQUARE)
 
-  private final class TimedElemImpl[S <: Sys[S], Elem, U](group                 : Impl[S, Elem, U],
+  private[lucre] final class TimedElemImpl[S <: Sys[S], Elem, U](group          : Impl[S, Elem, U],
                                                           protected val targets : evt.Targets[S],
                                                           val span              : Expr[S, SpanLike],
                                                           val value             : Elem)
@@ -160,22 +161,30 @@ object BiGroupImpl {
     protected def reader: evt.Reader[S, TimedElemImpl[S, Elem, U]] = group.TimedSer
   }
 
-  private abstract class Impl[S <: Sys[S], Elem, U](protected val targets: evt.Targets[S],
-                                                    val eventView: Elem => EventLike[S, U])
-                                                   (implicit val elemSerializer: Serializer[S#Tx, S#Acc, Elem])
-    extends Modifiable[S, Elem, U] {
-
+  abstract class Impl[S <: Sys[S], Elem, U] extends Modifiable[S, Elem, U] {
     group =>
 
-    implicit def pointView: (Leaf[S, Elem], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint(tup._1)
+    // ---- abstract ----
+
+    implicit final def pointView: (Leaf[S, Elem], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint(tup._1)
 
     protected def tree: Tree[S, Elem, U]
+    def eventView(elem: Elem): EventLike[S, U]
+    implicit def elemSerializer: Serializer[S#Tx, S#Acc, Elem]
 
-    def treeHandle = tree
+    // ---- implemented ----
 
-    override def toString() = "BiGroup" + tree.id
+    protected final def newTree()(implicit tx: S#Tx): Tree[S, Elem, U] =
+      SkipOctree.empty[S, TwoDim, LeafImpl[S, Elem, U]](MAX_SQUARE)
 
-    final def modifiableOption: Option[BiGroup.Modifiable[S, Elem, U]] = Some(this)
+    protected final def readTree(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Tree[S, Elem, U] =
+      SkipOctree.read[S, TwoDim, LeafImpl[S, Elem, U]](in, access)
+
+    final def treeHandle = tree
+
+    override def toString() = s"BiGroup${tree.id}"
+
+    def modifiableOption: Option[BiGroup.Modifiable[S, Elem, U]] = Some(this)
 
     implicit object TimedSer extends evt.NodeSerializer[S, TimedElemImpl[S, Elem, U]] {
       def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): TimedElemImpl[S, Elem, U] = {
@@ -195,7 +204,7 @@ object BiGroupImpl {
 
       protected def reader: evt.Reader[S, BiGroup[S, Elem, U]] = serializer(eventView)
 
-      override def toString() = node.toString + ".CollectionEvent"
+      override def toString() = s"$node.CollectionEvent"
       final val slot = 0
       def node: BiGroup[S, Elem, U] = group
     }
@@ -206,7 +215,7 @@ object BiGroupImpl {
 
       protected def reader: evt.Reader[S, BiGroup[S, Elem, U]] = serializer(eventView)
 
-      override def toString() = node.toString + ".ElementEvent"
+      override def toString() = s"$node..ElementEvent"
       final val slot = 1
       def node: BiGroup[S, Elem, U] = group
 
@@ -259,7 +268,7 @@ object BiGroupImpl {
 
       protected def reader: evt.Reader[S, BiGroup.Modifiable[S, Elem, U]] = modifiableSerializer(eventView)
 
-      override def toString() = node.toString + ".ChangeEvent"  // default toString invokes `slot`!
+      override def toString() = s"$node.ChangeEvent"  // default toString invokes `slot`!
       final val slot = 2
 
       def node: BiGroup.Modifiable[S, Elem, U] = group
@@ -495,23 +504,31 @@ object BiGroupImpl {
     final def changed: Event[S, BiGroup.Update[S, Elem, U], BiGroup.Modifiable[S, Elem, U]] = ChangeEvent
   }
 
-  def newModifiable[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])(
-      implicit tx: S#Tx, elemSerializer: Serializer[S#Tx, S#Acc, Elem]): Modifiable[S, Elem, U] =
-    new Impl(evt.Targets[S], eventView) {
+  def newModifiable[S <: Sys[S], Elem, U](eventViewFun: Elem => EventLike[S, U])(
+      implicit tx: S#Tx, _elemSerializer: Serializer[S#Tx, S#Acc, Elem]): Modifiable[S, Elem, U] =
+    new Impl[S, Elem, U] {
       group =>
 
-      val tree: Tree[S, Elem, U] = {
-        SkipOctree.empty[S, TwoDim, LeafImpl[S, Elem, U]](MAX_SQUARE) // ( tx, view, space, )
-      }
+      def eventView(elem: Elem): EventLike[S, U] = eventViewFun(elem)
+
+      val elemSerializer: Serializer[S#Tx, S#Acc, Elem] = _elemSerializer
+
+      protected val targets = evt.Targets[S]
+
+      val tree: Tree[S, Elem, U] = newTree()
     }
 
-  private def read[S <: Sys[S], Elem, U](in: DataInput, access: S#Acc, targets: evt.Targets[S],
-                                         eventView: Elem => EventLike[S, U])
+  private def read[S <: Sys[S], Elem, U](in: DataInput, access: S#Acc, _targets: evt.Targets[S],
+                                         eventViewFun: Elem => EventLike[S, U])
                                         (implicit tx: S#Tx,
-                                         elemSerializer: Serializer[S#Tx, S#Acc, Elem]): Impl[S, Elem, U] =
-    new Impl(targets, eventView) {
-      val tree: Tree[S, Elem, U] = {
-        SkipOctree.read[S, TwoDim, LeafImpl[S, Elem, U]](in, access)
-      }
+                                          _elemSerializer: Serializer[S#Tx, S#Acc, Elem]): Impl[S, Elem, U] =
+    new Impl[S, Elem, U] {
+      def eventView(elem: Elem): EventLike[S, U] = eventViewFun(elem)
+
+      implicit def elemSerializer: Serializer[S#Tx, S#Acc, Elem] = _elemSerializer
+
+      protected val targets: evt.Targets[S] = _targets
+
+      val tree: Tree[S, Elem, U] = readTree(in, access)
     }
 }

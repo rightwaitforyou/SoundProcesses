@@ -17,6 +17,7 @@ import de.sciss.lucre.bitemp.BiGroup
 import de.sciss.lucre.event.Sys
 import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc
+import impl.{TimelineImpl => Impl}
 
 object Timeline {
   final val SampleRate = 14112000.0 // lcm(88.2k, 96k); note: value is copied in AuralContextImpl
@@ -26,14 +27,20 @@ object Timeline {
   type Update[S <: Sys[S]]  = BiGroup.Update[S, proc.Obj[S], proc.Obj.Update[S]]
   val  Update               = BiGroup.Update
 
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl[S]
+
   object Modifiable {
-    def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = ???
+    // def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl[S]
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Modifiable[S]] = Impl.modSerializer[S]
+
+    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] = Impl.modRead(in, access)
   }
   trait Modifiable[S <: Sys[S]] extends Timeline[S] with BiGroup.Modifiable[S, proc.Obj[S], proc.Obj.Update[S]]
 
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Timeline[S]] = ???
-  
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline[S] = ???
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Timeline[S]] = Impl.serializer[S]
+
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline[S] = Impl.read(in, access)
 
   object Elem {
     def apply[S <: Sys[S]](peer: Timeline[S])(implicit tx: S#Tx): Timeline.Elem[S] =
