@@ -21,6 +21,7 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.lucre.data
+import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{TSet, Ref}
@@ -77,6 +78,7 @@ object AuralTimelineImpl {
           val obj = timed.value
           AuralObj(obj)
         }
+        logA(s"timeline - init. add $span -> $views")
         map.add(span -> views)
     }
 
@@ -124,6 +126,7 @@ object AuralTimelineImpl {
     }
 
     private def playViews(it: data.Iterator[I#Tx, Leaf[S]])(implicit tx: S#Tx): Unit = {
+      logA("timeline - playViews")
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
         views.foreach { view =>
@@ -134,6 +137,7 @@ object AuralTimelineImpl {
     }
 
     private def stopViews(it: data.Iterator[I#Tx, Leaf[S]])(implicit tx: S#Tx): Unit = {
+      logA("timeline - stopViews")
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
         views.foreach { view =>
@@ -147,6 +151,7 @@ object AuralTimelineImpl {
       implicit val ptx = tx.peer
       val targetFrame = nearestEventAfter(currentFrame)
       if (targetFrame != Long.MinValue) {
+        logA(s"timeline - scheduleNext($currentFrame) -> $targetFrame")
         val targetTime = sched.time + (targetFrame - currentFrame)
         schedToken() = sched.schedule(targetTime) { implicit tx =>
           eventReached(frame = targetFrame)
@@ -155,6 +160,7 @@ object AuralTimelineImpl {
     }
 
     private def eventReached(frame: Long)(implicit tx: S#Tx): Unit = {
+      logA(s"timeline - eventReached($frame)")
       val (toStart, toStop) = eventsAt(frame)
       playViews(toStart)
       stopViews(toStop )

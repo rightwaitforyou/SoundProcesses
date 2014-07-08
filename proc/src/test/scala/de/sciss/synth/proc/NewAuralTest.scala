@@ -164,6 +164,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val tlObj = _tl.obj()
       tlObj += (1.0 -> 3.0, _view1.obj())
       tlObj += (2.0 -> 4.0, _view2.obj())
+      val it = tlObj.elem.peer.debugList
+      println("--debug print--")
+      println(it)
       _tl
     }
 
