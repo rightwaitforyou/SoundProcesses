@@ -150,7 +150,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       def mkProc() = proc {
         val freq = graph.attribute("freq").ir(441)
         val pan = graph.attribute("pan").ir(0.0)
-        val sig = Pan2.ar(SinOsc.ar(freq) * 0.1, pan)
+        val sig = Pan2.ar(SinOsc.ar(freq) * 0.2, pan)
         Out.ar(0, sig)
       }
 

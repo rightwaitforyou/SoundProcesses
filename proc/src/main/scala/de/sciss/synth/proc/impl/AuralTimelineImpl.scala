@@ -66,7 +66,7 @@ object AuralTimelineImpl {
     //    val map               = BiGroup.Modifiable[system.I, AuralObj[S], Unit](_ => dummyEvent)
     implicit val pointView = (l: Leaf[S], tx: I#Tx) => spanToPoint(l._1)
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
-    val map = SkipOctree.empty[I, LongSpace.TwoDim, Leaf[S]](MAX_SQUARE)
+    val tree = SkipOctree.empty[I, LongSpace.TwoDim, Leaf[S]](MAX_SQUARE)
 
     // Note: in the future, we might want to
     // restrict the view build-up to a particular
@@ -79,19 +79,22 @@ object AuralTimelineImpl {
           AuralObj(obj)
         }
         // logA(s"timeline - init. add $span -> $views")
-        map.add(span -> views)
+        tree.add(span -> views)
     }
 
-    val res = new Impl[S, I](tx.newHandle(tlObj), map, context.scheduler)
+    val res = new Impl[S, I](tx.newHandle(tlObj), tree)
     res.init(tlObj)
     res
   }
 
   private final class Impl[S <: Sys[S], I <: stm.Sys[I]](val obj: stm.Source[S#Tx, Timeline.Obj[S]],
-      map: SkipOctree[I, LongSpace.TwoDim, Leaf[S]], sched: Scheduler[S])(implicit iSys: S#Tx => I#Tx)
+                                                         tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]])
+                                                        (implicit context: AuralContext[S], iSys: S#Tx => I#Tx)
     extends AuralObj.Timeline[S] with ObservableImpl[S, AuralObj.State] {
 
     def typeID: Int = Timeline.typeID
+
+    private def sched = context.scheduler
 
     private val currentStateRef = Ref[AuralObj.State](AuralObj.Stopped)
     private val activeViews     = TSet.empty[AuralObj[S]]
@@ -120,7 +123,15 @@ object AuralTimelineImpl {
 
     private def elemAdded(span: SpanLike, timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = {
       logA(s"timeline - elemAdded($span, ${timed.value})")
-      logA("--todo--")
+      implicit val itx: I#Tx = iSys(tx)
+      val view = AuralObj(timed.value)
+      tree.transformAt(spanToPoint(span)) { opt =>
+        val newViews = opt.fold(span -> Vec(view)) { case (span1, views) => (span1, views :+ view) }
+        Some(newViews)
+      }
+      if (state == AuralObj.Playing) {
+        logA("--todo: elemAdded -> play--")
+      }
     }
 
     private def elemRemoved(span: SpanLike, timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = {
@@ -164,7 +175,7 @@ object AuralTimelineImpl {
 
     private def scheduleNext(currentFrame: Long)(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
-      val targetFrame = nearestEventAfter(currentFrame)
+      val targetFrame = nearestEventAfter(currentFrame + 1)
       if (targetFrame != Long.MinValue) {
         logA(s"timeline - scheduleNext($currentFrame) -> $targetFrame")
         val targetTime = sched.time + (targetFrame - currentFrame)
@@ -222,11 +233,11 @@ object AuralTimelineImpl {
       (rangeSearch(startShape), rangeSearch(stopShape))
     }
 
-    // Long.MinValue indicates _no event_
+    // Long.MinValue indicates _no event_; frame is inclusive!
     private def nearestEventAfter(frame: Long)(implicit tx: S#Tx): Long = {
       implicit val itx: I#Tx = iSys(tx)
       val point = LongPoint2D(frame, frame) // + 1
-      val span  = map.nearestNeighborOption(point, advanceNNMetric).map(_._1).getOrElse(Span.Void)
+      val span  = tree.nearestNeighborOption(point, advanceNNMetric).map(_._1).getOrElse(Span.Void)
       span match {
         case sp @ Span.From(start) => assert(start >= frame, sp); start // else None
         case sp @ Span.Until(stop) => assert(stop  >= frame, sp); stop  // else None
@@ -243,7 +254,7 @@ object AuralTimelineImpl {
 
     private def rangeSearch(shape: LongRectangle)(implicit tx: S#Tx): data.Iterator[I#Tx, Leaf[S]] = {
       implicit val itx: I#Tx = iSys(tx)
-      map.rangeQuery(shape)
+      tree.rangeQuery(shape)
     }
   }
 }
