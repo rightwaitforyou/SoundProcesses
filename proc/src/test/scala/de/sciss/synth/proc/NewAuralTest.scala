@@ -8,7 +8,7 @@ import de.sciss.synth
 import scala.concurrent.stm.Txn
 
 object NewAuralTest extends App {
-  val confluent = false   // currently test4 has a problem with event-variables in confluent
+  val confluent = true   // currently test4 has a problem with event-variables in confluent
 
   val name = args.headOption.getOrElse("?")
 
@@ -38,6 +38,11 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   }
 
   def initView(s: Server): Unit = {
+    if (Txn.findCurrent.isDefined) {
+      Console.err.println("Damn! I could swear there is no transaction.")
+      throw new IllegalStateException()
+    }
+
     s.peer.dumpOSC()
     implicit val context = cursor.step { implicit tx =>
       AuralContext[S](s)
@@ -144,8 +149,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       view2.play()
       val proc1   = view1.obj()
       val proc2   = view2.obj()
-      val test = de.sciss.lucre.event.Peek.targets(proc2)
-      println(s"---1, num-children is ${test.size}")
+      //      val test = de.sciss.lucre.event.Peek.targets(proc2)
+      //      println(s"---1, num-children is ${test.size}")
       // reversed steps
       val scanIn  = addScan(proc2, "in" )
       val scanOut = addScan(proc1, "out")
@@ -155,19 +160,16 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     after(2.0) { implicit tx =>
       println("--issue play1--")
       view1.play()
-      val proc2   = view2.obj()
-      val test = de.sciss.lucre.event.Peek.targets(proc2)
-      println(s"---2, num-children is ${test.size}")
+      //      val proc2 = view2.obj()
+      //      val test = de.sciss.lucre.event.Peek.targets(proc2)
+      //      println(s"---2, num-children is ${test.size}")
 
       after(1.0) { implicit tx =>
-        val proc2 = view2.obj()
+        val proc2b = view2.obj()
         println("--adjust attribute--")
-        // XXX TODO - continue here. This doesn't fire an event,
-        // says proc2.targets.isEmpty?
-        val test = de.sciss.lucre.event.Peek.targets(proc2)
-        println(s"---3, num-children is ${test.size}")
-        // asInstanceOf[de.sciss.lucre.event.Node[S]]
-        putDouble(proc2, "freq", 999)
+        // val test1 = de.sciss.lucre.event.Peek.targets(proc2b)
+        // println(s"---3, num-children is ${test1.size}")
+        putDouble(proc2b, "freq", 999)
 
         stopAndQuit()
       }

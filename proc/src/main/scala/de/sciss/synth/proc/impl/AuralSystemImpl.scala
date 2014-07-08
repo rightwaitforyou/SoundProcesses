@@ -187,12 +187,12 @@ object AuralSystemImpl {
 
     def whenStarted(fun: Server => Unit)(implicit tx: Txn): Unit = {
       state.get(tx.peer) match {
-        case StateRunning(server) => fun(server)
+        case StateRunning(server) => tx.afterCommit(fun(server))
         case _ =>
           val c: Client = new Client {
-            def auralStarted(s: Server)(implicit tx: Txn): Unit = {
+            def auralStarted(server: Server)(implicit tx: Txn): Unit = {
               removeClient(this)
-              fun(s)
+              tx.afterCommit(fun(server))
             }
 
             def auralStopped()(implicit tx: Txn) = ()

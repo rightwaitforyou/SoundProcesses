@@ -70,6 +70,8 @@ trait AuralSystem {
 
   /** Registers a callback to be invoked when the server has been booted.
     * If the server is already running, this has no effect. This method is transaction safe.
+    *
+    * The function is always execution _outside_ of a transaction.
     */
   def whenStarted(fun: Server => Unit)(implicit tx: Txn): Unit
 

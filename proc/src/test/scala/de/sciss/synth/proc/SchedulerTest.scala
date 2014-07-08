@@ -1,16 +1,30 @@
 package de.sciss.synth.proc
 
-import java.util.concurrent.{TimeUnit, Executors}
 import de.sciss.lucre.synth.InMemory
 
-import concurrent.stm.{TxnLocal, Txn => ScalaTxn, TxnExecutor, InTxn, Ref => STMRef}
-
+// TODO - could be rather easily converted into a unit test
 object SchedulerTest extends App {
   type S = InMemory
   implicit val cursor = InMemory()
   showTransportLog = true
 
   def frames(secs: Double) = (Timeline.SampleRate * secs).toLong
+
+  /*
+      Expected output:
+
+        After 1 seconds
+        Logically 14112000 frames elapsed.
+
+        After 3   seconds (txn hash <X>)
+        After 1+2 seconds (txn hash <X>)
+        Logically 28224000 frames elapsed.
+
+        After 4 seconds
+        Terminating.
+
+        (the two hashes <X> must be the same; two 2-second item is omitted)
+   */
 
   cursor.step { implicit tx =>
     val sched = Scheduler[S]
@@ -41,6 +55,7 @@ object SchedulerTest extends App {
     override def run(): Unit = {
       Thread.sleep(5000)
       println("Terminating.")
+      sys.exit()
     }
     start()
   }

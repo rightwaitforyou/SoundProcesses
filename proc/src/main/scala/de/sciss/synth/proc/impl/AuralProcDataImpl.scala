@@ -203,7 +203,7 @@ object AuralProcDataImpl {
     // ---- attr events ----
 
     private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      logA(s"AttrAdded  to   ${procCached()} ($key)")
+      logA(s"AttrAdded   to   ${procCached()} ($key)")
       attrNodeSet(key, value)
     }
 
