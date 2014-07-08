@@ -137,7 +137,7 @@ object AuralProcImpl {
 
     def play(/* time: SpanLike */)(implicit tx: S#Tx): Unit = {
       targetStateRef.set(AuralObj.Playing)(tx.peer)
-      // val curr      = state
+      if (state != AuralObj.Stopped) return
       data.state match {
         case s: UGenGraphBuilder.Complete[S] =>
           launchProc(s /*, time */)

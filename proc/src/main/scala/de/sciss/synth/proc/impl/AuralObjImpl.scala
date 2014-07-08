@@ -49,8 +49,8 @@ object AuralObjImpl {
   private var map = scala.Predef.Map[Int, Factory](
     // AudioGrapheme   .typeID -> AudioGrapheme,
     // Folder          .typeID -> Folder,
-    Proc            .typeID -> AuralObj.Proc // AuralProcImpl
-    // Timeline        .typeID -> Timeline
+    Proc            .typeID -> AuralObj.Proc, // AuralProcImpl
+    Timeline        .typeID -> AuralObj.Timeline
     // Code            .typeID -> Code,
   )
 
@@ -117,17 +117,7 @@ object AuralObjImpl {
   object Folder extends Factory {
     type E[S <: evt.Sys[S]] = FolderElem[S]
 
-    def typeID  = FolderElemImpl.typeID
-
-    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ???
-  }
-
-  // -------- Timeline --------
-
-  object Timeline extends Factory {
-    type E[S <: evt.Sys[S]] = AudioGraphemeElem[S]
-
-    def typeID: Int = ??? // ElemImpl.Timeline.typeID
+    def typeID = FolderElemImpl.typeID
 
     def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ???
   }
