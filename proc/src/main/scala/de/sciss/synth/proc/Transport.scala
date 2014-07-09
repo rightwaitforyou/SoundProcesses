@@ -36,7 +36,7 @@ object Transport {
 
   final case class Play[S <: Sys[S]](transport: Transport[S], position: Long) extends Update[S]
   final case class Stop[S <: Sys[S]](transport: Transport[S], position: Long) extends Update[S]
-  final case class Seek[S <: Sys[S]](transport: Transport[S], position: Long) extends Update[S]
+  final case class Seek[S <: Sys[S]](transport: Transport[S], position: Long, isPlaying: Boolean) extends Update[S]
 }
 
 /** New reduced definition of a t_(P) transport mechanism. */

@@ -46,12 +46,6 @@ object Timeline {
     def apply[S <: Sys[S]](peer: Timeline[S])(implicit tx: S#Tx): Timeline.Elem[S] =
       proc.impl.ElemImpl.Timeline(peer)
 
-    object Obj {
-      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Timeline.Obj[S]] =
-        if (obj.elem.isInstanceOf[Timeline.Elem[S]]) Some(obj.asInstanceOf[Timeline.Obj[S]])
-        else None
-    }
-
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Timeline.Elem[S]] =
       proc.impl.ElemImpl.Timeline.serializer[S]
   }
@@ -61,6 +55,12 @@ object Timeline {
   }
 
   /** Convenient short-cut */
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Timeline.Obj[S]] =
+      if (obj.elem.isInstanceOf[Timeline.Elem[S]]) Some(obj.asInstanceOf[Timeline.Obj[S]])
+      else None
+  }
   type Obj[S <: Sys[S]] = proc.Obj.T[S, Timeline.Elem]
 
   // ---- events ----

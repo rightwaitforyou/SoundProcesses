@@ -109,7 +109,7 @@ object TransportImpl {
       logT(s"transport - seek - $timeBase1")
 
       if (p) playViews()
-      fire(Transport.Seek(this, timeBase1.pos0))
+      fire(Transport.Seek(this, timeBase1.pos0, isPlaying = p))
     }
 
     def isPlaying(implicit tx: S#Tx): Boolean = timeBaseRef.get(tx.peer).isPlaying
