@@ -36,11 +36,11 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   val as = AuralSystem()
   cursor.step { implicit tx =>
-    as.whenStarted(initView)
+    as.whenStarted(s => initView(as, s))
     as.start()
   }
 
-  def initView(s: Server): Unit = {
+  def initView(as: AuralSystem, s: Server): Unit = {
     if (Txn.findCurrent.isDefined) {
       Console.err.println("Damn! I could swear there is no transaction.")
       throw new IllegalStateException()
@@ -57,9 +57,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test3" => test3()
       case "--test4" => test4()
       case "--test5" => test5()
+      case "--test6" => test6(as)
       case _         =>
-        println("WARNING: No option given, using --test5")
-        test5()
+        println("WARNING: No option given, using --test6")
+        test6(as)
     }
   }
 
@@ -86,23 +87,30 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   import synth._
   import ugen._
 
-  def proc(graph: => Unit)(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
+  def procV(graph: => Unit)(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
+    val pObj  = proc(graph)
+    val _view = AuralObj.Proc(pObj)
+    _view
+  }
+
+  def proc(graph: => Unit)(implicit tx: S#Tx): Proc.Obj[S] = {
     val p = Proc[S]
     val g = SynthGraph {
       graph
     }
     p.graph() = SynthGraphs.newConst[S](g)
+    Obj(Proc.Elem(p))
+  }
 
-    val pObj = Obj(Proc.Elem(p))
-    val _view = AuralObj.Proc(pObj)
+  def timelineV()(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
+    val tlObj = timeline()
+    val _view = AuralObj.Timeline(tlObj)
     _view
   }
 
-  def timeline()(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
+  def timeline()(implicit tx: S#Tx): Timeline.Obj[S] = {
     val tl    = Timeline[S]
-    val tlObj = Obj(Timeline.Elem(tl))
-    val _view = AuralObj.Timeline(tlObj)
-    _view
+    Obj(Timeline.Elem(tl))
   }
 
   def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
@@ -150,13 +158,55 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
 
+  ////////////////////////////////////////////////////////////////////////////////////// 6
+
+  def test6(as: AuralSystem): Unit = {
+    println("----test6----\n")
+
+    val tr = cursor.step { implicit tx =>
+      val _proc1 = proc {
+        // val sig = GrayNoise.ar(Seq(0.25, 0.25))
+        val sig = Dust.ar(1000) * 0.66667
+        Out.ar(0, sig)
+      }
+
+      val _proc2 = proc {
+        val sig = BrownNoise.ar(Seq(0.125, 0.125))
+        Out.ar(0, sig)
+      }
+
+      val _tl = timeline()
+
+      _tl += (10.0 -> 13.0, _proc1)
+
+      val _tr = Transport(as)
+      _tr.addObject(_tl)
+      _tr.addObject(_proc2)
+      _tr.seek(frame(8.0))
+      println("--issue play at 8s--")
+      _tr.play()
+      _tr
+    }
+
+    after(5.0) { implicit tx =>
+      println("--issue seek to 10s--")
+      tr.seek(frame(10.0))
+
+      after(4.0) { implicit tx =>
+        println("--issue stop--")
+        tr.stop()
+        stopAndQuit()
+      }
+    }
+  }
+
   ////////////////////////////////////////////////////////////////////////////////////// 5
 
   def test5()(implicit context: AuralContext[S]): Unit = {
     println("----test5----\n")
 
     val tl = cursor.step { implicit tx =>
-      def mkProc() = proc {
+      def mkProc() = procV {
         val freq = graph.attribute("freq").ir(441)
         val pan  = graph.attribute("pan" ).ir(0.0)
         val sig  = Pan2.ar(SinOsc.ar(freq) * 0.2, pan)
@@ -169,7 +219,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       putDouble(_view2.obj(), "freq", 666)
       putDouble(_view2.obj(), "pan", 1)
 
-      val _tl   = timeline()
+      val _tl   = timelineV()
       val tlObj = _tl.obj()
       tlObj += (1.0 -> 3.0, _view1.obj())
       tlObj += (2.0 -> 4.0, _view2.obj())
@@ -195,7 +245,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         after(2.0) { implicit tx =>
           println("--insert at 5.5s--")
           val tlObj = tl.obj()
-          val _view3 = proc {
+          val _view3 = procV {
             val dur  = graph.Duration.ir
             val off  = graph.Offset  .ir
             val pos  = Line.ar(off / dur, 1, dur - off)
@@ -207,7 +257,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
           tlObj += (3.5 -> 8.5, _view3.obj())
 
-          val _view4 = proc {
+          val _view4 = procV {
             val sig  = PinkNoise.ar(0.5)
             Out.ar(1, sig)
           }
@@ -232,7 +282,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     println("----test4----\n")
 
     val (view1, view2) = cursor.step { implicit tx =>
-      val _view1 = proc {
+      val _view1 = procV {
         val amp   = graph.attribute("amp").ir(0.0)
         val noise = PinkNoise.ar(Seq(amp, amp))
         graph.scan.Out("out", noise)
@@ -241,7 +291,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val proc1 = _view1.obj()
       putDouble(proc1, "amp", 0.5)
 
-      val _view2 = proc {
+      val _view2 = procV {
         val freq  = graph.attribute("freq").kr(440)
         val in    = graph.scan.In("in")
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
@@ -290,7 +340,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     println("----test3----\n")
 
     val (view1, view2) = cursor.step { implicit tx =>
-      val _view1 = proc {
+      val _view1 = procV {
         val amp   = graph.attribute("amp").ir(0.0)
         val noise = PinkNoise.ar(Seq(amp, amp))
         graph.scan.Out("out", noise)
@@ -299,7 +349,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val proc1 = _view1.obj()
       putDouble(proc1, "amp", 0.5)
 
-      val _view2 = proc {
+      val _view2 = procV {
         val freq  = graph.attribute("freq").ir(440)
         val in    = graph.scan.In("in")
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
@@ -336,7 +386,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     println("----test2----\n")
 
     val (view1, view2) = cursor.step { implicit tx =>
-      val _view1 = proc {
+      val _view1 = procV {
         val amp   = graph.attribute("amp").ir(0.0)
         val noise = PinkNoise.ar(Seq(amp, amp))
         graph.scan.Out("out", noise)
@@ -345,7 +395,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val proc1 = _view1.obj()
       putDouble(proc1, "amp", 0.5)
 
-      val _view2 = proc {
+      val _view2 = procV {
         val freq  = graph.attribute("freq").ir(440)
         val in    = graph.scan.In("in")
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
@@ -376,7 +426,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     println("----test1----\n")
 
     val view = cursor.step { implicit tx =>
-      val _view = proc {
+      val _view = procV {
         Out.ar(0, PinkNoise.ar(Seq(0.5, 0.5)))
       }
       _view.react { implicit tx => upd => println(s"Observed: $upd") }

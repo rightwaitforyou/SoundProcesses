@@ -18,6 +18,8 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.IdentifierMap
 import de.sciss.lucre.synth.{Txn, Server, Sys}
 import de.sciss.span.Span
+import de.sciss.synth.proc
+import proc.{logTransport => logT}
 
 import scala.concurrent.stm.{TSet, Ref}
 
@@ -67,6 +69,7 @@ object TransportImpl {
 
       val timeBase1 = timeBase0.play()
       timeBaseRef() = timeBase1
+      logT(s"transport - play - $timeBase1")
 
       playViews()
       fire(Transport.Play(this, timeBase1.pos0))
@@ -74,6 +77,7 @@ object TransportImpl {
 
     private def playViews()(implicit tx: S#Tx): Unit = {
       val tr = mkTimeRef()
+      logT(s"transport - playViews - $tr")
       viewSet.foreach(_.play(tr))(tx.peer)
     }
 
@@ -84,6 +88,7 @@ object TransportImpl {
 
       val timeBase1 = timeBase0.stop()
       timeBaseRef() = timeBase1
+      logT(s"transport - stop - $timeBase1")
 
       stopViews()
       fire(Transport.Stop(this, timeBase1.pos0))
@@ -99,8 +104,9 @@ object TransportImpl {
       val p = isPlaying
       if (p) stopViews()
 
-      val timeBase1 = new PlayTime(wallClock0 = if (p) scheduler.time else Long.MaxValue, pos0 = position)
+      val timeBase1 = new PlayTime(wallClock0 = if (p) scheduler.time else Long.MinValue, pos0 = position)
       timeBaseRef() = timeBase1
+      logT(s"transport - seek - $timeBase1")
 
       if (p) playViews()
       fire(Transport.Seek(this, timeBase1.pos0))
@@ -180,6 +186,7 @@ object TransportImpl {
     }
 
     private def auralStartedTx(server: Server)(implicit tx: S#Tx): Unit = {
+      logT(s"transport - aural-system started")
       implicit val aural = AuralContext(server, scheduler)
       implicit val ptx   = tx.peer
       contextRef.set(Some(aural))
@@ -199,6 +206,7 @@ object TransportImpl {
     }
 
     private def auralStoppedTx()(implicit tx: S#Tx): Unit = {
+      logT(s"transport - aural-system stopped")
       contextRef.set(None)(tx.peer)
       disposeViews()
     }
