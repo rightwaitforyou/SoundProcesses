@@ -177,8 +177,10 @@ object AuralSystemImpl {
     def stop()(implicit tx: Txn): Unit =
       state.swap(StateStopped)(tx.peer).dispose()
 
-    def addClient(c: Client)(implicit tx: Txn): Unit =
+    def addClient(c: Client)(implicit tx: Txn): Unit = {
       clients.transform(_ :+ c)(tx.peer)
+      // serverOption.foreach(c.auralStarted)
+    }
 
     def serverOption(implicit tx: Txn): Option[Server] = state.get(tx.peer).serverOption
 

@@ -13,8 +13,8 @@
 
 package de.sciss.synth.proc
 
+import de.sciss.lucre.event.Sys
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.Sys
 import impl.{SchedulerImpl => Impl}
 
 object Scheduler {
@@ -47,4 +47,6 @@ trait Scheduler[S <: Sys[S]] {
     * It is ok to use an old token that was already completed or cancelled.
     */
   def cancel(token: Int /* Token */)(implicit tx: S#Tx): Unit
+
+  def cursor: stm.Cursor[S]
 }

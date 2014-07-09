@@ -4,8 +4,8 @@ package impl
 import java.util.concurrent.TimeUnit
 
 import de.sciss.lucre.data.SkipList
+import de.sciss.lucre.event.Sys
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.Sys
 import de.sciss.serial.ImmutableSerializer
 import de.sciss.synth.proc
 import proc.{logTransport => logT}
@@ -40,7 +40,7 @@ object SchedulerImpl {
   // such that if two functions A and B are submitted after another for the same target time,
   // then A would be executed before B. But currently we don't think this is an important aspect.
   private final class Impl[S <: Sys[S], I <: stm.Sys[I]](prio  : SkipList.Map [I , Long, Set[Int]])
-                                                        (implicit cursor: stm.Cursor[S], iSys: S#Tx => I#Tx)
+                                                        (implicit val cursor: stm.Cursor[S], iSys: S#Tx => I#Tx)
     extends Scheduler[S] {
 
     private final class ScheduledFunction(val time: Long, val fun: S#Tx => Unit)
