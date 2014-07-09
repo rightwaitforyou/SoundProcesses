@@ -63,12 +63,6 @@ object Proc {
     def apply[S <: Sys[S]](peer: Proc[S])(implicit tx: S#Tx): Proc.Elem[S] =
       proc.impl.ElemImpl.Proc(peer)
 
-    object Obj {
-      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Proc.Obj[S]] =
-        if (obj.elem.isInstanceOf[Proc.Elem[S]]) Some(obj.asInstanceOf[Proc.Obj[S]])
-        else None
-    }
-
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Proc.Elem[S]] = proc.impl.ElemImpl.Proc.serializer[S]
   }
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
@@ -77,6 +71,12 @@ object Proc {
   }
 
   /** Convenient short-cut */
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Proc.Obj[S]] =
+      if (obj.elem.isInstanceOf[Proc.Elem[S]]) Some(obj.asInstanceOf[Proc.Obj[S]])
+      else None
+  }
   type Obj[S <: Sys[S]] = proc.Obj.T[S, Proc.Elem]
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
