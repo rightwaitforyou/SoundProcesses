@@ -34,6 +34,8 @@ object SchedulerImpl {
     override def toString = s"[issueTime = $issueTime, targetTime = $targetTime]"
   }
 
+  private val infInfo = new Info(issueTime = 0L, targetTime  = Long.MaxValue)
+
   // one can argue whether the values should be ordered, e.g. Seq[Int] instead of Set[Int],
   // such that if two functions A and B are submitted after another for the same target time,
   // then A would be executed before B. But currently we don't think this is an important aspect.
@@ -50,7 +52,7 @@ object SchedulerImpl {
     private val sampleRateN = 0.014112 // = Timeline.SampleRate * 1.0e-9
     private val tokenRef    = Ref(0)
     private val tokenMap    = TMap.empty[Int, ScheduledFunction]
-    private val infoVar     = Ref(new Info(issueTime = 0L, targetTime  = Long.MaxValue))
+    private val infoVar     = Ref(infInfo)
 
     def time(implicit tx: S#Tx): Long = timeRef.get(tx.peer)
     private def time_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
@@ -74,7 +76,7 @@ object SchedulerImpl {
         prio.add(targetTime -> newSet)
       }
 
-      logT(s"schedule: token = $token, time = $t, target = $targetTime, submit? $reschedule")
+      logT(s"schedule: token = $token, time = $t, old-target ${oldInfo.targetTime}, new-target = $targetTime, submit? $reschedule")
 
       if (reschedule) {
         val newInfo = new Info(issueTime = t, targetTime = targetTime)
@@ -129,7 +131,7 @@ object SchedulerImpl {
       infoVar()         = info
       val jitter        = calcFrame() - info.issueTime
       val actualDelayN  = math.max(0L, ((info.delay - jitter) / sampleRateN).toLong)
-      logT(s"scheduled: $info; logicalDelay = ${info.delay}, actualDelay = $actualDelayN")
+      logT(s"scheduled: $info; logicalDelay (f) = ${info.delay}, actualDelay (ns) = $actualDelayN")
       tx.afterCommit {
         SoundProcesses.pool.schedule(new Runnable {
           def run(): Unit = {
@@ -179,10 +181,13 @@ object SchedulerImpl {
 
     // looks at the smallest time on the queue. if it exists, submits to peer scheduler
     private def scheduleNext()(implicit tx: S#Tx): Unit = {
-      implicit val itx: I#Tx  = iSys(tx)
+      implicit val itx: I#Tx = iSys(tx)
       val headOption = prio.ceil(Long.MinValue) // headOption method missing
 
-      headOption.foreach { case (newTargetTime, _) =>
+      headOption.fold {
+        infoVar.set(infInfo)(tx.peer)   // so that subsequent `schedule` will succeed
+
+      } { case (newTargetTime, _) =>
         val t       = time
         val newInfo = new Info(issueTime = t, targetTime = newTargetTime)
         submit(newInfo)

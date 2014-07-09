@@ -30,7 +30,8 @@ object NewAuralTest extends App {
   }
 }
 class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
-  showAuralLog = true
+  showAuralLog      = true
+  showTransportLog  = true
   // de.sciss.lucre.synth.showLog = true
 
   val as = AuralSystem()
@@ -104,6 +105,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     _view
   }
 
+  def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
+
   def putDouble(proc: Proc.Obj[S], key: String, value: Double)(implicit tx: S#Tx): Unit = {
     val imp = ExprImplicits[S]
     import imp._
@@ -136,6 +139,12 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val tlm = tl.elem.peer.modifiableOption.get  // yo
       tlm.add(bitemp.SpanLike.newConst(span), obj)
     }
+
+    def -= (span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
+      val tlm = tl.elem.peer.modifiableOption.get  // yo
+      val res = tlm.remove(bitemp.SpanLike.newConst(span), obj)
+      if (!res) Console.err.println(s"Warning: object $obj at $span not found in timeline")
+    }
   }
 
   //////////////////////////////////////////////////////////////////////////////////////
@@ -149,8 +158,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     val tl = cursor.step { implicit tx =>
       def mkProc() = proc {
         val freq = graph.attribute("freq").ir(441)
-        val pan = graph.attribute("pan").ir(0.0)
-        val sig = Pan2.ar(SinOsc.ar(freq) * 0.2, pan)
+        val pan  = graph.attribute("pan" ).ir(0.0)
+        val sig  = Pan2.ar(SinOsc.ar(freq) * 0.2, pan)
         Out.ar(0, sig)
       }
 
@@ -178,7 +187,42 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     after(5.0) { implicit tx =>
       println("--issue stop--")
       tl.stop()
-      stopAndQuit(1.0)
+
+      after(1.0) { implicit tx =>
+        println("--issue play from 3.5s--")
+        tl.play(TimeRef(Span.from(0L), frame(3.5)))
+
+        after(2.0) { implicit tx =>
+          println("--insert at 5.5s--")
+          val tlObj = tl.obj()
+          val _view3 = proc {
+            val dur  = graph.Duration.ir
+            val off  = graph.Offset  .ir
+            val pos  = Line.ar(off / dur, 1, dur - off)
+            pos.poll(8, "pos")
+            val freq = pos.linexp(0, 1, 400, 4000)
+            val sig  = Pan2.ar(SinOsc.ar(freq) * 0.2)
+            Out.ar(0, sig)
+          }
+
+          tlObj += (3.5 -> 8.5, _view3.obj())
+
+          val _view4 = proc {
+            val sig  = PinkNoise.ar(0.5)
+            Out.ar(1, sig)
+          }
+
+          tlObj += (6.0 -> 7.5, _view4.obj())
+
+          after(1.0) { implicit tx =>
+            val tlObj = tl.obj()
+            println("--kill your idol at 6.5s--")
+            tlObj -= (6.0 -> 7.5, _view4.obj())
+
+            stopAndQuit(3.0)
+          }
+        }
+      }
     }
   }
 

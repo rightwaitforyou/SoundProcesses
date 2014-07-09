@@ -17,6 +17,7 @@ package impl
 import de.sciss.lucre.stm
 import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
 import de.sciss.numbers
+import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{addToHead, ControlSet}
@@ -59,71 +60,6 @@ object AuralProcImpl {
 
     // def latencyEstimate(implicit tx: S#Tx): Long = ...
 
-    //    private def addFlush()(implicit tx: S#Tx): Unit = {
-    //      logA(s"addFlush (${hashCode.toHexString})")
-    //      tx.beforeCommit(flush()(_))
-    //      // concurrent.stm.Txn.afterRollback(status => logA(s"rollback $status !!"))(tx.peer)
-    //    }
-    //
-    //    // called before the transaction successfully completes.
-    //    // this is the place where we launch completely built procs.
-    //    private def flush()(ptx: Txn): Unit = {
-    //      val itx = ptx.peer
-    //      ongoingBuild.get(itx).seq.foreach { builder =>
-    //        val ugen = builder.ugen
-    //        if (ugen.isComplete) {
-    //          try {
-    //            launchProc(builder)
-    //          } catch {
-    //            case NonFatal(e) =>
-    //              e.printStackTrace()
-    //              throw e
-    //          }
-    //
-    //        } else {
-    //          // XXX TODO: do we need to free buses associated with ugen.scanOuts ?
-    //          println("Warning: Incomplete aural proc build for " + ugen.timed.value)
-    //        }
-    //      }
-    //    }
-
-    //    private def procAdded(time: Long, timed: TimedProc[S])(implicit tx: S#Tx): Unit = {
-    //      logA(s"added $timed (${hashCode.toHexString})")
-    //
-    //      val timedID = timed.id
-    //      val ugen    = UGenGraphBuilder(this)
-    //      val builder = new AuralProcBuilder(ugen /*, name */)
-    //      //      val newTxn  = !ongoingBuild.isInitialized(tx.peer)
-    //      //      if (newTxn) addFlush() // ( ProcTxn() )   // the next line (`ongoingBuild.get`) will initialise then
-    //      //      val ongoing = ongoingBuild.get(tx.peer)
-    //      //      ongoing.seq :+= builder
-    //      //      // assert(ongoingBuild.isInitialized(tx.peer))
-    //
-    //      //      // initialise the id-to-builder map if necessary
-    //      //      val builderMap = ongoing.idMap.getOrElse {
-    //      //        val m = tx.newInMemoryIDMap[AuralProcBuilder[S]]
-    //      //        ongoing.idMap = Some(m)
-    //      //        m
-    //      //      }
-    //      //      // add the builder to it.
-    //      //      builderMap.put(timedID, builder)
-    //
-    //      // store the look up information for the scans
-    //      // (this is only needed because Scan.Link.Scan reveals
-    //      // only the Scan which in turn doesn't currently carry
-    //      // key and proc information, so it can't be recovered
-    //      // otherwise; in the future this may change)
-    //      val proc  = timed.value.elem.peer
-    //      val scans = proc.scans
-    //      scans.iterator.foreach {
-    //        case (key, scan) =>
-    //          import de.sciss.lucre.synth.expr.IdentifierSerializer
-    //          scanMap.put(scan.id, key -> tx.newHandle(timedID))
-    //      }
-    //
-    //      incrementalBuild(ongoing, builder)
-    //    }
-
     private val currentStateRef = Ref[AuralObj.State](AuralObj.Stopped)
     private val targetStateRef  = Ref[AuralObj.State](AuralObj.Stopped)
 
@@ -135,12 +71,12 @@ object AuralProcImpl {
       if (value != old) fire(value)
     }
 
-    def play(/* time: SpanLike */)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       targetStateRef.set(AuralObj.Playing)(tx.peer)
       if (state != AuralObj.Stopped) return
       data.state match {
         case s: UGenGraphBuilder.Complete[S] =>
-          launchProc(s /*, time */)
+          launchProc(s, timeRef)
         case _ =>
       }
     }
@@ -159,7 +95,7 @@ object AuralProcImpl {
       context.release(data.procCached())
     }
 
-    private def launchProc(ugen: UGenGraphBuilder.Complete[S] /*, span: SpanLike */)(implicit tx: S#Tx): Unit = {
+    private def launchProc(ugen: UGenGraphBuilder.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p             = data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
       val ug            = ugen.result
@@ -173,19 +109,16 @@ object AuralProcImpl {
       var dependencies  = List.empty[Resource]
 
       // ---- handle input buses ----
-      // val span          = timed.span.value
-//      var setMap        = Vec[ControlSet](
-//        graph.Time    .key -> time / sampleRate,
-//        graph.Offset  .key -> (span match {
-//          case Span.HasStart(start) => (time - start) / sampleRate
-//          case _ => 0.0
-//        }),
-//        graph.Duration.key -> (span match {
-//          case Span(start, stop)  => (stop - start) / sampleRate
-//          case _ => Double.PositiveInfinity
-//        })
-//      )
-      var setMap = Vector.empty[ControlSet]
+      // XXX TODO - it would be nicer if these were added optionally
+      var setMap        = Vector[ControlSet](
+        graph.Time    .key -> (timeRef.frame        / Timeline.SampleRate),
+        graph.Offset  .key -> (timeRef.offsetOrZero / Timeline.SampleRate),
+        graph.Duration.key -> (timeRef.span match {
+          case Span(start, stop)  => (stop - start) / Timeline.SampleRate
+          case _ => Double.PositiveInfinity
+        })
+      )
+      // var setMap = Vector.empty[ControlSet]
 
       // ---- attributes ----
       val attrNames     = ugen.attributeIns
@@ -299,12 +232,7 @@ object AuralProcImpl {
 
           // note: if not found, stick with default
 
-          // XXX TODO:
-          //          val time = span match {
-          //            case hs: Span.HasStart => hs.start
-          //            case _ => 0L
-          //          }
-          val time = 0L
+          val time = timeRef.offsetOrZero
 
           // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
           //           we cannot use ControlSet any more, but need other mechanism

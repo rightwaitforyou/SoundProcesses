@@ -17,6 +17,7 @@ import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
+import de.sciss.span.Span
 import de.sciss.synth.{ControlSet, proc}
 import language.higherKinds
 import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralTimelineImpl, AuralProcImpl}
@@ -149,6 +150,6 @@ trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Dispos
 
   def state(implicit tx: S#Tx): AuralObj.State
 
-  def play(/* time: SpanLike = Span.Void */)(implicit tx: S#Tx): Unit
-  def stop(/* time: Long                 */)(implicit tx: S#Tx): Unit
+  def play(timeRef: TimeRef = TimeRef.Undefined)(implicit tx: S#Tx): Unit
+  def stop(/* time: Long*/                     )(implicit tx: S#Tx): Unit
 }
