@@ -59,9 +59,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test5" => test5()
       case "--test6" => test6(as)
       case "--test7" => test7()
+      case "--test8" => test8()
       case _         =>
-        println("WARNING: No option given, using --test7")
-        test7()
+        println("WARNING: No option given, using --test8")
+        test8()
     }
   }
 
@@ -159,12 +160,57 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
 
+  ////////////////////////////////////////////////////////////////////////////////////// 8
+
+  def test8()(implicit context: AuralContext[S]): Unit = {
+    println("----test8----\n")
+
+    val tl = cursor.step { implicit tx =>
+      val _proc1 = proc {
+        val in = graph.scan.In("in")
+        val sig = in
+        (sig \ 0).poll(1, "ping-1")
+        Out.ar(0, sig)
+      }
+
+      val _proc2 = proc {
+        val sig = PinkNoise.ar(Seq(0.5, 0.5))
+        (sig \ 0).poll(1, "ping-2")
+        graph.scan.Out("out", sig)
+      }
+
+      println("--mk timeline--")
+
+      val _tl = timelineV()
+      val tlObj = _tl.obj()
+      tlObj +=(0.0 -> 10.0, _proc1)
+      // the problem occurs when we add the scan _before_ creating
+      // adding _proc2
+      println("--add scan--")
+      addScan(_proc2, "out") ~> addScan(_proc1, "in")
+      println("--add proc2--")
+      tlObj +=(2.0 ->  4.0, _proc2)
+      println("--alright--")
+      _tl
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      tl.play()
+
+      after(6.0) { implicit tx =>
+        tl.stop()
+        stopAndQuit(2.0)
+      }
+    }
+  }
+
   ////////////////////////////////////////////////////////////////////////////////////// 7
 
   def test7()(implicit context: AuralContext[S]): Unit = {
     println("----test7----\n")
 
-    val tl = cursor.step { implicit tx =>
+    cursor.step { implicit tx =>
       val _view1 = procV {
         val in   = graph.scan.In("foo")
         val sig  = Resonz.ar(in, 777, 0.1) * 10
