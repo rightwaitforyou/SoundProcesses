@@ -90,7 +90,7 @@ object ThesisExamples extends App {
 
     sys.step { implicit tx =>
       val aural = AuralSystem.start()
-      AuralPresentation.run(transp, aural)
+      AuralPresentationOLD.run(transp, aural)
 
       aural.whenStarted { _ =>
         sys.step { implicit tx =>

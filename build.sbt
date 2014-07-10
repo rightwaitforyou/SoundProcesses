@@ -18,13 +18,13 @@ crossScalaVersions in ThisBuild := Seq("2.11.1", "2.10.4")
 
 resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-lazy val lucreCoreVersion       = "2.1.0-SNAPSHOT"
+lazy val lucreCoreVersion       = "2.1.0"
 
-lazy val lucreDataVersion       = "2.3.0-SNAPSHOT"
+lazy val lucreDataVersion       = "2.3.0"
 
-lazy val lucreEventVersion      = "2.7.0-SNAPSHOT"
+lazy val lucreEventVersion      = "2.7.0"
 
-lazy val lucreConfluentVersion  = "2.9.0-SNAPSHOT"
+lazy val lucreConfluentVersion  = "2.9.0"
 
 lazy val scalaColliderVersion   = "1.12.0"
 

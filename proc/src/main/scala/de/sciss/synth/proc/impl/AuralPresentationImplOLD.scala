@@ -1,5 +1,5 @@
 /*
- *  AuralPresentationImpl.scala
+ *  AuralPresentationImplOLD.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -32,7 +32,7 @@ import de.sciss.synth.{ControlBus, addToHead, ControlSet}
 import de.sciss.numbers
 import de.sciss.lucre.expr.Expr
 
-object AuralPresentationImpl {
+object AuralPresentationImplOLD {
   //  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] = {
   //    val c = new Client[S](transport, aural)
   //    aural.addClient(c)
@@ -46,7 +46,7 @@ object AuralPresentationImpl {
   //  }
 
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, sensor: Option[SensorSystem])
-                      (implicit tx: S#Tx): AuralPresentation[S] = {
+                      (implicit tx: S#Tx): AuralPresentationOLD[S] = {
     val c = new Client[S](transport, aural, sensor)
     aural.addClient(c)
     aural.serverOption.foreach(c.startedTx)
@@ -55,7 +55,7 @@ object AuralPresentationImpl {
   }
 
   private final class Client[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, sensor: Option[SensorSystem])
-    extends AuralPresentation[S] with AuralSystem.Client with SensorSystem.Client {
+    extends AuralPresentationOLD[S] with AuralSystem.Client with SensorSystem.Client {
 
     override def toString = s"AuralPresentation@${hashCode.toHexString}"
 
@@ -190,7 +190,7 @@ object AuralPresentationImpl {
                                                scanMap: IdentifierMap[S#ID, S#Tx, (String, stm.Source[S#Tx, S#ID])],
                                                sampleRate: Double)
   //                                               artifactStore: stm.Source[S#Tx, ArtifactStore[S]]
-    extends AuralPresentation.Running[S] {
+    extends AuralPresentationOLD.Running[S] {
 
     override def toString = s"AuralPresentation.Running@${hashCode.toHexString}"
 

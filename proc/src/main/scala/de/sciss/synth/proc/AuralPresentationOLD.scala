@@ -1,5 +1,5 @@
 /*
- *  AuralPresentation.scala
+ *  AuralPresentationOLD.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -15,18 +15,18 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.stm
 import stm.Disposable
-import impl.{AuralPresentationImpl => Impl}
+import impl.{AuralPresentationImplOLD => Impl}
 import de.sciss.lucre.synth.{Sys, Group}
 import de.sciss.synth.{ControlBus => SControlBus}
 
-object AuralPresentation {
+object AuralPresentationOLD {
   // ---- implementation forwards ----
 
   //  def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem): AuralPresentation[S] =
   //    Impl.run[S](transport, aural)
 
   def run[S <: Sys[S]](transport: ProcTransport[S], aural: AuralSystem, sensor: Option[SensorSystem] = None)
-                      (implicit tx: S#Tx): AuralPresentation[S] =
+                      (implicit tx: S#Tx): AuralPresentationOLD[S] =
     Impl.run[S](transport, aural, sensor)
 
   private[proc] trait Running[S <: Sys[S]] {
@@ -57,7 +57,7 @@ object AuralPresentation {
 
   final private[proc] case class MissingInfo[S <: Sys[S]](source: TimedProc[S], key: String) extends Throwable
 }
-trait AuralPresentation[S <: Sys[S]] extends Disposable[S#Tx] {
+trait AuralPresentationOLD[S <: Sys[S]] extends Disposable[S#Tx] {
   def group(implicit tx: S#Tx): Option[Group]
 
   def stopAll(implicit tx: S#Tx): Unit

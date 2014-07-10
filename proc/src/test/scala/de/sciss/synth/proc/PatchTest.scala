@@ -40,7 +40,7 @@ object PatchTest extends App {
     val group         = ProcGroup.Modifiable[S]
     val trans         = TransportOLD[S, I](group)
     implicit val loc  = ArtifactLocation.Modifiable.tmp[S]()
-    val ap            = AuralPresentation.run[S](trans, auralSys)
+    val ap            = AuralPresentationOLD.run[S](trans, auralSys)
     ap.group.foreach {
       _.server.peer.dumpOSC()
     }

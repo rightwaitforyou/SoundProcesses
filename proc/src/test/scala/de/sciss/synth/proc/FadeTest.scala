@@ -57,7 +57,7 @@ object FadeTest extends App {
           s.peer.dumpOSC()
           system.step {
             implicit tx =>
-              AuralPresentation.run[S](transp, aural)
+              AuralPresentationOLD.run[S](transp, aural)
               transp.react(tx => upd => println(s"Observed: $upd"))
               transp.play()
           }

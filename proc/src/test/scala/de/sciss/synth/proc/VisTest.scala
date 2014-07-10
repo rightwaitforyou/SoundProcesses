@@ -225,7 +225,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
   //      }
   //   }}
 
-  private val auralVar = STMRef(Option.empty[AuralPresentation[S]])
+  private val auralVar = STMRef(Option.empty[AuralPresentationOLD[S]])
 
   def aural(): Unit = {
     if (auralVar.single().isDefined) return
@@ -234,7 +234,7 @@ final class VisTest[S <: Sys[S], I <: evt.Sys[I]](system: S)(implicit cursor: Cu
       val as = AuralSystem.start()
       implicit val itx = tx.peer
       implicit val _artifactStore = artifactStore
-      auralVar() = Some(AuralPresentation.run[S](trans, as))
+      auralVar() = Some(AuralPresentationOLD.run[S](trans, as))
     }
   }
 

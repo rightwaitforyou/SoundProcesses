@@ -35,7 +35,7 @@ private[proc] object UGenGraphBuilderOLD {
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-  def apply[S <: Sys[S]](aural: AuralPresentation.Running[S], timed: TimedProc[S], time: Long)
+  def apply[S <: Sys[S]](aural: AuralPresentationOLD.Running[S], timed: TimedProc[S], time: Long)
                         (implicit tx: S#Tx): UGenGraphBuilderOLD[S] =
     Impl(aural, timed, time)
 
