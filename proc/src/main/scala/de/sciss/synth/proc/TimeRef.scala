@@ -9,9 +9,24 @@ object TimeRef {
   /** Utility method that generates a string representation of
     * the time in seconds of a given frame index.
     */
-  def framesToSecs(n: Long): String = {
+  def framesToSecs(n: Long): String = if (n == Long.MinValue) "-inf" else if (n == Long.MaxValue) "inf" else {
     val s = n / Timeline.SampleRate
     f"$s%1.3f"
+  }
+
+  def spanToSecs(span: SpanLike): String = span match {
+    case Span.Void => "(void)"
+    case Span.All => "(all)"
+    case s: Span.Bounded =>
+      val start = s match {
+        case hs: Span.HasStart => framesToSecs(hs.start)
+        case _ => "-inf"
+      }
+      val stop = s match {
+        case hs: Span.HasStop => framesToSecs(hs.stop)
+        case _ => "inf"
+      }
+      s"(${start}s - ${stop}s)"
   }
 
   case object Undefined extends TimeRef {
@@ -55,19 +70,7 @@ object TimeRef {
       }
     }
 
-    private def spanToSecs: String = {
-      val start = span match {
-        case hs: Span.HasStart => framesToSecs(hs.start)
-        case _ => "-inf"
-      }
-      val stop = span match {
-        case hs: Span.HasStop => framesToSecs(hs.stop)
-        case _ => "inf"
-      }
-      s"(${start}s - ${stop}s)"
-    }
-
-    override def toString = s"TimeRef(span = $span / $spanToSecs, frame = $frame)"
+    override def toString = s"TimeRef(span = $span / ${spanToSecs(span)}, frame = $frame / ${framesToSecs(frame)})"
   }
 
   def apply(span: Span.NonVoid, frame: Long) = new Apply(span, frame)

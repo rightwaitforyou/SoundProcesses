@@ -120,6 +120,9 @@ object AuralObj {
     override def obj: stm.Source[S#Tx, _Proc.Obj[S]]
 
     def targetState(implicit tx: S#Tx): AuralObj.State
+
+    private[proc] def stopForRebuild  ()(implicit tx: S#Tx): Unit
+    private[proc] def playAfterRebuild()(implicit tx: S#Tx): Unit
   }
 
   // ---- timeline ----

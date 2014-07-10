@@ -36,10 +36,11 @@ object scan {
     protected def mkUGen(ctlName: String, numCh: Int): UGenInLike
   }
 
-  final case class In(key: String, default: Double = 0.0)
+  final case class In(key: String /*, default: Double = 0.0 */)
     extends InLike {
 
-    override def toString = s"""scan.In("$key", $default)"""
+    // override def toString = s"""scan.In("$key", $default)"""
+    override def toString = s"""scan.In("$key")"""
 
     override def productPrefix = "scan$In"
 
@@ -47,9 +48,9 @@ object scan {
 
     protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
       if (numCh == 1) {
-        ctlName.ar(default).expand
+        ctlName.ar(0.0f).expand
       } else if (numCh > 1) {
-        ctlName.ar(Vector.fill(numCh)(default)).expand
+        ctlName.ar(Vector.fill(numCh)(0.0f)).expand
       } else {
         UGenInGroup.empty
       }

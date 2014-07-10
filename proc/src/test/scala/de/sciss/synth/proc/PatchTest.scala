@@ -58,7 +58,7 @@ object PatchTest extends App {
     }
 
     p2.graph() = SynthGraph {
-      val freq = graph.scan.In("freq", 441)
+      val freq = graph.scan.In("freq")
       val sig = RLPF.ar(Pulse.ar(freq), freq * 2, 0.1)
       Out.ar(0, Pan2.ar(sig))
     }

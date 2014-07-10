@@ -49,6 +49,23 @@ object AuralProcImpl {
 
   // ---------------------------------------------------------------------
 
+  private sealed trait TargetState {
+    def toAuralState: AuralObj.State
+  }
+  private case object TargetStop extends TargetState {
+    def toAuralState = AuralObj.Stopped
+  }
+  private final class TargetPlaying(val wallClock: Long, val timeRef: TimeRef) extends TargetState {
+    def toAuralState = AuralObj.Playing
+
+    override def toString = s"TargetPlaying(wallClock = $wallClock, timeRef = $timeRef)"
+
+    def shiftTo(newWallClock: Long): TimeRef = {
+      val delta = newWallClock - wallClock
+      timeRef.shift(delta)
+    }
+  }
+
   private final class Impl[S <: Sys[S]](private val data: ProcData[S])(implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
@@ -61,10 +78,10 @@ object AuralProcImpl {
     // def latencyEstimate(implicit tx: S#Tx): Long = ...
 
     private val currentStateRef = Ref[AuralObj.State](AuralObj.Stopped)
-    private val targetStateRef  = Ref[AuralObj.State](AuralObj.Stopped)
+    private val targetStateRef  = Ref[TargetState](TargetStop)
 
     def state      (implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
-    def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer)
+    def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer).toAuralState
 
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
@@ -72,7 +89,8 @@ object AuralProcImpl {
     }
 
     def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      targetStateRef.set(AuralObj.Playing)(tx.peer)
+      val ts = new TargetPlaying(context.scheduler.time, timeRef)
+      targetStateRef.set(ts)(tx.peer)
       if (state != AuralObj.Stopped) return
       data.state match {
         case s: UGenGraphBuilder.Complete[S] =>
@@ -81,9 +99,25 @@ object AuralProcImpl {
       }
     }
 
+    // same as `play` but reusing previous `timeRef`
+    def playAfterRebuild()(implicit tx: S#Tx): Unit = {
+      if (state != AuralObj.Stopped) return
+
+      (data.state, targetStateRef.get(tx.peer)) match {
+        case (s: UGenGraphBuilder.Complete[S], tp: TargetPlaying) =>
+          launchProc(s, tp.shiftTo(context.scheduler.time))
+        case _ =>
+      }
+    }
+
     def stop(/* time: Long */)(implicit tx: S#Tx): Unit = {
+      targetStateRef.set(TargetStop)(tx.peer)
+      stopForRebuild()
+    }
+
+    // same as `stop` but not touching target state
+    def stopForRebuild()(implicit tx: S#Tx): Unit = {
       freeNode()
-      targetStateRef.set(AuralObj.Stopped)(tx.peer)
       state = AuralObj.Stopped
     }
 

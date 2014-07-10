@@ -58,9 +58,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test4" => test4()
       case "--test5" => test5()
       case "--test6" => test6(as)
+      case "--test7" => test7()
       case _         =>
-        println("WARNING: No option given, using --test6")
-        test6(as)
+        println("WARNING: No option given, using --test7")
+        test7()
     }
   }
 
@@ -157,6 +158,46 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 7
+
+  def test7()(implicit context: AuralContext[S]): Unit = {
+    println("----test7----\n")
+
+    val tl = cursor.step { implicit tx =>
+      val _view1 = procV {
+        val in   = graph.scan.In("foo")
+        val sig  = Resonz.ar(in, 777, 0.1) * 10
+        Out.ar(0, sig)
+      }
+
+      val _view2 = procV {
+        graph.scan.Out("out", PinkNoise.ar(Seq(0.5, 0.5)))
+      }
+
+      val scanOut = addScan(_view2.obj(), "out")
+      val scanBar = addScan(_view1.obj(), "bar")
+
+      scanOut ~> scanBar
+
+      println("--issue play--")
+      _view1.play()
+      _view2.play()
+
+      after(2.0) { implicit tx =>
+        println("--issue graph change--")
+        val pObj = _view1.obj()
+        val newGraph = SynthGraph {
+          val in   = graph.scan.In("bar")
+          val sig  = Resonz.ar(in, 555, 0.1) * 10
+          Out.ar(0, sig)
+        }
+        pObj.elem.peer.graph() = SynthGraphs.newConst[S](newGraph)
+
+        stopAndQuit()
+      }
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 6
 

@@ -29,8 +29,7 @@ object UGenGraphBuilder {
     def apply[S <: Sys[S]](aural: AuralObj.ProcData[S], proc: Obj.T[S, Proc.Elem])
                           (implicit tx: S#Tx): State[S] = Impl(aural, proc)
 
-    def init[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): Incomplete[S] =
-      Impl.init(proc)
+    def init[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): Incomplete[S] = Impl.init(proc)
 
   case class ScanIn(numChannels: Int, fixed: Boolean)
 

@@ -142,7 +142,7 @@ object ScansTest extends App {
     }
 
     p2.graph() = SynthGraph {
-      val freq = scan.In("freq", 333)
+      val freq = scan.In("freq")
       //         freq.poll
       Out.ar(0, SinOsc.ar(freq))
     }

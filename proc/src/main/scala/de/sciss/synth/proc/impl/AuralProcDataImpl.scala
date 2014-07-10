@@ -40,33 +40,6 @@ object AuralProcDataImpl {
 
   private type ObjSource[S <: Sys[S]] = stm.Source[S#Tx, Obj.T[S, Proc.Elem]]
 
-  //  private sealed trait MapEntryChange[+K, +V]
-  //  private case class MapEntryRemoved[K   ](key: K)                      extends MapEntryChange[K, Nothing]
-  //  private case class MapEntryAdded  [K, V](key: K, value : V)           extends MapEntryChange[K, V]
-  //  private case class MapEntryUpdated[K, V](key: K, before: V, after: V) extends MapEntryChange[K, V]
-  //
-  //  import scala.collection.generic.CanBuildFrom
-  //
-  //  def mapEntryChanges[K, V, That](before: Map[K, V], after: Map[K, V], incremental: Boolean)
-  //                                 (implicit cbf: CanBuildFrom[Nothing, MapEntryChange[K, V], That]): That = {
-  //    val b = cbf() // .newBuilder[MapEntryChange[K, V]]
-  //    if (before eq after) return b.result()
-  //
-  //    if (!incremental) {
-  //      before.foreach { case (k, vb) =>
-  //        after.get(k) match {
-  //          case Some(va) if vb != va => b += MapEntryUpdated(k, vb, va)
-  //          case None                 => b += MapEntryRemoved(k)
-  //          case _ =>
-  //        }
-  //      }
-  //    }
-  //    after.foreach { case (k, va) =>
-  //      if (!before.contains(k)) b += MapEntryAdded(k, va)
-  //    }
-  //    b.result()
-  //  }
-
   private def GroupImpl(name: String, in0: NodeRef)(implicit tx: Txn): GroupImpl = {
     val res = new GroupImpl(name, in0)
     NodeGraph.addNode(res)
@@ -176,7 +149,19 @@ object AuralProcDataImpl {
     }
 
     private def newSynthGraph(g: SynthGraph)(implicit tx: S#Tx): Unit = {
-      logA(s"--todo-- GraphChange ${procCached()}")
+      logA(s"newSynthGraph ${procCached()}")
+      implicit val itx = tx.peer
+
+      // stop and dispose all
+      procViews.foreach { view =>
+        if (view.state == AuralObj.Playing) view.stopForRebuild()
+      }
+      disposeNodeRefAndScans()
+
+      // then try to rebuild the stuff
+      val ugenInit = UGenGraphBuilder.init(procCached())
+      stateRef() = ugenInit
+      tryBuild()  // this will re-start the temporarily stopped views if possible
     }
 
     // ---- scan events ----
@@ -285,9 +270,13 @@ object AuralProcDataImpl {
     def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.remove(view)(tx.peer)
 
     def dispose()(implicit tx: S#Tx): Unit = {
+      procObserver.dispose()
+      disposeNodeRefAndScans()
+    }
+
+    private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       nodeRef.swap(None).foreach(_.dispose())
-      procObserver.dispose()
       scanViews.foreach { case (_, view) => view.dispose()}
       clearMap(scanViews)
       clearMap(scanBuses)
@@ -296,7 +285,7 @@ object AuralProcDataImpl {
     private def clearMap[A, B](m: TMap[A, B])(implicit tx: S#Tx): Unit =
       m.retain((_, _) => false)(tx.peer) // no `clear` method
 
-    def state(implicit tx: S#Tx) = stateRef.get(tx.peer)
+    def state(implicit tx: S#Tx): UGenGraphBuilder.State[S] = stateRef.get(tx.peer)
 
     /* If the ugen graph is incomplete, tries to (incrementally)
      * build it. Calls `buildAdvanced` with the old and new
@@ -364,7 +353,7 @@ object AuralProcDataImpl {
           procViews.foreach { view =>
             if (view.targetState == AuralObj.Playing) {
               // ugen graph became ready and view wishes to play.
-              view.play()
+              view.playAfterRebuild()
             }
           }
         case _ =>
