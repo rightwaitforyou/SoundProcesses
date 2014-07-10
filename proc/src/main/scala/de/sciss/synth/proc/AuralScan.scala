@@ -18,6 +18,11 @@ import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import impl.{AuralScanImpl => Impl}
 
 object AuralScan {
+  sealed trait Proxy[S <: Sys[S]]
+  final class Incomplete[S <: Sys[S]](val data: AuralObj.ProcData[S], val key: String) extends Proxy[S] {
+    override def toString = s"Proxy($data, $key)"
+  }
+
   /** Creates a new aural scan view and registers it with the context under `scan.id`. */
   def apply[S <: Sys[S]](data: AuralObj.ProcData[S], key: String, scan: Scan[S], bus: AudioBus)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] =
@@ -35,7 +40,7 @@ object AuralScan {
   //  }
   //  case class NodeChanged[S <: Sys[S]](view: AuralScan[S], change: Change[Option[NodeRef]]) extends Update[S]
 }
-trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] /* with Observable[S#Tx, AuralScan.Update[S]] */ {
+trait AuralScan[S <: Sys[S]] extends AuralScan.Proxy[S] with Disposable[S#Tx] {
   // def numChannels(implicit tx: S#Tx): Int
   // def numChannels_=(value: Int)(implicit tx: S#Tx): Unit
 

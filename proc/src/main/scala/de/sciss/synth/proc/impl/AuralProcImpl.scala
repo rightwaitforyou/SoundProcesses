@@ -334,9 +334,6 @@ object AuralProcImpl {
       state = AuralObj.Playing
     }
 
-    //    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[(String, ProcData[S])] =
-    //      context.getAux[(String, ProcData[S])](scan.id)
-
     private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
       playingRef.swap(Some(node))(tx.peer).foreach(freeNode1)
       data.addInstanceNode(node)

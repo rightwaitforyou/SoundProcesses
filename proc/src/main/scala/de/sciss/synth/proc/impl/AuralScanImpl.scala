@@ -26,14 +26,24 @@ import scala.concurrent.stm.{TMap, Ref}
 object AuralScanImpl {
   def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], bus: AudioBus)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] = {
-    val view  = new Impl[S](data = data, key = key, bus = bus)
+    val id    = scan.id
+    val view  = new Impl[S](data = data, key = key, bus = bus, id = id)
     logA(s"AuralScan(${data.procCached()}, $key, bus = $bus)")
-    context.putAux(scan.id, view)
+    context.putAux[AuralScan.Proxy[S]](id, view)
+
+    def scanView(peer: S#ID)(implicit tx: S#Tx): Option[AuralScan[S]] =
+      context.getAux[AuralScan.Proxy[S]](peer) match {
+        case Some(view: AuralScan[S]) => Some(view)
+        case _                        => None
+      }
+
+    def scanViewProxy(peer: S#ID)(implicit tx: S#Tx): Option[AuralScan.Proxy[S]] =
+      context.getAux[AuralScan.Proxy[S]](peer)
 
     scan.sources.foreach {
       case Link.Grapheme(peer) =>
       case Link.Scan    (peer) =>
-        context.getAux[AuralScan[S]](peer.id).foreach { sourceView =>
+        scanView(peer.id).foreach { sourceView =>
           sourceView.addSink  (view      )
           view      .addSource(sourceView)
         }
@@ -41,9 +51,12 @@ object AuralScanImpl {
     scan.sinks.foreach {
       case Link.Grapheme(peer) => // XXX TODO: currently not supported
       case Link.Scan    (peer) =>
-        context.getAux[AuralScan[S]](peer.id).foreach { sinkView =>
-          view    .addSink  (sinkView)
-          sinkView.addSource(view    )
+        scanViewProxy(peer.id).foreach {
+          case sinkView: AuralScan[S] =>
+            view    .addSink  (sinkView)
+            sinkView.addSource(view    )
+          case proxy: AuralScan.Incomplete[S] =>
+            proxy.data.sinkAdded(proxy.key, view)
         }
     }
 
@@ -54,10 +67,13 @@ object AuralScanImpl {
     // this event and call into the symmetric method.
     val obs = scan.changed.react { implicit tx => upd =>
       upd.changes.foreach {
-        case Scan.SourceAdded  (peer) => context.getAux[AuralScan[S]](peer.id).foreach(view.addSource   )
-        case Scan.SourceRemoved(peer) => context.getAux[AuralScan[S]](peer.id).foreach(view.removeSource)
-        case Scan.SinkAdded    (peer) => context.getAux[AuralScan[S]](peer.id).foreach(view.addSink     )
-        case Scan.SinkRemoved  (peer) => context.getAux[AuralScan[S]](peer.id).foreach(view.removeSink  )
+        case Scan.SourceAdded  (peer) => scanView(peer.id).foreach(view.addSource   )
+        case Scan.SourceRemoved(peer) => scanView(peer.id).foreach(view.removeSource)
+        case Scan.SinkAdded    (peer) => scanViewProxy(peer.id).foreach {
+          case sinkView: AuralScan[S] => view.addSink(sinkView)
+          case proxy: AuralScan.Incomplete[S] => proxy.data.sinkAdded(proxy.key, view)
+        }
+        case Scan.SinkRemoved  (peer) => scanView(peer.id).foreach(view.removeSink)
         case Scan.GraphemeChange(_, _) => // XXX TODO: currently not supported
       }
     }
@@ -115,7 +131,7 @@ object AuralScanImpl {
 
   // ----------------------------------
 
-  private final class Impl[S <: Sys[S]](val data: ProcData[S], val key: String, val bus: AudioBus)
+  private final class Impl[S <: Sys[S]](val data: ProcData[S], val key: String, val bus: AudioBus, id: S#ID)
     extends AuralScan.Owned[S]  {
 
     private val sources = Ref(Set.empty[AuralScan[S]])
@@ -196,6 +212,7 @@ object AuralScanImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       logA(s"AuralScan dispose; ${data.procCached()}, $key")
+      data.context.removeAux(id)
       obs.dispose()
       val sources0  = sources.swap(Set.empty)(tx.peer)
       val sinks0    = sinks  .swap(Set.empty)(tx.peer)

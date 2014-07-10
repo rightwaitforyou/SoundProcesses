@@ -184,8 +184,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val _tl = timelineV()
       val tlObj = _tl.obj()
       tlObj +=(0.0 -> 10.0, _proc1)
-      // the problem occurs when we add the scan _before_ creating
-      // adding _proc2
+      // the problem occurs (occurred! now it's fixed) when we add the scan _before_ creating
+      // adding _proc2. like here:
       println("--add scan--")
       addScan(_proc2, "out") ~> addScan(_proc1, "in")
       println("--add proc2--")

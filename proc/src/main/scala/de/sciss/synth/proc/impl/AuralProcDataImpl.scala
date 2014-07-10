@@ -101,7 +101,7 @@ object AuralProcDataImpl {
   }
 
   private final class Impl[S <: Sys[S]](val obj: ObjSource[S], state0: UState[S])
-                                       (implicit context: AuralContext[S])
+                                       (implicit val context: AuralContext[S])
     extends ProcData[S] {
 
     private val stateRef  = Ref[UState[S]](state0)
@@ -226,9 +226,25 @@ object AuralProcDataImpl {
         if (numCh >= 0) {
           // the scan is ready to be used and was missing before
           tryBuild()
+        } else {
+          addIncompleteScanIn(key, scan)
         }
       }
     }
+
+    // incomplete scan ins are scan ins which do exist and are used by
+    // the ugen graph, but their source is not yet available. in order
+    // for them to be detected when a sink is added, the sink must
+    // be able to find a reference to them via the context's auxiliary
+    // map. we thus store the special proxy sub-type `Incomplete` in
+    // there; when the sink finds it, it will invoke `sinkAdded`,
+    // in turn causing the data object to try to rebuild the ugen graph.
+    private def addIncompleteScanIn(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit =
+      context.putAux[AuralScan.Proxy[S]](scan.id, new AuralScan.Incomplete(this, key))
+
+    // called from scan-view if source is not materialized yet
+    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit =
+      if (state.missingIns.contains(key)) tryBuild()
 
     private def testOutScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       state.scanOuts.get(key).foreach { numCh =>
@@ -277,9 +293,18 @@ object AuralProcDataImpl {
     private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       nodeRef.swap(None).foreach(_.dispose())
-      scanViews.foreach { case (_, view) => view.dispose()}
+      scanViews.foreach { case (_, view) => view.dispose() }
       clearMap(scanViews)
       clearMap(scanBuses)
+      val missingIns = stateRef().missingIns
+      if (missingIns.nonEmpty) {
+        val scans = procCached().elem.peer.scans
+        missingIns.foreach { key =>
+          scans.get(key).foreach { scan =>
+            context.removeAux(scan.id)
+          }
+        }
+      }
     }
 
     private def clearMap[A, B](m: TMap[A, B])(implicit tx: S#Tx): Unit =
@@ -319,6 +344,14 @@ object AuralProcDataImpl {
         logA(s"buildAdvanced ${procCached()}; complete? ${now.isComplete}")
       } else {
         logA(s"buildAdvanced ${procCached()}; missingIns = ${now.missingIns.mkString(",")}")
+
+        // store proxies so future sinks can detect this incomplete proc
+        val scans = procCached().elem.peer.scans
+        now.missingIns.foreach { key =>
+          scans.get(key).foreach { scan =>
+            addIncompleteScanIn(key, scan)
+          }
+        }
       }
 
       // handle newly visible outputs
@@ -461,7 +494,10 @@ object AuralProcDataImpl {
     }
 
     private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[AuralScan[S]] =
-      context.getAux[AuralScan[S]](scan.id)
+      context.getAux[AuralScan.Proxy[S]](scan.id) match {
+        case Some(view: AuralScan[S]) => Some(view)
+        case _                        => None
+      }
 
     // called by UGenGraphBuilderImpl
     def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {

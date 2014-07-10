@@ -105,6 +105,11 @@ object AuralObj {
       * A scalar audio grapheme is not supported right now.
       */
     def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet
+
+    // called from scan-view if source is not materialized yet
+    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit
+
+    implicit def context: AuralContext[S]
   }
 
   object Proc extends AuralObj.Factory {

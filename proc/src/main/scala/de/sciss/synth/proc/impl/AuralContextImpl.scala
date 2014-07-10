@@ -62,5 +62,6 @@ object AuralContextImpl {
 
     def putAux[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit      = auxMap.put(id, value)
     def getAux[A](id: S#ID          )(implicit tx: S#Tx): Option[A] = auxMap.get(id).asInstanceOf[Option[A]]
+    def removeAux(id: S#ID          )(implicit tx: S#Tx): Unit      = auxMap.remove(id)
   }
 }

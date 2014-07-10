@@ -40,5 +40,7 @@ trait AuralContext[S <: Sys[S]] {
 
   def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A]
 
+  def removeAux(id: S#ID)(implicit tx: S#Tx): Unit
+
   def scheduler: Scheduler[S]
 }
