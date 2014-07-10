@@ -13,7 +13,7 @@
 
 package de.sciss.lucre.synth
 
-import de.sciss.synth.{Node => SNode, ControlABusMap, ControlKBusMap, ControlSet}
+import de.sciss.synth.{Node => SNode, ControlFillRange, ControlABusMap, ControlKBusMap, ControlSet}
 
 trait Node extends Resource {
   // ---- abstract ----
@@ -45,6 +45,8 @@ trait Node extends Resource {
 
   def set (audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit
   def setn(audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit
+
+  def fill(audible: Boolean, data: ControlFillRange*)(implicit tx: Txn): Unit
 
   //   def setIfOnline( pairs: ControlSet* )( implicit tx: Txn ) : Unit
 

@@ -14,7 +14,7 @@
 package de.sciss.lucre.synth
 
 import concurrent.stm.{Ref => ScalaRef}
-import de.sciss.synth.{ControlBus => SControlBus, AudioBus => SAudioBus}
+import de.sciss.synth.{ControlBus => SControlBus, AudioBus => SAudioBus, ControlABusMap}
 
 trait BusNodeSetter extends DynamicBusUser {
   def node: Node
@@ -54,12 +54,13 @@ object BusNodeSetter {
   def mapper(controlName: String, bus: ControlBus, node: Node): ControlBusNodeSetter =
     new ControlMapperImpl( controlName, bus, node )
 
+  // provides the `added` state
   private sealed trait ImplLike extends BusNodeSetter {
     final val added = ScalaRef(initialValue = false)
   }
 
   private sealed trait AudioSetterLike extends ImplLike {
-    final def busChanged(b: SAudioBus)(implicit tx: Txn): Unit =
+    final def busChanged(b: SAudioBus, isDummy: Boolean)(implicit tx: Txn): Unit =
       if (node.isOnline) node.set(audible = true, pairs = controlName -> b.index)
   }
 
@@ -68,9 +69,19 @@ object BusNodeSetter {
       if (node.isOnline) node.set(audible = true, pairs = controlName -> b.index)
   }
 
+  // implements `busChanged` in terms of a `mapan` command
   private trait AudioMapperLike extends ImplLike {
-    final def busChanged(b: SAudioBus)(implicit tx: Txn): Unit =
-      node.mapan(true, controlName -> b)
+    final def busChanged(b: SAudioBus, isDummy: Boolean)(implicit tx: Txn): Unit = {
+//      val value: ControlABusMap = if (isDummy) controlName -> -1 else controlName -> b
+//      node.mapan(true, value)
+
+      if (isDummy) {
+        node.mapan(true, ControlABusMap.Multi(controlName, -1, b.numChannels))
+        // node.fill(true, (controlName, b.numChannels, 0f))
+      } else {
+        node.mapan(true, controlName -> b)
+      }
+    }
   }
 
   private sealed trait ControlMapperLike extends ImplLike {
@@ -80,6 +91,7 @@ object BusNodeSetter {
 
   private abstract class AbstractAudioImpl
     extends ImplLike with AudioBus.User with AudioBusNodeSetter {
+
     final def migrateTo(newBus: AudioBus)(implicit tx: Txn): AudioBusNodeSetter = {
       require(newBus.numChannels == bus.numChannels)
       val wasAdded = added.get(tx.peer)
@@ -115,8 +127,13 @@ object BusNodeSetter {
 
     final def remove()(implicit tx: Txn): Unit = {
       val wasAdded = added.swap(false)(tx.peer)
-      if (wasAdded) bus.removeReader(this)
+      if (wasAdded) {
+        bus.removeReader(this)
+        // wasRemoved()
+      }
     }
+
+    // protected def wasRemoved()(implicit tx: Txn) = ()
   }
 
   private abstract class AbstractControlReader extends AbstractControlImpl {
@@ -155,6 +172,10 @@ object BusNodeSetter {
     def newInstance(newBus: AudioBus) = mapper(controlName, newBus, node)
 
     override def toString = s"BusNodeSetter.mapper($controlName, $bus, $node)"
+
+    //    override protected def wasRemoved()(implicit tx: Txn) = {
+    //      println("Yo chuck")
+    //    }
   }
 
   private final class ControlMapperImpl(val controlName: String, val bus: ControlBus, val node: Node)
@@ -212,7 +233,7 @@ object BusNodeSetter {
    extends AbstractAudioImpl with AudioSetterLike {
 
     object dummy extends AudioBus.User {
-      def busChanged(b: SAudioBus)(implicit tx: Txn) = ()
+      def busChanged(b: SAudioBus, isDummy: Boolean)(implicit tx: Txn) = ()
     }
 
     def add()(implicit tx: Txn): Unit = {

@@ -57,7 +57,7 @@ object DynamicBusUser {
   private abstract class AbstractAudioImpl extends DynamicAudioBusUser with AudioBus.User {
     final val added = ScalaRef(initialValue = false)
 
-    final def busChanged(bus: SAudioBus)(implicit tx: Txn) = ()
+    final def busChanged(bus: SAudioBus, isDummy: Boolean)(implicit tx: Txn) = ()
 
     final def migrateTo(newBus: AudioBus)(implicit tx: Txn): DynamicAudioBusUser = {
       require(newBus.numChannels == bus.numChannels)

@@ -16,7 +16,7 @@ package impl
 
 import collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{TxnExecutor, InTxn, Ref}
-import de.sciss.synth.{ControlABusMap, ControlSet, ControlKBusMap}
+import de.sciss.synth.{ControlFillRange, ControlABusMap, ControlSet, ControlKBusMap}
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 
 object NodeImpl {
@@ -164,6 +164,8 @@ trait NodeImpl extends ResourceImpl with Node {
     tx.addMessage(this, peer.setnMsg(pairs: _*), audible = audible)
   }
 
+
+
   //   final def setIfOnline( pairs: ControlSet* )( implicit tx: Txn ) {
   //      // XXX eventually this should be like set with different failure resolution
   //      if( isOnline.get ) {
@@ -172,6 +174,11 @@ trait NodeImpl extends ResourceImpl with Node {
   ////      if( isOnline.get ) tx.add( OSCBundle(
   ////         OSCMessage( "/error", -1 ), node.setMsg( pairs: _* ), OSCMessage( "/error", -2 )), true )
   //   }
+
+  final def fill(audible: Boolean, data: ControlFillRange*)(implicit tx: Txn): Unit = {
+    requireOnline()
+    tx.addMessage(this, peer.fillMsg(data: _*), audible = audible)
+  }
 
   final def mapn(audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn): Unit = {
     requireOnline()
