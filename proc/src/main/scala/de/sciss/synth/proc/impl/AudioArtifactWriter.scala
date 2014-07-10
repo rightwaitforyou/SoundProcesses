@@ -20,9 +20,16 @@ import de.sciss.span.Span
 import de.sciss.numbers
 
 object AudioArtifactWriter {
-  def apply(bus: AudioBus, segm: Grapheme.Segment.Audio, time: Long, sampleRate: Double)
+  /** Creates a new audio artifact streaming synth.
+    * 
+    * @param bus          the bus to write the output signal to
+    * @param segm         the segment containing the audio grapheme
+    * @param frame         the current time with respect to the outer timeline (`Timeline.SampleRate`)
+    */
+  def apply(bus: AudioBus, segm: Grapheme.Segment.Audio, frame: Long)
            (implicit tx: Txn): Resource = {
-    val numChannels = segm.numChannels
+    val numChannels       = segm.numChannels
+    val serverSampleRate  = bus.server.sampleRate
     val sg  = SynthGraph {
       import de.sciss.synth._
       import ugen._
@@ -30,7 +37,7 @@ object AudioArtifactWriter {
       val dur = "dur".ir(1)
       val out = "out".kr
       val amp = "amp".kr(1)
-      val sig0 = if (segm.value.spec.sampleRate == sampleRate) {
+      val sig0 = if (segm.value.spec.sampleRate == serverSampleRate) {
         DiskIn .ar(numChannels, buf)
       } else {
         VDiskIn.ar(numChannels, buf, speed = "speed".ir(1))
@@ -40,13 +47,13 @@ object AudioArtifactWriter {
       Out.ar(out, sig)
     }
     val synth = Synth(bus.server, sg, nameHint = Some("audio-artifact"))
-    val res = new Impl(synth, bus, segm, time, sampleRate)
+    val res   = new Impl(synth = synth, bus = bus, segm = segm, frameTL = frame, serverSampleRate = serverSampleRate)
     res.play()
     res
   }
 
-  private final class Impl(synth: Synth, bus: AudioBus, segm: Grapheme.Segment.Audio, time: Long,
-                           sampleRate: Double)
+  private final class Impl(synth: Synth, bus: AudioBus, segm: Grapheme.Segment.Audio, frameTL: Long,
+                           serverSampleRate: Double)
     extends Resource.Proxy {
 
     // def resource(implicit tx: Txn) = synth
@@ -59,19 +66,28 @@ object AudioArtifactWriter {
       val path      = file.getAbsolutePath
       val spec      = audioVal.spec
       val fileFrames= spec.numFrames
-      val factor    = spec.sampleRate / sampleRate
-      val target    = server.defaultGroup // XXX
-      val fStart    = math.max(0L, math.min(fileFrames,
-                                            audioVal.offset + ((time - segm.span.start) * factor + 0.5).toLong))
-      val fStop     = math.min(fileFrames, segm.span match {
-        case Span.HasStop(stop) => fStart + ((stop - time) * factor + 0.5).toLong
-        case _ => Long.MaxValue
-      })
-      val dur       = (fStop - fStart) / spec.sampleRate
+      val factor    = spec.sampleRate / serverSampleRate
+      // XXX TODO - the target might come from an AudioContext eventually;
+      // this is fine nevertheless, because all we need to ensure is that
+      // the synth plays at the head
+      val offsetTL  = frameTL - segm.span.start
+      val srFile    = spec.sampleRate
+      val srRatio   = srFile / Timeline.SampleRate
+      val offsetFile = offsetTL * srRatio
+      val target    = server.defaultGroup
+      val startFile = math.max(0L, math.min(fileFrames, audioVal.offset + (offsetFile + 0.5).toLong))
+      val stopFile  = segm.span match {
+        case Span.HasStop(stopTL) =>
+          val lenTL   = stopTL - frameTL
+          val stop0   = startFile + (lenTL * srRatio + 0.5).toLong
+          math.min(stop0, fileFrames)
+        case _ => fileFrames
+      }
+      val dur       = (stopFile - startFile) / srFile
       import numbers.Implicits._
       // println(f"AudioArtifactWriter. fStart = $fStart, fStop = $fStop, $dur = $dur%1.3f")
       val bufSize   = (Buffer.defaultCueBufferSize * factor).toInt.nextPowerOfTwo max (server.peer.config.blockSize << 1)
-      val rb        = Buffer.diskIn(server)(path, startFrame = fStart, numChannels = bus.numChannels, numFrames = bufSize)
+      val rb        = Buffer.diskIn(server)(path, startFrame = startFile, numChannels = bus.numChannels, numFrames = bufSize)
       val args0     = List[ControlSet]("buf" -> rb.id, "dur" -> dur, "amp" -> audioVal.gain)
       val args      = if (factor == 1.0) args0 else ("speed" -> factor: ControlSet) :: args0
 

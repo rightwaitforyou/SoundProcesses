@@ -300,7 +300,7 @@ object AuralProcImpl {
                   case audio: Segment.Audio =>
                     ensureChannels(audio.numChannels)
                     val bm          = mkInBus()
-                    val w           = AudioArtifactWriter(bm.bus, audio, time, server.sampleRate)
+                    val w           = AudioArtifactWriter(bm.bus, audio, time)
                     dependencies  ::= w
                     // users    ::= w
                 }

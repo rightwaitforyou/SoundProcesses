@@ -402,7 +402,7 @@ object AuralPresentationImpl {
                     case audio: Segment.Audio =>
                       ensureChannels(audio.numChannels)
                       val bm     = lazyInBus
-                      val w      = AudioArtifactWriter(bm.bus, audio, time, sampleRate)
+                      val w      = AudioArtifactWriter(bm.bus, audio, time /*, sampleRate */)
                       dependencies     ::= w
                       // users    ::= w
                   }
