@@ -227,7 +227,7 @@ object AuralPresentationImplOLD {
       val time          = ugen.time
       val p             = timed.value
 
-      val nameHint      = p.attr.expr[String](ProcKeys.attrName).map(_.value)
+      val nameHint      = p.attr.expr[String](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
       // users are elements which must be added after the aural proc synth is started, and removed when it stops
       var users         = List.empty[DynamicUser]

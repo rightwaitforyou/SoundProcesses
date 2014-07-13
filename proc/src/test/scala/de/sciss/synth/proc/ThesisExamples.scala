@@ -12,9 +12,9 @@ object ThesisExamples extends App {
 
   def sg = SynthGraph {
     val sig   = PinkNoise.ar
-    val bus   = graph.attribute(ProcKeys.attrBus ).ir(0)
-    val mute  = graph.attribute(ProcKeys.attrMute).ir(0)
-    val env   = graph.FadeInOut(ProcKeys.attrFadeIn, ProcKeys.attrFadeOut).ar
+    val bus   = graph.attribute(ObjKeys.attrBus ).ir(0)
+    val mute  = graph.attribute(ObjKeys.attrMute).ir(0)
+    val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
     val amp   = env * (1 - mute)
     Out.ar(bus, sig * amp)
   }

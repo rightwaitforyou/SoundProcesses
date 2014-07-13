@@ -76,6 +76,15 @@ object Proc {
     def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Proc.Obj[S]] =
       if (obj.elem.isInstanceOf[Proc.Elem[S]]) Some(obj.asInstanceOf[Proc.Obj[S]])
       else None
+
+    /** Source code of the graph function. */
+    final val attrSource = "graph-source"
+
+    final val scanMainIn  = "in"
+    final val scanMainOut = "out"
+
+    /** Audio input file (tape) grapheme. */
+    final val graphAudio  = "sig"
   }
   type Obj[S <: Sys[S]] = proc.Obj.T[S, Proc.Elem]
 }

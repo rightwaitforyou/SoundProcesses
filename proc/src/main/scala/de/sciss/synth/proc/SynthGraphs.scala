@@ -250,10 +250,10 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
     SynthGraph {
       import de.sciss.synth._
       import ugen._
-      val sig   = graph.scan.In(ProcKeys.graphAudio)
-      val bus   = graph.attribute(ProcKeys.attrBus   ).ir(0)
-      val mute  = graph.attribute(ProcKeys.attrMute  ).ir(0)
-      val env   = graph.FadeInOut(ProcKeys.attrFadeIn, ProcKeys.attrFadeOut).ar
+      val sig   = graph.scan.In(Proc.Obj.graphAudio)
+      val bus   = graph.attribute(ObjKeys.attrBus   ).ir(0)
+      val mute  = graph.attribute(ObjKeys.attrMute  ).ir(0)
+      val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
       val amp   = env * (1 - mute)
       Out.ar(bus, sig * amp)
     }
@@ -261,12 +261,12 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   private lazy val tapeSynthGraph: SynthGraph =
     SynthGraph {
       import de.sciss.synth._
-      val sig   = graph.scan.In(ProcKeys.graphAudio)
-      val gain  = graph.attribute(ProcKeys.attrGain  ).ir(1)
-      val mute  = graph.attribute(ProcKeys.attrMute  ).ir(0)
-      val env   = graph.FadeInOut(ProcKeys.attrFadeIn, ProcKeys.attrFadeOut).ar
+      val sig   = graph.scan.In(Proc.Obj.graphAudio)
+      val gain  = graph.attribute(ObjKeys.attrGain  ).ir(1)
+      val mute  = graph.attribute(ObjKeys.attrMute  ).ir(0)
+      val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
       val amp   = env * (1 - mute) * gain
-      graph.scan.Out(ProcKeys.scanMainOut, sig * amp)
+      graph.scan.Out(Proc.Obj.scanMainOut, sig * amp)
     }
 
   private val emptySynthGraph = SynthGraph {}

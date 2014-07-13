@@ -13,7 +13,6 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.event.Sys
 import de.sciss.lucre.expr.{String => StringEx}
@@ -32,15 +31,15 @@ object Implicits {
     import me.{`this` => attr}
 
     def name(implicit tx: S#Tx): String =
-      attr.expr[String](ProcKeys.attrName).fold("<unnamed>")(_.value)
+      attr.expr[String](ObjKeys.attrName).fold("<unnamed>")(_.value)
 
     def name_=(value: String)(implicit tx: S#Tx): Unit = {
       val nameC = StringEx.newConst[S](value)
-      attr.expr[String](ProcKeys.attrName) match {
+      attr.expr[String](ObjKeys.attrName) match {
         case Some(Expr.Var(vr)) => vr() = nameC
         case _                  =>
           val nameV = StringEx.newVar(nameC)
-          attr.put(ProcKeys.attrName, Obj(StringElem[S](nameV)))
+          attr.put(ObjKeys.attrName, Obj(StringElem[S](nameV)))
       }
     }
   }

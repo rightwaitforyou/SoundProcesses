@@ -13,12 +13,13 @@
 
 package de.sciss.synth
 
-import de.sciss.lucre.{event => evt, expr, bitemp}
+import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.{expr, bitemp}
 import bitemp.BiGroup
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
 import annotation.elidable
-import annotation.elidable._
+import annotation.elidable.CONFIG
 import de.sciss.lucre.event.{EventLike, Sys}
 import scala.language.higherKinds
 import scala.language.existentials
@@ -48,6 +49,8 @@ package object proc {
   // ---- types ----
 
   type Folder[S <: Sys[S]] = expr.List.Modifiable[S, Obj[S], Obj.Update[S]]
+
+  // type Action[S <: Sys[S]] = Expr[S, () => Unit]
 
   // ---- ProcGroup ----
   // scalac gets fuzzy when this is put into a different file than the ProcGroup type alias!

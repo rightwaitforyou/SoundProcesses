@@ -18,7 +18,6 @@ import scala.concurrent.stm.{TxnExecutor, Ref}
 import collection.immutable.{IndexedSeq => Vec}
 import TxnExecutor.{defaultAtomic => atomic}
 import de.sciss.lucre.stm.{TxnLike, Disposable}
-import de.sciss.synth.proc.SoundProcesses
 import de.sciss.osc
 import java.net.SocketAddress
 

@@ -1,5 +1,5 @@
 /*
- *  ProcKeys.scala
+ *  ObjKeys.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -13,15 +13,9 @@
 
 package de.sciss.synth.proc
 
-object ProcKeys {
+object ObjKeys {
   /** Name attribute. Type `String` */
   final val attrName    = "name"
-  /** Track attribute. Type `Int` */
-  final val attrTrack   = "track"
-  /** Audio input file (tape) grapheme. */
-  final val graphAudio  = "sig"
-  /** Source code of the graph function. */
-  final val attrGraphSource = "graph-source"
   /** Bus attribute. Type `Int` */
   final val attrBus     = "bus"
   /** Gain factor. Type `Double` */
@@ -32,7 +26,4 @@ object ProcKeys {
   final val attrFadeIn  = "fade-in"
   /** Fade out. Type `FadeSpec` */
   final val attrFadeOut = "fade-out"
-
-  final val scanMainIn  = "in"
-  final val scanMainOut = "out"
 }
