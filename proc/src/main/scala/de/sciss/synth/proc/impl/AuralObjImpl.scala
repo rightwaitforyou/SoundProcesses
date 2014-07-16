@@ -103,23 +103,23 @@ object AuralObjImpl {
     }
   }
 
-  // -------- AudioGrapheme --------
-
-  object AudioGrapheme extends Factory {
-    type E[S <: evt.Sys[S]] = AudioGraphemeElem[S]
-
-    def typeID = ElemImpl.AudioGrapheme.typeID
-
-    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ???
-  }
-
-  // -------- Folder --------
-
-  object Folder extends Factory {
-    type E[S <: evt.Sys[S]] = FolderElem[S]
-
-    def typeID = FolderElemImpl.typeID
-
-    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ???
-  }
+//  // -------- AudioGrapheme --------
+//
+//  object AudioGrapheme extends Factory {
+//    type E[S <: evt.Sys[S]] = AudioGraphemeElem[S]
+//
+//    def typeID = ElemImpl.AudioGrapheme.typeID
+//
+//    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ...
+//  }
+//
+//  // -------- Folder --------
+//
+//  object Folder extends Factory {
+//    type E[S <: evt.Sys[S]] = FolderElem[S]
+//
+//    def typeID = FolderElemImpl.typeID
+//
+//    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ...
+//  }
 }

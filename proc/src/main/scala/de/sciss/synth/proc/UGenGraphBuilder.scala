@@ -26,12 +26,17 @@ object UGenGraphBuilder {
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-  def apply[S <: Sys[S]](aural: AuralObj.ProcData[S], proc: Obj.T[S, Proc.Elem])
-                        (implicit tx: S#Tx): State[S] = Impl(aural, proc)
+  def apply[S <: Sys[S]](context: Context[S], proc: Obj.T[S, Proc.Elem])
+                        (implicit tx: S#Tx): State[S] = Impl(context, proc)
 
   def init[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): Incomplete[S] = Impl.init(proc)
 
   case class ScanIn(numChannels: Int, fixed: Boolean)
+
+  trait Context[S <: Sys[S]] {
+    // def requestInput(in: Input)(implicit tx: S#Tx): in.Value
+    def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res })(implicit tx: S#Tx): Res
+  }
 
   //  object StreamIn {
   //    val empty = StreamIn(0.0, 0)
@@ -49,8 +54,8 @@ object UGenGraphBuilder {
   //  }
 
   sealed trait State[S <: Sys[S]] {
-    def acceptedInputs: Map[Input, Input#Value]
-    def rejectedInputs: Set[Input]
+    def acceptedInputs: Map[Key, Input#Value]
+    def rejectedInputs: Set[Key]
 
     //    /** Current set of used inputs (scan keys to number of channels).
     //      * This is guaranteed to only grow during incremental building, never shrink.
@@ -84,7 +89,7 @@ object UGenGraphBuilder {
   }
 
   trait Incomplete[S <: Sys[S]] extends State[S] {
-    def retry(aural: AuralObj.ProcData[S])(implicit tx: S#Tx): State[S]
+    def retry(context: Context[S])(implicit tx: S#Tx): State[S]
 
     final def isComplete = false
   }
@@ -95,20 +100,32 @@ object UGenGraphBuilder {
     final def isComplete = true
     // final def missingIns = Set.empty[String]
 
-    final def rejectedInputs = Set.empty[Input]
+    final def rejectedInputs = Set.empty[UGenGraphBuilder.Key]
   }
 
   // --------------------------------------------
 
+  trait Key
+  case class AttributeKey(name: String) extends Key
+  case class ScanKey     (name: String) extends Key
+
   object Input {
-    final case class Scan(key: String) extends Input {
-      type Key    = String
+    final case class Scan(name: String) extends Input {
+      type Key    = ScanKey
       type Value  = Int
+
+      def key = ScanKey(name)
     }
 
-    final case class Stream(key: String, maxSpeed: Double, interp: Int) extends Input {
-      type Key    = String
-      type Value  = (Int, Int)
+    object Stream {
+      final case class Key(name: String)
+      final case class Value(numChannels: Int, controlIndex: Int)
+    }
+    final case class Stream(name: String, maxSpeed: Double, interp: Int) extends Input {
+      type Key    = AttributeKey
+      type Value  = Stream.Value
+
+      def key = AttributeKey(name)
 
       /** Empty indicates that the stream is solely used for information
         * purposes such as `BufChannels`.
@@ -121,13 +138,15 @@ object UGenGraphBuilder {
       def isNative: Boolean = interp == -1
     }
 
-    final case class Attribute(key: String) extends Input {
-      type Key    = String
+    final case class Attribute(name: String) extends Input {
+      type Key    = AttributeKey
       type Value  = Int
+
+      def key = AttributeKey(name)
     }
   }
   trait Input {
-    type Key
+    type Key <: UGenGraphBuilder.Key
     type Value
 
     def key: Key

@@ -10,16 +10,16 @@ import de.sciss.synth.{UGen, Lazy, SynthGraph, UGenGraph}
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 object UGenGraphBuilderImpl {
-  import UGenGraphBuilder.{State, Complete, Incomplete, MissingIn}
+  import UGenGraphBuilder.{State, Complete, Incomplete, MissingIn, Context}
 
   /** '''Note''': The resulting object is mutable, therefore must not be shared across threads and also must be
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-  def apply[S <: Sys[S]](aural: AuralObj.ProcData[S], proc: Proc.Obj[S])
+  def apply[S <: Sys[S]](context: Context[S], proc: Proc.Obj[S])
                         (implicit tx: S#Tx): State[S] = {
     val in = init(proc)
-    in.retry(aural)
+    in.retry(context)
   }
 
   def init[S <: Sys[S]](proc: Proc.Obj[S])
@@ -44,23 +44,23 @@ object UGenGraphBuilderImpl {
       val controlNames  : Vec[(String, Int)],
       val sourceMap     : Map[AnyRef, Any],
       val scanOuts      : Map[String, Int],
-      val acceptedInputs: Map[Input, Input#Value],
-      val rejectedInputs: Set[Input]
+      val acceptedInputs: Map[UGenGraphBuilder.Key, Input#Value],
+      val rejectedInputs: Set[UGenGraphBuilder.Key]
    )
     extends Incomplete[S] {
 
-    def retry(aural: AuralObj.ProcData[S])(implicit tx: S#Tx): State[S] = 
-      new Impl[S](aural, this, tx).tryBuild()
+    def retry(context: Context[S])(implicit tx: S#Tx): State[S] =
+      new Impl[S](context, this, tx).tryBuild()
   }
 
   private final class CompleteImpl[S <: Sys[S]](val result: UGenGraph,
       val scanOuts      : Map[String, Int],
-      val acceptedInputs: Map[Input, Input#Value]
+      val acceptedInputs: Map[UGenGraphBuilder.Key, Input#Value]
    )
     extends Complete[S] {
   }
 
-  private final class Impl[S <: Sys[S]](aural: AuralObj.ProcData[S], in: IncompleteImpl[S], val tx: S#Tx)
+  private final class Impl[S <: Sys[S]](context: Context[S], in: IncompleteImpl[S], val tx: S#Tx)
     extends BasicUGenGraphBuilder with UGenGraphBuilder[S] {
     builder =>
 
@@ -71,7 +71,7 @@ object UGenGraphBuilderImpl {
 
     private var scanOuts        = in.scanOuts
     private var acceptedInputs  = in.acceptedInputs
-    private var rejectedInputs  = Set.empty[Input]
+    private var rejectedInputs  = Set.empty[UGenGraphBuilder.Key]
 
     // def sensorBus: SControlBus = aural.sensorBus
 
@@ -82,7 +82,11 @@ object UGenGraphBuilderImpl {
     //      res
     //    }
 
-    def requestInput(input: Input): input.Value = ???
+    def requestInput(in: Input): in.Value = {
+      val res = context.requestInput[in.Value](in)(tx)
+      acceptedInputs += in.key -> res
+      res
+    }
 
     def addScanOut(key: String, numChannels: Int): Unit =
       scanOuts.get(key).fold {
@@ -139,7 +143,7 @@ object UGenGraphBuilderImpl {
                 scanOuts            = savedScanOuts
                 acceptedInputs      = savedAcceptedInputs
                 missingElems      :+= elem
-                rejectedInputs     += rejected
+                rejectedInputs     += rejected.key
             }
           }
         }
