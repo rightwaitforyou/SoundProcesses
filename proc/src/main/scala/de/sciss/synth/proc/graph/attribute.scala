@@ -15,6 +15,7 @@ package de.sciss.synth
 package proc
 package graph
 
+import de.sciss.synth.proc.UGenGraphBuilder.Input
 import de.sciss.synth.ugen.ControlProxy
 
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -28,8 +29,9 @@ object attribute {
     override def toString       = s"""attribute("$key").${rate.methodName}($default)"""
 
     def makeUGens: UGenInLike = {
-      val b = UGenGraphBuilder.get
-      val numCh   = b.addAttributeIn(key)
+      val b       = UGenGraphBuilder.get
+      val numCh   = b.requestInput(Input.Attribute(key))
+      // val numCh   = b.addAttributeIn(key)
       val ctlName = controlName(key)
       val ctl     = ControlProxy(rate, Vec.fill(numCh)(default.toFloat), Some(ctlName))
       // val ctl     = if (numCh == 1) ctlName.ir(default) else ctlName.ir(Vec.fill(numCh)(default))

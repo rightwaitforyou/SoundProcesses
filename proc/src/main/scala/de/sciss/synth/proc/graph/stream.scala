@@ -16,6 +16,7 @@ package proc
 package graph
 
 import de.sciss.synth
+import de.sciss.synth.proc.UGenGraphBuilder.Input
 import synth.ugen.Constant
 import de.sciss.synth.proc.impl.StreamBuffer
 
@@ -29,17 +30,26 @@ private[proc] object stream {
 
     protected def key: String
 
-    protected def info: UGenGraphBuilder.StreamIn
+   // protected def info: UGenGraphBuilder.StreamIn
+    protected def maxSpeed: Double
+    protected def interp  : Int
 
     def makeUGens: UGenInLike = {
       val b = UGenGraphBuilder.get
-      val (numCh, idx)  = b.addStreamIn(key, info)
+      val interp1       = if (interp == 4) -1 else interp
+      val (numCh, idx)  = b.requestInput(Input.Stream(key, maxSpeed = maxSpeed, interp = interp1))
+      // val (numCh, idx)  = b.addStreamIn(key, info)
       val ctlName       = controlName  (key, idx )
       val ctl           = ctlName.ir(Seq(0, 0))
       val buf           = ctl \ 0
       val gain          = ctl \ 1
       makeUGen(numChannels = numCh, idx = idx, buf = buf, gain = gain)
     }
+  }
+
+  trait Info extends GE {
+    protected def maxSpeed  = 0.0
+    protected def interp    = 0
   }
 }
 
@@ -51,7 +61,9 @@ object DiskIn {
 case class DiskIn(rate: Rate, key: String, loop: synth.GE)
   extends stream.GE /* with HasSideEffect */ with IsIndividual {
 
-  protected def info = UGenGraphBuilder.StreamIn(1.0, -1)
+  // protected def info = UGenGraphBuilder.StreamIn(1.0, -
+  protected def maxSpeed  = 1.0
+  protected def interp    = -1
 
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.DiskIn(rate, numChannels = numChannels, buf = buf, loop = loop) * gain
@@ -74,7 +86,7 @@ case class VDiskIn(rate: Rate, key: String, speed: synth.GE, loop: synth.GE, int
 
   // VDiskIn uses cubic interpolation. Thus provide native streaming if that interpolation
   // is chosen; otherwise use the `StreamBuffer` functionality.
-  protected def info = UGenGraphBuilder.StreamIn(maxSpeed, if (interp == 4) -1 else interp)
+  // protected def info = UGenGraphBuilder.StreamIn(maxSpeed, if (interp == 4) -1 else interp)
 
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike = {
     val reader = if (interp == 4) {
@@ -90,9 +102,7 @@ object BufChannels {
   def ir(key: String): BufChannels = apply(scalar , key = key)
   def kr(key: String): BufChannels = apply(control, key = key)
 }
-case class BufChannels(rate: Rate, key: String) extends stream.GE {
-  protected def info = UGenGraphBuilder.StreamIn.empty
-
+case class BufChannels(rate: Rate, key: String) extends stream.Info {
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufChannels(rate, buf) // or just Constant(numChannels), ha?
 }
@@ -101,9 +111,7 @@ object BufRateScale {
   def ir(key: String): BufRateScale = apply(scalar , key = key)
   def kr(key: String): BufRateScale = apply(control, key = key)
 }
-case class BufRateScale(rate: Rate, key: String) extends stream.GE {
-  protected def info = UGenGraphBuilder.StreamIn.empty
-
+case class BufRateScale(rate: Rate, key: String) extends stream.Info {
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufRateScale(rate, buf)
 }
@@ -112,9 +120,7 @@ object BufSampleRate {
   def ir(key: String): BufSampleRate = apply(scalar , key = key)
   def kr(key: String): BufSampleRate = apply(control, key = key)
 }
-case class BufSampleRate(rate: Rate, key: String) extends stream.GE {
-  protected def info = UGenGraphBuilder.StreamIn.empty
-
+case class BufSampleRate(rate: Rate, key: String) extends stream.Info {
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufSampleRate(rate, buf)
 }

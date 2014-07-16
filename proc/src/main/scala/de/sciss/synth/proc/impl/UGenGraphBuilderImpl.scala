@@ -3,13 +3,14 @@ package impl
 
 import de.sciss.lucre.synth.Sys
 import de.sciss.synth.impl.BasicUGenGraphBuilder
+import de.sciss.synth.proc.UGenGraphBuilder.Input
 import de.sciss.synth.ugen.ControlProxyLike
 import de.sciss.synth.{UGen, Lazy, SynthGraph, UGenGraph}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 object UGenGraphBuilderImpl {
-  import UGenGraphBuilder.{State, Complete, Incomplete, MissingIn, StreamIn, ScanIn}
+  import UGenGraphBuilder.{State, Complete, Incomplete, MissingIn}
 
   /** '''Note''': The resulting object is mutable, therefore must not be shared across threads and also must be
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
@@ -27,8 +28,8 @@ object UGenGraphBuilderImpl {
     val in  = new IncompleteImpl[S](
       remaining = g.sources, controlProxies = g.controlProxies,
       ugens = Vec.empty, controlValues = Vec.empty, controlNames = Vec.empty,
-      sourceMap = Map.empty, scanOuts = Map.empty, scanIns = Map.empty,
-      attributeIns = Set.empty, streamIns = Map.empty, missingIns = Set.empty
+      sourceMap = Map.empty, scanOuts = Map.empty, acceptedInputs = Map.empty,
+      rejectedInputs = Set.empty
     )
     in
   }
@@ -43,10 +44,8 @@ object UGenGraphBuilderImpl {
       val controlNames  : Vec[(String, Int)],
       val sourceMap     : Map[AnyRef, Any],
       val scanOuts      : Map[String, Int],
-      val scanIns       : Map[String, ScanIn],
-      val attributeIns  : Set[String],
-      val streamIns     : Map[String, List[StreamIn]],
-      val missingIns    : Set[String]
+      val acceptedInputs: Map[Input, Input#Value],
+      val rejectedInputs: Set[Input]
    )
     extends Incomplete[S] {
 
@@ -56,9 +55,7 @@ object UGenGraphBuilderImpl {
 
   private final class CompleteImpl[S <: Sys[S]](val result: UGenGraph,
       val scanOuts      : Map[String, Int],
-      val scanIns       : Map[String, ScanIn],
-      val attributeIns  : Set[String],
-      val streamIns     : Map[String, List[StreamIn]]
+      val acceptedInputs: Map[Input, Input#Value]
    )
     extends Complete[S] {
   }
@@ -73,19 +70,19 @@ object UGenGraphBuilderImpl {
     private var controlProxies  = in.controlProxies
 
     private var scanOuts        = in.scanOuts
-    private var scanIns         = in.scanIns
-    private var missingIns      = Set.empty[String]
-    private var attributeIns    = in.attributeIns
-    private var streamIns       = in.streamIns
+    private var acceptedInputs  = in.acceptedInputs
+    private var rejectedInputs  = Set.empty[Input]
 
     // def sensorBus: SControlBus = aural.sensorBus
 
-    def addScanIn(key: String, numChannels: Int): Int = {
-      val fixed = numChannels >= 0
-      val res   = aural.scanInNumChannels(key = key, numChannels = numChannels)(tx)
-      scanIns  += key -> ScanIn(numChannels = res, fixed = fixed)
-      res
-    }
+    //    def addScanIn(key: String, numChannels: Int): Int = {
+    //      val fixed = numChannels >= 0
+    //      val res   = aural.scanInNumChannels(key = key, numChannels = numChannels)(tx)
+    //      scanIns  += key -> ScanIn(numChannels = res, fixed = fixed)
+    //      res
+    //    }
+
+    def requestInput(input: Input): input.Value = ???
 
     def addScanOut(key: String, numChannels: Int): Unit =
       scanOuts.get(key).fold {
@@ -98,24 +95,24 @@ object UGenGraphBuilderImpl {
         }
       }
 
-    def addAttributeIn(key: String): Int = {
-      val res       = aural.attrNumChannels(key = key)(tx)
-      attributeIns += key
-      res
-    }
+    //    def addAttributeIn(key: String): Int = {
+    //      val res       = aural.attrNumChannels(key = key)(tx)
+    //      attributeIns += key
+    //      res
+    //    }
 
-    def addStreamIn(key: String, info: StreamIn): (Int, Int) = {
-      val numCh = aural.attrNumChannels(key = key)(tx)
-      val idx   = if (info.isEmpty) {
-        if (!streamIns.contains(key)) streamIns += key -> Nil
-        0
-      } else {
-        val oldValue = streamIns.getOrElse(key, Nil)
-        streamIns += key -> (info :: oldValue)
-        oldValue.size
-      }
-      (numCh, idx)
-    }
+    //    def addStreamIn(key: String, info: StreamIn): (Int, Int) = {
+    //      val numCh = aural.attrNumChannels(key = key)(tx)
+    //      val idx   = if (info.isEmpty) {
+    //        if (!streamIns.contains(key)) streamIns += key -> Nil
+    //        0
+    //      } else {
+    //        val oldValue = streamIns.getOrElse(key, Nil)
+    //        streamIns += key -> (info :: oldValue)
+    //        oldValue.size
+    //      }
+    //      (numCh, idx)
+    //    }
 
     def tryBuild(): State[S] = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]
@@ -129,24 +126,20 @@ object UGenGraphBuilderImpl {
             val savedControlValues  = controlValues
             val savedUGens          = ugens
             val savedScanOuts       = scanOuts
-            val savedScanIns        = scanIns
-            val savedAttrs          = attributeIns
-            val savedStreams        = streamIns
+            val savedAcceptedInputs = acceptedInputs
             try {
               elem.force(builder)
               someSucceeded = true
             } catch {
-              case MissingIn(sinkKey) =>
+              case MissingIn(rejected) =>
                 sourceMap           = savedSourceMap
                 controlNames        = savedControlNames
                 controlValues       = savedControlValues
                 ugens               = savedUGens
                 scanOuts            = savedScanOuts
-                scanIns             = savedScanIns
-                attributeIns        = savedAttrs
-                streamIns           = savedStreams
+                acceptedInputs      = savedAcceptedInputs
                 missingElems      :+= elem
-                missingIns         += sinkKey
+                rejectedInputs     += rejected
             }
           }
         }
@@ -160,18 +153,15 @@ object UGenGraphBuilderImpl {
 
       val newState = if (missingElems.isEmpty) {
         val result = build(controlProxies)
-        new CompleteImpl[S](result,
-          scanOuts = scanOuts, scanIns = scanIns,
-          attributeIns = attributeIns, streamIns = streamIns
-        )
+        new CompleteImpl[S](result, scanOuts = scanOuts, acceptedInputs = acceptedInputs)
 
       } else {
         if (someSucceeded) {
           new IncompleteImpl[S](
             remaining = missingElems, controlProxies = controlProxies,
             ugens = ugens, controlValues = controlValues, controlNames = controlNames,
-            sourceMap = sourceMap, scanOuts = scanOuts, scanIns = scanIns,
-            attributeIns = attributeIns, streamIns = streamIns, missingIns = missingIns
+            sourceMap = sourceMap, scanOuts = scanOuts, acceptedInputs = acceptedInputs,
+            rejectedInputs = rejectedInputs
           )
         } else in
       }

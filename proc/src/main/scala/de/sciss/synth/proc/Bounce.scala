@@ -177,16 +177,16 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
 
       val server  = Server.offline(sCfg)
 
-      val view = blocking {
-        cursor.step { implicit tx =>
-          val aural   = AuralSystem.offline(server)
-          val _view   = AuralPresentationOLD.run[S](transp, aural)
-          config.init(tx, server)
-          transp.seek(span.start)
-          transp.play()
-          _view
-        }
-      }
+      //      val view = blocking {
+      //        cursor.step { implicit tx =>
+      //          val aural   = AuralSystem.offline(server)
+      //          val _view   = AuralPresentationOLD.run[S](transp, aural)
+      //          config.init(tx, server)
+      //          transp.seek(span.start)
+      //          transp.play()
+      //          _view
+      //        }
+      //      }
 
       @tailrec def loop(): Unit = {
         Await.result(server.committed(), Duration.Inf)
@@ -289,7 +289,7 @@ final class Bounce[S <: Sys[S], I <: stm.Sys[I]] private (implicit cursor: stm.C
 
       // XXX TODO: clean up
 
-      cursor.step(implicit tx => view.dispose())
+      ??? // cursor.step(implicit tx => view.dispose())
 
       outputFile
     }

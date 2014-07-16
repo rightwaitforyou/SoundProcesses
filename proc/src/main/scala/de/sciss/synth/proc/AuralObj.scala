@@ -58,24 +58,24 @@ object AuralObj {
       */
     def nodeOption(implicit tx: S#Tx): Option[NodeRef]
 
-    /** Queries the number of channel associated with a scanned input.
-      * Throws a control throwable when no value can be determined, making
-      * the ugen graph builder mark the querying graph element as incomplete
-      * (missing information).
-      *
-      * @param key          the scan key
-      * @param numChannels  a given number of channels if `>= 0`, or `-1` to accept whatever the scan in provides
-      *
-      * @return             the number of channels for the scan input at the given time
-      */
-    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int
+    //    /** Queries the number of channel associated with a scanned input.
+    //      * Throws a control throwable when no value can be determined, making
+    //      * the ugen graph builder mark the querying graph element as incomplete
+    //      * (missing information).
+    //      *
+    //      * @param key          the scan key
+    //      * @param numChannels  a given number of channels if `>= 0`, or `-1` to accept whatever the scan in provides
+    //      *
+    //      * @return             the number of channels for the scan input at the given time
+    //      */
+    //    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int
 
-    /** Queries the number of channels associated with an attribute input.
-      * @param key          the attribute key
-      *
-      * @return             the number of channels for the attribute input
-      */
-    def attrNumChannels(key: String)(implicit tx: S#Tx): Int
+    //    /** Queries the number of channels associated with an attribute input.
+    //      * @param key          the attribute key
+    //      *
+    //      * @return             the number of channels for the attribute input
+    //      */
+    //    def attrNumChannels(key: String)(implicit tx: S#Tx): Int
 
     def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
 

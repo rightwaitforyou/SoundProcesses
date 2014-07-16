@@ -16,6 +16,7 @@ package proc
 package graph
 
 import de.sciss.synth.proc.UGenGraphBuilder
+import de.sciss.synth.proc.UGenGraphBuilder.Input
 import ugen._
 
 object Fade {
@@ -35,7 +36,9 @@ object Fade {
 
     /** Returns (dur, shape, floor) */
     final protected def readCtl(b: UGenGraphBuilder[_], key: String): (GE, Env.Curve, GE) = {
-      b.addAttributeIn(key)
+      val numCh   = b.requestInput(Input.Attribute(key))
+      if (numCh != 4) throw new IllegalStateException(s"$this - requires a 4-channel attribute")
+      // b.addAttributeIn(key)
       val ctlName = attribute.controlName(key)
       val ctl     = ctlName.ir(Seq(0f, 0f, 0f, 0f))  // dur, shape-id, shape-curvature, floor
       (ctl \ 0, Env.Curve(ctl \ 1, ctl \ 2), ctl \ 3)

@@ -15,6 +15,8 @@ package de.sciss.synth
 package proc
 package graph
 
+import de.sciss.synth.proc.UGenGraphBuilder.Input
+
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.ugen.UGenInGroup
 
@@ -24,11 +26,12 @@ object scan {
 
   sealed trait InLike extends GE.Lazy with AudioRated {
     protected def key: String
-    protected def numChannels: Int
+    // protected def numChannels: Int
 
     final def makeUGens: UGenInLike = {
       val b = UGenGraphBuilder.get
-      val numCh   = b.addScanIn(key, numChannels)
+      val numCh   = b.requestInput(Input.Scan(key))
+      // val numCh   = b.addScanIn(key, numChannels)
       val ctlName = inControlName(key)
       mkUGen(ctlName, numCh)
     }
@@ -44,7 +47,7 @@ object scan {
 
     override def productPrefix = "scan$In"
 
-    protected def numChannels = -1
+    // protected def numChannels = -1
 
     protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
       if (numCh == 1) {
@@ -56,16 +59,16 @@ object scan {
       }
   }
 
-  final case class InFix(key: String, numChannels: Int)
-    extends InLike {
-
-    override def toString = s"""scan.InFix("$key", $numChannels)"""
-
-    override def productPrefix = "scan$InFix"
-
-    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
-      ugen.In.ar(ctlName.kr, numCh)
-  }
+  //  final case class InFix(key: String, numChannels: Int)
+  //    extends InLike {
+  //
+  //    override def toString = s"""scan.InFix("$key", $numChannels)"""
+  //
+  //    override def productPrefix = "scan$InFix"
+  //
+  //    protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
+  //      ugen.In.ar(ctlName.kr, numCh)
+  //  }
 
   final case class Out(key: String, in: GE)
     extends UGenSource.ZeroOut with WritesBus {

@@ -192,14 +192,14 @@ object AuralProcDataImpl {
       attrNodeSet(key, value)
     }
 
-    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
-      if (state.attributeIns.contains(key)) {
-        // XXX TODO -- we have to verify the number of channels
-        nodeOption.foreach { n =>
-          val set = attrControlSet(key, value.elem)
-          n.node.set(audible = true, pairs = set)
-        }
-      }
+    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = ???
+//      if (state.attributeIns.contains(key)) {
+//        // XXX TODO -- we have to verify the number of channels
+//        nodeOption.foreach { n =>
+//          val set = attrControlSet(key, value.elem)
+//          n.node.set(audible = true, pairs = set)
+//        }
+//      }
 
     private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
@@ -220,16 +220,17 @@ object AuralProcDataImpl {
     // check if the scan is used as currently missing input. if so,
     // try to build the ugen graph again.
     private def testInScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
-      if (state.missingIns.contains(key)) {
-        val numCh = scanInNumChannels(scan)
-        // println(s"testInScan($key) -> numCh = $numCh")
-        if (numCh >= 0) {
-          // the scan is ready to be used and was missing before
-          tryBuild()
-        } else {
-          addIncompleteScanIn(key, scan)
-        }
-      }
+      ???
+//      if (state.missingIns.contains(key)) {
+//        val numCh = scanInNumChannels(scan)
+//        // println(s"testInScan($key) -> numCh = $numCh")
+//        if (numCh >= 0) {
+//          // the scan is ready to be used and was missing before
+//          tryBuild()
+//        } else {
+//          addIncompleteScanIn(key, scan)
+//        }
+//      }
     }
 
     // incomplete scan ins are scan ins which do exist and are used by
@@ -243,8 +244,8 @@ object AuralProcDataImpl {
       context.putAux[AuralScan.Proxy[S]](scan.id, new AuralScan.Incomplete(this, key))
 
     // called from scan-view if source is not materialized yet
-    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit =
-      if (state.missingIns.contains(key)) tryBuild()
+    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit = ???
+//      if (state.missingIns.contains(key)) tryBuild()
 
     private def testOutScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       state.scanOuts.get(key).foreach { numCh =>
@@ -296,15 +297,16 @@ object AuralProcDataImpl {
       scanViews.foreach { case (_, view) => view.dispose() }
       clearMap(scanViews)
       clearMap(scanBuses)
-      val missingIns = stateRef().missingIns
-      if (missingIns.nonEmpty) {
-        val scans = procCached().elem.peer.scans
-        missingIns.foreach { key =>
-          scans.get(key).foreach { scan =>
-            context.removeAux(scan.id)
-          }
-        }
-      }
+      ???
+//      val missingIns = stateRef().missingIns
+//      if (missingIns.nonEmpty) {
+//        val scans = procCached().elem.peer.scans
+//        missingIns.foreach { key =>
+//          scans.get(key).foreach { scan =>
+//            context.removeAux(scan.id)
+//          }
+//        }
+//      }
     }
 
     private def clearMap[A, B](m: TMap[A, B])(implicit tx: S#Tx): Unit =
@@ -340,18 +342,19 @@ object AuralProcDataImpl {
     private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
 
-      if (now.missingIns.isEmpty) {
+      if (now.rejectedInputs.isEmpty) {
         logA(s"buildAdvanced ${procCached()}; complete? ${now.isComplete}")
       } else {
-        logA(s"buildAdvanced ${procCached()}; missingIns = ${now.missingIns.mkString(",")}")
+        logA(s"buildAdvanced ${procCached()}; rejectedInputs = ${now.rejectedInputs.mkString(",")}")
 
         // store proxies so future sinks can detect this incomplete proc
         val scans = procCached().elem.peer.scans
-        now.missingIns.foreach { key =>
-          scans.get(key).foreach { scan =>
-            addIncompleteScanIn(key, scan)
-          }
-        }
+        ???
+//        now.missingIns.foreach { key =>
+//          scans.get(key).foreach { scan =>
+//            addIncompleteScanIn(key, scan)
+//          }
+//        }
       }
 
       // handle newly visible outputs
@@ -369,17 +372,18 @@ object AuralProcDataImpl {
       }
 
       // handle newly visible inputs
-      if (before.scanIns ne now.scanIns) {
-        val newIns = now.scanIns.filterNot {
-          case (key, _) => before.scanIns.contains(key)
-        }
-        logA(s"...newIns  = ${newIns.mkString(",")}")
-
-        newIns.foreach { case (key, meta) =>
-          val numCh = meta.numChannels
-          activateAuralScan(key, numCh)
-        }
-      }
+      ???
+//      if (before.scanIns ne now.scanIns) {
+//        val newIns = now.scanIns.filterNot {
+//          case (key, _) => before.scanIns.contains(key)
+//        }
+//        logA(s"...newIns  = ${newIns.mkString(",")}")
+//
+//        newIns.foreach { case (key, meta) =>
+//          val numCh = meta.numChannels
+//          activateAuralScan(key, numCh)
+//        }
+//      }
 
       now match {
         case c: Complete[S] =>
@@ -499,24 +503,25 @@ object AuralProcDataImpl {
         case _                        => None
       }
 
-    // called by UGenGraphBuilderImpl
-    def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {
-      val procObj = procCached()
-      procObj.attr.getElem(key).fold(1) {
-        case a: DoubleVecElem[S]     => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
-        case _ => 1
-      }
-    }
-    // called by UGenGraphBuilderImpl
-    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
-      val procObj = procCached()
-      val proc    = procObj.elem.peer
-      val numCh   = proc.scans.get(key).fold(-1) { scan =>
-        scanInNumChannels(scan)
-      }
-      if (numCh == -1) throw MissingIn(key) else numCh
-    }
+//    // called by UGenGraphBuilderImpl
+//    def attrNumChannels(key: String)(implicit tx: S#Tx): Int = {
+//      val procObj = procCached()
+//      procObj.attr.getElem(key).fold(1) {
+//        case a: DoubleVecElem[S]     => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+//        case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
+//        case _ => 1
+//      }
+//    }
+
+//    // called by UGenGraphBuilderImpl
+//    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int = {
+//      val procObj = procCached()
+//      val proc    = procObj.elem.peer
+//      val numCh   = proc.scans.get(key).fold(-1) { scan =>
+//        scanInNumChannels(scan)
+//      }
+//      if (numCh == -1) throw MissingIn(key) else numCh
+//    }
 
     private def scanInNumChannels(scan: Scan[S])(implicit tx: S#Tx): Int = {
       val chans = scan.sources.toList.map {
