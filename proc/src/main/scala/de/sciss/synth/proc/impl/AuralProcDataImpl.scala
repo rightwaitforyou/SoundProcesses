@@ -30,15 +30,7 @@ import scala.concurrent.stm.{TSet, TMap, Ref, TxnLocal}
 
 object AuralProcDataImpl {
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
-    context.acquire[AuralObj.ProcData[S]](proc) {
-      val ugenInit = UGenGraphBuilder.init(proc)
-      val data0 = new Impl(tx.newHandle(proc), ugenInit)
-      data0.init(proc)
-      data0.tryBuild()
-      data0
-    }
-
-  private type ObjSource[S <: Sys[S]] = stm.Source[S#Tx, Obj.T[S, Proc.Elem]]
+    context.acquire[AuralObj.ProcData[S]](proc)(new Impl[S].init(proc))
 
   private def GroupImpl(name: String, in0: NodeRef)(implicit tx: Txn): GroupImpl = {
     val res = new GroupImpl(name, in0)
@@ -100,11 +92,10 @@ object AuralProcDataImpl {
     }
   }
 
-  private final class Impl[S <: Sys[S]](val obj: ObjSource[S], state0: UState[S])
-                                       (implicit val context: AuralContext[S])
+  class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGenGraphBuilder.Context[S] {
 
-    private val stateRef  = Ref[UState[S]](state0)
+    private val stateRef  = Ref.make[UState[S]]() // (state0)
     private val nodeRef   = Ref(Option.empty[GroupImpl])
     private val scanBuses = TMap.empty[String, AudioBus]
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
@@ -114,7 +105,18 @@ object AuralProcDataImpl {
 
     private var procObserver: Disposable[S#Tx] = _
 
-    def init(proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): Unit = {
+    private var _obj: stm.Source[S#Tx, Proc.Obj[S]] = _
+
+    final def obj = _obj
+
+    override def toString = s"AuralObj.ProcData@${hashCode().toHexString}"
+
+    /** Sub-classes may override this if invoking the super-method. */
+    def init(proc: Proc.Obj[S])(implicit tx: S#Tx): this.type = {
+      _obj          = tx.newHandle(proc)
+      val ugenInit  = UGenGraphBuilder.init(proc)
+      stateRef.set(ugenInit)(tx.peer)
+
       procObserver = proc.changed.react { implicit tx => upd =>
         upd.changes.foreach {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
@@ -130,9 +132,12 @@ object AuralProcDataImpl {
           case Obj.AttrChange (key, value, aCh)           => attrChange (key, value, aCh)
         }
       }
+
+      tryBuild()
+      this
     }
 
-    def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
+    final def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
 
     private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"playScans ${procCached()}")
@@ -192,7 +197,7 @@ object AuralProcDataImpl {
       attrNodeSet(key, value)
     }
 
-    protected def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
+    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
       state.acceptedInputs.get(UGenGraphBuilder.AttributeKey(key)).foreach {
         case UGenGraphBuilder.NumChannels(numCh) =>
           // XXX TODO -- we have to verify the number of channels
@@ -246,7 +251,7 @@ object AuralProcDataImpl {
       context.putAux[AuralScan.Proxy[S]](scan.id, new AuralScan.Incomplete(this, key))
 
     // called from scan-view if source is not materialized yet
-    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit =
+    final def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit =
       if (state.rejectedInputs.contains(UGenGraphBuilder.ScanKey(key))) tryBuild()
 
     private def testOutScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
@@ -259,7 +264,7 @@ object AuralProcDataImpl {
       }
     }
 
-    def addInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+    final def addInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"addInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       nodeRef().fold {
@@ -272,7 +277,7 @@ object AuralProcDataImpl {
       }
     }
 
-    def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+    final def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"removeInstanceNode ${procCached()} : $n")
       val groupImpl = nodeRef.get(tx.peer).getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
       if (groupImpl.removeInstanceNode(n)) {
@@ -281,9 +286,10 @@ object AuralProcDataImpl {
       }
     }
 
-    def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.add   (view)(tx.peer)
-    def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.remove(view)(tx.peer)
+    final def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.add   (view)(tx.peer)
+    final def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.remove(view)(tx.peer)
 
+    /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
       procObserver.dispose()
       disposeNodeRefAndScans()
@@ -311,13 +317,13 @@ object AuralProcDataImpl {
     private def clearMap[A, B](m: TMap[A, B])(implicit tx: S#Tx): Unit =
       m.retain((_, _) => false)(tx.peer) // no `clear` method
 
-    def state(implicit tx: S#Tx): UGenGraphBuilder.State[S] = stateRef.get(tx.peer)
+    final def state(implicit tx: S#Tx): UGenGraphBuilder.State[S] = stateRef.get(tx.peer)
 
     /* If the ugen graph is incomplete, tries to (incrementally)
      * build it. Calls `buildAdvanced` with the old and new
      * state then.
      */
-    def tryBuild()(implicit tx: S#Tx): Unit = {
+    final def tryBuild()(implicit tx: S#Tx): Unit = {
       state match {
         case s0: Incomplete[S] =>
           logA(s"try build ${procCached()}")
@@ -399,6 +405,7 @@ object AuralProcDataImpl {
       }
     }
 
+    /** Sub-classes may override this if invoking the super-method. */
     def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet = {
       val ctlName = graph.attribute.controlName(key)
       value match {
@@ -485,6 +492,7 @@ object AuralProcDataImpl {
 
     // def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
 
+    /** Sub-classes may override this if invoking the super-method. */
     def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res }, st: Incomplete[S])
                          (implicit tx: S#Tx): Res = in match {
       case i: UGenGraphBuilder.Input.Attribute  =>
@@ -511,11 +519,9 @@ object AuralProcDataImpl {
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
     }
 
-    def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanBuses.get(key)(tx.peer)
+    final def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanBuses.get(key)(tx.peer)
 
-    // def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = ...
-
-    def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
+    final def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
       implicit val itx = tx.peer
       if (procLoc.isInitialized) procLoc.get
       else {
@@ -542,11 +548,10 @@ object AuralProcDataImpl {
     }
 
     private def requestScanInNumChannels(req: UGenGraphBuilder.Input.Scan)(implicit tx: S#Tx): Int = {
-      val procObj = procCached()
+      val procObj = procCached()    /** Sub-classes may override this if invoking the super-method. */
+
       val proc    = procObj.elem.peer
-      val numCh   = proc.scans.get(req.name).fold(-1) { scan =>
-        scanInNumChannels(scan)
-      }
+      val numCh   = proc.scans.get(req.name).fold(-1)(scanInNumChannels)
       if (numCh == -1) throw MissingIn(req) else numCh
     }
 

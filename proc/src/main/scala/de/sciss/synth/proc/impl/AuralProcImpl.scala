@@ -30,9 +30,8 @@ import scala.concurrent.stm.Ref
 object AuralProcImpl {
   def apply[S <: Sys[S]](proc: Proc.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data  = AuralProcDataImpl(proc)
-    val res   = new Impl(data)
-    data.addInstanceView(res)
-    res
+    val res   = new Impl[S]
+    res.init(data)
   }
 
   private final class OutputBuilder(val bus: AudioBus) {
@@ -42,8 +41,6 @@ object AuralProcImpl {
   private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGB[S] /*, val name: String */) {
     var outputs = Map.empty[String, OutputBuilder]
   }
-
-  private type ObjSource[S <: Sys[S]] = stm.Source[S#Tx, Obj.T[S, Proc.Elem]]
 
   // ---------------------------------------------------------------------
 
@@ -64,33 +61,44 @@ object AuralProcImpl {
     }
   }
 
-  private final class Impl[S <: Sys[S]](private val data: ProcData[S])(implicit context: AuralContext[S])
+  class Impl[S <: Sys[S]](implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
     import context.server
 
-    def obj: stm.Source[S#Tx, Proc.Obj[S]] = data.obj
+    private var _data: ProcData[S]  = _
+    private val currentStateRef     = Ref[AuralObj.State](AuralObj.Stopped)
+    private val targetStateRef      = Ref[TargetState](TargetStop)
+    private val playingRef          = Ref(Option.empty[AuralNode])
 
-    def typeID: Int = Proc.typeID
+    final def obj: stm.Source[S#Tx, Proc.Obj[S]] = _data.obj
+
+    final def typeID: Int = Proc.typeID
 
     // def latencyEstimate(implicit tx: S#Tx): Long = ...
 
-    private val currentStateRef = Ref[AuralObj.State](AuralObj.Stopped)
-    private val targetStateRef  = Ref[TargetState](TargetStop)
+    override def toString = s"AuralObj.Proc@${hashCode().toHexString}"
 
-    def state      (implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
-    def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer).toAuralState
+    /** Sub-classes may override this if invoking the super-method. */
+    def init(data: ProcData[S])(implicit tx: S#Tx): this.type = {
+      this._data = data
+      data.addInstanceView(this)
+      this
+    }
+
+    final def state      (implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
+    final def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer).toAuralState
 
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
       if (value != old) fire(value)
     }
 
-    def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val ts = new TargetPlaying(context.scheduler.time, timeRef)
       targetStateRef.set(ts)(tx.peer)
       if (state != AuralObj.Stopped) return
-      data.state match {
+      _data.state match {
         case s: UGB.Complete[S] =>
           launchProc(s, timeRef)
         case _ =>
@@ -98,37 +106,38 @@ object AuralProcImpl {
     }
 
     // same as `play` but reusing previous `timeRef`
-    def playAfterRebuild()(implicit tx: S#Tx): Unit = {
+    final def playAfterRebuild()(implicit tx: S#Tx): Unit = {
       if (state != AuralObj.Stopped) return
 
-      (data.state, targetStateRef.get(tx.peer)) match {
+      (_data.state, targetStateRef.get(tx.peer)) match {
         case (s: UGB.Complete[S], tp: TargetPlaying) =>
           launchProc(s, tp.shiftTo(context.scheduler.time))
         case _ =>
       }
     }
 
-    def stop(/* time: Long */)(implicit tx: S#Tx): Unit = {
+    final def stop(/* time: Long */)(implicit tx: S#Tx): Unit = {
       targetStateRef.set(TargetStop)(tx.peer)
       stopForRebuild()
     }
 
     // same as `stop` but not touching target state
-    def stopForRebuild()(implicit tx: S#Tx): Unit = {
+    final def stopForRebuild()(implicit tx: S#Tx): Unit = {
       freeNode()
       state = AuralObj.Stopped
     }
 
     // def prepare()(implicit tx: S#Tx): Unit = ...
 
+    /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
       freeNode()
-      data.removeInstanceView(this)
-      context.release(data.procCached())
+      _data.removeInstanceView(this)
+      context.release(_data.procCached())
     }
 
     private def launchProc(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val p             = data.procCached()
+      val p             = _data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
       val ug            = ugen.result
       implicit val itx  = tx.peer
@@ -179,7 +188,7 @@ object AuralProcImpl {
                   dependencies ::= w
                 // users ::= w
 
-                case a => setMap :+= data.attrControlSet(key, a)
+                case a => setMap :+= _data.attrControlSet(key, a)
               }
 
             case UGB.Input.Stream.Value(numChannels, specs) =>
@@ -250,7 +259,7 @@ object AuralProcImpl {
           // var inBus     = Option.empty[AudioBusNodeSetter]
 
           def mkInBus(): AudioBusNodeSetter = {
-            val b      = data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
+            val b      = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
             // val b      = Bus.audio(server, numCh)
             logA(s"addInputBus($key, $b) (${hashCode.toHexString})")
             val res    =
@@ -311,7 +320,7 @@ object AuralProcImpl {
 
       // ---- handle output buses, and establish missing links to sinks ----
       ugen.scanOuts.foreach { case (key, numCh) =>
-        val b      = data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
+        val b      = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
         logA(s"addOutputBus($key, $b) (${hashCode.toHexString})")
         val res    = BusNodeSetter.writer(graph.scan.outControlName(key), b, synth)
         users ::= res
@@ -335,7 +344,7 @@ object AuralProcImpl {
 
     private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
       playingRef.swap(Some(node))(tx.peer).foreach(freeNode1)
-      data.addInstanceNode(node)
+      _data.addInstanceNode(node)
     }
 
     private def freeNode()(implicit tx: S#Tx): Unit = {
@@ -343,10 +352,8 @@ object AuralProcImpl {
     }
 
     private def freeNode1(n: AuralNode)(implicit tx: S#Tx): Unit = {
-      data.removeInstanceNode(n)
+      _data.removeInstanceNode(n)
       n.stop()
     }
-
-    private val playingRef = Ref(Option.empty[AuralNode])
   }
 }
