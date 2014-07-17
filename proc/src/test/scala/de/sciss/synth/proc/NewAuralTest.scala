@@ -6,6 +6,7 @@ import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
 import de.sciss.synth.Curve.{exponential, linear}
+import de.sciss.synth.io.AudioFile
 
 import scala.concurrent.stm.Txn
 import scala.language.implicitConversions
@@ -53,18 +54,19 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     }
     //////////////////////////////////////////////////////////////////////////////////////
     name match {
-      case "--test1" => test1()
-      case "--test2" => test2()
-      case "--test3" => test3()
-      case "--test4" => test4()
-      case "--test5" => test5()
-      case "--test6" => test6(as)
-      case "--test7" => test7()
-      case "--test8" => test8()
-      case "--test9" => test9()
+      case "--test1"  => test1()
+      case "--test2"  => test2()
+      case "--test3"  => test3()
+      case "--test4"  => test4()
+      case "--test5"  => test5()
+      case "--test6"  => test6(as)
+      case "--test7"  => test7()
+      case "--test8"  => test8()
+      case "--test9"  => test9()
+      case "--test10" => test10()
       case _         =>
-        println("WARNING: No option given, using --test9")
-        test9()
+        println("WARNING: No option given, using --test10")
+        test10()
     }
   }
 
@@ -161,6 +163,97 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 10
+
+  def test10()(implicit context: AuralContext[S]): Unit = {
+    println("----test10----")
+    println(
+      """
+        |Expected behaviour:
+        |A tape proc is fed through a global spatialization proc.
+        |It is heard after 1s, beginning with the text "So I took a turn...".
+        |The sound is panned rapidly between left and right stereo channel.
+        |After 1s the sound is muted (on the tape), after another 1s unmuted,
+        |then the same happens, but the mute is engaged with the global proc.
+        |
+        |""".stripMargin)
+
+    val imp     = ExprImplicits[S]
+    import imp._
+
+    val (tr, proc1H, proc2H) = cursor.step { implicit tx =>
+      val p     = Proc[S]
+      val g     = SynthGraphs.tape[S]
+      p.graph() = g
+      val _proc1 = Obj(Proc.Elem(p))
+
+      val sAudio = addScan(_proc1, "sig")
+      import de.sciss.file._
+      val f       = userHome / "Music" / "tapes" / "machinaecoelestis.aif"
+      val spec    = AudioFile.readSpec(f)
+      println(spec)
+      val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
+      val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
+      val gAudio  = Grapheme.Modifiable[S](spec.numChannels)
+      gAudio.add(0L -> vAudio) // ... çoit trop complexe ...
+      sAudio.addSource(Scan.Link.Grapheme(gAudio))
+
+      val _proc2 = proc {
+        val in  = graph.scan.In("in")
+        val m   = graph.attribute("mute").kr(0)
+        val sig0 = in * (1 - m)
+        val pos  = LFTri.ar(4)
+        val sig  = Balance2.ar(sig0 \ 0, sig0 \ 1, pos)
+        Out.ar(0, sig)
+      }
+
+      addScan(_proc1, "out") ~> addScan(_proc2, "in")
+
+      val _tl = timeline()
+      _tl += (1.0 -> 8.0, _proc1)
+      // _tl += (1.0 -> 6.0, _proc2)
+      _tl += (Span.all, _proc2)
+      val _tr = Transport(as)
+      _tr.addObject(_tl)
+
+      (_tr, tx.newHandle(_proc1), tx.newHandle(_proc2))
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      tr.play()
+
+      after(2.0) { implicit tx =>
+        println("--mute tape--")
+        val p1 = proc1H()
+        p1.attr.put(ObjKeys.attrMute, Obj(BooleanElem(true)))
+
+        after(1.0) { implicit tx =>
+          println("--unmute tape--")
+          val p1 = proc1H()
+          p1.attr.put(ObjKeys.attrMute, Obj(BooleanElem(false)))
+
+          after(1.0) { implicit tx =>
+            println("--mute main--")
+            val p2 = proc2H()
+            p2.attr.put(ObjKeys.attrMute, Obj(BooleanElem(true)))
+
+            after(1.0) { implicit tx =>
+              println("--unmute main--")
+              val p2 = proc2H()
+              p2.attr.put(ObjKeys.attrMute, Obj(BooleanElem(false)))
+
+              after(2.0) { implicit tx =>
+                tr.stop()
+                stopAndQuit(1.0)
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 9
 

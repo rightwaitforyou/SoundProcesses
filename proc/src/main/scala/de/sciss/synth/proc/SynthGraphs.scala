@@ -223,7 +223,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   //  def add(key: String, graph: SynthGraph): Unit =
   //    map.synchronized(map += (key, graph))
 
-  private final val oldTapeCookie = 1
+  // private final val oldTapeCookie = 1
   private final val emptyCookie   = 2
   private final val tapeCookie    = 3
 
@@ -236,7 +236,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                       (implicit tx: S#Tx): Ex[S] with evt.Node[S] =
     (cookie: @switch) match {
-      case `oldTapeCookie` | `emptyCookie` | `tapeCookie` => new Predefined(targets, cookie)
+      case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` => new Predefined(targets, cookie)
 
       //      case `mapCookie`  =>
       //        val key     = in.readUTF()
@@ -246,24 +246,24 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
 
   // private final class MapImpl[S <: Sys[S]]
 
-  private lazy val oldTapeSynthGraph: SynthGraph =
-    SynthGraph {
-      import de.sciss.synth._
-      import ugen._
-      val sig   = graph.scan.In(Proc.Obj.graphAudio)
-      val bus   = graph.attribute(ObjKeys.attrBus   ).ir(0)
-      val mute  = graph.attribute(ObjKeys.attrMute  ).ir(0)
-      val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
-      val amp   = env * (1 - mute)
-      Out.ar(bus, sig * amp)
-    }
+  //  private lazy val oldTapeSynthGraph: SynthGraph =
+  //    SynthGraph {
+  //      import de.sciss.synth._
+  //      import ugen._
+  //      val sig   = graph.scan.In(Proc.Obj.graphAudio)
+  //      val bus   = graph.attribute(ObjKeys.attrBus   ).ir(0)
+  //      val mute  = graph.attribute(ObjKeys.attrMute  ).ir(0)
+  //      val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
+  //      val amp   = env * (1 - mute)
+  //      Out.ar(bus, sig * amp)
+  //    }
 
   private lazy val tapeSynthGraph: SynthGraph =
     SynthGraph {
       import de.sciss.synth._
       val sig   = graph.scan.In(Proc.Obj.graphAudio)
-      val gain  = graph.attribute(ObjKeys.attrGain  ).ir(1)
-      val mute  = graph.attribute(ObjKeys.attrMute  ).ir(0)
+      val gain  = graph.attribute(ObjKeys.attrGain  ).kr(1)
+      val mute  = graph.attribute(ObjKeys.attrMute  ).kr(0)
       val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
       val amp   = env * (1 - mute) * gain
       graph.scan.Out(Proc.Obj.scanMainOut, sig * amp)
@@ -272,7 +272,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   private val emptySynthGraph = SynthGraph {}
 
   def tape   [S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(tapeCookie   )
-  def tapeOld[S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(oldTapeCookie)
+  // def tapeOld[S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(oldTapeCookie)
   def empty  [S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(emptyCookie  )
 
   private def apply[S <: Sys[S]](cookie: Int)(implicit tx: S#Tx): Ex[S] = {
@@ -293,7 +293,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
     protected def reader: evt.Reader[S, SynthGraphs.Ex[S]] = serializer
 
     def value(implicit tx: S#Tx): SynthGraph = (cookie: @switch) match {
-      case `oldTapeCookie`  => oldTapeSynthGraph
+      // case `oldTapeCookie`  => oldTapeSynthGraph
       case `emptyCookie`    => emptySynthGraph
       case `tapeCookie`     => tapeSynthGraph
     }
