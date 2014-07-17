@@ -564,12 +564,11 @@ object AuralProcDataImpl {
 
         case Link.Scan(peer) =>
           val sourceOpt = scanView(peer)
-          val chansOpt  = sourceOpt.map { sourceView =>
+          sourceOpt.fold(-1) { sourceView =>
             // val sourceObj = sourceObjH()
             // getOutputBus(sourceObj, sourceKey)
             sourceView.bus.numChannels // data.state.scanOuts.get(sourceView.key)
           }
-          chansOpt.getOrElse(-1)
       }
       if (chans.isEmpty) -1 else chans.max
     }

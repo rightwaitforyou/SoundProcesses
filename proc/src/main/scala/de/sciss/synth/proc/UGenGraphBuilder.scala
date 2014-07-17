@@ -109,11 +109,13 @@ object UGenGraphBuilder {
   case class AttributeKey(name: String) extends Key
   case class ScanKey     (name: String) extends Key
 
-  case class NumChannels(value: Int) extends Input.Value
+  case class NumChannels(value: Int) extends UGenGraphBuilder.Value
+
+  trait Value
+  case object Unit extends Value
+  type Unit = Unit.type
 
   object Input {
-    trait Value
-
     final case class Scan(name: String) extends Input {
       type Key    = ScanKey
       type Value  = NumChannels
@@ -135,7 +137,7 @@ object UGenGraphBuilder {
           */
         def isNative: Boolean = interp == -1
       }
-      final case class Value(numChannels: Int, specs: List[Spec]) extends Input.Value
+      final case class Value(numChannels: Int, specs: List[Spec]) extends UGenGraphBuilder.Value
     }
     final case class Stream(name: String, spec: Stream.Spec) extends Input {
       type Key    = AttributeKey
@@ -158,7 +160,7 @@ object UGenGraphBuilder {
   }
   trait Input {
     type Key   <: UGenGraphBuilder.Key
-    type Value <: Input.Value
+    type Value <: UGenGraphBuilder.Value
 
     def key: Key
   }
@@ -191,5 +193,5 @@ trait UGenGraphBuilder[S <: Sys[S]] extends UGenGraph.Builder {
   /** This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along
     * with the number of channels written to it.
     */
-  def addScanOut(key: String, numChannels: Int): Unit
+  def addScanOut(key: String, numChannels: Int): scala.Unit
 }

@@ -18,9 +18,10 @@ import concurrent.stm.Ref
 import de.sciss.synth.addBefore
 
 object AuralNode {
-  def apply(synth: Synth, outputBuses: Map[String, AudioBus])
-           (implicit tx: Txn): AuralNode = {
-    val res = new Impl(synth, outputBuses)
+  def apply(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
+            users: List[DynamicUser], resources: List[Resource])(implicit tx: Txn): AuralNode = {
+    val res = new Impl(synth, inputBuses = inputBuses, outputBuses = outputBuses,
+      users = users, resources = resources)
     NodeGraph.addNode(res)
     res
   }
@@ -36,16 +37,14 @@ object AuralNode {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl(synth: Synth, private var outBuses: Map[String, AudioBus])
+  private final class Impl(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
+                           users: List[DynamicUser], resources: List[Resource])
     extends AuralNode {
 
     private val groupsRef = Ref[Option[AllGroups]](None)
-    private var users     = List.empty[DynamicUser]
-    private var resources = List.empty[Resource]
-    private var inBuses   = Map.empty[String, AudioBus]
 
-    override def toString = s"AuralProc($synth, outs = ${outBuses.mkString("(", ", ", ")")}, " +
-      s"ins = ${inBuses.mkString("(", ", ", ")")}"
+    override def toString = s"AuralProc($synth, outs = ${outputBuses.mkString("(", ", ", ")")}, " +
+      s"ins = ${inputBuses.mkString("(", ", ", ")")}"
 
     def server = synth.server
 
@@ -114,16 +113,8 @@ object AuralNode {
       NodeGraph.removeNode(this)
     }
 
-    def getInputBus (key: String): Option[AudioBus] = inBuses .get(key)
-    def getOutputBus(key: String): Option[AudioBus] = outBuses.get(key)
-
-    def init(users: List[DynamicUser], resources: List[Resource]): Unit = {
-      this.users      = users
-      this.resources  = resources
-    }
-
-    def addInputBus (key: String, bus: AudioBus): Unit = inBuses  += key -> bus
-    def addOutputBus(key: String, bus: AudioBus): Unit = outBuses += key -> bus
+    def getInputBus (key: String): Option[AudioBus] = inputBuses .get(key)
+    def getOutputBus(key: String): Option[AudioBus] = outputBuses.get(key)
   }
 }
 
@@ -145,15 +136,4 @@ sealed trait AuralNode extends NodeRef {
 
   def getInputBus (key: String): Option[AudioBus]
   def getOutputBus(key: String): Option[AudioBus]
-
-  /** Warning: This is strictly for the builder to update the users, and it must be
-    * called within the same transaction that the aural proc was created.
-    */
-  private[sciss] def init(users: List[DynamicUser], resources: List[Resource]): Unit
-
-  // ditto
-  private[sciss] def addInputBus (key: String, bus: AudioBus): Unit
-  private[sciss] def addOutputBus(key: String, bus: AudioBus): Unit
-
-  // def addSink(key: String, sink: AudioBusNodeSetter)(implicit tx: Txn): Unit
 }
