@@ -265,7 +265,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
       val gain  = graph.attribute(ObjKeys.attrGain  ).kr(1)
       val mute  = graph.attribute(ObjKeys.attrMute  ).kr(0)
       val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
-      val amp   = env * (1 - mute) * gain
+      val amp   = env * ((1 - mute) * gain)
       graph.scan.Out(Proc.Obj.scanMainOut, sig * amp)
     }
 
