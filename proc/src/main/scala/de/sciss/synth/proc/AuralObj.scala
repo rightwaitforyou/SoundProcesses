@@ -83,7 +83,7 @@ object AuralObj {
      * The data instance is thus asked to provide a transaction-local
      * cache for resolving the proc from its `stm.Source`.
      */
-    def procCached()(implicit tx: S#Tx): Obj.T[S, _Proc.Elem]
+    def procCached()(implicit tx: S#Tx): _Proc.Obj[S]
 
     // def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
 

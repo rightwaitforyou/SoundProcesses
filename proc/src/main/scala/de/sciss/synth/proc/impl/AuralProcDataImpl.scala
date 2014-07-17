@@ -101,7 +101,7 @@ object AuralProcDataImpl {
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews = TSet.empty[AuralObj.Proc[S]]
 
-    private val procLoc   = TxnLocal[Obj.T[S, Proc.Elem]]() // cache-only purpose
+    private val procLoc   = TxnLocal[Proc.Obj[S]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
 
@@ -521,7 +521,7 @@ object AuralProcDataImpl {
 
     final def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanBuses.get(key)(tx.peer)
 
-    final def procCached()(implicit tx: S#Tx): Obj.T[S, Proc.Elem] = {
+    final def procCached()(implicit tx: S#Tx): Proc.Obj[S] = {
       implicit val itx = tx.peer
       if (procLoc.isInitialized) procLoc.get
       else {
