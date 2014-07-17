@@ -37,13 +37,15 @@ private[proc] object stream {
     def makeUGens: UGenInLike = {
       val b = UGenGraphBuilder.get
       val interp1       = if (interp == 4) -1 else interp
-      val info          = b.requestInput(Input.Stream(key, maxSpeed = maxSpeed, interp = interp1))
+      val spec          = Input.Stream.Spec(maxSpeed = maxSpeed, interp = interp1)
+      val info          = b.requestInput(Input.Stream(key, spec))
+      val idx           = if (spec.isEmpty) 0 else info.specs.size - 1
       // val (numCh, idx)  = b.addStreamIn(key, info)
-      val ctlName       = controlName(key, info.controlIndex)
+      val ctlName       = controlName(key, idx)
       val ctl           = ctlName.ir(Seq(0, 0))
       val buf           = ctl \ 0
       val gain          = ctl \ 1
-      makeUGen(numChannels = info.numChannels, idx = info.controlIndex, buf = buf, gain = gain)
+      makeUGen(numChannels = info.numChannels, idx = idx, buf = buf, gain = gain)
     }
   }
 

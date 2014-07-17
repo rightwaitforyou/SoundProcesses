@@ -163,12 +163,29 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 8
 
   def test8()(implicit context: AuralContext[S]): Unit = {
-    println("----test8----\n")
+    println("----test8----")
+    println(
+      """
+        |Expected behaviour:
+        |Two procs are connected to each other and placed
+        |on a timeline. The filter exists from the beginning,
+        |but the generator only joins after 2s. Sound
+        |should only be heard after 2s, The filter
+        |synth is started immediately with zero input as observable
+        |from the poll output (because the input's number of channels
+        |is known). At 4s the generator is removed
+        |again. The filter keeps playing but with zero
+        |input.
+        |
+        |There is currently a glitch when n_mapan is undone,
+        |resulting in a short burst of buffer repetition at 4s
+        |before the filter input becomes actually zero.
+        |
+        |""".stripMargin)
 
     val tl = cursor.step { implicit tx =>
       val _proc1 = proc {
-        val in = graph.scan.In("in")
-        val sig = in
+        val sig = graph.scan.In("in")
         (sig \ 0).poll(1, "ping-1")
         Out.ar(0, sig)
       }
@@ -208,7 +225,18 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 7
 
   def test7()(implicit context: AuralContext[S]): Unit = {
-    println("----test7----\n")
+    println("----test7----")
+    println(
+      """
+        |Expected behaviour:
+        |Two procs, a generator and filter, are connected,
+        |however the filter's scan input refers to an non-existing
+        |key, thus nothing is heard. After 2s, the filter's
+        |graph function is exchanged for one that refers to the
+        |correct scan key, making a pink noise filtered at 555 Hz
+        |be heard.
+        |
+        |""".stripMargin)
 
     cursor.step { implicit tx =>
       val _view1 = procV {
@@ -248,7 +276,18 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 6
 
   def test6(as: AuralSystem): Unit = {
-    println("----test6----\n")
+    println("----test6----")
+    println(
+      """
+        |Expected behaviour:
+        |A transport takes care both of a timeline and an individual
+        |proc. A dust ugen is placed on the timeline at 10s for 3s, but the
+        |transport is started at 8s, thus after 2s the dust is heard.
+        |The individual proc is a brownian noise. After the dust
+        |has stopped playing, the transport seeks back to 10s, playing
+        |again the full 3s of the dust.
+        |
+        |""".stripMargin)
 
     val tr = cursor.step { implicit tx =>
       val _proc1 = proc {
@@ -290,7 +329,22 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 5
 
   def test5()(implicit context: AuralContext[S]): Unit = {
-    println("----test5----\n")
+    println("----test5----")
+    println(
+      """
+        |Expected behaviour:
+        |Two sine generators are placed on a timeline
+        |Between 1 and 3 seconds, a sine of 441 Hz is heard on the left  channel.
+        |Between 2 and 4 seconds, a sine of 666 Hz is heard on the right channel.
+        |After 5 seconds, transport stops. One second later it restarts
+        |at 3.5s, thus playing the 666 Hz sine for 0.5s. After 5.5 seconds,
+        |a sweep is added with a span that has already started, making the
+        |sweep start at roughly 40% of the ramp (pos = 0.4) or 1 kHz. A pink noise
+        |is dynamically added to the timeline and should be heard 0.5s after
+        |the sweep. The pink noise is removed after another 0.5s, leaving
+        |only the sweep to finish playing.
+        |
+        |""".stripMargin)
 
     val tl = cursor.step { implicit tx =>
       def mkProc() = procV {
@@ -366,7 +420,14 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 4
 
   def test4()(implicit context: AuralContext[S]): Unit = {
-    println("----test4----\n")
+    println("----test4----")
+    println(
+      """
+        |Expected behaviour:
+        |A filtered pink noise with resonance frequency 666 Hz is heard
+        |after issuing 'play1'. A second later, the frequency changes to 999 Hz.
+        |
+        |""".stripMargin)
 
     val (view1, view2) = cursor.step { implicit tx =>
       val _view1 = procV {
@@ -424,7 +485,14 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 3
 
   def test3()(implicit context: AuralContext[S]): Unit = {
-    println("----test3----\n")
+    println("----test3----")
+    println(
+      """
+        |Expected behaviour:
+        |A filtered pink noise with resonance frequency 666 Hz is heard
+        |after issuing 'play2'.
+        |
+        |""".stripMargin)
 
     val (view1, view2) = cursor.step { implicit tx =>
       val _view1 = procV {
@@ -470,7 +538,13 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 2
 
   def test2()(implicit context: AuralContext[S]): Unit = {
-    println("----test2----\n")
+    println("----test2----")
+    println(
+      """
+        |Expected behaviour:
+        |A filtered pink noise with resonance frequency 666 Hz is heard.
+        |
+        |""".stripMargin)
 
     val (view1, view2) = cursor.step { implicit tx =>
       val _view1 = procV {
@@ -510,7 +584,13 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 1
 
   def test1()(implicit context: AuralContext[S]): Unit = {
-    println("----test1----\n")
+    println("----test1----")
+    println(
+      """
+        |Expected behaviour:
+        |A pink noise is heard after the 'play' is issued.
+        |
+        |""".stripMargin)
 
     val view = cursor.step { implicit tx =>
       val _view = procV {

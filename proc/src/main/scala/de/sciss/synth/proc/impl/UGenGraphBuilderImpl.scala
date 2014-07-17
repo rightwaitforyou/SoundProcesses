@@ -82,9 +82,9 @@ object UGenGraphBuilderImpl {
     //      res
     //    }
 
-    def requestInput(in: Input): in.Value = {
-      val res = context.requestInput[in.Value](in)(tx)
-      acceptedInputs += in.key -> res
+    def requestInput(req: Input): req.Value = {
+      val res = context.requestInput[req.Value](req, in)(tx)
+      acceptedInputs += req.key -> res
       res
     }
 

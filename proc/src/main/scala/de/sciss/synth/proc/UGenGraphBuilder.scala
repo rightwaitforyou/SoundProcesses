@@ -11,7 +11,7 @@ object UGenGraphBuilder {
 
   def get: UGenGraphBuilder[_] = UGenGraph.builder match {
     case b: UGenGraphBuilder[_] => b
-    case _ => sys.error("Expansion out of context")
+    case _ => throw new IllegalStateException("Expansion out of context")
   }
 
   /** An exception thrown when during incremental build an input is required for which the underlying source
@@ -35,7 +35,7 @@ object UGenGraphBuilder {
 
   trait Context[S <: Sys[S]] {
     // def requestInput(in: Input)(implicit tx: S#Tx): in.Value
-    def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res })(implicit tx: S#Tx): Res
+    def requestInput[Res](req: UGenGraphBuilder.Input { type Value = Res }, state: Incomplete[S])(implicit tx: S#Tx): Res
   }
 
   //  object StreamIn {
@@ -109,45 +109,54 @@ object UGenGraphBuilder {
   case class AttributeKey(name: String) extends Key
   case class ScanKey     (name: String) extends Key
 
+  case class NumChannels(value: Int) extends Input.Value
+
   object Input {
+    trait Value
+
     final case class Scan(name: String) extends Input {
       type Key    = ScanKey
-      type Value  = Int
+      type Value  = NumChannels
 
       def key = ScanKey(name)
     }
 
     object Stream {
-      final case class Key(name: String)
-      final case class Value(numChannels: Int, controlIndex: Int)
+      def EmptySpec = Spec(0.0, 0)
+
+      final case class Spec(maxSpeed: Double, interp: Int) {
+        /** Empty indicates that the stream is solely used for information
+          * purposes such as `BufChannels`.
+          */
+        def isEmpty: Boolean = interp == 0
+
+        /** Native indicates that the stream will be transported by the UGen
+          * itself, i.e. via `DiskIn` or `VDiskIn`.
+          */
+        def isNative: Boolean = interp == -1
+      }
+      final case class Value(numChannels: Int, specs: List[Spec]) extends Input.Value
     }
-    final case class Stream(name: String, maxSpeed: Double, interp: Int) extends Input {
+    final case class Stream(name: String, spec: Stream.Spec) extends Input {
       type Key    = AttributeKey
       type Value  = Stream.Value
 
       def key = AttributeKey(name)
-
-      /** Empty indicates that the stream is solely used for information
-        * purposes such as `BufChannels`.
-        */
-      def isEmpty: Boolean = interp == 0
-
-      /** Native indicates that the stream will be transported by the UGen
-        * itself, i.e. via `DiskIn` or `VDiskIn`.
-        */
-      def isNative: Boolean = interp == -1
     }
 
+    object Attribute {
+
+    }
     final case class Attribute(name: String) extends Input {
       type Key    = AttributeKey
-      type Value  = Int
+      type Value  = NumChannels
 
       def key = AttributeKey(name)
     }
   }
   trait Input {
-    type Key <: UGenGraphBuilder.Key
-    type Value
+    type Key   <: UGenGraphBuilder.Key
+    type Value <: Input.Value
 
     def key: Key
   }

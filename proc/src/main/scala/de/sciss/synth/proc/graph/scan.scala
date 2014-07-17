@@ -30,7 +30,7 @@ object scan {
 
     final def makeUGens: UGenInLike = {
       val b = UGenGraphBuilder.get
-      val numCh   = b.requestInput(Input.Scan(key))
+      val numCh   = b.requestInput(Input.Scan(key)).value
       // val numCh   = b.addScanIn(key, numChannels)
       val ctlName = inControlName(key)
       mkUGen(ctlName, numCh)

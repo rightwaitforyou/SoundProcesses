@@ -194,7 +194,7 @@ object AuralProcDataImpl {
 
     protected def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
       state.acceptedInputs.get(UGenGraphBuilder.AttributeKey(key)).foreach {
-        case a: UGenGraphBuilder.Input.Attribute =>
+        case UGenGraphBuilder.NumChannels(numCh) =>
           // XXX TODO -- we have to verify the number of channels
           nodeOption.foreach { n =>
             val set = attrControlSet(key, value.elem)
@@ -258,10 +258,6 @@ object AuralProcDataImpl {
         }
       }
     }
-
-    //    private def rebuild()(implicit tx: S#Tx): Unit = {
-    //      logA(s"--todo-- rebuild ${procCached()}")
-    //    }
 
     def addInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"addInstanceNode ${procCached()} : $n")
@@ -384,9 +380,10 @@ object AuralProcDataImpl {
         logA(s"...newIns  = ${newIns.mkString(",")}")
 
         newIns.foreach {
-          case (UGenGraphBuilder.ScanKey(key), numCh: Int /* meta */) =>
-          // val numCh = meta.numChannels
-          activateAuralScan(key, numCh)
+          case (UGenGraphBuilder.ScanKey(key), UGenGraphBuilder.NumChannels(numCh)) =>
+            // val numCh = meta.numChannels
+            activateAuralScan(key, numCh)
+          case _ =>
         }
       }
 
@@ -488,10 +485,22 @@ object AuralProcDataImpl {
 
     // def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
 
-    def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res })(implicit tx: S#Tx): Res = in match {
-      case i: UGenGraphBuilder.Input.Attribute  => requestAttrNumChannels(i.name)
-      case i: UGenGraphBuilder.Input.Scan       => requestScanInNumChannels(i)
-      // case i: UGenGraphBuilder.Input.Stream     => ...
+    def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res }, st: Incomplete[S])
+                         (implicit tx: S#Tx): Res = in match {
+      case i: UGenGraphBuilder.Input.Attribute  =>
+        UGenGraphBuilder.NumChannels(requestAttrNumChannels(i.name))
+      case i: UGenGraphBuilder.Input.Scan       =>
+        UGenGraphBuilder.NumChannels(requestScanInNumChannels(i))
+      case i: UGenGraphBuilder.Input.Stream     =>
+        val numCh     = requestAttrNumChannels(i.name)
+        val newSpecs0 = st.acceptedInputs.get(i.key) match {
+          case Some(v: Input.Stream.Value)  => v.specs
+          case _                            => Nil
+        }
+        val newSpecs = if (i.spec.isEmpty) newSpecs0 else {
+          i.spec :: newSpecs0
+        }
+        Input.Stream.Value(numChannels = numCh, specs = newSpecs)
 
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
     }

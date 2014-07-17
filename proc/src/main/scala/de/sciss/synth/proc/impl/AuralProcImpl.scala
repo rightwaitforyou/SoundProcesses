@@ -19,17 +19,15 @@ import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSet
 import de.sciss.numbers
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
+import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.{addToHead, ControlSet}
+import de.sciss.synth.{proc, addToHead, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
+import proc.{UGenGraphBuilder => UGB}
 
 import scala.concurrent.stm.Ref
 
 object AuralProcImpl {
-  // type E[S <: evt.Sys[S]] = Proc.Elem[S]
-
-  // def typeID = Proc.typeID
-
   def apply[S <: Sys[S]](proc: Proc.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data  = AuralProcDataImpl(proc)
     val res   = new Impl(data)
@@ -41,7 +39,7 @@ object AuralProcImpl {
     var sinks = List.empty[(String, AuralNode)]
   }
 
-  private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGenGraphBuilder[S] /*, val name: String */) {
+  private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGB[S] /*, val name: String */) {
     var outputs = Map.empty[String, OutputBuilder]
   }
 
@@ -93,7 +91,7 @@ object AuralProcImpl {
       targetStateRef.set(ts)(tx.peer)
       if (state != AuralObj.Stopped) return
       data.state match {
-        case s: UGenGraphBuilder.Complete[S] =>
+        case s: UGB.Complete[S] =>
           launchProc(s, timeRef)
         case _ =>
       }
@@ -104,7 +102,7 @@ object AuralProcImpl {
       if (state != AuralObj.Stopped) return
 
       (data.state, targetStateRef.get(tx.peer)) match {
-        case (s: UGenGraphBuilder.Complete[S], tp: TargetPlaying) =>
+        case (s: UGB.Complete[S], tp: TargetPlaying) =>
           launchProc(s, tp.shiftTo(context.scheduler.time))
         case _ =>
       }
@@ -129,7 +127,7 @@ object AuralProcImpl {
       context.release(data.procCached())
     }
 
-    private def launchProc(ugen: UGenGraphBuilder.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    private def launchProc(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p             = data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
       val ug            = ugen.result
@@ -154,17 +152,19 @@ object AuralProcImpl {
       )
       // var setMap = Vector.empty[ControlSet]
 
+      val node = AuralNode(synth, Map.empty)
+
       // ---- attributes ----
       ugen.acceptedInputs.foreach {
-        case (UGenGraphBuilder.AttributeKey(key), value) =>
+        case (UGB.AttributeKey(key), value) =>
           value match {
-            case numChannels: Int =>
+            case UGB.NumChannels(numChannels) =>
               // XXX TODO - numChannels is not tested
               p.attr.getElem(key).foreach {
                 case a: AudioGraphemeElem[S] =>
-                  val ctlName = graph.attribute.controlName(key)
+                  val ctlName   = graph.attribute.controlName(key)
                   val audioElem = a.peer
-                  val spec = audioElem.spec
+                  val spec      = audioElem.spec
                   //              require(spec.numChannels == 1 || spec.numFrames == 1,
                   //                s"Audio grapheme ${a.peer} must have either 1 channel or 1 frame to be used as scalar attribute")
                   require(spec.numFrames == 1, s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
@@ -182,140 +182,132 @@ object AuralProcImpl {
                 case a => setMap :+= data.attrControlSet(key, a)
               }
 
-            case UGenGraphBuilder.Input.Stream.Value(numChannels, controlIndex) =>
-              ???
-//              val infoSeq = if (infoSeq0.isEmpty) UGenGraphBuilder.StreamIn.empty :: Nil else infoSeq0
-//
-//              infoSeq.zipWithIndex.foreach { case (info, idx) =>
-//                val ctlName     = graph.stream.controlName(n, idx)
-//                val bufSize     = if (info.isEmpty) server.config.blockSize else {
-//                  val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
-//                  val bufDur    = 1.5 * maxSpeed
-//                  val minSz     = (2 * server.config.blockSize * math.max(1.0, maxSpeed)).toInt
-//                  val bestSz    = math.max(minSz, (bufDur * server.sampleRate).toInt)
-//                  import numbers.Implicits._
-//                  val bestSzHi  = bestSz.nextPowerOfTwo
-//                  val bestSzLo  = bestSzHi >> 1
-//                  if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
-//                }
-//                val (rb, gain) = p.attr.getElem(n).fold[(Buffer, Float)] {
-//                  // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
-//                  // So instead of aborting when the attribute is not set, fall back to zero
-//                  val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
-//                  (_buf, 0f)
-//                } {
-//                  case a: AudioGraphemeElem[S] =>
-//                    val audioElem = a.peer
-//                    val spec      = audioElem.spec
-//                    val path      = audioElem.artifact.value.getAbsolutePath
-//                    val offset    = audioElem.offset  .value
-//                    val _gain     = audioElem.gain    .value
-//                    val _buf      = if (info.isNative) {
-//                      Buffer.diskIn(server)(
-//                        path          = path,
-//                        startFrame    = offset,
-//                        numFrames     = bufSize,
-//                        numChannels   = spec.numChannels
-//                      )
-//                    } else {
-//                      val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
-//                      val trig = new StreamBuffer(key = n, idx = idx, synth = synth, buf = __buf, path = path,
-//                        fileFrames = spec.numFrames, interp = info.interp)
-//                      trig.install()
-//                      __buf
-//                    }
-//                    (_buf, _gain.toFloat)
-//
-//                  case a => sys.error(s"Cannot use attribute $a as an audio stream")
-//                }
-//                setMap       :+= (ctlName -> Seq[Float](rb.id, gain): ControlSet)
-//                dependencies ::= rb
-//              }
+            case UGB.Input.Stream.Value(numChannels, specs) =>
+              val infoSeq = if (specs.isEmpty) UGB.Input.Stream.EmptySpec :: Nil else specs
+
+              infoSeq.zipWithIndex.foreach { case (info, idx) =>
+                val ctlName     = graph.stream.controlName(key, idx)
+                val bufSize     = if (info.isEmpty) server.config.blockSize else {
+                  val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
+                  val bufDur    = 1.5 * maxSpeed
+                  val minSz     = (2 * server.config.blockSize * math.max(1.0, maxSpeed)).toInt
+                  val bestSz    = math.max(minSz, (bufDur * server.sampleRate).toInt)
+                  import numbers.Implicits._
+                  val bestSzHi  = bestSz.nextPowerOfTwo
+                  val bestSzLo  = bestSzHi >> 1
+                  if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
+                }
+                val (rb, gain) = p.attr.getElem(key).fold[(Buffer, Float)] {
+                  // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
+                  // So instead of aborting when the attribute is not set, fall back to zero
+                  val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
+                  (_buf, 0f)
+                } {
+                  case a: AudioGraphemeElem[S] =>
+                    val audioElem = a.peer
+                    val spec      = audioElem.spec
+                    val path      = audioElem.artifact.value.getAbsolutePath
+                    val offset    = audioElem.offset  .value
+                    val _gain     = audioElem.gain    .value
+                    val _buf      = if (info.isNative) {
+                      Buffer.diskIn(server)(
+                        path          = path,
+                        startFrame    = offset,
+                        numFrames     = bufSize,
+                        numChannels   = spec.numChannels
+                      )
+                    } else {
+                      val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
+                      val trig = new StreamBuffer(key = key, idx = idx, synth = synth, buf = __buf, path = path,
+                        fileFrames = spec.numFrames, interp = info.interp)
+                      trig.install()
+                      __buf
+                    }
+                    (_buf, _gain.toFloat)
+
+                  case a => sys.error(s"Cannot use attribute $a as an audio stream")
+                }
+                setMap       :+= (ctlName -> Seq[Float](rb.id, gain): ControlSet)
+                dependencies ::= rb
+              }
 
             case _ =>
               throw new IllegalStateException(s"Unsupported input request $value")
           }
+
+        case (UGB.ScanKey(key), UGB.NumChannels(numCh)) =>
+          // ---- scans ----
+          // XXX TODO : this should all disappear
+          // and the missing bits should be added
+          // to AuralScan
+
+          // val numCh = scanIn.numChannels
+
+          @inline def ensureChannels(n: Int): Unit =
+            require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
+
+          val inCtlName = graph.scan.inControlName(key)
+          // var inBus     = Option.empty[AudioBusNodeSetter]
+
+          def mkInBus(): AudioBusNodeSetter = {
+            val b      = data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
+            // val b      = Bus.audio(server, numCh)
+            logA(s"addInputBus($key, $b) (${hashCode.toHexString})")
+            val res    =
+              // if (scanIn.fixed)
+              //   BusNodeSetter.reader(inCtlName, b, synth)
+              // else
+                BusNodeSetter.mapper(inCtlName, b, synth)
+            users ::= res
+            node.addInputBus(key, b)
+            res
+          }
+
+          // note: if not found, stick with default
+
+          val time = timeRef.offsetOrZero
+
+          // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
+          //           we cannot use ControlSet any more, but need other mechanism
+          p.elem.peer.scans.get(key).foreach { scan =>
+            val src = scan.sources
+            // if (src.isEmpty) {
+            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
+            // } else {
+            src.foreach {
+              case Link.Grapheme(peer) =>
+                val segmOpt = peer.segment(time)
+                segmOpt.foreach {
+                  // again if not found... stick with default
+                  case const: Segment.Const =>
+                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
+                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
+                    setMap :+= (if (const.numChannels == 1) {
+                      ControlSet.Value (inCtlName, const.values.head .toFloat )
+                    } else {
+                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
+                    })
+
+                  case segm: Segment.Curve =>
+                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
+                    // println(s"segment : ${segm.span}")
+                    val bm          = mkInBus()
+                    val w           = SegmentWriter(bm.bus, segm, time, Timeline.SampleRate)
+                    dependencies  ::= w
+                    // users ::= w
+
+                  case audio: Segment.Audio =>
+                    ensureChannels(audio.numChannels)
+                    val bm          = mkInBus()
+                    val w           = AudioArtifactWriter(bm.bus, audio, time)
+                    dependencies  ::= w
+                    // users    ::= w
+                }
+
+              case Link.Scan(peer) => mkInBus()
+            }
+          }
       }
-
-      import Grapheme.Segment
-      // val outBuses      = builder.outputs
-      // val aural         = AuralNode(synth, outBuses.mapValues(_.bus))
-      val node = AuralNode(synth, Map.empty)
-
-      // ---- scans ----
-      // XXX TODO : this should all disappear
-      // and the missing bits should be added
-      // to AuralScan
-
-      ???
-//      ugen.scanIns.foreach {
-//        case (key, scanIn) =>
-//          val numCh = scanIn.numChannels
-//
-//          @inline def ensureChannels(n: Int): Unit =
-//            require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
-//
-//          val inCtlName = graph.scan.inControlName(key)
-//          // var inBus     = Option.empty[AudioBusNodeSetter]
-//
-//          def mkInBus(): AudioBusNodeSetter = {
-//            val b      = data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
-//            // val b      = Bus.audio(server, numCh)
-//            logA(s"addInputBus($key, $b) (${hashCode.toHexString})")
-//            val res    = if (scanIn.fixed)
-//              BusNodeSetter.reader(inCtlName, b, synth)
-//            else
-//              BusNodeSetter.mapper(inCtlName, b, synth)
-//            users ::= res
-//            node.addInputBus(key, b)
-//            res
-//          }
-//
-//          // note: if not found, stick with default
-//
-//          val time = timeRef.offsetOrZero
-//
-//          // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
-//          //           we cannot use ControlSet any more, but need other mechanism
-//          p.elem.peer.scans.get(key).foreach { scan =>
-//            val src = scan.sources
-//            // if (src.isEmpty) {
-//            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
-//            // } else {
-//            src.foreach {
-//              case Link.Grapheme(peer) =>
-//                val segmOpt = peer.segment(time)
-//                segmOpt.foreach {
-//                  // again if not found... stick with default
-//                  case const: Segment.Const =>
-//                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-//                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
-//                    setMap :+= (if (const.numChannels == 1) {
-//                      ControlSet.Value (inCtlName, const.values.head .toFloat )
-//                    } else {
-//                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
-//                    })
-//
-//                  case segm: Segment.Curve =>
-//                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-//                    // println(s"segment : ${segm.span}")
-//                    val bm          = mkInBus()
-//                    val w           = SegmentWriter(bm.bus, segm, time, Timeline.SampleRate)
-//                    dependencies  ::= w
-//                    // users ::= w
-//
-//                  case audio: Segment.Audio =>
-//                    ensureChannels(audio.numChannels)
-//                    val bm          = mkInBus()
-//                    val w           = AudioArtifactWriter(bm.bus, audio, time)
-//                    dependencies  ::= w
-//                    // users    ::= w
-//                }
-//
-//              case Link.Scan(peer) => mkInBus()
-//            }
-//          }
-//      }
 
       // ---- handle output buses, and establish missing links to sinks ----
       ugen.scanOuts.foreach { case (key, numCh) =>
