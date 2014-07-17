@@ -488,11 +488,15 @@ object AuralProcDataImpl {
     def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res }, st: Incomplete[S])
                          (implicit tx: S#Tx): Res = in match {
       case i: UGenGraphBuilder.Input.Attribute  =>
-        UGenGraphBuilder.NumChannels(requestAttrNumChannels(i.name))
+        val found = requestAttrNumChannels(i.name)
+        val res   = if (found < 0) i.numChannels else found
+        if (res < 0) throw new MissingIn(in)
+        UGenGraphBuilder.NumChannels(res)
       case i: UGenGraphBuilder.Input.Scan       =>
         UGenGraphBuilder.NumChannels(requestScanInNumChannels(i))
       case i: UGenGraphBuilder.Input.Stream     =>
-        val numCh     = requestAttrNumChannels(i.name)
+        val numCh0  = requestAttrNumChannels(i.name)
+        val numCh   = if (numCh0 < 0) 1 else numCh0     // simply default to 1
         val newSpecs0 = st.acceptedInputs.get(i.key) match {
           case Some(v: Input.Stream.Value)  => v.specs
           case _                            => Nil
@@ -527,10 +531,11 @@ object AuralProcDataImpl {
 
     private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
       val procObj = procCached()
-      procObj.attr.getElem(key).fold(1) {
-        case a: DoubleVecElem[S]     => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+      procObj.attr.getElem(key).fold(-1) {
+        case a: DoubleVecElem    [S] => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
-        case _ => 1
+        case _: FadeSpec.Elem    [S] => 4
+        case _ => -1
       }
     }
 

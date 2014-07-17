@@ -30,7 +30,7 @@ object attribute {
 
     def makeUGens: UGenInLike = {
       val b       = UGenGraphBuilder.get
-      val numCh   = b.requestInput(Input.Attribute(key)).value
+      val numCh   = b.requestInput(Input.Attribute(key, numChannels = -1)).value
       // val numCh   = b.addAttributeIn(key)
       val ctlName = controlName(key)
       val ctl     = ControlProxy(rate, Vec.fill(numCh)(default.toFloat), Some(ctlName))

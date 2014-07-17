@@ -144,10 +144,12 @@ object UGenGraphBuilder {
       def key = AttributeKey(name)
     }
 
-    object Attribute {
-
-    }
-    final case class Attribute(name: String) extends Input {
+    /** Specifies access to a scalar attribute.
+      *
+      * @param name         name (key) of the attribute
+      * @param numChannels  the required number of channels or `-1` if no specific requirement
+      */
+    final case class Attribute(name: String, numChannels: Int) extends Input {
       type Key    = AttributeKey
       type Value  = NumChannels
 

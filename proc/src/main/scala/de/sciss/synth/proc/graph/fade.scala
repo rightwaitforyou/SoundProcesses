@@ -36,8 +36,9 @@ object Fade {
 
     /** Returns (dur, shape, floor) */
     final protected def readCtl(b: UGenGraphBuilder[_], key: String): (GE, Env.Curve, GE) = {
-      val numCh   = b.requestInput(Input.Attribute(key))
-      if (numCh != 4) throw new IllegalStateException(s"$this - requires a 4-channel attribute")
+      val numCh   = b.requestInput(Input.Attribute(key, numChannels = 4)).value
+      assert (numCh == 4)
+      // if (numCh != 4) throw new IllegalStateException(s"$this - requires a 4-channel attribute (found $numCh)")
       // b.addAttributeIn(key)
       val ctlName = attribute.controlName(key)
       val ctl     = ctlName.ir(Seq(0f, 0f, 0f, 0f))  // dur, shape-id, shape-curvature, floor
