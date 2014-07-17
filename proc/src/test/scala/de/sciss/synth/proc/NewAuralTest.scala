@@ -5,6 +5,7 @@ import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
+import de.sciss.synth.Curve.{exponential, linear}
 
 import scala.concurrent.stm.Txn
 import scala.language.implicitConversions
@@ -60,9 +61,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test6" => test6(as)
       case "--test7" => test7()
       case "--test8" => test8()
+      case "--test9" => test9()
       case _         =>
-        println("WARNING: No option given, using --test8")
-        test8()
+        println("WARNING: No option given, using --test9")
+        test9()
     }
   }
 
@@ -159,6 +161,57 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 9
+
+  def test9()(implicit context: AuralContext[S]): Unit = {
+    println("----test9----")
+    println(
+      """
+        |Expected behaviour:
+        |After 2s, a pink noise is linearly faded in for 4s,
+        |after a sustain phase of 1s, it is exponentially faded
+        |out for 3s. Then transport jumps back into the proc,
+        |beginning the fade-in halfway through from -6 dB to 0 dB
+        |in 2s.
+        |
+        |""".stripMargin)
+
+    val tr = cursor.step { implicit tx =>
+      val _proc1 = proc {
+        val noise = PinkNoise.ar
+        val env   = graph.FadeInOut("fadeIn", "fadeOut").ar
+        val sig   = noise * env
+        Out.ar(0, sig)
+      }
+
+      import de.sciss.synth._
+      val imp = ExprImplicits[S]
+      import imp._
+
+      val fadeExprIn  = FadeSpec.Expr[S](frame(4.0), linear, 0.0)
+      val fadeExprOut = FadeSpec.Expr[S](frame(3.0), exponential, -40.dbamp)
+      _proc1.attr.put("fadeIn" , Obj(FadeSpec.Elem(fadeExprIn )))
+      _proc1.attr.put("fadeOut", Obj(FadeSpec.Elem(fadeExprOut)))
+
+      val _tl = timeline()
+      _tl += (2.0 -> 10.0, _proc1)
+      val _tr = Transport(as)
+      _tr.addObject(_tl)
+      _tr
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      tr.play()
+
+      after(11.0) { implicit tx =>
+        println("--issue seek--")
+        tr.seek(frame(4.0))
+        stopAndQuit(6.0)
+      }
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 8
 
