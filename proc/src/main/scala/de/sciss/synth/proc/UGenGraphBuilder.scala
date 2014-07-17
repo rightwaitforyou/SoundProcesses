@@ -121,6 +121,8 @@ object UGenGraphBuilder {
       type Value  = NumChannels
 
       def key = ScanKey(name)
+
+      override def productPrefix = "Input.Scan"
     }
 
     object Stream {
@@ -136,14 +138,20 @@ object UGenGraphBuilder {
           * itself, i.e. via `DiskIn` or `VDiskIn`.
           */
         def isNative: Boolean = interp == -1
+
+        override def productPrefix = "Input.Stream.Spec"
       }
-      final case class Value(numChannels: Int, specs: List[Spec]) extends UGenGraphBuilder.Value
+      final case class Value(numChannels: Int, specs: List[Spec]) extends UGenGraphBuilder.Value {
+        override def productPrefix = "Input.Stream.Value"
+      }
     }
     final case class Stream(name: String, spec: Stream.Spec) extends Input {
       type Key    = AttributeKey
       type Value  = Stream.Value
 
       def key = AttributeKey(name)
+
+      override def productPrefix = "Input.Stream"
     }
 
     /** Specifies access to a scalar attribute.
@@ -156,6 +164,8 @@ object UGenGraphBuilder {
       type Value  = NumChannels
 
       def key = AttributeKey(name)
+
+      override def productPrefix = "Input.Attribute"
     }
   }
   trait Input {
