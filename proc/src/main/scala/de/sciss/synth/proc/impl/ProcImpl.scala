@@ -24,13 +24,9 @@ import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
 import language.higherKinds
 import de.sciss.lucre.synth.InMemory
-import de.sciss.lucre.expr.ExprType1
-import de.sciss.lucre
 
 object ProcImpl {
   private final val SER_VERSION = 0x5073  // was "Pr"
-
-  implicit val paramType: ExprType1[Param] = lucre.expr.Double
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Proc[S] = new New[S]
 

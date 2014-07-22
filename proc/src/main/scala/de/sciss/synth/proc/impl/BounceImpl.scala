@@ -37,10 +37,6 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
     new Impl(config)
   }
 
-  private val DEBUG = false
-
-  // import BounceImpl.DEBUG
-
   private final class Impl(config: Config) extends ProcessorImpl[Product, GenericProcessor[File]]
     with GenericProcessor[File] {
 
@@ -54,7 +50,6 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       val needsOSCFile  = config.server.nrtCommandPath.isEmpty  // we need to generate that file
       val needsDummyOut = config.server.outputBusChannels == 0  // scsynth doesn't allow this. must have 1 dummy channel
       val needsOutFile  = config.server.nrtOutputPath.isEmpty && !needsDummyOut // we need to generate
-      val sampleRate    = config.server.sampleRate.toDouble
 
       // ---- configuration ----
 
@@ -66,8 +61,8 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           b.nrtCommandPath = f.getCanonicalPath
         }
         if (needsDummyOut) {
-          b.nrtHeaderFormat = AudioFileType.AIFF
-          b.nrtSampleFormat = SampleFormat.Int16
+          b.nrtHeaderFormat   = AudioFileType.AIFF
+          b.nrtSampleFormat   = SampleFormat.Int16
           b.outputBusChannels = 1
         }
         if (needsDummyOut || needsOutFile) {
@@ -83,7 +78,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       val server = Server.offline(sCfg)
 
-      val (span, scheduler, transp) = cursor.step { implicit tx =>
+      val (span, scheduler, transport) = cursor.step { implicit tx =>
         val _scheduler  = Scheduler.offline[S]
         val _span       = config.span
 
@@ -93,34 +88,27 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
         config.group.foreach { h =>
           _transport.addObject(h())
         }
+        _transport.seek(_span.start)
+        _transport.play()
         (_span, _scheduler, _transport)
       }
 
-      //      val view = blocking {
-      //        cursor.step { implicit tx =>
-      //          val aural   = AuralSystem.offline(server)
-      //          val _view   = AuralPresentationOLD.run[S](transp, aural)
-      //          config.init(tx, server)
-      //          transp.seek(span.start)
-      //          transp.play()
-      //          _view
-      //        }
-      //      }
+      val srRatio = server.sampleRate / Timeline.SampleRate
 
       @tailrec def loop(): Unit = {
         Await.result(server.committed(), Duration.Inf)
         val keepPlaying = blocking {
           cursor.step { implicit tx =>
             scheduler.stepTarget match {
-              case _posO@Some(pos) if pos <= span.stop =>
+              case Some(pos) if pos <= span.length =>
                 logTransport(s"stepTarget = $pos")
-                server.position = pos - span.start
+                server.position = (pos * srRatio + 0.5).toLong
                 scheduler.step()
                 true
 
               case _ =>
-                if (transp.position < span.stop) {
-                  server.position = span.length
+                if (transport.position < span.stop) {
+                  server.position = (span.length * srRatio + 0.5).toLong
                   server !! osc.Bundle.now() // dummy bundle to terminate the OSC file at the right position
                 }
                 false
@@ -134,9 +122,9 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       Await.result(server.committed(), Duration.Inf)
       val bundles = server.bundles()
 
-      if (DEBUG) {
-        println("---- BOUNCE: bundles ----")
-        bundles.foreach(println)
+      if (showTransportLog) {
+        logTransport("---- BOUNCE: bundles ----")
+        bundles.foreach(b => logTransport(b.toString()))
       }
 
       // ---- write OSC file ----
@@ -146,8 +134,8 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       // XXX TODO: this should be factored out, probably go into ScalaOSC or ScalaCollider
       blocking {
-        val c = osc.PacketCodec().scsynth().build
-        val sz = bundles.map(_.encodedSize(c)).max
+        val c   = osc.PacketCodec().scsynth().build
+        val sz  = bundles.map(_.encodedSize(c)).max
         val raf = new RandomAccessFile(oscFile, "rw")
         try {
           val bb = ByteBuffer.allocate(sz)
@@ -166,15 +154,13 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       // ---- run scsynth ----
 
-      val dur = span.length / sampleRate
+      val dur = span.length / Timeline.SampleRate
 
       val procArgs = sCfg.toNonRealtimeArgs
       val procBuilder = Process(procArgs, Some(new File(sCfg.program).getParentFile))
 
-      if (DEBUG) {
-        println("---- BOUNCE: scsynth ----")
-        println(procArgs.mkString(" "))
-      }
+      logTransport("---- BOUNCE: scsynth ----")
+      logTransport(procArgs.mkString(" "))
 
       lazy val log: ProcessLogger = new ProcessLogger {
         def buffer[A](f: => A): A = f
@@ -209,7 +195,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       // XXX TODO: clean up
 
       cursor.step { implicit tx =>
-        transp.dispose()
+        transport.dispose()
       }
       // scheduler.dispose()
 

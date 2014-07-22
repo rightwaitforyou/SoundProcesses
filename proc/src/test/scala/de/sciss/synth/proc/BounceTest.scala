@@ -14,9 +14,17 @@ object BounceTest extends App {
 
   implicit val system = Durable(BerkeleyDB.tmp())
 
-  // showTransportLog  = true
+  de.sciss.lucre.synth.showLog = true
+  showTransportLog  = true
 
   def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
+
+  println(
+    """Expected outcome:
+      |
+      |A sound file of duration 150ms. a sine tone of 200 Hz
+      |is seen for 50ms (or 10 periods), the remaining 100ms are silent.
+      |""".stripMargin)
 
   val groupH = system.step { implicit tx =>
     val expr      = ExprImplicits[S]
@@ -27,7 +35,7 @@ object BounceTest extends App {
     val obj       = Obj(peer)
     proc.graph() = SynthGraph {
       import ugen._
-      Out.ar(0, SinOsc.ar(440))
+      Out.ar(0, SinOsc.ar(200))
     }
     val group     = Timeline[S]
     group.add(Span(frame(0.1), frame(0.2)), obj)
@@ -56,7 +64,10 @@ object BounceTest extends App {
   import ExecutionContext.Implicits.global
 
   val t = new Thread {
-    override def run(): Unit = this.synchronized(this.wait())
+    override def run(): Unit = {
+      this.synchronized(this.wait())
+      sys.exit(0)
+    }
   }
   t.start()
 
