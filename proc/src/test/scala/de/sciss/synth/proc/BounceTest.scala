@@ -16,6 +16,8 @@ object BounceTest extends App {
 
   // showTransportLog  = true
 
+  def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
+
   val groupH = system.step { implicit tx =>
     val expr      = ExprImplicits[S]
     import expr._
@@ -27,16 +29,16 @@ object BounceTest extends App {
       import ugen._
       Out.ar(0, SinOsc.ar(440))
     }
-    val group     = ProcGroup.Modifiable[S]
-    group.add(Span(4410, 8820), obj)
-    import ProcGroup.serializer
-    tx.newHandle(group: ProcGroup[S])
+    val group     = Timeline[S]
+    group.add(Span(frame(0.1), frame(0.2)), obj)
+    // import ProcGroup.serializer
+    tx.newHandle(Obj(Timeline.Elem(group)))
   }
 
   val bounce              = Bounce[S, I]
-  val bCfg                = bounce.Config()
-  bCfg.group              = groupH
-  bCfg.span               = Span(4410 + 2205, 4410 * 3) // start in the middle of the proc span
+  val bCfg                = Bounce.Config[S]
+  bCfg.group              = groupH :: Nil
+  bCfg.span               = Span(frame(0.15), frame(0.3)) // start in the middle of the proc span
   val sCfg                = bCfg.server
   //sCfg.nrtCommandPath = "/Users/hhrutz/Desktop/test.osc"
   // sCfg.nrtOutputPath  = "/Users/hhrutz/Desktop/test.aif"

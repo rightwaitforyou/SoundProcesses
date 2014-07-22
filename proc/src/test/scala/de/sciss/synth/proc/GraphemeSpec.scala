@@ -18,8 +18,8 @@ class GraphemeSpec extends ConfluentEventSpec {
   ignore /* "Grapheme" */ should "notify observers about all relevant events" in { system =>
     val obs = new Observation[S]
     val (gH1, gH2) = system.step { implicit tx =>
-      val g1  = Modifiable[S](1)
-      val g2  = Modifiable[S](2)
+      val g1  = Grapheme[S](1)
+      val g2  = Grapheme[S](2)
       g1.changed.react(obs.register)
       g2.changed.react(obs.register)
       val res1 = tx.newHandle(g1)(Modifiable.serializer[S])

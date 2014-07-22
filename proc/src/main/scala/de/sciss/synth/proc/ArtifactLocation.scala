@@ -24,18 +24,18 @@ import de.sciss.lucre.data
 import impl.{ArtifactImpl => Impl}
 
 object ArtifactLocation {
+  def tmp[S <: Sys[S]]()(implicit tx: S#Tx): Modifiable[S] = {
+    val dir   = File.createTempFile("artifacts", "tmp")
+    dir.delete()
+    dir.mkdir()
+    dir.deleteOnExit()
+    apply(dir)
+  }
+
+  def apply[S <: Sys[S]](init: File)(implicit tx: S#Tx): Modifiable[S] =
+    Impl.newLocation[S](init)
+
   object Modifiable {
-    def tmp[S <: Sys[S]]()(implicit tx: S#Tx): ArtifactLocation.Modifiable[S] = {
-      val dir   = File.createTempFile("artifacts", "tmp")
-      dir.delete()
-      dir.mkdir()
-      dir.deleteOnExit()
-      apply(dir)
-    }
-
-    def apply[S <: Sys[S]](init: File)(implicit tx: S#Tx): ArtifactLocation.Modifiable[S] =
-      Impl.newLocation[S](init)
-
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactLocation.Modifiable[S]] =
       Impl.modLocationSerializer
 

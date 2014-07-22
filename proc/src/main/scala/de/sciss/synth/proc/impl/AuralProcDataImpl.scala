@@ -495,16 +495,16 @@ object AuralProcDataImpl {
     /** Sub-classes may override this if invoking the super-method. */
     def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res }, st: Incomplete[S])
                          (implicit tx: S#Tx): Res = in match {
-      case i: UGenGraphBuilder.Input.Attribute  =>
+      case i: UGenGraphBuilder.Input.Attribute =>
         val found  = requestAttrNumChannels(i.name)
         val reqNum = i.numChannels
         if ( found >= 0 && reqNum >= 0 && found != reqNum)
           throw new IllegalStateException(s"Attribute ${i.name} requires $reqNum channels (found $found)")
         val res = if (found >= 0) found else if (reqNum >= 0) reqNum else 1
         UGenGraphBuilder.NumChannels(res)
-      case i: UGenGraphBuilder.Input.Scan       =>
+      case i: UGenGraphBuilder.Input.Scan =>
         UGenGraphBuilder.NumChannels(requestScanInNumChannels(i))
-      case i: UGenGraphBuilder.Input.Stream     =>
+      case i: UGenGraphBuilder.Input.Stream =>
         val numCh0  = requestAttrNumChannels(i.name)
         val numCh   = if (numCh0 < 0) 1 else numCh0     // simply default to 1
         val newSpecs0 = st.acceptedInputs.get(i.key) match {

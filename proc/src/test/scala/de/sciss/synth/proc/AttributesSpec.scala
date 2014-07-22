@@ -55,13 +55,13 @@ class AttributesSpec extends ConfluentEventSpec {
 
       p.attr.put("fade"   , Obj(FadeSpec.Elem(FadeSpec.Expr.newConst(fade))))
       p.attr.put("d-vec"  , Obj(DoubleVecElem(DoubleVec.newConst(Vec(1.2, 3.4, 5.6)))))
-      val loc = ArtifactLocation.Modifiable[S](file("foo"))
+      val loc = ArtifactLocation[S](file("foo"))
       val art = loc.add(file("foo") / "bar")
       p.attr.put("audio"  , Obj(AudioGraphemeElem(Grapheme.Expr.Audio(art, spec, offset = n, gain = d))))
       p.attr.put("loc",     Obj(ArtifactLocation.Elem(loc)))
-      val group = ProcGroup.Modifiable[S]
-      p.attr.put("group",   Obj(ProcGroupElem(group)))
-      implicit val groupSer = ProcGroup.Modifiable.serializer[S]
+      val group = Timeline[S]
+      p.attr.put("group",   Obj(Timeline.Elem(group)))
+      // implicit val groupSer = ProcGroup.Modifiable.serializer[S]
       tx.newHandle(group)
     }
 
@@ -78,7 +78,7 @@ class AttributesSpec extends ConfluentEventSpec {
         Some(Grapheme.Value.Audio(file("foo") / "bar", spec, 1234L, 123.4)))
       assert(p.attr[ArtifactLocation]("loc").map(_.directory) === Some(file("foo")))
       val group = pgH()
-      assert(p.attr[ProcGroup]("group") === Some(group))
+      assert(p.attr[Timeline]("group") === Some(group))
     }
   }
 }

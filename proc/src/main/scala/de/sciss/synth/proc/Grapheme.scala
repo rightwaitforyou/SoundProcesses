@@ -414,9 +414,9 @@ object Grapheme {
     def clear()(implicit tx: S#Tx): Unit
   }
 
-  object Modifiable {
-    def apply[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S](numChannels)
+  def apply[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S](numChannels)
 
+  object Modifiable {
     def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
       Impl.readModifiable(in, access)
 

@@ -18,7 +18,16 @@ import de.sciss.lucre.stm
 import impl.{SchedulerImpl => Impl}
 
 object Scheduler {
-  def apply[S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): Scheduler[S] = Impl[S]
+  /** Creates a real-time scheduler. */
+  def apply  [S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): Scheduler[S] = Impl[S]
+
+  /** Creates a non-real-time scheduler. */
+  def offline[S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): Offline[S] = Impl.offline[S]
+
+  trait Offline[S <: Sys[S]] extends Scheduler[S] {
+    def step()    (implicit tx: S#Tx): Unit
+    def stepTarget(implicit tx: S#Tx): Option[Long]
+  }
 }
 
 /** A `Scheduler` uses a logical frame clock to execute functions transactionally
@@ -32,9 +41,6 @@ trait Scheduler[S <: Sys[S]] {
     * but are stable within a transaction.
     */
   def time(implicit tx: S#Tx): Long
-
-  //  /** Opaque type to identify scheduled functions. */
-  //  type Token
 
   /** Schedules the execution of a function at a given time. Time is given
     * as an "absolute" frame in the sense of `AuralContext.time`.

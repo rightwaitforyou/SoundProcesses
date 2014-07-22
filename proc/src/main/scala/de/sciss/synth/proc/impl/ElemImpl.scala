@@ -31,7 +31,7 @@ object ElemImpl {
   import Elem.Update
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec, ArtifactLocation => _ArtifactLocation, ProcGroup => _ProcGroup, Proc => _Proc, Timeline => _Timeline}
+  import proc.{FadeSpec => _FadeSpec, ArtifactLocation => _ArtifactLocation, Proc => _Proc, Timeline => _Timeline}
   import lucre.synth.expr.{DoubleVec => _DoubleVec}
 
   // ---- Int ----
@@ -351,38 +351,6 @@ object ElemImpl {
     def mkCopy()(implicit tx: S#Tx): _ArtifactLocation.Elem[S] = ArtifactLocation(peer)
   }
 
-  // ---- ProcGroup ----
-
-  object ProcGroup extends Companion[ProcGroupElem] {
-    val typeID = 0x10001 // _ProcGroup.typeID
-
-    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): ProcGroupElem[S] with evt.Node[S] = {
-      val peer = _ProcGroup.read(in, access)
-      new ProcGroupActiveImpl(targets, peer)
-    }
-
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ProcGroupElem[S] =
-      sys.error("Constant ProcGroup not supported")
-
-    def apply[S <: Sys[S]](peer: _ProcGroup[S])(implicit tx: S#Tx): ProcGroupElem[S] =
-      new ProcGroupActiveImpl(evt.Targets[S], peer)
-  }
-
-  trait ProcGroupImpl[S <: Sys[S]] extends ProcGroupElem[S] {
-    final def typeID = ProcGroup.typeID
-    final def prefix = "ProcGroup"
-  }
-
-  final class ProcGroupActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
-                                               val peer: _ProcGroup[S])
-    extends Active[S] with ProcGroupImpl[S] {
-
-    protected def peerEvent = peer.changed
-
-    def mkCopy()(implicit tx: S#Tx): ProcGroupElem[S] = ProcGroup(peer) // XXX TODO
-  }
-
   // ---- Timeline ----
 
   object Timeline extends Companion[_Timeline.Elem] {
@@ -609,7 +577,6 @@ object ElemImpl {
     AudioGrapheme   .typeID -> AudioGrapheme   ,
     ArtifactLocation.typeID -> ArtifactLocation,
     Proc            .typeID -> Proc            ,
-    ProcGroup       .typeID -> ProcGroup       ,
     Timeline        .typeID -> Timeline        ,
     FolderElemImpl  .typeID -> FolderElemImpl
   )

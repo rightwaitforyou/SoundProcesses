@@ -16,11 +16,25 @@ import scala.util.control.NonFatal
 object SchedulerImpl {
   def apply[S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): Scheduler[S] = {
     val system  = tx.system
+    val prio    = mkPrio[S, system.I](system)
     implicit val iSys = system.inMemoryTx _
-    implicit val itx  = iSys(tx)
-    implicit val fuckYourselfScalaImplicitResolution = ImmutableSerializer.set[Int]
-    val prio    = SkipList.Map.empty[system.I, Long, Set[Int]]()
-    new Impl[S, system.I](prio)
+    new RealtimeImpl[S, system.I](prio)
+  }
+
+  def offline[S <: Sys[S]](implicit tx: S#Tx, cursor: stm.Cursor[S]): Scheduler.Offline[S] = {
+    val system  = tx.system
+    val prio    = mkPrio[S, system.I](system)
+    implicit val iSys = system.inMemoryTx _
+    new OfflineImpl[S, system.I](prio)
+  }
+
+  // what a mess, Scala
+  private def mkPrio[S <: Sys[S], I1 <: Sys[I1]](system: S { type I = I1 })
+                                                (implicit tx: S#Tx): SkipList.Map[I1, Long, Set[Int]] = {
+    implicit val iSys   = system.inMemoryTx _
+    implicit val itx    = iSys(tx)
+    implicit val setSer = ImmutableSerializer.set[Int]
+    SkipList.Map.empty[system.I, Long, Set[Int]]()
   }
 
   /* Information about the current situation of the scheduler.
@@ -31,35 +45,108 @@ object SchedulerImpl {
   private final class Info(val issueTime: Long, val targetTime: Long) {
     def delay: Long = targetTime - issueTime
 
+    def isInf: Boolean = targetTime == Long.MaxValue
+
     override def toString = s"[issueTime = $issueTime, targetTime = $targetTime]"
   }
 
-  private val infInfo = new Info(issueTime = 0L, targetTime  = Long.MaxValue)
+  private val infInfo = new Info(issueTime = 0L, targetTime = Long.MaxValue)
+
+  private final class OfflineImpl[S <: Sys[S], I <: stm.Sys[I]](protected val prio: SkipList.Map [I , Long, Set[Int]])
+                                                                (implicit val cursor: stm.Cursor[S],
+                                                                 protected val iSys: S#Tx => I#Tx)
+    extends Impl[S, I] with Scheduler.Offline[S] {
+
+    private val timeRef = Ref(0L)
+
+    def           time               (implicit tx: S#Tx): Long = timeRef.get(tx.peer)
+    protected def time_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
+
+    protected def submit(info: Info)(implicit tx: S#Tx): Unit =
+      infoVar.set(info)(tx.peer)
+
+    def step()(implicit tx: S#Tx): Unit = {
+      val info = infoVar.get(tx.peer)
+      if (!info.isInf) eventReached(info)
+    }
+
+    def stepTarget(implicit tx: S#Tx): Option[Long] = {
+      implicit val ptx = tx.peer
+      val info = infoVar()
+      if (info.isInf) None else Some(info.targetTime)
+    }
+  }
+
+  private final class RealtimeImpl[S <: Sys[S], I <: stm.Sys[I]](protected val prio: SkipList.Map [I , Long, Set[Int]])
+                                                                (implicit val cursor: stm.Cursor[S],
+                                                                 protected val iSys: S#Tx => I#Tx)
+    extends Impl[S, I] {
+
+    private val timeZero    = System.nanoTime()
+    private val timeRef     = TxnLocal(calcFrame())
+
+    def           time               (implicit tx: S#Tx): Long = timeRef.get(tx.peer)
+    protected def time_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
+
+    private def calcFrame(): Long = {
+      // 1 ns = 10^-9 s
+      val delta = System.nanoTime() - timeZero
+      (delta * sampleRateN).toLong
+    }
+
+    protected def submit(info: Info)(implicit tx: S#Tx): Unit = {
+      implicit val ptx  = tx.peer
+      infoVar()         = info
+      val jitter        = calcFrame() - info.issueTime
+      val actualDelayN  = math.max(0L, ((info.delay - jitter) / sampleRateN).toLong)
+      logT(s"scheduled: $info; logicalDelay (f) = ${info.delay}, actualDelay (ns) = $actualDelayN")
+      tx.afterCommit {
+        SoundProcesses.pool.schedule(new Runnable {
+          def run(): Unit = {
+            logT(s"scheduled: execute $info")
+            cursor.step { implicit tx =>
+              eventReached(info)
+            }
+          }
+        }, actualDelayN, TimeUnit.NANOSECONDS)
+      }
+    }
+  }
 
   // one can argue whether the values should be ordered, e.g. Seq[Int] instead of Set[Int],
   // such that if two functions A and B are submitted after another for the same target time,
   // then A would be executed before B. But currently we don't think this is an important aspect.
-  private final class Impl[S <: Sys[S], I <: stm.Sys[I]](prio  : SkipList.Map [I , Long, Set[Int]])
-                                                        (implicit val cursor: stm.Cursor[S], iSys: S#Tx => I#Tx)
+  private abstract class Impl[S <: Sys[S], I <: stm.Sys[I]]
     extends Scheduler[S] {
+
+    // ---- abstract ----
+
+    protected def prio: SkipList.Map[I , Long, Set[Int]]
+    protected def iSys: S#Tx => I#Tx
+
+    /** Invoked to submit a schedule step either to a realtime scheduler or other mechanism.
+      * When the step is performed, execution should be handed over to `eventReached`, passing
+      * over the same three arguments.
+      */
+    protected def submit(info: Info)(implicit tx: S#Tx): Unit
+
+    protected def time_=(value: Long)(implicit tx: S#Tx): Unit
+
+    // ---- implemented ----
 
     private final class ScheduledFunction(val time: Long, val fun: S#Tx => Unit)
 
-    type Token = Int
+    private type Token = Int
 
-    private val timeZero    = System.nanoTime()
-    private val timeRef     = TxnLocal(calcFrame())
-    private val sampleRateN = 0.014112 // = Timeline.SampleRate * 1.0e-9
     private val tokenRef    = Ref(0)
     private val tokenMap    = TMap.empty[Int, ScheduledFunction]
-    private val infoVar     = Ref(infInfo)
 
-    def time(implicit tx: S#Tx): Long = timeRef.get(tx.peer)
-    private def time_=(value: Long)(implicit tx: S#Tx): Unit = timeRef.set(value)(tx.peer)
+    final protected val sampleRateN = 0.014112 // = Timeline.SampleRate * 1.0e-9
+    protected final val infoVar     = Ref(infInfo)
 
     // ---- scheduling ----
 
-    def schedule(targetTime: Long)(fun: S#Tx => Unit)(implicit tx: S#Tx): Token = {
+    final def schedule(targetTime: Long)(fun: S#Tx => Unit)(implicit tx: S#Tx): Token = {
       implicit val ptx  = tx.peer
       implicit val itx: I#Tx = iSys(tx)
       val t             = time
@@ -86,7 +173,7 @@ object SchedulerImpl {
       token
     }
 
-    def cancel(token: Token)(implicit tx: S#Tx): Unit = {
+    final def cancel(token: Token)(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       implicit val itx: I#Tx = iSys(tx)
       //      tokenMap.remove(token).fold {
@@ -111,46 +198,8 @@ object SchedulerImpl {
       }
     }
 
-    private def calcFrame(): Long = {
-      // 1 ns = 10^-9 s
-      val delta = System.nanoTime() - timeZero
-      (delta * sampleRateN).toLong
-    }
-
-    /* Invoked to submit a schedule step either to a realtime scheduler or other mechanism.
-     * When the step is performed, execution should be handed over to `eventReached`, passing
-     * over the same three arguments.
-     *
-     * @param logicalNow       the logical now time at the time the event was scheduled
-     * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
-     *                         (the event `happens` at `logicalNow + logicalDelay`)
-     * @param schedValid       the valid counter at the time of scheduling
-     */
-    private def submit(info: Info)(implicit tx: S#Tx): Unit = {
-      implicit val ptx  = tx.peer
-      infoVar()         = info
-      val jitter        = calcFrame() - info.issueTime
-      val actualDelayN  = math.max(0L, ((info.delay - jitter) / sampleRateN).toLong)
-      logT(s"scheduled: $info; logicalDelay (f) = ${info.delay}, actualDelay (ns) = $actualDelayN")
-      tx.afterCommit {
-        SoundProcesses.pool.schedule(new Runnable {
-          def run(): Unit = {
-            logT(s"scheduled: execute $info")
-            cursor.step { implicit tx =>
-              eventReached(info)
-            }
-          }
-        }, actualDelayN, TimeUnit.NANOSECONDS)
-      }
-    }
-
-    /* Invoked from the `submit` body after the scheduled event is reached.
-     *
-     * @param logicalNow       the logical now time at the time the event was scheduled
-     * @param logicalDelay     the logical delay corresponding with the delay of the scheduled event
-     * @param expectedValid    the valid counter at the time of scheduling
-     */
-    private def eventReached(info: Info)(implicit tx: S#Tx): Unit = {
+    /** Invoked from the `submit` body after the scheduled event is reached. */
+    final protected def eventReached(info: Info)(implicit tx: S#Tx): Unit = {
       implicit val itx: I#Tx  = iSys(tx)
       implicit val ptx = tx.peer
       if (info != infoVar()) return // the scheduled task was invalidated by an intermediate stop or seek command
