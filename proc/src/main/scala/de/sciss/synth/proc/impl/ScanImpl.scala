@@ -19,7 +19,6 @@ import de.sciss.lucre.{event => evt, data, expr}
 import evt.{impl => evti, Event, Sys}
 import annotation.switch
 import expr.List
-import proc.Scan
 import de.sciss.serial.{DataOutput, Serializer, DataInput}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.lucre.synth.InMemory
@@ -100,7 +99,8 @@ object ScanImpl {
     extends Scan[S]
     with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
     with evti.Generator[S, Scan.Update[S], Scan[S]] {
-    override def toString() = "Scan" + id
+
+    override def toString() = s"Scan$id"
 
     def sinks  (implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = sinkList.iterator
     def sources(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = new data.Iterator[S#Tx, Link[S]] {
@@ -194,12 +194,9 @@ object ScanImpl {
     def disconnect()(implicit tx: S#Tx): Unit = graphemeSourceList.changed -/-> this
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
-      val u1 = if (pull.parents(this).isEmpty)
-        pull.resolve[Scan.Update[S]].changes // fold(Vec.empty[Scan.Change[S]])(_.changes)
-      else
-        Vec.empty
-
-      val u2 = pull(graphemeSourceList.changed).fold(u1) { ll =>
+      val gen = pull.isOrigin(this)
+      val u1 = if (!gen) Vec.empty else pull.resolve[Scan.Update[S]].changes
+      val u2 = if ( gen) Vec.empty else pull(graphemeSourceList.changed).fold(u1) { ll =>
         val gcs = ll.changes.collect {
           case List.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
         }
