@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.{Publisher, Sys}
 import java.io.File
-import de.sciss.synth.proc.impl.{ElemImpl, ArtifactImpl}
+import de.sciss.synth.proc.impl.ElemImpl
 import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.model
 import de.sciss.synth.proc
@@ -77,12 +77,6 @@ object ArtifactLocation {
     def apply[S <: Sys[S]](peer: ArtifactLocation[S])(implicit tx: S#Tx): ArtifactLocation.Elem[S] =
       proc.impl.ElemImpl.ArtifactLocation(peer)
 
-    object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, ArtifactLocation.Elem]] =
-        if (obj.elem.isInstanceOf[Elem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, ArtifactLocation.Elem]])
-        else None
-    }
-
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactLocation.Elem[S]] =
       ElemImpl.ArtifactLocation.serializer[S]
   }
@@ -90,6 +84,13 @@ object ArtifactLocation {
     type Peer       = ArtifactLocation[S]
     type PeerUpdate = ArtifactLocation.Update[S]
   }
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[ArtifactLocation.Obj[S]] =
+      if (obj.elem.isInstanceOf[Elem[S]]) Some(obj.asInstanceOf[ArtifactLocation.Obj[S]])
+      else None
+  }
+  type Obj[S <: Sys[S]] = proc.Obj.T[S, ArtifactLocation.Elem]
 }
 trait ArtifactLocation[S <: Sys[S]] extends Mutable[S#ID, S#Tx] with Publisher[S, ArtifactLocation.Update[S]] {
   def directory(implicit tx: S#Tx): File
