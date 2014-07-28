@@ -28,6 +28,8 @@ object Server {
     Impl.offline(peer)
   }
 
+  val codec: osc.PacketCodec = osc.PacketCodec().scsynth().build
+
   implicit def defaultGroup(server: Server): Group = server.defaultGroup
 
   trait Offline extends Server {

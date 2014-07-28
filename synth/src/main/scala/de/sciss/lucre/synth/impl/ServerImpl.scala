@@ -14,6 +14,7 @@
 package de.sciss.lucre.synth
 package impl
 
+import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.{Server => SServer, AllocatorExhausted, addToHead, message}
@@ -74,10 +75,20 @@ object ServerImpl {
       res1
     }
 
-    private def addBundle(b: osc.Bundle): Unit = {
+    private def addBundle(b: osc.Bundle): Unit = sync.synchronized {
       val b1 = if (b.timetag == osc.Timetag.now) osc.Bundle.secs(time, b: _*) else b
-      log(s"addBundle $b1")
-      sync.synchronized(_bundles :+= b1)
+      val sz = Server.codec.encodedBundleSize(b1)
+      // SuperCollider versions until 2014 have a hard-coded limit of 8K bundles in NRT!
+      // cf. https://github.com/supercollider/supercollider/commit/f3f0f81de4259aa44983f1041589f895c91798a1
+      val szOk = sz <= 8192
+      if (szOk || b1.length == 1) {
+        log(s"addBundle $b1")
+        if (!szOk) log("addBundle - bundle exceeds 8k!")
+        _bundles :+= b1
+      } else {
+        val tt = b1.timetag
+        b.foreach(p => addBundle(osc.Bundle(tt, p)))
+      }
     }
 
     def !(p: osc.Packet): Unit = {

@@ -134,8 +134,9 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       // XXX TODO: this should be factored out, probably go into ScalaOSC or ScalaCollider
       blocking {
-        val c   = osc.PacketCodec().scsynth().build
-        val sz  = bundles.map(_.encodedSize(c)).max
+        val c   = Server.codec
+        val sz  = 8192 // bundles.map(_.encodedSize(c)).max
+        // logTransport(s"Max bundle size is $sz")
         val raf = new RandomAccessFile(oscFile, "rw")
         try {
           val bb = ByteBuffer.allocate(sz)
