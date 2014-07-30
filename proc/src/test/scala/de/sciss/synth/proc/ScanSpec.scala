@@ -19,7 +19,7 @@ class ScanSpec extends ConfluentEventSpec {
   // lucre.event    .showLog = true
   // lucre.confluent.showLog = true
 
-  "Proc" should "notify observers about all relevant events" in { system =>
+  ignore /* "Proc" */ should "notify observers about all relevant events" in { system =>
     val obs = new Observation[S]
     val ph = system.step { implicit tx =>
       val p = Proc[S]

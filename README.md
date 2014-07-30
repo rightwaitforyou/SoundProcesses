@@ -20,7 +20,7 @@ The following dependency is necessary:
     
     "de.sciss" %% "soundprocesses" % v
 
-The current stable version `v` is `"2.4.0"`. Snapshot is `"2.5.0-SNAPSHOT"`.
+The current version `v` is `"2.5.0"`.
 
 The following sub modules are available:
 
