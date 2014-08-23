@@ -14,23 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.synth.proc.AuralObj.{State, Factory}
+import AuralObj.Factory
 import de.sciss.lucre.synth.Sys
-import de.sciss.lucre.{event => evt, stm}
-import de.sciss.model.Model.Listener
-import de.sciss.processor.GenericProcessor
-import de.sciss.processor.Processor.Update
-import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc
-import de.sciss.synth.proc.Obj.T
-
-import scala.concurrent.{Future, ExecutionContext, CanAwait}
-import scala.concurrent.duration.Duration
-import scala.util.{Success, Try}
+import de.sciss.lucre.stm
 
 object AuralObjImpl {
-  import proc.{Proc => _Proc, Folder => _Folder, Timeline => _Timeline}
-
   private val sync = new AnyRef
 
   def addFactory(f: Factory): Unit = sync.synchronized {

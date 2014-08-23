@@ -23,7 +23,7 @@ import de.sciss.synth.proc.impl.StreamBuffer
 // XXX TODO: ought to go into an `impl` package
 private[proc] object stream {
   // name for a two channel controller: (buf-id, gain)
-  private[proc] def controlName(key: String, idx: Int): String = s"$$str${idx}_$key"
+  /* private[proc] */ def controlName(key: String, idx: Int): String = s"$$str${idx}_$key"
 
   sealed trait GE extends synth.GE.Lazy {
     protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike

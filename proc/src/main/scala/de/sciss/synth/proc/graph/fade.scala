@@ -21,7 +21,7 @@ import ugen._
 
 object Fade {
   private[graph] abstract class Base extends GE.Lazy {
-    protected def mkEnv(b: UGenGraphBuilder[_], dur: GE): IEnv
+    protected def mkEnv(b: UGenGraphBuilder, dur: GE): IEnv
 
     def rate: Rate
 
@@ -35,7 +35,7 @@ object Fade {
     }
 
     /** Returns (dur, shape, floor) */
-    final protected def readCtl(b: UGenGraphBuilder[_], key: String): (GE, Env.Curve, GE) = {
+    final protected def readCtl(b: UGenGraphBuilder, key: String): (GE, Env.Curve, GE) = {
       val numCh   = b.requestInput(Input.Attribute(key, numChannels = 4)).value
       assert (numCh == 4)
       // if (numCh != 4) throw new IllegalStateException(s"$this - requires a 4-channel attribute (found $numCh)")
@@ -49,7 +49,7 @@ object Fade {
   private[graph] abstract class SingleBase extends Base {
     protected def key: String
 
-    final protected def mkEnv(b: UGenGraphBuilder[_], dur: GE): IEnv = {
+    final protected def mkEnv(b: UGenGraphBuilder, dur: GE): IEnv = {
       val (fadeDur, shape, floor) = readCtl(b, key)
       mkSingleEnv(dur, fadeDur, shape, floor)
     }
@@ -82,7 +82,7 @@ object Fade {
     override def productPrefix  = "Fade$InOut"
     override def toString       = s"""FadeInOut("$inKey", "$outKey").${rate.methodName}"""
 
-    protected def mkEnv(b: UGenGraphBuilder[_], totalDur: GE): IEnv = {
+    protected def mkEnv(b: UGenGraphBuilder, totalDur: GE): IEnv = {
       val (fadeDurIn , shapeIn , floorIn ) = readCtl(b, inKey )
       val (fadeDurOut, shapeOut, floorOut) = readCtl(b, outKey)
       IEnv(floorIn,

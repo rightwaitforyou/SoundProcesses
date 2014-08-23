@@ -38,7 +38,7 @@ object AuralProcImpl {
     var sinks = List.empty[(String, AuralNode)]
   }
 
-  private final class AuralProcBuilder[S <: Sys[S]](val ugen: UGB[S] /*, val name: String */) {
+  private final class AuralProcBuilder(val ugen: UGB /*, val name: String */) {
     var outputs = Map.empty[String, OutputBuilder]
   }
 
@@ -115,8 +115,7 @@ object AuralProcImpl {
       targetStateRef.set(ts)(tx.peer)
       if (state != AuralObj.Stopped) return
       _data.state match {
-        case s: UGB.Complete[S] =>
-          launchProc(s, timeRef)
+        case s: UGB.Complete[S] => launchProc(s, timeRef)
         case _ =>
       }
     }
