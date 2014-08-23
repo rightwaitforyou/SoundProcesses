@@ -15,12 +15,11 @@ package de.sciss.synth
 package proc
 package graph
 
-import de.sciss.synth.proc.UGenGraphBuilder
 import de.sciss.synth.proc.UGenGraphBuilder.Input
 import ugen._
 
-object Fade {
-  private[graph] abstract class Base extends GE.Lazy {
+private[graph] object fade {
+  abstract class Base extends GE.Lazy {
     protected def mkEnv(b: UGenGraphBuilder, dur: GE): IEnv
 
     def rate: Rate
@@ -40,13 +39,13 @@ object Fade {
       assert (numCh == 4)
       // if (numCh != 4) throw new IllegalStateException(s"$this - requires a 4-channel attribute (found $numCh)")
       // b.addAttributeIn(key)
-      val ctlName = attribute.controlName(key)
+      val ctlName = Attribute.controlName(key)
       val ctl     = ctlName.ir(Seq(0f, 0f, 0f, 0f))  // dur, shape-id, shape-curvature, floor
       (ctl \ 0, Env.Curve(ctl \ 1, ctl \ 2), ctl \ 3)
     }
   }
 
-  private[graph] abstract class SingleBase extends Base {
+  abstract class SingleBase extends Base {
     protected def key: String
 
     final protected def mkEnv(b: UGenGraphBuilder, dur: GE): IEnv = {
@@ -57,53 +56,81 @@ object Fade {
     protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv
   }
 
-  private[graph] final case class In(key: String, rate: Rate) extends SingleBase {
+  //  private[graph] final case class In(key: String, rate: Rate) extends SingleBase {
+  //
+  //    override def productPrefix  = "Fade$In"
+  //    override def toString       = s"""FadeIn("$key").${rate.methodName}"""
+  //
+  //    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
+  //      IEnv(floor, Env.Segment(fadeDur, 1, shape) :: Nil)
+  //  }
 
-    override def productPrefix  = "Fade$In"
-    override def toString       = s"""FadeIn("$key").${rate.methodName}"""
+  //  // @SerialVersionUID(6793156274707521366L)
+  //  final case class Out(key: String, rate: Rate)  extends SingleBase {
+  //
+  //    override def productPrefix  = "Fade$Out"
+  //    override def toString       = s"""FadeOut("$key").${rate.methodName}"""
+  //
+  //    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
+  //      IEnv(1, Env.Segment(fadeDur, floor, shape) :: Nil, totalDur - fadeDur)
+  //  }
 
-    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
-      IEnv(floor, Env.Segment(fadeDur, 1, shape) :: Nil)
-  }
+  //  // @SerialVersionUID(6793156274707521366L)
+  //  case class InOut(inKey: String, outKey: String, rate: Rate) extends Base {
+  //
+  //    override def productPrefix  = "Fade$InOut"
+  //    override def toString       = s"""FadeInOut("$inKey", "$outKey").${rate.methodName}"""
+  //
+  //    protected def mkEnv(b: UGenGraphBuilder, totalDur: GE): IEnv = {
+  //      val (fadeDurIn , shapeIn , floorIn ) = readCtl(b, inKey )
+  //      val (fadeDurOut, shapeOut, floorOut) = readCtl(b, outKey)
+  //      IEnv(floorIn,
+  //        Env.Segment(fadeDurIn, 1, shapeIn) ::
+  //        Env.Segment(totalDur - (fadeDurIn + fadeDurOut), 1, Curve.step) ::
+  //        Env.Segment(fadeDurOut, floorOut, shapeOut) :: Nil
+  //      )
+  //    }
+  //  }
+}
+object FadeIn {
+  def kr: FadeIn = kr(ObjKeys.attrFadeIn)
+  def kr(key: String): FadeIn = new FadeIn(control, key)
 
-  // @SerialVersionUID(6793156274707521366L)
-  private[graph] final case class Out(key: String, rate: Rate)  extends SingleBase {
+  def ar: FadeIn = ar(ObjKeys.attrFadeIn)
+  def ar(key: String): FadeIn = new FadeIn(audio, key)
+}
+final case class FadeIn(rate: Rate, key: String) extends fade.SingleBase {
+  protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
+    IEnv(floor, Env.Segment(fadeDur, 1, shape) :: Nil)
+}
 
-    override def productPrefix  = "Fade$Out"
-    override def toString       = s"""FadeOut("$key").${rate.methodName}"""
+object FadeOut {
+  def kr: FadeOut = kr(ObjKeys.attrFadeOut)
+  def kr(key: String): FadeOut = new FadeOut(control, key)
 
-    protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
-      IEnv(1, Env.Segment(fadeDur, floor, shape) :: Nil, totalDur - fadeDur)
-  }
+  def ar: FadeOut = ar(ObjKeys.attrFadeOut)
+  def ar(key: String): FadeOut = new FadeOut(audio, key)
+}
+final case class FadeOut(rate: Rate, key: String) extends fade.SingleBase {
+  protected def mkSingleEnv(totalDur: GE, fadeDur: GE, shape: Env.Curve, floor: GE): IEnv =
+    IEnv(1, Env.Segment(fadeDur, floor, shape) :: Nil, totalDur - fadeDur)
+}
 
-  // @SerialVersionUID(6793156274707521366L)
-  private[graph] final case class InOut(inKey: String, outKey: String, rate: Rate) extends Base {
+object FadeInOut {
+  def kr: FadeInOut = kr(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut)
+  def kr(inKey: String, outKey: String): FadeInOut = new FadeInOut(control, inKey, outKey)
 
-    override def productPrefix  = "Fade$InOut"
-    override def toString       = s"""FadeInOut("$inKey", "$outKey").${rate.methodName}"""
-
-    protected def mkEnv(b: UGenGraphBuilder, totalDur: GE): IEnv = {
-      val (fadeDurIn , shapeIn , floorIn ) = readCtl(b, inKey )
-      val (fadeDurOut, shapeOut, floorOut) = readCtl(b, outKey)
-      IEnv(floorIn,
-        Env.Segment(fadeDurIn, 1, shapeIn) ::
+  def ar: FadeInOut = ar(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut)
+  def ar(inKey: String, outKey: String): FadeInOut = new FadeInOut(audio, inKey, outKey)
+}
+final case class FadeInOut(rate: Rate, inKey: String, outKey: String) extends fade.Base {
+  protected def mkEnv(b: UGenGraphBuilder, totalDur: GE): IEnv = {
+    val (fadeDurIn , shapeIn , floorIn ) = readCtl(b, inKey )
+    val (fadeDurOut, shapeOut, floorOut) = readCtl(b, outKey)
+    IEnv(floorIn,
+      Env.Segment(fadeDurIn, 1, shapeIn) ::
         Env.Segment(totalDur - (fadeDurIn + fadeDurOut), 1, Curve.step) ::
         Env.Segment(fadeDurOut, floorOut, shapeOut) :: Nil
-      )
-    }
+    )
   }
-}
-final case class FadeIn(key: String) {
-  def kr: GE = Fade.In(key, control)
-  def ar: GE = Fade.In(key, audio  )
-}
-
-final case class FadeOut(key: String) {
-  def kr: GE = Fade.Out(key, control)
-  def ar: GE = Fade.Out(key, audio  )
-}
-
-final case class FadeInOut(inKey: String, outKey: String) {
-  def kr: GE = Fade.InOut(inKey, outKey, control)
-  def ar: GE = Fade.InOut(inKey, outKey, audio  )
 }

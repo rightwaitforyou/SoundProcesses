@@ -1,5 +1,5 @@
 /*
- *  attribute.scala
+ *  Attribute.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
@@ -20,13 +20,13 @@ import de.sciss.synth.ugen.ControlProxy
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
-object attribute {
+object Attribute {
   private[proc] def controlName(key: String): String = "$attr_"  + key
 
   private final case class In(rate: Rate, key: String, default: Double) extends GE.Lazy {
 
-    override def productPrefix  = "attribute$In"
-    override def toString       = s"""attribute("$key").${rate.methodName}($default)"""
+    override def productPrefix  = "Attribute$In"
+    override def toString       = s"""Attribute("$key").${rate.methodName}($default)"""
 
     def makeUGens: UGenInLike = {
       val b       = UGenGraphBuilder.get
@@ -39,13 +39,13 @@ object attribute {
     }
   }
 }
-final case class attribute(key: String) {
+final case class Attribute(key: String) {
   def ir: GE = ir(0.0)
-  def ir(default: Double): GE = attribute.In(scalar , key, default)
+  def ir(default: Double): GE = Attribute.In(scalar , key, default)
 
   def kr: GE = kr(0.0)
-  def kr(default: Double): GE = attribute.In(control, key, default)
+  def kr(default: Double): GE = Attribute.In(control, key, default)
 
   def ar: GE = ar(0.0)
-  def ar(default: Double): GE = attribute.In(audio  , key, default)
+  def ar(default: Double): GE = Attribute.In(audio  , key, default)
 }

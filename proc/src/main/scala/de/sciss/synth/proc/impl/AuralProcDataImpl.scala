@@ -407,7 +407,7 @@ object AuralProcDataImpl {
 
     /** Sub-classes may override this if invoking the super-method. */
     def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet = {
-      val ctlName = graph.attribute.controlName(key)
+      val ctlName = graph.Attribute.controlName(key)
       value match {
         case a: IntElem     [S] => ctlName -> a.peer.value.toFloat: ControlSet
         case a: DoubleElem  [S] => ctlName -> a.peer.value.toFloat: ControlSet

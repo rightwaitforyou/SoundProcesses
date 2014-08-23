@@ -242,7 +242,7 @@ object AuralProcImpl {
         // XXX TODO - numChannels is not tested
         b.obj.attr.getElem(key).foreach {
           case a: AudioGraphemeElem[S] =>
-            val ctlName   = graph.attribute.controlName(key)
+            val ctlName   = graph.Attribute.controlName(key)
             val audioElem = a.peer
             val spec      = audioElem.spec
             //              require(spec.numChannels == 1 || spec.numFrames == 1,

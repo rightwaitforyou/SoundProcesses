@@ -262,9 +262,9 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
     SynthGraph {
       import de.sciss.synth._
       val sig   = graph.scan.In(Proc.Obj.graphAudio)
-      val gain  = graph.attribute(ObjKeys.attrGain  ).kr(1)
-      val mute  = graph.attribute(ObjKeys.attrMute  ).kr(0)
-      val env   = graph.FadeInOut(ObjKeys.attrFadeIn, ObjKeys.attrFadeOut).ar
+      val gain  = graph.Attribute(ObjKeys.attrGain  ).kr(1)
+      val mute  = graph.Attribute(ObjKeys.attrMute  ).kr(0)
+      val env   = graph.FadeInOut.ar
       val amp   = env * ((1 - mute) * gain)
       graph.scan.Out(Proc.Obj.scanMainOut, sig * amp)
     }
