@@ -23,29 +23,16 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 object Attribute {
   private[proc] def controlName(key: String): String = "$attr_"  + key
 
-  private final case class In(rate: Rate, key: String, default: Double) extends GE.Lazy {
-
-    override def productPrefix  = "Attribute$In"
-    override def toString       = s"""Attribute("$key").${rate.methodName}($default)"""
-
-    def makeUGens: UGenInLike = {
-      val b       = UGenGraphBuilder.get
-      val numCh   = b.requestInput(Input.Attribute(key, numChannels = -1)).value
-      // val numCh   = b.addAttributeIn(key)
-      val ctlName = controlName(key)
-      val ctl     = ControlProxy(rate, Vec.fill(numCh)(default.toFloat), Some(ctlName))
-      // val ctl     = if (numCh == 1) ctlName.ir(default) else ctlName.ir(Vec.fill(numCh)(default))
-      ctl.expand
-    }
-  }
+  def ir(key: String, default: Double = 0.0): Attribute = new Attribute(scalar , key, default)
+  def kr(key: String, default: Double = 0.0): Attribute = new Attribute(control, key, default)
+  def ar(key: String, default: Double = 0.0): Attribute = new Attribute(audio  , key, default)
 }
-final case class Attribute(key: String) {
-  def ir: GE = ir(0.0)
-  def ir(default: Double): GE = Attribute.In(scalar , key, default)
-
-  def kr: GE = kr(0.0)
-  def kr(default: Double): GE = Attribute.In(control, key, default)
-
-  def ar: GE = ar(0.0)
-  def ar(default: Double): GE = Attribute.In(audio  , key, default)
+final case class Attribute(rate: Rate, key: String, default: Double) extends GE.Lazy {
+  def makeUGens: UGenInLike = {
+    val b       = UGenGraphBuilder.get
+    val numCh   = b.requestInput(Input.Attribute(key, numChannels = -1)).value
+    val ctlName = Attribute.controlName(key)
+    val ctl     = ControlProxy(rate, Vec.fill(numCh)(default.toFloat), Some(ctlName))
+    ctl.expand
+  }
 }

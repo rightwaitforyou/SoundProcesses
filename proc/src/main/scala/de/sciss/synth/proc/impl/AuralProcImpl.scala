@@ -171,7 +171,7 @@ object AuralProcImpl {
         @inline def ensureChannels(n: Int): Unit =
           require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
 
-        val inCtlName = graph.scan.inControlName(key)
+        val inCtlName = graph.ScanIn.controlName(key)
         // var inBus     = Option.empty[AudioBusNodeSetter]
 
         def mkInBus(): AudioBusNodeSetter = {
@@ -342,7 +342,7 @@ object AuralProcImpl {
       ugen.scanOuts.foreach { case (key, numCh) =>
         val bus    = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
         logA(s"addOutputBus($key, $bus) (${hashCode.toHexString})")
-        val res    = BusNodeSetter.writer(graph.scan.outControlName(key), bus, synth)
+        val res    = BusNodeSetter.writer(graph.ScanOut.controlName(key), bus, synth)
         builder.users ::= res
         builder.outputBuses += key -> bus
         // res

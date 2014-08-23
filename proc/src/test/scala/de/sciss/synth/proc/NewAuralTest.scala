@@ -200,8 +200,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       sAudio.addSource(Scan.Link.Grapheme(gAudio))
 
       val _proc2 = proc {
-        val in  = graph.scan.In("in")
-        val m   = graph.Attribute("mute").kr(0)
+        val in  = graph.ScanIn("in")
+        val m   = graph.Attribute.kr("mute", 0)
         val sig0 = in * (1 - m)
         val pos  = LFTri.ar(4)
         val sig  = Balance2.ar(sig0 \ 0, sig0 \ 1, pos)
@@ -331,7 +331,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     val tl = cursor.step { implicit tx =>
       val _proc1 = proc {
-        val sig = graph.scan.In("in")
+        val sig = graph.ScanIn("in")
         (sig \ 0).poll(1, "ping-1")
         Out.ar(0, sig)
       }
@@ -339,7 +339,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val _proc2 = proc {
         val sig = PinkNoise.ar(Seq(0.5, 0.5))
         (sig \ 0).poll(1, "ping-2")
-        graph.scan.Out("out", sig)
+        graph.ScanOut("out", sig)
       }
 
       println("--mk timeline--")
@@ -386,13 +386,13 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     cursor.step { implicit tx =>
       val _view1 = procV {
-        val in   = graph.scan.In("foo")
+        val in   = graph.ScanIn("foo")
         val sig  = Resonz.ar(in, 777, 0.1) * 10
         Out.ar(0, sig)
       }
 
       val _view2 = procV {
-        graph.scan.Out("out", PinkNoise.ar(Seq(0.5, 0.5)))
+        graph.ScanOut("out", PinkNoise.ar(Seq(0.5, 0.5)))
       }
 
       val scanOut = addScan(_view2.obj(), "out")
@@ -408,7 +408,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         println("--issue graph change--")
         val pObj = _view1.obj()
         val newGraph = SynthGraph {
-          val in   = graph.scan.In("bar")
+          val in   = graph.ScanIn("bar")
           val sig  = Resonz.ar(in, 555, 0.1) * 10
           Out.ar(0, sig)
         }
@@ -494,8 +494,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     val tl = cursor.step { implicit tx =>
       def mkProc() = procV {
-        val freq = graph.Attribute("freq").ir(441)
-        val pan  = graph.Attribute("pan" ).ir(0.0)
+        val freq = graph.Attribute.ir("freq", 441)
+        val pan  = graph.Attribute.ir("pan")
         val sig  = Pan2.ar(SinOsc.ar(freq) * 0.2, pan)
         Out.ar(0, sig)
       }
@@ -577,17 +577,17 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     val (view1, view2) = cursor.step { implicit tx =>
       val _view1 = procV {
-        val amp   = graph.Attribute("amp").ir(0.0)
+        val amp   = graph.Attribute.ir("amp")
         val noise = PinkNoise.ar(Seq(amp, amp))
-        graph.scan.Out("out", noise)
+        graph.ScanOut("out", noise)
       }
       _view1.react { implicit tx => upd => println(s"Observed: $upd") }
       val proc1 = _view1.obj()
       putDouble(proc1, "amp", 0.5)
 
       val _view2 = procV {
-        val freq  = graph.Attribute("freq").kr(440)
-        val in    = graph.scan.In("in")
+        val freq  = graph.Attribute.kr("freq", 440)
+        val in    = graph.ScanIn("in")
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
       }
       val proc2 = _view2.obj()
@@ -642,17 +642,17 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     val (view1, view2) = cursor.step { implicit tx =>
       val _view1 = procV {
-        val amp   = graph.Attribute("amp").ir(0.0)
+        val amp   = graph.Attribute.ir("amp")
         val noise = PinkNoise.ar(Seq(amp, amp))
-        graph.scan.Out("out", noise)
+        graph.ScanOut("out", noise)
       }
       _view1.react { implicit tx => upd => println(s"Observed: $upd") }
       val proc1 = _view1.obj()
       putDouble(proc1, "amp", 0.5)
 
       val _view2 = procV {
-        val freq  = graph.Attribute("freq").ir(440)
-        val in    = graph.scan.In("in")
+        val freq  = graph.Attribute.ir("freq", 440)
+        val in    = graph.ScanIn("in")
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
       }
       val proc2 = _view2.obj()
@@ -694,17 +694,17 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     val (view1, view2) = cursor.step { implicit tx =>
       val _view1 = procV {
-        val amp   = graph.Attribute("amp").ir(0.0)
+        val amp   = graph.Attribute.ir("amp")
         val noise = PinkNoise.ar(Seq(amp, amp))
-        graph.scan.Out("out", noise)
+        graph.ScanOut("out", noise)
       }
       _view1.react { implicit tx => upd => println(s"Observed: $upd") }
       val proc1 = _view1.obj()
       putDouble(proc1, "amp", 0.5)
 
       val _view2 = procV {
-        val freq  = graph.Attribute("freq").ir(440)
-        val in    = graph.scan.In("in")
+        val freq  = graph.Attribute.ir("freq", 440)
+        val in    = graph.ScanIn("in")
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
       }
       val proc2 = _view2.obj()
