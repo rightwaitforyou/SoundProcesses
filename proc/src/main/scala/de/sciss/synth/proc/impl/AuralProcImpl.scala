@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Bus, Buffer, Synth, Sys}
 import de.sciss.numbers
 import de.sciss.span.Span
@@ -25,6 +26,7 @@ import de.sciss.synth.{proc, addToHead, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
 import proc.{UGenGraphBuilder => UGB}
 
+import scala.concurrent.Future
 import scala.concurrent.stm.Ref
 
 object AuralProcImpl {
@@ -44,37 +46,56 @@ object AuralProcImpl {
 
   // ---------------------------------------------------------------------
 
+  /* The target state indicates the eventual state the process should have,
+     independent of the current state which might not yet be ready.
+   */
   private sealed trait TargetState {
     def toAuralState: AuralObj.State
   }
   private case object TargetStop extends TargetState {
     def toAuralState = AuralObj.Stopped
   }
+  private case object TargetPrepared extends TargetState {
+    def toAuralState = AuralObj.Prepared
+  }
   private final class TargetPlaying(val wallClock: Long, val timeRef: TimeRef) extends TargetState {
     def toAuralState = AuralObj.Playing
-
-    override def toString = s"TargetPlaying(wallClock = $wallClock, timeRef = $timeRef)"
 
     def shiftTo(newWallClock: Long): TimeRef = {
       val delta = newWallClock - wallClock
       timeRef.shift(delta)
     }
-  }
 
-  private sealed trait PlayingRef   [S <: Sys[S]]
-  private final class PlayingNone   [S <: Sys[S]] extends PlayingRef[S]
-  private final class PlayingNode   [S <: Sys[S]](val aural: AuralNode) extends PlayingRef[S]
-  private final class PlayingPrepare[S <: Sys[S]](val resources: Vector[AsyncResource[S]]) extends PlayingRef[S]
+    override def toString = s"TargetPlaying(wallClock = $wallClock, timeRef = $timeRef)"
+  }
 
   class Impl[S <: Sys[S]](implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
     import context.server
 
+    /* The ongoing build aural node build process, as stored in `playingRef`. */
+    private sealed trait PlayingRef extends Disposable[S#Tx]
+
+    private object PlayingNone extends PlayingRef {
+      def dispose()(implicit tx: S#Tx) = ()
+    }
+    private final class PlayingNode(val node: AuralNode) extends PlayingRef {
+      def dispose()(implicit tx: S#Tx): Unit = {
+        _data.removeInstanceNode(node)
+        node.stop()
+      }
+    }
+    private final class PlayingPrepare(val resources: Vector[AsyncResource[S]]) extends PlayingRef {
+      def dispose()(implicit tx: S#Tx): Unit = {
+        ???
+      }
+    }
+
     private var _data: ProcData[S]  = _
     private val currentStateRef     = Ref[AuralObj.State](AuralObj.Stopped)
     private val targetStateRef      = Ref[TargetState](TargetStop)
-    private val playingRef          = Ref[PlayingRef[S]](new PlayingNone[S])
+    private val playingRef          = Ref[PlayingRef](PlayingNone)
 
     final def obj: stm.Source[S#Tx, Proc.Obj[S]] = _data.obj
 
@@ -97,6 +118,11 @@ object AuralProcImpl {
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
       if (value != old) fire(value)
+    }
+
+    final def prepare()(implicit tx: S#Tx): Unit = {
+      val ts = TargetPrepared
+      targetStateRef.set(ts)(tx.peer)
     }
 
     final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
@@ -127,7 +153,7 @@ object AuralProcImpl {
 
     // same as `stop` but not touching target state
     final def stopForRebuild()(implicit tx: S#Tx): Unit = {
-      freeNode()
+      freePlayingRef()
       state = AuralObj.Stopped
     }
 
@@ -135,7 +161,7 @@ object AuralProcImpl {
 
     /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
-      freeNode()
+      freePlayingRef()
       _data.removeInstanceView(this)
       context.release(_data.procCached())
     }
@@ -365,32 +391,48 @@ object AuralProcImpl {
         throw new IllegalStateException(s"Unsupported input attribute request $value")
     }
     
-    private def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val p = _data.procCached()
-      logA(s"begin launch $p (${hashCode.toHexString})")
-
-      val async = prepare(p, ugen, timeRef)
-      if (async.isEmpty) {
-        launch(p, ugen, timeRef)
-      } else {
-        ???
-      }
-    }
-
     // ---- asynchronous preparation ----
-    private def prepare(p: Proc.Obj[S], ugen: UGB.Complete[S], timeRef: TimeRef)
-                       (implicit tx: S#Tx): Vector[AsyncResource[S]] = {
+    private def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)
+                       (implicit tx: S#Tx): Unit = {
+      val p = _data.procCached()
       logA(s"begin prepare $p (${hashCode.toHexString})")
 
       var res = Vector.empty[AsyncResource[S]]
       ugen.acceptedInputs.foreach { case (key, value) =>
         if (value.async) res :+= buildAsyncInput(p, key, value)
       }
-      res
+      val done = res.isEmpty
+      if (done) {
+        freePlayingRef()
+        prepared(ugen)
+      } else {
+        val prep = setPlayingPrepare(res)
+        tx.afterCommit {
+          import SoundProcesses.executionContext
+          val reduced = Future.reduce(res)((_, _) => ())
+          reduced.foreach { _ =>
+            context.scheduler.cursor.step { implicit tx =>
+              if (playingRef.get(tx.peer) == prep) {
+                prepared(ugen)
+              }
+            }
+          }
+        }
+      }
     }
 
-      // ---- synchronous preparation ----
-    private def launch(p: Proc.Obj[S], ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    private def prepared(ugen: UGB.Complete[S])(implicit tx: S#Tx): Unit = {
+      targetStateRef.get(tx.peer) match {
+        case tp: TargetPlaying =>
+          launch(ugen, tp.shiftTo(context.scheduler.time)) // XXX TODO - yes or no, shift time?
+        case _ =>
+          state = AuralObj.Prepared
+      }
+    }
+
+    // ---- synchronous preparation ----
+    private def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+      val p = _data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
 
       val ug            = ugen.result
@@ -436,24 +478,27 @@ object AuralProcImpl {
 
       // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
       logA(s"launched $p -> $node (${hashCode.toHexString})")
-      setNode(node)
+      setPlayingNode(node)
+    }
+
+    private def setPlayingNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
+      val old = playingRef.swap(new PlayingNode(node))(tx.peer)
+      old.dispose()
+      _data.addInstanceNode(node)
       state = AuralObj.Playing
     }
 
-    private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
-      val old = playingRef.swap(new PlayingNode[S](node))(tx.peer)
-      ??? // old.foreach(freeNode1)
-      _data.addInstanceNode(node)
+    private def setPlayingPrepare(resources: Vector[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
+      val res = new PlayingPrepare(resources)
+      val old = playingRef.swap(res)(tx.peer)
+      old.dispose()
+      state = AuralObj.Preparing
+      res
     }
 
-    private def freeNode()(implicit tx: S#Tx): Unit = {
-      val old = playingRef.swap(new PlayingNone[S])(tx.peer)
-      ??? // old.foreach(freeNode1)
-    }
-
-    private def freeNode1(n: AuralNode)(implicit tx: S#Tx): Unit = {
-      _data.removeInstanceNode(n)
-      n.stop()
+    private def freePlayingRef()(implicit tx: S#Tx): Unit = {
+      val old = playingRef.swap(PlayingNone)(tx.peer)
+      old.dispose()
     }
   }
 }

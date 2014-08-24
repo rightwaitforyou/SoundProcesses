@@ -152,12 +152,11 @@ trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Dispos
 
   // def latencyEstimate(implicit tx: S#Tx): Long
 
-  // def prepare()(implicit tx: S#Tx): Unit // GenericProcessor[Unit]
-
   // def isPrepared(implicit tx: S#Tx): Boolean
 
   def state(implicit tx: S#Tx): AuralObj.State
 
-  def play(timeRef: TimeRef = TimeRef.Undefined)(implicit tx: S#Tx): Unit
-  def stop(/* time: Long*/                     )(implicit tx: S#Tx): Unit
+  def prepare()                                    (implicit tx: S#Tx): Unit
+  def play   (timeRef: TimeRef = TimeRef.Undefined)(implicit tx: S#Tx): Unit
+  def stop   (/* time: Long*/                     )(implicit tx: S#Tx): Unit
 }
