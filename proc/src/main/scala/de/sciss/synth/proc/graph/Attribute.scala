@@ -21,7 +21,7 @@ import de.sciss.synth.ugen.ControlProxy
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 object Attribute {
-  private[proc] def controlName(key: String): String = "$attr_"  + key
+  private[proc] def controlName(key: String): String = s"$$attr_$key"
 
   def ir(key: String, default: Double = 0.0): Attribute = new Attribute(scalar , key, default)
   def kr(key: String, default: Double = 0.0): Attribute = new Attribute(control, key, default)
@@ -30,7 +30,7 @@ object Attribute {
 final case class Attribute(rate: Rate, key: String, default: Double) extends GE.Lazy {
   def makeUGens: UGenInLike = {
     val b       = UGenGraphBuilder.get
-    val numCh   = b.requestInput(Input.Attribute(key, numChannels = -1)).value
+    val numCh   = b.requestInput(Input.Attribute(key, numChannels = -1)).numChannels
     val ctlName = Attribute.controlName(key)
     val ctl     = ControlProxy(rate, Vec.fill(numCh)(default.toFloat), Some(ctlName))
     ctl.expand

@@ -95,13 +95,14 @@ object AuralProcDataImpl {
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGB.Context[S] {
 
-    private val stateRef  = Ref.make[UGB.State[S]]() // (state0)
-    private val nodeRef   = Ref(Option.empty[GroupImpl])
+    private val stateRef = Ref.make[UGB.State[S]]()
+    // (state0)
+    private val nodeRef = Ref(Option.empty[GroupImpl])
     private val scanBuses = TMap.empty[String, AudioBus]
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews = TSet.empty[AuralObj.Proc[S]]
 
-    private val procLoc   = TxnLocal[Proc.Obj[S]]() // cache-only purpose
+    private val procLoc = TxnLocal[Proc.Obj[S]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
 
@@ -113,23 +114,23 @@ object AuralProcDataImpl {
 
     /** Sub-classes may override this if invoking the super-method. */
     def init(proc: Proc.Obj[S])(implicit tx: S#Tx): this.type = {
-      _obj          = tx.newHandle(proc)
-      val ugenInit  = UGB.init(proc)
+      _obj = tx.newHandle(proc)
+      val ugenInit = UGB.init(proc)
       stateRef.set(ugenInit)(tx.peer)
 
       procObserver = proc.changed.react { implicit tx => upd =>
         upd.changes.foreach {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
             pCh.foreach {
-              case Proc.GraphChange(Change(_, newGraph))  => newSynthGraph(newGraph)
-              case Proc.ScanAdded  (key, scan)            => scanAdded  (key, scan)
-              case Proc.ScanRemoved(key, scan)            => scanRemoved(key, scan)
-              case Proc.ScanChange (key, scan, sCh)       => scanChange (key, scan, sCh)
+              case Proc.GraphChange(Change(_, newGraph)) => newSynthGraph(newGraph)
+              case Proc.ScanAdded(key, scan) => scanAdded(key, scan)
+              case Proc.ScanRemoved(key, scan) => scanRemoved(key, scan)
+              case Proc.ScanChange(key, scan, sCh) => scanChange(key, scan, sCh)
             }
 
-          case Obj.AttrAdded  (key, value)                => attrAdded  (key, value)
-          case Obj.AttrRemoved(key, value)                => attrRemoved(key, value)
-          case Obj.AttrChange (key, value, aCh)           => attrChange (key, value, aCh)
+          case Obj.AttrAdded(key, value) => attrAdded(key, value)
+          case Obj.AttrRemoved(key, value) => attrRemoved(key, value)
+          case Obj.AttrChange(key, value, aCh) => attrChange(key, value, aCh)
         }
       }
 
@@ -166,14 +167,14 @@ object AuralProcDataImpl {
       // then try to rebuild the stuff
       val ugenInit = UGB.init(procCached())
       stateRef() = ugenInit
-      tryBuild()  // this will re-start the temporarily stopped views if possible
+      tryBuild() // this will re-start the temporarily stopped views if possible
     }
 
     // ---- scan events ----
 
     private def scanAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       logA(s"ScanAdded  to   ${procCached()} ($key)")
-      testInScan (key, scan)
+      testInScan(key, scan)
       testOutScan(key, scan)
     }
 
@@ -197,14 +198,20 @@ object AuralProcDataImpl {
       attrNodeSet(key, value)
     }
 
-    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
-      state.acceptedInputs.get(UGB.ScalarKey(key)).foreach {
-        case UGB.NumChannels(numCh) =>
+    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = nodeOption.foreach { n =>
+      state.acceptedInputs.get(UGB.AttributeKey(key)).foreach(v => attrNodeSet(n, key, v, value))
+    }
+
+    protected def attrNodeSet(n: NodeRef, key: String, assigned: UGB.Value, value: Obj[S])(implicit tx: S#Tx): Unit =
+      assigned match {
+        case UGB.Input.Attribute.Value(numCh) =>
           // XXX TODO -- we have to verify the number of channels
-          nodeOption.foreach { n =>
-            val set = attrControlSet(key, value.elem)
-            n.node.set(audible = true, pairs = set)
-          }
+          val set = attrControlSet(key, value.elem)
+          n.node.set(audible = true, pairs = set)
+
+        case b: UGB.Input.Buffer.Value =>
+          Console.err.println(s"WARNING: Changing buffer contents ($key) while playing not yet supported")
+
         case other =>
           throw new IllegalStateException(s"Unsupported input request $other")
       }
@@ -386,7 +393,7 @@ object AuralProcDataImpl {
         logA(s"...newIns  = ${newIns.mkString(",")}")
 
         newIns.foreach {
-          case (UGB.ScanKey(key), UGB.NumChannels(numCh)) =>
+          case (UGB.ScanKey(key), UGB.Input.Scan.Value(numCh)) =>
             // val numCh = meta.numChannels
             activateAuralScan(key, numCh)
           case _ =>
@@ -501,9 +508,11 @@ object AuralProcDataImpl {
         if (found >= 0 && reqNum >= 0 && found != reqNum)
           throw new IllegalStateException(s"Attribute ${i.name} requires $reqNum channels (found $found)")
         val res = if (found >= 0) found else if (reqNum >= 0) reqNum else 1
-        UGB.NumChannels(res)
+        UGB.Input.Attribute.Value(res)
+
       case i: UGB.Input.Scan =>
-        UGB.NumChannels(requestScanInNumChannels(i))
+        UGB.Input.Scan.Value(requestScanInNumChannels(i))
+
       case i: UGB.Input.Stream =>
         val numCh0  = requestAttrNumChannels(i.name)
         val numCh   = if (numCh0 < 0) 1 else numCh0     // simply default to 1
@@ -518,13 +527,19 @@ object AuralProcDataImpl {
 
       case i: UGB.Input.Buffer =>
         val procObj = procCached()
-        val numCh0 = procObj.attr.getElem(i.name).fold(-1) {
-          case a: DoubleVecElem    [S] => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-          case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
-          case _ => -1
+        val (numFr, numCh) = procObj.attr.getElem(i.name).fold((-1L, -1)) {
+          case a: DoubleVecElem    [S] =>
+            val v = a.peer.value   // XXX TODO: would be better to write a.peer.size.value
+            (v.size.toLong, 1)
+          case a: AudioGraphemeElem[S] =>
+            val spec = a.peer.spec
+            (spec.numFrames, spec.numChannels)
+
+          case _ => (-1L, -1)
         }
-        val numCh = if (numCh0 < 0) throw MissingIn(i) else numCh0
-        UGB.NumChannels(numCh)
+        if (numCh < 0) throw MissingIn(i)
+        val async = numFr > 65536
+        UGB.Input.Buffer.Value(numFrames = numFr, numChannels = numCh, async = async)
 
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
     }

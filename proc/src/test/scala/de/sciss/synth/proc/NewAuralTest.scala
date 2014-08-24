@@ -193,9 +193,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         val sig   = Pan2.ar(sig0)
         Out.ar(0, sig)
       }
-      val loc     = ArtifactLocation(f.parent)
+      val loc     = ArtifactLocation[S](f.parent)
       val artif   = loc.add(f)
-      val oAudio  = Grapheme.Expr.Audio[S](artif, spec, offset = 0L, gain = 2.0)
+      val oAudio  = Grapheme.Expr.Audio(artif, spec, offset = 0L, gain = 2.0)
 
       _proc.attr.put("metal", Obj(AudioGraphemeElem(oAudio)))
 

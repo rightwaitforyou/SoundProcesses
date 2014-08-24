@@ -154,49 +154,15 @@ object AuralProcImpl {
     /** Sub-classes may override this if falling back to the super-method. */
     protected def buildInput(b: SynthBuilder[S], keyW: UGB.Key, value: UGB.Value)
                             (implicit tx: S#Tx): Unit = keyW match {
-      case UGB.ScalarKey(key) => buildAttrInput  (b, key, value)
-      case UGB.ScanKey  (key) => buildScanInput  (b, key, value)
-      case UGB.BufferKey(key) => buildBufferInput(b, key, value)
-      case _                  => throw new IllegalStateException(s"Unsupported input request $keyW")
-    }
-
-    /** Sub-classes may override this if falling back to the super-method. */
-    protected def buildBufferInput(b: SynthBuilder[S], key: String, value: UGB.Value)
-                                  (implicit tx: S#Tx): Unit = value match {
-      case UGB.NumChannels(numCh) =>
-        val rb = b.obj.attr.getElem(key).fold[Buffer] {
-          sys.error(s"Missing attribute $key for buffer content")
-        } {
-          case a: AudioGraphemeElem[S] =>
-            val audioElem = a.peer
-            val spec      = audioElem.spec
-            val path      = audioElem.artifact.value.getAbsolutePath
-            val offset    = audioElem.offset  .value
-            // XXX TODO - for now, gain is ignored.
-            // one might add an auxiliary control proxy e.g. Buffer(...).gain
-            // val _gain     = audioElem.gain    .value
-            if (spec.numFrames > 0x3FFFFFFF)
-              sys.error(s"File too large for in-memory buffer: $path (${spec.numFrames} frames)")
-            val bufSize   = spec.numFrames.toInt
-            val _buf      = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
-            _buf.read(path = path, fileStartFrame = offset)
-            _buf
-
-          case a => sys.error(s"Cannot use attribute $a as a buffer content")
-        }
-        val ctlName    = graph.Buffer.controlName(key)
-        b.setMap      += ctlName -> rb.id
-        b.dependencies ::= rb
-
-      case _ =>
-        // XXX TODO --- we might add support for DoubleVec
-        throw new IllegalStateException(s"Unsupported input buffer request $value")
+      case UGB.AttributeKey(key) => buildAttrInput  (b, key, value)
+      case UGB.ScanKey     (key) => buildScanInput  (b, key, value)
+      case _                     => throw new IllegalStateException(s"Unsupported input request $keyW")
     }
 
       /** Sub-classes may override this if falling back to the super-method. */
     protected def buildScanInput(b: SynthBuilder[S], key: String, value: UGB.Value)
                                 (implicit tx: S#Tx): Unit = value match {
-      case UGB.NumChannels(numCh) =>
+      case UGB.Input.Scan.Value(numCh) =>
         // ---- scans ----
         // XXX TODO : this should all disappear
         // and the missing bits should be added
@@ -274,7 +240,7 @@ object AuralProcImpl {
 
     /** Sub-classes may override this if invoking the super-method. */
     protected def buildAttrInput(b: SynthBuilder[S], key: String, value: UGB.Value)(implicit tx: S#Tx): Unit = value match {
-      case UGB.NumChannels(numChannels) =>
+      case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
         // XXX TODO - numChannels is not tested
         b.obj.attr.getElem(key).foreach {
           case a: AudioGraphemeElem[S] =>
@@ -298,7 +264,7 @@ object AuralProcImpl {
           case a => b.setMap += _data.attrControlSet(key, a)
         }
 
-      case UGB.Input.Stream.Value(numChannels, specs) =>
+      case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
         val infoSeq = if (specs.isEmpty) UGB.Input.Stream.EmptySpec :: Nil else specs
 
         infoSeq.zipWithIndex.foreach { case (info, idx) =>
@@ -346,6 +312,31 @@ object AuralProcImpl {
           b.setMap      += (ctlName -> Seq[Float](rb.id, gain): ControlSet)
           b.dependencies ::= rb
         }
+
+      case UGB.Input.Buffer.Value(numFr, numCh, async) =>   // ----------------------- random access buffer
+        val rb = b.obj.attr.getElem(key).fold[Buffer] {
+          sys.error(s"Missing attribute $key for buffer content")
+        } {
+          case a: AudioGraphemeElem[S] =>
+            val audioElem = a.peer
+            val spec      = audioElem.spec
+            val path      = audioElem.artifact.value.getAbsolutePath
+            val offset    = audioElem.offset  .value
+            // XXX TODO - for now, gain is ignored.
+            // one might add an auxiliary control proxy e.g. Buffer(...).gain
+            // val _gain     = audioElem.gain    .value
+            if (spec.numFrames > 0x3FFFFFFF)
+              sys.error(s"File too large for in-memory buffer: $path (${spec.numFrames} frames)")
+            val bufSize   = spec.numFrames.toInt
+            val _buf      = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
+            _buf.read(path = path, fileStartFrame = offset)
+            _buf
+
+          case a => sys.error(s"Cannot use attribute $a as a buffer content")
+        }
+        val ctlName    = graph.Buffer.controlName(key)
+        b.setMap      += ctlName -> rb.id
+        b.dependencies ::= rb
 
       case _ =>
         throw new IllegalStateException(s"Unsupported input attribute request $value")
