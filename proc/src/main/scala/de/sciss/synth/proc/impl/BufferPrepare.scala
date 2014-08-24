@@ -41,7 +41,7 @@ object BufferPrepare {
   /** Creates and launches the process. */
   def apply[S <: Sys[S]](config: Config)(implicit tx: S#Tx): AsyncResource[S] = {
     import config._
-    if (buf.isOnline) sys.error("Buffer must be allocated")
+    if (!buf.isOnline) sys.error("Buffer must be allocated")
     val numFrL = spec.numFrames
     if (numFrL > 0x3FFFFFFF) sys.error(s"File $f is too large ($numFrL frames) for an in-memory buffer")
     val res = new Impl[S](path = f.getAbsolutePath, numFrames = numFrL.toInt, off0 = offset,

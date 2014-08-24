@@ -364,22 +364,28 @@ object AuralProcImpl {
       val p = _data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
 
-      ???
-    }
-
-    // ---- asynchronous preparation ----
-    private def prepare(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val p = _data.procCached()
-      logA(s"begin prepare $p (${hashCode.toHexString})")
-
-      ugen.acceptedInputs.foreach { case (key, value) =>
-        if (value.async) buildAsyncInput(p, key, value)
+      val async = prepare(p, ugen, timeRef)
+      if (async.isEmpty) {
+        launch(p, ugen, timeRef)
+      } else {
+        ???
       }
     }
 
+    // ---- asynchronous preparation ----
+    private def prepare(p: Proc.Obj[S], ugen: UGB.Complete[S], timeRef: TimeRef)
+                       (implicit tx: S#Tx): Vector[AsyncResource[S]] = {
+      logA(s"begin prepare $p (${hashCode.toHexString})")
+
+      var res = Vector.empty[AsyncResource[S]]
+      ugen.acceptedInputs.foreach { case (key, value) =>
+        if (value.async) res :+= buildAsyncInput(p, key, value)
+      }
+      res
+    }
+
       // ---- synchronous preparation ----
-    private def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val p = _data.procCached()
+    private def launch(p: Proc.Obj[S], ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       logA(s"begin launch $p (${hashCode.toHexString})")
 
       val ug            = ugen.result
