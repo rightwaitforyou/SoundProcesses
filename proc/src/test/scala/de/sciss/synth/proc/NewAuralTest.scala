@@ -64,6 +64,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test8"  => test8()
       case "--test9"  => test9()
       case "--test10" => test10()
+      case "--test11" => test11()
       case _         =>
         println("WARNING: No option given, using --test10")
         test10()
@@ -163,6 +164,54 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 11
+
+  def test11()(implicit context: AuralContext[S]): Unit = {
+    println("----test10----")
+    println(
+      """
+        |Expected behaviour:
+        |A buffer is loaded and played fast forward and backward.
+        |
+        |""".stripMargin)
+
+    val imp     = ExprImplicits[S]
+    import imp._
+
+    val procAural = cursor.step { implicit tx =>
+      import de.sciss.file._
+      val f       = userHome / "Music" / "tapes" / "MetallScheibe5TestN.aif"
+      val spec    = AudioFile.readSpec(f)
+      println(spec)
+      // val vAudio  = Grapheme.Value.Audio(f, spec, offset = 0L, gain = 2.0)
+
+      val _proc = proc {
+        val buf   = graph.Buffer("metal")
+        val speed = LFPulse.ar(BufDur.kr(buf).reciprocal).linlin(0, 1, -4, 4)
+        val sig0  = PlayBuf.ar(numChannels = spec.numChannels, buf = buf, speed = speed, loop = 1)
+        val sig   = Pan2.ar(sig0)
+        Out.ar(0, sig)
+      }
+      val loc     = ArtifactLocation(f.parent)
+      val artif   = loc.add(f)
+      val oAudio  = Grapheme.Expr.Audio[S](artif, spec, offset = 0L, gain = 2.0)
+
+      _proc.attr.put("metal", Obj(AudioGraphemeElem(oAudio)))
+
+      AuralObj(_proc)
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      procAural.play()
+
+      after(20.0) { implicit tx =>
+        procAural.stop()
+        stopAndQuit(1.0)
+      }
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 10
 

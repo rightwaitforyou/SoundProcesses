@@ -22,8 +22,8 @@ import de.sciss.synth.Curve.parametric
 import de.sciss.synth.{ControlSet, SynthGraph, addBefore}
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.proc.UGenGraphBuilder.{State => UState, Input, Complete, Incomplete, MissingIn}
-import de.sciss.synth.proc.{logAural => logA}
+import de.sciss.synth.proc.{logAural => logA, UGenGraphBuilder => UGB}
+import UGB.{Complete, Incomplete, MissingIn}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{TSet, TMap, Ref, TxnLocal}
@@ -93,9 +93,9 @@ object AuralProcDataImpl {
   }
 
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
-    extends ProcData[S] with UGenGraphBuilder.Context[S] {
+    extends ProcData[S] with UGB.Context[S] {
 
-    private val stateRef  = Ref.make[UState[S]]() // (state0)
+    private val stateRef  = Ref.make[UGB.State[S]]() // (state0)
     private val nodeRef   = Ref(Option.empty[GroupImpl])
     private val scanBuses = TMap.empty[String, AudioBus]
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
@@ -114,7 +114,7 @@ object AuralProcDataImpl {
     /** Sub-classes may override this if invoking the super-method. */
     def init(proc: Proc.Obj[S])(implicit tx: S#Tx): this.type = {
       _obj          = tx.newHandle(proc)
-      val ugenInit  = UGenGraphBuilder.init(proc)
+      val ugenInit  = UGB.init(proc)
       stateRef.set(ugenInit)(tx.peer)
 
       procObserver = proc.changed.react { implicit tx => upd =>
@@ -164,7 +164,7 @@ object AuralProcDataImpl {
       disposeNodeRefAndScans()
 
       // then try to rebuild the stuff
-      val ugenInit = UGenGraphBuilder.init(procCached())
+      val ugenInit = UGB.init(procCached())
       stateRef() = ugenInit
       tryBuild()  // this will re-start the temporarily stopped views if possible
     }
@@ -198,8 +198,8 @@ object AuralProcDataImpl {
     }
 
     private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
-      state.acceptedInputs.get(UGenGraphBuilder.AttributeKey(key)).foreach {
-        case UGenGraphBuilder.NumChannels(numCh) =>
+      state.acceptedInputs.get(UGB.ScalarKey(key)).foreach {
+        case UGB.NumChannels(numCh) =>
           // XXX TODO -- we have to verify the number of channels
           nodeOption.foreach { n =>
             val set = attrControlSet(key, value.elem)
@@ -228,7 +228,7 @@ object AuralProcDataImpl {
     // check if the scan is used as currently missing input. if so,
     // try to build the ugen graph again.
     private def testInScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
-      if (state.rejectedInputs.contains(UGenGraphBuilder.ScanKey(key))) {
+      if (state.rejectedInputs.contains(UGB.ScanKey(key))) {
         val numCh = scanInNumChannels(scan)
         // println(s"testInScan($key) -> numCh = $numCh")
         if (numCh >= 0) {
@@ -305,7 +305,7 @@ object AuralProcDataImpl {
       if (rj.nonEmpty) {
         val scans = procCached().elem.peer.scans
         rj.foreach {
-          case UGenGraphBuilder.ScanKey(key) =>
+          case UGB.ScanKey(key) =>
             scans.get(key).foreach { scan =>
               context.removeAux(scan.id)
             }
@@ -317,7 +317,7 @@ object AuralProcDataImpl {
     private def clearMap[A, B](m: TMap[A, B])(implicit tx: S#Tx): Unit =
       m.retain((_, _) => false)(tx.peer) // no `clear` method
 
-    final def state(implicit tx: S#Tx): UGenGraphBuilder.State[S] = stateRef.get(tx.peer)
+    final def state(implicit tx: S#Tx): UGB.State[S] = stateRef.get(tx.peer)
 
     /* If the ugen graph is incomplete, tries to (incrementally)
      * build it. Calls `buildAdvanced` with the old and new
@@ -344,7 +344,7 @@ object AuralProcDataImpl {
      * If the now-state indicates that the ugen-graph is complete,
      * it calls `play` on the proc-views whose target-state is to play.
      */
-    private def buildAdvanced(before: UState[S], now: UState[S])(implicit tx: S#Tx): Unit = {
+    private def buildAdvanced(before: UGB.State[S], now: UGB.State[S])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
 
       if (now.rejectedInputs.isEmpty) {
@@ -355,7 +355,7 @@ object AuralProcDataImpl {
         // store proxies so future sinks can detect this incomplete proc
         val scans = procCached().elem.peer.scans
         now.rejectedInputs.foreach {
-          case UGenGraphBuilder.ScanKey(key) =>
+          case UGB.ScanKey(key) =>
             scans.get(key).foreach { scan =>
               addIncompleteScanIn(key, scan)
             }
@@ -386,7 +386,7 @@ object AuralProcDataImpl {
         logA(s"...newIns  = ${newIns.mkString(",")}")
 
         newIns.foreach {
-          case (UGenGraphBuilder.ScanKey(key), UGenGraphBuilder.NumChannels(numCh)) =>
+          case (UGB.ScanKey(key), UGB.NumChannels(numCh)) =>
             // val numCh = meta.numChannels
             activateAuralScan(key, numCh)
           case _ =>
@@ -493,28 +493,38 @@ object AuralProcDataImpl {
     // def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
 
     /** Sub-classes may override this if invoking the super-method. */
-    def requestInput[Res](in: UGenGraphBuilder.Input { type Value = Res }, st: Incomplete[S])
+    def requestInput[Res](in: UGB.Input { type Value = Res }, st: Incomplete[S])
                          (implicit tx: S#Tx): Res = in match {
-      case i: UGenGraphBuilder.Input.Attribute =>
+      case i: UGB.Input.Attribute =>
         val found  = requestAttrNumChannels(i.name)
         val reqNum = i.numChannels
-        if ( found >= 0 && reqNum >= 0 && found != reqNum)
+        if (found >= 0 && reqNum >= 0 && found != reqNum)
           throw new IllegalStateException(s"Attribute ${i.name} requires $reqNum channels (found $found)")
         val res = if (found >= 0) found else if (reqNum >= 0) reqNum else 1
-        UGenGraphBuilder.NumChannels(res)
-      case i: UGenGraphBuilder.Input.Scan =>
-        UGenGraphBuilder.NumChannels(requestScanInNumChannels(i))
-      case i: UGenGraphBuilder.Input.Stream =>
+        UGB.NumChannels(res)
+      case i: UGB.Input.Scan =>
+        UGB.NumChannels(requestScanInNumChannels(i))
+      case i: UGB.Input.Stream =>
         val numCh0  = requestAttrNumChannels(i.name)
         val numCh   = if (numCh0 < 0) 1 else numCh0     // simply default to 1
         val newSpecs0 = st.acceptedInputs.get(i.key) match {
-          case Some(v: Input.Stream.Value)  => v.specs
+          case Some(v: UGB.Input.Stream.Value)  => v.specs
           case _                            => Nil
         }
         val newSpecs = if (i.spec.isEmpty) newSpecs0 else {
           i.spec :: newSpecs0
         }
-        Input.Stream.Value(numChannels = numCh, specs = newSpecs)
+        UGB.Input.Stream.Value(numChannels = numCh, specs = newSpecs)
+
+      case i: UGB.Input.Buffer =>
+        val procObj = procCached()
+        val numCh0 = procObj.attr.getElem(i.name).fold(-1) {
+          case a: DoubleVecElem    [S] => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
+          case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
+          case _ => -1
+        }
+        val numCh = if (numCh0 < 0) throw MissingIn(i) else numCh0
+        UGB.NumChannels(numCh)
 
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
     }

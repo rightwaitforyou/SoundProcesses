@@ -66,8 +66,12 @@ object UGenGraphBuilder {
 
   /** A pure marker trait to rule out some type errors. */
   trait Key
-  case class AttributeKey(name: String) extends Key
-  case class ScanKey     (name: String) extends Key
+  /** A scalar value found in the attribute map. */
+  case class ScalarKey(name: String) extends Key
+  /** A entry in a proc's scan map. */
+  case class ScanKey  (name: String) extends Key
+  /** A buffer source found in the attribute map. */
+  case class BufferKey(name: String) extends Key
 
   case class NumChannels(value: Int) extends UGenGraphBuilder.Value
 
@@ -107,10 +111,10 @@ object UGenGraphBuilder {
       }
     }
     final case class Stream(name: String, spec: Stream.Spec) extends Input {
-      type Key    = AttributeKey
+      type Key    = ScalarKey
       type Value  = Stream.Value
 
-      def key = AttributeKey(name)
+      def key = ScalarKey(name)
 
       override def productPrefix = "Input.Stream"
     }
@@ -121,12 +125,26 @@ object UGenGraphBuilder {
       * @param numChannels  the required number of channels or `-1` if no specific requirement
       */
     final case class Attribute(name: String, numChannels: Int) extends Input {
-      type Key    = AttributeKey
+      type Key    = ScalarKey
       type Value  = NumChannels
 
-      def key = AttributeKey(name)
+      def key = ScalarKey(name)
 
       override def productPrefix = "Input.Attribute"
+    }
+
+    /** Specifies access to a random access buffer.
+      *
+      * @param name         name (key) of the attribute referring to an object that
+      *                     can be buffered (e.g. audio grapheme)
+      */
+    final case class Buffer(name: String) extends Input {
+      type Key    = BufferKey
+      type Value  = NumChannels
+
+      def key = BufferKey(name)
+
+      override def productPrefix = "Input.Buffer"
     }
   }
   trait Input {

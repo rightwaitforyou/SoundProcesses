@@ -13,7 +13,12 @@
 
 package de.sciss.synth.proc.graph
 
+import de.sciss.synth.proc.UGenGraphBuilder
+import de.sciss.synth.proc.UGenGraphBuilder.Input
+import de.sciss.synth.ugen.ControlProxy
 import de.sciss.synth.{UGenInLike, GE, control, scalar, Rate}
+
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 /** An element referring to a random access buffer provided through an attribute.
   * The attribute will typically be an audio grapheme.
@@ -21,6 +26,9 @@ import de.sciss.synth.{UGenInLike, GE, control, scalar, Rate}
 object Buffer {
   def ir(key: String): Buffer = new Buffer(scalar , key)
   def kr(key: String): Buffer = new Buffer(control, key)
+
+  /** Convenience alias for `kr` */
+  def apply(key: String): Buffer = kr(key)
 
   private[proc] def controlName(key: String): String = "$buf_"  + key
 }
@@ -31,5 +39,11 @@ object Buffer {
   * @param key  the attribute key.
   */
 final case class Buffer(rate: Rate, key: String) extends GE.Lazy {
-  protected def makeUGens: UGenInLike = ???
+  protected def makeUGens: UGenInLike = {
+    val b       = UGenGraphBuilder.get
+    b.requestInput(Input.Buffer(key))
+    val ctlName = Buffer.controlName(key)
+    val ctl     = ControlProxy(rate, Vec(0f), Some(ctlName))
+    ctl.expand
+  }
 }
