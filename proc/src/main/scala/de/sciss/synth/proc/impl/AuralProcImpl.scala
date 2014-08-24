@@ -152,9 +152,9 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if falling back to the super-method. */
-    protected def buildAsyncInput(keyW: UGB.Key, value: UGB.Value)
+    protected def buildAsyncInput(obj: Proc.Obj[S], keyW: UGB.Key, value: UGB.Value)
                                  (implicit tx: S#Tx): Unit = keyW match {
-      case UGB.AttributeKey(key) => buildAsyncAttrInput(key, value)
+      case UGB.AttributeKey(key) => buildAsyncAttrInput(obj, key, value)
       case _                     => throw new IllegalStateException(s"Unsupported async input request $keyW")
     }
 
@@ -246,10 +246,32 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if invoking the super-method. */
-    protected def buildAsyncAttrInput(key: String, value: UGB.Value)
+    protected def buildAsyncAttrInput(obj: Proc.Obj[S], key: String, value: UGB.Value)
                                     (implicit tx: S#Tx): Unit = value match {
       case UGB.Input.Buffer.Value(numFr, numCh, true) =>   // ----------------------- random access buffer
+        val bufProc = obj.attr.getElem(key).fold[BufferPrepare] {
+          sys.error(s"Missing attribute $key for buffer content")
+        } {
+          case a: AudioGraphemeElem[S] =>
+            val audioElem = a.peer
+            val spec      = audioElem.spec
+            val f         = audioElem.artifact.value
+            val offset    = audioElem.offset  .value
+            // XXX TODO - for now, gain is ignored.
+            // one might add an auxiliary control proxy e.g. Buffer(...).gain
+            // val _gain     = audioElem.gain    .value
+            if (spec.numFrames > 0x3FFFFFFF)
+              sys.error(s"File too large for in-memory buffer: $f (${spec.numFrames} frames)")
+            val bufSize   = spec.numFrames.toInt
+            val _buf      = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
+            val cfg       = BufferPrepare.Config(f = f, spec = spec, offset = offset, buf = _buf)
+            BufferPrepare(cfg)
+
+          case a => sys.error(s"Cannot use attribute $a as a buffer content")
+        }
+        val ctlName = graph.Buffer.controlName(key)
         ???
+
       case _ =>
         throw new IllegalStateException(s"Unsupported input attribute request $value")
     }
@@ -264,13 +286,10 @@ object AuralProcImpl {
             val ctlName   = graph.Attribute.controlName(key)
             val audioElem = a.peer
             val spec      = audioElem.spec
-            //              require(spec.numChannels == 1 || spec.numFrames == 1,
-            //                s"Audio grapheme ${a.peer} must have either 1 channel or 1 frame to be used as scalar attribute")
-            require(spec.numFrames == 1, s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
-            //              val numChL = if (spec.numChannels == 1) spec.numFrames else spec.numChannels
-            //              require(numChL <= 4096, s"Audio grapheme size ($numChL) must be <= 4096 to be used as scalar attribute")
+            if (spec.numFrames != 1)
+              sys.error(s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
             val numCh = spec.numChannels // numChL.toInt
-            require(numCh <= 4096, s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
+            if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
             val bus = Bus.control(server, numCh)
             val res = BusNodeSetter.mapper(ctlName, bus, b.synth)
             b.users ::= res
@@ -360,13 +379,13 @@ object AuralProcImpl {
     }
     
     private def launchProc(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val p             = _data.procCached()
+      val p = _data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
 
       // ---- asynchronous preparation ----
 
       ugen.acceptedInputs.foreach { case (key, value) =>
-        if (value.async) buildAsyncInput(key, value)
+        if (value.async) buildAsyncInput(p, key, value)
       }
 
       // ---- synchronous preparation ----

@@ -1,3 +1,16 @@
+/*
+ *  StreamBuffer.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
+ *
+ *	This software is published under the GNU General Public License v2+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth.proc
 package impl
 
@@ -50,8 +63,8 @@ object StreamBuffer {
     BufRd.ar(numChannels, buf = buf, index = phasor, loop = 0, interp = interp)
   }
 }
-class StreamBuffer(key: String, idx: Int, synth: Synth, buf: Buffer.Modifiable, path: String, fileFrames: Long,
-                   interp: Int) {
+final class StreamBuffer(key: String, idx: Int, synth: Synth, buf: Buffer.Modifiable, path: String, fileFrames: Long,
+                         interp: Int) {
 
   private val bufSizeH  = buf.numFrames/2
   private val diskPad   = StreamBuffer.padSize(interp)

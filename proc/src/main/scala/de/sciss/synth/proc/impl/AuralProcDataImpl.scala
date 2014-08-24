@@ -528,7 +528,7 @@ object AuralProcDataImpl {
       case i: UGB.Input.Buffer =>
         val procObj = procCached()
         val (numFr, numCh) = procObj.attr.getElem(i.name).fold((-1L, -1)) {
-          case a: DoubleVecElem    [S] =>
+          case a: DoubleVecElem[S] =>
             val v = a.peer.value   // XXX TODO: would be better to write a.peer.size.value
             (v.size.toLong, 1)
           case a: AudioGraphemeElem[S] =>
@@ -538,7 +538,8 @@ object AuralProcDataImpl {
           case _ => (-1L, -1)
         }
         if (numCh < 0) throw MissingIn(i)
-        val async = numFr > 65536
+        // larger files are asynchronously prepared, smaller ones read on the fly
+        val async = numFr > 65536   // XXX TODO - that threshold should be configurable
         UGB.Input.Buffer.Value(numFrames = numFr, numChannels = numCh, async = async)
 
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
