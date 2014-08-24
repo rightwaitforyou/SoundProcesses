@@ -11,11 +11,11 @@
  *  contact@sciss.de
  */
 
-package de.sciss
-package lucre.synth
+package de.sciss.lucre.synth
 
-import concurrent.stm.Ref
 import de.sciss.synth.addBefore
+
+import scala.concurrent.stm.Ref
 
 object AuralNode {
   def apply(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],

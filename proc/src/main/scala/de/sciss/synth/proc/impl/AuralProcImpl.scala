@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, Sys}
+import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Bus, Buffer, Synth, Sys}
 import de.sciss.numbers
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
@@ -60,7 +60,12 @@ object AuralProcImpl {
       timeRef.shift(delta)
     }
   }
-  
+
+  private sealed trait PlayingRef   [S <: Sys[S]]
+  private final class PlayingNone   [S <: Sys[S]] extends PlayingRef[S]
+  private final class PlayingNode   [S <: Sys[S]](val aural: AuralNode) extends PlayingRef[S]
+  private final class PlayingPrepare[S <: Sys[S]](val resources: Vector[AsyncResource[S]]) extends PlayingRef[S]
+
   class Impl[S <: Sys[S]](implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
@@ -69,7 +74,7 @@ object AuralProcImpl {
     private var _data: ProcData[S]  = _
     private val currentStateRef     = Ref[AuralObj.State](AuralObj.Stopped)
     private val targetStateRef      = Ref[TargetState](TargetStop)
-    private val playingRef          = Ref(Option.empty[AuralNode])
+    private val playingRef          = Ref[PlayingRef[S]](new PlayingNone[S])
 
     final def obj: stm.Source[S#Tx, Proc.Obj[S]] = _data.obj
 
@@ -436,12 +441,14 @@ object AuralProcImpl {
     }
 
     private def setNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
-      playingRef.swap(Some(node))(tx.peer).foreach(freeNode1)
+      val old = playingRef.swap(new PlayingNode[S](node))(tx.peer)
+      ??? // old.foreach(freeNode1)
       _data.addInstanceNode(node)
     }
 
     private def freeNode()(implicit tx: S#Tx): Unit = {
-      playingRef.swap(None)(tx.peer).foreach(freeNode1)
+      val old = playingRef.swap(new PlayingNone[S])(tx.peer)
+      ??? // old.foreach(freeNode1)
     }
 
     private def freeNode1(n: AuralNode)(implicit tx: S#Tx): Unit = {
