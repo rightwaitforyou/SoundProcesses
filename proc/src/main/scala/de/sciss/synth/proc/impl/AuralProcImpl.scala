@@ -87,15 +87,14 @@ object AuralProcImpl {
       }
     }
     private final class PlayingPrepare(val resources: Vector[AsyncResource[S]]) extends PlayingRef {
-      def dispose()(implicit tx: S#Tx): Unit = {
-        ???
-      }
+      def dispose()(implicit tx: S#Tx): Unit = resources.foreach(_.dispose())
     }
 
     private var _data: ProcData[S]  = _
+    // XXX TODO - perhaps `currentStateRef` and `playingRef` could be one thing?
     private val currentStateRef     = Ref[AuralObj.State](AuralObj.Stopped)
-    private val targetStateRef      = Ref[TargetState](TargetStop)
-    private val playingRef          = Ref[PlayingRef](PlayingNone)
+    private val targetStateRef      = Ref[TargetState   ](TargetStop      )
+    private val playingRef          = Ref[PlayingRef    ](PlayingNone     )
 
     final def obj: stm.Source[S#Tx, Proc.Obj[S]] = _data.obj
 
@@ -121,16 +120,20 @@ object AuralProcImpl {
     }
 
     final def prepare()(implicit tx: S#Tx): Unit = {
-      val ts = TargetPrepared
-      targetStateRef.set(ts)(tx.peer)
+      targetStateRef.set(TargetPrepared)(tx.peer)
+
     }
 
     final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val ts = new TargetPlaying(context.scheduler.time, timeRef)
       targetStateRef.set(ts)(tx.peer)
-      if (state != AuralObj.Stopped) return
       _data.state match {
-        case s: UGB.Complete[S] => prepareAndLaunch(s, timeRef)
+        case s: UGB.Complete[S] =>
+          state match {
+            case AuralObj.Stopped   => prepareAndLaunch(s, timeRef)
+            case AuralObj.Prepared  => launch          (s, timeRef)
+          }
+
         case _ =>
       }
     }
@@ -442,6 +445,14 @@ object AuralProcImpl {
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
       val builder       = new SynthBuilder(p, synth, timeRef)
+
+      // "consume" prepared state
+      playingRef.swap(PlayingNone) match {
+        case prep: PlayingPrepare => prep.resources.foreach { resource =>
+          resource.install(builder)
+        }
+        case _ =>
+      }
 
       // XXX TODO - it would be nicer if these were added optionally
       builder.setMap += graph.Time    .key -> (timeRef.frame        / Timeline.SampleRate)
