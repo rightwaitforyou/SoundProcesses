@@ -152,10 +152,17 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if falling back to the super-method. */
-    protected def buildInput(b: SynthBuilder[S], keyW: UGB.Key, value: UGB.Value)
-                            (implicit tx: S#Tx): Unit = keyW match {
-      case UGB.AttributeKey(key) => buildAttrInput  (b, key, value)
-      case UGB.ScanKey     (key) => buildScanInput  (b, key, value)
+    protected def buildAsyncInput(keyW: UGB.Key, value: UGB.Value)
+                                 (implicit tx: S#Tx): Unit = keyW match {
+      case UGB.AttributeKey(key) => buildAsyncAttrInput(key, value)
+      case _                     => throw new IllegalStateException(s"Unsupported async input request $keyW")
+    }
+
+    /** Sub-classes may override this if falling back to the super-method. */
+    protected def buildSyncInput(b: SynthBuilder[S], keyW: UGB.Key, value: UGB.Value)
+                                (implicit tx: S#Tx): Unit = keyW match {
+      case UGB.AttributeKey(key) => buildSyncAttrInput(b, key, value)
+      case UGB.ScanKey     (key) => buildScanInput    (b, key, value)
       case _                     => throw new IllegalStateException(s"Unsupported input request $keyW")
     }
 
@@ -228,7 +235,7 @@ object AuralProcImpl {
                   val bm          = mkInBus()
                   val w           = AudioArtifactWriter(bm.bus, audio, time)
                   b.dependencies  ::= w
-                // users    ::= w
+                  // users    ::= w
               }
 
             case Link.Scan(peer) => mkInBus()
@@ -239,7 +246,17 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if invoking the super-method. */
-    protected def buildAttrInput(b: SynthBuilder[S], key: String, value: UGB.Value)(implicit tx: S#Tx): Unit = value match {
+    protected def buildAsyncAttrInput(key: String, value: UGB.Value)
+                                    (implicit tx: S#Tx): Unit = value match {
+      case UGB.Input.Buffer.Value(numFr, numCh, true) =>   // ----------------------- random access buffer
+        ???
+      case _ =>
+        throw new IllegalStateException(s"Unsupported input attribute request $value")
+    }
+
+    /** Sub-classes may override this if invoking the super-method. */
+    protected def buildSyncAttrInput(b: SynthBuilder[S], key: String, value: UGB.Value)
+                                    (implicit tx: S#Tx): Unit = value match {
       case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
         // XXX TODO - numChannels is not tested
         b.obj.attr.getElem(key).foreach {
@@ -313,7 +330,7 @@ object AuralProcImpl {
           b.dependencies ::= rb
         }
 
-      case UGB.Input.Buffer.Value(numFr, numCh, async) =>   // ----------------------- random access buffer
+      case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
         val rb = b.obj.attr.getElem(key).fold[Buffer] {
           sys.error(s"Missing attribute $key for buffer content")
         } {
@@ -345,6 +362,15 @@ object AuralProcImpl {
     private def launchProc(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p             = _data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
+
+      // ---- asynchronous preparation ----
+
+      ugen.acceptedInputs.foreach { case (key, value) =>
+        if (value.async) buildAsyncInput(key, value)
+      }
+
+      // ---- synchronous preparation ----
+
       val ug            = ugen.result
       implicit val itx  = tx.peer
 
@@ -361,8 +387,8 @@ object AuralProcImpl {
         case _ => Double.PositiveInfinity
       })
 
-      ugen.acceptedInputs.foreach { tup =>
-        buildInput(builder, tup._1, tup._2)
+      ugen.acceptedInputs.foreach { case (key, value) =>
+        if (!value.async) buildSyncInput(builder, key, value)
       }
 
       // ---- handle output buses, and establish missing links to sinks ----

@@ -76,13 +76,19 @@ object UGenGraphBuilder {
   // final case class NumChannels(value: Int) extends UGenGraphBuilder.Value
 
   /** A pure marker trait to rule out some type errors. */
-  trait Value
-  case object Unit extends Value
+  trait Value {
+    def async: Boolean
+  }
+  case object Unit extends Value {
+    final val async = false
+  }
   type Unit = Unit.type
 
   object Input {
     object Scan {
-      final case class Value(numChannels: Int) extends UGenGraphBuilder.Value
+      final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
+        def async = false
+      }
     }
     final case class Scan(name: String) extends Input {
       type Key    = ScanKey
@@ -111,6 +117,7 @@ object UGenGraphBuilder {
       }
       final case class Value(numChannels: Int, specs: List[Spec]) extends UGenGraphBuilder.Value {
         override def productPrefix = "Input.Stream.Value"
+        def async = false
       }
     }
     final case class Stream(name: String, spec: Stream.Spec) extends Input {
@@ -123,7 +130,9 @@ object UGenGraphBuilder {
     }
 
     object Attribute {
-      final case class Value(numChannels: Int) extends UGenGraphBuilder.Value
+      final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
+        def async = false
+      }
     }
     /** Specifies access to a scalar attribute.
       *
