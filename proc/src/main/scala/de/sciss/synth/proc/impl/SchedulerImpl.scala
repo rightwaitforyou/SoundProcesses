@@ -101,7 +101,7 @@ object SchedulerImpl {
       val actualDelayN  = math.max(0L, ((info.delay - jitter) / sampleRateN).toLong)
       logT(s"scheduled: $info; logicalDelay (f) = ${info.delay}, actualDelay (ns) = $actualDelayN")
       tx.afterCommit {
-        SoundProcesses.pool.schedule(new Runnable {
+        SoundProcesses.scheduledExecutorService.schedule(new Runnable {
           def run(): Unit = {
             logT(s"scheduled: execute $info")
             cursor.step { implicit tx =>

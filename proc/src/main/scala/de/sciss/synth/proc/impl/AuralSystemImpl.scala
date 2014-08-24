@@ -38,7 +38,7 @@ object AuralSystemImpl {
    * TODO: review
    */
   private def afterCommit(code: => Unit)(implicit tx: Txn): Unit = tx.afterCommit {
-    val exec = SoundProcesses.pool
+    val exec = SoundProcesses.scheduledExecutorService
     // note: `isShutdown` is true during VM shutdown. In that case
     // calling `submit` would throw an exception.
     if (exec.isShutdown) code else exec.submit(new Runnable() {
@@ -79,7 +79,7 @@ object AuralSystemImpl {
 
           case ServerConnection.Running(s) =>
             if (dumpOSC) s.dumpOSC(Dump.Text)
-            SoundProcesses.pool.submit(new Runnable() {
+            SoundProcesses.scheduledExecutorService.submit(new Runnable() {
               def run(): Unit = serverStarted(Server(s))
             })
         }

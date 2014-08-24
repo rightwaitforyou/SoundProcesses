@@ -15,6 +15,8 @@ package de.sciss.synth.proc
 
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 
+import scala.concurrent.ExecutionContext
+
 object SoundProcesses {
   var poolSize: Option[Int] = None
 
@@ -31,7 +33,7 @@ object SoundProcesses {
     cueBufSz = value
   }
 
-  lazy val pool: ScheduledExecutorService = {
+  lazy val scheduledExecutorService: ScheduledExecutorService = {
     // system wide scheduler
     val res = poolSize match {
       case Some(sz) => Executors.newScheduledThreadPool(sz)
@@ -41,8 +43,11 @@ object SoundProcesses {
     res
   }
 
+  lazy implicit val executionContext: ExecutionContext =
+    ExecutionContext.fromExecutorService(scheduledExecutorService)
+
   private def shutdownScheduler(): Unit = {
     log("Shutting down scheduler thread pool")
-    pool.shutdown()
+    scheduledExecutorService.shutdown()
   }
 }

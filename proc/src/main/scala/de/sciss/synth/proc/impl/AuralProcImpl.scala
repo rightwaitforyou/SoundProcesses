@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, DynamicUser, Resource, Sys}
+import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, BusNodeSetter, Bus, Buffer, Synth, Sys}
 import de.sciss.numbers
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
@@ -61,22 +61,6 @@ object AuralProcImpl {
     }
   }
   
-  final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, val timeRef: TimeRef) {
-    var setMap        = Vector.newBuilder[ControlSet]
-
-    /** Users are elements which must be added after the
-      * aural proc synth is started, and removed when it stops.
-      */
-    var users         = List.empty[DynamicUser]
-    /** resources are dependencies in terms of synth bundle spawning,
-      * and will be disposed by the aural proc.
-      */
-    var dependencies  = List.empty[Resource]
-
-    var outputBuses   = Map.empty[String, AudioBus]
-    var inputBuses    = Map.empty[String, AudioBus]
-  }
-
   class Impl[S <: Sys[S]](implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
@@ -115,7 +99,7 @@ object AuralProcImpl {
       targetStateRef.set(ts)(tx.peer)
       if (state != AuralObj.Stopped) return
       _data.state match {
-        case s: UGB.Complete[S] => launchProc(s, timeRef)
+        case s: UGB.Complete[S] => prepareAndLaunch(s, timeRef)
         case _ =>
       }
     }
@@ -126,7 +110,7 @@ object AuralProcImpl {
 
       (_data.state, targetStateRef.get(tx.peer)) match {
         case (s: UGB.Complete[S], tp: TargetPlaying) =>
-          launchProc(s, tp.shiftTo(context.scheduler.time))
+          prepareAndLaunch(s, tp.shiftTo(context.scheduler.time))
         case _ =>
       }
     }
@@ -153,7 +137,7 @@ object AuralProcImpl {
 
     /** Sub-classes may override this if falling back to the super-method. */
     protected def buildAsyncInput(obj: Proc.Obj[S], keyW: UGB.Key, value: UGB.Value)
-                                 (implicit tx: S#Tx): Unit = keyW match {
+                                 (implicit tx: S#Tx): AsyncResource[S] = keyW match {
       case UGB.AttributeKey(key) => buildAsyncAttrInput(obj, key, value)
       case _                     => throw new IllegalStateException(s"Unsupported async input request $keyW")
     }
@@ -247,9 +231,9 @@ object AuralProcImpl {
 
     /** Sub-classes may override this if invoking the super-method. */
     protected def buildAsyncAttrInput(obj: Proc.Obj[S], key: String, value: UGB.Value)
-                                    (implicit tx: S#Tx): Unit = value match {
+                                     (implicit tx: S#Tx): AsyncResource[S] = value match {
       case UGB.Input.Buffer.Value(numFr, numCh, true) =>   // ----------------------- random access buffer
-        val bufProc = obj.attr.getElem(key).fold[BufferPrepare] {
+        obj.attr.getElem(key).fold[AsyncResource[S]] {
           sys.error(s"Missing attribute $key for buffer content")
         } {
           case a: AudioGraphemeElem[S] =>
@@ -263,14 +247,12 @@ object AuralProcImpl {
             if (spec.numFrames > 0x3FFFFFFF)
               sys.error(s"File too large for in-memory buffer: $f (${spec.numFrames} frames)")
             val bufSize   = spec.numFrames.toInt
-            val _buf      = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
-            val cfg       = BufferPrepare.Config(f = f, spec = spec, offset = offset, buf = _buf)
-            BufferPrepare(cfg)
+            val buf       = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
+            val cfg       = BufferPrepare.Config(f = f, spec = spec, offset = offset, buf = buf, key = key)
+            BufferPrepare[S](cfg)
 
           case a => sys.error(s"Cannot use attribute $a as a buffer content")
         }
-        val ctlName = graph.Buffer.controlName(key)
-        ???
 
       case _ =>
         throw new IllegalStateException(s"Unsupported input attribute request $value")
@@ -378,17 +360,27 @@ object AuralProcImpl {
         throw new IllegalStateException(s"Unsupported input attribute request $value")
     }
     
-    private def launchProc(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    private def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p = _data.procCached()
       logA(s"begin launch $p (${hashCode.toHexString})")
 
-      // ---- asynchronous preparation ----
+      ???
+    }
+
+    // ---- asynchronous preparation ----
+    private def prepare(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+      val p = _data.procCached()
+      logA(s"begin prepare $p (${hashCode.toHexString})")
 
       ugen.acceptedInputs.foreach { case (key, value) =>
         if (value.async) buildAsyncInput(p, key, value)
       }
+    }
 
       // ---- synchronous preparation ----
+    private def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+      val p = _data.procCached()
+      logA(s"begin launch $p (${hashCode.toHexString})")
 
       val ug            = ugen.result
       implicit val itx  = tx.peer

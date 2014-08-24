@@ -16,11 +16,9 @@ package impl
 
 import java.io.File
 
-import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Buffer, Txn}
+import de.sciss.lucre.synth.{Sys, Buffer, Txn}
 import de.sciss.osc
 import de.sciss.processor.impl.ProcessorImpl
-import de.sciss.processor.{Processor, ProcessorFactory}
 import de.sciss.synth.io.AudioFileSpec
 
 import scala.concurrent.{blocking, Await, duration, TimeoutException}
@@ -28,22 +26,34 @@ import duration.Duration
 import scala.concurrent.stm.{TxnExecutor, Ref}
 import TxnExecutor.{defaultAtomic => atomic}
 
-object BufferPrepare extends ProcessorFactory {
-  case class Config(f: File, spec: AudioFileSpec, offset: Long, buf: Buffer.Modifiable)
+object BufferPrepare {
 
-  protected def prepare(config: Config): Prepared = {
+  /** The configuration of the buffer preparation.
+    *
+    * @param f        the audio file to read in
+    * @param spec     the file's specification (number of channels and frames)
+    * @param offset   the offset into the file to start with
+    * @param buf      the buffer to read into. This buffer must have been allocated already.
+    * @param key      the key of the `graph.Buffer` element, used for setting the synth control eventually
+    */
+  case class Config(f: File, spec: AudioFileSpec, offset: Long, buf: Buffer.Modifiable, key: String)
+
+  /** Creates and launches the process. */
+  def apply[S <: Sys[S]](config: Config)(implicit tx: S#Tx): AsyncResource[S] = {
     import config._
+    if (buf.isOnline) sys.error("Buffer must be allocated")
     val numFrL = spec.numFrames
     if (numFrL > 0x3FFFFFFF) sys.error(s"File $f is too large ($numFrL frames) for an in-memory buffer")
-    new Impl(path = f.getAbsolutePath, numFrames = numFrL.toInt, off0 = offset,
-      numChannels = spec.numChannels, buf = buf)
+    val res = new Impl[S](path = f.getAbsolutePath, numFrames = numFrL.toInt, off0 = offset,
+      numChannels = spec.numChannels, buf = buf, key = key)
+    import SoundProcesses.executionContext
+    tx.afterCommit(res.start())
+    res
   }
 
-  type Repr     = BufferPrepare
-  type Product  = Buffer.Modifiable
-
-  private final class Impl(path: String, numFrames: Int, off0: Long, numChannels: Int, buf: Product)
-    extends BufferPrepare with ProcessorImpl[Product, BufferPrepare] {
+  private final class Impl[S <: Sys[S]](path: String, numFrames: Int, off0: Long, numChannels: Int,
+                                        buf: Buffer.Modifiable, key: String)
+    extends AsyncResource[S] with ProcessorImpl[Any, AsyncResource[S]] {
 
     private val blockSize = 262144 / numChannels  // XXX TODO - could be configurable
     private val offsetRef = Ref(0)
@@ -87,10 +97,16 @@ object BufferPrepare extends ProcessorFactory {
       buf
     }
 
-    def dispose()(implicit tx: Txn): Unit = {
+    def install(b: SynthBuilder[S])(implicit tx: S#Tx): Unit = {
+      val ctlName = graph.Buffer.controlName(key)
+      b.setMap += ctlName -> buf.id
+      b.dependencies ::= buf
+    }
+
+    def dispose()(implicit tx: S#Tx): Unit = {
       tx.afterCommit(abort())
-      buf.dispose()
+      if (buf.isOnline) buf.dispose()
     }
   }
 }
-trait BufferPrepare extends Processor[Buffer.Modifiable, BufferPrepare] with Disposable[Txn]
+// trait BufferPrepare extends Processor[Buffer.Modifiable, BufferPrepare] with Disposable[Txn]

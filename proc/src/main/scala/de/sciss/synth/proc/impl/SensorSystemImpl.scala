@@ -34,7 +34,7 @@ object SensorSystemImpl {
    * do with the external decider being set?
    */
   private def afterCommit(code: => Unit)(implicit tx: TxnLike): Unit = tx.afterCommit {
-    SoundProcesses.pool.submit(new Runnable() {
+    SoundProcesses.scheduledExecutorService.submit(new Runnable() {
       def run(): Unit = code
     })
   }
