@@ -61,7 +61,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)
   def cue(path: String, fileStartFrame: Long = 0L, numFrames: Int = -1)(implicit tx: Txn): Unit = {
     requireOnline()
     if (fileStartFrame > 0x7FFFFFFFL) throw new IllegalArgumentException(s"Cannot encode start frame >32 bit ($fileStartFrame)")
-    if (numFrames < 0) throw new IllegalArgumentException(s"numFrames ($numFrames) must be >= -1")
+    // if (numFrames < 0) throw new IllegalArgumentException(s"numFrames ($numFrames) must be >= -1")
     val frameI = fileStartFrame.toInt
     tx.addMessage(this, peer.readMsg(path, fileStartFrame = frameI, numFrames = numFrames, leaveOpen = true),
       audible = false)

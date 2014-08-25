@@ -149,12 +149,16 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
     var j = 0
     while (m == null && j < ms.length) {
       val mj = ms(j)
-      if (mj.getName == "apply") m = mj
+      if (mj.getName == "apply" && mj.getParameterTypes.length == arity) m = mj
       j += 1
     }
     if (m == null) sys.error(s"No apply method found on $companion")
-    val res       = m.invoke(companion, elems: _*).asInstanceOf[Product]
-
+    val res       = try {
+      m.invoke(companion, elems: _*).asInstanceOf[Product]
+    } catch {
+      case e: IllegalArgumentException =>
+        throw new IllegalArgumentException(s"While de-serializing $prefix: ${e.getMessage}")
+    }
     val id        = ref.count
     ref.map      += ((id, res))
     ref.count     = id + 1
