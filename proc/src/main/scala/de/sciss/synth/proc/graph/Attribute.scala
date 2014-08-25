@@ -21,7 +21,7 @@ import de.sciss.synth.ugen.ControlProxy
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 object Attribute {
-  private[proc] def controlName(key: String): String = s"$$attr_$key"
+  /* private[proc] */ def controlName(key: String): String = s"$$attr_$key"
 
   def ir(key: String, default: Double = 0.0): Attribute = new Attribute(scalar , key, default)
   def kr(key: String, default: Double = 0.0): Attribute = new Attribute(control, key, default)

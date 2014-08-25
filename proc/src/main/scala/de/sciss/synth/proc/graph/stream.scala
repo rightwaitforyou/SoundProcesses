@@ -16,52 +16,17 @@ package proc
 package graph
 
 import de.sciss.synth
-import de.sciss.synth.proc.UGenGraphBuilder.Input
 import synth.ugen.Constant
 import de.sciss.synth.proc.impl.StreamBuffer
-
-// XXX TODO: ought to go into an `impl` package
-private[proc] object stream {
-  // name for a two channel controller: (buf-id, gain)
-  /* private[proc] */ def controlName(key: String, idx: Int): String = s"$$str${idx}_$key"
-
-  sealed trait GE extends synth.GE.Lazy {
-    protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike
-
-    protected def key: String
-
-   // protected def info: UGenGraphBuilder.StreamIn
-    protected def maxSpeed: Double
-    protected def interp  : Int
-
-    def makeUGens: UGenInLike = {
-      val b = UGenGraphBuilder.get
-      val interp1       = if (interp == 4) -1 else interp
-      val spec          = Input.Stream.Spec(maxSpeed = maxSpeed, interp = interp1)
-      val info          = b.requestInput(Input.Stream(key, spec))
-      val idx           = if (spec.isEmpty) 0 else info.specs.size - 1
-      // val (numCh, idx)  = b.addStreamIn(key, info)
-      val ctlName       = controlName(key, idx)
-      val ctl           = ctlName.ir(Seq(0, 0))
-      val buf           = ctl \ 0
-      val gain          = ctl \ 1
-      makeUGen(numChannels = info.numChannels, idx = idx, buf = buf, gain = gain)
-    }
-  }
-
-  trait Info extends GE {
-    protected def maxSpeed  = 0.0
-    protected def interp    = 0
-  }
-}
+import impl.Stream
 
 // ---- ugen wrappers ----
 
 object DiskIn {
   def ar(key: String, loop: synth.GE = 0): DiskIn = apply(audio, key = key, loop = loop)
 }
-case class DiskIn(rate: Rate, key: String, loop: synth.GE)
-  extends stream.GE /* with HasSideEffect */ with IsIndividual {
+final case class DiskIn(rate: Rate, key: String, loop: synth.GE)
+  extends Stream with IsIndividual {
 
   // protected def info = UGenGraphBuilder.StreamIn(1.0, -
   protected def maxSpeed  = 1.0
@@ -81,8 +46,8 @@ object VDiskIn {
     apply(audio, key = key, speed = speed, loop = loop, interp = interp, maxSpeed = maxSpeed1)
   }
 }
-case class VDiskIn(rate: Rate, key: String, speed: synth.GE, loop: synth.GE, interp: Int, maxSpeed: Double)
-  extends stream.GE /* with HasSideEffect */ with IsIndividual {
+final case class VDiskIn(rate: Rate, key: String, speed: synth.GE, loop: synth.GE, interp: Int, maxSpeed: Double)
+  extends Stream with IsIndividual {
 
   if (interp != 1 && interp != 2 && interp != 4) sys.error(s"Unsupported interpolation: $interp")
 
@@ -104,7 +69,7 @@ object BufChannels {
   def ir(key: String): BufChannels = apply(scalar , key = key)
   def kr(key: String): BufChannels = apply(control, key = key)
 }
-case class BufChannels(rate: Rate, key: String) extends stream.Info {
+final case class BufChannels(rate: Rate, key: String) extends Stream.Info {
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufChannels(rate, buf) // or just Constant(numChannels), ha?
 }
@@ -113,7 +78,7 @@ object BufRateScale {
   def ir(key: String): BufRateScale = apply(scalar , key = key)
   def kr(key: String): BufRateScale = apply(control, key = key)
 }
-case class BufRateScale(rate: Rate, key: String) extends stream.Info {
+final case class BufRateScale(rate: Rate, key: String) extends Stream.Info {
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufRateScale(rate, buf)
 }
@@ -122,7 +87,7 @@ object BufSampleRate {
   def ir(key: String): BufSampleRate = apply(scalar , key = key)
   def kr(key: String): BufSampleRate = apply(control, key = key)
 }
-case class BufSampleRate(rate: Rate, key: String) extends stream.Info {
+final case class BufSampleRate(rate: Rate, key: String) extends Stream.Info {
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufSampleRate(rate, buf)
 }

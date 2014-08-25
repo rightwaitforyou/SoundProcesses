@@ -30,7 +30,7 @@ object Buffer {
   /** Convenience alias for `kr` */
   def apply(key: String): Buffer = kr(key)
 
-  private[proc] def controlName(key: String): String = "$buf_"  + key
+  /* private[proc] */ def controlName(key: String): String = s"$$buf_$key"
 }
 
 /** An element referring to a random access buffer provided through an attribute.

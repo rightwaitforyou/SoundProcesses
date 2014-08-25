@@ -21,7 +21,7 @@ import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.ugen.UGenInGroup
 
 object ScanIn {
-  private[proc] def controlName (key: String): String = s"$$in_$key"
+  /* private[proc] */ def controlName (key: String): String = s"$$in_$key"
 
   sealed trait Like extends GE.Lazy with AudioRated {
     protected def key: String
@@ -63,7 +63,7 @@ final case class ScanIn(key: String /*, default: Double = 0.0 */)
     }
 }
 object ScanOut {
-  private[proc] def controlName(key: String): String = "$out_" + key
+  /* private[proc] */ def controlName(key: String): String = "$out_" + key
 
   def apply(in: GE): ScanOut = new ScanOut("out", in)
 }

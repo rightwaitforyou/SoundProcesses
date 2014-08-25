@@ -132,6 +132,7 @@ object AuralProcImpl {
           state match {
             case AuralObj.Stopped   => prepareAndLaunch(s, timeRef)
             case AuralObj.Prepared  => launch          (s, timeRef)
+            case _ =>
           }
 
         case _ =>
@@ -320,7 +321,7 @@ object AuralProcImpl {
         val infoSeq = if (specs.isEmpty) UGB.Input.Stream.EmptySpec :: Nil else specs
 
         infoSeq.zipWithIndex.foreach { case (info, idx) =>
-          val ctlName     = graph.stream.controlName(key, idx)
+          val ctlName     = graph.impl.Stream.controlName(key, idx)
           val bufSize     = if (info.isEmpty) server.config.blockSize else {
             val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
             val bufDur    = 1.5 * maxSpeed
