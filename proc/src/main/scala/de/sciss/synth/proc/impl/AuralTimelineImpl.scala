@@ -262,7 +262,8 @@ object AuralTimelineImpl {
     }
 
     def prepare()(implicit tx: S#Tx): Unit = {
-      ???
+      if (state != AuralObj.Stopped) return
+      Console.err.println("TODO: AuralTimeline.prepare") // XXX TODO
     }
 
     def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {

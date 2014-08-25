@@ -747,8 +747,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         val noise = PinkNoise.ar(Seq(amp, amp))
         graph.ScanOut("out", noise)
       }
+      import Implicits._
       _view1.react { implicit tx => upd => println(s"Observed: $upd") }
       val proc1 = _view1.obj()
+      proc1.attr.name = "pink"
       putDouble(proc1, "amp", 0.5)
 
       val _view2 = procV {
@@ -757,6 +759,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
       }
       val proc2 = _view2.obj()
+      proc2.attr.name = "filter"
       putDouble(proc2, "freq", 666)
 
       (_view1, _view2)
