@@ -123,14 +123,14 @@ object AuralProcDataImpl {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
             pCh.foreach {
               case Proc.GraphChange(Change(_, newGraph)) => newSynthGraph(newGraph)
-              case Proc.ScanAdded(key, scan) => scanAdded(key, scan)
-              case Proc.ScanRemoved(key, scan) => scanRemoved(key, scan)
-              case Proc.ScanChange(key, scan, sCh) => scanChange(key, scan, sCh)
+              case Proc.ScanAdded  (key, scan)      => scanAdded  (key, scan)
+              case Proc.ScanRemoved(key, scan)      => scanRemoved(key, scan)
+              case Proc.ScanChange (key, scan, sCh) => scanChange (key, scan, sCh)
             }
 
-          case Obj.AttrAdded(key, value) => attrAdded(key, value)
-          case Obj.AttrRemoved(key, value) => attrRemoved(key, value)
-          case Obj.AttrChange(key, value, aCh) => attrChange(key, value, aCh)
+          case Obj.AttrAdded  (key, value)          => attrAdded  (key, value)
+          case Obj.AttrRemoved(key, value)          => attrRemoved(key, value)
+          case Obj.AttrChange (key, value, aCh)     => attrChange (key, value, aCh)
         }
       }
 
@@ -174,7 +174,7 @@ object AuralProcDataImpl {
 
     private def scanAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       logA(s"ScanAdded  to   ${procCached()} ($key)")
-      testInScan(key, scan)
+      testInScan (key, scan)
       testOutScan(key, scan)
     }
 

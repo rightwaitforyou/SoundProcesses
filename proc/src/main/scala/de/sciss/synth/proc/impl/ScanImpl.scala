@@ -196,7 +196,7 @@ object ScanImpl {
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
       val gen = pull.isOrigin(this)
       val u1 = if (!gen) Vec.empty else pull.resolve[Scan.Update[S]].changes
-      val u2 = if ( gen) Vec.empty else pull(graphemeSourceList.changed).fold(u1) { ll =>
+      val u2 = if ( gen) u1        else pull(graphemeSourceList.changed).fold(u1) { ll =>
         val gcs = ll.changes.collect {
           case List.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
         }
