@@ -19,10 +19,12 @@ import de.sciss.lucre.synth.{Server, Sys}
 import impl.{AuralContextImpl => Impl}
 
 object AuralContext {
-  def apply[S <: Sys[S]](server: Server, scheduler: Scheduler[S])(implicit tx: S#Tx): AuralContext[S] =
+  def apply[S <: Sys[S]](server: Server, scheduler: Scheduler[S])
+                        (implicit tx: S#Tx, workspaceHandle: WorkspaceHandle[S]): AuralContext[S] =
     Impl(server, scheduler)
 
-  def apply[S <: Sys[S]](server: Server)(implicit tx: S#Tx, cursor: stm.Cursor[S]): AuralContext[S] = {
+  def apply[S <: Sys[S]](server: Server)(implicit tx: S#Tx, cursor: stm.Cursor[S],
+                                         workspaceHandle: WorkspaceHandle[S]): AuralContext[S] = {
     val sched = Scheduler[S]
     apply(server, sched)
   }
@@ -42,5 +44,7 @@ trait AuralContext[S <: Sys[S]] {
 
   def removeAux(id: S#ID)(implicit tx: S#Tx): Unit
 
-  def scheduler: Scheduler[S]
+  val scheduler: Scheduler[S]
+
+  implicit def workspaceHandle: WorkspaceHandle[S]
 }

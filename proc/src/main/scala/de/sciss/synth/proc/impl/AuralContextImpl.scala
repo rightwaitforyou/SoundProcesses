@@ -20,7 +20,8 @@ import de.sciss.lucre.synth.{Server, Sys}
 import scala.concurrent.stm.Ref
 
 object AuralContextImpl {
-  def apply[S <: Sys[S]](server: Server, sched: Scheduler[S])(implicit tx: S#Tx): AuralContext[S] = {
+  def apply[S <: Sys[S]](server: Server, sched: Scheduler[S])
+                        (implicit tx: S#Tx, workspaceHandle: WorkspaceHandle[S]): AuralContext[S] = {
     val objMap  = tx.newInMemoryIDMap[Entry[S]]
     val auxMap  = tx.newInMemoryIDMap[Any]
     new Impl[S](objMap, auxMap, sched, server)
@@ -33,7 +34,7 @@ object AuralContextImpl {
   private final class Impl[S <: Sys[S]](objMap: IdentifierMap[S#ID, S#Tx, Entry[S]],
                                         auxMap: IdentifierMap[S#ID, S#Tx, Any],
                                         val scheduler: Scheduler[S],
-                                        val server: Server)
+                                        val server: Server)(implicit val workspaceHandle: WorkspaceHandle[S])
     extends AuralContext[S] {
 
     def acquire[A <: Disposable[S#Tx]](obj: Obj[S])(init: => A)(implicit tx: S#Tx): A = {

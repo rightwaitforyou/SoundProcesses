@@ -187,6 +187,7 @@ object TransportImpl {
 
     private def auralStartedTx(server: Server)(implicit tx: S#Tx): Unit = {
       logT(s"transport - aural-system started")
+      import WorkspaceHandle.Implicits._
       implicit val aural = AuralContext(server, scheduler)
       implicit val ptx   = tx.peer
       contextRef.set(Some(aural))

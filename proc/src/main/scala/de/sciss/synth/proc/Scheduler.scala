@@ -54,5 +54,5 @@ trait Scheduler[S <: Sys[S]] {
     */
   def cancel(token: Int /* Token */)(implicit tx: S#Tx): Unit
 
-  def cursor: stm.Cursor[S]
+  implicit def cursor: stm.Cursor[S]
 }

@@ -50,6 +50,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     s.peer.dumpOSC()
     implicit val context = cursor.step { implicit tx =>
+      import WorkspaceHandle.Implicits._
       AuralContext[S](s)
     }
     //////////////////////////////////////////////////////////////////////////////////////
