@@ -518,7 +518,7 @@ object AuralProcDataImpl {
         val numCh   = if (numCh0 < 0) 1 else numCh0     // simply default to 1
         val newSpecs0 = st.acceptedInputs.get(i.key) match {
           case Some(v: UGB.Input.Stream.Value)  => v.specs
-          case _                            => Nil
+          case _                                => Nil
         }
         val newSpecs = if (i.spec.isEmpty) newSpecs0 else {
           i.spec :: newSpecs0

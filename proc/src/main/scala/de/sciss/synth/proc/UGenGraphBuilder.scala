@@ -1,3 +1,16 @@
+/*
+ *  UGenGraphBuilder.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
+ *
+ *	This software is published under the GNU General Public License v2+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth.proc
 
 import de.sciss.lucre.synth.Sys
@@ -24,7 +37,7 @@ object UGenGraphBuilder {
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-  def apply[S <: Sys[S]](context: Context[S], proc: Obj.T[S, Proc.Elem])
+  def apply[S <: Sys[S]](context: Context[S], proc: Proc.Obj[S])
                         (implicit tx: S#Tx): State[S] = Impl(context, proc)
 
   def init[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): Incomplete[S] = Impl.init(proc)
@@ -175,6 +188,22 @@ object UGenGraphBuilder {
 trait UGenGraphBuilder extends UGenGraph.Builder {
   import UGenGraphBuilder._
 
+  /** Called by graph elements during their expansion, this method forwards a request
+    * for input specifications to the `UGenGraphBuilder.Context`. The context should
+    * examine the input and return an appropriate value of type `input.Value` that
+    * will then be stored under `input.key` in the `acceptedInputs` map of the builder
+    * state.
+    *
+    * Note that the builder will not check whether an entry with the key already exists
+    * in the map or not. It is the responsibility of the context to react appropriately
+    * to repeated calls with the same input key. For example, the same attribute key
+    * for a streaming operation may be used multiple times, perhaps with different
+    * streaming speeds.
+    *
+    * If an input resource is not ready, the context should throw a `MissingIn` exception.
+    * The builder will catch that exception and add the key to `rejectedInputs` instead
+    * of `acceptedInputs` instead.
+    */
   def requestInput(input: Input): input.Value
 
   /** This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along

@@ -86,7 +86,7 @@ object AuralProcImpl {
         node.stop()
       }
     }
-    private final class PlayingPrepare(val resources: Vector[AsyncResource[S]]) extends PlayingRef {
+    private final class PlayingPrepare(val resources: List[AsyncResource[S]]) extends PlayingRef {
       def dispose()(implicit tx: S#Tx): Unit = resources.foreach(_.dispose())
     }
 
@@ -171,9 +171,9 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if falling back to the super-method. */
-    protected def buildAsyncInput(obj: Proc.Obj[S], keyW: UGB.Key, value: UGB.Value)
-                                 (implicit tx: S#Tx): AsyncResource[S] = keyW match {
-      case UGB.AttributeKey(key) => buildAsyncAttrInput(obj, key, value)
+    protected def buildAsyncInput(b: AsyncProcBuilder[S], keyW: UGB.Key, value: UGB.Value)
+                                 (implicit tx: S#Tx): Unit = keyW match {
+      case UGB.AttributeKey(key) => buildAsyncAttrInput(b, key, value)
       case _                     => throw new IllegalStateException(s"Unsupported async input request $keyW")
     }
 
@@ -265,10 +265,10 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if invoking the super-method. */
-    protected def buildAsyncAttrInput(obj: Proc.Obj[S], key: String, value: UGB.Value)
-                                     (implicit tx: S#Tx): AsyncResource[S] = value match {
+    protected def buildAsyncAttrInput(b: AsyncProcBuilder[S], key: String, value: UGB.Value)
+                                     (implicit tx: S#Tx): Unit = value match {
       case UGB.Input.Buffer.Value(numFr, numCh, true) =>   // ----------------------- random access buffer
-        obj.attr.getElem(key).fold[AsyncResource[S]] {
+        b.obj.attr.getElem(key).fold[Unit] {
           sys.error(s"Missing attribute $key for buffer content")
         } {
           case a: AudioGraphemeElem[S] =>
@@ -284,7 +284,7 @@ object AuralProcImpl {
             val bufSize   = spec.numFrames.toInt
             val buf       = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
             val cfg       = BufferPrepare.Config(f = f, spec = spec, offset = offset, buf = buf, key = key)
-            BufferPrepare[S](cfg)
+            b.resources ::= BufferPrepare[S](cfg)
 
           case a => sys.error(s"Cannot use attribute $a as a buffer content")
         }
@@ -401,11 +401,12 @@ object AuralProcImpl {
       val p = _data.procCached()
       logA(s"begin prepare $p (${hashCode.toHexString})")
 
-      var res = Vector.empty[AsyncResource[S]]
+      val b = new AsyncProcBuilder(p)
       ugen.acceptedInputs.foreach { case (key, value) =>
-        if (value.async) res :+= buildAsyncInput(p, key, value)
+        if (value.async) buildAsyncInput(b, key, value)
       }
-      val done = res.isEmpty
+      val res   = b.resources
+      val done  = res.isEmpty
       if (done) {
         freePlayingRef()
         prepared(ugen)
@@ -500,7 +501,7 @@ object AuralProcImpl {
       state = AuralObj.Playing
     }
 
-    private def setPlayingPrepare(resources: Vector[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
+    private def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
       val res = new PlayingPrepare(resources)
       val old = playingRef.swap(res)(tx.peer)
       old.dispose()

@@ -24,7 +24,7 @@ import de.sciss.synth.proc.{TimeRef, Proc}
   * @see  [[AuralProcImpl]]
   */
 final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, val timeRef: TimeRef) {
-  var setMap        = Vector.newBuilder[ControlSet]
+  val setMap        = Vector.newBuilder[ControlSet]
 
   /** Users are elements which must be added after the
     * aural proc synth is started, and removed when it stops.
@@ -37,4 +37,11 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
 
   var outputBuses   = Map.empty[String, AudioBus]
   var inputBuses    = Map.empty[String, AudioBus]
+}
+
+/** An object used in the preparatory phase of playing a process. It allows
+  * the addition of asynchronous processors.
+  */
+final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc.Obj[S]) {
+  var resources = List.empty[AsyncResource[S]]
 }
