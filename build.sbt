@@ -26,9 +26,9 @@ lazy val lucreEventVersion      = "2.7.0"
 
 lazy val lucreConfluentVersion  = "2.9.0"
 
-lazy val scalaColliderVersion   = "1.12.0"
+lazy val scalaColliderVersion   = "1.13.0-SNAPSHOT"
 
-lazy val scalaTestVersion       = "2.2.0"
+lazy val scalaTestVersion       = "2.2.2"
 
 lazy val spanVersion            = "1.2.1"
 
@@ -37,8 +37,8 @@ lazy val fileUtilVersion        = "1.1.1"
 // retrieveManaged in ThisBuild := true
 
 scalacOptions in ThisBuild ++= {
-  val xs = Seq("-deprecation", "-unchecked", "-feature", "-Xfuture")
-  if (version.value endsWith "-SNAPSHOT") xs else xs ++ Seq("-Xelide-below", "INFO")
+  val xs = Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture")
+  if (isSnapshot.value) xs else xs ++ Seq("-Xelide-below", "INFO")
 }
 
 // SI-7481

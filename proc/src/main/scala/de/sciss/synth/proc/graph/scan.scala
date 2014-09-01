@@ -83,8 +83,8 @@ final case class ScanOut(key: String, in: GE)
     val b = UGenGraphBuilder.get
     b.addScanOut(key, numChannels)
     val sigArgAr = sigArg.map { ui =>
-      if (ui.rate == audio) ui else new UGen.SingleOut("K2A", audio, Vector(ui))
+      if (ui.rate == audio) ui else UGen.SingleOut("K2A", audio, Vector(ui))
     }
-    new UGen.ZeroOut("Out", audio, busArg +: sigArgAr, isIndividual = true)
+    UGen.ZeroOut("Out", audio, busArg +: sigArgAr, isIndividual = true)
   }
 }
