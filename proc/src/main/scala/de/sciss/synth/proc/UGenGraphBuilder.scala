@@ -101,6 +101,8 @@ object UGenGraphBuilder {
     object Scan {
       final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
         def async = false
+        override def productPrefix = "Input.Scan.Value"
+        override def toString = s"$productPrefix(numChannels = $numChannels)"
       }
     }
     final case class Scan(name: String) extends Input {
@@ -127,9 +129,12 @@ object UGenGraphBuilder {
         def isNative: Boolean = interp == -1
 
         override def productPrefix = "Input.Stream.Spec"
+
+        override def toString = f"$productPrefix(maxSpeed = $maxSpeed%1.1f, interp = $interp)"
       }
       final case class Value(numChannels: Int, specs: List[Spec]) extends UGenGraphBuilder.Value {
         override def productPrefix = "Input.Stream.Value"
+        override def toString = s"$productPrefix(numChannels = $numChannels, spec = ${specs.mkString("[", ",", "]")})"
         def async = false
       }
     }
@@ -145,6 +150,8 @@ object UGenGraphBuilder {
     object Attribute {
       final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
         def async = false
+        override def productPrefix = "Input.Attribute.Value"
+        override def toString = s"$productPrefix(numChannels = $numChannels)"
       }
     }
     /** Specifies access to a scalar attribute.
@@ -162,7 +169,10 @@ object UGenGraphBuilder {
     }
 
     object Buffer {
-      final case class Value(numFrames: Long, numChannels: Int, async: Boolean) extends UGenGraphBuilder.Value
+      final case class Value(numFrames: Long, numChannels: Int, async: Boolean) extends UGenGraphBuilder.Value {
+        override def productPrefix = "Input.Buffer.Value"
+        override def toString = s"$productPrefix(numFrames = $numFrames, numChannels = $numChannels, async = $async)"
+      }
     }
     /** Specifies access to a random access buffer.
       *

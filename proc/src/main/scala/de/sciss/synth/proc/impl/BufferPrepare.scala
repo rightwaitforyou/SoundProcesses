@@ -36,7 +36,10 @@ object BufferPrepare {
     * @param buf      the buffer to read into. This buffer must have been allocated already.
     * @param key      the key of the `graph.Buffer` element, used for setting the synth control eventually
     */
-  case class Config(f: File, spec: AudioFileSpec, offset: Long, buf: Buffer.Modifiable, key: String)
+  case class Config(f: File, spec: AudioFileSpec, offset: Long, buf: Buffer.Modifiable, key: String) {
+    override def productPrefix = "BufferPrepare.Config"
+    override def toString = s"$productPrefix($f, numChannels = ${spec.numChannels}, numFrames = ${spec.numFrames}, offset = $offset, key = $key)"
+  }
 
   /** Creates and launches the process. */
   def apply[S <: Sys[S]](config: Config)(implicit tx: S#Tx): AsyncResource[S] = {
