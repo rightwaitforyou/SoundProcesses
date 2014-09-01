@@ -34,11 +34,13 @@ lazy val spanVersion            = "1.2.1"
 
 lazy val fileUtilVersion        = "1.1.1"
 
+lazy val loggingEnabled         = true
+
 // retrieveManaged in ThisBuild := true
 
 scalacOptions in ThisBuild ++= {
   val xs = Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture")
-  if (isSnapshot.value) xs else xs ++ Seq("-Xelide-below", "INFO")
+  if (loggingEnabled || isSnapshot.value) xs else xs ++ Seq("-Xelide-below", "INFO")
 }
 
 // SI-7481

@@ -74,7 +74,7 @@ object UGenGraphBuilderImpl {
   }
 
   private final class Impl[S <: Sys[S]](context: Context[S], in: IncompleteImpl[S], val tx: S#Tx)
-    extends BasicUGenGraphBuilder with UGenGraphBuilder {
+    extends BasicUGenGraphBuilder with UGenGraphBuilder with Incomplete[S] {
     builder =>
 
     override def toString = s"proc.UGenGraph.Builder@${hashCode.toHexString}"
@@ -82,9 +82,12 @@ object UGenGraphBuilderImpl {
     private var remaining       = in.remaining
     private var controlProxies  = in.controlProxies
 
-    private var scanOuts        = in.scanOuts
-    private var acceptedInputs  = in.acceptedInputs
-    private var rejectedInputs  = Set.empty[UGenGraphBuilder.Key]
+    var scanOuts                = in.scanOuts
+    var acceptedInputs          = in.acceptedInputs
+    var rejectedInputs          = Set.empty[UGenGraphBuilder.Key]
+
+    def retry(context: Context[S])(implicit tx: S#Tx): State[S] =
+      throw new IllegalStateException("Cannot retry an ongoing build")
 
     // def sensorBus: SControlBus = aural.sensorBus
 
@@ -96,8 +99,11 @@ object UGenGraphBuilderImpl {
     //    }
 
     def requestInput(req: Input): req.Value = {
-      val res = context.requestInput[req.Value](req, in)(tx)
+      // we pass in `this` and not `in`, because that way the context
+      // can find accepted inputs that have been added during the current build cycle!
+      val res = context.requestInput[req.Value](req, this /* in */)(tx)
       acceptedInputs += req.key -> res
+      logAural(s"acceptedInputs += ${req.key} -> $res")
       res
     }
 
@@ -157,6 +163,7 @@ object UGenGraphBuilderImpl {
                 acceptedInputs      = savedAcceptedInputs
                 missingElems      :+= elem
                 rejectedInputs     += rejected.key
+                logAural(s"rejectedInputs += ${rejected.key}")
             }
           }
         }
