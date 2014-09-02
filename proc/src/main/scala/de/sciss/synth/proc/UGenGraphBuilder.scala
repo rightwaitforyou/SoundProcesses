@@ -169,6 +169,12 @@ object UGenGraphBuilder {
     }
 
     object Buffer {
+      /** Maximum number of samples (channels multiplied by frames)
+        * prepared on-the-fly. If the number of samples exceeds this
+        * value, use asynchronous preparation.
+        */
+      final val AsyncThreshold = 65536
+
       final case class Value(numFrames: Long, numChannels: Int, async: Boolean) extends UGenGraphBuilder.Value {
         override def productPrefix = "Input.Buffer.Value"
         override def toString = s"$productPrefix(numFrames = $numFrames, numChannels = $numChannels, async = $async)"

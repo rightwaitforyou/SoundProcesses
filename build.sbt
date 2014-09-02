@@ -26,7 +26,7 @@ lazy val lucreEventVersion      = "2.7.0"
 
 lazy val lucreConfluentVersion  = "2.9.0"
 
-lazy val scalaColliderVersion   = "1.13.0-SNAPSHOT"
+lazy val scalaColliderVersion   = "1.13.0"
 
 lazy val scalaTestVersion       = "2.2.2"
 
@@ -144,7 +144,7 @@ lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucres
 publishMavenStyle in ThisBuild := true
 
 publishTo in ThisBuild :=
-  Some(if (version.value endsWith "-SNAPSHOT")
+  Some(if (isSnapshot.value)
     "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
   else
     "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"

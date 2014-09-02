@@ -539,7 +539,7 @@ object AuralProcDataImpl {
         }
         if (numCh < 0) throw MissingIn(i)
         // larger files are asynchronously prepared, smaller ones read on the fly
-        val async = numFr > 65536   // XXX TODO - that threshold should be configurable
+        val async = (numCh * numFr) > UGB.Input.Buffer.AsyncThreshold   // XXX TODO - that threshold should be configurable
         UGB.Input.Buffer.Value(numFrames = numFr, numChannels = numCh, async = async)
 
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
