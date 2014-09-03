@@ -142,6 +142,8 @@ object AuralObj {
   }
   trait Timeline[S <: Sys[S]] extends AuralObj[S] {
     override def obj: stm.Source[S#Tx, _Timeline.Obj[S]]
+
+    def views(implicit tx: S#Tx): Set[AuralObj[S]]
   }
 }
 trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Disposable[S#Tx] {

@@ -60,7 +60,9 @@ object AsyncBounceTest extends App {
     obj.attr.put("foo", Obj(AudioGraphemeElem(gr)))
 
     val group     = Timeline[S]
-    group.add(Span(frame(0.2), frame(0.2 + dur * 0.5)), obj)
+    // XXX TODO -- not yet supported: asynchronous objects that begin after the transport position
+    // group.add(Span(frame(0.2), frame(0.2 + dur * 0.5)), obj)
+    group.add(Span(frame(0.0), frame(0.0 + dur * 0.5)), obj)
     // import ProcGroup.serializer
     tx.newHandle(Obj(Timeline.Elem(group)))
   }

@@ -118,9 +118,14 @@ object AuralTimelineImpl {
 
     def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
 
+    def views(implicit tx: S#Tx): Set[AuralObj[S]] = activeViews.single.toSet
+
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
-      if (value != old) fire(value)
+      if (value != old) {
+        // println(s"------TIMELINE STATE $old > $value")
+        fire(value)
+      }
     }
 
     def init(tl: Timeline.Obj[S])(implicit tx: S#Tx): Unit = {

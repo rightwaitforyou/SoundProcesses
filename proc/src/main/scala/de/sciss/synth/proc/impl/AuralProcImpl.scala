@@ -116,7 +116,10 @@ object AuralProcImpl {
 
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
-      if (value != old) fire(value)
+      if (value != old) {
+        // println(s"------PROC STATE $old > $value")
+        fire(value)
+      }
     }
 
     final def prepare()(implicit tx: S#Tx): Unit = {

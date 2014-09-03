@@ -25,9 +25,10 @@ import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.synth.io.{SampleFormat, AudioFileType}
 
 import scala.annotation.tailrec
-import scala.concurrent.{Await, blocking}
+import scala.concurrent.{Future, Promise, Await, blocking}
 import scala.concurrent.duration.Duration
 import scala.sys.process.{Process, ProcessLogger}
+import scala.util.Success
 
 final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx)
   extends Bounce[S] {
@@ -94,6 +95,54 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       }
 
       val srRatio = server.sampleRate / Timeline.SampleRate
+
+      // Tricky business: While handling prepared state is not yet
+      // fully solved, especially with collection objects such as
+      // Timeline, we at least provide some bounce support for objects
+      // that require asynchronous preparation. To do that, we gather
+      // all views with state `Preparing` and wait for them to go into
+      // either `Playing` or `Stopped`. We go deeply into timelines as
+      // well. Finally, we bundle all these futures together and wait
+      // for their completion. Then we should be fine advancing the
+      // logical clock.
+      //
+      // This does not work with objects on a timeline that do not
+      // overlap with the transport's starting position!
+      val prepFutures = cursor.step { implicit tx =>
+        // println(s"States = ${transport.views.map(_.state)}")
+
+        def gather(views: Set[AuralObj[S]]): Set[Future[Unit]] = {
+          //          views.foreach { obj =>
+          //            if (obj.state != AuralObj.Preparing) println(s"- - - - $obj: ${obj.state}")
+          //          }
+          val set1 = views.collect {
+            case obj if obj.state == AuralObj.Preparing =>
+              val p = Promise[Unit]()
+              obj.react { implicit tx => {
+                case AuralObj.Playing | AuralObj.Stopped =>
+                  tx.afterCommit(p.tryComplete(Success(())))
+                case _ =>
+              }}
+              p.future
+          }
+          val set2 = views.flatMap {
+            case atl: AuralObj.Timeline[S] =>
+              val children = atl.views
+              // println(s"For timeline: $children")
+              gather(children)
+            case _ => Set.empty[Future[Unit]]
+          }
+
+          set1 ++ set2
+        }
+
+        gather(transport.views)
+      }
+      if (prepFutures.nonEmpty) {
+        logTransport(s"waiting for ${prepFutures.size} preparations to complete...")
+        Await.result(Future.sequence(prepFutures), Duration.Inf)
+        logTransport("...preparations completed")
+      }
 
       @tailrec def loop(): Unit = {
         Await.result(server.committed(), Duration.Inf)

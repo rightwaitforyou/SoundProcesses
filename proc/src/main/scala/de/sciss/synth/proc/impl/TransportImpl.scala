@@ -62,6 +62,8 @@ object TransportImpl {
 
     private val timeBaseRef = Ref(new PlayTime(wallClock0 = Long.MinValue, pos0 = 0L))
 
+    def views(implicit tx: S#Tx): Set[AuralObj[S]] = viewSet.single.toSet
+
     def play()(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       val timeBase0 = timeBaseRef()

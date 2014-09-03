@@ -54,6 +54,10 @@ trait Transport[S <: Sys[S]]
   //  def addView   (view: AuralObj[S])(implicit tx: S#Tx): Unit
   //  def removeView(view: AuralObj[S])(implicit tx: S#Tx): Unit
 
+  // def getView(obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]]
+
+  def views(implicit tx: S#Tx): Set[AuralObj[S]]
+
   def addObject   (obj: Obj[S])(implicit tx: S#Tx): Unit
   def removeObject(obj: Obj[S])(implicit tx: S#Tx): Unit
 
