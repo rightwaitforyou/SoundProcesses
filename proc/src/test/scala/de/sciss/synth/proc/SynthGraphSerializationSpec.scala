@@ -258,8 +258,8 @@ class SynthGraphSerializationSpec extends FunSpec {
   }
 
   //////////////////////////////////////////////////////////////////////////
-  // SysSon problem patch
 
+  // SysSon problem patch
   dfs += "SysSon-Test" -> SynthGraph {
     val v = LFDNoise3.ar(0.1).linexp(-1, 1, 1e-5, 1)
     val n = 32
@@ -272,6 +272,22 @@ class SynthGraphSerializationSpec extends FunSpec {
     }
     val sig = OnePole.ar(mix / n * 2, 0.95)
     Out.ar(0, Pan2.ar(sig))
+  }
+
+  ////////////////////////////////////////
+
+  // Env
+  dfs += "Env" -> SynthGraph {
+    val segm = {
+      import Curve._
+      Seq(step, linear, exponential, sine, welch, parametric(-2f), squared, cubed).zipWithIndex.map { case (c, i) =>
+        Env.Segment(0.1, i + 0.1, c)
+      }
+    }
+    val env  = Env(0.01, segm)
+    val y = EnvGen.ar(env)
+    val z = EnvGen.ar(Env.perc, doneAction = freeSelf) * SinOsc.ar(440) * 0.1
+    Out.ar(0, y + z)
   }
 
   dfs.foreach { case (name, graph) =>

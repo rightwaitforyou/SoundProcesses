@@ -23,6 +23,8 @@ import de.sciss.lucre.expr.Expr
 import de.sciss.synth.ugen.{ControlProxyLike, Constant}
 import java.util
 
+import scala.util.control.NonFatal
+
 object SynthGraphs extends expr.impl.ExprTypeImpl[SynthGraph] {
   final val typeID = 16
 
@@ -132,33 +134,44 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   private def readIdentifiedProduct(in: DataInput, ref: RefMapIn): Product = {
     val prefix    = in.readUTF()
     val arity     = in.readShort()
-    // val elems     = Vector.fill[AnyRef](arity)(readElem(in, ref).asInstanceOf[AnyRef])
-    val elems     = new Array[AnyRef](arity)
-    var i = 0
-    while (i < arity) {
-      elems(i) = readElem(in, ref).asInstanceOf[AnyRef]
-      i += 1
-    }
     val className = if (Character.isUpperCase(prefix.charAt(0))) s"de.sciss.synth.ugen.$prefix" else prefix
-    // cf. stackoverflow #3039822
-    val companion = Class.forName(s"$className$$").getField("MODULE$").get(null)
-    //    val m         = companion.getClass.getMethods.find(_.getName == "apply")
-    //      .getOrElse(sys.error(s"No apply method found on $companion"))
-    val ms        = companion.getClass.getMethods
-    var m         = null: java.lang.reflect.Method
-    var j = 0
-    while (m == null && j < ms.length) {
-      val mj = ms(j)
-      if (mj.getName == "apply" && mj.getParameterTypes.length == arity) m = mj
-      j += 1
-    }
-    if (m == null) sys.error(s"No apply method found on $companion")
-    val res       = try {
-      m.invoke(companion, elems: _*).asInstanceOf[Product]
+
+    val res = try {
+      if (arity == 0 && className.charAt(className.length - 1) == '$') {
+        // case object
+        val companion = Class.forName(s"$className").getField("MODULE$").get(null)
+        companion.asInstanceOf[Product]
+
+      } else {
+
+        // cf. stackoverflow #3039822
+        val companion = Class.forName(s"$className$$").getField("MODULE$").get(null)
+        val elems = new Array[AnyRef](arity)
+        var i = 0
+        while (i < arity) {
+          elems(i) = readElem(in, ref).asInstanceOf[AnyRef]
+          i += 1
+        }
+        //    val m         = companion.getClass.getMethods.find(_.getName == "apply")
+        //      .getOrElse(sys.error(s"No apply method found on $companion"))
+        val ms = companion.getClass.getMethods
+        var m = null: java.lang.reflect.Method
+        var j = 0
+        while (m == null && j < ms.length) {
+          val mj = ms(j)
+          if (mj.getName == "apply" && mj.getParameterTypes.length == arity) m = mj
+          j += 1
+        }
+        if (m == null) sys.error(s"No apply method found on $companion")
+
+        m.invoke(companion, elems: _*).asInstanceOf[Product]
+      }
+
     } catch {
-      case e: IllegalArgumentException =>
+      case NonFatal(e) =>
         throw new IllegalArgumentException(s"While de-serializing $prefix: ${e.getMessage}")
     }
+
     val id        = ref.count
     ref.map      += ((id, res))
     ref.count     = id + 1
