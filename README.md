@@ -18,9 +18,10 @@ The following dependency is necessary:
 
     resolvers += "Oracle Repository" at "http://download.oracle.com/maven"
     
-    "de.sciss" %% "soundprocesses" % v
+    "de.sciss" %% "soundprocesses"       % v
+    "de.sciss" %% "soundprocesses-views" % v  // common swing views
 
-The current version `v` is `"2.6.1"`.
+The current stable version `v` is `"2.6.1"`.
 
 The following sub modules are available:
 

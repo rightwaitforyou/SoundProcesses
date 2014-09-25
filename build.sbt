@@ -34,6 +34,10 @@ lazy val spanVersion            = "1.2.1"
 
 lazy val fileUtilVersion        = "1.1.1"
 
+lazy val lucreSwingVersion      = "0.5.0"
+
+lazy val audioWidgetsVersion    = "1.7.0"
+
 lazy val loggingEnabled         = true
 
 // retrieveManaged in ThisBuild := true
@@ -83,8 +87,8 @@ initialCommands in console :=
 // ---- sub-projects ----
 
 lazy val root = project.in(file("."))
-  .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
-  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses)
+  .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses, `soundprocesses-views`)
+  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses, `soundprocesses-views`)
   .settings(
     //    publishArtifact in(Compile, packageBin) := false, // there are no binaries
     //    publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
@@ -136,6 +140,15 @@ lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucres
       "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
       "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
       "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test"
+    )
+  )
+
+lazy val `soundprocesses-views` = project.in(file("views")).dependsOn(soundprocesses)
+  .settings(
+    description :=  "Views for Sound Processes",
+    libraryDependencies ++= Seq(
+      "de.sciss" %% "lucreswing"       % lucreSwingVersion,
+      "de.sciss" %% "audiowidgets-app" % audioWidgetsVersion
     )
   )
 
