@@ -16,7 +16,7 @@ package proc
 package graph
 
 import de.sciss.synth.proc.UGenGraphBuilder.Input
-import de.sciss.synth.ugen.ControlProxy
+import de.sciss.synth.ugen.{AudioControlProxy, ControlProxy}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
@@ -32,7 +32,12 @@ final case class Attribute(rate: Rate, key: String, default: Double) extends GE.
     val b       = UGenGraphBuilder.get
     val numCh   = b.requestInput(Input.Attribute(key, numChannels = -1)).numChannels
     val ctlName = Attribute.controlName(key)
-    val ctl     = ControlProxy(rate, Vec.fill(numCh)(default.toFloat), Some(ctlName))
+    val values  = Vec.fill(numCh)(default.toFloat)
+    val nameOpt = Some(ctlName)
+    val ctl     = if (rate == audio)
+      AudioControlProxy(values, nameOpt)
+    else
+      ControlProxy(rate, values, nameOpt)
     ctl.expand
   }
 }
