@@ -26,7 +26,7 @@ lazy val lucreEventVersion      = "2.7.0"
 
 lazy val lucreConfluentVersion  = "2.9.0"
 
-lazy val scalaColliderVersion   = "1.14.0-SNAPSHOT"
+lazy val scalaColliderVersion   = "1.14.0"
 
 lazy val scalaTestVersion       = "2.2.2"
 

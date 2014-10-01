@@ -37,7 +37,6 @@ object DoubleExtensions {
 
     val name = "Double-Double Ops"
 
-
     def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                   (implicit tx: S#Tx): Expr.Node[S, Double] = {
       import UnaryOp._
