@@ -64,7 +64,7 @@ object FolderElem {
     Impl.read(in, access)
 
   object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[Obj[S]] =
+    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
       if (obj.elem.isInstanceOf[FolderElem[S]]) Some(obj.asInstanceOf[Obj[S]])
       else None
   }
