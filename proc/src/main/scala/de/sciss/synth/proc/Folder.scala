@@ -19,7 +19,6 @@ import impl.{FolderElemImpl => Impl}
 import de.sciss.serial
 import de.sciss.synth.proc
 import de.sciss.serial.{Serializer, DataInput}
-import scala.collection.immutable.{IndexedSeq => Vec}
 import language.existentials
 
 object Folder {
@@ -65,10 +64,11 @@ object FolderElem {
     Impl.read(in, access)
 
   object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, FolderElem]] =
-      if (obj.elem.isInstanceOf[FolderElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, FolderElem]])
+    def unapply[S <: Sys[S]](obj: Obj[S]): Option[Obj[S]] =
+      if (obj.elem.isInstanceOf[FolderElem[S]]) Some(obj.asInstanceOf[Obj[S]])
       else None
   }
+  type Obj[S <: Sys[S]] = proc.Obj.T[S, FolderElem]
 
   implicit def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, FolderElem[S]] =
     Impl.serializer[S]

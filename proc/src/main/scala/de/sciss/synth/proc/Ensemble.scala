@@ -25,7 +25,7 @@ import impl.{EnsembleImpl => Impl}
 object Ensemble {
   final val typeID = 0x10007
 
-  def apply[S <: Sys[S]](folder: proc.Folder[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
+  def apply[S <: Sys[S]](folder: FolderElem.Obj[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
                         (implicit tx: S#Tx): Ensemble[S] = Impl(folder, offset, playing)
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Ensemble[S] =
@@ -70,7 +70,7 @@ object Ensemble {
   * the "seek" position.
   */
 trait Ensemble[S <: Sys[S]] extends Writable with Disposable[S#Tx] with Publisher[S, Ensemble.Update[S]] {
-  def folder (implicit tx: S#Tx): Folder[S]
+  def folder (implicit tx: S#Tx): FolderElem.Obj[S]
   def offset (implicit tx: S#Tx): Expr[S, Long]
   def playing(implicit tx: S#Tx): Expr[S, Boolean]
 }

@@ -51,6 +51,17 @@ object Obj {
     res
   }
 
+  def copyT[S <: Sys[S], E1[~ <: Sys[~]] <: Elem[~]](in: Obj.T[S, E1], elemCopy: E1[S])(implicit tx: S#Tx): Obj.T[S, E1] = {
+    //    val elemOrig: E1[S] = in.elem
+    //    val elemCopy: E1[S] = elemOrig.mkCopy()
+    val res = apply(elemCopy)
+    val outAttr = res.attr
+    in.attr.iterator.foreach { case (key, value) =>
+      outAttr.put(key, Obj.copy(value))
+    }
+    res
+  }
+
   // ---- serializer ----
 
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Obj[S]] = Impl.serializer[S]

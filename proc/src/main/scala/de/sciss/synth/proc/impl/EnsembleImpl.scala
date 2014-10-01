@@ -17,20 +17,20 @@ package impl
 import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.event.{InMemory, EventLike, Sys}
 import de.sciss.lucre.expr.{Expr, Long => LongEx, Boolean => BooleanEx}
-import de.sciss.serial.{Serializer, DataInput, DataOutput}
+import de.sciss.serial.{DataInput, DataOutput}
 import de.sciss.synth.proc
 import de.sciss.synth.proc.Ensemble.Update
 
 object EnsembleImpl {
   private final val COOKIE = 0x456E00  // "En\0"
 
-  def apply[S <: Sys[S]](folder: proc.Folder[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
+  def apply[S <: Sys[S]](folder: FolderElem.Obj[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
                         (implicit tx: S#Tx): Ensemble[S] = {
     val targets = evt.Targets[S]
     new Impl(targets, folder, offset, playing)
   }
 
-  def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Ensemble[S]] = anySer.asInstanceOf[Ser[S]]
+  def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Ensemble[S]] = anySer.asInstanceOf[Ser[S]]
 
   private val anySer = new Ser[InMemory]
 
@@ -38,7 +38,8 @@ object EnsembleImpl {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Ensemble[S] with evt.Node[S] = {
       val cookie  = in.readInt()
       if (cookie != COOKIE) sys.error(s"Unexpected cookie (found $cookie, expected $COOKIE)")
-      val folder  = Folder   .read(in, access)
+      // val folder  = Folder   .read(in, access)
+      val folder  = Obj.readT[S, FolderElem](in, access)
       val offset  = LongEx   .read(in, access)
       val playing = BooleanEx.read(in, access)
       new Impl(targets, folder, offset, playing)
@@ -64,7 +65,7 @@ object EnsembleImpl {
   }
 
   private final class ElemImpl[S <: Sys[S]](val targets: evt.Targets[S],
-                                          val peer: Ensemble[S])
+                                            val peer: Ensemble[S])
     extends proc.impl.ElemImpl.Active[S] with Ensemble.Elem[S] {
 
     def typeID = Ensemble.typeID
@@ -73,8 +74,12 @@ object EnsembleImpl {
     protected def peerEvent = peer.changed
 
     def mkCopy()(implicit tx: S#Tx): Ensemble.Elem[S] = {
-      ???
-//      val folderCopy =
+      val folderOrig  = peer.folder
+      val folderCopy: FolderElem.Obj[S] = Obj.copyT[S, FolderElem](folderOrig, folderOrig.elem)  // P.I.T.A.
+      val offsetCopy  = peer.offset
+      val playingCopy = peer.playing
+      val copy = Ensemble(folderCopy, offsetCopy, playingCopy)
+      Ensemble.Elem(copy)
 //
 //      val newPeer     = _Proc[S]
 //      newPeer.graph() = peer.graph()
@@ -94,14 +99,14 @@ object EnsembleImpl {
 
   // ---- impl ----
 
-  private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], folderEx: proc.Folder[S],
+  private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], folderObj: FolderElem.Obj[S],
                                         offsetEx: Expr[S, Long], playingEx: Expr[S, Boolean])
     extends Ensemble[S]
     with evt.impl.StandaloneLike[S, Ensemble.Update[S], Ensemble[S]] {
 
     override def toString() = s"Ensemble$id"
 
-    def folder (implicit tx: S#Tx): Folder[S]         = folderEx
+    def folder (implicit tx: S#Tx): FolderElem.Obj[S] = folderObj
     def offset (implicit tx: S#Tx): Expr[S, Long]     = offsetEx
     def playing(implicit tx: S#Tx): Expr[S, Boolean]  = playingEx
 
@@ -109,7 +114,7 @@ object EnsembleImpl {
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeInt(COOKIE)
-      folderEx .write(out)
+      folderObj.write(out)
       offsetEx .write(out)
       playingEx.write(out)
     }
@@ -118,22 +123,22 @@ object EnsembleImpl {
 
     // ---- event ----
 
-    protected def reader: evt.Reader[S, Ensemble[S]] = ???
+    protected def reader: evt.Reader[S, Ensemble[S]] = serializer[S]
 
     def connect   ()(implicit tx: S#Tx): Unit = {
-      folderEx .changed ---> this
+      folderObj .changed ---> this
       offsetEx .changed ---> this
       playingEx.changed ---> this
     }
 
     def disconnect()(implicit tx: S#Tx): Unit = {
-      folderEx .changed -/-> this
+      folderObj .changed -/-> this
       offsetEx .changed -/-> this
       playingEx.changed -/-> this
     }
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Ensemble.Update[S]] = {
-      val folderEvt = folderEx.changed
+      val folderEvt = folderObj.elem.peer.changed
       val l1 = if (pull.contains(folderEvt))
         pull(folderEvt).fold(List.empty[Ensemble.Change[S]])(Ensemble.Folder(_) :: Nil)
       else Nil
