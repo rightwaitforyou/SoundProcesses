@@ -19,7 +19,8 @@ import evt.Sys
 import de.sciss.serial.DataInput
 
 object FolderElemImpl extends ElemImpl.Companion[FolderElem] {
-  final val typeID = 0x10000
+  // final val typeID = 0x10000
+  def typeID = FolderElem.typeID
 
   //  def empty[S <: Sys[S]]()(implicit tx: S#Tx): FolderElem[S] =
   //    apply(expr.List.Modifiable[S, Obj[S], Obj.Update[S]])

@@ -19,8 +19,8 @@ import java.util.{Date, Locale}
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.synth.expr.DoubleVec
 import de.sciss.{lucre, model}
-import de.sciss.serial.Serializer
-import de.sciss.synth.proc.impl.ElemImpl
+import de.sciss.serial.{DataInput, Serializer}
+import de.sciss.synth.proc.impl.{FolderElemImpl, ElemImpl}
 
 import annotation.elidable
 import annotation.elidable.CONFIG
@@ -181,5 +181,33 @@ package object proc {
   trait AudioGraphemeElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Grapheme.Expr.Audio[S]
     type PeerUpdate = model.Change[Grapheme.Value.Audio]
+  }
+
+  implicit object FolderElem extends Elem.Companion[FolderElem] {
+    final val typeID = 0x10000
+
+    type Peer[S <: Sys[S]] = Folder[S] // expr.List.Modifiable[S, proc.Obj[S], proc.Obj.Update[S]]
+
+    // def empty[S <: Sys[S]]()(implicit tx: S#Tx): Folder[S] = Impl.empty[S]()
+
+    def apply[S <: Sys[S]](peer: Peer[S])(implicit tx: S#Tx): FolderElem[S] = FolderElemImpl(peer)
+
+    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): FolderElem[S] =
+      FolderElemImpl.read(in, access)
+
+    object Obj {
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[FolderElem[S]]) Some(obj.asInstanceOf[Obj[S]])
+        else None
+    }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, FolderElem]
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, FolderElem[S]] =
+      FolderElemImpl.serializer[S]
+  }
+  trait FolderElem[S <: Sys[S]] extends proc.Elem[S] {
+    type Peer       = Folder[S]
+    // type PeerUpdate = Folder.Update[S]
+    type PeerUpdate = Folder.Update[S]
   }
 }

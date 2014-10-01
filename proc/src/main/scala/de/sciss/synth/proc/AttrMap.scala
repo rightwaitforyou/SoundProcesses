@@ -28,7 +28,6 @@ object AttrMap {
   }
 }
 
-// XXX TODO: is the class-tag sufficient - don't we need the class-tag for `A` instead of `Expr[S, A]` under erasure???
 trait AttrMap[S <: Sys[S]] {
   // def apply[Attr <: Attr[S]](key: String)(implicit tx: S#Tx, tag: ClassTag[Attr]): Option[Attr#Peer]
 
