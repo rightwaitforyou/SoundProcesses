@@ -24,18 +24,29 @@ import proc.{logTransport => logT}
 import scala.concurrent.stm.{TSet, Ref}
 
 object TransportImpl {
-  def apply[S <: Sys[S]](aural: AuralSystem, scheduler: Scheduler[S])(implicit tx: S#Tx): Transport[S] = {
-    val objMap  = tx.newInMemoryIDMap[stm.Source[S#Tx, Obj[S]]]
-    val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
-    val res     = new Impl(aural, scheduler, objMap, viewMap)
-    aural.addClient(res)
-    aural.serverOption.foreach(res.auralStarted)
+  def apply[S <: Sys[S]](auralSystem: AuralSystem, scheduler: Scheduler[S])(implicit tx: S#Tx): Transport[S] = {
+    val res = mkTransport(Some(auralSystem), scheduler)
+    auralSystem.addClient(res)
+    auralSystem.serverOption.foreach(res.auralStarted)
     res
   }
 
-  private final class Impl[S <: Sys[S]](aural: AuralSystem, val scheduler: Scheduler[S],
-                                        objMap : IdentifierMap[S#ID, S#Tx, stm.Source[S#Tx, Obj[S]]],
-                                        viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
+  def apply[S <: Sys[S]](implicit tx: S#Tx, context: AuralContext[S]): Transport[S] = {
+    val res = mkTransport(None, context.scheduler)
+    res.auralStarted(context.server)
+    res
+  }
+
+  private def mkTransport[S <: Sys[S]](auralSystem: Option[AuralSystem], scheduler: Scheduler[S])
+                                      (implicit tx: S#Tx): Impl[S] = {
+    val objMap  = tx.newInMemoryIDMap[stm.Source[S#Tx, Obj[S]]]
+    val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
+    new Impl(auralSystem, scheduler, objMap, viewMap)
+  }
+
+  private final class Impl[S <: Sys[S]](auralSystem: Option[AuralSystem], val scheduler: Scheduler[S],
+                                  objMap : IdentifierMap[S#ID, S#Tx, stm.Source[S#Tx, Obj[S]]],
+                                  viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
     extends Transport[S] with ObservableImpl[S, Transport.Update[S]] with AuralSystem.Client {
 
     private final class PlayTime(val wallClock0: Long, val pos0: Long) {
@@ -161,7 +172,7 @@ object TransportImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
-      aural.removeClient(this)
+      auralSystem.foreach(_.removeClient(this))
       objMap.dispose()
       clearSet(objSet)
       disposeViews()
@@ -190,9 +201,9 @@ object TransportImpl {
     private def auralStartedTx(server: Server)(implicit tx: S#Tx): Unit = {
       logT(s"transport - aural-system started")
       import WorkspaceHandle.Implicits._
-      implicit val aural = AuralContext(server, scheduler)
+      implicit val auralContext = AuralContext(server, scheduler)
       implicit val ptx   = tx.peer
-      contextRef.set(Some(aural))
+      contextRef.set(Some(auralContext))
       objSet.foreach { objH =>
         val obj = objH()
         mkView(obj)

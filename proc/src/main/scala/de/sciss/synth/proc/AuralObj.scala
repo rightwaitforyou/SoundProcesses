@@ -19,10 +19,10 @@ import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.synth.{ControlSet, proc}
 import language.higherKinds
-import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralTimelineImpl, AuralProcImpl}
+import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralEnsembleImpl, AuralTimelineImpl, AuralProcImpl}
 
 object AuralObj {
-  import proc.{Proc => _Proc, Timeline => _Timeline}
+  import proc.{Proc => _Proc, Timeline => _Timeline, Ensemble => _Ensemble}
 
   trait Factory {
     def typeID: Int
@@ -141,6 +141,22 @@ object AuralObj {
   }
   trait Timeline[S <: Sys[S]] extends AuralObj[S] {
     override def obj: stm.Source[S#Tx, _Timeline.Obj[S]]
+
+    def views(implicit tx: S#Tx): Set[AuralObj[S]]
+  }
+
+  // ---- ensemble ----
+
+  object Ensemble extends AuralObj.Factory {
+    type E[S <: evt.Sys[S]] = _Ensemble.Elem[S]
+
+    def typeID = _Ensemble.typeID
+
+    def apply[S <: Sys[S]](obj: _Ensemble.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] =
+      AuralEnsembleImpl(obj)
+  }
+  trait Ensemble[S <: Sys[S]] extends AuralObj[S] {
+    override def obj: stm.Source[S#Tx, _Ensemble.Obj[S]]
 
     def views(implicit tx: S#Tx): Set[AuralObj[S]]
   }

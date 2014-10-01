@@ -38,7 +38,8 @@ object AuralObjImpl {
     // AudioGrapheme   .typeID -> AudioGrapheme,
     // Folder          .typeID -> Folder,
     Proc            .typeID -> AuralObj.Proc, // AuralProcImpl
-    Timeline        .typeID -> AuralObj.Timeline
+    Timeline        .typeID -> AuralObj.Timeline,
+    Ensemble        .typeID -> AuralObj.Ensemble
     // Code            .typeID -> Code,
   )
 

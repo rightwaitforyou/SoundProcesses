@@ -578,7 +578,8 @@ object ElemImpl {
     ArtifactLocation.typeID -> ArtifactLocation,
     Proc            .typeID -> Proc            ,
     Timeline        .typeID -> Timeline        ,
-    FolderElemImpl  .typeID -> FolderElemImpl
+    FolderElemImpl  .typeID -> FolderElemImpl  ,
+    Ensemble        .typeID -> EnsembleImpl.ElemImpl
   )
 
   def registerExtension(ext: Elem.Extension): Unit = sync.synchronized {

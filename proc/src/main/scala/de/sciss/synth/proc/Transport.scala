@@ -21,13 +21,22 @@ import de.sciss.lucre.event.Observable
 import impl.{TransportImpl => Impl}
 
 object Transport {
+  /** Creates a `Transport` independent of a running aural system. If will create and destroy
+    * an aural context with the state of the provided system.
+    */
   def apply[S <: Sys[S]](aural: AuralSystem, scheduler: Scheduler[S])(implicit tx: S#Tx): Transport[S] =
     Impl(aural, scheduler)
 
+  /** Creates a `Transport` independent of a running aural system. If will create and destroy
+    * an aural context with the state of the provided system. It creates a new scheduler.
+    */
   def apply[S <: Sys[S]](aural: AuralSystem)(implicit tx: S#Tx, cursor: Cursor[S]): Transport[S] = {
     val sched = Scheduler[S]
     apply(aural, sched)
   }
+
+  /** Creates a `Transport` for a running existing aural context. */
+  def apply[S <: Sys[S]](implicit tx: S#Tx, context: AuralContext[S]): Transport[S] = Impl[S]
 
   sealed trait Update[S <: Sys[S]] {
     def transport: Transport[S]
