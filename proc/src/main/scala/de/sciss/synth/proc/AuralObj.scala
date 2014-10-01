@@ -17,7 +17,6 @@ import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
-import de.sciss.span.Span
 import de.sciss.synth.{ControlSet, proc}
 import language.higherKinds
 import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralTimelineImpl, AuralProcImpl}
