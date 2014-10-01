@@ -24,6 +24,8 @@ import de.sciss.lucre.data
 import impl.{ArtifactImpl => Impl}
 
 object ArtifactLocation {
+  final val typeID = 0x10003
+
   def tmp[S <: Sys[S]]()(implicit tx: S#Tx): Modifiable[S] = {
     val dir   = File.createTempFile("artifacts", "tmp")
     dir.delete()
@@ -73,7 +75,9 @@ object ArtifactLocation {
 
   // ---- Elem ----
 
-  object Elem {
+  implicit object Elem extends proc.Elem.Companion[Elem] {
+    def typeID = ArtifactLocation.typeID
+
     def apply[S <: Sys[S]](peer: ArtifactLocation[S])(implicit tx: S#Tx): ArtifactLocation.Elem[S] =
       proc.impl.ElemImpl.ArtifactLocation(peer)
 

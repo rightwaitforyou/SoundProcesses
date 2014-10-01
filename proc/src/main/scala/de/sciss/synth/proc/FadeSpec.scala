@@ -24,6 +24,8 @@ import de.sciss.{model => m}
 import evt.Sys
 
 object FadeSpec {
+  final val typeID = 14
+
   private final val COOKIE = 0x4664 // 'Fd'
 
   implicit object serializer extends ImmutableSerializer[FadeSpec] {
@@ -46,7 +48,7 @@ object FadeSpec {
   }
 
   object Expr extends expr.impl.ExprTypeImpl[FadeSpec] {
-    final val typeID = 14
+    def typeID = FadeSpec.typeID
 
     // 0 reserved for variables
     private final val elemCookie = 1
@@ -146,7 +148,9 @@ object FadeSpec {
   
   // ---- Elem ----
 
-  object Elem {
+  implicit object Elem extends proc.Elem.Companion[Elem] {
+    def typeID = FadeSpec.Expr.typeID
+
     def apply[S <: Sys[S]](peer: _Expr[S, FadeSpec])(implicit tx: S#Tx): FadeSpec.Elem[S] =
       proc.impl.ElemImpl.FadeSpec(peer)
 

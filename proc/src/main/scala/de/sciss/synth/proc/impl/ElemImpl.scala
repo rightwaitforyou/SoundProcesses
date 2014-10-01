@@ -36,7 +36,7 @@ object ElemImpl {
 
   // ---- Int ----
 
-  object Int extends ExprCompanion[IntElem, _Int] {
+  object Int extends ExprCompanion[proc.IntElem, _Int] {
     protected val tpe = lucre.expr.Int
 
     protected def newActive[S <: Sys[S]](targets: evt.Targets[S], peer: _Expr[S, _Int])
@@ -319,7 +319,7 @@ object ElemImpl {
   // ---- ArtifactLocation ----
 
   object ArtifactLocation extends Companion[_ArtifactLocation.Elem] {
-    val typeID = 0x10003 // _ArtifactLocation.typeID
+    val typeID = _ArtifactLocation.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                    (implicit tx: S#Tx): _ArtifactLocation.Elem[S] with evt.Node[S] = {

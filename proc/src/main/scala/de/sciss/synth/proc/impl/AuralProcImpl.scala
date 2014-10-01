@@ -446,7 +446,7 @@ object AuralProcImpl {
       val ug            = ugen.result
       implicit val itx  = tx.peer
 
-      val nameHint      = p.attr.expr[String](ObjKeys.attrName).map(_.value)
+      val nameHint      = p.attr[StringElem](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
       val builder       = new SynthBuilder(p, synth, timeRef)

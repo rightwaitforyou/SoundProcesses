@@ -30,7 +30,7 @@ class AttributesSpec extends ConfluentEventSpec {
     system.step { implicit tx =>
       val p     = pH()
       // println(s"Keys found: ${p.attributes.keys.mkString(", ")}")
-      val expr  = p.attr.expr[Int]("foo")
+      val expr  = p.attr[IntElem]("foo")
       val v     = expr match {
         case Some(Expr.Var(vr)) => vr().value
         case _ => -1
@@ -67,18 +67,18 @@ class AttributesSpec extends ConfluentEventSpec {
 
     system.step { implicit tx =>
       val p = pH()
-      assert(p.attr.expr[Int    ]("int"    ).map(_.value) === Some(5678))
-      assert(p.attr.expr[Double ]("double" ).map(_.value) === Some(123.4))
-      assert(p.attr.expr[Long   ]("long"   ).map(_.value) === Some(1234L))
-      assert(p.attr.expr[Boolean]("boolean").map(_.value) === Some(true))
-      assert(p.attr.expr[String ]("string" ).map(_.value) === Some("123"))
-      assert(p.attr.expr[FadeSpec]("fade").map(_.value) === Some(fade))
-      assert(p.attr.expr[Vec[Double]]("d-vec").map(_.value) === Some(Vec(1.2, 3.4, 5.6)))
-      assert(p.attr.expr[Grapheme.Value.Audio]("audio").map(_.value) ===
+      assert(p.attr[IntElem    ]("int"    ).map(_.value) === Some(5678))
+      assert(p.attr[DoubleElem ]("double" ).map(_.value) === Some(123.4))
+      assert(p.attr[LongElem   ]("long"   ).map(_.value) === Some(1234L))
+      assert(p.attr[BooleanElem]("boolean").map(_.value) === Some(true))
+      assert(p.attr[StringElem ]("string" ).map(_.value) === Some("123"))
+      assert(p.attr[FadeSpec.Elem]("fade").map(_.value) === Some(fade))
+      assert(p.attr[DoubleVecElem]("d-vec").map(_.value) === Some(Vec(1.2, 3.4, 5.6)))
+      assert(p.attr[AudioGraphemeElem]("audio").map(_.value) ===
         Some(Grapheme.Value.Audio(file("foo") / "bar", spec, 1234L, 123.4)))
-      assert(p.attr[ArtifactLocation]("loc").map(_.directory) === Some(file("foo")))
+      assert(p.attr[ArtifactLocation.Elem]("loc").map(_.directory) === Some(file("foo")))
       val group = pgH()
-      assert(p.attr[Timeline]("group") === Some(group))
+      assert(p.attr[Timeline.Elem]("group") === Some(group))
     }
   }
 }

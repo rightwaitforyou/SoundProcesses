@@ -18,7 +18,7 @@ package proc
 import lucre.data
 import language.higherKinds
 import scala.reflect.ClassTag
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{ExprType, Expr}
 import de.sciss.lucre.event.Sys
 
 object AttrMap {
@@ -38,13 +38,15 @@ trait AttrMap[S <: Sys[S]] {
   /** Tries to look up a value of a given peer type.
     *
     * @param key  the map key
-    * @tparam A   the peer type, e.g. `Proc` for an `Obj.T[S, Proc.Elem]`
+    * @tparam E   the elem type, e.g. `Proc.Elem` for an `Obj.T[S, Proc.Elem]`
     * @return the unwrapped peer value, if an entry for the key exists and the value has the expected type
     */
-  def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]]
+  def apply[E[~ <: Sys[~]] <: Elem[~]](key: String)(implicit tx: S#Tx, companion: Elem.Companion[E]): Option[E[S]#Peer]
 
-  def expr[A](key: String)(implicit tx: S#Tx, tag: ClassTag[Expr[S, A]]): Option[Expr[S, A]] =
-    apply[({type Ex[~ <: Sys[~]] = Expr[~, A]})#Ex](key)
+  //  def expr[A](key: String)(implicit tx: S#Tx, tag: ClassTag[Expr[S, A]]): Option[Expr[S, A]] =
+  //    apply[({type Ex[~ <: Sys[~]] = Expr[~, A]})#Ex](key)
+
+  // def expr[A](key: String)(implicit tx: S#Tx, tpe: ExprType[A]): Option[Expr[S, A]]
 
   def get     (key: String)(implicit tx: S#Tx): Option[Obj[S]]
   def getElem (key: String)(implicit tx: S#Tx): Option[Elem[S]]

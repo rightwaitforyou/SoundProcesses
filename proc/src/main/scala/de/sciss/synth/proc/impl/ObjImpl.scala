@@ -160,18 +160,16 @@ object ObjImpl {
 
       protected def valueInfo = attributeEntryInfo[S, E]
 
-      def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]] =
-        get(key).flatMap { obj =>
-          tag.unapply(obj.elem.peer)
-        }
+      //      def apply[A[~ <: Sys[~]]](key: String)(implicit tx: S#Tx, tag: ClassTag[A[S]]): Option[A[S]] =
+      //        get(key).flatMap { obj =>
+      //          tag.unapply(obj.elem.peer)
+      //        }
 
-//      def apply[A[~ <: Sys[~]] <: Elem[_]](key: String)(implicit tx: S#Tx,
-//                                                        tag: reflect.ClassTag[A[S]]): Option[A[S]#Peer] =
-//        get(key) match {
-//          // cf. stackoverflow #16377741
-//          case Some(attr) => tag.unapply(attr).map(_.peer) // Some(attr.peer)
-//          case _          => None
-//        }
+      def apply[E[~ <: Sys[~]] <: Elem[~]](key: String)
+                                          (implicit tx: S#Tx, companion: Elem.Companion[E]): Option[E[S]#Peer] =
+          get(key).flatMap { obj =>
+            if (obj.elem.typeID == companion.typeID) Some(obj.elem.peer.asInstanceOf[E[S]#Peer]) else None
+          }
     }
 
     private object ChangeEvent

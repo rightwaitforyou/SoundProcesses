@@ -42,7 +42,9 @@ object Timeline {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline[S] = Impl.read(in, access)
 
-  object Elem {
+  implicit object Elem extends proc.Elem.Companion[Elem] {
+    def typeID = Timeline.typeID
+
     def apply[S <: Sys[S]](peer: Timeline[S])(implicit tx: S#Tx): Timeline.Elem[S] =
       proc.impl.ElemImpl.Timeline(peer)
 

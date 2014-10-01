@@ -21,12 +21,13 @@ object Implicits {
   implicit final class RichAttr[S <: Sys[S]](val `this`: AttrMap.Modifiable[S]) extends AnyVal { me =>
     import me.{`this` => attr}
 
+
     def name(implicit tx: S#Tx): String =
-      attr.expr[String](ObjKeys.attrName).fold("<unnamed>")(_.value)
+      attr[StringElem](ObjKeys.attrName).fold("<unnamed>")(_.value)
 
     def name_=(value: String)(implicit tx: S#Tx): Unit = {
       val valueC = StringEx.newConst[S](value)
-      attr.expr[String](ObjKeys.attrName) match {
+      attr[StringElem](ObjKeys.attrName) match {
         case Some(Expr.Var(vr)) => vr() = valueC
         case _                  =>
           val valueVr = StringEx.newVar(valueC)
@@ -35,11 +36,11 @@ object Implicits {
     }
 
     def muted(implicit tx: S#Tx): Boolean =
-      attr.expr[Boolean](ObjKeys.attrMute).fold(false)(_.value)
+      attr[BooleanElem](ObjKeys.attrMute).fold(false)(_.value)
 
     def muted_=(value: Boolean)(implicit tx: S#Tx): Unit = {
       val valueC = BooleanEx.newConst[S](value)
-      attr.expr[Boolean](ObjKeys.attrMute) match {
+      attr[BooleanElem](ObjKeys.attrMute) match {
         case Some(Expr.Var(vr)) => vr() = valueC
         case _                  =>
           val valueVr = BooleanEx.newVar(valueC)

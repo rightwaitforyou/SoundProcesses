@@ -37,6 +37,10 @@ object Elem {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] = Impl.read(in, access)
 
+  trait Companion[E[~ <: Sys[~]]] {
+    def typeID: scala.Int
+  }
+
   trait Extension {
     /** Unique type identifier */
     def typeID: scala.Int
@@ -70,125 +74,4 @@ trait Elem[S <: Sys[S]]
     type Peer       = Peer0
     type PeerUpdate = PeerUpdate0
   }
-}
-
-// ---- elements ----
-
-object IntElem {
-  def apply[S <: Sys[S]](peer: Expr[S, Int])(implicit tx: S#Tx): IntElem[S] =
-    proc.impl.ElemImpl.Int(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, IntElem]] =
-      if (obj.elem.isInstanceOf[IntElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, IntElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, IntElem[S]] = Impl.Int.serializer[S]
-}
-trait IntElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Expr[S, Int]
-  type PeerUpdate = model.Change[Int]
-}
-
-object DoubleElem {
-  def apply[S <: Sys[S]](peer: Expr[S, Double])(implicit tx: S#Tx): DoubleElem[S] =
-    proc.impl.ElemImpl.Double(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, DoubleElem]] =
-      if (obj.elem.isInstanceOf[DoubleElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, DoubleElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, DoubleElem[S]] = Impl.Double.serializer[S]
-}
-trait DoubleElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Expr[S, Double]
-  type PeerUpdate = model.Change[Double]
-}
-
-object LongElem {
-  def apply[S <: Sys[S]](peer: Expr[S, Long])(implicit tx: S#Tx): LongElem[S] =
-    proc.impl.ElemImpl.Long(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, LongElem]] =
-      if (obj.elem.isInstanceOf[LongElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, LongElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, LongElem[S]] = Impl.Long.serializer[S]
-}
-trait LongElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Expr[S, Long]
-  type PeerUpdate = model.Change[Long]
-}
-
-object BooleanElem {
-  def apply[S <: Sys[S]](peer: Expr[S, Boolean])(implicit tx: S#Tx): BooleanElem[S] =
-    proc.impl.ElemImpl.Boolean(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, BooleanElem]] =
-      if (obj.elem.isInstanceOf[BooleanElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, BooleanElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, BooleanElem[S]] = Impl.Boolean.serializer[S]
-}
-trait BooleanElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Expr[S, Boolean]
-  type PeerUpdate = model.Change[Boolean]
-}
-
-object StringElem {
-  def apply[S <: Sys[S]](peer: Expr[S, String])(implicit tx: S#Tx): StringElem[S] =
-    proc.impl.ElemImpl.String(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, StringElem]] =
-      if (obj.elem.isInstanceOf[StringElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, StringElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, StringElem[S]] = Impl.String.serializer[S]
-}
-trait StringElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Expr[S, String]
-  type PeerUpdate = model.Change[String]
-}
-
-object DoubleVecElem {
-  def apply[S <: Sys[S]](peer: Expr[S, Vec[Double]])(implicit tx: S#Tx): DoubleVecElem[S] =
-    proc.impl.ElemImpl.DoubleVec(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, DoubleVecElem]] =
-      if (obj.elem.isInstanceOf[DoubleVecElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, DoubleVecElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, DoubleVecElem[S]] = Impl.DoubleVec.serializer[S]
-}
-trait DoubleVecElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Expr[S, Vec[Double]]
-  type PeerUpdate = model.Change[Vec[Double]]
-}
-
-object AudioGraphemeElem {
-  def apply[S <: Sys[S]](peer: Grapheme.Expr.Audio[S])(implicit tx: S#Tx): AudioGraphemeElem[S] =
-    proc.impl.ElemImpl.AudioGrapheme(peer)
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, AudioGraphemeElem]] =
-      if (obj.elem.isInstanceOf[AudioGraphemeElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, AudioGraphemeElem]])
-      else None
-  }
-
-  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, AudioGraphemeElem[S]] = Impl.AudioGrapheme.serializer[S]
-}
-trait AudioGraphemeElem[S <: Sys[S]] extends Elem[S] {
-  type Peer       = Grapheme.Expr.Audio[S]
-  type PeerUpdate = model.Change[Grapheme.Value.Audio]
 }
