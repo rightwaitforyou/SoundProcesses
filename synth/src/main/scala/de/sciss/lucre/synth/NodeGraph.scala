@@ -1,5 +1,5 @@
 /*
- *  ProcWorld.scala
+ *  NodeGraph.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
