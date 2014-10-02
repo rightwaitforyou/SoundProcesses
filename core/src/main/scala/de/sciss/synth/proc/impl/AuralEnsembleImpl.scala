@@ -40,6 +40,7 @@ object AuralEnsembleImpl {
 
     def init(ens: Ensemble[S])(implicit tx: S#Tx): this.type = {
       observer = ens.changed.react { implicit tx => upd =>
+        val ens = upd.ensemble
         upd.changes.foreach {
           case Ensemble.Folder (fUpd) =>
             fUpd.changes.foreach {
@@ -50,7 +51,12 @@ object AuralEnsembleImpl {
 
           // case Ensemble.Offset (Change(_, newOffset )) =>
           case Ensemble.Playing(Change(_, newPlaying)) =>
-            if (newPlaying) play() else stop()
+            logTransport(s"AuralEnsemble - new playing.value = $newPlaying")
+            if (newPlaying) {
+              if (state == AuralObj.Playing) startTransport(ens)
+            } else {
+              transport.stop()
+            }
           case _ =>
         }
       }
@@ -76,13 +82,20 @@ object AuralEnsembleImpl {
 
     private def ensemble(implicit tx: S#Tx): Ensemble[S] = obj().elem.peer
 
+    private def startTransport(ens: Ensemble[S])(implicit tx: S#Tx): Unit = {
+      transport.stop()
+      transport.seek(ens.offset.value)  // XXX TODO -- should we incorporate timeRef.frame) ?
+      transport.play()                  // XXX TODO -- should we be able to pass the timeRef?
+    }
+
     def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+      if (state == AuralObj.Playing) return
+
       val ens = ensemble
-      if (ens.playing.value) {
-        transport.stop()
-        transport.seek(ens.offset.value)  // XXX TODO -- should we incorporate timeRef.frame) ?
-        transport.play()                  // XXX TODO -- should we be able to pass the timeRef?
-      }
+      val p   = ens.playing.value
+      logTransport(s"AuralEnsemble.play() - playing.value = $p")
+
+      if (p) startTransport(ens)
       state = AuralObj.Playing
     }
 
