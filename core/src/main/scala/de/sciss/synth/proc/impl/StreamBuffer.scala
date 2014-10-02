@@ -49,7 +49,6 @@ object StreamBuffer {
     val phasorTrig  = Trig1.kr(phasorK - numFrames/2, ControlDur.ir)
     val clockTrig   = phasorTrig + TDelay.kr(phasorTrig, halfPeriod)
     val position    = PulseCount.kr(clockTrig)
-    // SendTrig.kr(clockTrig, value = position, id = trigID)
 
     // println(s"makeUGen($key, $idx, $buf, $numChannels, $speed, $interp)")
     // numFrames.poll(0, "numFrames")

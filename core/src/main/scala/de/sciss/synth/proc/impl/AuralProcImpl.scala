@@ -22,6 +22,7 @@ import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Scan.Link
+import de.sciss.synth.proc.graph.impl.ActionResponder
 import de.sciss.synth.{proc, addToHead, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
 import proc.{UGenGraphBuilder => UGB}
@@ -73,6 +74,7 @@ object AuralProcImpl {
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
     import context.server
+    import context.scheduler.cursor
 
     /* The ongoing build aural node build process, as stored in `playingRef`. */
     private sealed trait PlayingRef extends Disposable[S#Tx]
@@ -394,6 +396,9 @@ object AuralProcImpl {
         b.setMap      += ctlName -> rb.id
         b.dependencies ::= rb
 
+      case UGB.Input.Action.Value =>   // ----------------------- action
+        ActionResponder.install(obj = b.obj, key = key, synth = b.synth)
+
       case _ =>
         throw new IllegalStateException(s"Unsupported input attribute request $value")
     }
@@ -419,7 +424,7 @@ object AuralProcImpl {
           import SoundProcesses.executionContext
           val reduced = Future.reduce(res)((_, _) => ())
           reduced.foreach { _ =>
-            context.scheduler.cursor.step { implicit tx =>
+            cursor.step { implicit tx =>
               if (playingRef.get(tx.peer) == prep) {
                 prepared(ugen)
               }

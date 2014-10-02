@@ -52,7 +52,9 @@ object Action {
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Action[S] = serializer[S].read(in, access)
 
   // ---- element ----
-  object Elem {
+  implicit object Elem extends proc.Elem.Companion[Elem] {
+    def typeID = Action.typeID
+
     def apply[S <: Sys[S]](peer: Action[S])(implicit tx: S#Tx): Action.Elem[S] = Impl.ElemImpl(peer)
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Action.Elem[S]] = Impl.ElemImpl.serializer

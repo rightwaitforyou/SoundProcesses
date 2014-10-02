@@ -193,6 +193,25 @@ object UGenGraphBuilder {
 
       override def productPrefix = "Input.Buffer"
     }
+
+    object Action {
+      case object Value extends UGenGraphBuilder.Value {
+        def async = false
+        override def productPrefix = "Input.Action.Value"
+      }
+    }
+    /** Specifies access to an action.
+      *
+      * @param name   name (key) of the attribute referring to an action
+      */
+    final case class Action(name: String) extends Input {
+      type Key    = AttributeKey
+      type Value  = Action.Value.type
+
+      def key = AttributeKey(name)
+
+      override def productPrefix = "Input.Action"
+    }
   }
   trait Input {
     type Key   <: UGenGraphBuilder.Key
