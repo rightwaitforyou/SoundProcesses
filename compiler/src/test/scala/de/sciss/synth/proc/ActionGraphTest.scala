@@ -54,7 +54,8 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
 
     val actionFut = cursor.step { implicit tx =>
       val code = Code.Action(
-        """println("Bang!")
+        """val name = self.attr[StringElem]("name").map(_.value).getOrElse("<not-found>")
+          |println(s"Bang! My name is $name")
           |sys.exit(0)
         """.stripMargin)
       Action.compile[S](code)
@@ -78,7 +79,9 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
       }
 
       val obj = Obj(Proc.Elem(p))
-      obj.attr.put("foo", Obj(Action.Elem(actionH())))
+      val actionObj = Obj(Action.Elem(actionH()))
+      actionObj.attr.put("name", Obj(StringElem("Baba Ganoush")))
+      obj.attr.put("foo", actionObj)
 
       val t = Transport[S](as)
       t.addObject(obj)

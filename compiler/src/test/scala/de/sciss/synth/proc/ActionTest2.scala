@@ -39,12 +39,12 @@ object ActionTest2 extends App {
     cursor.step { implicit tx =>
       val action = actionH()
       println("Execute #1")
-      action.execute()
+      action.execute(null)
     }
     cursor.step { implicit tx =>
       val action = actionH()
       println("Execute #2")
-      action.execute()
+      action.execute(null)
     }
     sys.exit()
   }

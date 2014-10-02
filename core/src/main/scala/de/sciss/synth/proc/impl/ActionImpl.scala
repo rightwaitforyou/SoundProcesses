@@ -68,15 +68,26 @@ object ActionImpl {
     })
   }
 
-  def execute[S <: Sys[S]](name: String, jar: Array[Byte])(implicit tx: S#Tx): Unit = {
+  //  def execute[S <: Sys[S]](name: String, jar: Array[Byte])(implicit tx: S#Tx): Unit = {
+  //    implicit val itx = tx.peer
+  //    val cl = classLoader[S]
+  //    cl.add(name, jar)
+  //    val fullName  = s"${Code.UserPackage}.$name"
+  //    val clazz     = Class.forName(fullName, true, cl)
+  //    //  println("Instantiating...")
+  //    val fun = clazz.newInstance().asInstanceOf[() => Unit]
+  //    fun()
+  //  }
+
+  def execute[S <: Sys[S]](universe: Action.Universe[S], name: String, jar: Array[Byte])(implicit tx: S#Tx): Unit = {
     implicit val itx = tx.peer
     val cl = classLoader[S]
     cl.add(name, jar)
     val fullName  = s"${Code.UserPackage}.$name"
     val clazz     = Class.forName(fullName, true, cl)
     //  println("Instantiating...")
-    val fun = clazz.newInstance().asInstanceOf[() => Unit]
-    fun()
+    val fun = clazz.newInstance().asInstanceOf[Action.Body]
+    fun(universe)
   }
 
   // ----
@@ -96,6 +107,10 @@ object ActionImpl {
     }
     p.completeWith(actFut)
   }
+
+  // ---- universe ----
+
+  final class UniverseImpl[S <: Sys[S]](val self: Action.Obj[S]) extends Action.Universe[S]
 
   // ---- serialization ----
 
@@ -165,7 +180,9 @@ object ActionImpl {
   private final class ConstFunImpl[S <: Sys[S]](val name: String, jar: Array[Byte])
     extends ConstImpl[S] {
 
-    def execute()(implicit tx: S#Tx): Unit = ActionImpl.execute[S](name, jar)
+    def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = {
+      ActionImpl.execute[S](universe, name, jar)
+    }
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeInt(COOKIE)
@@ -184,7 +201,7 @@ object ActionImpl {
   }
 
   private final class ConstEmptyImpl[S <: Sys[S]] extends ConstImpl[S] {
-    def execute()(implicit tx: S#Tx): Unit = ()
+    def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = ()
 
     override def equals(that: Any): Boolean = that match {
       case e: ConstEmptyImpl[_] => true
@@ -213,7 +230,7 @@ object ActionImpl {
     // stupidly defined on stm.Var
     def transform(fun: Action[S] => Action[S])(implicit tx: S#Tx): Unit = update(fun(apply()))
 
-    def execute()(implicit tx: S#Tx): Unit = peer().execute()
+    def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = peer().execute(universe)
 
     protected def disposeData()(implicit tx: S#Tx): Unit = peer.dispose()
 

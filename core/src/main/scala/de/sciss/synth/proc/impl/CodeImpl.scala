@@ -155,7 +155,9 @@ object CodeImpl {
       "de.sciss.synth.ugen.{DiskIn => _, VDiskIn => _, BufChannels => _, BufRateScale => _, BufSampleRate => _, _}",
       "de.sciss.synth.proc.graph._"
     ),
-    Code.Action.id -> Vec() // what should go inside?
+    Code.Action.id -> Vec(     // what should go inside?
+      "de.sciss.synth.proc._"
+    )
   )
 
   def registerImports(id: Int, imports: Seq[String]): Unit = sync.synchronized {
@@ -269,8 +271,9 @@ object CodeImpl {
     val source =
       s"""package ${Code.UserPackage}
          |
-         |class $name extends Function0[Unit] {
-         |  def apply(): Unit = {
+         |final class $name extends $pkgAction.Body {
+         |  def apply[S <: $pkgSys.Sys[S]](universe: $pkgAction.Universe[S])(implicit tx: S#Tx): Unit = {
+         |    import universe._
          |$impS
          |${code.source}
          |  }
@@ -332,18 +335,20 @@ object CodeImpl {
     }
   }
 
-  private val pkg = "de.sciss.synth.proc.impl.CodeImpl"
+  private val pkgAction = "de.sciss.synth.proc.Action"
+  private val pkgCode   = "de.sciss.synth.proc.impl.CodeImpl"
+  private val pkgSys    = "de.sciss.lucre.event"
 
   // note: synchronous
   private def compileThunk(code: String, w: Wrapper[_, _, _], execute: Boolean)(implicit compiler: Code.Compiler): Any = {
     val impS  = w.imports.map(i => s"  import $i\n").mkString
     val bindS = w.binding.fold("")(i =>
-      s"""  val __context__ = $pkg.$i.__context__
+      s"""  val __context__ = $pkgCode.$i.__context__
         |  import __context__._
         |""".stripMargin)
     val aTpe  = w.blockTag // .tpe.toString
     val synth =
-      s"""$pkg.Run[$aTpe]($execute) {
+      s"""$pkgCode.Run[$aTpe]($execute) {
         |$impS
         |$bindS
         |

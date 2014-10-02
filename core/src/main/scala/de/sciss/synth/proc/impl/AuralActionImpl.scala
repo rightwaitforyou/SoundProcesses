@@ -48,8 +48,9 @@ object AuralActionImpl extends AuralObj.Factory {
       if (oldState != AuralObj.Playing) {
         val actionObj = obj()
         if (!actionObj.attr.muted) {
-          val action = actionObj.elem.peer
-          action.execute()
+          val action    = actionObj.elem.peer
+          val universe  = Action.Universe(actionObj)
+          action.execute(universe)
         }
       }
     }

@@ -51,7 +51,21 @@ object Action {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Action[S] = serializer[S].read(in, access)
 
+  // ---- body ----
+
+  trait Body {
+    def apply[S <: Sys[S]](universe: Universe[S])(implicit tx: S#Tx): Unit
+  }
+
+  object Universe {
+    def apply[S <: Sys[S]](self: Action.Obj[S]): Universe[S] = new Impl.UniverseImpl(self)
+  }
+  trait Universe[S <: Sys[S]] {
+    def self: Action.Obj[S]
+  }
+
   // ---- element ----
+
   implicit object Elem extends proc.Elem.Companion[Elem] {
     def typeID = Action.typeID
 
@@ -75,5 +89,5 @@ object Action {
   type Obj[S <: Sys[S]] = proc.Obj.T[S, Action.Elem]
 }
 trait Action[S <: Sys[S]] extends Writable with Disposable[S#Tx] with evt.Publisher[S, Unit] {
-  def execute()(implicit tx: S#Tx): Unit
+  def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit
 }

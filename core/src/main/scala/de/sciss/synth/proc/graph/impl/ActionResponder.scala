@@ -30,9 +30,18 @@ object ActionResponder {
         if (DEBUG) println(s"ActionResponder($key, $NodeID) - received trigger")
         // logAural(m.toString())
         cursor.step { implicit tx =>
-          objH().attr[proc.Action.Elem](key).foreach { action =>
-            if (DEBUG) println("...and found action")
-            action.execute()
+          objH().attr.get(key).foreach { valueOpaque =>
+            // for some reason we cannot pattern match for Action.Obj(action);
+            // scalac gives us
+            // "inferred type arguments [S] do not conform to method unapply's type
+            // parameter bounds [S <: de.sciss.lucre.event.Sys[S]]"
+            // - WHY??
+            if (valueOpaque.elem.isInstanceOf[proc.Action.Elem[S]]) {
+              val action = valueOpaque.asInstanceOf[proc.Action.Obj[S]]
+              if (DEBUG) println("...and found action")
+              val universe = proc.Action.Universe(action)
+              action.elem.peer.execute(universe)
+            }
           }
         }
     }
