@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 package impl
 
-import java.io.File
+import java.io.{ByteArrayOutputStream, ByteArrayInputStream, File}
 import de.sciss.processor.Processor
 import de.sciss.synth
 import de.sciss.synth.proc
@@ -31,6 +31,45 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 
 object CodeImpl {
   private final val COOKIE  = 0x436F6465  // "Code"
+
+  def unpackJar(bytes: Array[Byte]): Map[String, Array[Byte]] = {
+    import java.util.jar._
+    import scala.annotation.tailrec
+
+    val in = new JarInputStream(new ByteArrayInputStream(bytes))
+    val b  = Map.newBuilder[String, Array[Byte]]
+
+    @tailrec def loop(): Unit = {
+      val entry = in.getNextJarEntry
+      if (entry != null) {
+        if (!entry.isDirectory) {
+          val name  = entry.getName
+
+          // cf. http://stackoverflow.com/questions/8909743/jarentry-getsize-is-returning-1-when-the-jar-files-is-opened-as-inputstream-f
+          val bs  = new ByteArrayOutputStream
+          var i   = 0
+          while (i >= 0) {
+            i = in.read()
+            if (i >= 0) bs.write(i)
+          }
+          val bytes = bs.toByteArray
+          b += mkClassName(name) -> bytes
+        }
+        loop()
+      }
+    }
+    loop()
+    in.close()
+    b.result()
+  }
+
+  /* Converts a jar entry name with slashes to a class name with dots
+   * and dropping the `class` extension
+   */
+  private def mkClassName(path: String): String = {
+    require(path.endsWith(".class"))
+    path.substring(0, path.length - 6).replace("/", ".")
+  }
 
   implicit object serializer extends ImmutableSerializer[Code] {
     def write(v: Code, out: DataOutput): Unit = {
@@ -57,10 +96,10 @@ object CodeImpl {
 
   // ---- elem ----
 
-  object ElemImpl extends proc.impl.ElemImpl.Companion[Code.Elem] {
+  object ElemImpl extends proc.impl.ElemCompanionImpl[Code.Elem] {
     def typeID = Code.typeID // 0x20001
 
-    Elem.registerExtension(this)
+    // Elem.registerExtension(this)
 
     def apply[S <: Sys[S]](peer: Expr[S, Code])(implicit tx: S#Tx): Code.Elem[S] = {
       val targets = evt.Targets[S]
@@ -88,7 +127,7 @@ object CodeImpl {
     private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
                                           val peer: Expr[S, Code])
       extends Code.Elem[S]
-      with proc.impl.ElemImpl.Active[S] {
+      with proc.impl.ActiveElemImpl[S] {
 
       def typeID = ElemImpl.typeID
       def prefix = "Code"
@@ -219,12 +258,6 @@ object CodeImpl {
     * and returns the function's class name (without package) and the raw jar file produced in the compilation.
     */
   def compileToFunction(name: String, code: Code.Action)(implicit compiler: Code.Compiler): Array[Byte] = {
-    // val compiler        = intp.global  // we re-use the intp compiler -- no problem, right?
-    // intp.reset()
-    // compiler.reporter.reset()
-
-    // val f               = File.createTempFile("temp", ".scala")
-    // val out             = new BufferedOutputStream(new FileOutputStream(f))
 
     val imports = getImports(Code.Action.id)
     val impS  = /* w. */imports.map(i => s"  import $i\n").mkString
@@ -244,46 +277,10 @@ object CodeImpl {
          |}
          |""".stripMargin
 
-    // println(synth)
+    // println(source)
 
     compiler.compile(source)
-
-    //    out.write(synth.getBytes("UTF-8"))
-    //    out.flush(); out.close()
-    //    val run = new compiler.Run()
-    //    run.compile(List(f.getPath))
-    //    f.delete()
-    //
-    //    if (compiler.reporter.hasErrors) throw new Code.CompilationFailed()
-    //
-    //    val d0    = intp.virtualDirectory // method deprecated in Scala 2.11, but necessary for Scala 2.10
-    //    // intp.replOutput.dir
-    //
-    //    val bytes = JarUtil.pack(d0)
-    //    bytes
   }
-
-  //  def deleteDir(base: File): Unit = {
-  //    base.listFiles().foreach { f =>
-  //      if (f.isFile) f.delete()
-  //      else deleteDir(f)
-  //    }
-  //    base.delete()
-  //  }
-
-  //  private final class Intp(cSet: nsc.Settings)
-  //    extends IMain(cSet, new NewLinePrintWriter(new ConsoleWriter, autoFlush = true)) {
-  //
-  //    override protected def parentClassLoader = CodeImpl.getClass.getClassLoader
-  //  }
-  //
-  //  private lazy val intp = {
-  //    val cSet = new nsc.Settings()
-  //    cSet.classpath.value += File.pathSeparator + sys.props("java.class.path")
-  //    val res = new Intp(cSet)
-  //    res.initializeSynchronous()
-  //    res
-  //  }
 
   object Run {
     def apply[A](execute: Boolean)(thunk: => A): A = if (execute) thunk else null.asInstanceOf[A]
@@ -337,12 +334,8 @@ object CodeImpl {
 
   private val pkg = "de.sciss.synth.proc.impl.CodeImpl"
 
-  // val UserPackage = "de.sciss.mellite.user"
-
   // note: synchronous
   private def compileThunk(code: String, w: Wrapper[_, _, _], execute: Boolean)(implicit compiler: Code.Compiler): Any = {
-    // val i = intp
-
     val impS  = w.imports.map(i => s"  import $i\n").mkString
     val bindS = w.binding.fold("")(i =>
       s"""  val __context__ = $pkg.$i.__context__
@@ -356,33 +349,6 @@ object CodeImpl {
         |
         |""".stripMargin + code + "\n}"
 
-    //    // work-around for SI-8521 (Scala 2.11.0)
-    //    def interpret(line: String) = {
-    //      val th = Thread.currentThread()
-    //      val cl = th.getContextClassLoader
-    //      try {
-    //        i.interpret(line)
-    //      } finally {
-    //        th.setContextClassLoader(cl)
-    //      }
-    //    }
-
-    // i.reset()
-    // val res = interpret(synth)
-    val res = compiler.interpret(synth)
-    res
-
-    //    // commented out to chase ClassNotFoundException
-    //    // i.reset()
-    //    res match {
-    //      case Results.Success =>
-    //        if (aTpe == "Unit" || !execute) () else {
-    //          val n = i.mostRecentVar
-    //          i.valueOfTerm(n).getOrElse(sys.error(s"No value for term $n"))
-    //        }
-    //
-    //      case Results.Error      => throw Code.CompilationFailed()
-    //      case Results.Incomplete => throw Code.CodeIncomplete()
-    //    }
+    compiler.interpret(synth, execute = execute && w.blockTag != "Unit")
   }
 }

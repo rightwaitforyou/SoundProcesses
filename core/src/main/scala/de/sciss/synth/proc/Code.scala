@@ -54,6 +54,8 @@ object Code {
 
   // ---- compiler ----
 
+  def unpackJar(bytes: Array[Byte]): Map[String, Array[Byte]] = Impl.unpackJar(bytes)
+
   trait Compiler {
     implicit def executionContext: ExecutionContext
 
@@ -78,7 +80,7 @@ object Code {
       *                 of an imported object. It must contain any necessary `import` statements.
       * @return the evaluation result, or `()` if there is no result value
       */
-    def interpret(source: String): Any
+    def interpret(source: String, execute: Boolean): Any
   }
 
   // ---- type: FileTransform ----

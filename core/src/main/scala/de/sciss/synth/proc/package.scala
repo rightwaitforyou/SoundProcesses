@@ -208,6 +208,6 @@ package object proc {
   trait FolderElem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Folder[S]
     // type PeerUpdate = Folder.Update[S]
-    type PeerUpdate = Folder.Update[S]
+    type PeerUpdate = expr.List.Update[S, Obj[S], Obj.Update[S]] // SCALAC BUG
   }
 }

@@ -19,10 +19,10 @@ import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.synth.{ControlSet, proc}
 import language.higherKinds
-import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralEnsembleImpl, AuralTimelineImpl, AuralProcImpl}
+import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralActionImpl, AuralEnsembleImpl, AuralTimelineImpl, AuralProcImpl}
 
 object AuralObj {
-  import proc.{Proc => _Proc, Timeline => _Timeline, Ensemble => _Ensemble}
+  import proc.{Proc => _Proc, Timeline => _Timeline, Ensemble => _Ensemble, Action => _Action}
 
   trait Factory {
     def typeID: Int
@@ -159,6 +159,22 @@ object AuralObj {
     override def obj: stm.Source[S#Tx, _Ensemble.Obj[S]]
 
     def views(implicit tx: S#Tx): Set[AuralObj[S]]
+  }
+
+  // ---- action ----
+
+  object Action extends AuralObj.Factory {
+    type E[S <: evt.Sys[S]] = _Action.Elem[S]
+
+    def typeID = _Action.typeID
+
+    def apply[S <: Sys[S]](obj: _Action.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Action[S] =
+      AuralActionImpl(obj)
+  }
+  trait Action[S <: Sys[S]] extends AuralObj[S] {
+    override def obj: stm.Source[S#Tx, _Action.Obj[S]]
+
+    // def views(implicit tx: S#Tx): Set[AuralObj[S]]
   }
 }
 trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Disposable[S#Tx] {

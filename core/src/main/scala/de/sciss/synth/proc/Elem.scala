@@ -19,10 +19,8 @@ import de.sciss.lucre.{event => evt}
 import evt.{EventLike, Sys}
 import de.sciss.lucre.stm.Disposable
 import proc.impl.{ElemImpl => Impl}
-import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.{higherKinds, implicitConversions}
-import de.sciss.serial.{Serializer, DataInput, Writable}
-import de.sciss.lucre.expr.Expr
+import de.sciss.serial.{DataInput, Writable}
 
 object Elem {
   final case class Update[S <: Sys[S], +Upd](element: Elem[S], change: Upd)
@@ -53,7 +51,11 @@ object Elem {
     def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Elem[S]
   }
 
-  def registerExtension(ext: Extension): Unit = Impl.registerExtension(ext)
+  def registerExtension(ext: Extension): Unit = {
+    // Impl
+    // println(s"YO: ${Impl.debug()}")
+    Impl.registerExtension(ext)
+  }
 }
 trait Elem[S <: Sys[S]]
   extends Writable with Disposable[S#Tx] /* Mutable[S#ID, S#Tx] */ with evt.Publisher[S, Elem.Update[S, Any]] { me =>

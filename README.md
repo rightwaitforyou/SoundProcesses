@@ -18,16 +18,18 @@ The following dependency is necessary:
 
     resolvers += "Oracle Repository" at "http://download.oracle.com/maven"
     
-    "de.sciss" %% "soundprocesses"       % v
-    "de.sciss" %% "soundprocesses-views" % v  // common swing views
+    "de.sciss" %% "soundprocesses" % v
 
 The current stable version `v` is `"2.6.1"`.
 
 The following sub modules are available:
 
-    "de.sciss" %% "lucrebitemp"     % v     // bi-temporal data structures
-    "de.sciss" %% "lucresynth"      % v     // transactional layer for ScalaCollider
-    "de.sciss" %% "lucresynth-expr" % v     // standard expression types
+    "de.sciss" %% "lucrebitemp"     % v          // bi-temporal data structures
+    "de.sciss" %% "lucresynth"      % v          // transactional layer for ScalaCollider
+    "de.sciss" %% "lucresynth-expr" % v          // standard expression types
+    "de.sciss" %% "soundprocesses-core"     % v  // everything but views and compiler
+    "de.sciss" %% "soundprocesses-views"    % v  // common swing views
+    "de.sciss" %% "soundprocesses-compiler" % v  // compiler integration
 
 ## usage
 

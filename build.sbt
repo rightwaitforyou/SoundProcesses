@@ -1,6 +1,6 @@
 lazy val logicalName = "SoundProcesses"
 
-name                      := s"$logicalName-full"
+name                      := logicalName // s"$logicalName-full"
 
 version      in ThisBuild := "2.7.0-SNAPSHOT"
 
@@ -28,15 +28,18 @@ lazy val lucreConfluentVersion  = "2.9.0"
 
 lazy val scalaColliderVersion   = "1.14.0"
 
-lazy val scalaTestVersion       = "2.2.2"
-
 lazy val spanVersion            = "1.2.1"
-
-lazy val fileUtilVersion        = "1.1.1"
 
 lazy val lucreSwingVersion      = "0.5.0"
 
 lazy val audioWidgetsVersion    = "1.7.0"
+
+// ---- test-only ----
+
+lazy val scalaTestVersion       = "2.2.2"
+
+lazy val fileUtilVersion        = "1.1.1"
+
 
 lazy val loggingEnabled         = true
 
@@ -86,15 +89,15 @@ initialCommands in console :=
 
 // ---- sub-projects ----
 
-lazy val root = project.in(file("."))
-  .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses, `soundprocesses-views`)
-  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, soundprocesses, `soundprocesses-views`)
+lazy val soundprocesses = project.in(file("."))
+  .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, `soundprocesses-core`, `soundprocesses-views` ,`soundprocesses-compiler`)
+  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, `soundprocesses-core`, `soundprocesses-views`, `soundprocesses-compiler`)
   .settings(
-    //    publishArtifact in(Compile, packageBin) := false, // there are no binaries
-    //    publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
-    //    publishArtifact in(Compile, packageSrc) := false, // there are no sources
-    packagedArtifacts := Map.empty
-    // autoScalaLibrary := false
+    publishArtifact in(Compile, packageBin) := false, // there are no binaries
+    publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
+    publishArtifact in(Compile, packageSrc) := false, // there are no sources
+    // packagedArtifacts := Map.empty
+    autoScalaLibrary := false
   )
 
 lazy val lucrebitemp = project.in(file("bitemp")).settings(
@@ -126,7 +129,7 @@ lazy val lucresynth = project.in(file("synth")).settings(
   )
 )
 
-lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`)
+lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`)
   .settings(buildInfoSettings: _*).settings(
     description :=  "A framework for creating and managing ScalaCollider based sound processes",
     sourceGenerators in Compile <+= buildInfo,
@@ -143,12 +146,22 @@ lazy val soundprocesses = project.in(file("proc")).dependsOn(lucrebitemp, lucres
     )
   )
 
-lazy val `soundprocesses-views` = project.in(file("views")).dependsOn(soundprocesses)
+lazy val `soundprocesses-views` = project.in(file("views")).dependsOn(`soundprocesses-core`)
   .settings(
     description :=  "Views for Sound Processes",
     libraryDependencies ++= Seq(
       "de.sciss" %% "lucreswing"       % lucreSwingVersion,
       "de.sciss" %% "audiowidgets-app" % audioWidgetsVersion
+    )
+  )
+
+lazy val `soundprocesses-compiler` = project.in(file("compiler")).dependsOn(`soundprocesses-core`)
+  .settings(
+    description := "Compiler-support for Sound Processes",
+    libraryDependencies ++= Seq(
+      "org.scala-lang" %  "scala-compiler" % scalaVersion.value,
+      "de.sciss"       %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
+      "de.sciss"       %% "fileutil"       % fileUtilVersion       % "test"
     )
   )
 

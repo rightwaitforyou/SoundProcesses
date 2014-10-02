@@ -48,7 +48,7 @@ object EnsembleImpl {
 
   // ---- Elem ----
 
-  object ElemImpl extends proc.impl.ElemImpl.Companion[Ensemble.Elem] {
+  object ElemImpl extends proc.impl.ElemCompanionImpl[Ensemble.Elem] {
     val typeID = Ensemble.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
@@ -66,7 +66,7 @@ object EnsembleImpl {
 
   private final class ElemImpl[S <: Sys[S]](val targets: evt.Targets[S],
                                             val peer: Ensemble[S])
-    extends proc.impl.ElemImpl.Active[S] with Ensemble.Elem[S] {
+    extends proc.impl.ActiveElemImpl[S] with Ensemble.Elem[S] {
 
     def typeID = Ensemble.typeID
     def prefix = "Ensemble"

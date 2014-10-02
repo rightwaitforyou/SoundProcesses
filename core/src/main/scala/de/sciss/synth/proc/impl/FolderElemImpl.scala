@@ -18,7 +18,7 @@ import de.sciss.lucre.{event => evt, expr}
 import evt.Sys
 import de.sciss.serial.DataInput
 
-object FolderElemImpl extends ElemImpl.Companion[FolderElem] {
+object FolderElemImpl extends ElemCompanionImpl[FolderElem] {
   // final val typeID = 0x10000
   def typeID = FolderElem.typeID
 
@@ -50,7 +50,7 @@ object FolderElemImpl extends ElemImpl.Companion[FolderElem] {
   private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
                                         val peer: Folder[S])
     extends FolderElem[S]
-    with ElemImpl.Active[S] {
+    with ActiveElemImpl[S] {
 
     def typeID = FolderElemImpl.typeID
     def prefix = "Folder"

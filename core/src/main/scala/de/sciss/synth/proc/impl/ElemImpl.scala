@@ -16,19 +16,15 @@ package synth
 package proc
 package impl
 
-import lucre.{event => evt, expr, stm}
-import de.sciss.lucre.event.{EventLike, Sys, Event}
-import serial.{DataInput, DataOutput, Writable}
-import stm.Disposable
-import de.sciss.lucre.expr.{Expr => _Expr, Type1Like, ExprType}
+import lucre.{event => evt}
+import de.sciss.lucre.event.Sys
+import serial.DataInput
+import de.sciss.lucre.expr.{Expr => _Expr}
 import de.sciss.lucre.synth.InMemory
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.higherKinds
-import de.sciss.synth.proc.Elem
-import de.sciss.lucre.expr.impl.ExprTypeImplA
 
 object ElemImpl {
-  import Elem.Update
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
   import proc.{FadeSpec => _FadeSpec, ArtifactLocation => _ArtifactLocation, Proc => _Proc, Timeline => _Timeline}
@@ -36,7 +32,7 @@ object ElemImpl {
 
   // ---- Int ----
 
-  object Int extends ExprCompanion[proc.IntElem, _Int] {
+  object Int extends ExprElemCompanionImpl[proc.IntElem, _Int] {
     protected val tpe = lucre.expr.Int
 
     protected def newActive[S <: Sys[S]](targets: evt.Targets[S], peer: _Expr[S, _Int])
@@ -47,23 +43,23 @@ object ElemImpl {
       new IntConstImpl[S](peer)
   }
 
-  trait IntImpl[S <: Sys[S]] extends IntElem[S] {
+  private trait IntImpl[S <: Sys[S]] extends IntElem[S] {
     final def prefix = "Int"
     final def typeID = Int.typeID
   }
 
-  final class IntConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Int])
-    extends Passive[S] with IntImpl[S]
+  private final class IntConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Int])
+    extends PassiveElemImpl[S] with IntImpl[S]
 
-  final class IntActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Int])
-    extends Active[S] with IntImpl[S] {
+  private final class IntActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Int])
+    extends ActiveElemImpl[S] with IntImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): IntElem[S] = Int(Int.copyExpr(peer))
   }
 
   // ---- Long ----
 
-  object Long extends ExprCompanion[LongElem, _Long] {
+  object Long extends ExprElemCompanionImpl[LongElem, _Long] {
     protected val tpe = lucre.expr.Long
 
     protected def newActive[S <: Sys[S]](targets: evt.Targets[S], peer: _Expr[S, _Long])
@@ -74,23 +70,23 @@ object ElemImpl {
       new LongConstImpl[S](peer)
   }
 
-  trait LongImpl[S <: Sys[S]] extends LongElem[S] {
+  private trait LongImpl[S <: Sys[S]] extends LongElem[S] {
     final def prefix = "Long"
     final def typeID = Long.typeID
   }
 
-  final class LongConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Long])
-    extends Passive[S] with LongImpl[S]
+  private final class LongConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Long])
+    extends PassiveElemImpl[S] with LongImpl[S]
 
-  final class LongActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Long])
-    extends Active[S] with LongImpl[S] {
+  private final class LongActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Long])
+    extends ActiveElemImpl[S] with LongImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): LongElem[S] = Long(Long.copyExpr(peer))
   }
 
   // ---- Double ----
 
-  object Double extends ExprCompanion[DoubleElem, _Double] {
+  object Double extends ExprElemCompanionImpl[DoubleElem, _Double] {
     protected val tpe = lucre.expr.Double
 
     protected def newActive[S <: Sys[S]](targets: evt.Targets[S], peer: _Expr[S, _Double])
@@ -101,23 +97,23 @@ object ElemImpl {
       new DoubleConstImpl[S](peer)
   }
 
-  trait DoubleImpl[S <: Sys[S]] extends DoubleElem[S] {
+  private trait DoubleImpl[S <: Sys[S]] extends DoubleElem[S] {
     final def prefix = "Double"
     final def typeID = Double.typeID
   }
 
-  final class DoubleConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Double])
-    extends Passive[S] with DoubleImpl[S]
+  private final class DoubleConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Double])
+    extends PassiveElemImpl[S] with DoubleImpl[S]
 
-  final class DoubleActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Double])
-    extends Active[S] with DoubleImpl[S] {
+  private final class DoubleActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Double])
+    extends ActiveElemImpl[S] with DoubleImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): DoubleElem[S] = Double(Double.copyExpr(peer))
   }
 
   // ---- Boolean ----
 
-  object Boolean extends ExprCompanion[BooleanElem, _Boolean] {
+  object Boolean extends ExprElemCompanionImpl[BooleanElem, _Boolean] {
     protected val tpe = lucre.expr.Boolean
 
     protected def newActive[S <: Sys[S]](targets: evt.Targets[S], peer: _Expr[S, _Boolean])
@@ -128,23 +124,23 @@ object ElemImpl {
       new BooleanConstImpl[S](peer)
   }
 
-  trait BooleanImpl[S <: Sys[S]] extends BooleanElem[S] {
+  private trait BooleanImpl[S <: Sys[S]] extends BooleanElem[S] {
     final def prefix = "Boolean"
     final def typeID = Boolean.typeID
   }
 
-  final class BooleanConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Boolean])
-    extends Passive[S] with BooleanImpl[S]
+  private final class BooleanConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Boolean])
+    extends PassiveElemImpl[S] with BooleanImpl[S]
 
-  final class BooleanActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Boolean])
-    extends Active[S] with BooleanImpl[S] {
+  private final class BooleanActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Boolean])
+    extends ActiveElemImpl[S] with BooleanImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): BooleanElem[S] = Boolean(Boolean.copyExpr(peer))
   }
 
   // ---- String ----
 
-  object String extends ExprCompanion[StringElem, _String] {
+  object String extends ExprElemCompanionImpl[StringElem, _String] {
     protected val tpe = lucre.expr.String
 
     protected def newActive[S <: Sys[S]](targets: evt.Targets[S], peer: _Expr[S, _String])
@@ -155,23 +151,23 @@ object ElemImpl {
       new StringConstImpl[S](peer)
   }
 
-  trait StringImpl[S <: Sys[S]] extends StringElem[S] {
+  private trait StringImpl[S <: Sys[S]] extends StringElem[S] {
     final def prefix = "String"
     final def typeID = String.typeID
   }
 
-  final class StringConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _String])
-    extends Passive[S] with StringImpl[S]
+  private final class StringConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _String])
+    extends PassiveElemImpl[S] with StringImpl[S]
 
-  final class StringActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _String])
-    extends Active[S] with StringImpl[S] {
+  private final class StringActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _String])
+    extends ActiveElemImpl[S] with StringImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): StringElem[S] = String(String.copyExpr(peer))
   }
 
   // ---- FadeSpec ----
 
-  object FadeSpec extends Companion[_FadeSpec.Elem] {
+  object FadeSpec extends ElemCompanionImpl[_FadeSpec.Elem] {
     final val typeID = _FadeSpec.Expr.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
@@ -194,16 +190,16 @@ object ElemImpl {
     }
   }
 
-  trait FadeSpecImpl[S <: Sys[S]] extends _FadeSpec.Elem[S] {
+  private trait FadeSpecImpl[S <: Sys[S]] extends _FadeSpec.Elem[S] {
     final def typeID = FadeSpec.typeID
     final def prefix = "FadeSpec"
   }
 
-  final class FadeSpecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _FadeSpec])
-    extends Passive[S] with FadeSpecImpl[S]
+  private final class FadeSpecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _FadeSpec])
+    extends PassiveElemImpl[S] with FadeSpecImpl[S]
 
-  final class FadeSpecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _FadeSpec])
-    extends Active[S] with FadeSpecImpl[S] {
+  private final class FadeSpecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _FadeSpec])
+    extends ActiveElemImpl[S] with FadeSpecImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): _FadeSpec.Elem[S] = {
       val newPeer = peer match {
@@ -222,7 +218,7 @@ object ElemImpl {
 
   // ---- DoubleVec ----
 
-  object DoubleVec extends Companion[DoubleVecElem] {
+  object DoubleVec extends ElemCompanionImpl[DoubleVecElem] {
     val typeID = _DoubleVec.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
@@ -243,16 +239,16 @@ object ElemImpl {
         new DoubleVecActiveImpl(evt.Targets[S], peer)
   }
 
-  trait DoubleVecImpl[S <: Sys[S]] extends DoubleVecElem[S] {
+  private trait DoubleVecImpl[S <: Sys[S]] extends DoubleVecElem[S] {
     final def typeID = DoubleVec.typeID
     final def prefix = "DoubleVec"
   }
 
-  final class DoubleVecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, Vec[_Double]])
-    extends Passive[S] with DoubleVecImpl[S]
+  private final class DoubleVecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, Vec[_Double]])
+    extends PassiveElemImpl[S] with DoubleVecImpl[S]
 
-  final class DoubleVecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, Vec[_Double]])
-    extends Active[S] with DoubleVecImpl[S] {
+  private final class DoubleVecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, Vec[_Double]])
+    extends ActiveElemImpl[S] with DoubleVecImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): DoubleVecElem[S] = {
       val newPeer = peer match {
@@ -265,7 +261,7 @@ object ElemImpl {
 
   // ---- AudioGrapheme ----
 
-  object AudioGrapheme extends Companion[AudioGraphemeElem] {
+  object AudioGrapheme extends ElemCompanionImpl[AudioGraphemeElem] {
     val typeID = Grapheme.Expr.Audio.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
@@ -294,7 +290,7 @@ object ElemImpl {
     }
   }
 
-  trait AudioGraphemeImpl[S <: Sys[S]] extends AudioGraphemeElem[S] {
+  private trait AudioGraphemeImpl[S <: Sys[S]] extends AudioGraphemeElem[S] {
     final def typeID = AudioGrapheme.typeID
     final def prefix = "AudioGrapheme"
   }
@@ -302,9 +298,9 @@ object ElemImpl {
   //  final class AudioGraphemeConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, Grapheme.Value.Audio])
   //    extends Passive[S] with AudioGraphemeImpl[S]
 
-  final class AudioGraphemeActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+  private final class AudioGraphemeActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
                                                    val peer: Grapheme.Expr.Audio[S])
-    extends Active[S] with AudioGraphemeImpl[S] {
+    extends ActiveElemImpl[S] with AudioGraphemeImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): AudioGraphemeElem[S] = {
       val artifactCopy  = peer.artifact // XXX TODO copy
@@ -318,7 +314,7 @@ object ElemImpl {
 
   // ---- ArtifactLocation ----
 
-  object ArtifactLocation extends Companion[_ArtifactLocation.Elem] {
+  object ArtifactLocation extends ElemCompanionImpl[_ArtifactLocation.Elem] {
     val typeID = _ArtifactLocation.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
@@ -334,7 +330,7 @@ object ElemImpl {
       new ArtifactLocationActiveImpl(evt.Targets[S], peer)
   }
 
-  trait ArtifactLocationImpl[S <: Sys[S]] extends _ArtifactLocation.Elem[S] {
+  private trait ArtifactLocationImpl[S <: Sys[S]] extends _ArtifactLocation.Elem[S] {
     final def typeID = ArtifactLocation.typeID
     final def prefix = "ArtifactLocation"
   }
@@ -342,9 +338,9 @@ object ElemImpl {
   //  final class AudioGraphemeConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, Grapheme.Value.Audio])
   //    extends Passive[S] with AudioGraphemeImpl[S]
 
-  final class ArtifactLocationActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+  private final class ArtifactLocationActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
                                                       val peer: _ArtifactLocation[S])
-    extends Active[S] with ArtifactLocationImpl[S] {
+    extends ActiveElemImpl[S] with ArtifactLocationImpl[S] {
 
     protected def peerEvent = peer.changed
 
@@ -353,7 +349,7 @@ object ElemImpl {
 
   // ---- Timeline ----
 
-  object Timeline extends Companion[_Timeline.Elem] {
+  object Timeline extends ElemCompanionImpl[_Timeline.Elem] {
     val typeID = _Timeline.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
@@ -369,14 +365,14 @@ object ElemImpl {
       new TimelineActiveImpl(evt.Targets[S], peer)
   }
 
-  trait TimelineImpl[S <: Sys[S]] extends _Timeline.Elem[S] {
+  private trait TimelineImpl[S <: Sys[S]] extends _Timeline.Elem[S] {
     final def typeID = Timeline.typeID
     final def prefix = "Timeline"
   }
 
-  final class TimelineActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+  private final class TimelineActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
                                                val peer: _Timeline[S])
-    extends Active[S] with TimelineImpl[S] {
+    extends ActiveElemImpl[S] with TimelineImpl[S] {
 
     protected def peerEvent = peer.changed
 
@@ -385,7 +381,7 @@ object ElemImpl {
 
   // ---- Proc ----
 
-  object Proc extends Companion[_Proc.Elem] {
+  object Proc extends ElemCompanionImpl[_Proc.Elem] {
     val typeID = _Proc.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
@@ -401,14 +397,14 @@ object ElemImpl {
       new ProcActiveImpl(evt.Targets[S], peer)
   }
 
-  trait ProcImpl[S <: Sys[S]] extends _Proc.Elem[S] {
+  private trait ProcImpl[S <: Sys[S]] extends _Proc.Elem[S] {
     final def typeID = Proc.typeID
     final def prefix = "Proc"
   }
 
-  final class ProcActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+  private final class ProcActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
                                           val peer: _Proc[S])
-    extends Active[S] with ProcImpl[S] {
+    extends ActiveElemImpl[S] with ProcImpl[S] {
 
     protected def peerEvent = peer.changed
 
@@ -429,133 +425,6 @@ object ElemImpl {
     }
   }
 
-  // ---------- Impl ----------
-
-  trait Companion[E[S <: Sys[S]] <: Elem[S]] extends Elem.Extension {
-    implicit final def serializer[S <: Sys[S]]: serial.Serializer[S#Tx, S#Acc, E[S]] =
-      anySer.asInstanceOf[Serializer[S]]
-
-    private val anySer = new Serializer[InMemory]
-
-    override def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                                (implicit tx: S#Tx): E[S] with evt.Node[S]
-
-    override def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): E[S]
-
-    private final class Serializer[S <: Sys[S]] extends evt.EventLikeSerializer[S, E[S]] {
-      def readConstant(in: DataInput)(implicit tx: S#Tx): E[S] = {
-        readCookie(in)
-        readIdentifiedConstant(in)
-      }
-
-      private def readCookie(in: DataInput): Unit = {
-        val cookie  = in.readInt()
-        if (cookie != typeID) sys.error(s"Cookie $cookie does not match expected value $typeID")
-      }
-
-      def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): E[S] with evt.Node[S] = {
-        readCookie(in)
-        readIdentified(in, access, targets)
-      }
-    }
-  }
-
-  trait ExprCompanion[E[S <: Sys[S]] <: Elem[S], A] extends Companion[E] {
-    protected def tpe: lucre.expr.ExprType1[A]
-
-    protected def newActive[S <: Sys[S]](targets: evt.Targets[S], peer: _Expr[S, A])
-                                        (implicit tx: S#Tx): E[S] with evt.Node[S]
-
-    protected def newConst[S <: Sys[S]](peer: _Expr.Const[S, A])(implicit tx: S#Tx): E[S]
-
-    def typeID = tpe.typeID
-
-    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): E[S] with evt.Node[S] = {
-      val peer = tpe.read(in, access)
-      newActive(targets, peer)
-    }
-
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): E[S] = {
-      val peer = tpe.readConst[S](in)
-      newConst(peer)
-    }
-
-    def apply[S <: Sys[S]](peer: _Expr[S, A])(implicit tx: S#Tx): E[S] = peer match {
-      case c: _Expr.Const[S, A] => newConst(c)
-      case _                    => newActive[S](evt.Targets[S], peer)
-    }
-
-    def copyExpr[S <: Sys[S]](in: _Expr[S, A])(implicit ts: S#Tx): _Expr[S, A] =
-      in match {
-        case _Expr.Var(vr) => tpe.newVar(vr())
-        case _ => in
-      }
-  }
-
-  trait Basic[S <: Sys[S]]
-    extends Elem[S] {
-    self =>
-
-    type Peer <: Writable with Disposable[S#Tx]
-
-    final protected def writeData(out: DataOutput): Unit = {
-      out.writeInt(typeID)
-      peer.write(out)
-    }
-
-    final protected def disposeData()(implicit tx: S#Tx): Unit = peer.dispose()
-
-    protected def prefix: String
-
-    // ---- events ----
-
-    final protected def reader: evt.Reader[S, Elem[S]] = serializer
-  }
-
-  trait Passive[S <: Sys[S]]
-    extends Basic[S] with evt.impl.Constant {
-
-    final def mkCopy()(implicit tx: S#Tx): this.type = this
-
-    final def changed: EventLike[S, Update[S, PeerUpdate]] = evt.Dummy[S, Update[S, PeerUpdate]]
-
-    override def toString = s"Elem.$prefix($peer)"
-
-    final def dispose()(implicit tx: S#Tx): Unit = disposeData()
-  }
-
-  trait Active[S <: Sys[S]]
-    extends Basic[S] with evt.Node[S] {
-    self =>
-
-    type Peer <: evt.Publisher[S, PeerUpdate] with Writable with Disposable[S#Tx]
-    // private def peerEvent = peer.changed
-
-    // protected def peerEvent: evt.EventLike[S, Any]
-
-    override def toString() = s"Elem.${prefix}$id"
-
-    def select(slot: Int): Event[S, Any, Any] = changed
-
-    object changed
-      extends evt.impl.EventImpl[S, Update[S, PeerUpdate], Elem[S]]
-      with evt.InvariantEvent   [S, Update[S, PeerUpdate], Elem[S]] {
-
-      final protected def reader: evt.Reader[S, Elem[S]] = self.reader
-      final def node: Elem[S] with evt.Node[S] = self
-
-      final val slot = 0
-
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Update[S, PeerUpdate]] = {
-        pull(peer.changed).map(ch => Update(self, ch))
-      }
-
-      def connect   ()(implicit tx: S#Tx): Unit = peer.changed ---> this
-      def disconnect()(implicit tx: S#Tx): Unit = peer.changed -/-> this
-    }
-  }
-
   // ----------------- Serializer -----------------
 
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Elem[S]] = anySer.asInstanceOf[Ser[S]]
@@ -565,6 +434,8 @@ object ElemImpl {
   private final val anySer = new Ser[InMemory]
 
   private final val sync = new AnyRef
+
+  def debug() = extensions.toString()
 
   @volatile private var extensions = Map[Int, Elem.Extension](
     Int             .typeID -> Int             ,
@@ -579,7 +450,9 @@ object ElemImpl {
     Proc            .typeID -> Proc            ,
     Timeline        .typeID -> Timeline        ,
     FolderElemImpl  .typeID -> FolderElemImpl  ,
-    Ensemble        .typeID -> EnsembleImpl.ElemImpl
+    Ensemble        .typeID -> EnsembleImpl.ElemImpl,
+    Action          .typeID -> ActionImpl.ElemImpl,
+    Code            .typeID -> CodeImpl.ElemImpl
   )
 
   def registerExtension(ext: Elem.Extension): Unit = sync.synchronized {
