@@ -48,11 +48,11 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
   final def addMessage(resource: Resource, m: osc.Message with message.Send, audible: Boolean, dependencies: Seq[Resource],
                        noErrors: Boolean): Unit = {
 
-    //      val rsrc = system.resources
-
     val server        = resource.server
+    if (!server.peer.isRunning) return
+
     val rsrcStampOld  = resource.timeStamp(tx)
-    require(rsrcStampOld >= 0, "Already disposed : " + resource)
+    if(rsrcStampOld < 0) sys.error(s"Already disposed : $resource")
 
     implicit val itx  = peer
     val txnCnt        = NodeGraph.messageTimeStamp(server)(tx)
@@ -66,7 +66,7 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
     var depStampMax = math.max(txnStartCnt << 1, rsrcStampOld)
     dependencies.foreach { dep =>
       val depStamp = dep.timeStamp(tx)
-      require(depStamp >= 0, "Dependency already disposed : " + dep)
+      if (depStamp < 0) sys.error(s"Dependency already disposed : $dep")
       if (depStamp > depStampMax) depStampMax = depStamp
       //         dep.addDependent( resource )( tx )  // validates dep's server
     }
