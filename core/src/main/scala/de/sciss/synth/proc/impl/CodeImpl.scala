@@ -148,7 +148,7 @@ object CodeImpl {
       "de.sciss.synth._",
       "de.sciss.file._",
       "de.sciss.fscape.{FScapeJobs => fscape}",
-      "de.sciss.mellite.TransformUtil._"
+      "de.sciss.mellite.TransformUtil._"  // XXX TODO - should not refer to Mellite packages
     ),
     Code.SynthGraph.id -> Vec(
       "de.sciss.synth.{Buffer => _, _}",
@@ -156,7 +156,8 @@ object CodeImpl {
       "de.sciss.synth.proc.graph._"
     ),
     Code.Action.id -> Vec(     // what should go inside?
-      "de.sciss.synth.proc._"
+      "de.sciss.synth.proc._",
+      "de.sciss.lucre.expr.Expr"
     )
   )
 

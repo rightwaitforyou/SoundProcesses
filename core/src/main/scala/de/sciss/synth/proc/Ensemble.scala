@@ -42,7 +42,9 @@ object Ensemble {
 
   // ---- Elem ----
 
-  object Elem {
+  implicit object Elem extends proc.Elem.Companion[Elem] {
+    def typeID = Ensemble.typeID
+
     def apply[S <: Sys[S]](peer: Ensemble[S])(implicit tx: S#Tx): Ensemble.Elem[S] = Impl.ElemImpl(peer)
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Ensemble.Elem[S]] = Impl.ElemImpl.serializer[S]

@@ -212,6 +212,8 @@ object AuralProcDataImpl {
         case b: UGB.Input.Buffer.Value =>
           Console.err.println(s"WARNING: Changing buffer contents ($key) while playing not yet supported")
 
+        case UGB.Input.Action.Value => // not relevant
+
         case other =>
           throw new IllegalStateException(s"Unsupported input request $other")
       }
@@ -226,7 +228,11 @@ object AuralProcDataImpl {
       // currently, instead of processing the changes
       // for individual types, we'll just re-evaluate
       // the value and set it that way
-      attrNodeSet(key, value)
+      val isElem = changes.exists {
+        case Obj.ElemChange(_) => true
+        case _ => false
+      }
+      if (isElem) attrNodeSet(key, value)
     }
 
     // ----
