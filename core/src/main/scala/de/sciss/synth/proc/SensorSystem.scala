@@ -15,28 +15,48 @@ package de.sciss.synth.proc
 
 import de.sciss.osc
 import de.sciss.lucre.stm.TxnLike
+import de.sciss.osc.{UDP, Channel}
 import impl.{SensorSystemImpl => Impl}
+
 import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.implicitConversions
 
 object SensorSystem {
-  final val defaultPort = 0x5350  // "SP"
+  final val defaultPort     = 0x5350        // "SP"
+  final val defaultCommand  = "/sensor"
+
+  // ---- config ----
+
+  sealed trait ConfigLike {
+    def osc: Channel.Net.ConfigLike
+    def command: String
+  }
+  object Config {
+    def apply() = new ConfigBuilder
+
+    implicit def build(b: ConfigBuilder) = b.build
+  }
+  final case class Config(osc: Channel.Net.Config, command: String) extends ConfigLike
+  final class ConfigBuilder private[SensorSystem] () extends ConfigLike {
+    var osc: Channel.Net.ConfigBuilder = UDP.Config()
+    osc.localPort = defaultPort
+
+    var command = defaultCommand
+
+    def build = Config(osc.build, command = command)
+  }
+
+  // ---- instantiation ----
 
   def apply(): SensorSystem = Impl()
 
-  def start(config: Config = defaultConfig)(implicit tx: TxnLike): SensorSystem = {
+  def start(config: Config = Config())(implicit tx: TxnLike): SensorSystem = {
     val res = apply()
     res.start(config)
     res
   }
 
-  type Config = osc.Channel.Net.Config
-
-  def defaultConfig: Config = {
-    val builder = osc.UDP.Config()
-    builder.localPort = defaultPort
-    // builder.localIsLoopback = true
-    builder.build
-  }
+  // ---- client ----
 
   trait Client {
     def sensorsStarted(c: Server)(implicit tx: TxnLike): Unit
@@ -49,7 +69,9 @@ object SensorSystem {
 trait SensorSystem {
   import SensorSystem.{Config, Client, Server}
 
-  def start(config: Config = SensorSystem.defaultConfig)(implicit tx: TxnLike): Unit
+  var dumpOSC: Boolean
+
+  def start(config: Config = SensorSystem.Config())(implicit tx: TxnLike): Unit
 
   def stop()(implicit tx: TxnLike): Unit
 

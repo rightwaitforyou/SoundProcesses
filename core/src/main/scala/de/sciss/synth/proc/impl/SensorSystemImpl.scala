@@ -24,7 +24,7 @@ import java.net.SocketAddress
 object SensorSystemImpl {
   import SensorSystem.{Client, Server}
 
-  var dumpOSC = false
+  // var dumpOSC = false
 
   def apply(): SensorSystem = new Impl
 
@@ -79,15 +79,17 @@ object SensorSystemImpl {
       //      }
 
       def init()(implicit tx: TxnLike): Unit = afterCommit {
-        val s = config match {
+        val s = config.osc match {
           case c: osc.UDP.Config =>
             val rcv = osc.UDP.Receiver(c)
             rcv.connect()
             rcv
           // case c: osc.TCP.Config => osc.TCP.Server(c)
         }
+        setDumpOSC(s, on = _dumpOSC)
+
         println(s.asInstanceOf[osc.Channel.Net.ConfigLike].localSocketAddress) // XXX TODO
-        clientStarted(s)
+        clientStarted(s, config.command)
       }
 
       def dispose()(implicit tx: TxnLike): Unit = ()
@@ -96,7 +98,7 @@ object SensorSystemImpl {
       def shutdown(): Unit = ()
     }
 
-    private case class StateRunning(server: Server) extends State {
+    private final class StateRunning(val server: Server, command: String) extends State {
       def dispose()(implicit tx: TxnLike): Unit = {
         // logA("Stopped client")
         // NodeGraph.removeosc.Client(client)
@@ -117,20 +119,16 @@ object SensorSystemImpl {
 
       // private val listener = Ref(Option.empty[Sosc.Client.Listener])
 
-      private def receive(p: osc.Packet, addr: SocketAddress): Unit = {
-        if (dumpOSC) osc.Packet.printTextOn(p, osc.PacketCodec.default, System.out)
+      private def receive(p: osc.Packet, addr: SocketAddress): Unit =
         p match {
-          case osc.Message("/forecast",
-              v0: Float, v1: Float, v2: Float, v3: Float, v4: Float, v5: Float, v6: Float, v7: Float,
-              v8: Float, v9: Float, va: Float, vb: Float, vc: Float, vd: Float, ve: Float, vf: Float) =>
-            val values = Vec(v0, v1, v2, v3, v4, v5, v6, v7, v8, v9, va, vb, vc, vd, ve, vf)
+          case osc.Message(`command`, valuesU @ _*) =>
+            val values = valuesU.asInstanceOf[Seq[Float]].toIndexedSeq
             atomic { implicit itx =>
               implicit val tx = TxnLike.wrap(itx)
               clients.get(tx.peer).foreach(_.sensorsUpdate(values))
             }
           case _ =>
         }
-      }
 
       def init()(implicit tx: TxnLike): Unit = {
         // logA("Started client")
@@ -159,14 +157,26 @@ object SensorSystemImpl {
     private val clients = Ref(Vec   .empty[Client])
     private val state   = Ref(StateStopped: State)
 
-    private def clientStarted(rich: Server): Unit =
+    private var _dumpOSC = false
+    def dumpOSC = _dumpOSC
+    def dumpOSC_=(value: Boolean): Unit = if (value != _dumpOSC) {
+      _dumpOSC = value
+      state.single.get.serverOption.foreach { server =>
+        setDumpOSC(server, on = value)
+      }
+    }
+
+    private def setDumpOSC(server: Server, on: Boolean): Unit =
+      server.dump(if (on) osc.Dump.Text else osc.Dump.Off)
+
+    private def clientStarted(rich: Server, command: String): Unit =
       atomic { implicit itx =>
         implicit val tx = TxnLike.wrap(itx)
-        clientStartedTx(rich)
+        clientStartedTx(rich, command)
       }
 
-    private def clientStartedTx(server: Server)(implicit tx: TxnLike): Unit = {
-      val running = StateRunning(server)
+    private def clientStartedTx(server: Server, command: String)(implicit tx: TxnLike): Unit = {
+      val running = new StateRunning(server, command)
       state.swap(running)(tx.peer) // .dispose()
       running.init()
     }
@@ -200,7 +210,7 @@ object SensorSystemImpl {
 
     def whenStarted(fun: Server => Unit)(implicit tx: TxnLike): Unit = {
       state.get(tx.peer) match {
-        case StateRunning(client) => fun(client)
+        case r: StateRunning => fun(r.server)
         case _ =>
           val c: Client = new Client {
             def sensorsStarted(s: Server)(implicit tx: TxnLike): Unit = {
