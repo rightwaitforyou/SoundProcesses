@@ -13,6 +13,7 @@
 
 package de.sciss.synth
 
+import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.lucre.expr
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
@@ -209,5 +210,26 @@ package object proc {
     type Peer       = Folder[S]
     // type PeerUpdate = Folder.Update[S]
     type PeerUpdate = expr.List.Update[S, Obj[S], Obj.Update[S]] // SCALAC BUG
+  }
+
+  implicit object ArtifactLocationElem extends proc.Elem.Companion[ArtifactLocationElem] {
+    def typeID = ArtifactLocation.typeID
+
+    def apply[S <: Sys[S]](peer: ArtifactLocation[S])(implicit tx: S#Tx): ArtifactLocationElem[S] =
+      proc.impl.ElemImpl.ArtifactLocation(peer)
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactLocationElem[S]] =
+      ElemImpl.ArtifactLocation.serializer[S]
+
+    object Obj {
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[ArtifactLocationElem[S]]) Some(obj.asInstanceOf[ArtifactLocationElem.Obj[S]])
+        else None
+    }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, ArtifactLocationElem]
+  }
+  trait ArtifactLocationElem[S <: Sys[S]] extends proc.Elem[S] {
+    type Peer       = ArtifactLocation[S]
+    type PeerUpdate = ArtifactLocation.Update[S]
   }
 }

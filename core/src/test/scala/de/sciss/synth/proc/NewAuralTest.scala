@@ -1,5 +1,6 @@
 package de.sciss.synth.proc
 
+import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.lucre.{bitemp, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.{Sys, Server}

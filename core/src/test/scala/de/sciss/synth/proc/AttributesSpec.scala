@@ -1,5 +1,6 @@
 package de.sciss.synth.proc
 
+import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.lucre.expr.Expr
 import de.sciss.ConfluentEventSpec
 import de.sciss.lucre
@@ -58,7 +59,7 @@ class AttributesSpec extends ConfluentEventSpec {
       val loc = ArtifactLocation[S](file("foo"))
       val art = loc.add(file("foo") / "bar")
       p.attr.put("audio"  , Obj(AudioGraphemeElem(Grapheme.Expr.Audio(art, spec, offset = n, gain = d))))
-      p.attr.put("loc",     Obj(ArtifactLocation.Elem(loc)))
+      p.attr.put("loc",     Obj(ArtifactLocationElem(loc)))
       val group = Timeline[S]
       p.attr.put("group",   Obj(Timeline.Elem(group)))
       // implicit val groupSer = ProcGroup.Modifiable.serializer[S]
@@ -76,7 +77,7 @@ class AttributesSpec extends ConfluentEventSpec {
       assert(p.attr[DoubleVecElem]("d-vec").map(_.value) === Some(Vec(1.2, 3.4, 5.6)))
       assert(p.attr[AudioGraphemeElem]("audio").map(_.value) ===
         Some(Grapheme.Value.Audio(file("foo") / "bar", spec, 1234L, 123.4)))
-      assert(p.attr[ArtifactLocation.Elem]("loc").map(_.directory) === Some(file("foo")))
+      assert(p.attr[ArtifactLocationElem]("loc").map(_.directory) === Some(file("foo")))
       val group = pgH()
       assert(p.attr[Timeline.Elem]("group") === Some(group))
     }

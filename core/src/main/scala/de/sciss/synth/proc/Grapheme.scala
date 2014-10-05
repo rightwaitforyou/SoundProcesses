@@ -15,6 +15,7 @@ package de.sciss
 package synth
 package proc
 
+import de.sciss.lucre.artifact.Artifact
 import lucre.{event => evt, bitemp, expr}
 import de.sciss.lucre.expr.{ExprType1, Expr => _Expr}
 import bitemp.BiExpr

@@ -27,8 +27,9 @@ import scala.language.higherKinds
 object ElemImpl {
   import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec, ArtifactLocation => _ArtifactLocation, Proc => _Proc, Timeline => _Timeline}
+  import proc.{FadeSpec => _FadeSpec, Proc => _Proc, Timeline => _Timeline}
   import lucre.synth.expr.{DoubleVec => _DoubleVec}
+  import lucre.artifact.{ArtifactLocation => _ArtifactLocation}
 
   // ---- Int ----
 
@@ -314,23 +315,23 @@ object ElemImpl {
 
   // ---- ArtifactLocation ----
 
-  object ArtifactLocation extends ElemCompanionImpl[_ArtifactLocation.Elem] {
+  object ArtifactLocation extends ElemCompanionImpl[ArtifactLocationElem] {
     val typeID = _ArtifactLocation.typeID
 
     def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): _ArtifactLocation.Elem[S] with evt.Node[S] = {
+                                   (implicit tx: S#Tx): ArtifactLocationElem[S] with evt.Node[S] = {
       val peer = _ArtifactLocation.read(in, access)
       new ArtifactLocationActiveImpl(targets, peer)
     }
 
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _ArtifactLocation.Elem[S] =
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ArtifactLocationElem[S] =
       sys.error("Constant Artifact.Location not supported")
 
-    def apply[S <: Sys[S]](peer: _ArtifactLocation[S])(implicit tx: S#Tx): _ArtifactLocation.Elem[S] =
+    def apply[S <: Sys[S]](peer: _ArtifactLocation[S])(implicit tx: S#Tx): ArtifactLocationElem[S] =
       new ArtifactLocationActiveImpl(evt.Targets[S], peer)
   }
 
-  private trait ArtifactLocationImpl[S <: Sys[S]] extends _ArtifactLocation.Elem[S] {
+  private trait ArtifactLocationImpl[S <: Sys[S]] extends ArtifactLocationElem[S] {
     final def typeID = ArtifactLocation.typeID
     final def prefix = "ArtifactLocation"
   }
@@ -344,7 +345,7 @@ object ElemImpl {
 
     protected def peerEvent = peer.changed
 
-    def mkCopy()(implicit tx: S#Tx): _ArtifactLocation.Elem[S] = ArtifactLocation(peer)
+    def mkCopy()(implicit tx: S#Tx): ArtifactLocationElem[S] = ArtifactLocation(peer)
   }
 
   // ---- Timeline ----

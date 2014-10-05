@@ -1,6 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.file._
+import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.synth.io.{AudioFile, AudioFileSpec}
 import de.sciss.synth.{freeSelf, ugen, SynthGraph}
 import de.sciss.span.Span

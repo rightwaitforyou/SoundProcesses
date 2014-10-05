@@ -22,7 +22,7 @@ lazy val lucreCoreVersion       = "2.1.0"
 
 lazy val lucreDataVersion       = "2.3.0"
 
-lazy val lucreEventVersion      = "2.7.0"
+lazy val lucreEventVersion      = "2.7.1"
 
 lazy val lucreConfluentVersion  = "2.9.0"
 
@@ -140,6 +140,7 @@ lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp,
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
       "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
+      "de.sciss"      %% "lucreevent-artifact" % lucreEventVersion,
       "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
       "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
       "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test"
