@@ -169,7 +169,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
 
     } catch {
       case NonFatal(e) =>
-        throw new IllegalArgumentException(s"While de-serializing $prefix: ${e.getMessage}")
+        throw new IllegalArgumentException(s"While de-serializing $prefix", e)
     }
 
     val id        = ref.count

@@ -83,6 +83,9 @@ object Buffer {
 
     def read(path: String, fileStartFrame: Long = 0L, numFrames: Int = -1, bufStartFrame: Int = 0)
             (implicit tx: Txn): Unit
+
+    def readChannel(path: String, channels: Seq[Int], fileStartFrame: Long = 0L, numFrames: Int = -1,
+                    bufStartFrame: Int = 0)(implicit tx: Txn): Unit
   }
 }
 
