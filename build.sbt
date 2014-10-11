@@ -12,9 +12,9 @@ description               := "A framework for creating and managing ScalaCollide
 
 licenses     in ThisBuild := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion in ThisBuild := "2.11.2"
+scalaVersion in ThisBuild := "2.11.3"
 
-crossScalaVersions in ThisBuild := Seq("2.11.2", "2.10.4")
+crossScalaVersions in ThisBuild := Seq("2.11.3", "2.10.4")
 
 resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
@@ -30,7 +30,7 @@ lazy val scalaColliderVersion   = "1.14.0"
 
 lazy val spanVersion            = "1.2.1"
 
-lazy val lucreSwingVersion      = "0.5.0"
+lazy val lucreSwingVersion      = "0.6.0-SNAPSHOT"
 
 lazy val audioWidgetsVersion    = "1.7.0"
 
