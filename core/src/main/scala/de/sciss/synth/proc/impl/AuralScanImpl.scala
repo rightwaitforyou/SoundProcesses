@@ -14,8 +14,9 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Bus, Synth, NodeGraph, NodeRef, AudioBus, Sys}
+import de.sciss.lucre.synth.{expr, Synth, NodeGraph, NodeRef, AudioBus, Sys}
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{addBefore, SynthGraph}
 import AuralObj.ProcData
@@ -27,7 +28,8 @@ object AuralScanImpl {
   def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], bus: AudioBus)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] = {
     val id    = scan.id
-    val view  = new Impl[S](data = data, key = key, bus = bus, id = id)
+    import expr.IdentifierSerializer
+    val view  = new Impl[S](data = data, key = key, bus = bus, idH = tx.newHandle(id))
     logA(s"AuralScan(${data.procCached()}, $key, bus = $bus)")
     context.putAux[AuralScan.Proxy[S]](id, view)
 
@@ -131,7 +133,11 @@ object AuralScanImpl {
 
   // ----------------------------------
 
-  private final class Impl[S <: Sys[S]](val data: ProcData[S], val key: String, val bus: AudioBus, id: S#ID)
+  // note: it is crucial that we use `stm.Source[S#Tx, S#ID]` instead of just `S#ID`, because if
+  // the view is created in the same transaction as the scan, the id's path will be empty, causing
+  // an error in `dispose()` when trying to remove the entry from the ID map!
+  private final class Impl[S <: Sys[S]](val data: ProcData[S], val key: String, val bus: AudioBus,
+                                        idH: stm.Source[S#Tx, S#ID])
     extends AuralScan.Owned[S]  {
 
     private val sources = Ref(Set.empty[AuralScan[S]])
@@ -212,7 +218,7 @@ object AuralScanImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       logA(s"AuralScan dispose; ${data.procCached()}, $key")
-      data.context.removeAux(id)
+      data.context.removeAux(idH())
       obs.dispose()
       val sources0  = sources.swap(Set.empty)(tx.peer)
       val sinks0    = sinks  .swap(Set.empty)(tx.peer)

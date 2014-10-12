@@ -27,7 +27,7 @@ object StreamBuffer {
     case _ => sys.error(s"Illegal interpolation value: $interp")
   }
 
-  // via SendReply
+  // via SendReplyAuralContextImpl
   private def replyName(key: String): String = s"/$$str_$key"
 
   def makeUGen(key: String, idx: Int, buf: GE, numChannels: Int, speed: GE, interp: Int): GE = {
