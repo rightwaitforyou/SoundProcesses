@@ -67,9 +67,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test9"  => test9()
       case "--test10" => test10()
       case "--test11" => test11()
+      case "--test12" => test12()
       case _         =>
-        println("WARNING: No option given, using --test10")
-        test10()
+        println("WARNING: No option given, using --test1")
+        test1()
     }
   }
 
@@ -143,6 +144,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   implicit class ScanOps(val `this`: Scan[S]) /* extends AnyVal */ {
     def ~> (that: Scan[S])(implicit tx: S#Tx): Unit =
       `this`.addSink(Scan.Link.Scan(that))
+
+    def ~/> (that: Scan[S])(implicit tx: S#Tx): Unit =
+      `this`.removeSink(Scan.Link.Scan(that))
   }
 
   implicit def timeRange(in: (Double, Double)): Span = {
@@ -169,8 +173,94 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 11
 
+  def test12()(implicit context: AuralContext[S]): Unit = {
+    println("----test12----")
+    println(
+      """
+        |Expected behaviour:
+        |A pulse sequence is heard continuously,
+        |After         4 seconds,   a noise is added.
+        |After another 2 seconds,   a dust  is added.
+        |After another 2 seconds, the noise is removed.
+        |After another 2 seconds, the dust  is removed.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val _proc = proc {
+        val in  = graph.ScanInFix("in", 1)
+        val gen = Pulse.ar(LFNoise1.ar(1).linexp(0, 1, 400, 1000.0)) * 0.2
+        val sig = gen + in
+        Out.ar(0, Pan2.ar(sig))
+      }
+      addScan(_proc, "in")
+      val t = Transport[S]
+      t.addObject(_proc)
+      t.play()
+      val procH = tx.newHandle(_proc)
+
+      after(2.0) { implicit tx =>
+        val in1 = proc {
+          val sig = PinkNoise.ar(0.2)
+          graph.ScanOut("out", sig)
+        }
+        addScan(in1, "out")
+        val in1H = tx.newHandle(in1)
+        t.addObject(in1)
+
+        val in2 = proc {
+          val sig = Dust.ar(50) * 0.5
+          graph.ScanOut("out", sig)
+        }
+        addScan(in2, "out")
+        val in2H = tx.newHandle(in2)
+        t.addObject(in2)
+
+        after(2.0) { implicit tx =>
+          for {
+            scanOut <- in1H ().elem.peer.scans.get("out")
+            scanIn  <- procH().elem.peer.scans.get("in" )
+          } {
+            scanOut ~> scanIn
+          }
+
+          after(2.0) { implicit tx =>
+            for {
+              scanOut <- in2H ().elem.peer.scans.get("out")
+              scanIn  <- procH().elem.peer.scans.get("in" )
+            } {
+              scanOut ~> scanIn
+            }
+
+            after(2.0) { implicit tx =>
+              for {
+                scanOut <- in1H ().elem.peer.scans.get("out")
+                scanIn  <- procH().elem.peer.scans.get("in" )
+              } {
+                scanOut ~/> scanIn
+              }
+
+              after(2.0) { implicit tx =>
+                for {
+                  scanOut <- in2H ().elem.peer.scans.get("out")
+                  scanIn  <- procH().elem.peer.scans.get("in" )
+                } {
+                  scanOut ~/> scanIn
+                }
+
+                stopAndQuit()
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////////// 11
+
   def test11()(implicit context: AuralContext[S]): Unit = {
-    println("----test10----")
+    println("----test11----")
     println(
       """
         |Expected behaviour:

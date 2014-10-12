@@ -585,7 +585,8 @@ object AuralProcDataImpl {
       val procObj = procCached()    /** Sub-classes may override this if invoking the super-method. */
 
       val proc    = procObj.elem.peer
-      val numCh   = proc.scans.get(req.name).fold(-1)(scanInNumChannels)
+      val numCh0  = proc.scans.get(req.name).fold(-1)(scanInNumChannels)
+      val numCh   = if (numCh0 == -1) req.fixed else numCh0
       if (numCh == -1) throw MissingIn(req) else numCh
     }
 

@@ -26,9 +26,11 @@ object ScanIn {
   sealed trait Like extends GE.Lazy with AudioRated {
     protected def key: String
 
+    protected def fixed: Int
+
     final def makeUGens: UGenInLike = {
       val b = UGenGraphBuilder.get
-      val numCh   = b.requestInput(Input.Scan(key)).numChannels
+      val numCh   = b.requestInput(Input.Scan(key, fixed)).numChannels
       val ctlName = controlName(key)
       mkUGen(ctlName, numCh)
     }
@@ -52,6 +54,8 @@ object ScanIn {
 }
 final case class ScanIn(key: String /*, default: Double = 0.0 */)
   extends ScanIn.Like {
+
+  protected def fixed = -1
 
   protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
     if (numCh == 1) {
@@ -87,4 +91,23 @@ final case class ScanOut(key: String, in: GE)
     }
     UGen.ZeroOut("Out", audio, busArg +: sigArgAr, isIndividual = true)
   }
+}
+
+object ScanInFix {
+  def apply(numChannels: Int): ScanInFix = apply("in", numChannels)
+}
+/** Like `ScanIn` but with a predetermined number of channels. */
+final case class ScanInFix(key: String, numChannels: Int)
+  extends ScanIn.Like {
+
+  protected def fixed = numChannels
+
+  protected def mkUGen(ctlName: String, numCh: Int): UGenInLike =
+    if (numCh == 1) {
+      ctlName.ar(0.0f).expand
+    } else if (numCh > 1) {
+      ctlName.ar(Vector.fill(numCh)(0.0f)).expand
+    } else {
+      UGenInGroup.empty
+    }
 }

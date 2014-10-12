@@ -105,7 +105,7 @@ object UGenGraphBuilder {
         override def toString = s"$productPrefix(numChannels = $numChannels)"
       }
     }
-    final case class Scan(name: String) extends Input {
+    final case class Scan(name: String, fixed: Int) extends Input {
       type Key    = ScanKey
       type Value  = Scan.Value
 
