@@ -229,40 +229,43 @@ object AuralProcImpl {
         //           we cannot use ControlSet any more, but need other mechanism
         b.obj.elem.peer.scans.get(key).foreach { scan =>
           val src = scan.sources
-          // if (src.isEmpty) {
-          // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
-          // } else {
-          src.foreach {
-            case Link.Grapheme(peer) =>
-              val segmOpt = peer.segment(time)
-              segmOpt.foreach {
-                // again if not found... stick with default
-                case const: Segment.Const =>
-                  ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-                  //                        setMap :+= ((key -> const.numChannels) : ControlSet)
-                  b.setMap += (if (const.numChannels == 1) {
-                    ControlSet.Value (inCtlName, const.values.head .toFloat )
-                  } else {
-                    ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
-                  })
+          if (src.isEmpty) {
+            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
+            mkInBus()
 
-                case segm: Segment.Curve =>
-                  ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-                // println(s"segment : ${segm.span}")
-                val bm          = mkInBus()
-                  val w           = SegmentWriter(bm.bus, segm, time, Timeline.SampleRate)
-                  b.dependencies  ::= w
-                // users ::= w
+          } else {
+            src.foreach {
+              case Link.Grapheme(peer) =>
+                val segmOpt = peer.segment(time)
+                segmOpt.foreach {
+                  // again if not found... stick with default
+                  case const: Segment.Const =>
+                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
+                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
+                    b.setMap += (if (const.numChannels == 1) {
+                      ControlSet.Value (inCtlName, const.values.head .toFloat )
+                    } else {
+                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
+                    })
 
-                case audio: Segment.Audio =>
-                  ensureChannels(audio.numChannels)
+                  case segm: Segment.Curve =>
+                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
+                  // println(s"segment : ${segm.span}")
                   val bm          = mkInBus()
-                  val w           = AudioArtifactWriter(bm.bus, audio, time)
-                  b.dependencies  ::= w
-                  // users    ::= w
-              }
+                    val w           = SegmentWriter(bm.bus, segm, time, Timeline.SampleRate)
+                    b.dependencies  ::= w
+                  // users ::= w
 
-            case Link.Scan(peer) => mkInBus()
+                  case audio: Segment.Audio =>
+                    ensureChannels(audio.numChannels)
+                    val bm          = mkInBus()
+                    val w           = AudioArtifactWriter(bm.bus, audio, time)
+                    b.dependencies  ::= w
+                    // users    ::= w
+                }
+
+              case Link.Scan(peer) => mkInBus()
+            }
           }
         }
 

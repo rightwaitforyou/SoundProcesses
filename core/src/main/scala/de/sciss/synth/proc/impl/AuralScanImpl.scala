@@ -199,7 +199,7 @@ object AuralScanImpl {
       implicit val itx = tx.peer
       if (!links.isEmpty) {
         links.foreach { case (_, link) => link.dispose() }
-        links.retain((_, _) => false) // no `clear` method
+        links.clear()
       }
       sources().foreach { source =>
         source.sinkStopped(this)
