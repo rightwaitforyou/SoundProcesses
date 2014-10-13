@@ -13,7 +13,7 @@
 
 package de.sciss.lucre.synth
 
-import de.sciss.synth.{Node => SNode, ControlFillRange, ControlABusMap, ControlKBusMap, ControlSet}
+import de.sciss.synth.{Node => SNode, _}
 
 trait Node extends Resource {
   // ---- abstract ----
@@ -61,6 +61,8 @@ trait Node extends Resource {
   def moveAfter (audible: Boolean, target: Node)(implicit tx: Txn): Unit
 
   def run(audible: Boolean, state: Boolean)(implicit tx: Txn): Unit
+
+  def release(releaseTime: Optional[Double] = None)(implicit tx: Txn): Unit
 }
 
 object NodeRef {

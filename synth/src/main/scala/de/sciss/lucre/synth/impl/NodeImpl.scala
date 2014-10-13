@@ -14,10 +14,12 @@
 package de.sciss.lucre.synth
 package impl
 
-import collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{TxnExecutor, InTxn, Ref}
-import de.sciss.synth.{ControlFillRange, ControlABusMap, ControlSet, ControlKBusMap}
 import java.util.concurrent.{Executors, ScheduledExecutorService}
+
+import de.sciss.synth.{ControlABusMap, ControlFillRange, ControlKBusMap, ControlSet, Optional}
+
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.concurrent.stm.{InTxn, Ref, TxnExecutor}
 
 object NodeImpl {
   private val EmptyOnEnd = new OnEnd(Vec.empty, Vec.empty)
@@ -45,7 +47,7 @@ object NodeImpl {
 }
 
 trait NodeImpl extends ResourceImpl with Node {
-  import NodeImpl._
+  import de.sciss.lucre.synth.impl.NodeImpl._
 
   private val onEndFuns = Ref(EmptyOnEnd)
 
@@ -220,5 +222,10 @@ trait NodeImpl extends ResourceImpl with Node {
   final def run(audible: Boolean, state: Boolean)(implicit tx: Txn): Unit = {
     requireOnline()
     tx.addMessage(this, peer.runMsg(state), audible = audible, dependencies = Nil)
+  }
+
+  final def release(releaseTime: Optional[Double])(implicit tx: Txn): Unit = {
+    requireOnline()
+    tx.addMessage(this, peer.releaseMsg(releaseTime), audible = true)
   }
 }
