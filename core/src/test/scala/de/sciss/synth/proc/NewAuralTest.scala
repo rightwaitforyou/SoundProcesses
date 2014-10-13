@@ -3,6 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.lucre.{bitemp, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
+import de.sciss.lucre.expr.{Boolean => BooleanEx}
 import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
@@ -68,6 +69,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test10" => test10()
       case "--test11" => test11()
       case "--test12" => test12()
+      case "--test13" => test13()
       case _         =>
         println("WARNING: No option given, using --test1")
         test1()
@@ -170,6 +172,68 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 11
+
+  def test13()(implicit context: AuralContext[S]): Unit = {
+    println("----test13----")
+    println(
+      """
+        |Expected behaviour:
+        |A generator and filter are separated
+        |by a nested ensemble. Both should be
+        |heard together.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val imp     = ExprImplicits[S]
+      import imp._
+      val playing = BooleanEx.newVar(false)
+      val foldIn  = Folder[S]
+      val ensIn   = Ensemble(foldIn , 0L, true)     // inner ensemble already active
+      val foldOut = Folder[S]
+      val ensOut  = Ensemble(foldOut, 0L, playing)  // outer ensemble will be activated later
+
+      val gen = proc {
+        val sig = WhiteNoise.ar(0.5)
+        DC.kr(0).poll(0, label = "gen")
+        graph.ScanOut(sig)
+      }
+      val source = addScan(gen, "out")
+
+      val filter = proc {
+        val in  = graph.ScanInFix("in", 1)
+        val sig = Resonz.ar(in, 444, 0.1) * 10
+        DC.kr(0).poll(0, label = "filter")
+        Out.ar(0, Pan2.ar(sig))
+      }
+      val sink = addScan(filter, "in")
+
+      source ~> sink
+
+      // - `gen` will be the contents of `ensIn`
+      // - `filter` and `foldIn` will be the contents of `ensOut`
+      foldIn .addLast(gen)
+      // foldOut.addLast(gen)
+      foldOut.addLast(Obj(Ensemble.Elem(ensIn)))
+      foldOut.addLast(filter)
+
+      val t = Transport[S]
+      t.addObject(Obj(Ensemble.Elem(ensOut)))
+      t.play()
+
+      import BooleanEx.varSerializer
+      val playingH = tx.newHandle(playing)
+
+      after(2.0) { implicit tx =>
+        println("--enable outer ensemble--")
+        val p = playingH()
+        p() = true
+        stopAndQuit()
+      }
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 11
 
