@@ -197,7 +197,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
       val gen = proc {
         val sig = WhiteNoise.ar(0.5)
-        DC.kr(0).poll(0, label = "gen")
+        DC.kr(1).poll(0, label = "gen")
         graph.ScanOut(sig)
       }
       val source = addScan(gen, "out")
@@ -205,7 +205,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val filter = proc {
         val in  = graph.ScanInFix("in", 1)
         val sig = Resonz.ar(in, 444, 0.1) * 10
-        DC.kr(0).poll(0, label = "filter")
+        DC.kr(1).poll(0, label = "filter")
         Out.ar(0, Pan2.ar(sig))
       }
       val sink = addScan(filter, "in")

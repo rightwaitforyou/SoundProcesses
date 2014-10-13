@@ -24,7 +24,10 @@ object AuralContextImpl {
                         (implicit tx: S#Tx, workspaceHandle: WorkspaceHandle[S]): AuralContext[S] = {
     val objMap  = tx.newInMemoryIDMap[Entry[S]]
     val auxMap  = tx.newInMemoryIDMap[Any]
-    new Impl[S](objMap, auxMap, sched, server)
+    val res     = new Impl[S](objMap, auxMap, sched, server)
+    logAural(s"create context ${res.hashCode().toHexString}")
+    // (new Throwable).printStackTrace()
+    res
   }
 
   private final class Entry[S <: Sys[S]](val data: Disposable[S#Tx]) {

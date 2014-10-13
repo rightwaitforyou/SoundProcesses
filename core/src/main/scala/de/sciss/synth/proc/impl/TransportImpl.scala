@@ -33,7 +33,7 @@ object TransportImpl {
 
   def apply[S <: Sys[S]](implicit tx: S#Tx, context: AuralContext[S]): Transport[S] = {
     val res = mkTransport(None, context.scheduler)
-    res.auralStarted(context.server)
+    res.auralStartedTx(context.server)
     res
   }
 
@@ -41,6 +41,7 @@ object TransportImpl {
                                       (implicit tx: S#Tx): Impl[S] = {
     val objMap  = tx.newInMemoryIDMap[stm.Source[S#Tx, Obj[S]]]
     val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
+    // (new Throwable).printStackTrace()
     new Impl(auralSystem, scheduler, objMap, viewMap)
   }
 
@@ -191,18 +192,19 @@ object TransportImpl {
     def contextOption(implicit tx: S#Tx): Option[AuralContext[S]] = contextRef.get(tx.peer)
 
     def auralStarted(server: Server)(implicit tx: Txn): Unit = {
+      // XXX TODO -- what was the reasoning for the txn decoupling?
       tx.afterCommit {
         scheduler.cursor.step { implicit tx =>
+          import WorkspaceHandle.Implicits._
+          implicit val auralContext = AuralContext(server, scheduler)
           auralStartedTx(server)
         }
       }
     }
 
-    private def auralStartedTx(server: Server)(implicit tx: S#Tx): Unit = {
+    def auralStartedTx(server: Server)(implicit tx: S#Tx, auralContext: AuralContext[S]): Unit = {
       logT(s"transport - aural-system started")
-      import WorkspaceHandle.Implicits._
-      implicit val auralContext = AuralContext(server, scheduler)
-      implicit val ptx   = tx.peer
+      implicit val ptx = tx.peer
       contextRef.set(Some(auralContext))
       objSet.foreach { objH =>
         val obj = objH()
@@ -212,6 +214,7 @@ object TransportImpl {
     }
 
     def auralStopped()(implicit tx: Txn): Unit = {
+      // XXX TODO -- what was the reasoning for the txn decoupling?
       tx.afterCommit {
         scheduler.cursor.step { implicit tx =>
           auralStoppedTx()
