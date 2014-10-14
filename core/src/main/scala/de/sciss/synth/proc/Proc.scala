@@ -59,7 +59,9 @@ object Proc {
 
   // ---- Elem ----
 
-  object Elem {
+  implicit object Elem extends proc.Elem.Companion[Proc.Elem] {
+    def typeID: Int = Proc.typeID
+
     def apply[S <: Sys[S]](peer: Proc[S])(implicit tx: S#Tx): Proc.Elem[S] =
       proc.impl.ElemImpl.Proc(peer)
 
