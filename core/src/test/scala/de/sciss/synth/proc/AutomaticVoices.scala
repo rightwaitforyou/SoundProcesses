@@ -16,41 +16,54 @@ object AutomaticVoices {
   type S = Confluent
   //  type S = InMemory
 
+  private[this] val imp = ExprImplicits[S]
+  import imp._
+
   def main(args: Array[String]): Unit = {
     val sys = Confluent(BerkeleyDB.tmp())
     val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     //    val sys       = InMemory()
     //    val cursor    = sys
     lucre.synth.expr.initTypes()
+    println("Making the world...")
     val world = cursor.step { implicit tx =>
       mkWorld()
     }
-    println("Made the world.")
+    println("Changing a sensor...")
     cursor.step { implicit tx =>
       val imp = ExprImplicits[S]
       import imp._
       val s0 = world.sensors(0)()
       s0()   = 0
+      checkWorld(world)
     }
-    println("Made a difference.")
+    println("End.")
     sys.close()
   }
 
-  class Speaker(val gate  : stm.Source[S#Tx, Expr    [S, Boolean]],
-                             val active: stm.Source[S#Tx, Expr.Var[S, Boolean]])
+  class Speaker(val gate: stm.Source[S#Tx, Expr    [S, Boolean]],
+                val active: stm.Source[S#Tx, Expr.Var[S, Boolean]])
 
-  class Layer(val speakers: Vec[Speaker])
+  class Layer(val speakers: Vec[Speaker], val playing: stm.Source[S#Tx, Expr[S, Boolean]])
 
   class World(val layers: Vec[Layer],
-                           val sensors: Vec[stm.Source[S#Tx, Expr.Var[S, Int]]],
-                           val hasFreeVoices: stm.Source[S#Tx, Expr[S, Boolean]])
+              val sensors: Vec[stm.Source[S#Tx, Expr.Var[S, Int]]],
+              val hasFreeVoices: stm.Source[S#Tx, Expr[S, Boolean]])
+
+  def checkWorld(w: World)(implicit tx: S#Tx): Unit =
+    w.layers.foreach { l =>
+      if (!l.playing().value) {
+        l.speakers.foreach { s =>
+          if (s.gate().value) s.active().update(true)
+        }
+      }
+    }
 
   def mkWorld()(implicit tx: S#Tx): World = {
-    val imp = ExprImplicits[S]
-    import imp._
-
     val sensors = Vec.tabulate(NumSpeakers) { speaker =>
-      IntEx.newVar[S](-1)
+      val sensor = IntEx.newVar[S](-1)
+      sensor.changed.react(_ => ch => println(s"sensor$speaker -> ${ch.now}"))
+      sensor
     }
 
     //    // decoupling data-flow recursion here
@@ -63,8 +76,12 @@ object AutomaticVoices {
     import IntEx.{varSerializer => intVarSer}
     import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
 
-    val (vecLayer, vecPlaying) = Vec.tabulate(NumLayers) { layer =>
-      val vecActive   = Vec.fill(NumSpeakers)(BooleanEx.newVar[S](false))
+    val vecLayer = Vec.tabulate(NumLayers) { layer =>
+      val vecActive   = Vec.tabulate(NumSpeakers) { speaker =>
+        val active = BooleanEx.newVar[S](false)
+        active.changed.react(_ => ch => println(s"active$layer$speaker -> ${ch.now}"))
+        active
+      }
       // val playing     = vecPlaying(layer)
       val vecGate: Vec[Expr[S, Boolean]] = Vec.tabulate(NumSpeakers) { speaker =>
         val isLayer = sensors(speaker) sig_== layer
@@ -73,19 +90,19 @@ object AutomaticVoices {
         gate
       }
       val sumActive = count(vecActive)
-      val sumGate   = count(vecGate  )
-      val playing   = sumActive + sumGate > 0
-      // playing()     = playing1
+      // val sumGate   = count(vecGate  )
+      val playing   = sumActive /* + sumGate */ > 0
+      playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
 
-      val l = new Layer((vecGate zip vecActive).map { case (gate, active) =>
+      val speakers = (vecGate zip vecActive).map { case (gate, active) =>
         new Speaker(gate = tx.newHandle(gate), active = tx.newHandle(active))
-      })
+      }
+      new Layer(speakers, tx.newHandle(playing))
+    }
 
-      (l, playing)
-    } .unzip
-
-    val activeVoices   = count(vecPlaying)
-    val hasFreeVoices  = activeVoices < MaxVoices
+    val vecPlaying      = vecLayer.map(_.playing())
+    val activeVoices    = count(vecPlaying)
+    val hasFreeVoices   = activeVoices < MaxVoices
     activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
 
     new World(vecLayer, sensors.map(tx.newHandle(_)), tx.newHandle(hasFreeVoices))
