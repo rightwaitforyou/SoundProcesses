@@ -2,6 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
+import de.sciss.lucre.synth.InMemory
 import de.sciss.synth.SynthGraph
 import de.sciss.{synth, lucre}
 import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Double => DoubleEx, Int => IntEx}
@@ -18,7 +19,7 @@ object AutomaticVoices {
   val NumSpeakers = 4
 
   type S = Confluent
-  //  type S = InMemory
+  // type S = InMemory
 
   private[this] val imp = ExprImplicits[S]
   import imp._
@@ -27,19 +28,22 @@ object AutomaticVoices {
     val sys = Confluent(BerkeleyDB.tmp())
     val (_, _cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val cursor = _cursor
-    //    val sys       = InMemory()
-    //    val cursor    = sys
+    //    val sys = InMemory()
+    //    implicit val cursor = sys
     lucre.synth.expr.initTypes()
-    println("Making the world...")
-    val world = cursor.step { implicit tx =>
-      mkWorld()
-    }
-    println("Making procs...")
-    val transport = cursor.step { implicit tx =>
-      mkProcs(world)
-    }
-    println("Making views...")
     cursor.step { implicit tx =>
+    println("Making the world...")
+    val world =
+    // cursor.step { implicit tx =>
+      mkWorld()
+    // }
+    println("Making procs...")
+    val transport =
+    // cursor.step { implicit tx =>
+      mkProcs(world)
+    // }
+    println("Making views...")
+    // cursor.step { implicit tx =>
       mkViews(world, transport, sys)
     }
 
@@ -91,6 +95,7 @@ object AutomaticVoices {
 
   def mkProcs(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Transport[S] = {
     val aural     = AuralSystem()
+    aural.whenStarted(_.peer.dumpOSC())
     val transport = Transport[S](aural)
 
     val g = SynthGraph {
