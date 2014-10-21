@@ -30,7 +30,7 @@ object AutomaticVoices {
     import imp._
 
     val sensors = Vec.tabulate(NumSpeakers) { speaker =>
-      IntEx.newVar[S](0)
+      IntEx.newVar[S](-1)
     }
 
     // decoupling data-flow recursion here

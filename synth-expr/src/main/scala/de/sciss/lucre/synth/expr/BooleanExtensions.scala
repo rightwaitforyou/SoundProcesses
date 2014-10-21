@@ -14,11 +14,13 @@
 package de.sciss.lucre.synth
 package expr
 
+import de.sciss.lucre
 import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.event.{Targets, Sys}
-import de.sciss.serial.DataInput
+import de.sciss.serial.{DataOutput, DataInput}
 import de.sciss.lucre.expr.{Type, Expr, Boolean => BooleanEx, Int => IntEx}
 import scala.annotation.switch
+import de.sciss.model
 
 object BooleanExtensions  {
   private[this] type Ex[S <: Sys[S]] = Expr[S, Boolean]
@@ -82,7 +84,7 @@ object BooleanExtensions  {
 
     def && (b: E)(implicit tx: S#Tx): Ex[S] = And(a, b)
     def || (b: E)(implicit tx: S#Tx): Ex[S] = Or (a, b)
-    def ^^ (b: E)(implicit tx: S#Tx): Ex[S] = Xor(a, b)
+    def ^  (b: E)(implicit tx: S#Tx): Ex[S] = Xor(a, b)
 
     // ---- Boolean => Int ----
 
@@ -116,13 +118,6 @@ object BooleanExtensions  {
 
     def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Expr.Node[S, Boolean]
 
-    // ---- impl ----
-
-    final def apply[S <: Sys[S]](a: Expr[S, T1], b: Expr[S, T1])(implicit tx: S#Tx): Ex[S] = (a, b) match {
-      case (Expr.Const(ca), Expr.Const(cb)) => BooleanEx.newConst(value(ca, cb))
-      case _ => new impl.Tuple2(BooleanEx, BooleanEx.typeID, this, Targets.partial[S], a, b)
-    }
-
     final def toString[S <: Sys[S]](_1: Expr[S, T1], _2: Expr[S, T1]): String = s"(${_1} $name ${_2})"
   }
 
@@ -130,7 +125,14 @@ object BooleanExtensions  {
     def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Expr.Node[S, Boolean] = {
       val _1 = BooleanEx.read(in, access)
       val _2 = BooleanEx.read(in, access)
-      new impl.Tuple2(BooleanEx, BooleanEx.typeID, op, targets, _1, _2)
+      new LazyTuple2(op, targets, _1, _2)
+    }
+
+    def lazyValue[S <: Sys[S]](_1: Expr[S, Boolean], _2: Expr[S, Boolean])(implicit tx: S#Tx): Boolean
+
+    final def apply[S <: Sys[S]](a: Expr[S, Boolean], b: Expr[S, Boolean])(implicit tx: S#Tx): Ex[S] = (a, b) match {
+      case (Expr.Const(ca), Expr.Const(cb)) => BooleanEx.newConst(value(ca, cb))
+      case _ => new LazyTuple2(this, Targets.partial[S], a, b)
     }
   }
 
@@ -140,6 +142,71 @@ object BooleanExtensions  {
       val _2 = IntEx.read(in, access)
       new impl.Tuple2(BooleanEx, BooleanEx.typeID, op, targets, _1, _2)
     }
+
+    // ---- impl ----
+
+    final def apply[S <: Sys[S]](a: Expr[S, Int], b: Expr[S, Int])(implicit tx: S#Tx): Ex[S] = (a, b) match {
+      case (Expr.Const(ca), Expr.Const(cb)) => BooleanEx.newConst(value(ca, cb))
+      case _ => new impl.Tuple2(BooleanEx, BooleanEx.typeID, this, Targets.partial[S], a, b)
+    }
+  }
+
+  private final class LazyTuple2[S <: Sys[S]](op: BooleanBinaryOp, protected val targets: evt.Targets[S],
+                                             _1: Expr[S, Boolean], _2: Expr[S, Boolean])
+    extends lucre.expr.impl.NodeImpl[S, Boolean] {
+
+    protected def reader = BooleanEx.serializer[S]
+
+    private[lucre] def connect()(implicit tx: S#Tx): Unit = {
+      _1.changed ---> this
+      _2.changed ---> this
+    }
+
+    private[lucre] def disconnect()(implicit tx: S#Tx): Unit = {
+      _1.changed -/-> this
+      _2.changed -/-> this
+    }
+
+    def value(implicit tx: S#Tx): Boolean = {
+      // op.value(_1.value, _2.value)
+      op.lazyValue(_1, _2)
+    }
+
+    protected def writeData(out: DataOutput): Unit = {
+      out.writeByte(2)
+      out.writeInt(BooleanEx.typeID)
+      out.writeInt(op.id)
+      _1.write(out)
+      _2.write(out)
+    }
+
+    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[model.Change[Boolean]] = {
+      val _1c = _1.changed
+      val _2c = _2.changed
+
+      val _1ch = if (pull.contains(_1c)) pull(_1c) else None
+      val _2ch = if (pull.contains(_2c)) pull(_2c) else None
+
+      (_1ch, _2ch) match {
+        case (Some(ach), None) =>
+          val bv      = _2.value
+          val before  = op.value(ach.before, bv)
+          val now     = op.value(ach.now, bv)
+          if (before == now) None else Some(model.Change(before, now))
+        case (None, Some(bch)) =>
+          val av      = _1.value
+          val before  = op.value(av, bch.before)
+          val now     = op.value(av, bch.now)
+          if (before == now) None else Some(model.Change(before, now))
+        case (Some(ach), Some(bch)) =>
+          val before  = op.value(ach.before, bch.before)
+          val now     = op.value(ach.now, bch.now)
+          if (before == now) None else Some(model.Change(before, now))
+        case _ => None
+      }
+    }
+
+    override def toString() = op.toString(_1, _2)
   }
 
   // ---- (Boolean, Boolean) => Boolean ----
@@ -148,18 +215,27 @@ object BooleanExtensions  {
     final val id = 0
     def value(a: Boolean, b: Boolean): Boolean = a && b
     def name = "&&"
+
+    def lazyValue[S <: Sys[S]](_1: Expr[S, Boolean], _2: Expr[S, Boolean])(implicit tx: S#Tx): Boolean =
+      _1.value && _2.value
   }
 
   private[this] case object Or extends BooleanBinaryOp {
     final val id = 1
     def value(a: Boolean, b: Boolean): Boolean = a || b
     def name = "||"
+
+    def lazyValue[S <: Sys[S]](_1: Expr[S, Boolean], _2: Expr[S, Boolean])(implicit tx: S#Tx): Boolean =
+      _1.value || _2.value
   }
 
   private[this] case object Xor extends BooleanBinaryOp {
     final val id = 2
-    def value(a: Boolean, b: Boolean): Boolean = a && b
-    def name = "&&"
+    def value(a: Boolean, b: Boolean): Boolean = a ^ b
+    def name = "^"
+
+    def lazyValue[S <: Sys[S]](_1: Expr[S, Boolean], _2: Expr[S, Boolean])(implicit tx: S#Tx): Boolean =
+      _1.value ^ _2.value   // eager actually
   }
 
   // ---- (Int, Int) => Boolean ----
