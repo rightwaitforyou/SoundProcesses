@@ -94,7 +94,7 @@ object AutomaticVoices {
   }
 
   def mkProcs(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Transport[S] = {
-    val aural     = AuralSystem()
+    val aural = AuralSystem()
     aural.whenStarted(_.peer.dumpOSC())
     val transport = Transport[S](aural)
 
