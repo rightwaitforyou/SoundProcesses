@@ -138,10 +138,12 @@ object AutomaticVoices {
   }
 
   def checkWorld(w: World)(implicit tx: S#Tx): Unit =
-    w.layers.foreach { l =>
+    w.layers.zipWithIndex.foreach { case (l, li) =>
       if (!l.playing().value) {
-        l.speakers.foreach { s =>
-          if (s.gate().value) s.active().update(true)
+        l.speakers.zipWithIndex.foreach { case (s, si) =>
+          val gate = s.gate()
+          // println(s"gate$li$si: $gate")
+          if (gate.value) s.active().update(true)
         }
       }
     }
@@ -153,31 +155,25 @@ object AutomaticVoices {
       sensor
     }
 
-    //    // decoupling data-flow recursion here
-    //    val vecPlaying = Vec.tabulate(NumLayers) { layer =>
-    //      val playing = BooleanEx.newVar[S](false)
-    //      playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
-    //      playing
-    //    }
-
     import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
     import IntEx.{varSerializer => intVarSer}
 
-    val vecLayer = Vec.tabulate(NumLayers) { layer =>
-      val vecActive   = Vec.tabulate(NumSpeakers) { speaker =>
+    val vecLayer = Vec.tabulate(NumLayers) { li =>
+      val vecActive = Vec.tabulate(NumSpeakers) { si =>
         val active = BooleanEx.newVar[S](false)
-        active.changed.react(_ => ch => println(s"active$layer$speaker -> ${ch.now}"))
+        active.changed.react(_ => ch => println(s"active$li$si -> ${ch.now}"))
         active
       }
-      val vecGate = Vec.tabulate(NumSpeakers) { speaker =>
-        val isLayer = sensors(speaker) sig_== layer
+      val vecGate = Vec.tabulate(NumSpeakers) { si =>
+        val isLayer = sensors(si) sig_== li
         val gate    = isLayer
-        gate.changed.react(_ => ch => println(s"gate$layer$speaker -> ${ch.now}"))
+        // println(s"gate$li$si: $gate")
+        gate.changed.react(_ => ch => println(s"gate$li$si -> ${ch.now}"))
         gate
       }
       val sumActive = count(vecActive)
       val playing   = sumActive > 0
-      playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
+      playing.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
 
       val speakers = (vecGate zip vecActive).map { case (gate, active) =>
         new Speaker(gate = tx.newHandle(gate), active = tx.newHandle(active))
