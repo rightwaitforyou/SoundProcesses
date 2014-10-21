@@ -143,7 +143,8 @@ lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp,
       "de.sciss"      %% "lucreevent-artifact" % lucreEventVersion,
       "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
       "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
-      "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test"
+      "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test",
+      "de.sciss"      %% "lucreswing"     % lucreSwingVersion     % "test"
     )
   )
 

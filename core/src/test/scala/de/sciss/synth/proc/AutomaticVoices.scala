@@ -1,10 +1,14 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre
-import de.sciss.lucre.expr.{Int => IntEx, Boolean => BooleanEx, Expr}
+import de.sciss.desktop.impl.UndoManagerImpl
+import de.sciss.lucre.swing.IntSpinnerView
+import de.sciss.synth.SynthGraph
+import de.sciss.{synth, lucre}
+import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Double => DoubleEx, Int => IntEx}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.synth.{Sys, InMemory}
+import de.sciss.lucre.swing.deferTx
+import de.sciss.numbers.Implicits._
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
@@ -21,7 +25,8 @@ object AutomaticVoices {
 
   def main(args: Array[String]): Unit = {
     val sys = Confluent(BerkeleyDB.tmp())
-    val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
+    val (_, _cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
+    implicit val cursor = _cursor
     //    val sys       = InMemory()
     //    val cursor    = sys
     lucre.synth.expr.initTypes()
@@ -29,26 +34,108 @@ object AutomaticVoices {
     val world = cursor.step { implicit tx =>
       mkWorld()
     }
-    println("Changing a sensor...")
-    cursor.step { implicit tx =>
-      val imp = ExprImplicits[S]
-      import imp._
-      val s0 = world.sensors(0)()
-      s0()   = 0
-      checkWorld(world)
+    println("Making procs...")
+    val transport = cursor.step { implicit tx =>
+      mkProcs(world)
     }
-    println("End.")
-    sys.close()
+    println("Making views...")
+    cursor.step { implicit tx =>
+      mkViews(world, transport, sys)
+    }
+
+    //    println("Changing a sensor...")
+    //    cursor.step { implicit tx =>
+    //      val s0 = world.sensors(0)()
+    //      s0()   = 0
+    //      checkWorld(world)
+    //    }
+    //    println("End.")
+    //    sys.close()
   }
 
-  class Speaker(val gate: stm.Source[S#Tx, Expr    [S, Boolean]],
+  class Speaker(val gate  : stm.Source[S#Tx, Expr    [S, Boolean]],
                 val active: stm.Source[S#Tx, Expr.Var[S, Boolean]])
 
   class Layer(val speakers: Vec[Speaker], val playing: stm.Source[S#Tx, Expr[S, Boolean]])
 
-  class World(val layers: Vec[Layer],
-              val sensors: Vec[stm.Source[S#Tx, Expr.Var[S, Int]]],
+  class World(val layers   : Vec[Layer],
+              val sensors  : Vec[stm.Source[S#Tx, Expr.Var[S, Int]]],
               val hasFreeVoices: stm.Source[S#Tx, Expr[S, Boolean]])
+
+  def mkViews(w: World, transport: Transport[S], system: S)(implicit tx: S#Tx, _cursor: stm.Cursor[S]): Unit = {
+    implicit val undo = new UndoManagerImpl
+    val views = w.sensors.zipWithIndex.map { case (s, si) =>
+      s().changed.react { implicit tx => _ =>
+        checkWorld(w)
+      }
+      IntSpinnerView(s(), s"s$si", 64)
+    }
+    deferTx {
+      import scala.swing._
+      new Frame {
+        title = "Automatic Voices"
+        contents = new FlowPanel(views.zipWithIndex.flatMap { case (v, vi) =>
+          new Label(s"s$vi") :: v.component :: Nil
+        }: _*)
+        pack().centerOnScreen()
+        open()
+
+        override def closeOperation(): Unit = {
+          _cursor.step { implicit tx => transport.dispose() }
+          system.close()
+          sys.exit(0)
+        }
+      }
+    }
+  }
+
+  def mkProcs(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Transport[S] = {
+    val aural     = AuralSystem()
+    val transport = Transport[S](aural)
+
+    val g = SynthGraph {
+      import synth._
+      import ugen._
+      val li    = graph.Attribute.ir("li"  , 0)
+      val si    = graph.Attribute.ir("si"  , 0)
+      val gate  = graph.Attribute.kr("gate", 0)
+      (li * 10 + si + 900).poll(0, "synth")
+      val freq  = li.linexp(0, NumLayers - 1, 300.0, 2000.0)
+      val pan   = si.linlin(0, NumSpeakers - 1, -1, 1)
+      val env   = Env.asr(attack = 10, release = 10)
+      val amp   = EnvGen.ar(env, gate = gate, levelScale = 0.5)
+      val done  = Done.kr(amp)
+      graph.Action(done, "done")
+      val dust  = Decay.ar(Dust.ar(10), 1).min(1)
+      val sig   = Resonz.ar(dust, freq, 0.1) * amp
+      Out.ar(0, Pan2.ar(sig, pan))
+    }
+
+    w.layers.zipWithIndex.foreach { case (l, li) =>
+      val folder  = Folder[S]
+      val liObj   = Obj(IntElem(li))
+      l.speakers.zipWithIndex.foreach { case (s, si) =>
+        val siObj     = Obj(IntElem(si))
+        val proc      = Proc[S]
+        proc.graph()  = g
+        val procObj   = Obj(Proc.Elem(proc))
+        val attr      = procObj.attr
+        val gateObj   = Obj(BooleanElem(s.gate()))
+        attr.put("li"   , liObj   )
+        attr.put("si"   , siObj   )
+        attr.put("gate" , gateObj )
+        folder.addLast(procObj)
+      }
+      val playing = l.playing()
+      val ens     = Ensemble(folder, 0L, playing)
+      val ensObj  = Obj(Ensemble.Elem(ens))
+      transport.addObject(ensObj)
+    }
+
+    transport.play()
+    aural.start()
+    transport
+  }
 
   def checkWorld(w: World)(implicit tx: S#Tx): Unit =
     w.layers.foreach { l =>
@@ -73,8 +160,8 @@ object AutomaticVoices {
     //      playing
     //    }
 
-    import IntEx.{varSerializer => intVarSer}
     import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
+    import IntEx.{varSerializer => intVarSer}
 
     val vecLayer = Vec.tabulate(NumLayers) { layer =>
       val vecActive   = Vec.tabulate(NumSpeakers) { speaker =>
@@ -82,16 +169,14 @@ object AutomaticVoices {
         active.changed.react(_ => ch => println(s"active$layer$speaker -> ${ch.now}"))
         active
       }
-      // val playing     = vecPlaying(layer)
-      val vecGate: Vec[Expr[S, Boolean]] = Vec.tabulate(NumSpeakers) { speaker =>
+      val vecGate = Vec.tabulate(NumSpeakers) { speaker =>
         val isLayer = sensors(speaker) sig_== layer
-        val gate    = isLayer // && (playing || hasFreeVoices)
+        val gate    = isLayer
         gate.changed.react(_ => ch => println(s"gate$layer$speaker -> ${ch.now}"))
         gate
       }
       val sumActive = count(vecActive)
-      // val sumGate   = count(vecGate  )
-      val playing   = sumActive /* + sumGate */ > 0
+      val playing   = sumActive > 0
       playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
 
       val speakers = (vecGate zip vecActive).map { case (gate, active) =>
@@ -114,7 +199,7 @@ object AutomaticVoices {
     reduce(in.map(_.toInt))(_ + _)
   }
 
-    // like Vec.reduce, but splitting at the half,
+  // like Vec.reduce, but splitting at the half,
   // thus allowing the composition of bin-ops with guaranteed
   // tree depth of ld(N)
   private def reduce[A](in: Vec[A])(op: (A, A) => A): A = {
