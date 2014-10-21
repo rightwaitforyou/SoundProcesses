@@ -33,23 +33,31 @@ object AutomaticVoices {
       IntEx.newVar[S](0)
     }
 
-    lazy val vecPlaying: Vec[Expr[S, Boolean]] = Vec.tabulate(NumLayers) { layer =>
-      val vecActive  = Vec.fill(NumSpeakers)(BooleanEx.newVar[S](false))
-      lazy val vecGate: Vec[Expr[S, Boolean]] = Vec.tabulate(NumSpeakers) { speaker =>
+    // decoupling data-flow recursion here
+    val vecPlaying = Vec.tabulate(NumLayers) { layer =>
+      val playing = BooleanEx.newVar[S](false)
+      playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
+      playing
+    }
+
+    val activeVoices   = count(vecPlaying)
+    val hasFreeVoices  = activeVoices < MaxVoices
+    activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
+
+    for (layer <- 0 until NumLayers) {
+      val vecActive   = Vec.fill(NumSpeakers)(BooleanEx.newVar[S](false))
+      val playing     = vecPlaying(layer)
+      val vecGate: Vec[Expr[S, Boolean]] = Vec.tabulate(NumSpeakers) { speaker =>
         val isLayer = sensors(speaker) sig_== layer
         val gate    = isLayer && (playing || hasFreeVoices)
         gate.changed.react(_ => ch => println(s"gate$layer$speaker -> ${ch.now}"))
         gate
       }
-      lazy val sumActive  = count(vecActive)
-      lazy val sumGate    = count(vecGate  )
-      lazy val playing    = sumActive + sumGate > 0
-      playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
-      playing
+      val sumActive = count(vecActive)
+      val sumGate   = count(vecGate  )
+      val playing1  = sumActive + sumGate > 0
+      playing()     = playing1
     }
-    lazy val activeVoices   = count(vecPlaying)
-    lazy val hasFreeVoices  = activeVoices < MaxVoices
-    activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
   }
 
   private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {
