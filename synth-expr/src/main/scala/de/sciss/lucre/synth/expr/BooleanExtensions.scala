@@ -74,11 +74,19 @@ object BooleanExtensions  {
     import me.{`this` => a}
     private type E = Expr[S, Boolean]
 
+    // ---- Boolean => Boolean ----
+
     def unary_!(implicit tx: S#Tx): Ex[S] = Not(a)
+
+    // ---- (Boolean, Boolean) => Boolean ----
 
     def && (b: E)(implicit tx: S#Tx): Ex[S] = And(a, b)
     def || (b: E)(implicit tx: S#Tx): Ex[S] = Or (a, b)
     def ^^ (b: E)(implicit tx: S#Tx): Ex[S] = Xor(a, b)
+
+    // ---- Boolean => Int ----
+
+    def toInt(implicit tx: S#Tx): Expr[S, Int] = IntExtensions.BooleanToInt(a)
   }
 
   // ----- impl -----

@@ -46,7 +46,7 @@ package object expr {
 
   /** Initializes types and thus installs some type extensions. */
   def initTypes(): Unit = {
-    // BooleanExtensions
+    BooleanExtensions
     // Curve
     DoubleExtensions
     IntExtensions
