@@ -16,16 +16,24 @@ object AutomaticVoices {
   def main(args: Array[String]): Unit = {
     //    val sys = Confluent(BerkeleyDB.tmp())
     //    val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
-    val sys = InMemory()
-    val cursor = sys
-    cursor.step { implicit tx =>
-      mkWorld()
+    val sys       = InMemory()
+    val cursor    = sys
+    val sensorsH  = cursor.step { implicit tx =>
+      import IntEx.varSerializer
+      mkWorld().map(tx.newHandle(_))
     }
     println("Made the world.")
+    cursor.step { implicit tx =>
+      val imp = ExprImplicits[S]
+      import imp._
+      val s0 = sensorsH(0)()
+      s0()   = 0
+    }
+    println("Made a difference.")
     sys.close()
   }
 
-  def mkWorld()(implicit tx: S#Tx): Unit = {
+  def mkWorld()(implicit tx: S#Tx): Vec[Expr.Var[S, Int]] = {
     val imp = ExprImplicits[S]
     import imp._
 
@@ -58,6 +66,8 @@ object AutomaticVoices {
       val playing1  = sumActive + sumGate > 0
       playing()     = playing1
     }
+
+    sensors
   }
 
   private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {
