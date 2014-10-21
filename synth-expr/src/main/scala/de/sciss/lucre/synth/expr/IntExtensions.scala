@@ -28,8 +28,8 @@ object IntExtensions {
 
   private[this] object IntTuple1s extends Type.Extension1[({type Repr[~ <: Sys[~]] = Expr[~, Int]})#Repr] {
     final val arity = 1
-    final val opLo  = Neg  .id
-    final val opHi  = Cubed.id
+    final val opLo  = Neg         .id
+    final val opHi  = BooleanToInt.id
 
     val name = "Int-1 Ops"
 

@@ -1,8 +1,10 @@
 package de.sciss.synth.proc
 
+import de.sciss.lucre
 import de.sciss.lucre.expr.{Int => IntEx, Boolean => BooleanEx, Expr}
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.synth.{Sys, InMemory}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
@@ -11,29 +13,39 @@ object AutomaticVoices {
   val MaxVoices   = 2
   val NumSpeakers = 4
 
-  type S = InMemory // Confluent
+  type S = Confluent
+  //  type S = InMemory
 
   def main(args: Array[String]): Unit = {
-    //    val sys = Confluent(BerkeleyDB.tmp())
-    //    val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
-    val sys       = InMemory()
-    val cursor    = sys
-    val sensorsH  = cursor.step { implicit tx =>
-      import IntEx.varSerializer
-      mkWorld().map(tx.newHandle(_))
+    val sys = Confluent(BerkeleyDB.tmp())
+    val (_, cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
+    //    val sys       = InMemory()
+    //    val cursor    = sys
+    lucre.synth.expr.initTypes()
+    val world = cursor.step { implicit tx =>
+      mkWorld()
     }
     println("Made the world.")
     cursor.step { implicit tx =>
       val imp = ExprImplicits[S]
       import imp._
-      val s0 = sensorsH(0)()
+      val s0 = world.sensors(0)()
       s0()   = 0
     }
     println("Made a difference.")
     sys.close()
   }
 
-  def mkWorld()(implicit tx: S#Tx): Vec[Expr.Var[S, Int]] = {
+  class Speaker(val gate  : stm.Source[S#Tx, Expr    [S, Boolean]],
+                             val active: stm.Source[S#Tx, Expr.Var[S, Boolean]])
+
+  class Layer(val speakers: Vec[Speaker])
+
+  class World(val layers: Vec[Layer],
+                           val sensors: Vec[stm.Source[S#Tx, Expr.Var[S, Int]]],
+                           val hasFreeVoices: stm.Source[S#Tx, Expr[S, Boolean]])
+
+  def mkWorld()(implicit tx: S#Tx): World = {
     val imp = ExprImplicits[S]
     import imp._
 
@@ -41,33 +53,42 @@ object AutomaticVoices {
       IntEx.newVar[S](-1)
     }
 
-    // decoupling data-flow recursion here
-    val vecPlaying = Vec.tabulate(NumLayers) { layer =>
-      val playing = BooleanEx.newVar[S](false)
-      playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
-      playing
-    }
+    //    // decoupling data-flow recursion here
+    //    val vecPlaying = Vec.tabulate(NumLayers) { layer =>
+    //      val playing = BooleanEx.newVar[S](false)
+    //      playing.changed.react(_ => ch => println(s"playing$layer -> ${ch.now}"))
+    //      playing
+    //    }
 
-    val activeVoices   = count(vecPlaying)
-    val hasFreeVoices  = activeVoices < MaxVoices
-    activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
+    import IntEx.{varSerializer => intVarSer}
+    import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
 
-    for (layer <- 0 until NumLayers) {
+    val (vecLayer, vecPlaying) = Vec.tabulate(NumLayers) { layer =>
       val vecActive   = Vec.fill(NumSpeakers)(BooleanEx.newVar[S](false))
-      val playing     = vecPlaying(layer)
+      // val playing     = vecPlaying(layer)
       val vecGate: Vec[Expr[S, Boolean]] = Vec.tabulate(NumSpeakers) { speaker =>
         val isLayer = sensors(speaker) sig_== layer
-        val gate    = isLayer && (playing || hasFreeVoices)
+        val gate    = isLayer // && (playing || hasFreeVoices)
         gate.changed.react(_ => ch => println(s"gate$layer$speaker -> ${ch.now}"))
         gate
       }
       val sumActive = count(vecActive)
       val sumGate   = count(vecGate  )
-      val playing1  = sumActive + sumGate > 0
-      playing()     = playing1
-    }
+      val playing   = sumActive + sumGate > 0
+      // playing()     = playing1
 
-    sensors
+      val l = new Layer((vecGate zip vecActive).map { case (gate, active) =>
+        new Speaker(gate = tx.newHandle(gate), active = tx.newHandle(active))
+      })
+
+      (l, playing)
+    } .unzip
+
+    val activeVoices   = count(vecPlaying)
+    val hasFreeVoices  = activeVoices < MaxVoices
+    activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
+
+    new World(vecLayer, sensors.map(tx.newHandle(_)), tx.newHandle(hasFreeVoices))
   }
 
   private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {

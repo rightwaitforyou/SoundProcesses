@@ -21,7 +21,6 @@ import de.sciss.model.Change
 import de.sciss.serial.{DataOutput, DataInput}
 import de.sciss.lucre.expr.{Type, Expr, Boolean => BooleanEx, Int => IntEx}
 import scala.annotation.switch
-import de.sciss.model
 
 object BooleanExtensions  {
   private[this] type Ex[S <: Sys[S]] = Expr[S, Boolean]
