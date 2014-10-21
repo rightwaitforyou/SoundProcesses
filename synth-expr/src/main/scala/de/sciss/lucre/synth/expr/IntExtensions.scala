@@ -15,10 +15,10 @@ package de.sciss.lucre.synth
 package expr
 
 import de.sciss.lucre.{event => evt, expr}
-import de.sciss.lucre.event.{Node, Targets, Sys}
+import de.sciss.lucre.event.{Targets, Sys}
 import annotation.switch
-import de.sciss.lucre.expr.{Type, Expr}
-import de.sciss.serial.{DataOutput, DataInput}
+import de.sciss.lucre.expr.{Type, Expr, Int => IntEx, Boolean => BooleanEx}
+import de.sciss.serial.DataInput
 import de.sciss.lucre
 
 object IntExtensions {
@@ -34,7 +34,7 @@ object IntExtensions {
     final val opLo  = UnaryOp.Neg  .id
     final val opHi  = UnaryOp.Cubed.id
 
-    val name = "Int-Int Ops"
+    val name = "Int-1 Ops"
 
     def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                   (implicit tx: S#Tx): Expr.Node[S, Int] = {
@@ -56,7 +56,7 @@ object IntExtensions {
     final val opLo  = BinaryOp.Plus  .id
     final val opHi  = BinaryOp.Absdif.id
 
-    val name = "Int-Int Ops"
+    val name = "Int-2 Ops"
 
     def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                   (implicit tx: S#Tx): Expr.Node[S, Int] = {
@@ -281,26 +281,39 @@ object IntExtensions {
   }
 
   final class Ops[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
-    import me.{`this` => ex}
+    import me.{`this` => a}
     private type E = Ex[S]
 
     import UnaryOp._
 
-    def unary_- (implicit tx: S#Tx): E = Neg   (ex)
-    def unary_~ (implicit tx: S#Tx): E = BitNot(ex)
+    // ---- Int => Int ----
+
+    def unary_- (implicit tx: S#Tx): E = Neg   (a)
+    def unary_~ (implicit tx: S#Tx): E = BitNot(a)
 
     import BinaryOp._
 
-    def +   (b: E)(implicit tx: S#Tx): E = Plus              (ex, b)
-    def -   (b: E)(implicit tx: S#Tx): E = Minus             (ex, b)
-    def *   (b: E)(implicit tx: S#Tx): E = Times             (ex, b)
-    def /   (b: E)(implicit tx: S#Tx): E = IDiv              (ex, b)
-    def &   (b: E)(implicit tx: S#Tx): E = BitAnd            (ex, b)
-    def |   (b: E)(implicit tx: S#Tx): E = BitOr             (ex, b)
-    def ^   (b: E)(implicit tx: S#Tx): E = BitXor            (ex, b)
-    def <<  (b: E)(implicit tx: S#Tx): E = ShiftLeft         (ex, b)
-    def >>  (b: E)(implicit tx: S#Tx): E = ShiftRight        (ex, b)
-    def >>> (b: E)(implicit tx: S#Tx): E = UnsignedShiftRight(ex, b)
+    // ---- (Int, Int) => Int ----
+
+    def +   (b: E)(implicit tx: S#Tx): E = Plus              (a, b)
+    def -   (b: E)(implicit tx: S#Tx): E = Minus             (a, b)
+    def *   (b: E)(implicit tx: S#Tx): E = Times             (a, b)
+    def /   (b: E)(implicit tx: S#Tx): E = IDiv              (a, b)
+    def &   (b: E)(implicit tx: S#Tx): E = BitAnd            (a, b)
+    def |   (b: E)(implicit tx: S#Tx): E = BitOr             (a, b)
+    def ^   (b: E)(implicit tx: S#Tx): E = BitXor            (a, b)
+    def <<  (b: E)(implicit tx: S#Tx): E = ShiftLeft         (a, b)
+    def >>  (b: E)(implicit tx: S#Tx): E = ShiftRight        (a, b)
+    def >>> (b: E)(implicit tx: S#Tx): E = UnsignedShiftRight(a, b)
+
+    // ---- (Int, Int) => Boolean ----
+
+    def sig_==(b: E)(implicit tx: S#Tx): Expr[S, Boolean] = BooleanExtensions.IntEq (a, b)
+    def sig_!=(b: E)(implicit tx: S#Tx): Expr[S, Boolean] = BooleanExtensions.IntNeq(a, b)
+    def <     (b: E)(implicit tx: S#Tx): Expr[S, Boolean] = BooleanExtensions.IntLt (a, b)
+    def >     (b: E)(implicit tx: S#Tx): Expr[S, Boolean] = BooleanExtensions.IntGt (a, b)
+    def <=    (b: E)(implicit tx: S#Tx): Expr[S, Boolean] = BooleanExtensions.IntLeq(a, b)
+    def >=    (b: E)(implicit tx: S#Tx): Expr[S, Boolean] = BooleanExtensions.IntGeq(a, b)
   }
 
   final class RichOps[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>

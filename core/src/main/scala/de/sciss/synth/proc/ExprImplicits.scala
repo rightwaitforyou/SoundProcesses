@@ -20,7 +20,7 @@ import language.implicitConversions
 
 object ExprImplicits {
   def apply[S <: evt.Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
-  private object Imp extends ExprImplicits[evt.InMemory]
+  private[this] val Imp = new ExprImplicits[evt.InMemory]
 }
 
 /** This class helps overcome the limitation of scala's implicit resolution -- by resolving an expression
@@ -30,6 +30,6 @@ object ExprImplicits {
   * outside the implicit scope (e.g. addition on longs).
   */
 class ExprImplicits[S <: evt.Sys[S]] protected extends de.sciss.lucre.synth.expr.ExprImplicits[S] {
-  implicit def synthGraphConst(s: SynthGraph    ): Expr[S, SynthGraph    ] = SynthGraphs  .newConst(s)
-  implicit def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Expr.newConst(v)
+  implicit final def synthGraphConst(s: SynthGraph    ): Expr[S, SynthGraph    ] = SynthGraphs  .newConst(s)
+  implicit final def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Expr.newConst(v)
 }

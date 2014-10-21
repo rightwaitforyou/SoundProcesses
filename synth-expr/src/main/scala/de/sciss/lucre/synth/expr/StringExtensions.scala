@@ -15,8 +15,8 @@ package de.sciss.lucre.synth
 package expr
 
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.event.{Node, Targets, Sys}
-import de.sciss.serial.{DataInput, DataOutput}
+import de.sciss.lucre.event.{Targets, Sys}
+import de.sciss.serial.DataInput
 import de.sciss.lucre.expr.{Type, Expr}
 import scala.annotation.switch
 import de.sciss.lucre
@@ -33,7 +33,7 @@ object StringExtensions  {
     final val opLo  = BinaryOp.Append.id
     final val opHi  = BinaryOp.Append.id
 
-    val name = "Long-Long Ops"
+    val name = "String-2 Ops"
 
     def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                   (implicit tx: S#Tx): Expr.Node[S, String] = {
