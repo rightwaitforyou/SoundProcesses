@@ -143,8 +143,7 @@ lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp,
       "de.sciss"      %% "lucreevent-artifact" % lucreEventVersion,
       "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
       "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
-      "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test",
-      "de.sciss"      %% "lucreswing"     % lucreSwingVersion     % "test"
+      "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test"
     )
   )
 
@@ -163,7 +162,8 @@ lazy val `soundprocesses-compiler` = project.in(file("compiler")).dependsOn(`sou
     libraryDependencies ++= Seq(
       "org.scala-lang" %  "scala-compiler" % scalaVersion.value,
       "de.sciss"       %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
-      "de.sciss"       %% "fileutil"       % fileUtilVersion       % "test"
+      "de.sciss"       %% "fileutil"       % fileUtilVersion       % "test",
+      "de.sciss"       %% "lucreswing"     % lucreSwingVersion     % "test"
     )
   )
 

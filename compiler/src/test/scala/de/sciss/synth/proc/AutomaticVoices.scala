@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
 import de.sciss.lucre.synth.InMemory
-import de.sciss.synth.SynthGraph
+import de.sciss.synth.{proc, SynthGraph}
 import de.sciss.{synth, lucre}
 import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Double => DoubleEx, Int => IntEx}
 import de.sciss.lucre.stm
@@ -31,19 +31,15 @@ object AutomaticVoices {
     //    val sys = InMemory()
     //    implicit val cursor = sys
     lucre.synth.expr.initTypes()
+    val compiler = proc.Compiler()
     cursor.step { implicit tx =>
-    println("Making the world...")
-    val world =
-    // cursor.step { implicit tx =>
-      mkWorld()
-    // }
-    println("Making procs...")
-    val transport =
-    // cursor.step { implicit tx =>
-      mkProcs(world)
-    // }
-    println("Making views...")
-    // cursor.step { implicit tx =>
+      println("Making the world...")
+      val world = mkWorld()
+      println("Making action...")
+      mkAction(world, compiler)
+      println("Making procs...")
+      val transport = mkProcs(world)
+      println("Making views...")
       mkViews(world, transport, sys)
     }
 
@@ -58,13 +54,15 @@ object AutomaticVoices {
   }
 
   class Speaker(val gate  : stm.Source[S#Tx, Expr    [S, Boolean]],
-                val active: stm.Source[S#Tx, Expr.Var[S, Boolean]])
+                val active: stm.Source[S#Tx, Expr.Var[S, Boolean]],
+                val proc  : stm.Source[S#Tx, Proc.Obj[S]])
 
   class Layer(val speakers: Vec[Speaker], val playing: stm.Source[S#Tx, Expr[S, Boolean]])
 
   class World(val layers   : Vec[Layer],
-              val sensors  : Vec[stm.Source[S#Tx, Expr.Var[S, Int]]],
-              val hasFreeVoices: stm.Source[S#Tx, Expr[S, Boolean]])
+              val sensors  : Vec[stm.Source[S#Tx, Expr.Var[S, Int    ]]],
+              val activeVoices : stm.Source[S#Tx, Expr    [S, Int    ]],
+              val hasFreeVoices: stm.Source[S#Tx, Expr    [S, Boolean]])
 
   def mkViews(w: World, transport: Transport[S], system: S)(implicit tx: S#Tx, _cursor: stm.Cursor[S]): Unit = {
     implicit val undo = new UndoManagerImpl
@@ -74,17 +72,30 @@ object AutomaticVoices {
       }
       IntSpinnerView(s(), s"s$si", 64)
     }
+    val vcView = IntSpinnerView(w.activeVoices(), "vc", 64)
     deferTx {
       import scala.swing._
       new Frame {
         title = "Automatic Voices"
-        contents = new FlowPanel(views.zipWithIndex.flatMap { case (v, vi) =>
-          new Label(s"s$vi") :: v.component :: Nil
-        }: _*)
+        contents = new BoxPanel(Orientation.Vertical) {
+          contents += new FlowPanel(views.zipWithIndex.flatMap { case (v, vi) =>
+            new Label(s"s$vi:") :: v.component :: Nil
+          }: _*)
+          contents += Swing.VStrut(4)
+          contents += new FlowPanel(new Label("vc:"), vcView.component)
+        }
         pack().centerOnScreen()
         open()
 
+        private val timer = new javax.swing.Timer(1000, Swing.ActionListener { _ =>
+          _cursor.step { implicit tx =>
+            checkWorld(w)
+          }
+        })
+        timer.start()
+
         override def closeOperation(): Unit = {
+          timer.stop()
           _cursor.step { implicit tx => transport.dispose() }
           system.close()
           sys.exit(0)
@@ -104,7 +115,7 @@ object AutomaticVoices {
       val li    = graph.Attribute.ir("li"  , 0)
       val si    = graph.Attribute.ir("si"  , 0)
       val gate  = graph.Attribute.kr("gate", 0)
-      (li * 10 + si + 900).poll(0, "synth")
+      // (li * 10 + si + 900).poll(0, "synth")
       val freq  = li.linexp(0, NumLayers - 1, 300.0, 2000.0)
       val pan   = si.linlin(0, NumSpeakers - 1, -1, 1)
       val env   = Env.asr(attack = 10, release = 10)
@@ -121,9 +132,11 @@ object AutomaticVoices {
       val liObj   = Obj(IntElem(li))
       l.speakers.zipWithIndex.foreach { case (s, si) =>
         val siObj     = Obj(IntElem(si))
-        val proc      = Proc[S]
+        // val proc      = Proc[S]
+        // val procObj   = Obj(Proc.Elem(proc))
+        val procObj   = s.proc()
+        val proc      = procObj.elem.peer
         proc.graph()  = g
-        val procObj   = Obj(Proc.Elem(proc))
         val attr      = procObj.attr
         val gateObj   = Obj(BooleanElem(s.gate()))
         attr.put("li"   , liObj   )
@@ -142,9 +155,10 @@ object AutomaticVoices {
     transport
   }
 
-  def checkWorld(w: World)(implicit tx: S#Tx): Unit =
+  def checkWorld(w: World)(implicit tx: S#Tx): Unit = {
+    val free = w.hasFreeVoices()
     w.layers.zipWithIndex.foreach { case (l, li) =>
-      if (!l.playing().value) {
+      if (!l.playing().value && free.value) {
         l.speakers.zipWithIndex.foreach { case (s, si) =>
           val gate = s.gate()
           // println(s"gate$li$si: $gate")
@@ -152,6 +166,36 @@ object AutomaticVoices {
         }
       }
     }
+  }
+
+  def mkAction(w: World, c: Code.Compiler)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Unit = {
+    val source =
+      """val imp = ExprImplicits[S]
+        |import imp._
+        |// println("Action")
+        |
+        |self.attr[BooleanElem]("active").foreach {
+        |  case Expr.Var(active) => active() = false
+        |}
+        |""".stripMargin
+    implicit val compiler = c
+    import compiler.executionContext
+    val fut = Action.compile[S](Code.Action(source))
+    fut.foreach { actionH =>
+      println("Action compiled.")
+      cursor.step { implicit tx =>
+        val action = actionH()
+        w.layers.foreach { l =>
+          l.speakers.foreach { s =>
+            val activeObj = Obj(BooleanElem(s.active()))
+            val actionObj = Obj(Action.Elem(action))
+            actionObj.attr.put("active", activeObj)
+            s.proc() .attr.put("done"  , actionObj)
+          }
+        }
+      }
+    }
+  }
 
   def mkWorld()(implicit tx: S#Tx): World = {
     val sensors = Vec.tabulate(NumSpeakers) { speaker =>
@@ -161,7 +205,7 @@ object AutomaticVoices {
     }
 
     import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
-    import IntEx.{varSerializer => intVarSer}
+    import IntEx    .{serializer => intSer , varSerializer => intVarSer }
 
     val vecLayer = Vec.tabulate(NumLayers) { li =>
       val vecActive = Vec.tabulate(NumSpeakers) { si =>
@@ -181,7 +225,9 @@ object AutomaticVoices {
       playing.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
 
       val speakers = (vecGate zip vecActive).map { case (gate, active) =>
-        new Speaker(gate = tx.newHandle(gate), active = tx.newHandle(active))
+        val proc      = Proc[S]
+        val procObj   = Obj(Proc.Elem(proc))
+        new Speaker(gate = tx.newHandle(gate), active = tx.newHandle(active), proc = tx.newHandle(procObj))
       }
       new Layer(speakers, tx.newHandle(playing))
     }
@@ -191,7 +237,7 @@ object AutomaticVoices {
     val hasFreeVoices   = activeVoices < MaxVoices
     activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
 
-    new World(vecLayer, sensors.map(tx.newHandle(_)), tx.newHandle(hasFreeVoices))
+    new World(vecLayer, sensors.map(tx.newHandle(_)), tx.newHandle(activeVoices), tx.newHandle(hasFreeVoices))
   }
 
   private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {
