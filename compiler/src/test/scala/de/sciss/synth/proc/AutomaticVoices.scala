@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
 import de.sciss.lucre.synth.InMemory
-import de.sciss.synth.{proc, SynthGraph}
+import de.sciss.synth.{GE, proc, SynthGraph}
 import de.sciss.{synth, lucre}
 import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Double => DoubleEx, Int => IntEx}
 import de.sciss.lucre.stm
@@ -32,7 +32,7 @@ object AutomaticVoices {
     //    implicit val cursor = sys
     lucre.synth.expr.initTypes()
     val compiler = proc.Compiler()
-    cursor.step { implicit tx =>
+    _cursor.step { implicit tx =>
       println("Making the world...")
       val world = mkWorld()
       println("Making action...")
@@ -109,22 +109,80 @@ object AutomaticVoices {
     aural.whenStarted(_.peer.dumpOSC())
     val transport = Transport[S](aural)
 
+    // for simplicity, same graph for
+    // all layers, distinguished by
+    // resonant frequency depending on
+    // attribute 0 <= `li` < NumLayers
     val g = SynthGraph {
       import synth._
       import ugen._
       val li    = graph.Attribute.ir("li"  , 0)
-      val si    = graph.Attribute.ir("si"  , 0)
+      // val si    = graph.Attribute.ir("si"  , 0)
       val gate  = graph.Attribute.kr("gate", 0)
-      // (li * 10 + si + 900).poll(0, "synth")
       val freq  = li.linexp(0, NumLayers - 1, 300.0, 2000.0)
-      val pan   = si.linlin(0, NumSpeakers - 1, -1, 1)
+      // val pan   = si.linlin(0, NumSpeakers - 1, -1, 1)
       val env   = Env.asr(attack = 10, release = 10)
       val amp   = EnvGen.ar(env, gate = gate, levelScale = 0.5)
       val done  = Done.kr(amp)
       graph.Action(done, "done")
       val dust  = Decay.ar(Dust.ar(10), 1).min(1)
-      val sig   = Resonz.ar(dust, freq, 0.1) * amp
-      Out.ar(0, Pan2.ar(sig, pan))
+      val sig   = Resonz.ar(dust, freq, 0.5) * amp
+      graph.ScanOut(sig)
+      // Out.ar(0, Pan2.ar(sig, pan))
+    }
+
+    def mkTransition(fun: (GE, GE, GE) => GE): SynthGraph = SynthGraph {
+      import synth._
+      import ugen._
+      val pred  = graph.ScanInFix("pred", 1)
+      val succ  = graph.ScanInFix("succ", 1)
+      val gate  = graph.Attribute.kr("gate", 0)
+      val env   = Env.asr(attack = 10, release = 10, curve = Curve.linear)
+      val fade  = EnvGen.ar(env, gate = gate)
+      val done  = Done.kr(fade)
+      graph.Action(done, "done")
+      val sig   = fun(pred, succ, fade)
+      graph.ScanOut(sig)
+    }
+
+    // transition 1: rising LPF
+    val t1 = mkTransition { (pred, succ, fade) =>
+      import synth._
+      import ugen._
+      val freq = fade.linexp(0, 1, 22.05, 22050)
+      HPF.ar(pred, freq) + LPF.ar(succ, freq)
+    }
+
+    // transition 2: descending HPF
+    val t2 = mkTransition { (pred, succ, fade) =>
+      import synth._
+      import ugen._
+      val freq = fade.linexp(1, 0, 22.05, 22050)
+      HPF.ar(succ, freq) + LPF.ar(pred, freq)
+    }
+
+    // transition 3: rising PV_MagBelow
+    val t3 = mkTransition { (pred, succ, fade) =>
+      import synth._
+      import ugen._
+      val thresh  = fade.linexp(0, 1, 1.0e-3, 1.0e-1)
+      val bufPred = LocalBuf(1024)
+      val bufSucc = LocalBuf(1024)
+      val fltPred = IFFT.ar(PV_MagAbove(FFT(bufPred, pred), thresh))
+      val fltSucc = IFFT.ar(PV_MagBelow(FFT(bufSucc, succ), thresh))
+      fltSucc + fltPred
+    }
+
+    // transition 4: descending PV_MagAbove
+    val t4 = mkTransition { (pred, succ, fade) =>
+      import synth._
+      import ugen._
+      val thresh  = fade.linexp(1, 0, 1.0e-3, 1.0e-1)
+      val bufPred = LocalBuf(1024)
+      val bufSucc = LocalBuf(1024)
+      val fltPred = IFFT.ar(PV_MagBelow(FFT(bufPred, pred), thresh))
+      val fltSucc = IFFT.ar(PV_MagAbove(FFT(bufSucc, succ), thresh))
+      fltSucc + fltPred
     }
 
     w.layers.zipWithIndex.foreach { case (l, li) =>
@@ -162,7 +220,7 @@ object AutomaticVoices {
         l.speakers.zipWithIndex.foreach { case (s, si) =>
           val gate = s.gate()
           // println(s"gate$li$si: $gate")
-          if (gate.value) s.active().update(true)
+          if (gate.value) s.active().update(true)  // here it would come to the front
         }
       }
     }
