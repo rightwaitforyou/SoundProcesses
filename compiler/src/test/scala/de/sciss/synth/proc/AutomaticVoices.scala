@@ -31,13 +31,22 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
 import scala.swing.Swing
 
+// topology bug:
+// s0 -> 0, s1 -> 1, s1 -> 2, s0 -> 1
+// ausserdem: nachdem playing = false
+// ohne action auskommt, muss allerdings
+// noch ein bypass layerIn -> layerOut
+// automatisch aktiviert werden (ensBypass.playing = !ens.playing)
 object AutomaticVoices {
   val DumpOSC         = false
   val ShowLog         = false
+  val Shadowing       = true
+  val Attack          = 10
+  val Release         = 10
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  val NumSpeakers     = 5
+  val NumSpeakers     = 2 // 5
   // val NumSpeakers     = 42
   val NumTransitions  = 4
 
@@ -161,7 +170,28 @@ object AutomaticVoices {
 
         if (becomesActive) {
           l.transId().update(w.transId().value)
-          // XXX TODO - here it would come to the front
+          if (Shadowing) for {
+            layerIn  <- l.input ().scans.get("in" )
+            layerOut <- l.output().scans.get("out")
+            diffIn   <- w.diffusion().elem.peer.scans.get("in")
+          } {
+            val sources = diffIn.sources.collect {
+              case l @ Scan.Link.Scan(_) => l
+            } .toSet
+            val layerOutL = Scan.Link.Scan(layerOut)
+            // only act if we're not there
+            if (!sources.contains(layerOutL)) {
+              val existingIn = layerIn.sources.collect {
+                case l @ Scan.Link.Scan(_) => l
+              } .toSet
+              val toAdd     = sources    -- existingIn
+              val toRemove  = existingIn -- sources
+              toRemove.foreach(layerIn.removeSource)
+              sources .foreach(diffIn .removeSource)
+              toAdd   .foreach(layerIn.addSource   )
+              diffIn.addSource(layerOutL)
+            }
+          }
 
           gateVals.collect {
             case (s, true) => s.active().update(true)
@@ -237,7 +267,7 @@ object AutomaticVoices {
       val pred  = graph.ScanInFix("pred", 1)
       val succ  = graph.ScanInFix("succ", 1)
       val gate  = graph.Attribute.kr("gate", 0)
-      val env   = Env.asr(attack = 30 /* 10 */, release = 30 /* 10 */, curve = Curve.linear)
+      val env   = Env.asr(attack = Attack, release = Release, curve = Curve.linear)
       val fade  = EnvGen.ar(env, gate = gate)
       val done  = Done.kr(fade)
       graph.Action(done, "done")
@@ -414,8 +444,8 @@ object AutomaticVoices {
 
       vecTrans.foreach(lFolder.addLast)
 
-      // XXX TODO - short debug solution; just connect all layer outputs to main diffusion
-      coll.scans.add("out") ~> diff.scans.add("in")
+      // short debug solution; just connect all layer outputs to main diffusion
+      if (!Shadowing) coll.scans.add("out") ~> diff.scans.add("in")
 
       val speakers = (vecGate zip vecActive).map { case (gate, active) =>
         new Speaker(gate   = tx.newHandle(gate),
