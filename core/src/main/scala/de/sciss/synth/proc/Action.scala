@@ -34,6 +34,9 @@ object Action {
 
   def empty[S <: Sys[S]](implicit tx: S#Tx): Action[S] = Impl.empty[S]
 
+  def apply[S <: Sys[S]](name: String, jar: Array[Byte])(implicit tx: S#Tx): Action[S] =
+    Impl.newConst(name, jar)
+
   object Var {
     def apply[S <: Sys[S]](init: Action[S])(implicit tx: S#Tx): Var[S] = Impl.newVar(init)
 

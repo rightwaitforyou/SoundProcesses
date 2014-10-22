@@ -50,6 +50,10 @@ object AutomaticVoices {
   def main(args: Array[String]): Unit = {
     showAuralLog = ShowLog
 
+    val compiler = proc.Compiler()
+    println("Making action...")
+    val (actionName, actionBytes) = mkAction(compiler)
+
     val dbc = BerkeleyDB.Config()
     dbc.lockTimeout = Duration(2, TimeUnit.SECONDS)    // this value appears to be crucial to prevent deadlocks / inf loops
     val sys: S = Confluent(BerkeleyDB.tmp(dbc))
@@ -58,12 +62,10 @@ object AutomaticVoices {
     //    val sys = InMemory()
     //    implicit val cursor = sys
     lucre.synth.expr.initTypes()
-    val compiler = proc.Compiler()
     atomic { implicit tx =>
+      val action = Action[S](actionName, actionBytes)
       println("Making the world...")
-      val world = mkWorld()
-      println("Making action...")
-      mkAction(world, compiler)
+      val world = mkWorld(action)
       println("Making procs...")
       val transport = mkAural(world)
       println("Making views...")
@@ -176,7 +178,7 @@ object AutomaticVoices {
       }
     })
 
-  def mkAction(w: World, c: Code.Compiler)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Unit = {
+  def mkAction(c: Code.Compiler): (String, Array[Byte]) = {
     val source =
       """val imp = ExprImplicits[S]
         |import imp._
@@ -188,21 +190,12 @@ object AutomaticVoices {
         |""".stripMargin
     implicit val compiler = c
     import compiler.executionContext
-    val fut = Action.compile[S](Code.Action(source))
-    fut.foreach { actionH =>
-      println("Action compiled.")
-      atomic { implicit tx =>
-        val action = actionH()
-        w.layers.foreach { l =>
-          l.speakers.foreach { s =>
-            val activeObj = Obj(BooleanElem(s.active()))
-            val actionObj = Obj(Action.Elem(action))
-            actionObj.attr.put("active", activeObj)
-            println("TODO - STORE DONE ACTION") // s.proc() .attr.put("done"  , actionObj)
-          }
-        }
-      }
-    }
+    val code  = Code.Action(source)
+    val name  = "Done"
+    val bytes = code.execute(name)
+    println("Action compiled.")
+
+    /* Action */ (name, bytes)
   }
 
   implicit class ScanOps(val `this`: Scan[S]) extends AnyVal {
@@ -213,7 +206,7 @@ object AutomaticVoices {
       `this`.removeSink(Scan.Link.Scan(that))
   }
 
-  def mkWorld()(implicit tx: S#Tx): World = {
+  def mkWorld(done: Action[S])(implicit tx: S#Tx): World = {
     val sensors = Vec.tabulate(NumSpeakers) { speaker =>
       val sensor = IntEx.newVar[S](-1)
       sensor.changed.react(_ => ch => println(s"sensor$speaker -> ${ch.now}"))
@@ -244,7 +237,7 @@ object AutomaticVoices {
       val pred  = graph.ScanInFix("pred", 1)
       val succ  = graph.ScanInFix("succ", 1)
       val gate  = graph.Attribute.kr("gate", 0)
-      val env   = Env.asr(attack = 10, release = 10, curve = Curve.linear)
+      val env   = Env.asr(attack = 30 /* 10 */, release = 30 /* 10 */, curve = Curve.linear)
       val fade  = EnvGen.ar(env, gate = gate)
       val done  = Done.kr(fade)
       graph.Action(done, "done")
@@ -272,7 +265,7 @@ object AutomaticVoices {
     val t3 = mkTransition { (pred, succ, fade) =>
       import synth._
       import ugen._
-      val thresh  = fade.linexp(0, 1, 1.0e-3, 1.0e-1)
+      val thresh  = fade.linexp(0, 1, 1.0e-3, 1.0e1)
       val bufPred = LocalBuf(1024)
       val bufSucc = LocalBuf(1024)
       val fltPred = IFFT.ar(PV_MagAbove(FFT(bufPred, pred), thresh))
@@ -284,7 +277,7 @@ object AutomaticVoices {
     val t4 = mkTransition { (pred, succ, fade) =>
       import synth._
       import ugen._
-      val thresh  = fade.linexp(1, 0, 1.0e-3, 1.0e-1)
+      val thresh  = fade.linexp(1, 0, 1.0e-3, 1.0e1)
       val bufPred = LocalBuf(1024)
       val bufSucc = LocalBuf(1024)
       val fltPred = IFFT.ar(PV_MagBelow(FFT(bufPred, pred), thresh))
@@ -408,7 +401,9 @@ object AutomaticVoices {
           val attr      = procTObj.attr
           attr.name     = s"T$gi$si"
           attr.put("gate", gate)
-          // attr.put("done", ...) // XXX TODO - based on `active`
+          val doneObj   = Obj(Action.Elem(done))
+          doneObj.attr.put("active", active)
+          attr.put("done", doneObj)
 
           procTObj
         }

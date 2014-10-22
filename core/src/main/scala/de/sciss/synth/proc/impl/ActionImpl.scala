@@ -107,6 +107,8 @@ object ActionImpl {
       if (DEBUG) println(s"ActionImpl: compileToFunction completed. jar-size = ${jar.length}")
       cursor.step { implicit tx =>
         val a = newConst(name, jar)
+        // Is this affected by https://github.com/Sciss/LucreConfluent/issues/6 ?
+        // No, as it doesn't contain any mutable state or S#ID instances
         tx.newHandle(a)
       }
     }
@@ -134,7 +136,7 @@ object ActionImpl {
           val jarSize = in.readInt()
           val jar     = new Array[Byte](jarSize)
           in.readFully(jar)
-          val system  = tx.system
+          // val system  = tx.system
           new ConstFunImpl[S](name, jar)
 
         case CONST_EMPTY  => new ConstEmptyImpl[S]
