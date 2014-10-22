@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
-import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.synth.{Server, InMemory}
 import de.sciss.synth.{GE, proc, SynthGraph}
 import de.sciss.{synth, lucre}
 import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Int => IntEx}
@@ -31,10 +31,14 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
 
 object AutomaticVoices {
+  val DumpOSC         = false
+  val ShowLog         = false
+
   val NumLayers       = 3
   val MaxVoices       = 2
-  val NumSpeakers     = 4
-  val NumTransitions  = 4 // XXX TODO - for testing, it would be better to have unique numbers, i.e. NumSpeakers != NumTransitions
+  val NumSpeakers     = 5
+  // val NumSpeakers     = 42
+  val NumTransitions  = 4
 
   type S = Confluent
   // type S = InMemory
@@ -43,10 +47,10 @@ object AutomaticVoices {
   import imp._
 
   def main(args: Array[String]): Unit = {
-    showAuralLog = true
+    showAuralLog = ShowLog
 
     val dbc = BerkeleyDB.Config()
-    dbc.lockTimeout = Duration(1000, TimeUnit.SECONDS)
+    dbc.lockTimeout = Duration(2000, TimeUnit.SECONDS)    // this value appears to be crucial to prevent deadlocks / inf loops
     val sys: S = Confluent(BerkeleyDB.tmp(dbc))
     val (_, _cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val cursor = _cursor
@@ -98,9 +102,13 @@ object AutomaticVoices {
       new Frame {
         title = "Automatic Voices"
         contents = new BoxPanel(Orientation.Vertical) {
-          contents += new FlowPanel(views.zipWithIndex.flatMap { case (v, vi) =>
-            new Label(s"s$vi:") :: v.component :: Nil
-          }: _*)
+          // contents += new ServerStatusPanel
+          contents += new GridPanel(0, 12) {
+            views.zipWithIndex.foreach { case (v, vi) =>
+              contents += new Label(s"s$vi:", null, Alignment.Right)
+              contents += v.component
+            }
+          }
           contents += Swing.VStrut(4)
           contents += new FlowPanel(new Label("trans:"), transView.component, new Label("vc:"), vcView.component)
         }
@@ -126,12 +134,14 @@ object AutomaticVoices {
 
   def mkAural(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Transport[S] = {
     val aural = AuralSystem()
-    aural.whenStarted(_.peer.dumpOSC())
+    if (DumpOSC) aural.whenStarted(_.peer.dumpOSC())
     val transport = Transport[S](aural)
     transport.addObject(w.diffusion())
     w.layers.foreach { l => transport.addObject(l.ensemble()) }
     transport.play()
-    aural.start()
+    val cfg = Server.Config()
+    cfg.audioBusChannels = 1024
+    aural.start(cfg)
     transport
   }
 
