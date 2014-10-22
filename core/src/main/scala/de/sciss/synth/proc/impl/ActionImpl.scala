@@ -97,7 +97,12 @@ object ActionImpl {
                                          (implicit cursor: stm.Cursor[S], compiler: Code.Compiler): Unit = {
     // val jarFut = source.compileToFunction(name)
     val jarFut = Code.future(blocking(source.execute(name)))
-    import compiler.executionContext
+
+    // somehow we get problems with BDB on the compiler context.
+    // for simplicity use the main SP context!
+
+    // import compiler.executionContext
+    import SoundProcesses.executionContext
     val actFut = jarFut.map { jar =>
       if (DEBUG) println(s"ActionImpl: compileToFunction completed. jar-size = ${jar.length}")
       cursor.step { implicit tx =>

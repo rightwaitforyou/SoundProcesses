@@ -29,6 +29,7 @@ import proc.Implicits._
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
+import scala.swing.Swing
 
 object AutomaticVoices {
   val DumpOSC         = false
@@ -50,7 +51,7 @@ object AutomaticVoices {
     showAuralLog = ShowLog
 
     val dbc = BerkeleyDB.Config()
-    dbc.lockTimeout = Duration(2000, TimeUnit.SECONDS)    // this value appears to be crucial to prevent deadlocks / inf loops
+    dbc.lockTimeout = Duration(2, TimeUnit.SECONDS)    // this value appears to be crucial to prevent deadlocks / inf loops
     val sys: S = Confluent(BerkeleyDB.tmp(dbc))
     val (_, _cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val cursor = _cursor
@@ -58,11 +59,11 @@ object AutomaticVoices {
     //    implicit val cursor = sys
     lucre.synth.expr.initTypes()
     val compiler = proc.Compiler()
-    _cursor.step { implicit tx =>
+    atomic { implicit tx =>
       println("Making the world...")
       val world = mkWorld()
       println("Making action...")
-      // mkAction(world, compiler)
+      mkAction(world, compiler)
       println("Making procs...")
       val transport = mkAural(world)
       println("Making views...")
@@ -116,7 +117,7 @@ object AutomaticVoices {
         open()
 
         private val timer = new javax.swing.Timer(1000, Swing.ActionListener { _ =>
-          _cursor.step { implicit tx =>
+          atomic { implicit tx =>
             checkWorld(w)
           }
         })
@@ -124,9 +125,13 @@ object AutomaticVoices {
 
         override def closeOperation(): Unit = {
           timer.stop()
-          _cursor.step { implicit tx => transport.dispose() }
-          system.close()
-          sys.exit(0)
+          atomic { implicit tx =>
+            transport.dispose()
+            tx.afterCommit {
+              system.close()
+              sys.exit(0)
+            }
+          }
         }
       }
     }
@@ -164,6 +169,13 @@ object AutomaticVoices {
     }
   }
 
+  def atomic(fun: S#Tx => Unit)(implicit cursor: stm.Cursor[S]): Unit =
+    SoundProcesses.executionContext.execute(Swing.Runnable {
+      cursor.step { implicit tx =>
+        fun(tx)
+      }
+    })
+
   def mkAction(w: World, c: Code.Compiler)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Unit = {
     val source =
       """val imp = ExprImplicits[S]
@@ -179,7 +191,7 @@ object AutomaticVoices {
     val fut = Action.compile[S](Code.Action(source))
     fut.foreach { actionH =>
       println("Action compiled.")
-      cursor.step { implicit tx =>
+      atomic { implicit tx =>
         val action = actionH()
         w.layers.foreach { l =>
           l.speakers.foreach { s =>
