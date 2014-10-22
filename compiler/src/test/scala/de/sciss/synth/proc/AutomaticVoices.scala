@@ -58,7 +58,7 @@ object AutomaticVoices {
       println("Making the world...")
       val world = mkWorld()
       println("Making action...")
-      mkAction(world, compiler)
+      // mkAction(world, compiler)
       println("Making procs...")
       val transport = mkAural(world)
       println("Making views...")
@@ -211,7 +211,7 @@ object AutomaticVoices {
       val li    = graph.Attribute.ir("li", 0)
       val freq  = li.linexp(0, NumLayers - 1, 300.0, 2000.0)
       val amp   = 0.5
-      val dust  = Decay.ar(Dust.ar(10), 1).min(1)
+      val dust  = Decay.ar(Dust.ar(Seq.fill(NumSpeakers)(10)), 1).min(1)
       val sig   = Resonz.ar(dust, freq, 0.5) * amp
       graph.ScanOut(sig)
     }
@@ -380,7 +380,7 @@ object AutomaticVoices {
           val collIn    = coll  .scans.add(s"in-$si")
           predOut ~> predIn
           succOut ~> succIn
-// XXX TODO: tOut    ~> collIn
+          tOut    ~> collIn
 
           val procTObj  = Obj(Proc.Elem(procT))
           val attr      = procTObj.attr
@@ -395,7 +395,7 @@ object AutomaticVoices {
         Obj(Ensemble.Elem(ensTrans))
       }
 
-      // XXX TODO: vecTrans.foreach(lFolder.addLast)
+      vecTrans.foreach(lFolder.addLast)
 
       // XXX TODO - short debug solution; just connect all layer outputs to main diffusion
       coll.scans.add("out") ~> diff.scans.add("in")
