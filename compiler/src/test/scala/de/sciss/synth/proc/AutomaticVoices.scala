@@ -188,20 +188,24 @@ object AutomaticVoices {
             layerOut <- l.output().scans.get("out")
             diffIn   <- w.diffusion().elem.peer.scans.get("in")
           } {
-            val sources = diffIn.sources.collect {
+            val diffSources = diffIn.sources.collect {
               case l @ Scan.Link.Scan(_) => l
             } .toSet
             val layerOutL = Scan.Link.Scan(layerOut)
             // only act if we're not there
-            if (!sources.contains(layerOutL)) {
+            if (!diffSources.contains(layerOutL)) {
               val existingIn = layerIn.sources.collect {
                 case l @ Scan.Link.Scan(_) => l
               } .toSet
-              val toAdd     = sources    -- existingIn
-              val toRemove  = existingIn -- sources
-              toRemove.foreach(layerIn.removeSource)
-              sources .foreach(diffIn .removeSource)
-              toAdd   .foreach(layerIn.addSource   )
+              val existingOut = layerOut.sinks.collect {
+                case l @ Scan.Link.Scan(_) => l
+              } .toSet
+              val toAddIn     = diffSources -- existingIn
+              val toRemoveIn  = existingIn  -- diffSources
+              toRemoveIn .foreach(layerIn .removeSource)
+              diffSources.foreach(diffIn  .removeSource)
+              existingOut.foreach(layerOut.removeSink  )
+              toAddIn    .foreach(layerIn .addSource   )
               diffIn.addSource(layerOutL)
             }
           }
