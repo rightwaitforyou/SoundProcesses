@@ -31,19 +31,17 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
 import scala.swing.Swing
 
-// topology bug:
-// s0 -> 0, s0 -> 1, s0 -> 0
 object AutomaticVoices {
-  val DumpOSC         = false
+  val DumpOSC         = true
   val ShowLog         = false
   val Shadowing       = true
-  val Attack          = 10
-  val Release         = 10
+  val Attack          = 30
+  val Release         = 30
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  val NumSpeakers     = 1 // 5
-  // val NumSpeakers     = 42
+  // val NumSpeakers     = 1 // 5
+  val NumSpeakers     = 42
   val NumTransitions  = 4
 
   type S = Confluent
@@ -60,7 +58,7 @@ object AutomaticVoices {
     val (actionName, actionBytes) = mkAction(compiler)
 
     val dbc = BerkeleyDB.Config()
-    dbc.lockTimeout = Duration(2, TimeUnit.SECONDS)    // this value appears to be crucial to prevent deadlocks / inf loops
+    dbc.lockTimeout = Duration(4, TimeUnit.SECONDS)    // this value appears to be crucial to prevent deadlocks / inf loops
     val sys: S = Confluent(BerkeleyDB.tmp(dbc))
     val (_, _cursor) = sys.cursorRoot(_ => ())(implicit tx => _ => sys.newCursor())
     implicit val cursor = _cursor
@@ -92,9 +90,11 @@ object AutomaticVoices {
   class World(val diffusion     :     stm.Source[S#Tx, Proc.Obj[S]],
               val layers        : Vec[Layer],
               val sensors       : Vec[stm.Source[S#Tx, Expr.Var[S, Int    ]]],
-              val transId       :     stm.Source[S#Tx, Expr    [S, Int    ]],
+              val transId       :     stm.Source[S#Tx, Expr.Var[S, Int    ]],
               val activeVoices  :     stm.Source[S#Tx, Expr    [S, Int    ]],
               val hasFreeVoices :     stm.Source[S#Tx, Expr    [S, Boolean]])
+
+  def rrand(lo: Int, hi: Int): Int = util.Random.nextInt(hi - lo + 1) + lo
 
   def mkViews(w: World, aural: AuralSystem, transport: Transport[S], system: S)
              (implicit tx: S#Tx, _cursor: stm.Cursor[S]): Unit = {
@@ -122,17 +122,36 @@ object AutomaticVoices {
           contents += Swing.VStrut(4)
           contents += new FlowPanel(new Label("trans:"), transView.component, new Label("vc:"), vcView.component)
           contents += Swing.VStrut(4)
-          contents += Button("Topology") {
-            val topOpt = _cursor.step { implicit tx =>
-              aural.serverOption.map { s =>
-                NodeGraph(s).topology
+          contents += new FlowPanel(
+            Button("Topology") {
+              atomic { implicit tx =>
+                aural.serverOption.map { s =>
+                  val top = NodeGraph(s).topology
+                  tx.afterCommit {
+                    println("---- TOPOLOGY ----")
+                    top.edges.foreach(println)
+                  }
+                }
+              }
+            },
+            Button("Randomize") {
+              atomic { implicit tx =>
+                w.transId().update(rrand(0, NumTransitions - 1))
+              }
+              w.sensors.foreach { s =>
+                atomic { implicit tx =>
+                  s().update(rrand(-1, NumLayers - 1))
+                }
+              }
+            },
+            Button("Clear") {
+              w.sensors.foreach { s =>
+                atomic { implicit tx =>
+                  s().update(-1)
+                }
               }
             }
-            topOpt.foreach { top =>
-              println("---- TOPOLOGY ----")
-              top.edges.foreach(println)
-            }
-          }
+          )
         }
         pack().centerOnScreen()
         open()
@@ -219,7 +238,7 @@ object AutomaticVoices {
   }
 
   def atomic(fun: S#Tx => Unit)(implicit cursor: stm.Cursor[S]): Unit =
-    SoundProcesses.executionContext.execute(Swing.Runnable {
+    SoundProcesses.scheduledExecutorService.submit(Swing.Runnable {
       cursor.step { implicit tx =>
         fun(tx)
       }
