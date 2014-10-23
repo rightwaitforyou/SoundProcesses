@@ -27,33 +27,33 @@ object Topology {
   private val emptySeq = Vec.empty[Nothing]
 }
 
-/** An online toplogical order maintenance structure. This is an immutable data structure with
+/** An online topological order maintenance structure. This is an immutable data structure with
   * amortized costs. The edge adding operation returns a new copy of the modified structure along
   * with a list of vertices which have been moved due to the insertion. The caller can then use
   * that list to adjust any views (e.g. DSP processes).
   *
   * @param  vertices      the vertices in the structure
   * @param  edges         a set of edges between the vertices
-  * @param  unpositioned  the number of unpositioned vertices (the leading elements in `vertices`)
+  * @param  unconnected  the number of unconnected vertices (the leading elements in `vertices`)
   * @param  edgeMap       allows lookup of edges via vertex keys
   */
 final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set[E])
-                                                   (unpositioned: Int, edgeMap: Map[V, Set[E]])
+                                                   (unconnected: Int, edgeMap: Map[V, Set[E]])
   extends Ordering[V] {
 
   import Topology.emptySeq
 
   type T = Topology[V, E]
 
-  override def toString = s"Topology($vertices, $edges)($unpositioned, $edgeMap)"
+  override def toString = s"Topology($vertices, $edges)($unconnected, $edgeMap)"
 
-  /** For two positioned vertices `a` and `b`, returns `-1` if `a` is before `b`, or `1` if `a` follows `b`,
-    *  or `0` if both are equal. Throws an exception if `a` or `b` is unpositioned.
+  /** For two connected vertices `a` and `b`, returns `-1` if `a` is before `b`, or `1` if `a` follows `b`,
+    *  or `0` if both are equal. Throws an exception if `a` or `b` is unconnected.
     */
   def compare(a: V, b: V): Int = {
     val ai = vertices.indexOf(a)
     val bi = vertices.indexOf(b)
-    require(ai >= unpositioned && bi >= unpositioned)
+    require(ai >= unconnected && bi >= unconnected)
     if (ai < bi) -1 else if (ai > bi) 1 else 0
   }
 
@@ -81,38 +81,38 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set
     val newEdgeMap: Map[V, Set[E]] = edgeMap + (source -> (edgeMap.getOrElse(source, Set.empty) + e))
     val newEdgeSet = edges + e
 
-    // dealing with unpositioned elements
-    if (upBound < unpositioned) { // first edge for source
-      if (loBound < unpositioned) { // first edge for target
+    // dealing with unconnected elements
+    if (upBound < unconnected) { // first edge for source
+      if (loBound < unconnected) { // first edge for target
         val min         = math.min(upBound, loBound)
         val max         = math.max(upBound, loBound)
-        val newUnpos    = unpositioned - 2
+        val newUnCon    = unconnected - 2
         val newVertices = vertices
           .patch(min     , emptySeq, 1)
           .patch(max - 1 , emptySeq, 1)
-          .patch(newUnpos, Vec(source, target), 0)
-        Some((copy(newVertices, newEdgeSet)(newUnpos, newEdgeMap), source, Vec(target)))
+          .patch(newUnCon, Vec(source, target), 0)
+        Some((copy(newVertices, newEdgeSet)(newUnCon, newEdgeMap), source, Vec(target)))
       } else {
         //            Some( (this, emptySeq) )
-        val newUnpos    = unpositioned - 1
+        val newUnCon    = unconnected - 1
         val sourceSeq   = Vec(source)
         val newVertices = vertices
           .patch(upBound    , emptySeq , 1)
           .patch(loBound - 1, sourceSeq, 0)
-        Some((copy(newVertices, newEdgeSet)(newUnpos, newEdgeMap), target, sourceSeq))
+        Some((copy(newVertices, newEdgeSet)(newUnCon, newEdgeMap), target, sourceSeq))
       }
 
       // regular algorithm
     } else if (loBound > upBound) {
-      Some((copy(vertices, newEdgeSet)(unpositioned, newEdgeMap), source, emptySeq))
+      Some((copy(vertices, newEdgeSet)(unconnected, newEdgeMap), source, emptySeq))
     } else if (loBound < upBound) {
       val visited = MSet.empty[V]
       if (!discovery(visited, newEdgeMap, target, upBound)) {
         None // Cycle --> Abort
       } else {
         val (newVertices, affected) = shift(visited, loBound, upBound)
-        val newUnpos                = if (loBound < unpositioned) unpositioned - 1 else unpositioned
-        Some((copy(newVertices, newEdgeSet)(newUnpos, newEdgeMap), source, affected))
+        val newUnCon                = if (loBound < unconnected) unconnected - 1 else unconnected
+        Some((copy(newVertices, newEdgeSet)(newUnCon, newEdgeMap), source, affected))
       }
     } else {
       // loBound == upBound
@@ -123,18 +123,18 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set
   def removeEdge(e: E): T = {
     if (edges.contains(e)) {
       val source = e.sourceVertex
-      copy(edges = edges - e)(unpositioned, edgeMap + (source -> (edgeMap(source) - e)))
+      copy(edges = edges - e)(unconnected, edgeMap + (source -> (edgeMap(source) - e)))
     } else this
   }
 
-  /** Adds a new vertex to the set of unpositioned vertices. Throws an exception
+  /** Adds a new vertex to the set of unconnected vertices. Throws an exception
     * if the vertex had been added before.
     */
   def addVertex(v: V): T = {
     if (vertices.contains(v)) throw new IllegalArgumentException(s"Vertex $v was already added")
     // XXX TEST
-    //      copy( vertices.patch( unpositioned, Vec( v ), 0 ), unpositioned + 1 )
-    copy(v +: vertices)(unpositioned + 1, edgeMap)
+    //      copy( vertices.patch( unconnected, Vec( v ), 0 ), unconnected + 1 )
+    copy(v +: vertices)(unconnected + 1, edgeMap)
   }
 
   /** Removes a vertex and all associated edges. */
@@ -142,17 +142,17 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set
     val idx = vertices.indexOf(v)
     if (idx >= 0) {
       val newV = vertices.patch(idx, emptySeq, 1)
-      if (idx < unpositioned) {
-        val newUnpos  = unpositioned - 1
-        copy(newV)(newUnpos, edgeMap)
+      if (idx < unconnected) {
+        val newUnCon  = unconnected - 1
+        copy(newV)(newUnCon, edgeMap)
       } else {
         if (edgeMap.contains(v)) {
           val e     = edgeMap(v)
           val newEM = edgeMap - v
           val newE  = edges -- e
-          copy(newV, newE)(unpositioned, newEM)
+          copy(newV, newE)(unconnected, newEM)
         } else {
-          copy(newV)(unpositioned, edgeMap)
+          copy(newV)(unconnected, edgeMap)
         }
       }
     } else this
@@ -166,8 +166,8 @@ final case class Topology[V, E <: Topology.Edge[V]](vertices: Vec[V], edges: Set
       visited        += v
       val moreTargets = newEdgeMap.getOrElse(v, Set.empty).map(_.targetVertex)
       val grouped     = moreTargets.groupBy { t =>
-        val vidx = vertices.indexOf(t)
-        if (vidx < upBound) -1 else if (vidx > upBound) 1 else 0
+        val vIdx = vertices.indexOf(t)
+        if (vIdx < upBound) -1 else if (vIdx > upBound) 1 else 0
       }
       if (grouped.contains(0)) return false // cycle detected
       // visit s if it was not not already visited

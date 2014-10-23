@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
-import de.sciss.lucre.synth.{Server, InMemory}
+import de.sciss.lucre.synth.{NodeGraph, Server, InMemory}
 import de.sciss.synth.{GE, proc, SynthGraph}
 import de.sciss.{synth, lucre}
 import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Int => IntEx}
@@ -32,11 +32,7 @@ import scala.concurrent.duration.Duration
 import scala.swing.Swing
 
 // topology bug:
-// s0 -> 0, s1 -> 1, s1 -> 2, s0 -> 1
-// ausserdem: nachdem playing = false
-// ohne action auskommt, muss allerdings
-// noch ein bypass layerIn -> layerOut
-// automatisch aktiviert werden (ensBypass.playing = !ens.playing)
+// s0 -> 0, s0 -> 1, s0 -> 0
 object AutomaticVoices {
   val DumpOSC         = false
   val ShowLog         = false
@@ -46,7 +42,7 @@ object AutomaticVoices {
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  val NumSpeakers     = 2 // 5
+  val NumSpeakers     = 1 // 5
   // val NumSpeakers     = 42
   val NumTransitions  = 4
 
@@ -76,9 +72,9 @@ object AutomaticVoices {
       println("Making the world...")
       val world = mkWorld(action)
       println("Making procs...")
-      val transport = mkAural(world)
+      val (aural, transport) = mkAural(world)
       println("Making views...")
-      mkViews(world, transport, sys)
+      mkViews(world, aural, transport, sys)
     }
   }
 
@@ -86,6 +82,7 @@ object AutomaticVoices {
                 val active: stm.Source[S#Tx, Expr.Var[S, Boolean]])
 
   class Layer(val ensemble: stm.Source[S#Tx, Ensemble.Obj[S]],
+              val bypass  : stm.Source[S#Tx, Ensemble.Obj[S]],
               val speakers: Vec[Speaker],
               val playing : stm.Source[S#Tx, Expr[S, Boolean]],
               val transId : stm.Source[S#Tx, Expr.Var[S, Int]],
@@ -99,7 +96,8 @@ object AutomaticVoices {
               val activeVoices  :     stm.Source[S#Tx, Expr    [S, Int    ]],
               val hasFreeVoices :     stm.Source[S#Tx, Expr    [S, Boolean]])
 
-  def mkViews(w: World, transport: Transport[S], system: S)(implicit tx: S#Tx, _cursor: stm.Cursor[S]): Unit = {
+  def mkViews(w: World, aural: AuralSystem, transport: Transport[S], system: S)
+             (implicit tx: S#Tx, _cursor: stm.Cursor[S]): Unit = {
     implicit val undo = new UndoManagerImpl
     val views = w.sensors.zipWithIndex.map { case (s, si) =>
       s().changed.react { implicit tx => _ =>
@@ -107,15 +105,15 @@ object AutomaticVoices {
       }
       IntSpinnerView(s(), s"s$si", 64)
     }
-    val transView = IntSpinnerView(w.transId(), "trans", 64)
-    val vcView    = IntSpinnerView(w.activeVoices(), "vc", 64)
+    val transView = IntSpinnerView(w.transId     (), "trans", 64)
+    val vcView    = IntSpinnerView(w.activeVoices(), "vc"   , 64)
     deferTx {
       import scala.swing._
       new Frame {
         title = "Automatic Voices"
         contents = new BoxPanel(Orientation.Vertical) {
           // contents += new ServerStatusPanel
-          contents += new GridPanel(0, 12) {
+          contents += new GridPanel(0, math.min(6, views.size) * 2) {
             views.zipWithIndex.foreach { case (v, vi) =>
               contents += new Label(s"s$vi:", null, Alignment.Right)
               contents += v.component
@@ -123,6 +121,18 @@ object AutomaticVoices {
           }
           contents += Swing.VStrut(4)
           contents += new FlowPanel(new Label("trans:"), transView.component, new Label("vc:"), vcView.component)
+          contents += Swing.VStrut(4)
+          contents += Button("Topology") {
+            val topOpt = _cursor.step { implicit tx =>
+              aural.serverOption.map { s =>
+                NodeGraph(s).topology
+              }
+            }
+            topOpt.foreach { top =>
+              println("---- TOPOLOGY ----")
+              top.edges.foreach(println)
+            }
+          }
         }
         pack().centerOnScreen()
         open()
@@ -148,17 +158,20 @@ object AutomaticVoices {
     }
   }
 
-  def mkAural(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S]): Transport[S] = {
+  def mkAural(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S]): (AuralSystem, Transport[S]) = {
     val aural = AuralSystem()
     if (DumpOSC) aural.whenStarted(_.peer.dumpOSC())
     val transport = Transport[S](aural)
     transport.addObject(w.diffusion())
-    w.layers.foreach { l => transport.addObject(l.ensemble()) }
+    w.layers.foreach { l =>
+      transport.addObject(l.ensemble())
+      transport.addObject(l.bypass  ())
+    }
     transport.play()
     val cfg = Server.Config()
     cfg.audioBusChannels = 1024
     aural.start(cfg)
-    transport
+    (aural, transport)
   }
 
   def checkWorld(w: World)(implicit tx: S#Tx): Unit = {
@@ -337,6 +350,10 @@ object AutomaticVoices {
       graph.ScanOut(Flatten(in))
     }
 
+    val bypassGraph = SynthGraph {
+      graph.ScanOut(graph.ScanIn())
+    }
+
     val diff = Proc[S]
     diff.graph() = SynthGraph {
       import synth._
@@ -383,31 +400,58 @@ object AutomaticVoices {
 
       val gen       = Proc[S]
       val genObj    = Obj(Proc.Elem(gen))
-      lFolder.addHead(genObj)
+      lFolder.addLast(genObj)
 
       gen.graph()   = genGraph
       val liObj     = Obj(IntElem(li))
       genObj.attr.put("li", liObj)
 
-      val pred        = Proc[S] // aka background splitter
-      pred.graph()    = splitGraph
+      val pred        = Proc[S]
+      pred.graph()    = bypassGraph
       pred.scans.add("in")      // layer-ensemble input from predecessor
       val predObj     = Obj(Proc.Elem(pred))
       predObj.attr.name = s"pred-$li"
       lFolder.addLast(predObj)
+
+      val split       = Proc[S] // aka background splitter
+      split.graph()   = splitGraph
+      val splitObj    = Obj(Proc.Elem(split))
+      splitObj.attr.name = s"split-$li"
+      lFolder.addLast(splitObj)
+      pred.scans.add("out") ~> split.scans.add("in")
+
       val succ        = Proc[S] // aka foreground splitter
       succ.graph()    = splitGraph
       val succObj     = Obj(Proc.Elem(succ))
       succObj.attr.name = s"succ-$li"
       lFolder.addLast(succObj)
+      gen.scans.add("out") ~> succ.scans.add("in")
+
+      val out         = Proc[S]
+      out.graph()     = bypassGraph
+      out.scans.add("out")     // layer-ensemble output to successor
+      val outObj      = Obj(Proc.Elem(out))
+      outObj.attr.name = s"out-$li"
+      lFolder.addLast(outObj)
+
       val coll        = Proc[S] // aka collector
       coll.graph()    = collGraph
-      coll.scans.add("out")     // layer-ensemble output to successor
       val collObj     = Obj(Proc.Elem(coll))
       collObj.attr.name = s"coll-$li"
       lFolder.addLast(collObj)
+      coll.scans.add("out") ~> out.scans.add("in")
 
-      gen.scans.add("out") ~> succ.scans.add("in")
+      val bypassPlaying = !lPlaying
+      val bypassF       = Folder[S]
+      val ensBypass     = Ensemble[S](bypassF, 0L, bypassPlaying)
+      val ensBypassObj  = Obj(Ensemble.Elem(ensBypass))
+      val bypass        = Proc[S]
+      bypass.graph()    = bypassGraph
+      val bypassObj     = Obj(Proc.Elem(bypass))
+      bypassObj.attr.name = s"bypass-$li"
+      bypassF.addLast(bypassObj)
+      pred  .scans.add("out") ~> bypass.scans.add("in")
+      bypass.scans.add("out") ~> out   .scans.add("in")
 
       val vecTrans = transGraphs.zipWithIndex.map { case (g, gi) =>
         val tPlaying    = transId sig_== gi
@@ -417,7 +461,7 @@ object AutomaticVoices {
         val vecChans = (vecGateObj zip vecActiveObj).zipWithIndex.map { case ((gate, active), si) =>
           val procT     = Proc[S]
           procT.graph() = g
-          val predOut   = pred  .scans.add(s"out-$si")
+          val predOut   = split  .scans.add(s"out-$si")
           val succOut   = succ  .scans.add(s"out-$si")
           val predIn    = procT .scans.add("pred")
           val succIn    = procT .scans.add("succ")
@@ -452,10 +496,11 @@ object AutomaticVoices {
                     active = tx.newHandle(active))
       }
       new Layer(ensemble  = tx.newHandle(ensLObj),
+                bypass    = tx.newHandle(ensBypassObj),
                 speakers  = speakers,
                 playing   = tx.newHandle(lPlaying),
                 transId   = tx.newHandle(transId),
-                input     = tx.newHandle(pred),
+                input     = tx.newHandle(split),
                 output    = tx.newHandle(coll))
     }
 

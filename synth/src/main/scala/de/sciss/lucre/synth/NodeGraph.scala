@@ -57,17 +57,17 @@ object NodeGraph {
   // commented out for debugging inspection
   private val worlds = TMap.empty[Server, NodeGraph]
 
-  private def getWorld(server: Server)(implicit tx: Txn): NodeGraph =
+  def apply(server: Server)(implicit tx: Txn): NodeGraph =
     worlds.get(server)(tx.peer).getOrElse(DummyNodeGraphImpl)
 
   def addNode(node: NodeRef)(implicit tx: Txn): Unit =
-    getWorld(node.server).addNode(node)
+    apply(node.server).addNode(node)
 
   def removeNode(node: NodeRef)(implicit tx: Txn): Unit =
-    getWorld(node.server).removeNode(node)
+    apply(node.server).removeNode(node)
 
   def addEdge(edge: Edge)(implicit tx: Txn): Unit = {
-    val world                 = getWorld(edge.source.server)
+    val world                 = apply(edge.source.server)
     val res                   = world.addEdge(edge)
     val (_, source, affected) = res.getOrElse(sys.error(s"Edge $edge is cyclic"))
 
@@ -92,7 +92,7 @@ object NodeGraph {
   }
 
   def removeEdge(edge: Edge)(implicit tx: Txn): Unit =
-    getWorld(edge.source.server).removeEdge(edge)
+    apply(edge.source.server).removeEdge(edge)
 
   private[synth] def send(server: Server, bundles: Txn.Bundles): Unit = {
     val w = worlds.single.getOrElse(server, DummyNodeGraphImpl) // sys.error(s"Trying to access unregistered server $server")
@@ -100,13 +100,13 @@ object NodeGraph {
   }
 
   private[synth] def messageTimeStamp(server: Server)(implicit tx: Txn): Ref[Int] =
-    getWorld(server).messageTimeStamp
+    apply(server).messageTimeStamp
 
   private[synth] def getSynthDef(server: Server, graph: SynthGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef =
     getSynthDef(server, graph.expand(synth.impl.DefaultUGenGraphBuilderFactory), nameHint)
 
   private[synth] def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef =
-    getWorld(server).getSynthDef(server, graph, nameHint)
+    apply(server).getSynthDef(server, graph, nameHint)
 }
 trait NodeGraph {
   // def server: Server
@@ -122,4 +122,7 @@ trait NodeGraph {
   private[synth] def messageTimeStamp: Ref[Int]
 
   def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef
+
+  /** Queries the current topology */
+  def topology(implicit tx: Txn): Topology[NodeRef, NodeGraph.Edge]
 }

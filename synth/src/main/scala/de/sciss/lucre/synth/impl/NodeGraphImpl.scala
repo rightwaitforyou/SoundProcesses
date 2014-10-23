@@ -113,6 +113,8 @@ object DummyNodeGraphImpl extends NodeGraph {
   def removeEdge(edge: Edge   )(implicit tx: Txn) = ()
 
   def send(bundles: Bundles): Future[Unit] = Future.successful(())
+
+  def topology(implicit tx: Txn): Topology[NodeRef, Edge] = Topology.empty
 }
 
 final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
@@ -123,6 +125,8 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
   private val ugenGraphs = Ref(Map.empty[GraphEquality, SynthDef])
 
   private val topologyRef = Ref[T](Topology.empty)
+
+  def topology(implicit tx: Txn): T = topologyRef.get(tx.peer)
 
   def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef = {
     implicit val itx = tx.peer
