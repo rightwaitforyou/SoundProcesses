@@ -43,7 +43,7 @@ object AutomaticVoices {
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  // val NumSpeakers     = 1 // 5
+  // val NumSpeakers     = 2 // 5
   val NumSpeakers     = 42
   val NumTransitions  = 4
 
@@ -403,7 +403,7 @@ object AutomaticVoices {
       import synth._
       val in = graph.ScanInFix(NumSpeakers)
       Vec.tabulate(NumSpeakers) { ch =>
-        graph.ScanOut(s"out-$ch", in \ ch)
+        graph.ScanOut(s"out$ch", in \ ch)
       }
     }
 
@@ -412,7 +412,7 @@ object AutomaticVoices {
       import synth._
       import ugen._
       val in = Vec.tabulate(NumSpeakers) { ch =>
-        graph.ScanInFix(s"in-$ch", 1)
+        graph.ScanInFix(s"in$ch", 1)
       }
       graph.ScanOut(Flatten(in))
     }
@@ -476,20 +476,20 @@ object AutomaticVoices {
       pred.graph()    = bypassGraph
       pred.scans.add("in")      // layer-ensemble input from predecessor
       val predObj     = Obj(Proc.Elem(pred))
-      predObj.attr.name = s"pred-$li"
+      predObj.attr.name = s"pred$li"
       lFolder.addLast(predObj)
 
       val split       = Proc[S] // aka background splitter
       split.graph()   = splitGraph
       val splitObj    = Obj(Proc.Elem(split))
-      splitObj.attr.name = s"split-$li"
+      splitObj.attr.name = s"split$li"
       lFolder.addLast(splitObj)
       pred.scans.add("out") ~> split.scans.add("in")
 
       val succ        = Proc[S] // aka foreground splitter
       succ.graph()    = splitGraph
       val succObj     = Obj(Proc.Elem(succ))
-      succObj.attr.name = s"succ-$li"
+      succObj.attr.name = s"succ$li"
       lFolder.addLast(succObj)
       gen.scans.add("out") ~> succ.scans.add("in")
 
@@ -497,13 +497,13 @@ object AutomaticVoices {
       out.graph()     = bypassGraph
       out.scans.add("out")     // layer-ensemble output to successor
       val outObj      = Obj(Proc.Elem(out))
-      outObj.attr.name = s"out-$li"
+      outObj.attr.name = s"out$li"
       lFolder.addLast(outObj)
 
       val coll        = Proc[S] // aka collector
       coll.graph()    = collGraph
       val collObj     = Obj(Proc.Elem(coll))
-      collObj.attr.name = s"coll-$li"
+      collObj.attr.name = s"coll$li"
       lFolder.addLast(collObj)
       coll.scans.add("out") ~> out.scans.add("in")
 
@@ -514,7 +514,7 @@ object AutomaticVoices {
       val bypass        = Proc[S]
       bypass.graph()    = bypassGraph
       val bypassObj     = Obj(Proc.Elem(bypass))
-      bypassObj.attr.name = s"bypass-$li"
+      bypassObj.attr.name = s"bypass$li"
       bypassF.addLast(bypassObj)
       pred  .scans.add("out") ~> bypass.scans.add("in")
       bypass.scans.add("out") ~> out   .scans.add("in")
@@ -527,12 +527,12 @@ object AutomaticVoices {
         val vecChans = (vecGateObj zip vecActiveObj).zipWithIndex.map { case ((gate, active), si) =>
           val procT     = Proc[S]
           procT.graph() = g
-          val predOut   = split  .scans.add(s"out-$si")
-          val succOut   = succ  .scans.add(s"out-$si")
+          val predOut   = split .scans.add(s"out$si")
+          val succOut   = succ  .scans.add(s"out$si")
           val predIn    = procT .scans.add("pred")
           val succIn    = procT .scans.add("succ")
           val tOut      = procT .scans.add("out")
-          val collIn    = coll  .scans.add(s"in-$si")
+          val collIn    = coll  .scans.add(s"in$si")
           predOut ~> predIn
           succOut ~> succIn
           tOut    ~> collIn

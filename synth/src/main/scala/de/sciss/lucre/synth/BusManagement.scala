@@ -13,9 +13,11 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.numbers
+
 import collection.immutable.{SortedMap => ISortedMap}
 import de.sciss.synth.{AudioBus => SAudioBus, AudioRated, Bus => SBus, ControlBus => SControlBus, ControlRated, Rate}
-import scala.concurrent.stm.{Ref => ScalaRef, TSet}
+import scala.concurrent.stm.{Ref, TSet, TMap}
 
 sealed trait Bus {
   def server: Server
@@ -176,52 +178,48 @@ object Bus {
     FixedImpl(server, bus)
   }
 
-  //   trait User {
-  //      def busChanged( bus: AudioBus )( implicit tx: Txn ) : Unit
-  //   }
+  // var verbose = false
 
-  var verbose = false
+  private sealed trait BusHolder[A <: SBus] {
+    // ---- abstract ----
 
-  private sealed trait BusHolder[T <: SBus] {
-    def peer: T
+    def peer: A
 
-    //      def server: Server
+    protected def remove()(implicit tx: Txn): Unit
 
-    private val useCount = ScalaRef(0) // Ref.withCheck( 0 ) { case 0 => peer.free() }
+    protected def useCount: Ref[Int]
+
+    // ---- impl ----
 
     // increments use count
     final def alloc()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       useCount += 1
-      if (verbose) println(s"$peer.alloc -> ${useCount.get}")
+      // if (verbose) println(s"$peer.alloc -> ${useCount.get}")
     }
 
     // decrements use count and calls `remove` if that count reaches zero
     final def free()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val cnt = useCount.get - 1
-      if (verbose) println(s"$peer.free -> $cnt")
+      // if (verbose) println(s"$peer.free -> $cnt")
       require(cnt >= 0)
       useCount.set(cnt)
-      if (cnt == 0) {
-        remove()
-      }
+      if (cnt == 0) remove()
     }
 
-    final def index: Int = peer.index
-
+    final def index      : Int = peer.index
     final def numChannels: Int = peer.numChannels
-
-    protected def remove()(implicit tx: Txn): Unit
   }
 
   private type AudioBusHolder   = BusHolder[SAudioBus  ]
   private type ControlBusHolder = BusHolder[SControlBus]
 
-  private type ABusHolderMap = Map[Server, ISortedMap[Int, AudioBusHolder]]
-
   private final class PlainAudioBusHolder(server: Server, val peer: SAudioBus)
     extends BusHolder[SAudioBus] {
+
+    protected val useCount = Ref(0)
+
     protected def remove()(implicit tx: Txn): Unit =
       server.freeAudioBus(peer.index, peer.numChannels)
   }
@@ -229,53 +227,80 @@ object Bus {
   private final class PlainControlBusHolder(server: Server, val peer: SControlBus)
     extends BusHolder[SControlBus] {
 
+    protected val useCount = Ref(0)
+
     protected def remove()(implicit tx: Txn): Unit =
       server.freeControlBus(peer.index, peer.numChannels)
   }
 
-  private final class AudioBusHolderImpl(val server: Server, val peer: SAudioBus, mapScalaRef: ScalaRef[ABusHolderMap])
+  // full is the possibly re-used bus, it may have more channels than peer.
+  // peer be either full or share full index but less channels.
+  private final class OneWayAudioBusHolder(val server: Server, full: SAudioBus,
+                                           val peer: SAudioBus, mapRef: ABusHolderMap, val useCount: Ref[Int])
     extends AudioBusHolder {
 
-    def add()(implicit tx: Txn): Unit =
-      mapScalaRef.transform(map => map +
-        (server -> (map.getOrElse(server, ISortedMap.empty[Int, AudioBusHolder]) + (numChannels -> this)))
-      )(tx.peer)
+    if (full.index != peer.index || full.numChannels < peer.numChannels)
+      throw new IllegalStateException(s"full = $full, peer = $peer")
+
+    /** Returns a copy with `peer` having the desired number of channels. */
+    def withChannels(n: Int): OneWayAudioBusHolder =
+      if (peer.numChannels == n) this
+      else new OneWayAudioBusHolder(server, full = full, peer = full.copy(numChannels = n), mapRef = mapRef,
+                                            useCount = useCount)
+
+    def add()(implicit tx: Txn): Unit = {
+      implicit val itx = tx.peer
+      val m0 = mapRef.getOrElse(server, emptySortedMap)
+      val m1 = m0 + ((full.numChannels, this))
+      mapRef.put(server, m1)
+    }
 
     protected def remove()(implicit tx: Txn): Unit = {
-      server.freeAudioBus(peer.index, peer.numChannels)
-      mapScalaRef.transform(map => {
-        val newMap = map(server) - numChannels
-        if (newMap.isEmpty) {
-          map - server
-        } else {
-          map + (server -> newMap)
-        }
-      })(tx.peer)
+      implicit val itx = tx.peer
+      // println(s"---------FREE (${full.numChannels}) -> ${full.index}")
+      server.freeAudioBus(full.index, full.numChannels)
+      val m = mapRef(server) - full.numChannels
+      if (m.isEmpty)
+        mapRef.remove(server)
+      else
+        mapRef.put(server, m)
     }
   }
 
-  // XXX TODO
-  private val readOnlyBuses  = ScalaRef(Map.empty[Server, ISortedMap[Int, AudioBusHolder]])
-  private val writeOnlyBuses = ScalaRef(Map.empty[Server, ISortedMap[Int, AudioBusHolder]])
+  // the number of channels key in the sorted map is always a power of two
+  private type ABusHolderMap = TMap[Server, ISortedMap[Int, OneWayAudioBusHolder]]
+  private val readOnlyBuses  : ABusHolderMap = TMap.empty
+  private val writeOnlyBuses : ABusHolderMap = TMap.empty
+  private val emptySortedMap = ISortedMap.empty[Int, OneWayAudioBusHolder]
+
+  // XXX TODO - would be better if `Server` had a model that dispatches disposal
+  private[synth] def serverRemoved(server: Server)(implicit tx: Txn): Unit = {
+    implicit val itx = tx.peer
+    readOnlyBuses .remove(server)
+    writeOnlyBuses.remove(server)
+  }
 
   private def createReadOnlyBus(server: Server, numChannels: Int)(implicit tx: Txn): AudioBusHolder =
-    createAudioBus(server, numChannels, readOnlyBuses)
+    createOneWayAudioBus(server, numChannels, readOnlyBuses)
 
   private def createWriteOnlyBus(server: Server, numChannels: Int)(implicit tx: Txn): AudioBusHolder =
-    createAudioBus(server, numChannels, writeOnlyBuses)
+    createOneWayAudioBus(server, numChannels, writeOnlyBuses)
 
-  private def createAudioBus(server: Server, numChannels: Int,
-                                 mapScalaRef: ScalaRef[Map[Server, ISortedMap[Int, AudioBusHolder]]])
+  private def createOneWayAudioBus(server: Server, numChannels: Int, mapRef: ABusHolderMap)
                                 (implicit tx: Txn): AudioBusHolder = {
-    val chanMapO = mapScalaRef.get(tx.peer).get(server)
-    val bus: AudioBusHolder = chanMapO.flatMap(_.from(numChannels).headOption.map(_._2)).getOrElse {
-      val index = server.allocAudioBus(numChannels)
+    implicit val itx = tx.peer
+    val chanMap = mapRef.getOrElse(server, emptySortedMap)
+    import numbers.Implicits._
+    val n       = numChannels.nextPowerOfTwo
+    chanMap.from(n).headOption.fold {
+      val index = server.allocAudioBus(n)
+      // println(s"---------ALLOC($n) -> $index")
+      val full  = SAudioBus(server.peer, index = index, numChannels = n)
       val peer  = SAudioBus(server.peer, index = index, numChannels = numChannels)
-      val res   = new AudioBusHolderImpl(server, peer, mapScalaRef)
+      val res   = new OneWayAudioBusHolder(server, full = full, peer = peer, mapRef = mapRef, useCount = Ref(0))
       res.add()
       res
-    }
-    bus
+    } (_._2.withChannels(numChannels))
   }
 
   private def createAudioBus(server: Server, numChannels: Int)(implicit tx: Txn): AudioBusHolder = {
@@ -324,7 +349,7 @@ object Bus {
   }
 
   private abstract class BasicAudioImpl extends AbstractAudioImpl {
-    final protected val bus = ScalaRef.make[AudioBusHolder]
+    final protected val bus = Ref.make[AudioBusHolder]
 
     final def busOption(implicit tx: Txn): Option[SAudioBus] = {
       val bh = bus.get(tx.peer)
@@ -515,9 +540,9 @@ object Bus {
   private final class ControlImpl(val server: Server, val numChannels: Int) extends ControlBus {
     import ControlBus.{User => CU}
 
-    private val bus     = ScalaRef.make[ControlBusHolder]
-    private val readers = ScalaRef(Set.empty[CU])
-    private val writers = ScalaRef(Set.empty[CU])
+    private val bus     = Ref.make[ControlBusHolder]
+    private val readers = Ref(Set.empty[CU])
+    private val writers = Ref(Set.empty[CU])
 
     override def toString = s"cbus_$numChannels@${hashCode().toHexString}"
 
@@ -529,7 +554,7 @@ object Bus {
     def addReader(u: CU)(implicit tx: Txn): Unit = add(readers, writers, u)
     def addWriter(u: CU)(implicit tx: Txn): Unit = add(writers, readers, u)
 
-    private def add(users: ScalaRef[Set[CU]], others: ScalaRef[Set[CU]], u: CU)(implicit tx: Txn): Unit = {
+    private def add(users: Ref[Set[CU]], others: Ref[Set[CU]], u: CU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val us = users.get
       require(!us.contains(u))
@@ -557,7 +582,7 @@ object Bus {
     def removeReader(u: CU)(implicit tx: Txn): Unit = remove(readers, u)
     def removeWriter(u: CU)(implicit tx: Txn): Unit = remove(writers, u)
 
-    private def remove(users: ScalaRef[Set[CU]], u: CU)(implicit tx: Txn): Unit = {
+    private def remove(users: Ref[Set[CU]], u: CU)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val rw = users.get
       if (!rw.contains(u)) return

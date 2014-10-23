@@ -47,11 +47,7 @@ object NodeGraph {
     implicit val itx = tx.peer
     servers -= server
     worlds  -= server
-    //    // keep a dummy graph running till the end of the ongoing transaction
-    //    worlds  += server -> DummyNodeGraphImpl
-    //    tx.afterCommit {
-    //      worlds.single.remove(server)
-    //    }
+    Bus.serverRemoved(server)
   }
 
   // commented out for debugging inspection
