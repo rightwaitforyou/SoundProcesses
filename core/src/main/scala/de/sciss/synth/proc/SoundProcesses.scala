@@ -15,7 +15,11 @@ package de.sciss.synth.proc
 
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 
+import de.sciss.lucre.event.Sys
+import de.sciss.lucre.stm
+
 import scala.concurrent.ExecutionContext
+import scala.concurrent.stm.Txn
 
 object SoundProcesses {
   var poolSize: Option[Int] = None
@@ -45,6 +49,13 @@ object SoundProcesses {
 
   lazy implicit val executionContext: ExecutionContext =
     ExecutionContext.fromExecutorService(scheduledExecutorService)
+
+  def atomic[S <: Sys[S]](fun: S#Tx => Unit)(implicit cursor: stm.Cursor[S]): Unit = {
+    if (Txn.findCurrent.isDefined) throw new IllegalStateException(s"Cannot nest transactions")
+    scheduledExecutorService.submit(new Runnable {
+      def run(): Unit = cursor.step(fun)
+    })
+  }
 
   private def shutdownScheduler(): Unit = {
     log("Shutting down scheduler thread pool")

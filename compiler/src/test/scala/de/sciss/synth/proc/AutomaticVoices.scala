@@ -19,13 +19,14 @@ import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
 import de.sciss.lucre.synth.{NodeGraph, Server, InMemory}
 import de.sciss.synth.{GE, proc, SynthGraph}
-import de.sciss.{synth, lucre}
+import de.sciss.{osc, synth, lucre}
 import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Int => IntEx}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.swing.deferTx
 import de.sciss.numbers.Implicits._
 import proc.Implicits._
+import SoundProcesses.atomic
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
@@ -65,7 +66,7 @@ object AutomaticVoices {
     //    val sys = InMemory()
     //    implicit val cursor = sys
     lucre.synth.expr.initTypes()
-    atomic { implicit tx =>
+    atomic[S] { implicit tx =>
       val action = Action[S](actionName, actionBytes)
       println("Making the world...")
       val world = mkWorld(action)
@@ -109,6 +110,60 @@ object AutomaticVoices {
     val vcView    = IntSpinnerView(w.activeVoices(), "vc"   , 64)
     deferTx {
       import scala.swing._
+
+      val butTopology = Button("Topology") {
+        atomic[S] { implicit tx =>
+          aural.serverOption.map { s =>
+            val top = NodeGraph(s).topology
+            tx.afterCommit {
+              println("---- TOPOLOGY ----")
+              top.edges.foreach(println)
+            }
+          }
+        }
+      }
+
+      val butTree = Button("Tree") {
+        atomic[S] { implicit tx =>
+          aural.serverOption.map { s =>
+            s.peer.dumpTree()
+          }
+        }
+      }
+
+      val butRandomize = Button("Randomize") {
+        atomic[S] { implicit tx =>
+          w.transId().update(rrand(0, NumTransitions - 1))
+        }
+        w.sensors.foreach { s =>
+          atomic[S] { implicit tx =>
+            s().update(rrand(-1, NumLayers - 1))
+          }
+        }
+      }
+
+      val butClear = Button("Clear") {
+        w.sensors.foreach { s =>
+          atomic[S] { implicit tx =>
+            s().update(-1)
+          }
+        }
+      }
+
+      val battleTimer = new javax.swing.Timer(5000, Swing.ActionListener { _ =>
+        val but = if (rrand(1, 5) == 1) butClear else butRandomize
+        but.doClick()
+      })
+
+      val butBattle = new ToggleButton("Battle Test") {
+        listenTo(this)
+        reactions += {
+          case event.ButtonClicked(_) =>
+            battleTimer.stop()
+            if (selected) battleTimer.restart()
+        }
+      }
+
       new Frame {
         title = "Automatic Voices"
         contents = new BoxPanel(Orientation.Vertical) {
@@ -123,49 +178,23 @@ object AutomaticVoices {
           contents += new FlowPanel(new Label("trans:"), transView.component, new Label("vc:"), vcView.component)
           contents += Swing.VStrut(4)
           contents += new FlowPanel(
-            Button("Topology") {
-              atomic { implicit tx =>
-                aural.serverOption.map { s =>
-                  val top = NodeGraph(s).topology
-                  tx.afterCommit {
-                    println("---- TOPOLOGY ----")
-                    top.edges.foreach(println)
-                  }
-                }
-              }
-            },
-            Button("Randomize") {
-              atomic { implicit tx =>
-                w.transId().update(rrand(0, NumTransitions - 1))
-              }
-              w.sensors.foreach { s =>
-                atomic { implicit tx =>
-                  s().update(rrand(-1, NumLayers - 1))
-                }
-              }
-            },
-            Button("Clear") {
-              w.sensors.foreach { s =>
-                atomic { implicit tx =>
-                  s().update(-1)
-                }
-              }
-            }
+            butTopology, butTree, butRandomize, butClear, butBattle
           )
         }
         pack().centerOnScreen()
         open()
 
-        private val timer = new javax.swing.Timer(1000, Swing.ActionListener { _ =>
-          atomic { implicit tx =>
+        private val checkTimer = new javax.swing.Timer(1000, Swing.ActionListener { _ =>
+          atomic[S] { implicit tx =>
             checkWorld(w)
           }
         })
-        timer.start()
+        checkTimer.start()
 
         override def closeOperation(): Unit = {
-          timer.stop()
-          atomic { implicit tx =>
+          checkTimer .stop()
+          battleTimer.stop()
+          atomic[S] { implicit tx =>
             transport.dispose()
             tx.afterCommit {
               system.close()
@@ -187,9 +216,10 @@ object AutomaticVoices {
       transport.addObject(l.bypass  ())
     }
     transport.play()
-    val cfg = Server.Config()
-    cfg.audioBusChannels = 1024
-    aural.start(cfg)
+    val config = Server.Config()
+    config.audioBusChannels  = 1024
+    config.transport         = osc.TCP
+    aural.start(config)
     (aural, transport)
   }
 
@@ -236,13 +266,6 @@ object AutomaticVoices {
       }
     }
   }
-
-  def atomic(fun: S#Tx => Unit)(implicit cursor: stm.Cursor[S]): Unit =
-    SoundProcesses.scheduledExecutorService.submit(Swing.Runnable {
-      cursor.step { implicit tx =>
-        fun(tx)
-      }
-    })
 
   def mkAction(c: Code.Compiler): (String, Array[Byte]) = {
     val source =

@@ -50,6 +50,8 @@ object TransportImpl {
                                   viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
     extends Transport[S] with ObservableImpl[S, Transport.Update[S]] with AuralSystem.Client {
 
+    import scheduler.cursor
+
     private final class PlayTime(val wallClock0: Long, val pos0: Long) {
       override def toString = s"[pos0 = $pos0 / ${TimeRef.framesToSecs(pos0)}, time0 = $wallClock0]"
 
@@ -194,7 +196,7 @@ object TransportImpl {
     def auralStarted(server: Server)(implicit tx: Txn): Unit = {
       // XXX TODO -- what was the reasoning for the txn decoupling?
       tx.afterCommit {
-        scheduler.cursor.step { implicit tx =>
+        SoundProcesses.atomic[S] { implicit tx =>
           import WorkspaceHandle.Implicits._
           implicit val auralContext = AuralContext(server, scheduler)
           auralStartedTx(server)
@@ -216,7 +218,7 @@ object TransportImpl {
     def auralStopped()(implicit tx: Txn): Unit = {
       // XXX TODO -- what was the reasoning for the txn decoupling?
       tx.afterCommit {
-        scheduler.cursor.step { implicit tx =>
+        SoundProcesses.atomic[S] { implicit tx =>
           auralStoppedTx()
         }
       }
