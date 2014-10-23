@@ -19,19 +19,19 @@ import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
 import de.sciss.lucre.synth.impl.ServerImpl
 import de.sciss.lucre.synth.{NodeGraph, Server, InMemory}
+import de.sciss.synth.swing.j.JServerStatusPanel
 import de.sciss.synth.{GE, proc, SynthGraph}
 import de.sciss.{osc, synth, lucre}
 import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Int => IntEx}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.swing.deferTx
+import de.sciss.lucre.swing.{defer, deferTx}
 import de.sciss.numbers.Implicits._
 import proc.Implicits._
 import SoundProcesses.atomic
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
-import scala.swing.Swing
 
 object AutomaticVoices {
   val DumpOSC         = true
@@ -111,6 +111,10 @@ object AutomaticVoices {
     }
     val transView = IntSpinnerView(w.transId     (), "trans", 64)
     val vcView    = IntSpinnerView(w.activeVoices(), "vc"   , 64)
+
+    lazy val status = new JServerStatusPanel(JServerStatusPanel.COUNTS)
+    aural.whenStarted { s => defer(status.server = Some(s.peer)) }
+
     deferTx {
       import scala.swing._
 
@@ -194,6 +198,8 @@ object AutomaticVoices {
           contents += new FlowPanel(
             butTopology, butTree, butRandomize, butClear, butBattle
           )
+          contents += Swing.VStrut(4)
+          contents += Component.wrap(status)
         }
         pack().centerOnScreen()
         open()
