@@ -30,7 +30,7 @@ lazy val scalaColliderVersion   = "1.14.1"
 
 lazy val spanVersion            = "1.2.1"
 
-lazy val lucreSwingVersion      = "0.6.0"
+lazy val lucreSwingVersion      = "0.6.1-SNAPSHOT"
 
 lazy val audioWidgetsVersion    = "1.7.0"
 

@@ -51,8 +51,8 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
     val server        = resource.server
     if (!server.peer.isRunning) return
 
-    val rsrcStampOld  = resource.timeStamp(tx)
-    if(rsrcStampOld < 0) sys.error(s"Already disposed : $resource")
+    val resourceStampOld  = resource.timeStamp(tx)
+    if(resourceStampOld < 0) sys.error(s"Already disposed : $resource")
 
     implicit val itx  = peer
     val txnCnt        = NodeGraph.messageTimeStamp(server)(tx)
@@ -63,45 +63,45 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
     // calculate the maximum time stamp from the dependencies. this includes
     // the resource as its own dependency (since we should send out messages
     // in monotonic order)
-    var depStampMax = math.max(txnStartCnt << 1, rsrcStampOld)
+    var depStampMax = math.max(txnStartCnt << 1, resourceStampOld)
     dependencies.foreach { dep =>
       val depStamp = dep.timeStamp(tx)
       if (depStamp < 0) sys.error(s"Dependency already disposed : $dep")
       if (depStamp > depStampMax) depStampMax = depStamp
-      //         dep.addDependent( resource )( tx )  // validates dep's server
+      //         dep.addDependent( resource )( tx )  // validates dependent's server
     }
 
     //      val dAsync     = (dTsMax & 1) == 1
     val msgAsync = !m.isSynchronous
 
-    // if the message is asynchronous, it suffices to ensure that the time stamp's async bit is set.
+    // if the message is asynchronous, it suffices to ensure that the time stamp async bit is set.
     // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
     // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
-    val rsrcStampNew = if (msgAsync) depStampMax | 1 else (depStampMax + 1) & ~1
+    val resourceStampNew = if (msgAsync) depStampMax | 1 else (depStampMax + 1) & ~1
 
-    log(s"addMessage($resource, $m) -> stamp = $rsrcStampNew")
-    if (rsrcStampNew != rsrcStampOld) resource.timeStamp_=(rsrcStampNew)(tx)
+    log(s"addMessage($resource, $m) -> stamp = $resourceStampNew")
+    if (resourceStampNew != resourceStampOld) resource.timeStamp_=(resourceStampNew)(tx)
 
     val bNew = if (bOld.payload.isEmpty) {
       markBundlesDirty()
       //         log( "registering after commit handler" )
       //         afterCommit( flush() )
-      val txnStartCntNew = rsrcStampNew >> 1
+      val txnStartCntNew = resourceStampNew >> 1
       assert(txnStartCntNew == txnStartCnt)
       txnCnt += 1
       Txn.Bundles(txnStartCntNew, Vector(Vector(m)))
 
     } else {
       val cntOld = bOld.firstCnt
-      val rsrcCnt = rsrcStampNew >> 1
+      val resourceCnt = resourceStampNew >> 1
       val payOld = bOld.payload
       val szOld = payOld.size
-      //         if( rsrcCnt == cntOld - 1 ) {   // prepend to front
+      //         if( resourceCnt == cntOld - 1 ) {   // prepend to front
       //            val payNew = Vec( message ) +: payOld
-      //            bOld.copy( firstCnt = rsrcCnt, payload = payNew )
+      //            bOld.copy( firstCnt = resourceCnt, payload = payNew )
       //
       //         } else
-      if (rsrcCnt == cntOld + szOld) {
+      if (resourceCnt == cntOld + szOld) {
         // append to back
         val payNew = payOld :+ Vector(m)
         txnCnt += 1
@@ -111,7 +111,7 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
         // we don't need the assertion, since we are going to call payload.apply which would
         // through an out of bounds exception if the assertion wouldn't hold
         //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
-        val payIdx = rsrcCnt - cntOld
+        val payIdx = resourceCnt - cntOld
         val payNew = payOld.updated(payIdx, payOld(payIdx) :+ m)
         bOld.copy(payload = payNew)
       }
@@ -125,15 +125,15 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
   //      var clumpMap   = Map.empty[ Entry, Int ]
   //      var clumps     = IntMap.empty[ List[ Entry ]]
   //      val audibleIdx = Int.MaxValue
-  //      topo.vertices.foreach( targetEntry => {
+  //      topology.vertices.foreach( targetEntry => {
   //         if( targetEntry.audible ) {
   //            clumps += audibleIdx -> (targetEntry :: clumps.getOrElse( audibleIdx, Nil ))
   //            clumpMap += targetEntry -> audibleIdx
   //         } else {
   //            val depIdx = clumpEdges.get( targetEntry ).map( set => {
-  //               set.map( clumpMap.getOrElse( _, sys.error( "Unsatisfied dependancy " + targetEntry ))).max
+  //               set.map( clumpMap.getOrElse( _, sys.error( "Unsatisfied dependency " + targetEntry ))).max
   //            }).getOrElse( -1 )
-  //            if( depIdx > clumpIdx ) sys.error( "Unsatisfied dependancy " + targetEntry )
+  //            if( depIdx > clumpIdx ) sys.error( "Unsatisfied dependency " + targetEntry )
   //            if( depIdx == clumpIdx ) clumpIdx += 1
   //            clumps += clumpIdx -> (targetEntry :: clumps.getOrElse( clumpIdx, Nil ))
   //            clumpMap += targetEntry -> clumpIdx

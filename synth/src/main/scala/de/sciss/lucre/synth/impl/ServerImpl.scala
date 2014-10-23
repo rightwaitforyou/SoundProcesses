@@ -14,7 +14,6 @@
 package de.sciss.lucre.synth
 package impl
 
-import scala.annotation.tailrec
 import scala.concurrent.{ExecutionContext, Future}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.{Server => SServer, AllocatorExhausted, addToHead, message}
@@ -25,17 +24,34 @@ object ServerImpl {
   def apply  (peer: SServer): Server          = new OnlineImpl (peer)
   def offline(peer: SServer): Server.Offline  = new OfflineImpl(peer)
 
+  var DEBUG_SIZE = false
+
   private final case class OnlineImpl(peer: SServer) extends Impl {
     override def toString = peer.toString()
 
     // ---- side effects ----
 
-    def !(p: osc.Packet): Unit = peer ! p
+    def !(p: osc.Packet): Unit = {
+      if (DEBUG_SIZE) checkPacket(p)
+      peer ! p
+    }
+
+    private def checkPacket(p: osc.Packet): Unit = {
+      val sz = p match {
+        case b: osc.Bundle  => Server.codec.encodedBundleSize (b)
+        case m: osc.Message => Server.codec.encodedMessageSize(m)
+      }
+      if (sz >= 0x10000) {
+        Console.err.println(s"ERROR: Packet size $sz exceeds 64K")
+        osc.Packet.printTextOn(p, Server.codec, Console.err)
+      }
+    }
 
     def !!(bndl: osc.Bundle): Future[Unit] = {
       val syncMsg = peer.syncMsg()
       val syncID  = syncMsg.id
       val bndlS   = osc.Bundle(bndl.timetag, bndl :+ syncMsg: _*)
+      if (DEBUG_SIZE) checkPacket(bndlS)
       peer.!!(bndlS) {
         case message.Synced(`syncID`) =>
       }

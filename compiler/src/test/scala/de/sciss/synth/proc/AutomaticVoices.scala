@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
+import de.sciss.lucre.synth.impl.ServerImpl
 import de.sciss.lucre.synth.{NodeGraph, Server, InMemory}
 import de.sciss.synth.{GE, proc, SynthGraph}
 import de.sciss.{osc, synth, lucre}
@@ -33,8 +34,9 @@ import scala.concurrent.duration.Duration
 import scala.swing.Swing
 
 object AutomaticVoices {
-  val DumpOSC         = true
+  val DumpOSC         = false
   val ShowLog         = false
+  val PrintStates     = false
   val Shadowing       = true
   val Attack          = 30
   val Release         = 30
@@ -53,6 +55,7 @@ object AutomaticVoices {
 
   def main(args: Array[String]): Unit = {
     showAuralLog = ShowLog
+    ServerImpl.DEBUG_SIZE = true
 
     val compiler = proc.Compiler()
     println("Making action...")
@@ -150,9 +153,20 @@ object AutomaticVoices {
         }
       }
 
+      var battleCount = 0
       val battleTimer = new javax.swing.Timer(5000, Swing.ActionListener { _ =>
-        val but = if (rrand(1, 5) == 1) butClear else butRandomize
-        but.doClick()
+        if (battleCount > 0) {
+          battleCount -= 1
+        } else {
+          val but = if (rrand(1, 5) == 1) {
+            battleCount = 7   // enough for all to stop
+            butClear
+          } else {
+            battleCount = rrand(0, 3)
+            butRandomize
+          }
+          but.doClick()
+        }
       })
 
       val butBattle = new ToggleButton("Battle Test") {
@@ -298,7 +312,7 @@ object AutomaticVoices {
   def mkWorld(done: Action[S])(implicit tx: S#Tx): World = {
     val sensors = Vec.tabulate(NumSpeakers) { speaker =>
       val sensor = IntEx.newVar[S](-1)
-      sensor.changed.react(_ => ch => println(s"sensor$speaker -> ${ch.now}"))
+      if (PrintStates) sensor.changed.react(_ => ch => println(s"sensor$speaker -> ${ch.now}"))
       sensor
     }
 
@@ -422,7 +436,7 @@ object AutomaticVoices {
 
       val vecActive = Vec.tabulate(NumSpeakers) { si =>
         val active = BooleanEx.newVar[S](false)
-        active.changed.react(_ => ch => println(s"active$li$si -> ${ch.now}"))
+        if (PrintStates) active.changed.react(_ => ch => println(s"active$li$si -> ${ch.now}"))
         active
       }
       val vecActiveObj = vecActive.map(ex => Obj(BooleanElem(ex)))
@@ -430,15 +444,14 @@ object AutomaticVoices {
       val vecGate = Vec.tabulate(NumSpeakers) { si =>
         val isLayer = sensors(si) sig_== li
         val gate    = isLayer
-        // println(s"gate$li$si: $gate")
-        gate.changed.react(_ => ch => println(s"gate$li$si -> ${ch.now}"))
+        if (PrintStates) gate.changed.react(_ => ch => println(s"gate$li$si -> ${ch.now}"))
         gate
       }
       val vecGateObj = vecGate.map(ex => Obj(BooleanElem(ex)))
 
       val sumActive = count(vecActive)
       val lPlaying  = sumActive > 0
-      lPlaying.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
+      if (PrintStates) lPlaying.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
 
       val lFolder = Folder[S]
       val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
@@ -553,7 +566,7 @@ object AutomaticVoices {
     val vecPlaying      = vecLayer.map(_.playing())
     val activeVoices    = count(vecPlaying)
     val hasFreeVoices   = activeVoices < MaxVoices
-    activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
+    if (PrintStates) activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
 
     val wTransId = IntEx.newVar[S](0)
 
