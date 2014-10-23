@@ -34,7 +34,7 @@ import scala.concurrent.duration.Duration
 import scala.swing.Swing
 
 object AutomaticVoices {
-  val DumpOSC         = false
+  val DumpOSC         = true
   val ShowLog         = false
   val PrintStates     = false
   val Shadowing       = true
@@ -233,6 +233,7 @@ object AutomaticVoices {
     val config = Server.Config()
     config.audioBusChannels  = 1024
     config.transport         = osc.TCP
+    config.pickPort()
     aural.start(config)
     (aural, transport)
   }

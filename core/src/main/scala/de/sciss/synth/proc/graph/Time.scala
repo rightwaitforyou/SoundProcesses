@@ -45,5 +45,5 @@ object Duration {
   * length. To gather for how long it's going to play, use `Duration() - Offset()`.
   */
 final case class Duration() extends GE.Lazy with ScalarRated {
-  protected def makeUGens: UGenInLike = Duration.key.ir
+  protected def makeUGens: UGenInLike = Duration.key.ir(inf)
 }

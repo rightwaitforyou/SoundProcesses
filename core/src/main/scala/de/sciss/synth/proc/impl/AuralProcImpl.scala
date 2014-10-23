@@ -26,6 +26,7 @@ import de.sciss.synth.proc.graph.impl.ActionResponder
 import de.sciss.synth.{proc, addToHead, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
 import proc.{UGenGraphBuilder => UGB}
+import Timeline.SampleRate
 
 import scala.concurrent.Future
 import scala.concurrent.stm.Ref
@@ -252,7 +253,7 @@ object AuralProcImpl {
                     ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
                   // println(s"segment : ${segm.span}")
                   val bm          = mkInBus()
-                    val w           = SegmentWriter(bm.bus, segm, time, Timeline.SampleRate)
+                    val w           = SegmentWriter(bm.bus, segm, time, SampleRate)
                     b.dependencies  ::= w
                   // users ::= w
 
@@ -468,12 +469,13 @@ object AuralProcImpl {
       }
 
       // XXX TODO - it would be nicer if these were added optionally
-      builder.setMap += graph.Time    .key -> (timeRef.frame        / Timeline.SampleRate)
-      builder.setMap += graph.Offset  .key -> (timeRef.offsetOrZero / Timeline.SampleRate)
-      builder.setMap += graph.Duration.key -> (timeRef.span match {
-        case Span(start, stop)  => (stop - start) / Timeline.SampleRate
-        case _ => Double.PositiveInfinity
-      })
+      if (timeRef.frame        != 0) builder.setMap += graph.Time    .key -> (timeRef.frame        / SampleRate)
+      if (timeRef.offsetOrZero != 0) builder.setMap += graph.Offset  .key -> (timeRef.offsetOrZero / SampleRate)
+      timeRef.span match {
+        case Span(start, stop) =>
+          builder.setMap += graph.Duration.key -> ((stop - start) / SampleRate)
+        case _ => // Double.PositiveInfinity
+      }
 
       ugen.acceptedInputs.foreach { case (key, value) =>
         if (!value.async) buildSyncInput(builder, key, value)

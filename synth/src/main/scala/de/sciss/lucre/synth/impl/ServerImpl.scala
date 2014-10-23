@@ -16,25 +16,20 @@ package impl
 
 import scala.concurrent.{ExecutionContext, Future}
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.synth.{Server => SServer, AllocatorExhausted, addToHead, message}
+import de.sciss.synth.{Server => SServer, Client => SClient, ControlABusMap, ControlSet, AllocatorExhausted, addToHead, message}
 import de.sciss.osc
-import de.sciss.synth.{Client => SClient}
 
 object ServerImpl {
   def apply  (peer: SServer): Server          = new OnlineImpl (peer)
   def offline(peer: SServer): Server.Offline  = new OfflineImpl(peer)
 
-  var DEBUG_SIZE = false
+  /** If `true`, checks against bundle size overflow (64K) and prints the bundle before crashing. */
+  var DEBUG_SIZE      = true
+  /** If `true`, applies a few optimizations to messages within a bundle, in order to reduce its size */
+  var USE_COMPRESSION = true
 
   private final case class OnlineImpl(peer: SServer) extends Impl {
     override def toString = peer.toString()
-
-    // ---- side effects ----
-
-    def !(p: osc.Packet): Unit = {
-      if (DEBUG_SIZE) checkPacket(p)
-      peer ! p
-    }
 
     private def checkPacket(p: osc.Packet): Unit = {
       val sz = p match {
@@ -47,10 +42,134 @@ object ServerImpl {
       }
     }
 
-    def !!(bndl: osc.Bundle): Future[Unit] = {
+    // ---- compression ----
+
+    private def compress(b: osc.Bundle): osc.Bundle = {
+      val in  = b.packets
+      val num = in.length
+      if (num < 10) return b   // don't bother
+
+      // currently, we focus on the three messages
+      // most frequently found in sound processes:
+      // `/n_set`, `/n_mapan`, `/n_after`.
+      // `/n_set` and `/n_mapan` can be collapsed
+      // per node-ID; `/n_after` can be all collapsed.
+      // To ensure correctness, we must not collapse
+      // across `/s_new` and `/g_new` boundaries.
+
+      // XXX TODO - actually, we don't yet optimize `/n_after`
+
+      val out     = new Array[osc.Packet](num)
+      var inOff   = 0
+      var outOff  = 0
+
+      var setMap    = Map.empty[Int, Int]
+      var mapanMap  = Map.empty[Int, Int]
+
+      while (inOff < num) {
+        val p       = in(inOff)
+        val append  = p match {
+          case m: message.NodeSet =>
+            val id = m.id
+            val i = setMap.getOrElse(id, -1)
+            val res = i < 0
+            if (res) {
+              setMap += id -> outOff
+            } else {
+              var message.NodeSet(_, pairs @ _*) = out(i)
+              m.pairs.foreach {
+                case c @ ControlSet.Value(key, _) =>
+                  val j = pairs.indexWhere {
+                    case ControlSet.Value(`key`, _) => true
+                    case _ => false
+                  }
+                  pairs = if (j < 0) pairs :+ c else pairs.updated(j, c)
+
+                case c => pairs :+= c
+              }
+              out(i) = message.NodeSet(id, pairs: _*)
+            }
+            res
+
+          case m: message.NodeMapan =>
+            val id = m.id
+            val i = mapanMap.getOrElse(id, -1)
+            val res = i < 0
+            if (res) {
+              mapanMap += id -> outOff
+            } else {
+              var message.NodeMapan(_, mappings @ _*) = out(i)
+              m.mappings.foreach {
+                case c @ ControlABusMap.Single(key, _) =>
+                  val j = mappings.indexWhere {
+                    case ControlABusMap.Single(`key`, _) => true
+                    case _ => false
+                  }
+                  mappings = if (j < 0) mappings :+ c else mappings.updated(j, c)
+
+                case c @ ControlABusMap.Multi(key, _, numChannels) =>
+                  val j = mappings.indexWhere {
+                    case ControlABusMap.Multi(`key`, _, `numChannels`) => true
+                    case _ => false
+                  }
+                  mappings = if (j < 0) mappings :+ c else mappings.updated(j, c)
+              }
+              out(i) = message.NodeMapan(id, mappings: _*)
+            }
+            res
+
+          case m: message.SynthNew =>
+            val id = m.id
+            setMap   -= id
+            mapanMap -= id
+            true
+
+          case m: message.GroupNew =>
+            m.groups.foreach { g =>
+              val id = g.groupID
+              setMap   -= id
+              mapanMap -= id
+            }
+            true
+
+          case _ => true
+        }
+        if (append) {
+          out(outOff) = p
+          outOff += 1
+        }
+        inOff += 1
+      }
+
+      if (outOff == num) b else {
+        val outT = new Array[osc.Packet](outOff)
+        System.arraycopy(out, 0, outT, 0, outOff)
+        val res = osc.Bundle(b.timetag, outT: _*)
+        //        Console.err.println("----------- BEFORE COMPRESSION -----------")
+        //        osc.Packet.printTextOn(b  , Server.codec, Console.err)
+        //        Console.err.println("----------- AFTER  COMPRESSION -----------")
+        //        osc.Packet.printTextOn(res, Server.codec, Console.err)
+        res
+      }
+    }
+
+    // ---- side effects ----
+
+    def !(p0: osc.Packet): Unit = {
+      val p = if (USE_COMPRESSION) p0 match {
+        case b: osc.Bundle => compress(b)
+        case _ => p0
+      } else  p0
+
+      if (DEBUG_SIZE) checkPacket(p)
+      peer ! p
+    }
+
+    def !!(b0: osc.Bundle): Future[Unit] = {
+      val b       = if (USE_COMPRESSION) compress(b0) else b0
       val syncMsg = peer.syncMsg()
       val syncID  = syncMsg.id
-      val bndlS   = osc.Bundle(bndl.timetag, bndl :+ syncMsg: _*)
+      val bndlS   = osc.Bundle(b.timetag, b :+ syncMsg: _*)
       if (DEBUG_SIZE) checkPacket(bndlS)
       peer.!!(bndlS) {
         case message.Synced(`syncID`) =>

@@ -32,6 +32,8 @@ lazy val spanVersion            = "1.2.1"
 
 lazy val lucreSwingVersion      = "0.6.1-SNAPSHOT"
 
+lazy val scalaColliderSwingVersion = "1.20.2-SNAPSHOT"
+
 lazy val audioWidgetsVersion    = "1.7.0"
 
 // ---- test-only ----
@@ -160,10 +162,11 @@ lazy val `soundprocesses-compiler` = project.in(file("compiler")).dependsOn(`sou
   .settings(
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
-      "org.scala-lang" %  "scala-compiler" % scalaVersion.value,
-      "de.sciss"       %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
-      "de.sciss"       %% "fileutil"       % fileUtilVersion       % "test",
-      "de.sciss"       %% "lucreswing"     % lucreSwingVersion     % "test"
+      "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,
+      "de.sciss"       %% "lucrestm-bdb"            % lucreCoreVersion          % "test",
+      "de.sciss"       %% "fileutil"                % fileUtilVersion           % "test",
+      "de.sciss"       %% "lucreswing"              % lucreSwingVersion         % "test",
+      "de.sciss"       %% "scalacolliderswing-core" % scalaColliderSwingVersion % "test"
     )
   )
 
