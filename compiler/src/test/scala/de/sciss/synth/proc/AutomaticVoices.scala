@@ -33,18 +33,19 @@ import SoundProcesses.atomic
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
 
+// bug: s0 -> 0, s1 -> 1, s1 -> 0
 object AutomaticVoices {
   val DumpOSC         = true
   val ShowLog         = false
   val PrintStates     = false
   val Shadowing       = true
-  val Attack          = 30
-  val Release         = 30
+  val Attack          = 10 // 30
+  val Release         = 10 // 30
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  // val NumSpeakers     = 2 // 5
-  val NumSpeakers     = 42
+  val NumSpeakers     = 2 // 5
+  // val NumSpeakers     = 42
   val NumTransitions  = 4
 
   type S = Confluent
@@ -395,7 +396,8 @@ object AutomaticVoices {
       fltSucc + fltPred
     }
 
-    val transGraphs = Vec(t1, t2, t3, t4)
+    // val transGraphs = Vec(t1, t2, t3, t4)
+    val transGraphs = Vec.fill(NumTransitions)(t3)
     assert(transGraphs.size == NumTransitions)
 
     // multi-channel single scan in, multiple signal-channel scan outs
