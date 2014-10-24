@@ -34,10 +34,31 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
 
 // bug: s0 -> 0, s1 -> 1, s1 -> 0
+//
+// the problems are:
+// (1)
+// - only for the gates that are open
+//   during becomesActive we set active to true.
+// - therefore if a gate is opened later,
+//   it will not have set active to true,
+//   and therefore that voice doesn't count
+//   during release. (the ensemble might
+//   have it's `playing` set to false although
+//   there is unreleased channels).
+// (2)
+// - the bypass synth is wired to pred/out
+//   which are inside the ensL and therefore
+//   bypass and pred/out are never active
+//   both at the same time (the bypass is
+//   never working)
+// (3)
+// - checkWorld is called for each sensor
+//   changing. we should call it _once_
+//   after the whole sensor matrix update
 object AutomaticVoices {
   val DumpOSC         = true
   val ShowLog         = false
-  val PrintStates     = false
+  val PrintStates     = true
   val Shadowing       = true
   val Attack          = 10 // 30
   val Release         = 10 // 30
