@@ -42,12 +42,13 @@ object AutomaticVoices {
   val Shadowing       = true
   val Attack          = 30
   val Release         = 30
+  val FFTSize         = 512 // 1024
 
-  val NumLayers       = 3
-  val MaxVoices       = 2
+  val NumLayers       = 15 // 3
+  val MaxVoices       = 3 // 2
   // val NumSpeakers     = 2 // 3 // 5
   val NumSpeakers     = 42
-  val NumTransitions  = 4
+  val NumTransitions  = 7 // 4
 
   type S = Confluent
   // type S = InMemory
@@ -261,7 +262,7 @@ object AutomaticVoices {
     }
     transport.play()
     val config = Server.Config()
-    config.audioBusChannels  = 2048 // 1024
+    config.audioBusChannels  = 4096 // 1024
     config.transport         = osc.TCP
     config.pickPort()
     aural.start(config)
@@ -391,7 +392,7 @@ object AutomaticVoices {
       import synth._
       import ugen._
       val li    = graph.Attribute.ir("li", 0)
-      val freq  = if (NumLayers == 1) 1000.0: GE else li.linexp(0, NumLayers - 1, 300.0, 2000.0)
+      val freq  = if (NumLayers == 1) 1000.0: GE else li.linexp(0, NumLayers - 1, 200.0, 4000.0)
       val amp   = 0.5
       val dust  = Decay.ar(Dust.ar(Seq.fill(NumSpeakers)(10)), 1).min(1)
       val sig   = Resonz.ar(dust, freq, 0.5) * amp
@@ -433,8 +434,8 @@ object AutomaticVoices {
       import synth._
       import ugen._
       val thresh  = fade.linexp(0, 1, 1.0e-3, 1.0e1)
-      val bufPred = LocalBuf(1024)
-      val bufSucc = LocalBuf(1024)
+      val bufPred = LocalBuf(FFTSize)
+      val bufSucc = LocalBuf(FFTSize)
       val fltPred = IFFT.ar(PV_MagAbove(FFT(bufPred, pred), thresh))
       val fltSucc = IFFT.ar(PV_MagBelow(FFT(bufSucc, succ), thresh))
       fltSucc + fltPred
@@ -445,14 +446,64 @@ object AutomaticVoices {
       import synth._
       import ugen._
       val thresh  = fade.linexp(1, 0, 1.0e-3, 1.0e1)
-      val bufPred = LocalBuf(1024)
-      val bufSucc = LocalBuf(1024)
+      val bufPred = LocalBuf(FFTSize)
+      val bufSucc = LocalBuf(FFTSize)
       val fltPred = IFFT.ar(PV_MagBelow(FFT(bufPred, pred), thresh))
       val fltSucc = IFFT.ar(PV_MagAbove(FFT(bufSucc, succ), thresh))
       fltSucc + fltPred
     }
 
-    val transGraphs = Vec(t1, t2, t3, t4)
+    // transition 5: to dust
+    val t5 = mkTransition { (pred, succ, fade) =>
+      import synth._
+      import ugen._
+      val f1   =   20
+      val f2   = 2000
+
+      val dustFreqS = fade.linexp(0, 1, f1, f2)
+      val dustFreqP = fade.linexp(1, 0, f1, f2)
+
+      val decayTime = 0.01
+      val dustS = Decay.ar(Dust.ar(dustFreqS), decayTime).min(1)
+      val dustP = Decay.ar(Dust.ar(dustFreqP), decayTime).min(1)
+
+      val fltSucc = succ * dustS
+      val fltPred = pred * dustP
+
+      //      val fadeIn = Line.kr(0, 1, dur = 2)
+      //      val sig = in * (1 - fadeIn) + mod * fadeIn
+
+      fltSucc + fltPred
+    }
+
+    // transition 6: shift upwards
+    val t6 = mkTransition { (pred, succ, fade) =>
+      import synth._
+      import ugen._
+
+      val freq = fade.linexp(1, 0, 22.05, 22050) - 22.05
+
+      val fltSucc = FreqShift.ar(LPF.ar(succ, 22050 - freq),  freq)
+      val fltPred = FreqShift.ar(HPF.ar(pred, 22050 - freq), -freq)
+
+      fltSucc + fltPred
+    }
+
+    // transition 7: shift downwards
+    val t7 = mkTransition { (pred, succ, fade) =>
+      import synth._
+      import ugen._
+
+      val freq = fade.linexp(0, 1, 22.05, 22050) - 22.05
+
+      val fltSucc = FreqShift.ar(HPF.ar(succ, 22050 - freq), -freq)
+      val fltPred = FreqShift.ar(LPF.ar(pred, 22050 - freq),  freq)
+
+      fltSucc + fltPred
+    }
+
+    val transGraphs0  = Vec(t1, t2, t3, t4, t5, t6, t7)
+    val transGraphs   = Vec.tabulate(NumTransitions)(i => transGraphs0(i % transGraphs0.size))
     // val transGraphs = Vec.fill(NumTransitions)(t3)
     assert(transGraphs.size == NumTransitions)
 

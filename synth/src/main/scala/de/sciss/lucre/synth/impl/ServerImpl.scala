@@ -44,6 +44,21 @@ object ServerImpl {
 
     // ---- compression ----
 
+    private def compressControlSet(old: Seq[ControlSet], add: Seq[ControlSet]): Seq[ControlSet] = {
+      var res = old
+      add.foreach {
+        case c @ ControlSet.Value(key, _) =>
+          val j = res.indexWhere {
+            case ControlSet.Value(`key`, _) => true
+            case _ => false
+          }
+          res = if (j < 0) res :+ c else res.updated(j, c)
+
+        case c => res :+= c
+      }
+      res
+    }
+
     private def compress(b: osc.Bundle): osc.Bundle = {
       val in  = b.packets
       val num = in.length
@@ -63,8 +78,8 @@ object ServerImpl {
       var inOff   = 0
       var outOff  = 0
 
-      var setMap    = Map.empty[Int, Int]
-      var mapanMap  = Map.empty[Int, Int]
+      var setMap    = Map.empty[Int, Int] // node-id to out-offset containing either n_set or s_new
+      var mapanMap  = Map.empty[Int, Int] // node-id to out-offset containing n_mapan
 
       while (inOff < num) {
         val p       = in(inOff)
@@ -76,18 +91,13 @@ object ServerImpl {
             if (res) {
               setMap += id -> outOff
             } else {
-              var message.NodeSet(_, pairs @ _*) = out(i)
-              m.pairs.foreach {
-                case c @ ControlSet.Value(key, _) =>
-                  val j = pairs.indexWhere {
-                    case ControlSet.Value(`key`, _) => true
-                    case _ => false
-                  }
-                  pairs = if (j < 0) pairs :+ c else pairs.updated(j, c)
-
-                case c => pairs :+= c
+              out(i) = (out(i): @unchecked) match {  // unfortunately those case classes do not have `copy` methods...
+                case n: message.NodeSet =>
+                  message.NodeSet(id, compressControlSet(n.pairs, m.pairs): _*)
+                case n: message.SynthNew =>
+                  message.SynthNew(n.defName, id, n.addAction, n.targetID,
+                    compressControlSet(n.controls, m.pairs): _*)
               }
-              out(i) = message.NodeSet(id, pairs: _*)
             }
             res
 
@@ -120,7 +130,8 @@ object ServerImpl {
 
           case m: message.SynthNew =>
             val id = m.id
-            setMap   -= id
+            // setMap   -= id
+            setMap   += id -> outOff
             mapanMap -= id
             true
 
