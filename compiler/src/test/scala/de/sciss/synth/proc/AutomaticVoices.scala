@@ -19,6 +19,7 @@ import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
 import de.sciss.lucre.synth.impl.ServerImpl
 import de.sciss.lucre.synth.{NodeGraph, Server, InMemory}
+import de.sciss.synth.swing.NodeTreePanel
 import de.sciss.synth.swing.j.JServerStatusPanel
 import de.sciss.synth.{GE, proc, SynthGraph}
 import de.sciss.{osc, synth, lucre}
@@ -33,31 +34,11 @@ import SoundProcesses.atomic
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
 
-// bug: s0 -> 0, s1 -> 1, s1 -> 0
-//
-// the problems are:
-// (1)
-// - only for the gates that are open
-//   during becomesActive we set active to true.
-// - therefore if a gate is opened later,
-//   it will not have set active to true,
-//   and therefore that voice doesn't count
-//   during release. (the ensemble might
-//   have it's `playing` set to false although
-//   there is unreleased channels).
-// (2)
-// - the bypass synth is wired to pred/out
-//   which are inside the ensL and therefore
-//   bypass and pred/out are never active
-//   both at the same time (the bypass is
-//   never working)
-// (3)
-// - checkWorld is called for each sensor
-//   changing. we should call it _once_
-//   after the whole sensor matrix update
+// bug: s0 -> 0, s1 -> 1, s1 -> 2, s1 -> 1
 object AutomaticVoices {
-  val DumpOSC         = true
+  val DumpOSC         = false
   val ShowLog         = false
+  var ShowNodeTree    = false
   val PrintStates     = true
   val Shadowing       = true
   val Attack          = 10 // 30
@@ -65,9 +46,9 @@ object AutomaticVoices {
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  val NumSpeakers     = 3 // 5
+  val NumSpeakers     = 2 // 3 // 5
   // val NumSpeakers     = 42
-  val NumTransitions  = 4
+  val NumTransitions  = 1 // 4
 
   type S = Confluent
   // type S = InMemory
@@ -134,8 +115,14 @@ object AutomaticVoices {
     val transView = IntSpinnerView(w.transId     (), "trans", 64)
     val vcView    = IntSpinnerView(w.activeVoices(), "vc"   , 64)
 
-    lazy val status = new JServerStatusPanel(JServerStatusPanel.COUNTS)
-    aural.whenStarted { s => defer(status.server = Some(s.peer)) }
+    lazy val status   = new JServerStatusPanel(JServerStatusPanel.COUNTS)
+    lazy val nodeTree = new NodeTreePanel { nodeActionMenu = true }
+    aural.whenStarted { s =>
+      defer {
+        status.server   = Some(s.peer)
+        if (ShowNodeTree) nodeTree.group  = Some(s.defaultGroup.peer)
+      }
+    }
 
     deferTx {
       import scala.swing._
@@ -204,6 +191,12 @@ object AutomaticVoices {
         }
       }
 
+      if (ShowNodeTree) new Frame {
+        title = "Nodes"
+        contents = nodeTree
+        pack().open()
+      }
+
       new Frame {
         title = "Automatic Voices"
         contents = new BoxPanel(Orientation.Vertical) {
@@ -236,6 +229,7 @@ object AutomaticVoices {
         override def closeOperation(): Unit = {
           checkTimer .stop()
           battleTimer.stop()
+          if (ShowNodeTree) nodeTree.group = None
           atomic[S] { implicit tx =>
             transport.dispose()
             tx.afterCommit {
@@ -253,7 +247,8 @@ object AutomaticVoices {
     if (DumpOSC) aural.whenStarted(_.peer.dumpOSC())
     val transport = Transport[S](aural)
     transport.addObject(w.diffusion())
-    w.layers.foreach { l =>
+    w.layers.zipWithIndex.foreach { case (l, li) =>
+      println(s"Adding layer $li (playing = ${l.playing().value}; bypass = ${l.bypass().elem.peer.playing.value})")
       transport.addObject(l.input   ())
       transport.addObject(l.output  ())
       transport.addObject(l.ensemble())
@@ -378,7 +373,7 @@ object AutomaticVoices {
       import synth._
       import ugen._
       val li    = graph.Attribute.ir("li", 0)
-      val freq  = li.linexp(0, NumLayers - 1, 300.0, 2000.0)
+      val freq  = if (NumLayers == 1) 1000.0: GE else li.linexp(0, NumLayers - 1, 300.0, 2000.0)
       val amp   = 0.5
       val dust  = Decay.ar(Dust.ar(Seq.fill(NumSpeakers)(10)), 1).min(1)
       val sig   = Resonz.ar(dust, freq, 0.5) * amp
@@ -473,7 +468,7 @@ object AutomaticVoices {
       val in = graph.ScanInFix(NumSpeakers)
       val mix = Mix.tabulate(NumSpeakers) { ch =>
         val inc = in \ ch
-        val pan = ch.linlin(0, NumSpeakers - 1, -1, 1)
+        val pan = if (NumSpeakers == 1) 0.0 else ch.linlin(0, NumSpeakers - 1, -1, 1)
         val sig = Pan2.ar(inc, pan)
         sig
       }
@@ -508,19 +503,19 @@ object AutomaticVoices {
       //        case Change(_, false) => println(s"TODO: un-wire layer $li")
       //        case _ =>
       //      }}
-      val lPlayingObj = Obj(BooleanElem(lPlaying))
+      // val lPlayingObj = Obj(BooleanElem(lPlaying))
 
       val lFolder = Folder[S]
       val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
       val ensLObj = Obj(Ensemble.Elem(ensL))
 
       val gen       = Proc[S]
-      val genObj    = Obj(Proc.Elem(gen))
-      lFolder.addLast(genObj)
-
       gen.graph()   = genGraph
+      val genObj    = Obj(Proc.Elem(gen))
       val liObj     = Obj(IntElem(li))
       genObj.attr.put("li", liObj)
+      genObj.attr.name = s"gen$li"
+      lFolder.addLast(genObj)
 
       val pred        = Proc[S]
       pred.graph()    = bypassGraph
@@ -547,7 +542,7 @@ object AutomaticVoices {
       out.graph()     = bypassGraph
       out.scans.add("out")     // layer-ensemble output to successor
       val outObj      = Obj(Proc.Elem(out))
-      outObj.attr.name = s"out$li"
+      outObj.attr.name = s"foo$li"
       // lFolder.addLast(outObj)
 
       val coll        = Proc[S] // aka collector
@@ -573,9 +568,9 @@ object AutomaticVoices {
         val doneObj   = Obj(Action.Elem(done))
         val attr      = doneObj.attr
         attr.put("active" , active     )
-        attr.put("playing", lPlayingObj)
-        attr.put("pred"   , predObj    )
-        attr.put("out"    , outObj     )
+        //        attr.put("playing", lPlayingObj)
+        //        attr.put("pred"   , predObj    )
+        //        attr.put("out"    , outObj     )
         doneObj
       }
 

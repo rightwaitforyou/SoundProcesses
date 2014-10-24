@@ -139,7 +139,7 @@ object UGenGraphBuilderImpl {
 
     def tryBuild(): State[S] = UGenGraph.use(this) {
       var missingElems  = Vector.empty[Lazy]
-      var someSucceeded = false
+      // var someSucceeded = false
       while (remaining.nonEmpty) {  // XXX TODO: this can go through many exceptions. perhaps should short circuit?
       val g = SynthGraph {
           remaining.foreach { elem =>
@@ -152,7 +152,7 @@ object UGenGraphBuilderImpl {
             val savedAcceptedInputs = acceptedInputs
             try {
               elem.force(builder)
-              someSucceeded = true
+              // someSucceeded = true
             } catch {
               case MissingIn(rejected) =>
                 sourceMap           = savedSourceMap
@@ -180,14 +180,17 @@ object UGenGraphBuilderImpl {
         new CompleteImpl[S](result, scanOuts = scanOuts, acceptedInputs = acceptedInputs)
 
       } else {
-        if (someSucceeded) {
+        // NOTE: we have to return a new object even if no elem succeeded,
+        // because `rejectedInputs` may contain a new key!
+
+        // if (someSucceeded) {
           new IncompleteImpl[S](
             remaining = missingElems, controlProxies = controlProxies,
             ugens = ugens, controlValues = controlValues, controlNames = controlNames,
             sourceMap = sourceMap, scanOuts = scanOuts, acceptedInputs = acceptedInputs,
             rejectedInputs = rejectedInputs
           )
-        } else in
+        // } else in
       }
 
       newState

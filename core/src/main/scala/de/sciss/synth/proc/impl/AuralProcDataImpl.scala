@@ -16,17 +16,18 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Bus, NodeGraph, Node, Txn, Group, NodeRef, AudioBus, Sys}
+import de.sciss.lucre.synth.{AudioBus, Bus, Group, Node, NodeGraph, NodeRef, Sys, Txn}
 import de.sciss.model.Change
 import de.sciss.synth.Curve.parametric
-import de.sciss.synth.{ControlSet, SynthGraph, addBefore}
 import de.sciss.synth.proc.AuralObj.ProcData
+import de.sciss.synth.proc.Implicits._
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.proc.{logAural => logA, UGenGraphBuilder => UGB}
-import UGB.{Complete, Incomplete, MissingIn}
+import de.sciss.synth.proc.UGenGraphBuilder.{Complete, Incomplete, MissingIn}
+import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
+import de.sciss.synth.{ControlSet, SynthGraph, addBefore}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{TSet, TMap, Ref, TxnLocal}
+import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
 
 object AuralProcDataImpl {
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
@@ -339,7 +340,7 @@ object AuralProcDataImpl {
     final def tryBuild()(implicit tx: S#Tx): Unit = {
       state match {
         case s0: Incomplete[S] =>
-          logA(s"try build ${procCached()}")
+          logA(s"try build ${procCached()} - ${procCached().attr.name}")
           val s1 = s0.retry(this)
           stateRef.set(s1)(tx.peer)
           buildAdvanced(before = s0, now = s1)
@@ -485,7 +486,7 @@ object AuralProcDataImpl {
       val view  = AuralScan(data = this, key = key, scan = scan, bus = bus)
       scanViews.put(key, view)(tx.peer)
       // note: the view will iterate over the
-      //       sources and sink itself upon initialization,
+      //       sources and sinks itself upon initialization,
       //       and establish the playing links if found
       //
       //      nodeOption.foreach { n =>
