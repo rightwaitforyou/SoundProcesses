@@ -65,7 +65,7 @@ object AutomaticVoices {
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  val NumSpeakers     = 2 // 5
+  val NumSpeakers     = 3 // 5
   // val NumSpeakers     = 42
   val NumTransitions  = 4
 
@@ -110,8 +110,8 @@ object AutomaticVoices {
               val speakers: Vec[Speaker],
               val playing : stm.Source[S#Tx, Expr[S, Boolean]],
               val transId : stm.Source[S#Tx, Expr.Var[S, Int]],
-              val input   : stm.Source[S#Tx, Proc[S]],
-              val output  : stm.Source[S#Tx, Proc[S]])
+              val input   : stm.Source[S#Tx, Proc.Obj[S]],
+              val output  : stm.Source[S#Tx, Proc.Obj[S]])
 
   class World(val diffusion     :     stm.Source[S#Tx, Proc.Obj[S]],
               val layers        : Vec[Layer],
@@ -126,9 +126,9 @@ object AutomaticVoices {
              (implicit tx: S#Tx, _cursor: stm.Cursor[S]): Unit = {
     implicit val undo = new UndoManagerImpl
     val views = w.sensors.zipWithIndex.map { case (s, si) =>
-      s().changed.react { implicit tx => _ =>
-        checkWorld(w)
-      }
+      //      s().changed.react { implicit tx => _ =>
+      //        checkWorld(w)
+      //      }
       IntSpinnerView(s(), s"s$si", 64)
     }
     val transView = IntSpinnerView(w.transId     (), "trans", 64)
@@ -254,6 +254,8 @@ object AutomaticVoices {
     val transport = Transport[S](aural)
     transport.addObject(w.diffusion())
     w.layers.foreach { l =>
+      transport.addObject(l.input   ())
+      transport.addObject(l.output  ())
       transport.addObject(l.ensemble())
       transport.addObject(l.bypass  ())
     }
@@ -268,56 +270,76 @@ object AutomaticVoices {
 
   def checkWorld(w: World)(implicit tx: S#Tx): Unit = {
     val free = w.hasFreeVoices()
-    w.layers.zipWithIndex.foreach { case (l, li) =>
-      if (!l.playing().value && free.value) {
-        val gateVals      = l.speakers.map(s => s -> s.gate().value)
-        val becomesActive = gateVals.exists(_._2)
+    w.layers.zipWithIndex /* .scramble() */.foreach { case (l, li) =>
+      val isActive      = l.playing().value
+      val becomesActive = !isActive && free.value && l.speakers.exists(_.gate().value)
 
-        if (becomesActive) {
-          l.transId().update(w.transId().value)
-          if (Shadowing) for {
-            layerIn  <- l.input ().scans.get("in" )
-            layerOut <- l.output().scans.get("out")
-            diffIn   <- w.diffusion().elem.peer.scans.get("in")
-          } {
-            val diffSources = diffIn.sources.collect {
-              case l @ Scan.Link.Scan(_) => l
-            } .toSet
-            val layerOutL = Scan.Link.Scan(layerOut)
-            // only act if we're not there
-            if (!diffSources.contains(layerOutL)) {
-              val existingIn = layerIn.sources.collect {
-                case l @ Scan.Link.Scan(_) => l
-              } .toSet
-              val existingOut = layerOut.sinks.collect {
-                case l @ Scan.Link.Scan(_) => l
-              } .toSet
-              val toAddIn     = diffSources -- existingIn
-              val toRemoveIn  = existingIn  -- diffSources
-              toRemoveIn .foreach(layerIn .removeSource)
-              diffSources.foreach(diffIn  .removeSource)
-              existingOut.foreach(layerOut.removeSink  )
-              toAddIn    .foreach(layerIn .addSource   )
-              diffIn.addSource(layerOutL)
-            }
-          }
-
-          gateVals.collect {
-            case (s, true) => s.active().update(true)
-          }
-        }
+      if (becomesActive) {
+        l.transId().update(w.transId().value)
+        if (Shadowing) layerToFront(w, l)
       }
+
+      // now every `active` must be high for which the `gate` is open
+      if (isActive || becomesActive)
+        l.speakers.foreach { s =>
+          if (s.gate().value) s.active().update(true)
+        }
     }
   }
+
+  def layerToFront(w: World, l: Layer)(implicit tx: S#Tx): Unit =
+    for {
+      layerIn  <- l.input    ().elem.peer.scans.get("in" )
+      layerOut <- l.output   ().elem.peer.scans.get("out")
+      diffIn   <- w.diffusion().elem.peer.scans.get("in" )
+    } {
+      val diffSources = diffIn.sources.collect {
+        case l @ Scan.Link.Scan(_) => l
+      } .toSet
+      val layerOutL = Scan.Link.Scan(layerOut)
+      // only act if we're not there
+      if (!diffSources.contains(layerOutL)) {
+        val existingIn = layerIn.sources.collect {
+          case l @ Scan.Link.Scan(_) => l
+        } .toSet
+        val existingOut = layerOut.sinks.collect {
+          case l @ Scan.Link.Scan(_) => l
+        } .toSet
+        val toAddIn     = diffSources -- existingIn
+        val toRemoveIn  = existingIn  -- diffSources
+        toRemoveIn .foreach(layerIn .removeSource)
+        diffSources.foreach(diffIn  .removeSource)
+        existingOut.foreach(layerOut.removeSink  )
+        toAddIn    .foreach(layerIn .addSource   )
+        diffIn.addSource(layerOutL)
+      }
+    }
 
   def mkAction(c: Code.Compiler): (String, Array[Byte]) = {
     val source =
       """val imp = ExprImplicits[S]
         |import imp._
-        |// println("Action")
         |
-        |self.attr[BooleanElem]("active").foreach {
-        |  case Expr.Var(active) => active() = false
+        |for {
+        |  Expr.Var(active) <- self.attr[BooleanElem]("active")
+        |  // playing          <- self.attr[BooleanElem]("playing")
+        |} {
+        |  active() = false
+        |  /*
+        |  if (!playing.value)
+        |    for {
+        |      pred     <- self.attr[Proc.Elem]("pred")
+        |      out      <- self.attr[Proc.Elem]("out" )
+        |      predScan <- pred.elem.peer.scans.get("in")
+        |      outScan  <- out .elem.peer.scans.get("out")
+        |    } {
+        |      val sources = predScan.sources.toList
+        |      val sinks   = outScan .sinks  .toList
+        |      sources.foreach(predScan.removeSource)
+        |      sinks  .foreach(outScan .removeSink  )
+        |      ...
+        |    }
+        | */
         |}
         |""".stripMargin
     implicit val compiler = c
@@ -482,6 +504,11 @@ object AutomaticVoices {
       val sumActive = count(vecActive)
       val lPlaying  = sumActive > 0
       if (PrintStates) lPlaying.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
+      //      lPlaying.changed.react { implicit tx => {
+      //        case Change(_, false) => println(s"TODO: un-wire layer $li")
+      //        case _ =>
+      //      }}
+      val lPlayingObj = Obj(BooleanElem(lPlaying))
 
       val lFolder = Folder[S]
       val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
@@ -500,7 +527,7 @@ object AutomaticVoices {
       pred.scans.add("in")      // layer-ensemble input from predecessor
       val predObj     = Obj(Proc.Elem(pred))
       predObj.attr.name = s"pred$li"
-      lFolder.addLast(predObj)
+      // lFolder.addLast(predObj)
 
       val split       = Proc[S] // aka background splitter
       split.graph()   = splitGraph
@@ -521,7 +548,7 @@ object AutomaticVoices {
       out.scans.add("out")     // layer-ensemble output to successor
       val outObj      = Obj(Proc.Elem(out))
       outObj.attr.name = s"out$li"
-      lFolder.addLast(outObj)
+      // lFolder.addLast(outObj)
 
       val coll        = Proc[S] // aka collector
       coll.graph()    = collGraph
@@ -542,12 +569,22 @@ object AutomaticVoices {
       pred  .scans.add("out") ~> bypass.scans.add("in")
       bypass.scans.add("out") ~> out   .scans.add("in")
 
+      val vecDoneObj = vecActiveObj.map { active =>
+        val doneObj   = Obj(Action.Elem(done))
+        val attr      = doneObj.attr
+        attr.put("active" , active     )
+        attr.put("playing", lPlayingObj)
+        attr.put("pred"   , predObj    )
+        attr.put("out"    , outObj     )
+        doneObj
+      }
+
       val vecTrans = transGraphs.zipWithIndex.map { case (g, gi) =>
         val tPlaying    = transId sig_== gi
         val tFolder     = Folder[S]
         val ensTrans    = Ensemble[S](tFolder, 0L, tPlaying)
 
-        val vecChans = (vecGateObj zip vecActiveObj).zipWithIndex.map { case ((gate, active), si) =>
+        val vecChans = (vecGateObj zip vecActiveObj zip vecDoneObj).zipWithIndex.map { case (((gate, active), doneObj), si) =>
           val procT     = Proc[S]
           procT.graph() = g
           val predOut   = split .scans.add(s"out$si")
@@ -564,8 +601,6 @@ object AutomaticVoices {
           val attr      = procTObj.attr
           attr.name     = s"T$gi$si"
           attr.put("gate", gate)
-          val doneObj   = Obj(Action.Elem(done))
-          doneObj.attr.put("active", active)
           attr.put("done", doneObj)
 
           procTObj
@@ -589,8 +624,8 @@ object AutomaticVoices {
                 speakers  = speakers,
                 playing   = tx.newHandle(lPlaying),
                 transId   = tx.newHandle(transId),
-                input     = tx.newHandle(split),
-                output    = tx.newHandle(coll))
+                input     = tx.newHandle(predObj),
+                output    = tx.newHandle(outObj))
     }
 
     val vecPlaying      = vecLayer.map(_.playing())
