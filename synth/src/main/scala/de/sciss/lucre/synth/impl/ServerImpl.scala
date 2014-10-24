@@ -71,6 +71,8 @@ object ServerImpl {
       // per node-ID; `/n_after` can be all collapsed.
       // To ensure correctness, we must not collapse
       // across `/s_new` and `/g_new` boundaries.
+      // For simplicity, we also restrict collapse
+      // of `/n_after` to adjacent messages
 
       // XXX TODO - actually, we don't yet optimize `/n_after`
 
@@ -80,6 +82,7 @@ object ServerImpl {
 
       var setMap    = Map.empty[Int, Int] // node-id to out-offset containing either n_set or s_new
       var mapanMap  = Map.empty[Int, Int] // node-id to out-offset containing n_mapan
+      var nAfterIdx = -2
 
       while (inOff < num) {
         val p       = in(inOff)
@@ -125,6 +128,16 @@ object ServerImpl {
                   mappings = if (j < 0) mappings :+ c else mappings.updated(j, c)
               }
               out(i) = message.NodeMapan(id, mappings: _*)
+            }
+            res
+
+          case m: message.NodeAfter =>
+            val res = nAfterIdx != outOff - 1
+            if (res) {  // predecessor was not n_after
+              nAfterIdx = outOff
+            } else {
+              val message.NodeAfter(groups @ _*) = out(nAfterIdx)
+              out(nAfterIdx) = message.NodeAfter(groups ++ m.groups: _*)
             }
             res
 

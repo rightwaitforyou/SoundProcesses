@@ -404,7 +404,7 @@ object AutomaticVoices {
       import ugen._
       val pred  = graph.ScanInFix("pred", 1)
       val succ  = graph.ScanInFix("succ", 1)
-      val gate  = graph.Attribute.kr("gate", 0)
+      val gate  = graph.Attribute.kr("gt", 0)
       val env   = Env.asr(attack = Attack, release = Release, curve = Curve.linear)
       val fade  = EnvGen.ar(env, gate = gate)
       val done  = Done.kr(fade)
@@ -664,7 +664,7 @@ object AutomaticVoices {
           val procTObj  = Obj(Proc.Elem(procT))
           val attr      = procTObj.attr
           attr.name     = s"T$gi$si"
-          attr.put("gate", gate)
+          attr.put("gt"  , gate)
           attr.put("done", doneObj)
 
           procTObj

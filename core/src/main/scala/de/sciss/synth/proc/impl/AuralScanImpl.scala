@@ -105,7 +105,7 @@ object AuralScanImpl {
       Out.ar("out".kr, sig)
     }
 
-    val synth     = Synth(sourceBus.server, g, nameHint = Some(s"a-link$numCh"))
+    val synth     = Synth(sourceBus.server, g, nameHint = Some(s"a-ln$numCh"))
     val synthRef  = NodeRef(synth)
     synth.play(target = sinkNode.node, args = Nil, addAction = addBefore, dependencies = Nil)
     synth.read (sourceBus -> "in" )
