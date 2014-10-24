@@ -34,21 +34,20 @@ import SoundProcesses.atomic
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
 
-// bug: s0 -> 0, s1 -> 1, s1 -> 2, s1 -> 1
 object AutomaticVoices {
   val DumpOSC         = false
   val ShowLog         = false
   var ShowNodeTree    = false
   val PrintStates     = true
   val Shadowing       = true
-  val Attack          = 10 // 30
-  val Release         = 10 // 30
+  val Attack          = 30
+  val Release         = 30
 
   val NumLayers       = 3
   val MaxVoices       = 2
-  val NumSpeakers     = 2 // 3 // 5
-  // val NumSpeakers     = 42
-  val NumTransitions  = 1 // 4
+  // val NumSpeakers     = 2 // 3 // 5
+  val NumSpeakers     = 42
+  val NumTransitions  = 4
 
   type S = Confluent
   // type S = InMemory
@@ -150,32 +149,38 @@ object AutomaticVoices {
       val butRandomize = Button("Randomize") {
         atomic[S] { implicit tx =>
           w.transId().update(rrand(0, NumTransitions - 1))
-        }
+        // }
         w.sensors.foreach { s =>
-          atomic[S] { implicit tx =>
+        // atomic[S] { implicit tx =>
             s().update(rrand(-1, NumLayers - 1))
           }
+          checkWorld(w)
         }
       }
 
       val butClear = Button("Clear") {
+        atomic[S] { implicit tx =>
         w.sensors.foreach { s =>
-          atomic[S] { implicit tx =>
+          // atomic[S] { implicit tx =>
             s().update(-1)
           }
+          checkWorld(w)
         }
       }
 
-      var battleCount = 0
+      var battleCount     = 0
+      var battleWasClear  = true
       val battleTimer = new javax.swing.Timer(5000, Swing.ActionListener { _ =>
         if (battleCount > 0) {
           battleCount -= 1
         } else {
-          val but = if (rrand(1, 5) == 1) {
-            battleCount = 7   // enough for all to stop
+          val but = if (!battleWasClear && rrand(1, 5) == 1) {
+            battleCount = (Release+4)/5 + 1   // enough for all to stop
+            battleWasClear = true
             butClear
           } else {
             battleCount = rrand(0, 3)
+            battleWasClear = false
             butRandomize
           }
           but.doClick()
@@ -248,7 +253,7 @@ object AutomaticVoices {
     val transport = Transport[S](aural)
     transport.addObject(w.diffusion())
     w.layers.zipWithIndex.foreach { case (l, li) =>
-      println(s"Adding layer $li (playing = ${l.playing().value}; bypass = ${l.bypass().elem.peer.playing.value})")
+      // println(s"Adding layer $li (playing = ${l.playing().value}; bypass = ${l.bypass().elem.peer.playing.value})")
       transport.addObject(l.input   ())
       transport.addObject(l.output  ())
       transport.addObject(l.ensemble())
@@ -256,7 +261,7 @@ object AutomaticVoices {
     }
     transport.play()
     val config = Server.Config()
-    config.audioBusChannels  = 1024
+    config.audioBusChannels  = 2048 // 1024
     config.transport         = osc.TCP
     config.pickPort()
     aural.start(config)
@@ -288,25 +293,38 @@ object AutomaticVoices {
       layerOut <- l.output   ().elem.peer.scans.get("out")
       diffIn   <- w.diffusion().elem.peer.scans.get("in" )
     } {
-      val diffSources = diffIn.sources.collect {
+      val oldDiffIn = diffIn.sources.collect {
         case l @ Scan.Link.Scan(_) => l
       } .toSet
       val layerOutL = Scan.Link.Scan(layerOut)
       // only act if we're not there
-      if (!diffSources.contains(layerOutL)) {
-        val existingIn = layerIn.sources.collect {
+      if (!oldDiffIn.contains(layerOutL)) {
+        val oldLayerIn = layerIn.sources.collect {
           case l @ Scan.Link.Scan(_) => l
         } .toSet
-        val existingOut = layerOut.sinks.collect {
+        val oldLayerOut = layerOut.sinks.collect {
           case l @ Scan.Link.Scan(_) => l
         } .toSet
-        val toAddIn     = diffSources -- existingIn
-        val toRemoveIn  = existingIn  -- diffSources
-        toRemoveIn .foreach(layerIn .removeSource)
-        diffSources.foreach(diffIn  .removeSource)
-        existingOut.foreach(layerOut.removeSink  )
-        toAddIn    .foreach(layerIn .addSource   )
+
+        // val toAddIn     = oldDiffIn -- oldLayerIn
+        // val toRemoveIn  = oldLayerIn  -- oldDiffIn
+
+        // disconnect old layer inputs
+        oldLayerIn .foreach(layerIn .removeSource)
+        // disconnect old diff inputs
+        oldDiffIn  .foreach(diffIn  .removeSource)
+        // disconnect old outputs
+        oldLayerOut.foreach(layerOut.removeSink  )
+        // connect old diff inputs as new layer inputs
+        oldDiffIn  .foreach(layerIn .addSource   )
+        // connect layer output to diff input
         diffIn.addSource(layerOutL)
+        // connect old layer inputs to old layer outputs
+        oldLayerIn.foreach { in =>
+          oldLayerOut.foreach { out =>
+            in.peer.addSink(out)
+          }
+        }
       }
     }
 
@@ -434,8 +452,8 @@ object AutomaticVoices {
       fltSucc + fltPred
     }
 
-    // val transGraphs = Vec(t1, t2, t3, t4)
-    val transGraphs = Vec.fill(NumTransitions)(t3)
+    val transGraphs = Vec(t1, t2, t3, t4)
+    // val transGraphs = Vec.fill(NumTransitions)(t3)
     assert(transGraphs.size == NumTransitions)
 
     // multi-channel single scan in, multiple signal-channel scan outs
