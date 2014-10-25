@@ -37,7 +37,7 @@ import scala.concurrent.duration.Duration
 object AutomaticVoices {
   val DumpOSC         = false
   val ShowLog         = false
-  var ShowNodeTree    = false
+  var ShowNodeTree    = false   // warning - buggy
   val PrintStates     = true
   val Shadowing       = true
   val Attack          = 10 // 30
@@ -288,6 +288,7 @@ object AutomaticVoices {
       if (becomesActive) {
         l.transId().update(w.transId().value)
         if (Shadowing) layerToFront(w, l)
+        l.playing().update(true)
       }
     }
   }
@@ -336,7 +337,6 @@ object AutomaticVoices {
         // connect layer output to diff input
         diffIn.addSource(layerOutL)
       }
-      l.playing().update(true)
     }
 
   def mkAction(c: Code.Compiler): (String, Array[Byte]) = {
@@ -643,9 +643,11 @@ object AutomaticVoices {
                   val doneObj: Action.Obj[S])
 
     val vecChannels = Vec.tabulate[Channel](NumSpeakers) { si =>
-      val state = IntEx.newVar[S](0)  // 0 - bypass, 1 - engaged, 2 - fade-in, 3 - fade-out
+      val state     = IntEx.newVar[S](0)  // 0 - bypass, 1 - engaged, 2 - fade-in, 3 - fade-out
+      val stateObj  = Obj(IntElem(state))
       if (PrintStates) state.changed.react(_ => ch => println(s"state$li$si -> ${ch.now}"))
-      val fPlaying = state >= 2 // ongoing transition per channel
+      val fPlaying  = state >= 2 // ongoing transition per channel
+      if (PrintStates) fPlaying.changed.react(_ => ch => println(s"fPlaying$li$si -> ${ch.now}"))
 
       val predOut   = split .scans.add(s"out$si")
       val succOut   = succ  .scans.add(s"out$si")
@@ -654,6 +656,8 @@ object AutomaticVoices {
       val procB     = Proc[S]   // transition bypass/engage per channel
       procB.graph() = switchGraph
       val procBObj  = Obj(Proc.Elem(procB))
+      procBObj.attr.put("state", stateObj)
+      procBObj.attr.name = s"by$li$si"
       val bPlaying  = state <  2
       val bFolder   = Folder[S]
       bFolder.addLast(procBObj)
@@ -667,7 +671,6 @@ object AutomaticVoices {
       succOut ~> succInB
       outB    ~> collIn
 
-      val stateObj  = Obj(IntElem(state))
       val active    = state > 0
 
       val doneObj   = Obj(Action.Elem(done))
@@ -722,7 +725,7 @@ object AutomaticVoices {
 
         val procTObj  = Obj(Proc.Elem(procT))
         val attr      = procTObj.attr
-        attr.name     = s"T$gi$si"
+        attr.name     = s"t$gi$si"
         attr.put("state", channel.stateObj)
         attr.put("done" , channel.doneObj )
 
@@ -734,7 +737,7 @@ object AutomaticVoices {
     if (!Shadowing) coll.scans.add("out") ~> diff.scans.add("in")
 
     val states = vecChannels.map { channel => tx.newHandle(channel.state) }
-    val res = new Layer(
+    val l = new Layer(
               ensemble  = tx.newHandle(ensLObj),
               states    = states,
               playing   = tx.newHandle(lPlaying),
@@ -742,9 +745,12 @@ object AutomaticVoices {
               input     = tx.newHandle(predObj),
               output    = tx.newHandle(outObj))
     activeCount.changed.react { implicit tx => ch =>
-      if (ch.now == 0) unlinkLayer(res)
+      if (ch.now == 0) {
+        l.playing().update(false)
+        unlinkLayer(l)
+      }
     }
-    res
+    l
   }
 
   private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {
