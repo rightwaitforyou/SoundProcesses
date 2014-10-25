@@ -87,8 +87,7 @@ object AutomaticVoices {
                 val active: stm.Source[S#Tx, Expr.Var[S, Boolean]])
 
   class Layer(val ensemble: stm.Source[S#Tx, Ensemble.Obj[S]],
-              val bypass  : stm.Source[S#Tx, Ensemble.Obj[S]],
-              val speakers: Vec[Speaker],
+              val states  : Vec[stm.Source[S#Tx, Expr.Var[S, Int]]],
               val playing : stm.Source[S#Tx, Expr[S, Boolean]],
               val transId : stm.Source[S#Tx, Expr.Var[S, Int]],
               val input   : stm.Source[S#Tx, Proc.Obj[S]],
@@ -255,10 +254,10 @@ object AutomaticVoices {
     transport.addObject(w.diffusion())
     w.layers.zipWithIndex.foreach { case (l, li) =>
       // println(s"Adding layer $li (playing = ${l.playing().value}; bypass = ${l.bypass().elem.peer.playing.value})")
-      transport.addObject(l.input   ())
-      transport.addObject(l.output  ())
+      // transport.addObject(l.input   ())
+      // transport.addObject(l.output  ())
       transport.addObject(l.ensemble())
-      transport.addObject(l.bypass  ())
+      // transport.addObject(l.bypass  ())
     }
     transport.play()
     val config = Server.Config()
@@ -273,18 +272,19 @@ object AutomaticVoices {
     val free = w.hasFreeVoices()
     w.layers.zipWithIndex /* .scramble() */.foreach { case (l, li) =>
       val isActive      = l.playing().value
-      val becomesActive = !isActive && free.value && l.speakers.exists(_.gate().value)
-
-      if (becomesActive) {
-        l.transId().update(w.transId().value)
-        if (Shadowing) layerToFront(w, l)
-      }
-
-      // now every `active` must be high for which the `gate` is open
-      if (isActive || becomesActive)
-        l.speakers.foreach { s =>
-          if (s.gate().value) s.active().update(true)
-        }
+        ???
+//      val becomesActive = !isActive && free.value && l.speakers.exists(_.gate().value)
+//
+//      if (becomesActive) {
+//        l.transId().update(w.transId().value)
+//        if (Shadowing) layerToFront(w, l)
+//      }
+//
+//      // now every `active` must be high for which the `gate` is open
+//      if (isActive || becomesActive)
+//        l.speakers.foreach { s =>
+//          if (s.gate().value) s.active().update(true)
+//        }
     }
   }
 
@@ -306,9 +306,6 @@ object AutomaticVoices {
         val oldLayerOut = layerOut.sinks.collect {
           case l @ Scan.Link.Scan(_) => l
         } .toSet
-
-        // val toAddIn     = oldDiffIn -- oldLayerIn
-        // val toRemoveIn  = oldLayerIn  -- oldDiffIn
 
         // disconnect old layer inputs
         oldLayerIn .foreach(layerIn .removeSource)
@@ -374,39 +371,16 @@ object AutomaticVoices {
       `this`.removeSink(Scan.Link.Scan(that))
   }
 
-  def mkWorld(done: Action[S])(implicit tx: S#Tx): World = {
-    val sensors = Vec.tabulate(NumSpeakers) { speaker =>
-      val sensor = IntEx.newVar[S](-1)
-      if (PrintStates) sensor.changed.react(_ => ch => println(s"sensor$speaker -> ${ch.now}"))
-      sensor
-    }
-
-    import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
-    import IntEx    .{serializer => intSer , varSerializer => intVarSer }
-
-    // for simplicity, same graph for
-    // all layers, distinguished by
-    // resonant frequency depending on
-    // attribute 0 <= `li` < NumLayers
-    val genGraph = SynthGraph {
-      import synth._
-      import ugen._
-      val li    = graph.Attribute.ir("li", 0)
-      val freq  = if (NumLayers == 1) 1000.0: GE else li.linexp(0, NumLayers - 1, 200.0, 4000.0)
-      val amp   = 0.5
-      val dust  = Decay.ar(Dust.ar(Seq.fill(NumSpeakers)(10)), 1).min(1)
-      val sig   = Resonz.ar(dust, freq, 0.5) * amp
-      graph.ScanOut(sig)
-    }
-
+  private lazy val transGraphs: Vec[SynthGraph] = {
     def mkTransition(fun: (GE, GE, GE) => GE): SynthGraph = SynthGraph {
       import synth._
       import ugen._
       val pred  = graph.ScanInFix("pred", 1)
       val succ  = graph.ScanInFix("succ", 1)
       val gate  = graph.Attribute.kr("gt", 0)
+      ???
       val env   = Env.asr(attack = Attack, release = Release, curve = Curve.linear)
-      val fade  = EnvGen.ar(env, gate = gate)
+      val fade  = EnvGen.kr(env, gate = gate)
       val done  = Done.kr(fade)
       graph.Action(done, "done")
       val sig   = fun(pred, succ, fade)
@@ -503,32 +477,21 @@ object AutomaticVoices {
     }
 
     val transGraphs0  = Vec(t1, t2, t3, t4, t5, t6, t7)
-    val transGraphs   = Vec.tabulate(NumTransitions)(i => transGraphs0(i % transGraphs0.size))
+    val res   = Vec.tabulate(NumTransitions)(i => transGraphs0(i % transGraphs0.size))
     // val transGraphs = Vec.fill(NumTransitions)(t3)
-    assert(transGraphs.size == NumTransitions)
+    assert(res.size == NumTransitions)
+    res
+  }
 
-    // multi-channel single scan in, multiple signal-channel scan outs
-    val splitGraph = SynthGraph {
-      import synth._
-      val in = graph.ScanInFix(NumSpeakers)
-      Vec.tabulate(NumSpeakers) { ch =>
-        graph.ScanOut(s"out$ch", in \ ch)
-      }
+  def mkWorld(done: Action[S])(implicit tx: S#Tx): World = {
+    val sensors = Vec.tabulate(NumSpeakers) { speaker =>
+      val sensor = IntEx.newVar[S](-1)
+      if (PrintStates) sensor.changed.react(_ => ch => println(s"sensor$speaker -> ${ch.now}"))
+      sensor
     }
 
-    // multiple signal-channel scan ins, multi-channel single scan out,
-    val collGraph = SynthGraph {
-      import synth._
-      import ugen._
-      val in = Vec.tabulate(NumSpeakers) { ch =>
-        graph.ScanInFix(s"in$ch", 1)
-      }
-      graph.ScanOut(Flatten(in))
-    }
-
-    val bypassGraph = SynthGraph {
-      graph.ScanOut(graph.ScanIn())
-    }
+    import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
+    import IntEx    .{serializer => intSer , varSerializer => intVarSer }
 
     val diff = Proc[S]
     diff.graph() = SynthGraph {
@@ -548,148 +511,7 @@ object AutomaticVoices {
     diffObj.attr.name = "diff"
 
     val vecLayer = Vec.tabulate(NumLayers) { li =>
-      val transId = IntEx.newVar[S](-1) // "sampled" in `checkWorld`
-
-      val vecActive = Vec.tabulate(NumSpeakers) { si =>
-        val active = BooleanEx.newVar[S](false)
-        if (PrintStates) active.changed.react(_ => ch => println(s"active$li$si -> ${ch.now}"))
-        active
-      }
-      val vecActiveObj = vecActive.map(ex => Obj(BooleanElem(ex)))
-
-      val vecGate = Vec.tabulate(NumSpeakers) { si =>
-        val isLayer = sensors(si) sig_== li
-        val gate    = isLayer
-        if (PrintStates) gate.changed.react(_ => ch => println(s"gate$li$si -> ${ch.now}"))
-        gate
-      }
-      val vecGateObj = vecGate.map(ex => Obj(BooleanElem(ex)))
-
-      val sumActive = count(vecActive)
-      val lPlaying  = sumActive > 0
-      if (PrintStates) lPlaying.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
-      //      lPlaying.changed.react { implicit tx => {
-      //        case Change(_, false) => println(s"TODO: un-wire layer $li")
-      //        case _ =>
-      //      }}
-      // val lPlayingObj = Obj(BooleanElem(lPlaying))
-
-      val lFolder = Folder[S]
-      val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
-      val ensLObj = Obj(Ensemble.Elem(ensL))
-
-      val gen       = Proc[S]
-      gen.graph()   = genGraph
-      val genObj    = Obj(Proc.Elem(gen))
-      val liObj     = Obj(IntElem(li))
-      genObj.attr.put("li", liObj)
-      genObj.attr.name = s"gen$li"
-      lFolder.addLast(genObj)
-
-      val pred        = Proc[S]
-      pred.graph()    = bypassGraph
-      pred.scans.add("in")      // layer-ensemble input from predecessor
-      val predObj     = Obj(Proc.Elem(pred))
-      predObj.attr.name = s"pred$li"
-      // lFolder.addLast(predObj)
-
-      val split       = Proc[S] // aka background splitter
-      split.graph()   = splitGraph
-      val splitObj    = Obj(Proc.Elem(split))
-      splitObj.attr.name = s"split$li"
-      lFolder.addLast(splitObj)
-      pred.scans.add("out") ~> split.scans.add("in")
-
-      val succ        = Proc[S] // aka foreground splitter
-      succ.graph()    = splitGraph
-      val succObj     = Obj(Proc.Elem(succ))
-      succObj.attr.name = s"succ$li"
-      lFolder.addLast(succObj)
-      gen.scans.add("out") ~> succ.scans.add("in")
-
-      val out         = Proc[S]
-      out.graph()     = bypassGraph
-      out.scans.add("out")     // layer-ensemble output to successor
-      val outObj      = Obj(Proc.Elem(out))
-      outObj.attr.name = s"foo$li"
-      // lFolder.addLast(outObj)
-
-      val coll        = Proc[S] // aka collector
-      coll.graph()    = collGraph
-      val collObj     = Obj(Proc.Elem(coll))
-      collObj.attr.name = s"coll$li"
-      lFolder.addLast(collObj)
-      coll.scans.add("out") ~> out.scans.add("in")
-
-      val bypassPlaying = !lPlaying
-      val bypassF       = Folder[S]
-      val ensBypass     = Ensemble[S](bypassF, 0L, bypassPlaying)
-      val ensBypassObj  = Obj(Ensemble.Elem(ensBypass))
-      val bypass        = Proc[S]
-      bypass.graph()    = bypassGraph
-      val bypassObj     = Obj(Proc.Elem(bypass))
-      bypassObj.attr.name = s"bypass$li"
-      bypassF.addLast(bypassObj)
-      pred  .scans.add("out") ~> bypass.scans.add("in")
-      bypass.scans.add("out") ~> out   .scans.add("in")
-
-      val vecDoneObj = vecActiveObj.map { active =>
-        val doneObj   = Obj(Action.Elem(done))
-        val attr      = doneObj.attr
-        attr.put("active" , active     )
-        //        attr.put("playing", lPlayingObj)
-        //        attr.put("pred"   , predObj    )
-        //        attr.put("out"    , outObj     )
-        doneObj
-      }
-
-      val vecTrans = transGraphs.zipWithIndex.map { case (g, gi) =>
-        val tPlaying    = transId sig_== gi
-        val tFolder     = Folder[S]
-        val ensTrans    = Ensemble[S](tFolder, 0L, tPlaying)
-
-        val vecChans = (vecGateObj zip vecActiveObj zip vecDoneObj).zipWithIndex.map { case (((gate, active), doneObj), si) =>
-          val procT     = Proc[S]
-          procT.graph() = g
-          val predOut   = split .scans.add(s"out$si")
-          val succOut   = succ  .scans.add(s"out$si")
-          val predIn    = procT .scans.add("pred")
-          val succIn    = procT .scans.add("succ")
-          val tOut      = procT .scans.add("out")
-          val collIn    = coll  .scans.add(s"in$si")
-          predOut ~> predIn
-          succOut ~> succIn
-          tOut    ~> collIn
-
-          val procTObj  = Obj(Proc.Elem(procT))
-          val attr      = procTObj.attr
-          attr.name     = s"T$gi$si"
-          attr.put("gt"  , gate)
-          attr.put("done", doneObj)
-
-          procTObj
-        }
-        vecChans.foreach(tFolder.addLast)
-
-        Obj(Ensemble.Elem(ensTrans))
-      }
-
-      vecTrans.foreach(lFolder.addLast)
-
-      // short debug solution; just connect all layer outputs to main diffusion
-      if (!Shadowing) coll.scans.add("out") ~> diff.scans.add("in")
-
-      val speakers = (vecGate zip vecActive).map { case (gate, active) =>
-        new Speaker(gate   = tx.newHandle(gate),
-                    active = tx.newHandle(active))
-      }
-      new Layer(ensemble  = tx.newHandle(ensLObj),
-                bypass    = tx.newHandle(ensBypassObj),
-                speakers  = speakers,
-                playing   = tx.newHandle(lPlaying),
-                transId   = tx.newHandle(transId),
-                input     = tx.newHandle(predObj),
-                output    = tx.newHandle(outObj))
+      mkLayer(sensors, diff, done, li)
     }
 
     val vecPlaying      = vecLayer.map(_.playing())
@@ -705,6 +527,213 @@ object AutomaticVoices {
               transId       = tx.newHandle(wTransId),
               activeVoices  = tx.newHandle(activeVoices),
               hasFreeVoices = tx.newHandle(hasFreeVoices))
+  }
+
+  // for simplicity, same graph for
+  // all layers, distinguished by
+  // resonant frequency depending on
+  // attribute 0 <= `li` < NumLayers
+  private lazy val genGraph = SynthGraph {
+    import synth._
+    import ugen._
+    val li    = graph.Attribute.ir("li", 0)
+    val freq  = if (NumLayers == 1) 1000.0: GE else li.linexp(0, NumLayers - 1, 200.0, 4000.0)
+    val amp   = 0.5
+    val dust  = Decay.ar(Dust.ar(Seq.fill(NumSpeakers)(10)), 1).min(1)
+    val sig   = Resonz.ar(dust, freq, 0.5) * amp
+    graph.ScanOut(sig)
+  }
+
+  // multi-channel single scan in, multiple signal-channel scan outs
+  private lazy val splitGraph = SynthGraph {
+    import synth._
+    val in = graph.ScanInFix(NumSpeakers)
+    Vec.tabulate(NumSpeakers) { ch =>
+      graph.ScanOut(s"out$ch", in \ ch)
+    }
+  }
+
+  // multiple signal-channel scan ins, multi-channel single scan out,
+  private lazy val collGraph = SynthGraph {
+    import synth._
+    import ugen._
+    val in = Vec.tabulate(NumSpeakers) { ch =>
+      graph.ScanInFix(s"in$ch", 1)
+    }
+    graph.ScanOut(Flatten(in))
+  }
+
+  // simply in -> out
+  private lazy val throughGraph = SynthGraph {
+    graph.ScanOut(graph.ScanIn())
+  }
+
+  private lazy val switchGraph = SynthGraph {
+    import synth._
+    import ugen._
+    val pred    = graph.ScanInFix("pred", 1)
+    val succ    = graph.ScanInFix("succ", 1)
+    val state   = graph.Attribute.kr("state", 2)  // 0 - bypass (pred), 1 - engage (succ)
+    val sig     = Select.ar(state, Seq(pred, succ))
+    graph.ScanOut(sig)
+  }
+
+  private def mkLayer(sensors: Vec[Expr[S, Int]], diff: Proc[S], done: Action[S], li: Int)
+                     (implicit tx: S#Tx): Layer = {
+    val transId = IntEx.newVar[S](-1) // "sampled" in `checkWorld`
+
+    // layer-level ensemble
+    val lFolder = Folder[S]
+
+    // the actual sound layer
+    val gen       = Proc[S]
+    gen.graph()   = genGraph
+    val genObj    = Obj(Proc.Elem(gen))
+    val liObj     = Obj(IntElem(li))
+    genObj.attr.put("li", liObj)
+    genObj.attr.name = s"gen$li"
+    lFolder.addLast(genObj)
+
+    // layer-ensemble input from predecessor
+    val pred        = Proc[S]
+    pred.graph()    = throughGraph
+    pred.scans.add("in")
+    val predObj     = Obj(Proc.Elem(pred))
+    predObj.attr.name = s"pred$li"
+    lFolder.addLast(predObj)
+
+    // aka background splitter
+    val split       = Proc[S]
+    split.graph()   = splitGraph
+    val splitObj    = Obj(Proc.Elem(split))
+    splitObj.attr.name = s"split$li"
+    lFolder.addLast(splitObj)
+    pred.scans.add("out") ~> split.scans.add("in")
+
+    // aka foreground splitter
+    val succ        = Proc[S]
+    succ.graph()    = splitGraph
+    val succObj     = Obj(Proc.Elem(succ))
+    succObj.attr.name = s"succ$li"
+    lFolder.addLast(succObj)
+    gen.scans.add("out") ~> succ.scans.add("in")
+
+    // aka collector
+    val coll        = Proc[S]
+    coll.graph()    = collGraph
+    val collObj     = Obj(Proc.Elem(coll))
+    collObj.attr.name = s"coll$li"
+    lFolder.addLast(collObj)
+
+    // layer-ensemble output to successor
+    val out         = Proc[S]
+    out.graph()     = throughGraph
+    out.scans.add("out")
+    val outObj      = Obj(Proc.Elem(out))
+    outObj.attr.name = s"foo$li"
+    lFolder.addLast(outObj)
+    coll.scans.add("out") ~> out.scans.add("in")
+
+    class Channel(val stateObj: Obj[S], val state: Expr.Var[S, Int], val fPlaying: Expr[S, Boolean],
+                  val active: Expr[S, Boolean], val predOut: Scan[S], val succOut: Scan[S], val collIn: Scan[S],
+                  val doneObj: Action.Obj[S])
+
+    val vecChannels = Vec.tabulate[Channel](NumSpeakers) { si =>
+      val state = IntEx.newVar[S](0)  // 0 - bypass, 1 - engaged, 2 - fade-in, 3 - fade-out
+      if (PrintStates) state.changed.react(_ => ch => println(s"state$li$si -> ${ch.now}"))
+      val fPlaying = state >= 2 // ongoing transition per channel
+
+      val predOut   = split .scans.add(s"out$si")
+      val succOut   = succ  .scans.add(s"out$si")
+      val collIn    = coll  .scans.add(s"in$si")
+
+      val procB     = Proc[S]   // transition bypass/engage per channel
+      procB.graph() = switchGraph
+      val procBObj  = Obj(Proc.Elem(procB))
+      val bPlaying  = state <  2
+      val bFolder   = Folder[S]
+      bFolder.addLast(procBObj)
+      val ensB      = Ensemble(bFolder, 0L, bPlaying)
+      val ensBObj   = Obj(Ensemble.Elem(ensB))
+      val predInB   = procB .scans.add("pred")
+      val succInB   = procB .scans.add("succ")
+      val outB      = procB .scans.add("out")
+      lFolder.addLast(ensBObj)
+      predOut ~> predInB
+      succOut ~> succInB
+      outB    ~> collIn
+
+      val stateObj  = Obj(IntElem(state))
+      val active    = state > 0
+
+      val doneObj   = Obj(Action.Elem(done))
+      doneObj.attr.put("state", stateObj)
+
+      new Channel(stateObj = stateObj, state = state, fPlaying = fPlaying, active = active,
+        predOut = predOut, succOut = succOut, collIn = collIn, doneObj = doneObj)
+    }
+
+    val sumActive = count(vecChannels.map(_.active))
+    val lPlaying  = sumActive > 0
+    if (PrintStates) lPlaying.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
+
+    val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
+    val ensLObj = Obj(Ensemble.Elem(ensL))
+
+    //    val bypassPlaying = !lPlaying
+    //    val bypassF       = Folder[S]
+    //    val ensBypass     = Ensemble[S](bypassF, 0L, bypassPlaying)
+    //    val ensBypassObj  = Obj(Ensemble.Elem(ensBypass))
+    //    val bypass        = Proc[S]
+    //    bypass.graph()    = throughGraph
+    //    val bypassObj     = Obj(Proc.Elem(bypass))
+    //    bypassObj.attr.name = s"bypass$li"
+    //    bypassF.addLast(bypassObj)
+    //    pred  .scans.add("out") ~> bypass.scans.add("in")
+    //    bypass.scans.add("out") ~> out   .scans.add("in")
+
+    transGraphs.zipWithIndex.foreach { case (g, gi) =>
+      val tPlaying    = transId sig_== gi
+      val tFolder     = Folder[S]
+      val ensT        = Ensemble[S](tFolder, 0L, tPlaying)
+      val ensTObj     = Obj(Ensemble.Elem(ensT))
+      lFolder.addLast(ensTObj)
+
+      vecChannels.zipWithIndex.foreach { case (channel, si) =>
+        val fFolder   = Folder[S]
+        val ensF      = Ensemble(fFolder, 0L, channel.fPlaying)
+        tFolder.addLast(Obj(Ensemble.Elem(ensF)))
+
+        val procT     = Proc[S]
+        procT.graph() = g
+        val predInT   = procT.scans.add("pred")
+        val succInT   = procT.scans.add("succ")
+        val outT      = procT.scans.add("out")
+
+        channel.predOut ~> predInT
+        channel.succOut ~> succInT
+        outT            ~> channel.collIn
+
+        val procTObj  = Obj(Proc.Elem(procT))
+        val attr      = procTObj.attr
+        attr.name     = s"T$gi$si"
+        attr.put("state", channel.stateObj)
+        attr.put("done" , channel.doneObj )
+
+        fFolder.addLast(procTObj)
+      }
+    }
+
+    // short debug solution; just connect all layer outputs to main diffusion
+    if (!Shadowing) coll.scans.add("out") ~> diff.scans.add("in")
+
+    val states = vecChannels.map { channel => tx.newHandle(channel.state) }
+    new Layer(ensemble  = tx.newHandle(ensLObj),
+              states    = states,
+              playing   = tx.newHandle(lPlaying),
+              transId   = tx.newHandle(transId),
+              input     = tx.newHandle(predObj),
+              output    = tx.newHandle(outObj))
   }
 
   private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {
