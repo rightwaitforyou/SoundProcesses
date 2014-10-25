@@ -38,17 +38,16 @@ object AutomaticVoices {
   val DumpOSC         = false
   val ShowLog         = false
   var ShowNodeTree    = false   // warning - buggy
-  val PrintStates     = true
+  val PrintStates     = false
   val Shadowing       = true
-  val Attack          = 10 // 30
-  val Release         = 10 // 30
+  val Attack          = 30  // 10
+  val Release         = 30  // 10
   val FFTSize         = 512 // 1024
 
-  val NumLayers       = 3 // 15
-  val MaxVoices       = 2 // 3
-  val NumSpeakers     = 2 // 3 // 5
-  // val NumSpeakers     = 42
-  val NumTransitions  = 2 // 7
+  val NumLayers       = 15  // 3
+  val MaxVoices       = 3 // 2
+  val NumSpeakers     = 42  // 2
+  val NumTransitions  = 7   // 2
 
   type S = Confluent
   // type S = InMemory
@@ -151,7 +150,7 @@ object AutomaticVoices {
         // atomic[S] { implicit tx =>
             s().update(rrand(-1, NumLayers - 1))
           }
-          checkWorld(w)
+          checkWorld(w, debug = true)
         }
       }
 
@@ -265,11 +264,18 @@ object AutomaticVoices {
     (aural, transport)
   }
 
-  def checkWorld(w: World)(implicit tx: S#Tx): Unit = {
+  def checkWorld(w: World, debug: Boolean = false)(implicit tx: S#Tx): Unit = {
     val free  = w.hasFreeVoices()
     val sense: Vec[Int] = w.sensors.map(_.apply().value)
     w.layers.zipWithIndex /* .scramble() */.foreach { case (l, li) =>
-      val hasFadeIn = (false /: l.states.zipWithIndex) { case (res, (stateH, si)) =>
+      if (PrintStates && debug) {
+        println(s"----- LAYER $li -----")
+      }
+
+      val isActive        = l.playing().value
+      val mayBecomeActive = !isActive && free.value
+
+      val hasFadeIn = (isActive || mayBecomeActive) && (false /: l.states.zipWithIndex) { case (res, (stateH, si)) =>
         val state   = stateH()
         val gate    = sense(si) == li
         val before  = state().value
@@ -282,10 +288,14 @@ object AutomaticVoices {
         res | (now == 2)
       }
 
-      val isActive      = l.playing().value
-      val becomesActive = !isActive && free.value && hasFadeIn
+      if (PrintStates && debug) {
+        println(l.states.zipWithIndex.map { case (s, si) => f"s$si%02d = ${s.apply().value}" } .mkString(", "))
+      }
+
+      val becomesActive = mayBecomeActive && hasFadeIn
 
       if (becomesActive) {
+        if (PrintStates) println(s"Layer $li becomes active.")
         l.transId().update(w.transId().value)
         if (Shadowing) layerToFront(w, l)
         l.playing().update(true)
@@ -482,7 +492,7 @@ object AutomaticVoices {
 
     val transGraphs0  = Vec(t1, t2, t3, t4, t5, t6, t7)
     val res   = Vec.tabulate(NumTransitions)(i => transGraphs0(i % transGraphs0.size))
-    // val transGraphs = Vec.fill(NumTransitions)(t3)
+    // val res = Vec.fill(NumTransitions)(t1)
     assert(res.size == NumTransitions)
     res
   }
@@ -645,9 +655,9 @@ object AutomaticVoices {
     val vecChannels = Vec.tabulate[Channel](NumSpeakers) { si =>
       val state     = IntEx.newVar[S](0)  // 0 - bypass, 1 - engaged, 2 - fade-in, 3 - fade-out
       val stateObj  = Obj(IntElem(state))
-      if (PrintStates) state.changed.react(_ => ch => println(s"state$li$si -> ${ch.now}"))
+      if (PrintStates) state.changed.react(_ => ch => println(s"state${li}_$si -> ${ch.now}"))
       val fPlaying  = state >= 2 // ongoing transition per channel
-      if (PrintStates) fPlaying.changed.react(_ => ch => println(s"fPlaying$li$si -> ${ch.now}"))
+      if (PrintStates) fPlaying.changed.react(_ => ch => println(s"fPlaying${li}_$si -> ${ch.now}"))
 
       val predOut   = split .scans.add(s"out$si")
       val succOut   = succ  .scans.add(s"out$si")
@@ -684,7 +694,7 @@ object AutomaticVoices {
     if (PrintStates) activeCount.changed.react(_ => ch => println(s"activeCount$li -> ${ch.now}"))
 
     val lPlaying    = BooleanEx.newVar[S](false)
-    // if (PrintStates) lPlaying.changed.react(_ => ch => println(s"playing$li -> ${ch.now}"))
+    // if (PrintStates) lPlaying.changed.react(_ => ch => println(s"lPlaying$li -> ${ch.now}"))
 
     val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
     val ensLObj = Obj(Ensemble.Elem(ensL))
@@ -746,6 +756,7 @@ object AutomaticVoices {
               output    = tx.newHandle(outObj))
     activeCount.changed.react { implicit tx => ch =>
       if (ch.now == 0) {
+        if (PrintStates) println(s"Layer $li becomes inactive.")
         l.playing().update(false)
         unlinkLayer(l)
       }
