@@ -71,7 +71,7 @@ object AutomaticVoices {
     //    val sys = InMemory()
     //    implicit val cursor = sys
     lucre.synth.expr.initTypes()
-    atomic[S] { implicit tx =>
+    atomic[S, Unit] { implicit tx =>
       val action = Action[S](actionName, actionBytes)
       println("Making the world...")
       val world = mkWorld(action)
@@ -123,7 +123,7 @@ object AutomaticVoices {
       import scala.swing._
 
       val butTopology = Button("Topology") {
-        atomic[S] { implicit tx =>
+        atomic[S, Unit] { implicit tx =>
           aural.serverOption.map { s =>
             val top = NodeGraph(s).topology
             tx.afterCommit {
@@ -135,7 +135,7 @@ object AutomaticVoices {
       }
 
       val butTree = Button("Tree") {
-        atomic[S] { implicit tx =>
+        atomic[S, Unit] { implicit tx =>
           aural.serverOption.map { s =>
             s.peer.dumpTree()
           }
@@ -143,7 +143,7 @@ object AutomaticVoices {
       }
 
       val butRandomize = Button("Randomize") {
-        atomic[S] { implicit tx =>
+        atomic[S, Unit] { implicit tx =>
           w.transId().update(rrand(0, NumTransitions - 1))
         // }
         w.sensors.foreach { s =>
@@ -155,7 +155,7 @@ object AutomaticVoices {
       }
 
       val butClear = Button("Clear") {
-        atomic[S] { implicit tx =>
+        atomic[S, Unit] { implicit tx =>
         w.sensors.foreach { s =>
           // atomic[S] { implicit tx =>
             s().update(-1)
@@ -221,7 +221,7 @@ object AutomaticVoices {
         open()
 
         private val checkTimer = new javax.swing.Timer(1000, Swing.ActionListener { _ =>
-          atomic[S] { implicit tx =>
+          atomic[S, Unit] { implicit tx =>
             checkWorld(w)
           }
         })
@@ -231,7 +231,7 @@ object AutomaticVoices {
           checkTimer .stop()
           battleTimer.stop()
           if (ShowNodeTree) nodeTree.group = None
-          atomic[S] { implicit tx =>
+          atomic[S, Unit] { implicit tx =>
             transport.dispose()
             tx.afterCommit {
               system.close()

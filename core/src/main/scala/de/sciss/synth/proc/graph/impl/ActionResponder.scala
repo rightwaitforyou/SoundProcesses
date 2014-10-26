@@ -29,7 +29,7 @@ object ActionResponder {
       case m @ osc.Message(Name, NodeID, 0, _ /* dummy single value */) =>
         if (DEBUG) println(s"ActionResponder($key, $NodeID) - received trigger")
         // logAural(m.toString())
-        SoundProcesses.atomic[S] { implicit tx =>
+        SoundProcesses.atomic { implicit tx: S#Tx =>
           objH().attr.get(key).foreach { valueOpaque =>
             // for some reason we cannot pattern match for Action.Obj(action);
             // scalac gives us

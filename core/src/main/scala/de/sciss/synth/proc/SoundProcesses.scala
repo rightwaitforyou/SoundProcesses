@@ -18,7 +18,7 @@ import java.util.concurrent.{Executors, ScheduledExecutorService}
 import de.sciss.lucre.event.Sys
 import de.sciss.lucre.stm
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.stm.Txn
 
 object SoundProcesses {
@@ -50,11 +50,11 @@ object SoundProcesses {
   lazy implicit val executionContext: ExecutionContext =
     ExecutionContext.fromExecutorService(scheduledExecutorService)
 
-  def atomic[S <: Sys[S]](fun: S#Tx => Unit)(implicit cursor: stm.Cursor[S]): Unit = {
+  def atomic[S <: Sys[S], A](fun: S#Tx => A)(implicit cursor: stm.Cursor[S]): Future[A] = {
     if (Txn.findCurrent.isDefined) throw new IllegalStateException(s"Cannot nest transactions")
-    scheduledExecutorService.submit(new Runnable {
-      def run(): Unit = cursor.step(fun)
-    })
+    Future {
+      cursor.step(fun)
+    } (executionContext)
   }
 
   private def shutdownScheduler(): Unit = {

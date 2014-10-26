@@ -196,7 +196,7 @@ object TransportImpl {
     def auralStarted(server: Server)(implicit tx: Txn): Unit = {
       // XXX TODO -- what was the reasoning for the txn decoupling?
       tx.afterCommit {
-        SoundProcesses.atomic[S] { implicit tx =>
+        SoundProcesses.atomic { implicit tx: S#Tx =>
           import WorkspaceHandle.Implicits._
           implicit val auralContext = AuralContext(server, scheduler)
           auralStartedTx(server)
@@ -218,7 +218,7 @@ object TransportImpl {
     def auralStopped()(implicit tx: Txn): Unit = {
       // XXX TODO -- what was the reasoning for the txn decoupling?
       tx.afterCommit {
-        SoundProcesses.atomic[S] { implicit tx =>
+        SoundProcesses.atomic { implicit tx: S#Tx =>
           auralStoppedTx()
         }
       }
