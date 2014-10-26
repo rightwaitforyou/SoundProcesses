@@ -47,7 +47,7 @@ object AuralActionImpl extends AuralObj.Factory {
       val oldState = stateRef.swap(AuralObj.Playing)(tx.peer) // XXX TODO fire update
       if (oldState != AuralObj.Playing) {
         val actionObj = obj()
-        if (!actionObj.attr.muted) {
+        if (!actionObj.muted) {
           val action    = actionObj.elem.peer
           val universe  = Action.Universe(actionObj)
           action.execute(universe)

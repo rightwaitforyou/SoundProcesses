@@ -522,7 +522,7 @@ object AutomaticVoices {
     }
     diff.scans.add("in")
     val diffObj = Obj(Proc.Elem(diff))
-    diffObj.attr.name = "diff"
+    diffObj.name = "diff"
 
     val vecLayer = Vec.tabulate(NumLayers) { li =>
       mkLayer(sensors, diff, done, li)
@@ -605,7 +605,7 @@ object AutomaticVoices {
     val genObj    = Obj(Proc.Elem(gen))
     val liObj     = Obj(IntElem(li))
     genObj.attr.put("li", liObj)
-    genObj.attr.name = s"gen$li"
+    genObj.name = s"gen$li"
     lFolder.addLast(genObj)
 
     // layer-ensemble input from predecessor
@@ -613,14 +613,14 @@ object AutomaticVoices {
     pred.graph()    = throughGraph
     pred.scans.add("in")
     val predObj     = Obj(Proc.Elem(pred))
-    predObj.attr.name = s"pred$li"
+    predObj.name = s"pred$li"
     lFolder.addLast(predObj)
 
     // aka background splitter
     val split       = Proc[S]
     split.graph()   = splitGraph
     val splitObj    = Obj(Proc.Elem(split))
-    splitObj.attr.name = s"split$li"
+    splitObj.name = s"split$li"
     lFolder.addLast(splitObj)
     pred.scans.add("out") ~> split.scans.add("in")
 
@@ -628,7 +628,7 @@ object AutomaticVoices {
     val succ        = Proc[S]
     succ.graph()    = splitGraph
     val succObj     = Obj(Proc.Elem(succ))
-    succObj.attr.name = s"succ$li"
+    succObj.name = s"succ$li"
     lFolder.addLast(succObj)
     gen.scans.add("out") ~> succ.scans.add("in")
 
@@ -636,15 +636,15 @@ object AutomaticVoices {
     val coll        = Proc[S]
     coll.graph()    = collGraph
     val collObj     = Obj(Proc.Elem(coll))
-    collObj.attr.name = s"coll$li"
+    collObj.name = s"coll$li"
     lFolder.addLast(collObj)
 
     // layer-ensemble output to successor
-    val out         = Proc[S]
-    out.graph()     = throughGraph
+    val out       = Proc[S]
+    out.graph()   = throughGraph
     out.scans.add("out")
-    val outObj      = Obj(Proc.Elem(out))
-    outObj.attr.name = s"foo$li"
+    val outObj    = Obj(Proc.Elem(out))
+    outObj.name   = s"foo$li"
     lFolder.addLast(outObj)
     coll.scans.add("out") ~> out.scans.add("in")
 
@@ -667,7 +667,7 @@ object AutomaticVoices {
       procB.graph() = switchGraph
       val procBObj  = Obj(Proc.Elem(procB))
       procBObj.attr.put("state", stateObj)
-      procBObj.attr.name = s"by$li$si"
+      procBObj.name = s"by$li$si"
       val bPlaying  = state <  2
       val bFolder   = Folder[S]
       bFolder.addLast(procBObj)
@@ -734,10 +734,9 @@ object AutomaticVoices {
         outT            ~> channel.collIn
 
         val procTObj  = Obj(Proc.Elem(procT))
-        val attr      = procTObj.attr
-        attr.name     = s"t$gi$si"
-        attr.put("state", channel.stateObj)
-        attr.put("done" , channel.doneObj )
+        procTObj.name = s"t$gi$si"
+        procTObj.attr.put("state", channel.stateObj)
+        procTObj.attr.put("done" , channel.doneObj )
 
         fFolder.addLast(procTObj)
       }

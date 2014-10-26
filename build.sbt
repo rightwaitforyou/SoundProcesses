@@ -47,6 +47,8 @@ lazy val loggingEnabled         = true
 
 // retrieveManaged in ThisBuild := true
 
+lazy val bdb = "bdb6"  // either "bdb" or "bdb6"
+
 scalacOptions in ThisBuild ++= {
   val xs = Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture")
   if (loggingEnabled || isSnapshot.value) xs else xs ++ Seq("-Xelide-below", "INFO")
@@ -115,7 +117,7 @@ lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitem
   description := "Bitemporal expression types for SoundProcesses",
   libraryDependencies ++= Seq(
     "de.sciss"      %% "scalacollider"  % scalaColliderVersion,
-    "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
+    "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test",
     "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
     "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion % "test"
   )
@@ -144,7 +146,7 @@ lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp,
       "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
       "de.sciss"      %% "lucreevent-artifact" % lucreEventVersion,
       "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
-      "de.sciss"      %% "lucrestm-bdb"   % lucreCoreVersion      % "test",
+      "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test",
       "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test"
     )
   )
@@ -163,7 +165,7 @@ lazy val `soundprocesses-compiler` = project.in(file("compiler")).dependsOn(`sou
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
       "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,
-      "de.sciss"       %% "lucrestm-bdb"            % lucreCoreVersion          % "test",
+      "de.sciss"       %% s"lucrestm-$bdb"          % lucreCoreVersion          % "test",
       "de.sciss"       %% "fileutil"                % fileUtilVersion           % "test",
       "de.sciss"       %% "lucreswing"              % lucreSwingVersion         % "test",
       "de.sciss"       %% "scalacolliderswing-core" % scalaColliderSwingVersion % "test"

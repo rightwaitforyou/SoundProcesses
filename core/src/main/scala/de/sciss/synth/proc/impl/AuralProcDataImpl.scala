@@ -340,7 +340,7 @@ object AuralProcDataImpl {
     final def tryBuild()(implicit tx: S#Tx): Unit = {
       state match {
         case s0: Incomplete[S] =>
-          logA(s"try build ${procCached()} - ${procCached().attr.name}")
+          logA(s"try build ${procCached()} - ${procCached().name}")
           val s1 = s0.retry(this)
           stateRef.set(s1)(tx.peer)
           buildAdvanced(before = s0, now = s1)

@@ -18,33 +18,185 @@ import de.sciss.lucre.event.Sys
 import de.sciss.lucre.expr.{String => StringEx, Boolean => BooleanEx}
 
 object Implicits {
-  implicit final class RichAttr[S <: Sys[S]](val `this`: AttrMap.Modifiable[S]) extends AnyVal { me =>
-    import me.{`this` => attr}
+  implicit class ExprAsVar[A, S <: Sys[S]](val `this`: Expr[S, A]) extends AnyVal { me =>
+    import me.{`this` => ex}
 
+    /** Resolves the expression as a variable. If the expression is not a variable,
+      * throws an exception.
+      */
+    def asVar: Expr.Var[S, A] = Expr.Var.unapply(ex).getOrElse(sys.error(s"Not a variable: $ex"))
+  }
 
-    def name(implicit tx: S#Tx): String =
-      attr[StringElem](ObjKeys.attrName).fold("<unnamed>")(_.value)
+  implicit class SecFrames(val `this`: Double) extends AnyVal { me =>
+    import me.{`this` => d}
 
-    def name_=(value: String)(implicit tx: S#Tx): Unit = {
-      val valueC = StringEx.newConst[S](value)
-      attr[StringElem](ObjKeys.attrName) match {
-        case Some(Expr.Var(vr)) => vr() = valueC
-        case _                  =>
-          val valueVr = StringEx.newVar(valueC)
-          attr.put(ObjKeys.attrName, Obj(StringElem[S](valueVr)))
+    /** Interprets the number as a duration in seconds, and converts it to sample frames,
+      * based on the standard `Timeline` sample-rate.
+      */
+    def secframes: Long = (d * Timeline.SampleRate + 0.5).toLong
+  }
+
+  implicit class ScanOps[S <: Sys[S]](val `this`: Scan[S]) extends AnyVal {
+    /** Connects this scan as source to that scan as sink. */
+    def ~> (that: Scan[S])(implicit tx: S#Tx): Unit =
+      `this`.addSink(Scan.Link.Scan(that))
+
+    /** Disconnects this scan as source from that scan as sink. */
+    def ~/> (that: Scan[S])(implicit tx: S#Tx): Unit =
+      `this`.removeSink(Scan.Link.Scan(that))
+  }
+
+  implicit class ProcPairOps[S <: Sys[S]](val `this`: (Proc.Obj[S], Proc.Obj[S])) extends AnyVal { me =>
+    import me.{`this` => pair}
+
+    private def getLayerIn(implicit tx: S#Tx): Scan[S] = {
+      val inObj = pair._1
+      inObj.elem.peer.scans.get("in").getOrElse(sys.error(s"Proc ${inObj.name} does not have scan 'in'"))
+    }
+
+    private def getLayerOut(implicit tx: S#Tx): Scan[S] = {
+      val outObj = pair._2
+      outObj.elem.peer.scans.get("out").getOrElse(sys.error(s"Proc ${outObj.name} does not have scan 'out'"))
+    }
+
+    /** Removes the signal chain signified by the input proc pair from its predecessors and successors.
+      * It does so by removing the sources of the `_1` scan named `"in"` and the sinks of the
+      * `_2` scan named `"out"`. It re-connects the predecessors and successors thus found.
+      */
+    def unlink()(implicit tx: S#Tx): Unit = {
+      val layerIn   = getLayerIn
+      val layerOut  = getLayerOut
+
+      val oldLayerIn = layerIn.sources.collect {
+        case l @ Scan.Link.Scan(_) => l
+      } .toSet
+      val oldLayerOut = layerOut.sinks.collect {
+        case l @ Scan.Link.Scan(_) => l
+      } .toSet
+
+      // disconnect old inputs
+      oldLayerIn .foreach(layerIn .removeSource)
+      // disconnect old outputs
+      oldLayerOut.foreach(layerOut.removeSink  )
+      // connect old layer inputs to old layer outputs
+      oldLayerIn.foreach { in =>
+        oldLayerOut.foreach { out =>
+          in.peer.addSink(out)
+        }
       }
     }
 
-    def muted(implicit tx: S#Tx): Boolean =
-      attr[BooleanElem](ObjKeys.attrMute).fold(false)(_.value)
+    def linkAfter(out: Proc.Obj[S])(implicit tx: S#Tx): Unit = {
+      val target = out.elem.peer.scans.get("out").getOrElse(sys.error(s"Successor ${out.name} does not have scan 'out'"))
+      link1(target, isAfter = true)
+    }
 
+    def linkBefore(in: Proc.Obj[S])(implicit tx: S#Tx): Unit = {
+      val target = in.elem.peer.scans.get("in").getOrElse(sys.error(s"Predecessor ${in.name} does not have scan 'in'"))
+      link1(target, isAfter = false)
+    }
+
+    private def link1(target: Scan[S], isAfter: Boolean)(implicit tx: S#Tx): Unit = {
+      val layerIn  = getLayerIn
+      val layerOut = getLayerOut
+
+      val targetIt  = if (isAfter) target.sinks else target.sources
+      val oldTargetLinks = targetIt.collect {
+        case l @ Scan.Link.Scan(_) => l
+      } .toSet
+      val layerLink = Scan.Link.Scan(if (isAfter) layerIn else layerOut)
+      // only act if we're not there
+      if (!oldTargetLinks.contains(layerLink)) {
+        unlink()
+        if (isAfter) {
+          // disconnect old diff outputs
+          oldTargetLinks.foreach(target.removeSink)
+          // connect old diff inputs as new layer inputs
+          oldTargetLinks.foreach(layerOut.addSink)
+          // connect layer output to diff input
+          target.addSink(layerLink)
+        } else {
+          // disconnect old diff inputs
+          oldTargetLinks.foreach(target.removeSource)
+          // connect old diff inputs as new layer inputs
+          oldTargetLinks.foreach(layerIn.addSource)
+          // connect layer output to diff input
+          target.addSource(layerLink)
+        }
+      }
+    }
+  }
+
+  implicit class FolderOps[S <: Sys[S]](val `this`: Folder[S]) extends AnyVal { me =>
+    import me.{`this` => folder}
+
+    def / (child: String)(implicit tx: S#Tx): Option[Obj[S]] = {
+      val res = folder.iterator.filter { obj =>
+        obj.name == child
+      } .toList.headOption
+
+      // if (res.isEmpty) warn(s"Child $child not found in $folder")
+      res
+    }
+  }
+
+  implicit class EnsembleOps[S <: Sys[S]](val `this`: Ensemble.Obj[S]) extends AnyVal { me =>
+    import me.{`this` => ensemble}
+
+    def / (child: String)(implicit tx: S#Tx): Option[Obj[S]] = {
+      val res = ensemble.elem.peer.folder.iterator.filter { obj =>
+        obj.name == child
+      }.toList.headOption
+
+      // if (res.isEmpty) warn(s"Child $child not found in ${ensemble.attr.name}")
+      res
+    }
+
+    def play()(implicit tx: S#Tx): Unit = play1(value = true )
+    def stop()(implicit tx: S#Tx): Unit = play1(value = false)
+
+    private def play1(value: Boolean)(implicit tx: S#Tx): Unit = {
+      val vr = ensemble.elem.peer.playing.asVar
+      val imp = ExprImplicits[S]
+      import imp._
+      vr() = value
+    }
+
+    def isPlaying(implicit tx: S#Tx): Boolean = ensemble.elem.peer.playing.value
+  }
+
+  implicit final class ObjOps[S <: Sys[S]](val `this`: Obj[S]) extends AnyVal { me =>
+    import me.{`this` => obj}
+
+    /** Short cut for accessing the attribute `"name"`.
+      * If their is no value found, a dummy string `"&lt;unnamed&gt;"` is returned.
+      */
+    def name(implicit tx: S#Tx): String =
+      obj.attr[StringElem](ObjKeys.attrName).fold("<unnamed>")(_.value)
+
+    /** Short cut for updating the attribute `"name"`. */
+    def name_=(value: String)(implicit tx: S#Tx): Unit = {
+      val valueC = StringEx.newConst[S](value)
+      obj.attr[StringElem](ObjKeys.attrName) match {
+        case Some(Expr.Var(vr)) => vr() = valueC
+        case _                  =>
+          val valueVr = StringEx.newVar(valueC)
+          obj.attr.put(ObjKeys.attrName, Obj(StringElem[S](valueVr)))
+      }
+    }
+
+    /** Short cut for accessing the attribute `"mute"`. */
+    def muted(implicit tx: S#Tx): Boolean =
+      obj.attr[BooleanElem](ObjKeys.attrMute).fold(false)(_.value)
+
+    /** Short cut for updating the attribute `"mute"`. */
     def muted_=(value: Boolean)(implicit tx: S#Tx): Unit = {
       val valueC = BooleanEx.newConst[S](value)
-      attr[BooleanElem](ObjKeys.attrMute) match {
+      obj.attr[BooleanElem](ObjKeys.attrMute) match {
         case Some(Expr.Var(vr)) => vr() = valueC
         case _                  =>
           val valueVr = BooleanEx.newVar(valueC)
-          attr.put(ObjKeys.attrMute, Obj(BooleanElem[S](valueVr)))
+          obj.attr.put(ObjKeys.attrMute, Obj(BooleanElem[S](valueVr)))
       }
     }
   }

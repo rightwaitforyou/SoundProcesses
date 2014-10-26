@@ -157,6 +157,8 @@ object CodeImpl {
     ),
     Code.Action.id -> Vec(     // what should go inside?
       "de.sciss.synth.proc._",
+      "de.sciss.synth.proc.Implicits._",
+      "de.sciss.lucre.expr.{Boolean => BooleanEx, Int => IntEx, Double => DoubleEx, String => StringEx}",
       "de.sciss.lucre.expr.Expr"
     )
   )
