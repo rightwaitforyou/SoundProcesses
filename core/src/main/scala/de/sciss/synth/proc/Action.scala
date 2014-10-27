@@ -13,14 +13,15 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt, stm}
-import evt.Sys
+import de.sciss.lucre.event.Sys
 import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.{stm, event => evt}
 import de.sciss.serial.{DataInput, Serializer, Writable}
 import de.sciss.synth.proc
-import impl.{ActionImpl => Impl}
+import de.sciss.synth.proc.impl.{ActionImpl => Impl}
 
 import scala.concurrent.Future
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object Action {
   final val typeID = 19
@@ -61,11 +62,23 @@ object Action {
   }
 
   object Universe {
-    def apply[S <: Sys[S]](self: Action.Obj[S]): Universe[S] = new Impl.UniverseImpl(self)
+    def apply[S <: Sys[S]](self: Action.Obj[S], workspace: WorkspaceHandle[S],
+                           values: Vec[Float] = Vector.empty): Universe[S] =
+      new Impl.UniverseImpl(self, workspace, values)
   }
   trait Universe[S <: Sys[S]] {
+    /** The action object itself, most prominently giving access to
+      * linked objects via its attributes.
+      */
     def self: Action.Obj[S]
-    // def root: Folder[S]
+
+    /** Root folder of the workspace containing the action. */
+    def root(implicit tx: S#Tx): Folder[S]
+
+    /** A collection of sampled values if the action was invoked through
+      * `graph.Reaction` (otherwise empty).
+      */
+    def values: Vec[Float]
   }
 
   // ---- element ----

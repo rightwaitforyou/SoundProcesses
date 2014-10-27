@@ -76,6 +76,7 @@ object AutomaticVoices {
       println("Making the world...")
       val world = mkWorld(action)
       println("Making procs...")
+      import WorkspaceHandle.Implicits._
       val (aural, transport) = mkAural(world)
       println("Making views...")
       mkViews(world, aural, transport, sys)
@@ -243,7 +244,7 @@ object AutomaticVoices {
     }
   }
 
-  def mkAural(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S]): (AuralSystem, Transport[S]) = {
+  def mkAural(w: World)(implicit tx: S#Tx, cursor: stm.Cursor[S], workspace: WorkspaceHandle[S]): (AuralSystem, Transport[S]) = {
     val aural = AuralSystem()
     if (DumpOSC) aural.whenStarted(_.peer.dumpOSC())
     val transport = Transport[S](aural)

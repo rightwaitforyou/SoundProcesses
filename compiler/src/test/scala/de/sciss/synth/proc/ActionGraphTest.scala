@@ -83,6 +83,7 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
       actionObj.attr.put("name", Obj(StringElem("Baba Ganoush")))
       obj.attr.put("foo", actionObj)
 
+      import WorkspaceHandle.Implicits._
       val t = Transport[S](as)
       t.addObject(obj)
       t.play()

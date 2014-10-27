@@ -24,7 +24,8 @@ import scala.collection.immutable.{Iterable => IIterable}
 import impl.{BounceImpl => Impl}
 
 object Bounce {
-  def apply[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx): Bounce[S] =
+  def apply[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx,
+                                          workspace: WorkspaceHandle[S]): Bounce[S] =
     new Impl[S, I]
 
   private type GroupH[S <: Sys[S]] = IIterable[stm.Source[S#Tx, Obj[S]]]

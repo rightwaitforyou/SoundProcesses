@@ -32,7 +32,7 @@ object AuralActionImpl extends AuralObj.Factory {
     new Impl(objH)
   }
 
-  private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Action.Obj[S]])
+  private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Action.Obj[S]])(implicit context: AuralContext[S])
     extends AuralObj.Action[S] with ObservableImpl[S, AuralObj.State] {
 
     def typeID = Action.typeID
@@ -49,7 +49,7 @@ object AuralActionImpl extends AuralObj.Factory {
         val actionObj = obj()
         if (!actionObj.muted) {
           val action    = actionObj.elem.peer
-          val universe  = Action.Universe(actionObj)
+          val universe  = Action.Universe(actionObj, context.workspaceHandle)
           action.execute(universe)
         }
       }

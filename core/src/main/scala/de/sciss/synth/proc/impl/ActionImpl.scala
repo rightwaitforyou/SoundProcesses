@@ -22,6 +22,7 @@ import de.sciss.lucre.stm.IDPeek
 import de.sciss.serial.{Serializer, DataInput, DataOutput}
 
 import scala.annotation.switch
+import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.collection.mutable
 import scala.concurrent.{Promise, Future, blocking}
 import scala.concurrent.stm.{InTxn, TMap, TSet}
@@ -117,7 +118,11 @@ object ActionImpl {
 
   // ---- universe ----
 
-  final class UniverseImpl[S <: Sys[S]](val self: Action.Obj[S]) extends Action.Universe[S]
+  final class UniverseImpl[S <: Sys[S]](val self: Action.Obj[S], workspace: WorkspaceHandle[S], val values: Vec[Float])
+    extends Action.Universe[S] {
+
+    def root(implicit tx: S#Tx): Folder[S] = workspace.root
+  }
 
   // ---- serialization ----
 

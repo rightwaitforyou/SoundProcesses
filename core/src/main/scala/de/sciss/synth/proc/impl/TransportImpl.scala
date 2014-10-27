@@ -24,7 +24,8 @@ import proc.{logTransport => logT}
 import scala.concurrent.stm.{TSet, Ref}
 
 object TransportImpl {
-  def apply[S <: Sys[S]](auralSystem: AuralSystem, scheduler: Scheduler[S])(implicit tx: S#Tx): Transport[S] = {
+  def apply[S <: Sys[S]](auralSystem: AuralSystem, scheduler: Scheduler[S])
+                        (implicit tx: S#Tx, workspace: WorkspaceHandle[S]): Transport[S] = {
     val res = mkTransport(Some(auralSystem), scheduler)
     auralSystem.addClient(res)
     auralSystem.serverOption.foreach(res.auralStarted)
@@ -32,13 +33,14 @@ object TransportImpl {
   }
 
   def apply[S <: Sys[S]](implicit tx: S#Tx, context: AuralContext[S]): Transport[S] = {
+    import context.workspaceHandle
     val res = mkTransport(None, context.scheduler)
     res.auralStartedTx(context.server)
     res
   }
 
   private def mkTransport[S <: Sys[S]](auralSystem: Option[AuralSystem], scheduler: Scheduler[S])
-                                      (implicit tx: S#Tx): Impl[S] = {
+                                      (implicit tx: S#Tx, workspace: WorkspaceHandle[S]): Impl[S] = {
     val objMap  = tx.newInMemoryIDMap[stm.Source[S#Tx, Obj[S]]]
     val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
     // (new Throwable).printStackTrace()
@@ -46,8 +48,9 @@ object TransportImpl {
   }
 
   private final class Impl[S <: Sys[S]](auralSystem: Option[AuralSystem], val scheduler: Scheduler[S],
-                                  objMap : IdentifierMap[S#ID, S#Tx, stm.Source[S#Tx, Obj[S]]],
-                                  viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
+                                        objMap : IdentifierMap[S#ID, S#Tx, stm.Source[S#Tx, Obj[S]]],
+                                        viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
+                                       (implicit workspace: WorkspaceHandle[S])
     extends Transport[S] with ObservableImpl[S, Transport.Update[S]] with AuralSystem.Client {
 
     import scheduler.cursor
@@ -197,7 +200,6 @@ object TransportImpl {
       // XXX TODO -- what was the reasoning for the txn decoupling?
       tx.afterCommit {
         SoundProcesses.atomic { implicit tx: S#Tx =>
-          import WorkspaceHandle.Implicits._
           implicit val auralContext = AuralContext(server, scheduler)
           auralStartedTx(server)
         }

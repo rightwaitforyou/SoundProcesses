@@ -68,6 +68,7 @@ object AsyncBounceTest extends App {
     tx.newHandle(Obj(Timeline.Elem(group)))
   }
 
+  import WorkspaceHandle.Implicits._
   val bounce              = Bounce[S, I]
   val bCfg                = Bounce.Config[S]
   bCfg.group              = groupH :: Nil

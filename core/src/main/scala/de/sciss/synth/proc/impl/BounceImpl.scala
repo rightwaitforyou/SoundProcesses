@@ -30,7 +30,8 @@ import scala.concurrent.duration.Duration
 import scala.sys.process.{Process, ProcessLogger}
 import scala.util.Success
 
-final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx)
+final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx,
+                                                     workspace: WorkspaceHandle[S])
   extends Bounce[S] {
 
   protected def prepare(config: Config): Prepared = {

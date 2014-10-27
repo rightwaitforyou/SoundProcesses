@@ -9,6 +9,7 @@ import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
 import de.sciss.synth.Curve.{exponential, linear}
 import de.sciss.synth.io.AudioFile
+import WorkspaceHandle.Implicits._
 
 import scala.concurrent.stm.Txn
 import scala.language.implicitConversions
