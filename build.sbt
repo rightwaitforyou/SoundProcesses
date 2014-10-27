@@ -2,7 +2,7 @@ lazy val logicalName = "SoundProcesses"
 
 name                      := logicalName // s"$logicalName-full"
 
-version      in ThisBuild := "2.8.0-SNAPSHOT"
+version      in ThisBuild := "2.8.0"
 
 organization in ThisBuild := "de.sciss"
 
@@ -18,7 +18,7 @@ crossScalaVersions in ThisBuild := Seq("2.11.2", "2.10.4")
 
 resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-lazy val lucreCoreVersion       = "2.1.1-SNAPSHOT"
+lazy val lucreCoreVersion       = "2.1.1"
 
 lazy val lucreDataVersion       = "2.3.0"
 
@@ -30,9 +30,9 @@ lazy val scalaColliderVersion   = "1.14.1"
 
 lazy val spanVersion            = "1.2.1"
 
-lazy val lucreSwingVersion      = "0.6.1-SNAPSHOT"
+lazy val lucreSwingVersion      = "0.6.1"
 
-lazy val scalaColliderSwingVersion = "1.20.2-SNAPSHOT"
+lazy val scalaColliderSwingVersion = "1.20.1"
 
 lazy val audioWidgetsVersion    = "1.7.0"
 
@@ -47,7 +47,7 @@ lazy val loggingEnabled         = true
 
 // retrieveManaged in ThisBuild := true
 
-lazy val bdb = "bdb6"  // either "bdb" or "bdb6"
+lazy val bdb = "bdb"  // either "bdb" or "bdb6"
 
 scalacOptions in ThisBuild ++= {
   val xs = Seq("-deprecation", "-unchecked", "-feature", "-encoding", "utf8", "-Xfuture")

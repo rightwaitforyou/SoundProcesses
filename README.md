@@ -16,11 +16,9 @@ SoundProcesses builds with sbt 0.13 and Scala 2.11, 2.10. The dependencies shoul
 
 The following dependency is necessary:
 
-    resolvers += "Oracle Repository" at "http://download.oracle.com/maven"
-    
     "de.sciss" %% "soundprocesses" % v
 
-The current stable version `v` is `"2.7.0"`.
+The current stable version `v` is `"2.8.0"`.
 
 The following sub modules are available:
 
@@ -30,6 +28,10 @@ The following sub modules are available:
     "de.sciss" %% "soundprocesses-core"     % v  // everything but views and compiler
     "de.sciss" %% "soundprocesses-views"    % v  // common swing views
     "de.sciss" %% "soundprocesses-compiler" % v  // compiler integration
+
+For compiling the tests, the following additional resolver may be needed:
+
+    resolvers += "Oracle Repository" at "http://download.oracle.com/maven"
 
 ## usage
 

@@ -13,6 +13,7 @@
 
 package de.sciss.synth.proc
 
+import de.sciss.lucre.data
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.event.Sys
 import de.sciss.lucre.expr.{String => StringEx, Boolean => BooleanEx}
@@ -46,6 +47,14 @@ object Implicits {
       `this`.removeSink(Scan.Link.Scan(that))
   }
 
+  // Scala 2.10.4 has a compiler bug that prevents putting this
+  // code inside a value class
+  private[this] def getScanLinks[S <: Sys[S]](in: data.Iterator[S#Tx, Scan.Link[S]])
+                                             (implicit tx: S#Tx): Set[Scan.Link.Scan[S]] =
+    in.collect {
+      case l @ Scan.Link.Scan(_) => l
+    } .toSet
+
   implicit class ProcPairOps[S <: Sys[S]](val `this`: (Proc.Obj[S], Proc.Obj[S])) extends AnyVal { me =>
     import me.{`this` => pair}
 
@@ -67,12 +76,8 @@ object Implicits {
       val layerIn   = getLayerIn
       val layerOut  = getLayerOut
 
-      val oldLayerIn = layerIn.sources.collect {
-        case l @ Scan.Link.Scan(_) => l
-      } .toSet
-      val oldLayerOut = layerOut.sinks.collect {
-        case l @ Scan.Link.Scan(_) => l
-      } .toSet
+      val oldLayerIn  = getScanLinks(layerIn.sources)
+      val oldLayerOut = getScanLinks(layerOut.sinks)
 
       // disconnect old inputs
       oldLayerIn .foreach(layerIn .removeSource)
@@ -101,9 +106,7 @@ object Implicits {
       val layerOut = getLayerOut
 
       val targetIt  = if (isAfter) target.sinks else target.sources
-      val oldTargetLinks = targetIt.collect {
-        case l @ Scan.Link.Scan(_) => l
-      } .toSet
+      val oldTargetLinks = getScanLinks(targetIt)
       val layerLink = Scan.Link.Scan(if (isAfter) layerIn else layerOut)
       // only act if we're not there
       if (!oldTargetLinks.contains(layerLink)) {
