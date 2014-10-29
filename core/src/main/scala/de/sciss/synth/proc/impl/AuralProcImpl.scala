@@ -363,7 +363,8 @@ object AuralProcImpl {
               } else {
                 val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
                 val trig = new StreamBuffer(key = key, idx = idx, synth = b.synth, buf = __buf, path = path,
-                  fileFrames = spec.numFrames, interp = info.interp)
+                  fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
+                  resetFrame = offset)
                 trig.install()
                 __buf
               }

@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.{synth, osc}
-import scala.annotation.switch
+import scala.annotation.{tailrec, switch}
 import de.sciss.lucre.synth.{Synth, Txn, Buffer}
 import de.sciss.synth.GE
 
@@ -62,8 +62,28 @@ object StreamBuffer {
     BufRd.ar(numChannels, buf = buf, index = phasor, loop = 0, interp = interp)
   }
 }
+/** An object that manages streaming an audio buffer.
+ *
+ * @param key         the key is used for the `SendReply` messages
+ * @param idx         the index in `SendReply`
+ * @param synth       the synth to expect the `SendReply` messages to come from
+ * @param buf         the buffer to send data to
+ * @param path        the path of the audio file
+ * @param fileFrames  the total number of frames in the file
+ * @param interp      the type of interpolation (1 = none, 2 = linear, 4 = cubic)
+ * @param startFrame  the start frame into the file to begin with
+ * @param loop        if `true` keeps looping the buffer, if `false` pads reset with zeroes, then stops
+ * @param resetFrame  when looping, the reset frame position into the file after each loop begins.
+  *                   this should be less than or equal to `startFrame`
+ */
 final class StreamBuffer(key: String, idx: Int, synth: Synth, buf: Buffer.Modifiable, path: String, fileFrames: Long,
-                         interp: Int) {
+                         interp: Int, startFrame: Long, loop: Boolean, resetFrame: Long) {
+
+  // for binary compatibility
+  def this(key: String, idx: Int, synth: Synth, buf: Buffer.Modifiable, path: String, fileFrames: Long,
+           interp: Int) =
+    this(key = key, idx = idx, synth = synth, buf = buf, path = path, fileFrames = fileFrames, interp = interp,
+         startFrame = 0L, loop = false, resetFrame = 0L)
 
   private val bufSizeH  = buf.numFrames/2
   private val diskPad   = StreamBuffer.padSize(interp)
@@ -74,7 +94,14 @@ final class StreamBuffer(key: String, idx: Int, synth: Synth, buf: Buffer.Modifi
   private def updateBuffer(trigVal: Int)(implicit tx: Txn): Long = {
     val trigEven  = trigVal % 2 == 0
     val bufOff    = if (trigEven) 0 else bufSizeH
-    val frame     = trigVal.toLong * bufSizeHM /* + startPos = 0 */ + (if (trigEven) 0 else diskPad)
+    val frame     = trigVal.toLong * bufSizeHM + startFrame + (if (trigEven) 0 else diskPad)
+    if (loop)
+      updateBufferLoop  (bufOff, frame)
+    else
+      updateBufferNoLoop(bufOff, frame)
+  }
+
+  private def updateBufferNoLoop(bufOff: Int, frame: Long)(implicit tx: Txn): Long = {
     val readSz    = math.max(0, math.min(bufSizeH, fileFrames - frame)).toInt
     val fillSz    = bufSizeH - readSz
 
@@ -90,6 +117,27 @@ final class StreamBuffer(key: String, idx: Int, synth: Synth, buf: Buffer.Modifi
     )
 
     frame
+  }
+
+  private def updateBufferLoop(bufOff: Int, frame0: Long)(implicit tx: Txn): Long = {
+    @tailrec def loop(done: Int): Long = {
+      val frame1  = frame0 + done
+      val frame   = (frame1 - resetFrame) % (fileFrames - resetFrame) + resetFrame  // wrap inside loop span
+      val readSz  =  math.min(bufSizeH - done, fileFrames - frame).toInt
+      if (readSz > 0) {
+        buf.read(
+          path            = path,
+          fileStartFrame  = frame,
+          numFrames       = readSz,
+          bufStartFrame   = bufOff + done
+        )
+        loop(done + readSz)
+      } else {
+        frame
+      }
+    }
+
+    loop(0)
   }
 
   def install()(implicit tx: Txn): Unit = {
