@@ -14,6 +14,9 @@
 package de.sciss.lucre.synth
 package impl
 
+import java.io.File
+
+import de.sciss.synth.message.SynthDefLoad
 import de.sciss.synth.{SynthDef => SSynthDef}
 
 final case class SynthDefImpl(server: Server, peer: SSynthDef) extends ResourceImpl with SynthDef {
@@ -23,10 +26,23 @@ final case class SynthDefImpl(server: Server, peer: SSynthDef) extends ResourceI
 
   /** Actually checks if the def is already online.
     * Only if that is not the case, the receive message will be queued.
+    * If the SynthDef is too large, it will be written to a temporary
+    * file and `/d_load` used instead.
     */
   def recv()(implicit tx: Txn): Unit = {
     requireOffline()
-    tx.addMessage(this, peer.recvMsg, audible = false)
+    val mRecv = peer.recvMsg
+    // XXX TODO - limit is a bit arbitrary
+    val m = if (mRecv.bytes.limit() < 30000 || !server.peer.isLocal) mRecv else {
+      val file = File.createTempFile("temp", s".${SSynthDef.extension}")
+      val path = file.getAbsolutePath
+      file.deleteOnExit()
+      // hmmm, not too pretty doing this inside a transaction...
+      SSynthDef.write(path, peer :: Nil)
+      SynthDefLoad(path, None)
+    }
+
+    tx.addMessage(this, m, audible = false)
     setOnline(value = true)
   }
 

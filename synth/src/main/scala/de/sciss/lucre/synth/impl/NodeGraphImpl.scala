@@ -14,15 +14,17 @@
 package de.sciss.lucre.synth
 package impl
 
+import java.io.{ByteArrayOutputStream, DataOutputStream}
+
 import de.sciss.lucre.synth.Txn.Bundles
 import de.sciss.osc
 import de.sciss.synth.ugen.{Constant, ControlUGenOutProxy, UGenOutProxy}
-import de.sciss.synth.{SynthDef => SSynthDef, UGen, Rate, message, UGenGraph}
+import de.sciss.synth.{SynthDef => SSynthDef, Escape, UGen, Rate, message, UGenGraph}
 import NodeGraph.Edge
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.concurrent.stm.{InTxn, Ref}
+import scala.concurrent.stm.{TMap, TSet, InTxn, Ref}
 
 object NodeGraphImpl {
   var DEBUG = false
@@ -122,7 +124,10 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
 
   private type T = Topology[NodeRef, Edge]
 
+  // XXX TODO - remove. It's here for bin-compat
   private val ugenGraphs = Ref(Map.empty[GraphEquality, SynthDef])
+
+  private[this] val ugenGraphsNew = TMap.empty[IndexedSeq[Byte], SynthDef]
 
   private val topologyRef = Ref[T](Topology.empty)
 
@@ -137,9 +142,37 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     // not SynthGraph equality
     //      val u = graph.expand
 
+    // val equ = new GraphEquality(graph)
+    val baos  = new ByteArrayOutputStream
+    val dos   = new DataOutputStream(baos)
+    // graph.write(dos)
+    Escape.write(graph, dos)
+    dos.flush()
+    dos.close()
+    val bytes = baos.toByteArray
+    val equ: IndexedSeq[Byte] = bytes // opposed to plain `Array[Byte]`, this has correct definition of `equals`
+    log(s"request for synth graph ${equ.hashCode()}")
+
+    ugenGraphsNew.getOrElseUpdate(equ, {
+      log(s"synth graph ${equ.hashCode()} is new")
+      val name  = abbreviate(s"${nameHint.getOrElse("proc")}_${nextDefID()}")
+      val peer  = SSynthDef(name, graph)
+      val rd    = impl.SynthDefImpl(server, peer) // (bytes)
+      rd.recv()
+      rd
+    })
+  }
+
+  // XXX TODO -- needed for bin-compat, makes MiMa happy because of the access of `ugenGraphs`
+  def getSynthDefOLD(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef = {
+    implicit val itx = tx.peer
+    // XXX note: unfortunately we have side effects in the expansion, such as
+    // includeParam for ProcAudioOutput ... And anyways, we might allow for
+    // indeterminate GE.Lazies, thus we need to check for UGenGraph equality,
+    // not SynthGraph equality
+    // val u = graph.expand
     val equ = new GraphEquality(graph)
     log(s"request for synth graph ${equ.hashCode}")
-
     ugenGraphs.get.getOrElse(equ, {
       log(s"synth graph ${equ.hashCode} is new")
       val name = abbreviate(s"${nameHint.getOrElse("proc")}_${nextDefID()}")
