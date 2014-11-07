@@ -354,9 +354,16 @@ object AuralProcImpl {
               val offset    = audioElem.offset  .value
               val _gain     = audioElem.gain    .value
               val _buf      = if (info.isNative) {
+                // XXX DIRTY HACK
+                val offset1 = if (key.contains("!rnd")) {
+                  offset + (math.random * (spec.numFrames - offset)).toLong
+                } else {
+                  offset
+                }
+                // println(s"OFFSET = $offset1")
                 Buffer.diskIn(server)(
                   path          = path,
-                  startFrame    = offset,
+                  startFrame    = offset1,
                   numFrames     = bufSize,
                   numChannels   = spec.numChannels
                 )
