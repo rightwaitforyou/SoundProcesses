@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Sys
-import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.stm.{TxnLike, Disposable}
 import de.sciss.lucre.{stm, event => evt}
 import de.sciss.serial.{DataInput, Serializer, Writable}
 import de.sciss.synth.proc
@@ -37,6 +37,10 @@ object Action {
 
   def apply[S <: Sys[S]](name: String, jar: Array[Byte])(implicit tx: S#Tx): Action[S] =
     Impl.newConst(name, jar)
+
+  def predef[S <: Sys[S]](id: String)(implicit tx: S#Tx): Action[S] = Impl.predef(id)
+
+  def registerPredef(id: String, body: Body)(implicit tx: TxnLike): Unit = Impl.registerPredef(id, body)
 
   object Var {
     def apply[S <: Sys[S]](init: Action[S])(implicit tx: S#Tx): Var[S] = Impl.newVar(init)

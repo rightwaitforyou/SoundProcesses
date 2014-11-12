@@ -234,7 +234,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   //
   //  /** Adds a predefined synth graph which is serialized through a key.
   //    * Care must be taken so that the key is unique and that the graph
-  //    * is registered before any possible deserialization (which would
+  //    * is registered before any possible de-serialization (which would
   //    * fail if no in-memory graph is found under the key)
   //    */
   //  def add(key: String, graph: SynthGraph): Unit =
@@ -247,6 +247,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   def readValue (                   in : DataInput ): SynthGraph  = ValueSerializer.read (       in )
   def writeValue(value: SynthGraph, out: DataOutput): Unit        = ValueSerializer.write(value, out)
 
+  // XXX TODO: unused, remove
   lazy val install: Unit = ()
 
   // XXX TODO: not cool. Should use `1` to `3` for cookies

@@ -18,7 +18,7 @@ import de.sciss.lucre.{event => evt}
 import de.sciss.synth.proc
 import de.sciss.lucre.event.{Reader, InMemory, EventLike, Sys}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.IDPeek
+import de.sciss.lucre.stm.{TxnLike, IDPeek}
 import de.sciss.serial.{Serializer, DataInput, DataOutput}
 
 import scala.annotation.switch
@@ -32,10 +32,11 @@ object ActionImpl {
 
   private final val COOKIE        = 0x61637400   // "act\0"
   private final val CONST_EMPTY   = 0
-  private final val CONST_FUN     = 1
+  private final val CONST_JAR     = 1
   private final val CONST_VAR     = 2
+  private final val CONST_BODY    = 3
 
-  private final val DEBUG = false
+  private final val DEBUG         = false
 
   // ---- creation ----
 
@@ -61,6 +62,19 @@ object ActionImpl {
 
   def newConst[S <: Sys[S]](name: String, jar: Array[Byte])(implicit tx: S#Tx): Action[S] =
     new ConstFunImpl(name, jar)
+
+  private val mapPredef = TMap.empty[String, Action.Body]
+
+  def predef[S <: Sys[S]](id: String)(implicit tx: S#Tx): Action[S] = {
+    if (!mapPredef.contains(id)(tx.peer))
+      throw new IllegalArgumentException(s"Predefined action '$id' is not registered")
+
+    new ConstBodyImpl[S](id)
+  }
+
+  def registerPredef(id: String, body: Action.Body)(implicit tx: TxnLike): Unit =
+    if (mapPredef.put(id, body)(tx.peer).nonEmpty)
+      throw new IllegalArgumentException(s"Predefined action '$id' was already registered")
 
   private def classLoader[S <: Sys[S]](implicit tx: S#Tx): MemoryClassLoader = sync.synchronized {
     clMap.getOrElseUpdate(tx.system, {
@@ -136,13 +150,17 @@ object ActionImpl {
   private final class Ser[S <: Sys[S]] extends evt.EventLikeSerializer[S, Action[S]] {
     def readConstant(in: DataInput)(implicit tx: S#Tx): Action[S] =
       (readCookieAndTpe(in): @switch) match {
-        case CONST_FUN    =>
+        case CONST_JAR    =>
           val name    = in.readUTF()
           val jarSize = in.readInt()
           val jar     = new Array[Byte](jarSize)
           in.readFully(jar)
           // val system  = tx.system
           new ConstFunImpl[S](name, jar)
+
+        case CONST_BODY   =>
+          val id  = in.readUTF()
+          new ConstBodyImpl[S](id)
 
         case CONST_EMPTY  => new ConstEmptyImpl[S]
 
@@ -189,6 +207,23 @@ object ActionImpl {
     def changed: EventLike[S, Unit] = evt.Dummy[S, Unit]
   }
 
+  private final case class ConstBodyImpl[S <: Sys[S]](id: String)
+    extends ConstImpl[S] {
+
+    def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
+      val fun = mapPredef.getOrElse(id, sys.error(s"Predefined action '$id' not registered"))
+      fun(universe)
+    }
+
+    protected def writeData(out: DataOutput): Unit = {
+      out.writeInt(COOKIE)
+      out.writeByte(CONST_BODY)
+      out.writeUTF(id)
+    }
+  }
+
+  // XXX TODO - should be called ConstJarImpl in next major version
   private final class ConstFunImpl[S <: Sys[S]](val name: String, jar: Array[Byte])
     extends ConstImpl[S] {
 
@@ -198,7 +233,7 @@ object ActionImpl {
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeInt(COOKIE)
-      out.writeByte(CONST_FUN)
+      out.writeByte(CONST_JAR)
       out.writeUTF(name)
       out.writeInt(jar.length)
       out.write(jar)
