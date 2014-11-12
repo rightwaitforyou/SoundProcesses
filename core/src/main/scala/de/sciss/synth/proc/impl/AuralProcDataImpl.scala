@@ -549,7 +549,8 @@ object AuralProcDataImpl {
         val async = (numCh * numFr) > UGB.Input.Buffer.AsyncThreshold   // XXX TODO - that threshold should be configurable
         UGB.Input.Buffer.Value(numFrames = numFr, numChannels = numCh, async = async)
 
-      case i: UGB.Input.Action => UGB.Input.Action.Value
+      case i: UGB.Input.Action  => UGB.Input.Action .Value
+      case i: UGB.Input.DiskOut => UGB.Input.DiskOut.Value(i.numChannels)
 
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
     }

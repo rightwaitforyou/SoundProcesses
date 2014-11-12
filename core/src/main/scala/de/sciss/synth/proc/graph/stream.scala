@@ -16,6 +16,7 @@ package proc
 package graph
 
 import de.sciss.synth
+import de.sciss.synth.proc.UGenGraphBuilder.Input
 import synth.ugen.Constant
 import de.sciss.synth.proc.impl.StreamBuffer
 import impl.Stream
@@ -62,6 +63,37 @@ final case class VDiskIn(rate: Rate, key: String, speed: synth.GE, loop: synth.G
       StreamBuffer.makeUGen(key = key, idx = idx, buf = buf, numChannels = numChannels, speed = speed, interp = interp)
     }
     reader * gain
+  }
+}
+
+object DiskOut {
+  /* private[proc] */ def controlName(key: String): String = s"$$disk_$key"
+
+  def ar(key: String, in: GE): DiskOut = apply(audio, key = key, in = in)
+}
+
+/** A graph element that creates a `DiskOut` writing to a file
+  * designated by an object attribute with a given `key` and the
+  * value being an `Artifact`.
+  *
+  * The file-type is determined by this artifact. For example, if the
+  * artifact's path ends in `".aif"`, the AIFF format will used, if
+  * the path ends in `".w64"`, then Wave64 will be used. The default is AIFF.
+  * The sample format is currently always Float-32.
+  *
+  * @param key  the key into the enclosing object's attribute map, pointing to an `Artifact`
+  * @param in   the signal to write
+  */
+final case class DiskOut(rate: Rate, key: String, in: GE)
+  extends synth.GE.Lazy with WritesBuffer {
+
+  protected def makeUGens: UGenInLike = {
+    val b         = UGenGraphBuilder.get
+    val ins       = in.expand.flatOutputs
+    b.requestInput(Input.DiskOut(key, numChannels = ins.size))
+    val ctlName   = DiskOut.controlName(key)
+    val buf       = ctlName.ir
+    ugen.DiskOut(rate, buf = buf, in = ins)
   }
 }
 

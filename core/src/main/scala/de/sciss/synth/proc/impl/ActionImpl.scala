@@ -168,7 +168,7 @@ object ActionImpl {
 
   private def readVar[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                   (implicit tx: S#Tx): Action.Var[S] with evt.Node[S] =
-    (readCookieAndTpe(in): @switch) match {
+    readCookieAndTpe(in) /* : @switch */ match {
       case CONST_VAR =>
         val peer = tx.readVar[Action[S]](targets.id, in)
         new VarImpl[S](targets, peer)

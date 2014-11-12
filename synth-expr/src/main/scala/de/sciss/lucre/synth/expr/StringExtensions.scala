@@ -38,7 +38,7 @@ object StringExtensions  {
     def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                   (implicit tx: S#Tx): Expr.Node[S, String] = {
       import BinaryOp._
-      val op: Op = (opID: @switch) match {
+      val op: Op = opID /* : @switch */ match {
         case Append.id => Append
       }
       val _1 = read(in, access)

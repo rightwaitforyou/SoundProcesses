@@ -1,8 +1,8 @@
 lazy val logicalName = "SoundProcesses"
 
-name                      := logicalName // s"$logicalName-full"
+name                      := logicalName
 
-version      in ThisBuild := "2.8.2"
+version      in ThisBuild := "2.8.4-SNAPSHOT"
 
 organization in ThisBuild := "de.sciss"
 
@@ -12,9 +12,9 @@ description               := "A framework for creating and managing ScalaCollide
 
 licenses     in ThisBuild := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion in ThisBuild := "2.11.2"
+scalaVersion in ThisBuild := "2.11.4"
 
-crossScalaVersions in ThisBuild := Seq("2.11.2", "2.10.4")
+crossScalaVersions in ThisBuild := Seq("2.11.4", "2.10.4")
 
 resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
@@ -22,7 +22,7 @@ lazy val lucreCoreVersion       = "2.1.1"
 
 lazy val lucreDataVersion       = "2.3.0"
 
-lazy val lucreEventVersion      = "2.7.1"
+lazy val lucreEventVersion      = "2.7.2-SNAPSHOT"
 
 lazy val lucreConfluentVersion  = "2.9.0"
 
@@ -36,12 +36,11 @@ lazy val scalaColliderSwingVersion = "1.20.1"
 
 lazy val audioWidgetsVersion    = "1.7.0"
 
+lazy val fileUtilVersion        = "1.1.1"
+
 // ---- test-only ----
 
 lazy val scalaTestVersion       = "2.2.2"
-
-lazy val fileUtilVersion        = "1.1.1"
-
 
 lazy val loggingEnabled         = true
 
@@ -145,9 +144,9 @@ lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp,
     libraryDependencies ++= Seq(
       "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
       "de.sciss"      %% "lucreevent-artifact" % lucreEventVersion,
+      "de.sciss"      %% "fileutil"       % fileUtilVersion,
       "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
-      "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test",
-      "de.sciss"      %% "fileutil"       % fileUtilVersion       % "test"
+      "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test"
     )
   )
 

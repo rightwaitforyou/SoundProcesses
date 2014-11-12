@@ -1,5 +1,6 @@
 package de.sciss.synth.proc
 
+import de.sciss.file._
 import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.lucre.{bitemp, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
@@ -8,7 +9,7 @@ import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
 import de.sciss.synth.Curve.{exponential, linear}
-import de.sciss.synth.io.AudioFile
+import de.sciss.synth.io.{AudioFileType, AudioFile}
 import WorkspaceHandle.Implicits._
 
 import scala.concurrent.stm.Txn
@@ -71,6 +72,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test11" => test11()
       case "--test12" => test12()
       case "--test13" => test13()
+      case "--test14" => test14()
       case _         =>
         println("WARNING: No option given, using --test1")
         test1()
@@ -174,7 +176,65 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
 
-  ////////////////////////////////////////////////////////////////////////////////////// 11
+  ////////////////////////////////////////////////////////////////////////////////////// 14
+
+  def test14()(implicit context: AuralContext[S]): Unit = {
+    println("----test14----")
+    println(
+      """
+        |Expected behaviour:
+        |A sound is recorded to a sound file.
+        |Then another proc plays back that sound file.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val imp     = ExprImplicits[S]
+      import imp._
+
+      val pRec = proc {
+        val freq  = LFNoise0.ar(Seq(5, 5)).linlin(-1, 1, 70, 90).roundTo(1).midicps
+        val sig   = SinOsc.ar(freq) * 0.2
+        graph.DiskOut.ar("disk", sig)
+        Out.ar(0, sig)  // let it be heard
+      }
+      val f     = File.createTemp("disk", ".w64")
+      val loc   = ArtifactLocation[S](f.parent)
+      val art   = loc.add(f)
+      val artH  = tx.newHandle(art)
+      pRec.attr.put("disk", Obj(ArtifactElem(art)))
+
+      val t     = Transport[S]
+      t.addObject(pRec)
+      t.play()
+      val pRecH = tx.newHandle(pRec)
+
+      after(2.0) { implicit tx =>
+        println("--stop pRec--")
+        println(s"file = $f")
+        t.stop()
+        after(1.0) { implicit tx =>
+          val spec  = AudioFile.readSpec(f)
+          assert(spec.fileType == AudioFileType.Wave64 && spec.numChannels == 2)
+          val gr    = Grapheme.Expr.Audio(artH(), spec, 0L, 1.0)
+          val pPlay = proc {
+            val sig   = graph.DiskIn.ar("disk")
+            Out.ar(0, sig)  // let it be heard
+          }
+          pPlay.attr.put("disk", Obj(AudioGraphemeElem(gr)))
+          t.removeObject(pRecH())
+          t.addObject(pPlay)
+          t.play()
+
+          after(2.0) { implicit tx =>
+            stopAndQuit()
+          }
+        }
+      }
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////////// 13
 
   def test13()(implicit context: AuralContext[S]): Unit = {
     println("----test13----")
@@ -236,7 +296,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     }
   }
 
-  ////////////////////////////////////////////////////////////////////////////////////// 11
+  ////////////////////////////////////////////////////////////////////////////////////// 12
 
   def test12()(implicit context: AuralContext[S]): Unit = {
     println("----test12----")

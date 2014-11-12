@@ -37,7 +37,7 @@ object BooleanExtensions  {
 
     def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                   (implicit tx: S#Tx): Expr.Node[S, Boolean] = {
-      val op: UnaryOp[Boolean] = (opID: @switch) match {
+      val op: UnaryOp[Boolean] = opID /* : @switch */ match {
         case Not.id => Not
       }
       val _1 = BooleanEx.read(in, access)

@@ -19,11 +19,18 @@ import de.sciss.lucre.synth.impl.BufferImpl
 
 object Buffer {
   private var cueBufSz = 32768
+  private var recBufSz = 32768
 
   def defaultCueBufferSize: Int = cueBufSz
   def defaultCueBufferSize_=(value: Int): Unit = {
     validateCueBufferSize(64, value)
     cueBufSz = value
+  }
+
+  def defaultRecBufferSize: Int = recBufSz
+  def defaultRecBufferSize_=(value: Int): Unit = {
+    validateCueBufferSize(64, value)
+    recBufSz = value
   }
 
   private def isPowerOfTwo(value: Int) = (value & (value - 1)) == 0
@@ -48,7 +55,7 @@ object Buffer {
 
   def diskOut(server: Server)(path: String, fileType: AudioFileType = AudioFileType.AIFF,
                               sampleFormat: SampleFormat = SampleFormat.Float,
-                              numFrames: Int = defaultCueBufferSize, numChannels: Int = 1)(implicit tx: Txn): Buffer = {
+                              numFrames: Int = defaultRecBufferSize, numChannels: Int = 1)(implicit tx: Txn): Buffer = {
     validateCueBufferSize(server, numFrames)
     val res = create(server, numFrames = numFrames, numChannels = numChannels, closeOnDisposal = true)
     res.alloc()

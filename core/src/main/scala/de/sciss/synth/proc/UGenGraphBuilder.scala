@@ -147,6 +147,22 @@ object UGenGraphBuilder {
       override def productPrefix = "Input.Stream"
     }
 
+    object DiskOut {
+      final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
+        def async = false
+        override def productPrefix = "Input.DiskOut.Value"
+        override def toString = s"$productPrefix(numChannels = $numChannels)"
+      }
+    }
+    final case class DiskOut(name: String, numChannels: Int) extends Input {
+      type Key    = AttributeKey
+      type Value  = DiskOut.Value
+
+      def key = AttributeKey(name)
+
+      override def productPrefix = "Input.DiskOut"
+    }
+
     object Attribute {
       final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
         def async = false

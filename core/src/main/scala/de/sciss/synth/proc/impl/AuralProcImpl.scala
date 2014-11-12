@@ -14,11 +14,13 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.file._
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Bus, Buffer, Synth, Sys}
 import de.sciss.numbers
 import de.sciss.span.Span
+import de.sciss.synth.io.AudioFileType
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Scan.Link
@@ -410,6 +412,24 @@ object AuralProcImpl {
 
       case UGB.Input.Action.Value =>   // ----------------------- action
         ActionResponder.install(obj = b.obj, key = key, synth = b.synth)
+
+      case UGB.Input.DiskOut.Value(numCh) =>
+        val rb = b.obj.attr.getElem(key).fold[Buffer] {
+          sys.error(s"Missing attribute $key for disk-out artifact")
+        } {
+          case a: ArtifactElem[S] =>
+            val artifact  = a.peer
+            val f         = artifact.value.absolute
+            val ext       = f.ext.toLowerCase
+            val tpe       = AudioFileType.writable.find(_.extensions.contains(ext)).getOrElse(AudioFileType.AIFF)
+            val _buf      = Buffer.diskOut(server)(path = f.path, fileType = tpe, numChannels = numCh)
+            _buf
+
+          case a => sys.error(s"Cannot use attribute $a as an artifact")
+        }
+        val ctlName    = graph.DiskOut.controlName(key)
+        b.setMap      += ctlName -> rb.id
+        b.dependencies ::= rb
 
       case _ =>
         throw new IllegalStateException(s"Unsupported input attribute request $value")

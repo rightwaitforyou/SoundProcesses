@@ -62,7 +62,7 @@ object SpanExtensions  {
     def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                   (implicit tx: S#Tx): Expr.Node[S, span.Span] = {
       import BinaryOp._
-      val op: Op[_, _] = (opID: @switch) match {
+      val op: Op[_, _] = opID /* : @switch */ match {
         case Apply.id => Apply
         case Shift.id => Shift
       }

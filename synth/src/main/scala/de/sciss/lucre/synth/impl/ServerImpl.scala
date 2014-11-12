@@ -14,6 +14,10 @@
 package de.sciss.lucre.synth
 package impl
 
+import de.sciss.osc.Timetag
+
+import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.{Server => SServer, Client => SClient, ControlABusMap, ControlSet, AllocatorExhausted, addToHead, message}
@@ -28,19 +32,28 @@ object ServerImpl {
   /** If `true`, applies a few optimizations to messages within a bundle, in order to reduce its size */
   var USE_COMPRESSION = true
 
+  private final val MaxPacketSize = 0x8000 // 0x10000 // 64K
+
   private final case class OnlineImpl(peer: SServer) extends Impl {
     override def toString = peer.toString()
 
-    private def checkPacket(p: osc.Packet): Unit = {
-      val sz = p match {
-        case b: osc.Bundle  => Server.codec.encodedBundleSize (b)
-        case m: osc.Message => Server.codec.encodedMessageSize(m)
-      }
-      if (sz >= 0x10000) {
-        Console.err.println(s"ERROR: Packet size $sz exceeds 64K")
-        osc.Packet.printTextOn(p, Server.codec, Console.err)
-      }
-    }
+    //    private def printExcessPacket(p: osc.Packet, sz: Int): Unit = {
+    //      Console.err.println(s"ERROR: Packet size $sz exceeds $MaxPacketSize")
+    //      osc.Packet.printTextOn(p, Server.codec, Console.err)
+    //    }
+    //
+    //    // returns `true` if packet size ok, `false` if too large
+    //    private def checkPacket(p: osc.Packet): Boolean = {
+    //      val sz = p match {
+    //        case b: osc.Bundle  => Server.codec.encodedBundleSize (b)
+    //        case m: osc.Message => Server.codec.encodedMessageSize(m)
+    //      }
+    //      val ok = sz < MaxPacketSize
+    //      if (!ok) {
+    //        printExcessPacket(p, sz)
+    //      }
+    //      ok
+    //    }
 
     // ---- compression ----
 
@@ -72,7 +85,9 @@ object ServerImpl {
       // To ensure correctness, we must not collapse
       // across `/s_new` and `/g_new` boundaries.
       // For simplicity, we also restrict collapse
-      // of `/n_after` to adjacent messages
+      // of `/n_after` to adjacent messages.
+      // Another optimization is collapsing adjacent
+      // `/n_free` messages
 
       // XXX TODO - actually, we don't yet optimize `/n_after`
 
@@ -83,6 +98,7 @@ object ServerImpl {
       var setMap    = Map.empty[Int, Int] // node-id to out-offset containing either n_set or s_new
       var mapanMap  = Map.empty[Int, Int] // node-id to out-offset containing n_mapan
       var nAfterIdx = -2
+      var nFreeIdx  = -2
 
       while (inOff < num) {
         val p       = in(inOff)
@@ -135,9 +151,32 @@ object ServerImpl {
             val res = nAfterIdx != outOff - 1
             if (res) {  // predecessor was not n_after
               nAfterIdx = outOff
+
+              //              // more ambitious:
+              //              // collapse a single `/n_after` with an immediate
+              //              // preceding `/s_new`.
+              //              val g = m.groups
+              //              if (g.size == 1) {
+              //                val (id, after) = g.head
+              //                val newIdx = setMap.getOrElse(id, -1)
+              //                if (newIdx >= 0) {
+              //                  ...
+              //                }
+              //              }
+
             } else {
               val message.NodeAfter(groups @ _*) = out(nAfterIdx)
               out(nAfterIdx) = message.NodeAfter(groups ++ m.groups: _*)
+            }
+            res
+
+          case m: message.NodeFree =>
+            val res = nFreeIdx != outOff - 1
+            if (res) {  // predecessor was not n_after
+              nFreeIdx = outOff
+            } else {
+              val message.NodeFree(ids @ _*) = out(nFreeIdx)
+              out(nFreeIdx) = message.NodeFree(ids ++ m.ids: _*)
             }
             res
 
@@ -179,22 +218,101 @@ object ServerImpl {
 
     // ---- side effects ----
 
-    def !(p0: osc.Packet): Unit = {
-      val p = if (USE_COMPRESSION) p0 match {
-        case b: osc.Bundle => compress(b)
-        case _ => p0
-      } else  p0
+    private def splitAndSend[A, B](init: A, iter: Iterator[osc.Packet], addSize: Int)(fun: Vec[osc.Packet] => B)
+                                  (combine: (A, B) => A): A = {
+      @tailrec def loop(a: A, sz: Int, builder: mutable.Builder[osc.Packet, Vec[osc.Packet]]): A =
+        if (iter.isEmpty) {
+          val res = builder.result()
+          if (res.nonEmpty) {
+            val a1 = fun(res)
+            val a2  = combine(a, a1)
+            a2
+          } else a
 
-      if (DEBUG_SIZE) checkPacket(p)
-      peer ! p
+        } else {
+          val next  = iter.next()
+          val sz1   = next.encodedSize(Server.codec) + 4
+          val sz2   = sz + sz1
+          if (sz2 >= MaxPacketSize) {
+            val res = builder.result()
+            if (res.isEmpty) sys.error(s"Cannot encode packet -- too large ($sz1)")
+            val a1  = fun(res)
+            val a2  = combine(a, a1)
+            val newBuilder = Vec.newBuilder[osc.Packet]
+            newBuilder += next
+            loop(a2, 16 + addSize + sz1, newBuilder)
+          } else {
+            builder += next
+            loop(a, sz2, builder)
+          }
+        }
+
+      loop(init, 16 + addSize, Vec.newBuilder[osc.Packet])
+    }
+
+    def ! (p0: osc.Packet): Unit = {
+      val p = p0 match {
+        case b0: osc.Bundle if USE_COMPRESSION => compress(b0)
+        case _ => p0
+      }
+
+      p match {
+        case b: osc.Bundle if DEBUG_SIZE =>
+          val sz0 = Server.codec.encodedBundleSize(b)
+          if (sz0 < MaxPacketSize) {
+            peer ! b
+          } else {
+            // Since the bundle is synchronous, it is not trivial to split it
+            // into several bundles. And if we split at arbitrary points some
+            // very bad things could happen, for example sound or feedback
+            // going to wrong temporary buses, so this is absolutely forbidden.
+            //
+            // We take this as an "emergency" branch that one should avoid to
+            // be taken at all costs. The solution for this branch is that we
+            // temporarily pause the server's default group. That way no
+            // damage can be done, but it may result in a short noticable bit
+            // of silence. That's as good as it gets, I suppose...
+            Console.err.println(s"WARNING: Bundle size $sz0 exceeds $MaxPacketSize. Splitting into multiple bundles")
+            val gid   = peer.defaultGroup.id
+            val iter  =
+              Iterator.single(message.NodeRun(gid -> false)) ++ b.packets.iterator ++
+              Iterator.single(message.NodeRun(gid -> true ))
+
+            splitAndSend[Unit, Unit](init = (), iter = iter, addSize = 0) { packets =>
+              peer ! osc.Bundle(b.timetag, packets: _*)
+            } ((_, _) => ())
+          }
+
+        case _ =>
+          peer ! p
+      }
     }
 
     def !!(b0: osc.Bundle): Future[Unit] = {
-      val b       = if (USE_COMPRESSION) compress(b0) else b0
+      val b   = if (USE_COMPRESSION) compress(b0) else b0
+      val tt  = b.timetag
+      if (DEBUG_SIZE) {
+        val sz0     = Server.codec.encodedBundleSize(b)
+        if (sz0 + 20 < MaxPacketSize) {
+          perform_!!(tt, b.packets)
+        } else {
+          val iter = b.packets.iterator
+          val futs = splitAndSend[Vec[Future[Unit]], Future[Unit]](init = Vector.empty,
+                                                                   iter = iter, addSize = 20 /* /sync */) { packets =>
+            perform_!!(tt, packets)
+          } (_ :+ _)
+          import ExecutionContext.Implicits.global
+          Future.reduce[Unit, Unit](futs)((_, _) => ())
+        }
+      } else {
+        perform_!!(tt, b.packets)
+      }
+    }
+
+    private def perform_!!(tt: Timetag, packets: Seq[osc.Packet]): Future[Unit] = {
       val syncMsg = peer.syncMsg()
       val syncID  = syncMsg.id
-      val bndlS   = osc.Bundle(b.timetag, b :+ syncMsg: _*)
-      if (DEBUG_SIZE) checkPacket(bndlS)
+      val bndlS   = osc.Bundle(tt, packets :+ syncMsg: _*)
       peer.!!(bndlS) {
         case message.Synced(`syncID`) =>
       }
@@ -205,7 +323,6 @@ object ServerImpl {
 
   private final case class OfflineImpl(peer: SServer) extends Impl with Server.Offline {
     override def toString = s"$peer @offline"
-
 
     private val sync = new AnyRef
 

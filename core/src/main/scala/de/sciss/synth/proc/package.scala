@@ -13,12 +13,13 @@
 
 package de.sciss.synth
 
-import de.sciss.lucre.artifact.ArtifactLocation
+import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.expr
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.synth.expr.DoubleVec
+import de.sciss.model.Change
 import de.sciss.{lucre, model}
 import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc.impl.{FolderElemImpl, ElemImpl}
@@ -231,5 +232,26 @@ package object proc {
   trait ArtifactLocationElem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = ArtifactLocation[S]
     type PeerUpdate = ArtifactLocation.Update[S]
+  }
+
+  implicit object ArtifactElem extends proc.Elem.Companion[ArtifactElem] {
+    def typeID = Artifact.typeID
+
+    def apply[S <: Sys[S]](peer: Artifact[S])(implicit tx: S#Tx): ArtifactElem[S] =
+      proc.impl.ElemImpl.Artifact(peer)
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, ArtifactElem[S]] =
+      ElemImpl.Artifact.serializer[S]
+
+    object Obj {
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[ArtifactElem[S]]) Some(obj.asInstanceOf[ArtifactElem.Obj[S]])
+        else None
+    }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, ArtifactElem]
+  }
+  trait ArtifactElem[S <: Sys[S]] extends proc.Elem[S] {
+    type Peer       = Artifact[S]
+    type PeerUpdate = Change[Artifact.Value] // Artifact.Update[S]
   }
 }

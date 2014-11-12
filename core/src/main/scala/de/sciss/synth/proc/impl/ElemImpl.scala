@@ -29,7 +29,7 @@ object ElemImpl {
   import java.lang.{String => _String}
   import proc.{FadeSpec => _FadeSpec, Proc => _Proc, Timeline => _Timeline}
   import lucre.synth.expr.{DoubleVec => _DoubleVec}
-  import lucre.artifact.{ArtifactLocation => _ArtifactLocation}
+  import lucre.artifact.{ArtifactLocation => _ArtifactLocation, Artifact => _Artifact}
 
   // ---- Int ----
 
@@ -348,6 +348,38 @@ object ElemImpl {
     def mkCopy()(implicit tx: S#Tx): ArtifactLocationElem[S] = ArtifactLocation(peer)
   }
 
+  // ---- Artifact ----
+
+  object Artifact extends ElemCompanionImpl[ArtifactElem] {
+    val typeID = _Artifact.typeID
+
+    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                   (implicit tx: S#Tx): ArtifactElem[S] with evt.Node[S] = {
+      val peer = _Artifact.read(in, access)
+      new ArtifactActiveImpl(targets, peer)
+    }
+
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): ArtifactElem[S] =
+      sys.error("Constant Artifact not supported")
+
+    def apply[S <: Sys[S]](peer: _Artifact[S])(implicit tx: S#Tx): ArtifactElem[S] =
+      new ArtifactActiveImpl(evt.Targets[S], peer)
+  }
+
+  private trait ArtifactImpl[S <: Sys[S]] extends ArtifactElem[S] {
+    final def typeID = Artifact.typeID
+    final def prefix = "Artifact"
+  }
+
+  private final class ArtifactActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+                                                      val peer: _Artifact[S])
+    extends ActiveElemImpl[S] with ArtifactImpl[S] {
+
+    protected def peerEvent = peer.changed
+
+    def mkCopy()(implicit tx: S#Tx): ArtifactElem[S] = Artifact(peer)
+  }
+
   // ---- Timeline ----
 
   object Timeline extends ElemCompanionImpl[_Timeline.Elem] {
@@ -448,12 +480,13 @@ object ElemImpl {
     DoubleVec       .typeID -> DoubleVec       ,
     AudioGrapheme   .typeID -> AudioGrapheme   ,
     ArtifactLocation.typeID -> ArtifactLocation,
+    Artifact        .typeID -> Artifact        ,
     Proc            .typeID -> Proc            ,
     Timeline        .typeID -> Timeline        ,
     FolderElemImpl  .typeID -> FolderElemImpl  ,
     Ensemble        .typeID -> EnsembleImpl.ElemImpl,
-    Action          .typeID -> ActionImpl.ElemImpl,
-    Code            .typeID -> CodeImpl.ElemImpl
+    Action          .typeID -> ActionImpl  .ElemImpl,
+    Code            .typeID -> CodeImpl    .ElemImpl
   )
 
   def registerExtension(ext: Elem.Extension): Unit = sync.synchronized {
