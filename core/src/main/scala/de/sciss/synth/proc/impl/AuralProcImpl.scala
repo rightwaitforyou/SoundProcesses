@@ -127,6 +127,8 @@ object AuralProcImpl {
       }
     }
 
+    def data: ProcData[S] = _data
+
     final def prepare()(implicit tx: S#Tx): Unit = {
       targetStateRef.set(TargetPrepared)(tx.peer)
 

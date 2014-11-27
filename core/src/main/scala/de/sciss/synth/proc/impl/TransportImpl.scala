@@ -81,6 +81,8 @@ object TransportImpl {
 
     def views(implicit tx: S#Tx): Set[AuralObj[S]] = viewSet.single.toSet
 
+    def getView(obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]] = viewMap.get(obj.id)
+
     def play()(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       val timeBase0 = timeBaseRef()
@@ -139,6 +141,7 @@ object TransportImpl {
       val objH = tx.newHandle(obj)
       objMap.put(id, objH)
       objSet.add(objH)(tx.peer)
+      fire(Transport.ObjectAdded(this, obj))
 
       contextOption.foreach { implicit context =>
         val view = mkView(obj)
@@ -161,7 +164,10 @@ object TransportImpl {
         viewMap.remove(id)
         viewSet.remove(view)
         if (isPlaying) view.stop()
+        fire(Transport.ViewRemoved(this, view))
       }
+
+      fire(Transport.ObjectRemoved(this, obj))
     }
 
     private def mkTimeRef()(implicit tx: S#Tx) = TimeRef(Span.from(0L), position)
@@ -170,24 +176,29 @@ object TransportImpl {
       val view = AuralObj(obj)
       viewMap.put(obj.id, view)
       viewSet.add(view)(tx.peer)
+      fire(Transport.ViewAdded(this, view))
       view
     }
-
-    private def clearSet[A](s: TSet[A])(implicit tx: S#Tx): Unit =
-      s.retain(_ => false)(tx.peer) // no `clear` method
 
     def dispose()(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       auralSystem.foreach(_.removeClient(this))
       objMap.dispose()
-      clearSet(objSet)
+      objSet.foreach { obj =>
+        fire(Transport.ObjectRemoved(this, obj()))
+      }
+      objSet.clear()
       disposeViews()
     }
 
     private def disposeViews()(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
       viewMap.dispose()
-      viewSet.foreach(_.dispose())(tx.peer)
-      clearSet(viewSet)
+      viewSet.foreach { view =>
+        fire(Transport.ViewRemoved(this, view))
+        view.dispose()
+      }
+      viewSet.clear()
     }
 
     // ---- aural system ----

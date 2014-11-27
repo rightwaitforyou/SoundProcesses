@@ -41,6 +41,7 @@ object TransportViewImpl {
       case Transport.Stop(_, time) => view.stoppedPlaying(time)
       case Transport.Seek(_, time, p) =>
         if (p) view.startedPlaying(time) else view.stoppedPlaying(time)
+      case _ =>
     }}
 
     val initPlaying = transport.isPlaying // .playing.value

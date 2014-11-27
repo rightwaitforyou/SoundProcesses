@@ -18,7 +18,7 @@ import de.sciss.lucre.data.SkipOctree
 import de.sciss.lucre.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2D, LongSquare, LongSpace}
 import de.sciss.lucre.stm.{IdentifierMap, Disposable}
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{expr, Sys}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.lucre.data
 import de.sciss.synth.proc.{logAural => logA}
@@ -32,7 +32,7 @@ object AuralTimelineImpl {
   private val MAX_COORD   = MAX_SQUARE.right
   private val MAX_SIDE    = MAX_SQUARE.side
 
-  private type Leaf[S <: Sys[S]] = (SpanLike, Vec[AuralObj[S]])
+  private type Leaf[S <: Sys[S]] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], AuralObj[S])])
 
   // XXX TODO - DRY - large overlap with BiGroupImpl
   private def spanToPoint(span: SpanLike): LongPoint2D = span match {
@@ -79,7 +79,8 @@ object AuralTimelineImpl {
           val obj   = timed.value
           val view  = AuralObj(obj)
           viewMap.put(timed.id, view)
-          view
+          import expr.IdentifierSerializer
+          (tx.newHandle(timed.id), view)
         }
         // logA(s"timeline - init. add $span -> $views")
         tree.add(span -> views)
@@ -104,7 +105,7 @@ object AuralTimelineImpl {
                                                          tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]],
                                                          viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
                                                         (implicit context: AuralContext[S], iSys: S#Tx => I#Tx)
-    extends AuralObj.Timeline[S] with ObservableImpl[S, AuralObj.State] {
+    extends AuralObj.Timeline[S] with ObservableImpl[S, AuralObj.State] { impl =>
 
     def typeID: Int = Timeline.typeID
 
@@ -119,6 +120,16 @@ object AuralTimelineImpl {
     def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
 
     def views(implicit tx: S#Tx): Set[AuralObj[S]] = activeViews.single.toSet
+
+    object contents extends ObservableImpl[S, AuralObj.Timeline.Update[S]] {
+      def viewAdded(timed: S#ID, view: AuralObj[S])(implicit tx: S#Tx): Unit =
+        fire(AuralObj.Timeline.ViewAdded(impl, timed, view))
+
+      def viewRemoved(view: AuralObj[S])(implicit tx: S#Tx): Unit =
+        fire(AuralObj.Timeline.ViewRemoved(impl, view))
+    }
+
+    def getView(timed: Timeline.Timed[S])(implicit tx: S#Tx): Option[AuralObj[S]] = viewMap.get(timed.id)
 
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
@@ -152,9 +163,13 @@ object AuralTimelineImpl {
       val view = AuralObj(timed.value)
       viewMap.put(timed.id, view)
       tree.transformAt(spanToPoint(span)) { opt =>
-        val newViews = opt.fold(span -> Vec(view)) { case (span1, views) => (span1, views :+ view) }
+        import expr.IdentifierSerializer
+        val tup       = (tx.newHandle(timed.id), view)
+        val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
         Some(newViews)
       }
+
+      // contents.viewAdded(view)
 
       if (state != AuralObj.Playing) return
 
@@ -171,7 +186,7 @@ object AuralTimelineImpl {
       if (elemPlays) {
         val tr1 = tr0.intersect(span)
         logA(s"...playView: $tr1")
-        playView(view, tr1)
+        playView(timed.id, view, tr1)
       }
 
       // re-validate the next scheduling position
@@ -212,7 +227,7 @@ object AuralTimelineImpl {
       viewMap.remove(timed.id)
       tree.transformAt(spanToPoint(span)) { opt =>
         opt.flatMap { case (span1, views) =>
-          val i = views.indexOf(view)
+          val i = views.indexWhere(_._2 == view)
           val views1 = if (i >= 0) {
             views.patch(i, Nil, 1)
           } else {
@@ -264,6 +279,8 @@ object AuralTimelineImpl {
         sched.cancel(oldSched.token)
         scheduleNext(currentFrame)
       }
+
+      // contents.viewRemoved(view)
     }
 
     def prepare()(implicit tx: S#Tx): Unit = {
@@ -289,27 +306,29 @@ object AuralTimelineImpl {
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
         val tr = timeRef.intersect(span)
-        views.foreach(view => playView(view, tr))
+        views.foreach(view => playView(view._1(), view._2, tr))
       }
     }
 
     // note: `timeRef` should already have been updated
-    private def playView(view: AuralObj[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    private def playView(timed: S#ID, view: AuralObj[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       view.play(timeRef)
       activeViews.add(view)(tx.peer)
+      contents.viewAdded(timed, view)
     }
 
     private def stopViews(it: data.Iterator[I#Tx, Leaf[S]])(implicit tx: S#Tx): Unit = {
       logA("timeline - stopViews")
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
-        views.foreach(stopView)
+        views.foreach { case (_, view) => stopView(view) }
       }
     }
 
     private def stopView(view: AuralObj[S])(implicit tx: S#Tx): Unit = {
       view.stop()
       activeViews.remove(view)(tx.peer)
+      contents.viewRemoved(view)
     }
 
     private def scheduleNext(currentFrame: Long)(implicit tx: S#Tx): Unit = {
@@ -343,18 +362,20 @@ object AuralTimelineImpl {
     def dispose()(implicit tx: S#Tx): Unit = {
       tlObserver.dispose()
       freeNodes()
+      // XXX TODO - we really need an iterator for id-map
+      // viewMap.foreach { view => contents.fire(AuralObj.Timeline.ViewRemoved(this, view)) }
       viewMap.dispose()
     }
 
     private def freeNodes()(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
-      activeViews.foreach(_.stop())
+      activeViews.foreach { view =>
+        view.stop()
+        contents.viewRemoved(view)
+      }
       sched.cancel(schedToken().token)
-      clearSet(activeViews)
+      activeViews.clear()
     }
-
-    private def clearSet[A](s: TSet[A])(implicit tx: S#Tx): Unit =
-      s.retain(_ => false)(tx.peer) // no `clear` method
 
     // ---- bi-group functionality TODO - DRY ----
 

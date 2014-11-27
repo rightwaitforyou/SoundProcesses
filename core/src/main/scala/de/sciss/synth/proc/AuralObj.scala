@@ -57,6 +57,8 @@ object AuralObj {
       */
     def nodeOption(implicit tx: S#Tx): Option[NodeRef]
 
+    def getScan(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
+
     //    /** Queries the number of channel associated with a scanned input.
     //      * Throws a control throwable when no value can be determined, making
     //      * the ugen graph builder mark the querying graph element as incomplete
@@ -120,7 +122,8 @@ object AuralObj {
       AuralProcImpl(obj)
   }
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
-    // def data: ProcData[S]
+    def data: ProcData[S]
+
     override def obj: stm.Source[S#Tx, _Proc.Obj[S]]
 
     def targetState(implicit tx: S#Tx): AuralObj.State
@@ -138,11 +141,31 @@ object AuralObj {
 
     def apply[S <: Sys[S]](obj: _Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] =
       AuralTimelineImpl(obj)
+
+    sealed trait Update[S <: Sys[S]] {
+      def timeline: Timeline[S]
+    }
+
+    final case class ViewAdded[S <: Sys[S]](timeline: Timeline[S], timed: S#ID, view: AuralObj[S])
+      extends Update[S]
+
+    final case class ViewRemoved[S <: Sys[S]](timeline: Timeline[S], view: AuralObj[S])
+      extends Update[S]
   }
   trait Timeline[S <: Sys[S]] extends AuralObj[S] {
     override def obj: stm.Source[S#Tx, _Timeline.Obj[S]]
 
+    /** Monitors the _active_ views, i.e. views which are
+      * intersecting with the current transport position.
+      */
+    def contents: Observable[S#Tx, Timeline.Update[S]]
+
+    /** Returns the set of _active_ views, i.e. views which are intersecting
+      * with the current transport position.
+      */
     def views(implicit tx: S#Tx): Set[AuralObj[S]]
+
+    def getView(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Option[AuralObj[S]]
   }
 
   // ---- ensemble ----

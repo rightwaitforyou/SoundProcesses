@@ -96,9 +96,9 @@ object AuralProcDataImpl {
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGB.Context[S] {
 
-    private val stateRef = Ref.make[UGB.State[S]]()
+    private val stateRef  = Ref.make[UGB.State[S]]()
     // (state0)
-    private val nodeRef = Ref(Option.empty[GroupImpl])
+    private val nodeRef   = Ref(Option.empty[GroupImpl])
     private val scanBuses = TMap.empty[String, AudioBus]
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews = TSet.empty[AuralObj.Proc[S]]
@@ -140,6 +140,15 @@ object AuralProcDataImpl {
     }
 
     final def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
+
+    final def getScan(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] = {
+      implicit val itx = tx.peer
+      scanViews.get(key).fold[Option[Either[AudioBus, AuralScan[S]]]] {
+        scanBuses.get(key).map(Left(_))
+      } { v =>
+        Some(Right(v))
+      }
+    }
 
     private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"playScans ${procCached()}")
