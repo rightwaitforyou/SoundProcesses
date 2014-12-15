@@ -644,8 +644,7 @@ object AuralProcDataImpl {
                   val trig = new StreamBuffer(key = key, idx = idx, synth = b.node, buf = __buf, path = path,
                     fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
                     resetFrame = offset)
-                  trig.install()
-                  ???
+                  b.addUser(trig)
                   __buf
                 }
                 (_buf, _gain.toFloat)
@@ -682,8 +681,8 @@ object AuralProcDataImpl {
           b.addResource(rb)
 
         case UGB.Input.Action.Value =>   // ----------------------- action
-          ActionResponder.install(obj = b.obj, key = key, synth = b.node)
-          ???
+          val resp = new ActionResponder(objH = tx.newHandle(b.obj), key = key, synth = b.node)
+          b.addUser(resp)
 
         case UGB.Input.DiskOut.Value(numCh) =>
           val rb = b.obj.attr.getElem(key).fold[Buffer] {

@@ -16,8 +16,10 @@ package impl
 
 import de.sciss.{synth, osc}
 import scala.annotation.{tailrec, switch}
-import de.sciss.lucre.synth.{Node, Synth, Txn, Buffer}
+import de.sciss.lucre.synth.{DynamicUser, Node, Synth, Txn, Buffer}
 import de.sciss.synth.GE
+
+import scala.concurrent.stm.Ref
 
 object StreamBuffer {
   def padSize(interp: Int): Int = (interp: @switch) match {
@@ -77,7 +79,8 @@ object StreamBuffer {
   *                   this should be less than or equal to `startFrame`
  */
 final class StreamBuffer(key: String, idx: Int, synth: Node, buf: Buffer.Modifiable, path: String, fileFrames: Long,
-                         interp: Int, startFrame: Long, loop: Boolean, resetFrame: Long) {
+                         interp: Int, startFrame: Long, loop: Boolean, resetFrame: Long)
+  extends DynamicUser {
 
   // for binary compatibility
   def this(key: String, idx: Int, synth: Synth, buf: Buffer.Modifiable, path: String, fileFrames: Long,
@@ -90,6 +93,20 @@ final class StreamBuffer(key: String, idx: Int, synth: Node, buf: Buffer.Modifia
   private val bufSizeHM = bufSizeH - diskPad
   private val replyName = StreamBuffer.replyName(key)
   private val nodeID    = synth.peer.id
+
+  private val trigResp = de.sciss.synth.message.Responder.add(synth.server.peer) {
+    case m @ osc.Message(`replyName`, `nodeID`, `idx`, trigValF: Float) =>
+      // println(s"RECEIVED TR $trigValF...")
+      // logAural(m.toString())
+      val trigVal = trigValF.toInt + 1
+      scala.concurrent.stm.atomic { itx =>
+        implicit val tx = Txn.wrap(itx)
+        val frame = updateBuffer(trigVal)
+        if (frame >= fileFrames + bufSizeH) {
+          synth.free()
+        }
+      }
+  }
 
   private def updateBuffer(trigVal: Int)(implicit tx: Txn): Long = {
     val trigEven  = trigVal % 2 == 0
@@ -140,29 +157,26 @@ final class StreamBuffer(key: String, idx: Int, synth: Node, buf: Buffer.Modifia
     loop(0)
   }
 
-  def install()(implicit tx: Txn): Unit = {
-    val trigResp = de.sciss.synth.message.Responder.add(synth.server.peer) {
-      case m @ osc.Message(`replyName`, `nodeID`, `idx`, trigValF: Float) =>
-        // println(s"RECEIVED TR $trigValF...")
-        // logAural(m.toString())
-        val trigVal = trigValF.toInt + 1
-        scala.concurrent.stm.atomic { itx =>
-          implicit val tx = Txn.wrap(itx)
-          val frame = updateBuffer(trigVal)
-          if (frame >= fileFrames + bufSizeH) {
-            synth.free()
-          }
-        }
-    }
+  private val added = Ref(initialValue = false)
+
+  def add()(implicit tx: Txn): Unit = if (!added.swap(true)(tx.peer)) {
+    trigResp.add()
     // Responder.add is non-transactional. Thus, if the transaction fails, we need to remove it.
     scala.concurrent.stm.Txn.afterRollback { _ =>
       trigResp.remove()
     } (tx.peer)
 
-    synth.onEnd(trigResp.remove())
+    // synth.onEnd(trigResp.remove())
 
     // initial buffer fills. XXX TODO: fuse both reads into one
     updateBuffer(0)
     updateBuffer(1)
+  }
+
+  def remove()(implicit tx: Txn): Unit = if (added.swap(false)(tx.peer)) {
+    trigResp.remove()
+    scala.concurrent.stm.Txn.afterRollback { _ =>
+      trigResp.add()
+    } (tx.peer)
   }
 }
