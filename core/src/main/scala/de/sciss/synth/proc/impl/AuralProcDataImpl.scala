@@ -567,8 +567,8 @@ object AuralProcDataImpl {
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /** Sub-classes may override this if invoking the super-method. */
-    protected def buildSyncAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGB.Value)
-                                    (implicit tx: S#Tx): Unit = {
+    def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGB.Value)
+                      (implicit tx: S#Tx): Unit = {
       import context.server
       import context.scheduler.cursor
       value match {
@@ -585,14 +585,11 @@ object AuralProcDataImpl {
               if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
               val bus = Bus.control(server, numCh)
               val res = BusNodeSetter.mapper(ctlName, bus, b.node)
-              // b.users ::= res
               b.addUser(res)
               val w = AudioArtifactScalarWriter(bus, audioElem.value)
-              // b.dependencies ::= w
               b.addResource(w)
 
             case a =>
-              // b.setMap += /* _data.*/ attrControlSet(key, a)
               b.addControl(attrControlSet(key, a))
           }
 
@@ -649,9 +646,7 @@ object AuralProcDataImpl {
 
               case a => sys.error(s"Cannot use attribute $a as an audio stream")
             }
-            // b.setMap      += (ctlName -> Seq[Float](rb.id, gain): ControlSet)
             b.addControl(ctlName -> Seq[Float](rb.id, gain): ControlSet)
-            // b.dependencies ::= rb
             b.addResource(rb)
           }
 
@@ -677,9 +672,7 @@ object AuralProcDataImpl {
             case a => sys.error(s"Cannot use attribute $a as a buffer content")
           }
           val ctlName    = graph.Buffer.controlName(key)
-          // b.setMap      += ctlName -> rb.id
           b.addControl(ctlName -> rb.id)
-          // b.dependencies ::= rb
           b.addResource(rb)
 
         case UGB.Input.Action.Value =>   // ----------------------- action
@@ -700,9 +693,7 @@ object AuralProcDataImpl {
             case a => sys.error(s"Cannot use attribute $a as an artifact")
           }
           val ctlName    = graph.DiskOut.controlName(key)
-          // b.setMap      += ctlName -> rb.id
           b.addControl(ctlName -> rb.id)
-          // b.dependencies ::= rb
           b.addResource(rb)
 
         case _ =>

@@ -14,17 +14,13 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.file._
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Bus, Buffer, Synth, Sys}
-import de.sciss.numbers
+import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Buffer, Synth, Sys}
 import de.sciss.span.Span
-import de.sciss.synth.io.AudioFileType
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.proc.graph.impl.ActionResponder
 import de.sciss.synth.{proc, addToHead, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
 import proc.{UGenGraphBuilder => UGB}
@@ -190,8 +186,8 @@ object AuralProcImpl {
     /** Sub-classes may override this if falling back to the super-method. */
     protected def buildSyncInput(b: SynthBuilder[S], keyW: UGB.Key, value: UGB.Value)
                                 (implicit tx: S#Tx): Unit = keyW match {
-      case UGB.AttributeKey(key) => buildSyncAttrInput(b, key, value)
-      case UGB.ScanKey     (key) => buildScanInput    (b, key, value)
+      case UGB.AttributeKey(key) => _data.buildAttrInput(b, key, value)
+      case UGB.ScanKey     (key) => buildScanInput      (b, key, value)
       case _                     => throw new IllegalStateException(s"Unsupported input request $keyW")
     }
 
@@ -304,136 +300,6 @@ object AuralProcImpl {
         throw new IllegalStateException(s"Unsupported input attribute request $value")
     }
 
-    /** Sub-classes may override this if invoking the super-method. */
-    protected def buildSyncAttrInput(b: SynthBuilder[S], key: String, value: UGB.Value)
-                                    (implicit tx: S#Tx): Unit = value match {
-      case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
-        // XXX TODO - numChannels is not tested
-        b.obj.attr.getElem(key).foreach {
-          case a: AudioGraphemeElem[S] =>
-            val ctlName   = graph.Attribute.controlName(key)
-            val audioElem = a.peer
-            val spec      = audioElem.spec
-            if (spec.numFrames != 1)
-              sys.error(s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
-            val numCh = spec.numChannels // numChL.toInt
-            if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
-            val bus = Bus.control(server, numCh)
-            val res = BusNodeSetter.mapper(ctlName, bus, b.synth)
-            b.users ::= res
-            val w = AudioArtifactScalarWriter(bus, audioElem.value)
-            b.dependencies ::= w
-
-          case a => b.setMap += _data.attrControlSet(key, a)
-        }
-
-      case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
-        val infoSeq = if (specs.isEmpty) UGB.Input.Stream.EmptySpec :: Nil else specs
-
-        infoSeq.zipWithIndex.foreach { case (info, idx) =>
-          val ctlName     = graph.impl.Stream.controlName(key, idx)
-          val bufSize     = if (info.isEmpty) server.config.blockSize else {
-            val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
-            val bufDur    = 1.5 * maxSpeed
-            val minSz     = (2 * server.config.blockSize * math.max(1.0, maxSpeed)).toInt
-            val bestSz    = math.max(minSz, (bufDur * server.sampleRate).toInt)
-            import numbers.Implicits._
-            val bestSzHi  = bestSz.nextPowerOfTwo
-            val bestSzLo  = bestSzHi >> 1
-            if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
-          }
-          val (rb, gain) = b.obj.attr.getElem(key).fold[(Buffer, Float)] {
-            // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
-            // So instead of aborting when the attribute is not set, fall back to zero
-            val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
-            (_buf, 0f)
-          } {
-            case a: AudioGraphemeElem[S] =>
-              val audioElem = a.peer
-              val spec      = audioElem.spec
-              val path      = audioElem.artifact.value.getAbsolutePath
-              val offset    = audioElem.offset  .value
-              val _gain     = audioElem.gain    .value
-              val _buf      = if (info.isNative) {
-                // XXX DIRTY HACK
-                val offset1 = if (key.contains("!rnd")) {
-                  offset + (math.random * (spec.numFrames - offset)).toLong
-                } else {
-                  offset
-                }
-                // println(s"OFFSET = $offset1")
-                Buffer.diskIn(server)(
-                  path          = path,
-                  startFrame    = offset1,
-                  numFrames     = bufSize,
-                  numChannels   = spec.numChannels
-                )
-              } else {
-                val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
-                val trig = new StreamBuffer(key = key, idx = idx, synth = b.synth, buf = __buf, path = path,
-                  fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
-                  resetFrame = offset)
-                trig.install()
-                __buf
-              }
-              (_buf, _gain.toFloat)
-
-            case a => sys.error(s"Cannot use attribute $a as an audio stream")
-          }
-          b.setMap      += (ctlName -> Seq[Float](rb.id, gain): ControlSet)
-          b.dependencies ::= rb
-        }
-
-      case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
-        val rb = b.obj.attr.getElem(key).fold[Buffer] {
-          sys.error(s"Missing attribute $key for buffer content")
-        } {
-          case a: AudioGraphemeElem[S] =>
-            val audioElem = a.peer
-            val spec      = audioElem.spec
-            val path      = audioElem.artifact.value.getAbsolutePath
-            val offset    = audioElem.offset  .value
-            // XXX TODO - for now, gain is ignored.
-            // one might add an auxiliary control proxy e.g. Buffer(...).gain
-            // val _gain     = audioElem.gain    .value
-            if (spec.numFrames > 0x3FFFFFFF)
-              sys.error(s"File too large for in-memory buffer: $path (${spec.numFrames} frames)")
-            val bufSize   = spec.numFrames.toInt
-            val _buf      = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
-            _buf.read(path = path, fileStartFrame = offset)
-            _buf
-
-          case a => sys.error(s"Cannot use attribute $a as a buffer content")
-        }
-        val ctlName    = graph.Buffer.controlName(key)
-        b.setMap      += ctlName -> rb.id
-        b.dependencies ::= rb
-
-      case UGB.Input.Action.Value =>   // ----------------------- action
-        ActionResponder.install(obj = b.obj, key = key, synth = b.synth)
-
-      case UGB.Input.DiskOut.Value(numCh) =>
-        val rb = b.obj.attr.getElem(key).fold[Buffer] {
-          sys.error(s"Missing attribute $key for disk-out artifact")
-        } {
-          case a: ArtifactElem[S] =>
-            val artifact  = a.peer
-            val f         = artifact.value.absolute
-            val ext       = f.ext.toLowerCase
-            val tpe       = AudioFileType.writable.find(_.extensions.contains(ext)).getOrElse(AudioFileType.AIFF)
-            val _buf      = Buffer.diskOut(server)(path = f.path, fileType = tpe, numChannels = numCh)
-            _buf
-
-          case a => sys.error(s"Cannot use attribute $a as an artifact")
-        }
-        val ctlName    = graph.DiskOut.controlName(key)
-        b.setMap      += ctlName -> rb.id
-        b.dependencies ::= rb
-
-      case _ =>
-        throw new IllegalStateException(s"Unsupported input attribute request $value")
-    }
-    
     // ---- asynchronous preparation ----
     private def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)
                        (implicit tx: S#Tx): Unit = {

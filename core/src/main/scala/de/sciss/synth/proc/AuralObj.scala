@@ -15,14 +15,14 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
-import de.sciss.lucre.{event => evt, stm}
-import de.sciss.synth.{ControlSet, proc}
-import language.higherKinds
-import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralActionImpl, AuralEnsembleImpl, AuralTimelineImpl, AuralProcImpl}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
+import de.sciss.lucre.{stm, event => evt}
+import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralProcImpl, AuralTimelineImpl, AuralObjImpl => Impl}
+
+import scala.language.higherKinds
 
 object AuralObj {
-  import proc.{Proc => _Proc, Timeline => _Timeline, Ensemble => _Ensemble, Action => _Action}
+  import de.sciss.synth.proc.{Action => _Action, Ensemble => _Ensemble, Proc => _Proc, Timeline => _Timeline}
 
   trait Factory {
     def typeID: Int
@@ -99,15 +99,18 @@ object AuralObj {
     def addInstanceNode   (n: NodeRef)(implicit tx: S#Tx): Unit
     def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit
 
-    /** Converts an attribute key and a value, given as an `Elem`, to a
-      * control-set entry for a synth. Currently throws an exception if
-      * the attribute value cannot be cast into a scalar control value.
-      *
-      * A scalar audio grapheme is not supported right now.
-      */
-    def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet
+    //    /** Converts an attribute key and a value, given as an `Elem`, to a
+    //      * control-set entry for a synth. Currently throws an exception if
+    //      * the attribute value cannot be cast into a scalar control value.
+    //      *
+    //      * A scalar audio grapheme is not supported right now.
+    //      */
+    //    def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet
 
-    // called from scan-view if source is not materialized yet
+    def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGenGraphBuilder.Value)
+                      (implicit tx: S#Tx): Unit
+
+      // called from scan-view if source is not materialized yet
     def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit
 
     implicit def context: AuralContext[S]
