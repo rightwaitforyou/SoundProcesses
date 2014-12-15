@@ -13,7 +13,6 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AuralNode, Txn, AudioBus, Resource, DynamicUser, Synth, Sys}
 import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
@@ -41,29 +40,31 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
   var outputBuses   = Map.empty[String, AudioBus]
   var inputBuses    = Map.empty[String, AudioBus]
 
-  private var attrMap = Map.empty[String, List[Disposable[Txn]]]
+  private var attrMap = Map.empty[String, (List[DynamicUser], List[Resource])]
 
   def finish()(implicit tx: Txn): AuralNode = {
     // XXX TODO
     val server  = synth.server
     val group   = server.defaultGroup
 
+    val attrMap1 = attrMap.map { case (key, value) => (key, value._1 ::: value._2) }
+
     val node = AuralNode(synth, inputBuses = inputBuses, outputBuses = outputBuses,
-      resources = users ::: dependencies)
+      resources = users ::: dependencies, attrMap = attrMap1)
 
     // wrap as AuralProc and save it in the identifier map for later lookup
     synth.play(target = group, addAction = addToHead, args = setMap.result(),
       dependencies = dependencies)
 
-    if (users.nonEmpty) users.foreach(_.add())
+    users                  .foreach(_.add())
+    attrMap.foreach(_._2._1.foreach(_.add()))
     node
   }
 
   // copies the node-dependency-builder stuff to a map entry
   def storeKey(key: String): Unit =
     if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-      val disp = keyedUsers ::: keyedResources
-      attrMap += key -> disp
+      attrMap += key -> (keyedUsers, keyedResources)
       keyedUsers      = Nil
       keyedResources  = Nil
     }

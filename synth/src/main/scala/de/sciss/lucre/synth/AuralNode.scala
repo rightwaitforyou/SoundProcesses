@@ -16,13 +16,14 @@ package de.sciss.lucre.synth
 import de.sciss.lucre.stm.Disposable
 import de.sciss.synth.addBefore
 
-import scala.concurrent.stm.Ref
+import scala.concurrent.stm.{TMap, Ref}
 
 object AuralNode {
   def apply(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
-            resources: List[Disposable[Txn]])(implicit tx: Txn): AuralNode = {
+            resources: List[Disposable[Txn]], attrMap: Map[String, List[Disposable[Txn]]])
+           (implicit tx: Txn): AuralNode = {
     val res = new Impl(synth, inputBuses = inputBuses, outputBuses = outputBuses,
-      resources = resources)
+      resources = resources, attrMap0 = attrMap)
     NodeGraph.addNode(res)
     res
   }
@@ -39,10 +40,12 @@ object AuralNode {
                                      post: Option[Group] = None, back: Option[Group] = None)
 
   private final class Impl(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
-                           resources: List[Disposable[Txn]])
+                           resources: List[Disposable[Txn]], attrMap0: Map[String, List[Disposable[Txn]]])
     extends AuralNode {
 
     private val groupsRef = Ref[Option[AllGroups]](None)
+
+    private val attrMap   = TMap[String, List[Disposable[Txn]]](attrMap0.toSeq: _*)
 
     override def toString = s"AuralProc($synth, outs = ${outputBuses.mkString("(", ", ", ")")}, " +
       s"ins = ${inputBuses.mkString("(", ", ", ")")}"
@@ -108,9 +111,11 @@ object AuralNode {
     }
 
     def stop()(implicit tx: Txn): Unit = {
+      implicit val itx = tx.peer
       node.free()
-      // if (users    .nonEmpty) users    .foreach(_.remove ())
-      if (resources.nonEmpty) resources.foreach(_.dispose())
+      resources.foreach(_.dispose())
+      attrMap  .foreach(_._2.foreach(_.dispose()))
+      attrMap.clear()
       NodeGraph.removeNode(this)
     }
 
