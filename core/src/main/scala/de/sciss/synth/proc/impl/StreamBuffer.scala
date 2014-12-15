@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.{synth, osc}
 import scala.annotation.{tailrec, switch}
-import de.sciss.lucre.synth.{Synth, Txn, Buffer}
+import de.sciss.lucre.synth.{Node, Synth, Txn, Buffer}
 import de.sciss.synth.GE
 
 object StreamBuffer {
@@ -76,7 +76,7 @@ object StreamBuffer {
  * @param resetFrame  when looping, the reset frame position into the file after each loop begins.
   *                   this should be less than or equal to `startFrame`
  */
-final class StreamBuffer(key: String, idx: Int, synth: Synth, buf: Buffer.Modifiable, path: String, fileFrames: Long,
+final class StreamBuffer(key: String, idx: Int, synth: Node, buf: Buffer.Modifiable, path: String, fileFrames: Long,
                          interp: Int, startFrame: Long, loop: Boolean, resetFrame: Long) {
 
   // for binary compatibility

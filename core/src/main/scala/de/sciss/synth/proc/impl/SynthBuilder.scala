@@ -13,9 +13,9 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.synth.{NodeDependencyBuilder, AudioBus, Resource, DynamicUser, Synth, Sys}
+import de.sciss.lucre.synth.{AudioBus, Resource, DynamicUser, Synth, Sys}
 import de.sciss.synth.ControlSet
-import de.sciss.synth.proc.{TimeRef, Proc}
+import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
 
 /** An object used in the last phase of playing a process. It has
   * an instantiated synth and allows the addition of controls, buses, users
@@ -24,7 +24,7 @@ import de.sciss.synth.proc.{TimeRef, Proc}
   * @see  [[AuralProcImpl]]
   */
 final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, val timeRef: TimeRef)
-  extends NodeDependencyBuilder {
+  extends NodeDependencyBuilder[S] {
 
   val setMap        = Vector.newBuilder[ControlSet]
 
@@ -42,7 +42,9 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
 
   // ---- node dependency builder ----
 
-  def setControl(pair: ControlSet): Unit = setMap += pair
+  def node = synth
+
+  def addControl(pair: ControlSet): Unit = setMap += pair
 
   var keyedUsers      = List.empty[DynamicUser]
   var keyedResources  = List.empty[Resource   ]

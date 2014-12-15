@@ -3,7 +3,7 @@ package graph
 package impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{Synth, Sys}
+import de.sciss.lucre.synth.{Node, Synth, Sys}
 import de.sciss.{osc, synth}
 import de.sciss.synth.{proc, GE, message}
 
@@ -24,7 +24,7 @@ object ActionResponder {
 
   var DEBUG = false
 
-  def install[S <: Sys[S]](obj: Obj[S], key: String, synth: Synth)
+  def install[S <: Sys[S]](obj: Obj[S], key: String, synth: Node)
                           (implicit tx: S#Tx, cursor: stm.Cursor[S], context: AuralContext[S]): Unit = {
     val Name    = replyName(key)
     val NodeID  = synth.peer.id

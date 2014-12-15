@@ -567,7 +567,7 @@ object AuralProcDataImpl {
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     /** Sub-classes may override this if invoking the super-method. */
-    protected def buildSyncAttrInput(b: SynthBuilder[S], key: String, value: UGB.Value)
+    protected def buildSyncAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGB.Value)
                                     (implicit tx: S#Tx): Unit = {
       import context.server
       import context.scheduler.cursor
@@ -584,12 +584,16 @@ object AuralProcDataImpl {
               val numCh = spec.numChannels // numChL.toInt
               if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
               val bus = Bus.control(server, numCh)
-              val res = BusNodeSetter.mapper(ctlName, bus, b.synth)
-              b.users ::= res
+              val res = BusNodeSetter.mapper(ctlName, bus, b.node)
+              // b.users ::= res
+              b.addUser(res)
               val w = AudioArtifactScalarWriter(bus, audioElem.value)
-              b.dependencies ::= w
+              // b.dependencies ::= w
+              b.addResource(w)
 
-            case a => b.setMap += /* _data.*/ attrControlSet(key, a)
+            case a =>
+              // b.setMap += /* _data.*/ attrControlSet(key, a)
+              b.addControl(attrControlSet(key, a))
           }
 
         case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
@@ -635,7 +639,7 @@ object AuralProcDataImpl {
                   )
                 } else {
                   val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
-                  val trig = new StreamBuffer(key = key, idx = idx, synth = b.synth, buf = __buf, path = path,
+                  val trig = new StreamBuffer(key = key, idx = idx, synth = b.node, buf = __buf, path = path,
                     fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
                     resetFrame = offset)
                   trig.install()
@@ -645,8 +649,10 @@ object AuralProcDataImpl {
 
               case a => sys.error(s"Cannot use attribute $a as an audio stream")
             }
-            b.setMap      += (ctlName -> Seq[Float](rb.id, gain): ControlSet)
-            b.dependencies ::= rb
+            // b.setMap      += (ctlName -> Seq[Float](rb.id, gain): ControlSet)
+            b.addControl(ctlName -> Seq[Float](rb.id, gain): ControlSet)
+            // b.dependencies ::= rb
+            b.addResource(rb)
           }
 
         case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
@@ -671,11 +677,13 @@ object AuralProcDataImpl {
             case a => sys.error(s"Cannot use attribute $a as a buffer content")
           }
           val ctlName    = graph.Buffer.controlName(key)
-          b.setMap      += ctlName -> rb.id
-          b.dependencies ::= rb
+          // b.setMap      += ctlName -> rb.id
+          b.addControl(ctlName -> rb.id)
+          // b.dependencies ::= rb
+          b.addResource(rb)
 
         case UGB.Input.Action.Value =>   // ----------------------- action
-          ActionResponder.install(obj = b.obj, key = key, synth = b.synth)
+          ActionResponder.install(obj = b.obj, key = key, synth = b.node)
 
         case UGB.Input.DiskOut.Value(numCh) =>
           val rb = b.obj.attr.getElem(key).fold[Buffer] {
@@ -692,8 +700,10 @@ object AuralProcDataImpl {
             case a => sys.error(s"Cannot use attribute $a as an artifact")
           }
           val ctlName    = graph.DiskOut.controlName(key)
-          b.setMap      += ctlName -> rb.id
-          b.dependencies ::= rb
+          // b.setMap      += ctlName -> rb.id
+          b.addControl(ctlName -> rb.id)
+          // b.dependencies ::= rb
+          b.addResource(rb)
 
         case _ =>
           throw new IllegalStateException(s"Unsupported input attribute request $value")
