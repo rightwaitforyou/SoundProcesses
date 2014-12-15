@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AudioBus, Bus, Group, Node, NodeGraph, NodeRef, Sys, Txn}
+import de.sciss.lucre.synth.{AudioBus, Bus, NodeRef, Sys}
 import de.sciss.model.Change
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.proc.AuralObj.ProcData
@@ -24,7 +24,7 @@ import de.sciss.synth.proc.Implicits._
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.UGenGraphBuilder.{Complete, Incomplete, MissingIn}
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
-import de.sciss.synth.{ControlSet, SynthGraph, addBefore}
+import de.sciss.synth.{ControlSet, SynthGraph}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
@@ -33,77 +33,17 @@ object AuralProcDataImpl {
   def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
     context.acquire[AuralObj.ProcData[S]](proc)(new Impl[S].init(proc))
 
-  private def GroupImpl(name: String, in0: NodeRef)(implicit tx: Txn): GroupImpl = {
-    val res = new GroupImpl(name, in0)
-    NodeGraph.addNode(res)
-    res
-  }
-
-  // dynamically flips between single proc and multiple procs
-  // (wrapping them in one common group)
-  private final class GroupImpl(name: String, in0: NodeRef) extends NodeRef {
-    val server = in0.server
-
-    override def toString = name
-
-    private val instancesRef  = Ref(in0 :: Nil)
-    private val nodeRef       = Ref(in0)
-
-    def node(implicit tx: Txn): Node = nodeRef.get(tx.peer).node
-
-    def addInstanceNode(n: NodeRef)(implicit tx: Txn): Unit = {
-      implicit val itx = tx.peer
-      val old = instancesRef.getAndTransform(n :: _)
-      old match {
-        case single :: Nil =>
-          val g = Group(single.node, addBefore)
-          nodeRef() = NodeRef(g)
-          single.node.moveToHead(g)
-          n     .node.moveToHead(g)
-
-        case _ =>
-      }
-    }
-
-    def removeInstanceNode(n: NodeRef)(implicit tx: Txn): Boolean = {
-      implicit val itx = tx.peer
-      val after = instancesRef.transformAndGet(_.filterNot(_ == n))
-      after match {
-        case single :: Nil =>
-          val group = nodeRef.swap(single).node
-          single.node.moveBefore(group)
-          group.free()
-          false
-
-        case Nil  =>
-          dispose()
-          true
-
-        case _ => false
-      }
-    }
-
-    def dispose()(implicit tx: Txn): Unit = {
-      implicit val itx = tx.peer
-      if (instancesRef.swap(Nil).size > 1) {
-        val group = nodeRef.swap(null).node
-        group.free()
-      }
-      NodeGraph.removeNode(this)
-    }
-  }
-
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGB.Context[S] {
 
     private val stateRef  = Ref.make[UGB.State[S]]()
     // (state0)
-    private val nodeRef   = Ref(Option.empty[GroupImpl])
+    private val nodeRef   = Ref(Option.empty[NodeRef.Group])
     private val scanBuses = TMap.empty[String, AudioBus]
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews = TSet.empty[AuralObj.Proc[S]]
 
-    private val procLoc = TxnLocal[Proc.Obj[S]]() // cache-only purpose
+    private val procLoc   = TxnLocal[Proc.Obj[S]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
 
@@ -195,8 +135,7 @@ object AuralProcDataImpl {
     private def scanChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
       logA(s"ScanChange in   ${procCached()} ($key)")
       changes.foreach {
-        case Scan.SourceAdded(_) =>
-          testInScan(key, scan)
+        case Scan.SourceAdded(_) => testInScan(key, scan)
         case _ =>
       }
     }
@@ -291,7 +230,7 @@ object AuralProcDataImpl {
       logA(s"addInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       nodeRef().fold {
-        val groupImpl = GroupImpl(name = s"Group-NodeRef ${procCached()}", in0 = n)
+        val groupImpl = NodeRef.Group(name = s"Group-NodeRef ${procCached()}", in0 = n)
         nodeRef() = Some(groupImpl)
         playScans(groupImpl)
 
@@ -321,9 +260,9 @@ object AuralProcDataImpl {
     private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       nodeRef.swap(None).foreach(_.dispose())
-      scanViews.foreach { case (_, view) => view.dispose() }
-      clearMap(scanViews)
-      clearMap(scanBuses)
+      scanViews.foreach(_._2.dispose())
+      scanViews.clear()
+      scanBuses.clear()
       val rj = stateRef().rejectedInputs
       if (rj.nonEmpty) {
         val scans = procCached().elem.peer.scans
@@ -336,9 +275,6 @@ object AuralProcDataImpl {
         }
       }
     }
-
-    private def clearMap[A, B](m: TMap[A, B])(implicit tx: S#Tx): Unit =
-      m.retain((_, _) => false)(tx.peer) // no `clear` method
 
     final def state(implicit tx: S#Tx): UGB.State[S] = stateRef.get(tx.peer)
 
