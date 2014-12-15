@@ -13,13 +13,14 @@
 
 package de.sciss.lucre.synth
 
-import de.sciss.lucre.stm.Disposable
 import de.sciss.synth.{Node => SNode, _}
-import impl.{NodeRefImpl => Impl}
 
-trait Node extends Resource {
+trait Node extends Resource with NodeRef {
   // ---- abstract ----
   def peer: SNode
+
+  /** Refers to itself */
+  def node(implicit tx: Txn): Node = this
 
   //   final val isOnline: State = State( this, "isOnline", init = initOnline )
 
@@ -65,18 +66,4 @@ trait Node extends Resource {
   def run(state: Boolean)(implicit tx: Txn): Unit
 
   def release(releaseTime: Optional[Double] = None)(implicit tx: Txn): Unit
-}
-
-object NodeRef {
-  def apply(n: Node): NodeRef = Impl(n)
-  def Group(name: String, in0: NodeRef)(implicit tx: Txn): Group = Impl.Group(name, in0)
-
-  trait Group extends NodeRef with Disposable[Txn] {
-    def addInstanceNode   (n: NodeRef)(implicit tx: Txn): Unit
-    def removeInstanceNode(n: NodeRef)(implicit tx: Txn): Boolean
-  }
-}
-trait NodeRef {
-  def server: Server
-  def node(implicit tx: Txn): Node
 }
