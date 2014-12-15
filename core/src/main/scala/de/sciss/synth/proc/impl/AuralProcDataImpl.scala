@@ -30,15 +30,21 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
 
 object AuralProcDataImpl {
-  def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
+  def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])
+                        (implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
     context.acquire[AuralObj.ProcData[S]](proc)(new Impl[S].init(proc))
 
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGB.Context[S] {
 
     private val stateRef  = Ref.make[UGB.State[S]]()
-    // (state0)
+
+    // running main synths
     private val nodeRef   = Ref(Option.empty[NodeRef.Group])
+
+    // running attribute inputs
+    private val attrMap   = TMap.empty[String, Disposable[S#Tx]]
+
     private val scanBuses = TMap.empty[String, AudioBus]
     private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews = TSet.empty[AuralObj.Proc[S]]
@@ -94,13 +100,6 @@ object AuralProcDataImpl {
       logA(s"playScans ${procCached()}")
       scanViews.foreach { case (_, view) =>
         view.play(n)
-      }(tx.peer)
-    }
-
-    private def stopScans()(implicit tx: S#Tx): Unit = {
-      logA(s"stopScans ${procCached()}")
-      scanViews.foreach { case (_, view) =>
-        view.stop()
       }(tx.peer)
     }
 
@@ -241,10 +240,13 @@ object AuralProcDataImpl {
 
     final def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"removeInstanceNode ${procCached()} : $n")
-      val groupImpl = nodeRef.get(tx.peer).getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
+      implicit val itx = tx.peer
+      val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
       if (groupImpl.removeInstanceNode(n)) {
-        nodeRef.set(None)(tx.peer)
-        stopScans()
+        nodeRef() = None
+        scanViews.foreach(_._2.stop   ())
+        attrMap  .foreach(_._2.dispose())
+        attrMap  .clear()
       }
     }
 
@@ -259,9 +261,11 @@ object AuralProcDataImpl {
 
     private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
-      nodeRef.swap(None).foreach(_.dispose())
+      nodeRef  .swap(None).foreach(_.dispose())
       scanViews.foreach(_._2.dispose())
       scanViews.clear()
+      attrMap  .foreach(_._2.dispose())
+      attrMap  .clear()
       scanBuses.clear()
       val rj = stateRef().rejectedInputs
       if (rj.nonEmpty) {

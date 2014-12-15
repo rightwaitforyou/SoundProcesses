@@ -29,16 +29,10 @@ object AuralScan {
     Impl(data = data, key = key, scan = scan, bus = bus)
 
   trait Owned[S <: Sys[S]] extends AuralScan[S] {
-    // def node_=(value: Option[NodeRef])(implicit tx: S#Tx): Unit
 
     def stop()(implicit tx: S#Tx): Unit
     def play(n: NodeRef)(implicit tx: S#Tx): Unit
   }
-
-  //  sealed trait Update[S <: Sys[S]] {
-  //    def view: AuralScan[S]
-  //  }
-  //  case class NodeChanged[S <: Sys[S]](view: AuralScan[S], change: Change[Option[NodeRef]]) extends Update[S]
 }
 trait AuralScan[S <: Sys[S]] extends AuralScan.Proxy[S] with Disposable[S#Tx] {
   // def numChannels(implicit tx: S#Tx): Int
@@ -53,8 +47,6 @@ trait AuralScan[S <: Sys[S]] extends AuralScan.Proxy[S] with Disposable[S#Tx] {
 
   def removeSource(view: AuralScan[S])(implicit tx: S#Tx): Unit
   def removeSink  (view: AuralScan[S])(implicit tx: S#Tx): Unit
-
-  // def node(implicit tx: S#Tx): Option[NodeRef]
 
   def data: AuralObj.ProcData[S]
 
