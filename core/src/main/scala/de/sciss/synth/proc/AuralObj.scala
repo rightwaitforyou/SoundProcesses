@@ -96,8 +96,8 @@ object AuralObj {
     def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
     def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
 
-    def addInstanceNode   (n: NodeRef)(implicit tx: S#Tx): Unit
-    def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit
+    def addInstanceNode   (n: NodeRef.Full)(implicit tx: S#Tx): Unit
+    def removeInstanceNode(n: NodeRef.Full)(implicit tx: S#Tx): Unit
 
     //    /** Converts an attribute key and a value, given as an `Elem`, to a
     //      * control-set entry for a synth. Currently throws an exception if

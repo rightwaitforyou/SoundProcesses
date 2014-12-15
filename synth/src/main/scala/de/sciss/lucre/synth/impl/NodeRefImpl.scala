@@ -14,6 +14,7 @@
 package de.sciss.lucre.synth
 package impl
 
+import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth
 import de.sciss.synth.addBefore
 
@@ -22,7 +23,7 @@ import scala.concurrent.stm.Ref
 object NodeRefImpl {
   // def apply(n: Node): NodeRef = new Wrap(n)
 
-  def Group(name: String, in0: NodeRef)(implicit tx: Txn): NodeRef.Group = {
+  def Group(name: String, in0: NodeRef.Full)(implicit tx: Txn): NodeRef.Group = {
     val res = new GroupImpl(name, in0)
     NodeGraph.addNode(res)
     res
@@ -37,17 +38,17 @@ object NodeRefImpl {
 
   // dynamically flips between single proc and multiple procs
   // (wrapping them in one common group)
-  private final class GroupImpl(name: String, in0: NodeRef) extends NodeRef.Group {
+  private final class GroupImpl(name: String, in0: NodeRef.Full) extends NodeRef.Group {
     val server = in0.server
 
     override def toString = name
 
     private val instancesRef  = Ref(in0 :: Nil)
-    private val nodeRef       = Ref(in0)
+    private val nodeRef       = Ref[NodeRef](in0)
 
     def node(implicit tx: Txn): Node = nodeRef.get(tx.peer).node
 
-    def addInstanceNode(n: NodeRef)(implicit tx: Txn): Unit = {
+    def addInstanceNode(n: NodeRef.Full)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val old = instancesRef.getAndTransform(n :: _)
       old match {
@@ -61,7 +62,7 @@ object NodeRefImpl {
       }
     }
 
-    def removeInstanceNode(n: NodeRef)(implicit tx: Txn): Boolean = {
+    def removeInstanceNode(n: NodeRef.Full)(implicit tx: Txn): Boolean = {
       implicit val itx = tx.peer
       val after = instancesRef.transformAndGet(_.filterNot(_ == n))
       after match {
@@ -78,6 +79,10 @@ object NodeRefImpl {
         case _ => false
       }
     }
+
+    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit = ???
+
+    def removeAttrResources(key: String)(implicit tx: Txn): Unit = ???
 
     def dispose()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer

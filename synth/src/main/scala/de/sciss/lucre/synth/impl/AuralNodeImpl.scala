@@ -111,7 +111,7 @@ object AuralNodeImpl {
       }
     }
 
-    def stop()(implicit tx: Txn): Unit = {
+    def dispose()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       node.free()
       resources.foreach(_.dispose())

@@ -24,7 +24,7 @@ object AuralNode {
       resources = resources, attrMap = attrMap)
 }
 
-trait AuralNode extends NodeRef {
+trait AuralNode extends NodeRef.Full {
   def server: Server
 
   /** Retrieves the main group of the Proc, or returns None if a group has not yet been assigned. */
@@ -38,13 +38,6 @@ trait AuralNode extends NodeRef {
 
   def preGroup()(implicit tx: Txn): Group
 
-  def stop()(implicit tx: Txn): Unit
-
   def getInputBus (key: String): Option[AudioBus]
   def getOutputBus(key: String): Option[AudioBus]
-
-  def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit
-
-  /** Removes and frees resources associated with the attribute specified by `key` */
-  def removeAttrResources(key: String)(implicit tx: Txn): Unit
 }

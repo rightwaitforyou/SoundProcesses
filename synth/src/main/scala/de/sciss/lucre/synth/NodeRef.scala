@@ -18,11 +18,18 @@ import de.sciss.lucre.synth.impl.{NodeRefImpl => Impl}
 
 object NodeRef {
   // def apply(n: Node): NodeRef = Impl(n)
-  def Group(name: String, in0: NodeRef)(implicit tx: Txn): Group = Impl.Group(name, in0)
+  def Group(name: String, in0: Full)(implicit tx: Txn): Group = Impl.Group(name, in0)
 
-  trait Group extends NodeRef with Disposable[Txn] {
-    def addInstanceNode   (n: NodeRef)(implicit tx: Txn): Unit
-    def removeInstanceNode(n: NodeRef)(implicit tx: Txn): Boolean
+  trait Full extends NodeRef with Disposable[Txn] {
+    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit
+
+    /** Removes and frees resources associated with the attribute specified by `key` */
+    def removeAttrResources(key: String)(implicit tx: Txn): Unit
+  }
+
+  trait Group extends Full with Disposable[Txn] {
+    def addInstanceNode   (n: Full)(implicit tx: Txn): Unit
+    def removeInstanceNode(n: Full)(implicit tx: Txn): Boolean
   }
 }
 trait NodeRef {

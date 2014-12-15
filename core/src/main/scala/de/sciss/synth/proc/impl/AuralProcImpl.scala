@@ -84,7 +84,7 @@ object AuralProcImpl {
     private final class PlayingNode(val node: AuralNode) extends PlayingRef {
       def dispose()(implicit tx: S#Tx): Unit = {
         _data.removeInstanceNode(node)
-        node.stop()
+        node.dispose()
       }
     }
     private final class PlayingPrepare(val resources: List[AsyncResource[S]]) extends PlayingRef {

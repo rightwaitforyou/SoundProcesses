@@ -41,6 +41,9 @@ object AuralProcDataImpl {
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGB.Context[S] {
 
+    import context.server
+    import context.scheduler.cursor
+
     private val stateRef  = Ref.make[UGB.State[S]]()
 
     // running main synths
@@ -147,33 +150,18 @@ object AuralProcDataImpl {
 
     private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrAdded   to   ${procCached()} ($key)")
-      attrNodeSet(key, value)
+      for {
+        n <- nodeRef.get(tx.peer)
+        v <- state.acceptedInputs.get(UGB.AttributeKey(key))
+      } attrNodeSet1(n, key, v, value)
     }
-
-    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
-      nodeRef.get(tx.peer).foreach { n =>
-        state.acceptedInputs.get(UGB.AttributeKey(key)).foreach(v => attrNodeSet(n, key, v, value))
-      }
-
-    protected def attrNodeSet(n: NodeRef, key: String, assigned: UGB.Value, value: Obj[S])(implicit tx: S#Tx): Unit =
-      assigned match {
-        case UGB.Input.Attribute.Value(numCh) =>
-          // XXX TODO -- we have to verify the number of channels
-          val set = attrControlSet(key, value.elem)
-          n.node.set(set)
-
-        case b: UGB.Input.Buffer.Value =>
-          Console.err.println(s"WARNING: Changing buffer contents ($key) while playing not yet supported")
-
-        case UGB.Input.Action.Value => // not relevant
-
-        case other =>
-          throw new IllegalStateException(s"Unsupported input request $other")
-      }
 
     private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
-      // currently this is simply ignored
+      for {
+        n <- nodeRef.get(tx.peer)
+        v <- state.acceptedInputs.get(UGB.AttributeKey(key))
+      } attrNodeUnset1(n, key, v, value)
     }
 
     private def attrChange(key: String, value: Obj[S], changes: Vec[Obj.Change[S, Any]])(implicit tx: S#Tx): Unit = {
@@ -185,7 +173,23 @@ object AuralProcDataImpl {
         case Obj.ElemChange(_) => true
         case _ => false
       }
-      if (isElem) attrNodeSet(key, value)
+      if (isElem) {
+        for {
+          n <- nodeRef.get(tx.peer)
+          v <- state.acceptedInputs.get(UGB.AttributeKey(key))
+        } {
+          attrNodeUnset1(n, key, v, value)
+          attrNodeSet1  (n, key, v, value)
+        }
+      }
+    }
+
+    private def attrNodeUnset1(n: NodeRef, key: String, assigned: UGB.Value, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      ???
+    }
+
+    private def attrNodeSet1(n: NodeRef, key: String, assigned: UGB.Value, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      buildAttrInput(???, key, assigned)
     }
 
     // ----
@@ -230,7 +234,7 @@ object AuralProcDataImpl {
       }
     }
 
-    final def addInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+    final def addInstanceNode(n: NodeRef.Full)(implicit tx: S#Tx): Unit = {
       logA(s"addInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       nodeRef().fold {
@@ -243,7 +247,7 @@ object AuralProcDataImpl {
       }
     }
 
-    final def removeInstanceNode(n: NodeRef)(implicit tx: S#Tx): Unit = {
+    final def removeInstanceNode(n: NodeRef.Full)(implicit tx: S#Tx): Unit = {
       logA(s"removeInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
@@ -370,32 +374,6 @@ object AuralProcDataImpl {
             }
           }
         case _ =>
-      }
-    }
-
-    /** Sub-classes may override this if invoking the super-method. */
-    def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet = {
-      val ctlName = graph.Attribute.controlName(key)
-      value match {
-        case a: IntElem     [S] => ctlName -> a.peer.value.toFloat: ControlSet
-        case a: DoubleElem  [S] => ctlName -> a.peer.value.toFloat: ControlSet
-        case a: BooleanElem [S] => ctlName -> (if (a.peer.value) 1f else 0f): ControlSet
-        case a: FadeSpec.Elem[S] =>
-          val spec = a.peer.value
-          // dur, shape-id, shape-curvature, floor
-          val values = Vec(
-            (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
-              case parametric(c)  => c
-              case _              => 0f
-            }, spec.floor
-          )
-          ctlName -> values: ControlSet
-        case a: DoubleVecElem[S] =>
-          val values = a.peer.value.map(_.toFloat)
-          ctlName -> values: ControlSet
-
-        case _ =>
-          sys.error(s"Cannot cast attribute $value to a scalar value")
       }
     }
 
@@ -565,32 +543,59 @@ object AuralProcDataImpl {
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
+    /** Sub-classes may override this if invoking the super-method. */
+    protected def buildAttrValueInput(b: NodeDependencyBuilder[S], key: String, value: Elem[S])
+                                     (implicit tx: S#Tx): Unit = {
+      val ctlName = graph.Attribute.controlName(key)
+      value match {
+        case a: IntElem     [S] =>
+          b.addControl(ctlName -> a.peer.value.toFloat)
+        case a: DoubleElem  [S] =>
+          b.addControl(ctlName -> a.peer.value.toFloat)
+        case a: BooleanElem [S] =>
+          b.addControl(ctlName -> (if (a.peer.value) 1f else 0f))
+        case a: FadeSpec.Elem[S] =>
+          val spec = a.peer.value
+          // dur, shape-id, shape-curvature, floor
+          val values = Vec(
+            (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+              case parametric(c)  => c
+              case _              => 0f
+            }, spec.floor
+          )
+          b.addControl(ctlName -> values)
+
+        case a: DoubleVecElem[S] =>
+          val values = a.peer.value.map(_.toFloat)
+          b.addControl(ctlName -> values)
+
+        case a: AudioGraphemeElem[S] =>
+          val ctlName   = graph.Attribute.controlName(key)
+          val audioElem = a.peer
+          val spec      = audioElem.spec
+          if (spec.numFrames != 1)
+            sys.error(s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
+          val numCh = spec.numChannels // numChL.toInt
+          if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
+          val bus = Bus.control(server, numCh)
+          val res = BusNodeSetter.mapper(ctlName, bus, b.node)
+          b.addUser(res)
+          val w = AudioArtifactScalarWriter(bus, audioElem.value)
+          b.addResource(w)
+
+        case _ =>
+          sys.error(s"Cannot cast attribute $value to a scalar value")
+      }
+    }
 
     /** Sub-classes may override this if invoking the super-method. */
     def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGB.Value)
                       (implicit tx: S#Tx): Unit = {
-      import context.server
-      import context.scheduler.cursor
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
           // XXX TODO - numChannels is not tested
-          b.obj.attr.getElem(key).foreach {
-            case a: AudioGraphemeElem[S] =>
-              val ctlName   = graph.Attribute.controlName(key)
-              val audioElem = a.peer
-              val spec      = audioElem.spec
-              if (spec.numFrames != 1)
-                sys.error(s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
-              val numCh = spec.numChannels // numChL.toInt
-              if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
-              val bus = Bus.control(server, numCh)
-              val res = BusNodeSetter.mapper(ctlName, bus, b.node)
-              b.addUser(res)
-              val w = AudioArtifactScalarWriter(bus, audioElem.value)
-              b.addResource(w)
-
-            case a =>
-              b.addControl(attrControlSet(key, a))
+          b.obj.attr.getElem(key).foreach { a =>
+            buildAttrValueInput(b, key, a)
           }
 
         case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
@@ -640,6 +645,7 @@ object AuralProcDataImpl {
                     fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
                     resetFrame = offset)
                   trig.install()
+                  ???
                   __buf
                 }
                 (_buf, _gain.toFloat)
@@ -677,6 +683,7 @@ object AuralProcDataImpl {
 
         case UGB.Input.Action.Value =>   // ----------------------- action
           ActionResponder.install(obj = b.obj, key = key, synth = b.node)
+          ???
 
         case UGB.Input.DiskOut.Value(numCh) =>
           val rb = b.obj.attr.getElem(key).fold[Buffer] {
