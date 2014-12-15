@@ -34,13 +34,13 @@ object AudioArtifactWriter {
       import de.sciss.synth._
       import ugen._
       val buf = "buf".ir
-      val dur = "dur".ir(1)
+      val dur = "dur".ir(1f)
       val out = "out".kr
-      val amp = "amp".kr(1)
+      val amp = "amp".kr(1f)
       val sig0 = if (segm.value.spec.sampleRate == serverSampleRate) {
         DiskIn .ar(numChannels, buf)
       } else {
-        VDiskIn.ar(numChannels, buf, speed = "speed".ir(1))
+        VDiskIn.ar(numChannels, buf, speed = "speed".ir(1f))
       }
       val sig = sig0 * amp
       Line.kr(start = 0, end = 0, dur = dur, doneAction = freeSelf)

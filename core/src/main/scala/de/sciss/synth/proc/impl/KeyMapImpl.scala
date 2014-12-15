@@ -29,7 +29,7 @@ object KeyMapImpl {
   }
 
   implicit def entrySerializer[S <: evt.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
-  : evt.Serializer[S, Entry[S, Key, Value, ValueUpd]] = new EntrySer
+  : evt.Serializer[S, Entry[S, Key, Value, ValueUpd]] = new EntrySer[S, Key, Value, ValueUpd]
 
   private final class EntrySer[S <: evt.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
     extends evt.NodeSerializer[S, Entry[S, Key, Value, ValueUpd]] {

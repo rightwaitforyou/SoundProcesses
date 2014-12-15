@@ -34,7 +34,7 @@ object SensorSystem {
   object Config {
     def apply() = new ConfigBuilder
 
-    implicit def build(b: ConfigBuilder) = b.build
+    implicit def build(b: ConfigBuilder): Config = b.build
   }
   final case class Config(osc: Channel.Net.Config, command: String) extends ConfigLike
   final class ConfigBuilder private[SensorSystem] () extends ConfigLike {

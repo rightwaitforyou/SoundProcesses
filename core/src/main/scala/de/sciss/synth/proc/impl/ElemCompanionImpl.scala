@@ -117,7 +117,7 @@ trait ActiveElemImpl[S <: Sys[S]]
 
   // protected def peerEvent: evt.EventLike[S, Any]
 
-  override def toString() = s"Elem.${prefix}$id"
+  override def toString() = s"Elem.$prefix$id"
 
   def select(slot: Int): Event[S, Any, Any] = changed
 

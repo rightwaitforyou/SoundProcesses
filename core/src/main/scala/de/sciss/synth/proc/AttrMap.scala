@@ -15,11 +15,10 @@ package de.sciss
 package synth
 package proc
 
-import lucre.data
-import language.higherKinds
-import scala.reflect.ClassTag
-import de.sciss.lucre.expr.{ExprType, Expr}
+import de.sciss.lucre.data
 import de.sciss.lucre.event.Sys
+
+import scala.language.higherKinds
 
 object AttrMap {
   trait Modifiable[S <: Sys[S]] extends AttrMap[S] {

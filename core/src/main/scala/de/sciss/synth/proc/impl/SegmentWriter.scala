@@ -14,10 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.synth.{AudioBus, Resource, Synth, Txn}
 import de.sciss.synth.Curve.parametric
-import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.lucre.synth.{DynamicBusUser, AudioBus, Synth, Resource, Txn}
-import de.sciss.synth.{addToHead, ControlSet, SynthGraph}
+import de.sciss.synth.{ControlSet, SynthGraph, addToHead}
+
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object SegmentWriter {
   def apply(bus: AudioBus, segm: Grapheme.Segment.Curve, time: Long, sampleRate: Double)
@@ -35,7 +36,7 @@ object SegmentWriter {
     var usesShape = false // XXX TODO dirty variable
     val sg = SynthGraph {
       import de.sciss.synth._
-      import ugen._
+      import de.sciss.synth.ugen._
 
       val zero        = Vec.fill(segm.numChannels)(0f)
       val start       = "start".ir(zero)

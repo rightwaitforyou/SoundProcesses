@@ -15,13 +15,14 @@ package de.sciss.synth.proc
 
 import java.io.File
 
-import de.sciss.span.Span
-import language.implicitConversions
-import de.sciss.processor.{GenericProcessor, Processor, ProcessorFactory}
 import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{Sys, Server}
+import de.sciss.lucre.synth.{Server, Sys}
+import de.sciss.processor.{GenericProcessor, ProcessorFactory}
+import de.sciss.span.Span
+import de.sciss.synth.proc.impl.{BounceImpl => Impl}
+
 import scala.collection.immutable.{Iterable => IIterable}
-import impl.{BounceImpl => Impl}
+import scala.language.implicitConversions
 
 object Bounce {
   def apply[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx,

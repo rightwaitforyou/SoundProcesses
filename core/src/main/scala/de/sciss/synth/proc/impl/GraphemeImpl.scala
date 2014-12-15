@@ -15,20 +15,21 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, synth, bitemp}
-import bitemp.BiPin
-import collection.breakOut
-import collection.immutable.{IndexedSeq => Vec}
-import evt.{Event, impl => evti, Sys}
-import proc.Grapheme.Segment
-import annotation.tailrec
-import de.sciss.span.Span
-import de.sciss.serial.{DataOutput, DataInput}
 import de.sciss.lucre
+import de.sciss.lucre.bitemp.BiPin
+import de.sciss.lucre.event.{Event, Sys, impl => evti}
 import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.{event => evt}
+import de.sciss.serial.{DataInput, DataOutput}
+import de.sciss.span.Span
+import de.sciss.synth.proc.Grapheme.Segment
+
+import scala.annotation.tailrec
+import scala.collection.breakOut
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object GraphemeImpl {
-  import Grapheme.{Expr, TimedElem, Value, Modifiable}
+  import Grapheme.{Expr, Modifiable, TimedElem, Value}
 
   private implicit val timeEx = lucre.expr.Long
 

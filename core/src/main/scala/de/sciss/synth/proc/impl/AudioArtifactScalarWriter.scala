@@ -25,7 +25,7 @@ object AudioArtifactScalarWriter {
       import ugen._
       val buf   = "buf".ir
       val out   = "out".kr
-      val amp   = "amp".kr(1)
+      val amp   = "amp".kr(1f)
       val sig0  = BufRd.kr(numChannels, buf = buf, loop = 0, interp = 1)
       val sig   = sig0 * amp
       // Line.kr(start = 0, end = 0, dur = dur, doneAction = freeSelf)

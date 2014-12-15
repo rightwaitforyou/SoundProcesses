@@ -72,8 +72,10 @@ trait Elem[S <: Sys[S]]
 
   import me.{Peer => Peer0, PeerUpdate => PeerUpdate0}
 
-  def mkCopy()(implicit tx: S#Tx): Elem[S] {
+  type This = Elem[S] {
     type Peer       = Peer0
     type PeerUpdate = PeerUpdate0
   }
+
+  def mkCopy()(implicit tx: S#Tx): This
 }

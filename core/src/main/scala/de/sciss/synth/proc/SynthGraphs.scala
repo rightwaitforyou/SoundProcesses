@@ -253,7 +253,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   // XXX TODO: not cool. Should use `1` to `3` for cookies
   override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                       (implicit tx: S#Tx): Ex[S] with evt.Node[S] =
-    (cookie /* : @switch */) match {
+    cookie match {
       case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` => new Predefined(targets, cookie)
 
       //      case `mapCookie`  =>
@@ -310,7 +310,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
 
     protected def reader: evt.Reader[S, SynthGraphs.Ex[S]] = serializer
 
-    def value(implicit tx: S#Tx): SynthGraph = (cookie /* : @switch */) match {
+    def value(implicit tx: S#Tx): SynthGraph = cookie match {
       // case `oldTapeCookie`  => oldTapeSynthGraph
       case `emptyCookie`    => emptySynthGraph
       case `tapeCookie`     => tapeSynthGraph
