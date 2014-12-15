@@ -58,8 +58,8 @@ object AuralProcDataImpl {
         case single :: Nil =>
           val g = Group(single.node, addBefore)
           nodeRef() = NodeRef(g)
-          single.node.moveToHead(audible = true, group = g)
-          n     .node.moveToHead(audible = true, group = g)
+          single.node.moveToHead(g)
+          n     .node.moveToHead(g)
 
         case _ =>
       }
@@ -71,8 +71,8 @@ object AuralProcDataImpl {
       after match {
         case single :: Nil =>
           val group = nodeRef.swap(single).node
-          single.node.moveBefore(audible = true, target = group)
-          group.free(audible = true)
+          single.node.moveBefore(group)
+          group.free()
           false
 
         case Nil  =>
@@ -87,7 +87,7 @@ object AuralProcDataImpl {
       implicit val itx = tx.peer
       if (instancesRef.swap(Nil).size > 1) {
         val group = nodeRef.swap(null).node
-        group.free(audible = false)
+        group.free()
       }
       NodeGraph.removeNode(this)
     }
@@ -217,7 +217,7 @@ object AuralProcDataImpl {
         case UGB.Input.Attribute.Value(numCh) =>
           // XXX TODO -- we have to verify the number of channels
           val set = attrControlSet(key, value.elem)
-          n.node.set(audible = true, pairs = set)
+          n.node.set(set)
 
         case b: UGB.Input.Buffer.Value =>
           Console.err.println(s"WARNING: Changing buffer contents ($key) while playing not yet supported")

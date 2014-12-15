@@ -64,11 +64,11 @@ object AuralNode {
       groupsRef.transform { groupsOpt =>
         val res = groupsOpt.fold {
           val all = AllGroups(main = newGroup)
-          synth.moveToHead(audible = true, group = newGroup)
+          synth.moveToHead(newGroup)
           all
         } { all =>
           moveAllTo(all, newGroup)
-          all.main.free(audible = true) // what can you do...?
+          all.main.free() // what can you do...?
           all.copy(main = newGroup)
         }
         Some(res)
@@ -97,12 +97,12 @@ object AuralNode {
 
     private def moveAllTo(all: AllGroups, newGroup: Group)(implicit tx: Txn): Unit = {
       val core = anchorNode
-      core.moveToTail(audible = true, group = newGroup)
-      all.pre .foreach(_.moveBefore(audible = true, target = core))
-      all.post.foreach(_.moveAfter (audible = true, target = core))
+      core.moveToTail(newGroup)
+      all.pre .foreach(_.moveBefore(core))
+      all.post.foreach(_.moveAfter (core))
 
       all.back.foreach { g =>
-        if (g.isOnline) g.moveToHead(audible = true, group = newGroup)
+        if (g.isOnline) g.moveToHead(newGroup)
       }
     }
 

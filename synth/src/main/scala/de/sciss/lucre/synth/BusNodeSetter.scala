@@ -13,8 +13,9 @@
 
 package de.sciss.lucre.synth
 
-import concurrent.stm.{Ref => ScalaRef}
-import de.sciss.synth.{ControlBus => SControlBus, AudioBus => SAudioBus, ControlABusMap}
+import de.sciss.synth.{ControlABusMap, AudioBus => SAudioBus, ControlBus => SControlBus}
+
+import scala.concurrent.stm.{Ref => ScalaRef}
 
 trait BusNodeSetter extends DynamicBusUser {
   def node: Node
@@ -61,12 +62,12 @@ object BusNodeSetter {
 
   private sealed trait AudioSetterLike extends ImplLike {
     final def busChanged(b: SAudioBus, isDummy: Boolean)(implicit tx: Txn): Unit =
-      if (node.isOnline) node.set(audible = true, pairs = controlName -> b.index)
+      if (node.isOnline) node.set(controlName -> b.index)
   }
 
   private sealed trait ControlSetterLike extends ImplLike {
     final def busChanged(b: SControlBus)(implicit tx: Txn): Unit =
-      if (node.isOnline) node.set(audible = true, pairs = controlName -> b.index)
+      if (node.isOnline) node.set(controlName -> b.index)
   }
 
   // implements `busChanged` in terms of a `mapan` command
@@ -76,17 +77,17 @@ object BusNodeSetter {
 //      node.mapan(true, value)
 
       if (isDummy) {
-        node.mapan(true, ControlABusMap.Multi(controlName, -1, b.numChannels))
+        node.mapan(ControlABusMap.Multi(controlName, -1, b.numChannels))
         // node.fill(true, (controlName, b.numChannels, 0f))
       } else {
-        node.mapan(true, controlName -> b)
+        node.mapan(controlName -> b)
       }
     }
   }
 
   private sealed trait ControlMapperLike extends ImplLike {
     final def busChanged(b: SControlBus)(implicit tx: Txn): Unit =
-      node.mapn(true, controlName -> b)
+      node.mapn(controlName -> b)
   }
 
   private abstract class AbstractAudioImpl

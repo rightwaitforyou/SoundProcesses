@@ -27,7 +27,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     requireOffline()
     if (numFrames   < 0) throw new IllegalArgumentException(s"numFrames ($numFrames) must be >= 0")
     if (numChannels < 0) throw new IllegalArgumentException(s"numChannels ($numChannels) must be >= 0")
-    tx.addMessage(this, peer.allocMsg(numFrames = numFrames, numChannels = numChannels), audible = false)
+    tx.addMessage(this, peer.allocMsg(numFrames = numFrames, numChannels = numChannels))
     setOnline(value = true)
   }
 
@@ -37,7 +37,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     if (startFrame > 0x7FFFFFFFL) throw new IllegalArgumentException(s"Cannot encode start frame >32 bit ($startFrame)")
     // require(numFrames >= 0, s"numFrames ($numFrames) must be >= 0")
     val frameI = startFrame.toInt
-    tx.addMessage(this, peer.allocReadMsg(path, startFrame = frameI, numFrames = numFrames), audible = false)
+    tx.addMessage(this, peer.allocReadMsg(path, startFrame = frameI, numFrames = numFrames))
     setOnline(value = true)
   }
 
@@ -54,7 +54,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     if (leaveOpen != closeOnDisposal) throw new IllegalArgumentException(s"leaveOpen is $leaveOpen but should be $closeOnDisposal")
     if (startFrame < 0) throw new IllegalArgumentException(s"startFrame ($startFrame) must be >= 0")
     tx.addMessage(this, peer.writeMsg(path, fileType, sampleFormat, numFrames = numFrames, startFrame = startFrame,
-      leaveOpen = leaveOpen), audible = false)
+      leaveOpen = leaveOpen))
   }
 
   /** Cues the input sound file for streaming via DiskIn (leaves the file open). */
@@ -63,8 +63,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     if (fileStartFrame > 0x7FFFFFFFL) throw new IllegalArgumentException(s"Cannot encode start frame >32 bit ($fileStartFrame)")
     // if (numFrames < 0) throw new IllegalArgumentException(s"numFrames ($numFrames) must be >= -1")
     val frameI = fileStartFrame.toInt
-    tx.addMessage(this, peer.readMsg(path, fileStartFrame = frameI, numFrames = numFrames, leaveOpen = true),
-      audible = false)
+    tx.addMessage(this, peer.readMsg(path, fileStartFrame = frameI, numFrames = numFrames, leaveOpen = true))
   }
 
   /** Reads the buffer contents from a file (closes the file). */
@@ -74,7 +73,7 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     if (bufStartFrame < 0) throw new IllegalArgumentException(s"bufStartFrame ($bufStartFrame) must be >= 0")
     val frameI = fileStartFrame.toInt
     tx.addMessage(this, peer.readMsg(path, fileStartFrame = frameI, bufStartFrame = bufStartFrame,
-      numFrames = numFrames, leaveOpen = false), audible = false)
+      numFrames = numFrames, leaveOpen = false))
   }
 
   // XXX TODO - DRY with `read`
@@ -85,13 +84,13 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     if (bufStartFrame < 0) throw new IllegalArgumentException(s"bufStartFrame ($bufStartFrame) must be >= 0")
     val frameI = fileStartFrame.toInt
     tx.addMessage(this, peer.readChannelMsg(path, fileStartFrame = frameI, bufStartFrame = bufStartFrame,
-      numFrames = numFrames, leaveOpen = false, channels = channels), audible = false)
+      numFrames = numFrames, leaveOpen = false, channels = channels))
   }
 
   /** Clears the buffer contents. */
   def zero()(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.zeroMsg, audible = false)
+    tx.addMessage(this, peer.zeroMsg)
   }
 
   /** Clears the buffer contents. */
@@ -101,15 +100,15 @@ final case class BufferImpl(server: Server, peer: SBuffer)
     if (num   < 0         ) throw new IllegalArgumentException (s"num ($num) must be >= 0")
     if (index + num > size) throw new IndexOutOfBoundsException(s"index ($index) + num ($num) > size ($size)")
     requireOnline()
-    tx.addMessage(this, peer.fillMsg(FillRange(index = index, num = num, value = value)), audible = false) // XXX TODO audible?
+    tx.addMessage(this, peer.fillMsg(FillRange(index = index, num = num, value = value)))
   }
 
   def dispose()(implicit tx: Txn): Unit = {
     requireOnline()
     if (closeOnDisposal) {
-      tx.addMessage(this, peer.closeMsg, audible = false)
+      tx.addMessage(this, peer.closeMsg)
     }
-    tx.addMessage(this, peer.freeMsg(release = false), audible = false)
+    tx.addMessage(this, peer.freeMsg(release = false))
     server.freeBuffer(peer.id)
     setOnline(value = false)
   }

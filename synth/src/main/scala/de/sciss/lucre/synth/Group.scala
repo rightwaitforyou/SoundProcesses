@@ -34,5 +34,5 @@ object Group {
 
 trait Group extends Node {
   def peer: SGroup
-  def freeAll(audible: Boolean = true)(implicit tx: Txn): Unit
+  def freeAll()(implicit tx: Txn): Unit
 }

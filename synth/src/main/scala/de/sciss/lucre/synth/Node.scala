@@ -41,26 +41,26 @@ trait Node extends Resource {
   def map(assoc: (AudioBus  , String))(implicit tx: Txn): AudioBusNodeSetter
   def map(assoc: (ControlBus, String))(implicit tx: Txn): ControlBusNodeSetter
 
-  def free(audible: Boolean = true)(implicit tx: Txn): Unit
+  def free()(implicit tx: Txn): Unit
 
-  def set (audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit
-  def setn(audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit
+  def set (pairs: ControlSet*)(implicit tx: Txn): Unit
+  def setn(pairs: ControlSet*)(implicit tx: Txn): Unit
 
-  def fill(audible: Boolean, data: ControlFillRange*)(implicit tx: Txn): Unit
+  def fill(data: ControlFillRange*)(implicit tx: Txn): Unit
 
   //   def setIfOnline( pairs: ControlSet* )( implicit tx: Txn ) : Unit
 
-  def mapn (audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn): Unit
-  def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn): Unit
+  def mapn (pairs: ControlKBusMap*)(implicit tx: Txn): Unit
+  def mapan(pairs: ControlABusMap*)(implicit tx: Txn): Unit
 
   //   def moveToHeadIfOnline( group: Group )( implicit tx: Txn ) : Unit
 
-  def moveToHead(audible: Boolean, group: Group)(implicit tx: Txn): Unit
-  def moveToTail(audible: Boolean, group: Group)(implicit tx: Txn): Unit
-  def moveBefore(audible: Boolean, target: Node)(implicit tx: Txn): Unit
-  def moveAfter (audible: Boolean, target: Node)(implicit tx: Txn): Unit
+  def moveToHead(group: Group)(implicit tx: Txn): Unit
+  def moveToTail(group: Group)(implicit tx: Txn): Unit
+  def moveBefore(target: Node)(implicit tx: Txn): Unit
+  def moveAfter (target: Node)(implicit tx: Txn): Unit
 
-  def run(audible: Boolean, state: Boolean)(implicit tx: Txn): Unit
+  def run(state: Boolean)(implicit tx: Txn): Unit
 
   def release(releaseTime: Optional[Double] = None)(implicit tx: Txn): Unit
 }

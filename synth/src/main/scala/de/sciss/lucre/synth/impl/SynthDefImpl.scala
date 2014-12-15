@@ -42,13 +42,13 @@ final case class SynthDefImpl(server: Server, peer: SSynthDef) extends ResourceI
       SynthDefLoad(path, None)
     }
 
-    tx.addMessage(this, m, audible = false)
+    tx.addMessage(this, m)
     setOnline(value = true)
   }
 
   def dispose()(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.freeMsg, audible = false)
+    tx.addMessage(this, peer.freeMsg)
     setOnline(value = false)
   }
 }

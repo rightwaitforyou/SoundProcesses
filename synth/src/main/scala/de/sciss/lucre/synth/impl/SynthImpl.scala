@@ -33,7 +33,6 @@ final case class SynthImpl(peer: SSynth, definition: SynthDef) extends NodeImpl 
         s"Dependency $r must be running and using the same server"))
     }
     tx.addMessage(this, peer.newMsg(definition.name, target.peer, args, addAction),
-      audible = true,
       dependencies = target :: definition :: dependencies)
 
     setOnline(value = true)

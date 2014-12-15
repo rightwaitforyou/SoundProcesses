@@ -18,12 +18,14 @@ import de.sciss.lucre.{event => evt, data}
 import impl.{ScanImpl => Impl}
 import de.sciss.lucre.event.Publisher
 import language.implicitConversions
-import de.sciss.serial.DataInput
+import de.sciss.serial.{Serializer, DataInput}
 import de.sciss.lucre.stm.Identifiable
 import collection.immutable.{IndexedSeq => Vec}
 import evt.Sys
 
 object Scan {
+  final val typeID = 0x10009
+
   object Link {
     implicit def grapheme[S <: Sys[S]](peer: proc.Grapheme[S]): Grapheme[S] = Grapheme(peer)
     implicit def scan    [S <: Sys[S]](peer: proc.Scan    [S]): Scan    [S] = Scan    (peer)
@@ -51,7 +53,7 @@ object Scan {
 
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Scan[S]] = Impl.serializer
 
-  /** A scan's event fires updates of this type. */
+  /** A scan event fires updates of this type. */
   final case class Update[S <: Sys[S]](scan: Scan[S], changes: Vec[Change[S]])
   sealed trait Change      [S <: Sys[S]]
   sealed trait LinkChange  [S <: Sys[S]] extends Change[S]      { def link  : Link[S] }
@@ -80,6 +82,30 @@ object Scan {
 
   final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
                                                changes: Vec[Grapheme.Segment]) extends Change[S]
+
+  // ---- Elem ----
+
+  implicit object Elem extends proc.Elem.Companion[Scan.Elem] {
+    def typeID: Int = Scan.typeID
+
+    def apply[S <: Sys[S]](peer: Scan[S])(implicit tx: S#Tx): Scan.Elem[S] =  proc.impl.ElemImpl.Scan(peer)
+
+    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Scan.Elem[S]] =
+      proc.impl.ElemImpl.Scan.serializer[S]
+  }
+  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
+    type Peer       = Scan[S]
+    type PeerUpdate = Scan.Update[S]
+  }
+
+  /** Convenient short-cut */
+
+  object Obj {
+    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Scan.Obj[S]] =
+      if (obj.elem.isInstanceOf[Scan.Elem[S]]) Some(obj.asInstanceOf[Scan.Obj[S]])
+      else None
+  }
+  type Obj[S <: Sys[S]] = proc.Obj.T[S, Scan.Elem]
 }
 
 /** A `Scan` represents a real-time signal which can either function as a reader linked to another scan

@@ -79,9 +79,9 @@ object NodeGraph {
       pred = succ
       val curr = iter.next().node
       if (isAfter) {
-        curr.moveAfter (audible = true, target = pred)
+        curr.moveAfter (pred)
       } else {
-        curr.moveBefore(audible = true, target = pred)
+        curr.moveBefore(pred)
       }
       succ = curr
     }

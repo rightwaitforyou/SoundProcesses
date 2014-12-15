@@ -16,20 +16,23 @@ package synth
 package proc
 package impl
 
-import lucre.{event => evt}
 import de.sciss.lucre.event.Sys
-import serial.DataInput
 import de.sciss.lucre.expr.{Expr => _Expr}
 import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.{event => evt}
+import de.sciss.serial.DataInput
+
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.higherKinds
 
 object ElemImpl {
-  import scala.{Int => _Int, Double => _Double, Boolean => _Boolean, Long => _Long}
   import java.lang.{String => _String}
-  import proc.{FadeSpec => _FadeSpec, Proc => _Proc, Timeline => _Timeline}
-  import lucre.synth.expr.{DoubleVec => _DoubleVec}
-  import lucre.artifact.{ArtifactLocation => _ArtifactLocation, Artifact => _Artifact}
+
+  import de.sciss.lucre.artifact.{Artifact => _Artifact, ArtifactLocation => _ArtifactLocation}
+  import de.sciss.lucre.synth.expr.{DoubleVec => _DoubleVec}
+  import proc.{FadeSpec => _FadeSpec, Proc => _Proc, Scan => _Scan, Timeline => _Timeline}
+
+  import scala.{Boolean => _Boolean, Double => _Double, Int => _Int, Long => _Long}
 
   // ---- Int ----
 
@@ -458,6 +461,47 @@ object ElemImpl {
     }
   }
 
+  // ---- Scan ----
+
+  object Scan extends ElemCompanionImpl[_Scan.Elem] {
+    val typeID = _Scan.typeID
+
+    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                   (implicit tx: S#Tx): _Scan.Elem[S] with evt.Node[S] = {
+      val peer = _Scan.read(in, access)
+      new ScanActiveImpl(targets, peer)
+    }
+
+    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): _Scan.Elem[S] =
+      sys.error("Constant Scan not supported")
+
+    def apply[S <: Sys[S]](peer: _Scan[S])(implicit tx: S#Tx): _Scan.Elem[S] =
+      new ScanActiveImpl(evt.Targets[S], peer)
+  }
+
+  private trait ScanImpl[S <: Sys[S]] extends _Scan.Elem[S] {
+    final def typeID = Scan.typeID
+    final def prefix = "Scan"
+  }
+
+  private final class ScanActiveImpl[S <: Sys[S]](val targets: evt.Targets[S],
+                                                  val peer: _Scan[S])
+    extends ActiveElemImpl[S] with ScanImpl[S] {
+
+    protected def peerEvent = peer.changed
+
+    def mkCopy()(implicit tx: S#Tx): _Scan.Elem[S] = {
+      val newPeer     = _Scan[S]
+      peer.sources.foreach { link =>
+        newPeer.addSource(link)
+      }
+      peer.sinks.foreach { link =>
+        newPeer.addSink(link)
+      }
+      _Scan.Elem(newPeer)
+    }
+  }
+
   // ----------------- Serializer -----------------
 
   implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Elem[S]] = anySer.asInstanceOf[Ser[S]]
@@ -482,6 +526,7 @@ object ElemImpl {
     ArtifactLocation.typeID -> ArtifactLocation,
     Artifact        .typeID -> Artifact        ,
     Proc            .typeID -> Proc            ,
+    Scan            .typeID -> Scan            ,
     Timeline        .typeID -> Timeline        ,
     FolderElemImpl  .typeID -> FolderElemImpl  ,
     Ensemble        .typeID -> EnsembleImpl.ElemImpl,

@@ -73,6 +73,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test12" => test12()
       case "--test13" => test13()
       case "--test14" => test14()
+      case "--test15" => test15()
       case _         =>
         println("WARNING: No option given, using --test1")
         test1()
@@ -175,6 +176,44 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 15
+
+  def test15()(implicit context: AuralContext[S]): Unit = {
+    println("----test15----")
+    println(
+      """
+        |Expected behaviour:
+        |A scan be used as attribute input.
+        |NOTE: this is currently NOT supported
+        |(since Attribute is designated for scalar values)
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val p1 = proc {
+        val freq  = graph.Attribute.ar("key")
+        val sin   = SinOsc.ar(SinOsc.ar(freq).madd(300, 600))
+        Out.ar(0, Pan2.ar(sin * 0.1))
+      }
+
+      val p2 = proc {
+        val sig   = Line.ar(0, 1000, 4)
+        graph.ScanOut("out", sig)
+      }
+      val scan = p2.elem.peer.scans.add("out")
+
+      val scanObj = Obj(Scan.Elem(scan))
+      p1.attr.put("key", scanObj)
+
+      val t     = Transport[S]
+      t.addObject(p1)
+      t.addObject(p2)
+      t.play()
+
+      stopAndQuit(5.0)
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 14
 

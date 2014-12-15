@@ -22,7 +22,7 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{InTxn, Ref, TxnExecutor}
 
 object NodeImpl {
-  private val EmptyOnEnd = new OnEnd(Vec.empty, Vec.empty)
+  private val EmptyOnEnd = new OnEnd(Vector.empty, Vector.empty)
 
   private final case class OnEnd(direct: Vec[() => Unit], inTxn: Vec[Txn => Unit]) {
     def nonEmpty = direct.nonEmpty || inTxn.nonEmpty
@@ -145,87 +145,69 @@ trait NodeImpl extends ResourceImpl with Node {
     }
   }
 
-  final def dispose()(implicit tx: Txn): Unit = free(audible = true)
+  final def dispose()(implicit tx: Txn): Unit = free()
 
   /** Note: this is graceful in not throwing up if the node was already freed. */
-  final def free(audible: Boolean = true)(implicit tx: Txn): Unit = {
+  final def free()(implicit tx: Txn): Unit = {
     // requireOnline()
     if (isOnline) {
-      tx.addMessage(this, peer.freeMsg, audible = audible)
+      tx.addMessage(this, peer.freeMsg)
       setOnline(value = false)
     }
   }
 
-  final def set(audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit = {
+  final def set(pairs: ControlSet*)(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.setMsg(pairs: _*), audible = audible)
+    tx.addMessage(this, peer.setMsg(pairs: _*))
   }
 
-  final def setn(audible: Boolean, pairs: ControlSet*)(implicit tx: Txn): Unit = {
+  final def setn(pairs: ControlSet*)(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.setnMsg(pairs: _*), audible = audible)
+    tx.addMessage(this, peer.setnMsg(pairs: _*))
   }
 
-
-
-  //   final def setIfOnline( pairs: ControlSet* )( implicit tx: Txn ) {
-  //      // XXX eventually this should be like set with different failure resolution
-  //      if( isOnline.get ) {
-  //         tx.addMessage( peer.setMsg( pairs: _* ), change = None, audible = true, noErrors = true )
-  //      }
-  ////      if( isOnline.get ) tx.add( OSCBundle(
-  ////         OSCMessage( "/error", -1 ), node.setMsg( pairs: _* ), OSCMessage( "/error", -2 )), true )
-  //   }
-
-  final def fill(audible: Boolean, data: ControlFillRange*)(implicit tx: Txn): Unit = {
+  final def fill(data: ControlFillRange*)(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.fillMsg(data: _*), audible = audible)
+    tx.addMessage(this, peer.fillMsg(data: _*))
   }
 
-  final def mapn(audible: Boolean, pairs: ControlKBusMap*)(implicit tx: Txn): Unit = {
+  final def mapn(pairs: ControlKBusMap*)(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.mapnMsg(pairs: _*), audible = audible)
+    tx.addMessage(this, peer.mapnMsg(pairs: _*))
   }
 
-  final def mapan(audible: Boolean, pairs: ControlABusMap*)(implicit tx: Txn): Unit = {
+  final def mapan(pairs: ControlABusMap*)(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.mapanMsg(pairs: _*), audible = audible) // , dependencies = this :: Nil /* ?! */)
+    tx.addMessage(this, peer.mapanMsg(pairs: _*)) // , dependencies = this :: Nil /* ?! */)
   }
 
-  final def moveToHead(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
+  final def moveToHead(group: Group)(implicit tx: Txn): Unit = {
     require(isOnline && group.isOnline, s"Both source $this and target $group must be online")
-    tx.addMessage(this, peer.moveToHeadMsg(group.peer), audible = audible, dependencies = group :: Nil)
+    tx.addMessage(this, peer.moveToHeadMsg(group.peer), dependencies = group :: Nil)
   }
 
-  //   final def moveToHeadIfOnline( group: Group )( implicit tx: Txn ) {
-  //      if( isOnline.get ) {
-  //         tx.addMessage( peer.moveToHeadMsg( group.peer ), change = None, audible = true,
-  //                        dependencies = Map( group.isOnline -> true ), noErrors = true )
-  //      }
-  //   }
-
-  final def moveToTail(audible: Boolean, group: Group)(implicit tx: Txn): Unit = {
+  final def moveToTail(group: Group)(implicit tx: Txn): Unit = {
     require(isOnline && group.isOnline, s"Both source $this and target $group must be online")
-    tx.addMessage(this, peer.moveToTailMsg(group.peer), audible = audible, dependencies = group :: Nil)
+    tx.addMessage(this, peer.moveToTailMsg(group.peer), dependencies = group :: Nil)
   }
 
-  final def moveBefore(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
+  final def moveBefore(target: Node)(implicit tx: Txn): Unit = {
     require(isOnline && target.isOnline, s"Both source $this and target $target must be online")
-    tx.addMessage(this, peer.moveBeforeMsg(target.peer), audible = audible, dependencies = target :: Nil)
+    tx.addMessage(this, peer.moveBeforeMsg(target.peer), dependencies = target :: Nil)
   }
 
-  final def moveAfter(audible: Boolean, target: Node)(implicit tx: Txn): Unit = {
+  final def moveAfter(target: Node)(implicit tx: Txn): Unit = {
     require(isOnline && target.isOnline, s"Both source $this and target $target must be online")
-    tx.addMessage(this, peer.moveAfterMsg(target.peer), audible = audible, dependencies = target :: Nil)
+    tx.addMessage(this, peer.moveAfterMsg(target.peer), dependencies = target :: Nil)
   }
 
-  final def run(audible: Boolean, state: Boolean)(implicit tx: Txn): Unit = {
+  final def run(state: Boolean)(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.runMsg(state), audible = audible, dependencies = Nil)
+    tx.addMessage(this, peer.runMsg(state), dependencies = Nil)
   }
 
   final def release(releaseTime: Optional[Double])(implicit tx: Txn): Unit = {
     requireOnline()
-    tx.addMessage(this, peer.releaseMsg(releaseTime), audible = true)
+    tx.addMessage(this, peer.releaseMsg(releaseTime))
   }
 }

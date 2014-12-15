@@ -45,7 +45,7 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
 
   protected def markBundlesDirty(): Unit
 
-  final def addMessage(resource: Resource, m: osc.Message with message.Send, audible: Boolean, dependencies: Seq[Resource],
+  final def addMessage(resource: Resource, m: osc.Message with message.Send, dependencies: Seq[Resource],
                        noErrors: Boolean): Unit = {
 
     val server        = resource.server
@@ -119,26 +119,6 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
 
     bundlesMap += server -> bNew
   }
-
-  //      // clumping
-  //      var clumpIdx   = 0
-  //      var clumpMap   = Map.empty[ Entry, Int ]
-  //      var clumps     = IntMap.empty[ List[ Entry ]]
-  //      val audibleIdx = Int.MaxValue
-  //      topology.vertices.foreach( targetEntry => {
-  //         if( targetEntry.audible ) {
-  //            clumps += audibleIdx -> (targetEntry :: clumps.getOrElse( audibleIdx, Nil ))
-  //            clumpMap += targetEntry -> audibleIdx
-  //         } else {
-  //            val depIdx = clumpEdges.get( targetEntry ).map( set => {
-  //               set.map( clumpMap.getOrElse( _, sys.error( "Unsatisfied dependency " + targetEntry ))).max
-  //            }).getOrElse( -1 )
-  //            if( depIdx > clumpIdx ) sys.error( "Unsatisfied dependency " + targetEntry )
-  //            if( depIdx == clumpIdx ) clumpIdx += 1
-  //            clumps += clumpIdx -> (targetEntry :: clumps.getOrElse( clumpIdx, Nil ))
-  //            clumpMap += targetEntry -> clumpIdx
-  //         }
-  //      })
 }
 
 trait TxnFullImpl[S <: Sys[S]] extends TxnImpl with Sys.Txn[S] {
