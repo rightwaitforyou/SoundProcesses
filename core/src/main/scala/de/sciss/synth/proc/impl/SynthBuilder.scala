@@ -13,7 +13,7 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.synth.{AudioBus, Resource, DynamicUser, Synth, Sys}
+import de.sciss.lucre.synth.{NodeDependencyBuilder, AudioBus, Resource, DynamicUser, Synth, Sys}
 import de.sciss.synth.ControlSet
 import de.sciss.synth.proc.{TimeRef, Proc}
 
@@ -23,7 +23,9 @@ import de.sciss.synth.proc.{TimeRef, Proc}
   *
   * @see  [[AuralProcImpl]]
   */
-final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, val timeRef: TimeRef) {
+final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, val timeRef: TimeRef)
+  extends NodeDependencyBuilder {
+
   val setMap        = Vector.newBuilder[ControlSet]
 
   /** Users are elements which must be added after the
@@ -37,6 +39,16 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
 
   var outputBuses   = Map.empty[String, AudioBus]
   var inputBuses    = Map.empty[String, AudioBus]
+
+  // ---- node dependency builder ----
+
+  def setControl(pair: ControlSet): Unit = setMap += pair
+
+  var keyedUsers      = List.empty[DynamicUser]
+  var keyedResources  = List.empty[Resource   ]
+
+  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
+  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
 }
 
 /** An object used in the preparatory phase of playing a process. It allows
