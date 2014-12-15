@@ -255,18 +255,16 @@ object AuralProcImpl {
 
                   case segm: Segment.Curve =>
                     ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-                  // println(s"segment : ${segm.span}")
-                  val bm          = mkInBus()
+                    // println(s"segment : ${segm.span}")
+                    val bm          = mkInBus()
                     val w           = SegmentWriter(bm.bus, segm, time, SampleRate)
                     b.dependencies  ::= w
-                  // users ::= w
 
                   case audio: Segment.Audio =>
                     ensureChannels(audio.numChannels)
                     val bm          = mkInBus()
                     val w           = AudioArtifactWriter(bm.bus, audio, time)
                     b.dependencies  ::= w
-                    // users    ::= w
                 }
 
               case Link.Scan(peer) => mkInBus()
@@ -325,7 +323,6 @@ object AuralProcImpl {
             b.users ::= res
             val w = AudioArtifactScalarWriter(bus, audioElem.value)
             b.dependencies ::= w
-          // users ::= w
 
           case a => b.setMap += _data.attrControlSet(key, a)
         }

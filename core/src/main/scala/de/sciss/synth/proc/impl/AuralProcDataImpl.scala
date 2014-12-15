@@ -146,9 +146,10 @@ object AuralProcDataImpl {
       attrNodeSet(key, value)
     }
 
-    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = nodeOption.foreach { n =>
-      state.acceptedInputs.get(UGB.AttributeKey(key)).foreach(v => attrNodeSet(n, key, v, value))
-    }
+    private def attrNodeSet(key: String, value: Obj[S])(implicit tx: S#Tx): Unit =
+      nodeRef.get(tx.peer).foreach { n =>
+        state.acceptedInputs.get(UGB.AttributeKey(key)).foreach(v => attrNodeSet(n, key, v, value))
+      }
 
     protected def attrNodeSet(n: NodeRef, key: String, assigned: UGB.Value, value: Obj[S])(implicit tx: S#Tx): Unit =
       assigned match {

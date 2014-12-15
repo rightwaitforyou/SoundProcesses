@@ -110,7 +110,7 @@ object BusNodeSetter {
     final def migrateTo(newBus: ControlBus)(implicit tx: Txn): ControlBusNodeSetter = {
       require(newBus.numChannels == bus.numChannels)
       val wasAdded = added.get(tx.peer)
-      if( wasAdded ) remove()
+      if (wasAdded) remove()
       val res = newInstance(newBus)
       if (wasAdded) res.add()
       res
