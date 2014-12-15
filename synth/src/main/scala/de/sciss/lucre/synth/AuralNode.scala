@@ -13,15 +13,16 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.lucre.stm.Disposable
 import de.sciss.synth.addBefore
 
 import scala.concurrent.stm.Ref
 
 object AuralNode {
   def apply(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
-            users: List[DynamicUser], resources: List[Resource])(implicit tx: Txn): AuralNode = {
+            resources: List[Disposable[Txn]])(implicit tx: Txn): AuralNode = {
     val res = new Impl(synth, inputBuses = inputBuses, outputBuses = outputBuses,
-      users = users, resources = resources)
+      resources = resources)
     NodeGraph.addNode(res)
     res
   }
@@ -38,7 +39,7 @@ object AuralNode {
                                      post: Option[Group] = None, back: Option[Group] = None)
 
   private final class Impl(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
-                           users: List[DynamicUser], resources: List[Resource])
+                           resources: List[Disposable[Txn]])
     extends AuralNode {
 
     private val groupsRef = Ref[Option[AllGroups]](None)
@@ -108,7 +109,7 @@ object AuralNode {
 
     def stop()(implicit tx: Txn): Unit = {
       node.free()
-      if (users    .nonEmpty) users    .foreach(_.remove ())
+      // if (users    .nonEmpty) users    .foreach(_.remove ())
       if (resources.nonEmpty) resources.foreach(_.dispose())
       NodeGraph.removeNode(this)
     }

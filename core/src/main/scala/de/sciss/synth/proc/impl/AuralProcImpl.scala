@@ -186,9 +186,15 @@ object AuralProcImpl {
     /** Sub-classes may override this if falling back to the super-method. */
     protected def buildSyncInput(b: SynthBuilder[S], keyW: UGB.Key, value: UGB.Value)
                                 (implicit tx: S#Tx): Unit = keyW match {
-      case UGB.AttributeKey(key) => _data.buildAttrInput(b, key, value)
-      case UGB.ScanKey     (key) => buildScanInput      (b, key, value)
-      case _                     => throw new IllegalStateException(s"Unsupported input request $keyW")
+      case UGB.AttributeKey(key) =>
+        _data.buildAttrInput(b, key, value)
+        b.storeKey(key)
+
+      case UGB.ScanKey(key) =>
+        buildScanInput(b, key, value)
+
+      case _ =>
+        throw new IllegalStateException(s"Unsupported input request $keyW")
     }
 
       /** Sub-classes may override this if falling back to the super-method. */
@@ -384,18 +390,7 @@ object AuralProcImpl {
         // res
       }
 
-      // XXX TODO
-      val group = server.defaultGroup
-
-      val node = AuralNode(synth, inputBuses = builder.inputBuses, outputBuses = builder.outputBuses,
-        users = builder.users, resources = builder.dependencies)
-
-      // wrap as AuralProc and save it in the identifier map for later lookup
-      synth.play(target = group, addAction = addToHead, args = builder.setMap.result(), 
-        dependencies = builder.dependencies)
-      if (builder.users.nonEmpty) builder.users.foreach(_.add())
-
-      // if (setMap.nonEmpty) synth.set(audible = true, setMap: _*)
+      val node = builder.finish()
       logA(s"launched $p -> $node (${hashCode.toHexString})")
       setPlayingNode(node)
     }

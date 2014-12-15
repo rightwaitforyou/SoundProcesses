@@ -13,8 +13,9 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.synth.{AudioBus, Resource, DynamicUser, Synth, Sys}
-import de.sciss.synth.ControlSet
+import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.synth.{AuralNode, Txn, AudioBus, Resource, DynamicUser, Synth, Sys}
+import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
 
 /** An object used in the last phase of playing a process. It has
@@ -40,7 +41,34 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
   var outputBuses   = Map.empty[String, AudioBus]
   var inputBuses    = Map.empty[String, AudioBus]
 
-  // ---- node dependency builder ----
+  private var attrMap = Map.empty[String, List[Disposable[Txn]]]
+
+  def finish()(implicit tx: Txn): AuralNode = {
+    // XXX TODO
+    val server  = synth.server
+    val group   = server.defaultGroup
+
+    val node = AuralNode(synth, inputBuses = inputBuses, outputBuses = outputBuses,
+      resources = users ::: dependencies)
+
+    // wrap as AuralProc and save it in the identifier map for later lookup
+    synth.play(target = group, addAction = addToHead, args = setMap.result(),
+      dependencies = dependencies)
+
+    if (users.nonEmpty) users.foreach(_.add())
+    node
+  }
+
+  // copies the node-dependency-builder stuff to a map entry
+  def storeKey(key: String): Unit =
+    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
+      val disp = keyedUsers ::: keyedResources
+      attrMap += key -> disp
+      keyedUsers      = Nil
+      keyedResources  = Nil
+    }
+
+  // ---- node-dependency-builder ----
 
   def node = synth
 

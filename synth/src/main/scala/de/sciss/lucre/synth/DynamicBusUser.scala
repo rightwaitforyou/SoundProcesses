@@ -13,12 +13,15 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.lucre.stm.Disposable
+
 import concurrent.stm.{Ref => ScalaRef}
 import de.sciss.synth.{ControlBus => SControlBus, AudioBus => SAudioBus}
 
-trait DynamicUser {
-  def add   ()(implicit tx: Txn): Unit
-  def remove()(implicit tx: Txn): Unit
+trait DynamicUser extends Disposable[Txn] {
+  def add    ()(implicit tx: Txn): Unit
+  def remove ()(implicit tx: Txn): Unit
+  def dispose()(implicit tx: Txn): Unit = remove()
 }
 
 trait DynamicBusUser extends DynamicUser {
