@@ -160,8 +160,8 @@ object AuralProcDataImpl {
       logA(s"AttrRemoved from ${procCached()} ($key)")
       for {
         n <- nodeRef.get(tx.peer)
-        v <- state.acceptedInputs.get(UGB.AttributeKey(key))
-      } attrNodeUnset1(n, key, v, value)
+        _ <- state.acceptedInputs.get(UGB.AttributeKey(key))
+      } attrNodeUnset1(n, key)
     }
 
     private def attrChange(key: String, value: Obj[S], changes: Vec[Obj.Change[S, Any]])(implicit tx: S#Tx): Unit = {
@@ -178,18 +178,20 @@ object AuralProcDataImpl {
           n <- nodeRef.get(tx.peer)
           v <- state.acceptedInputs.get(UGB.AttributeKey(key))
         } {
-          attrNodeUnset1(n, key, v, value)
+          attrNodeUnset1(n, key)
           attrNodeSet1  (n, key, v, value)
         }
       }
     }
 
-    private def attrNodeUnset1(n: NodeRef, key: String, assigned: UGB.Value, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      ???
-    }
+    private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
+      n.removeAttrResources(key)
 
-    private def attrNodeSet1(n: NodeRef, key: String, assigned: UGB.Value, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      buildAttrInput(???, key, assigned)
+    private def attrNodeSet1(n: NodeRef.Full, key: String, assigned: UGB.Value, value: Obj[S])
+                            (implicit tx: S#Tx): Unit = {
+      val b = new SynthUpdater(procCached(), n.node, key, n)
+      buildAttrInput(b, key, assigned)
+      b.finish()
     }
 
     // ----

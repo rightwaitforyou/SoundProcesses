@@ -80,9 +80,11 @@ object NodeRefImpl {
       }
     }
 
-    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit = ???
+    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit =
+      instancesRef.get(tx.peer).foreach(_.addAttrResources(key, values))
 
-    def removeAttrResources(key: String)(implicit tx: Txn): Unit = ???
+    def removeAttrResources(key: String)(implicit tx: Txn): Unit =
+      instancesRef.get(tx.peer).foreach(_.removeAttrResources(key))
 
     def dispose()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer

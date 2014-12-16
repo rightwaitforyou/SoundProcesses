@@ -13,7 +13,7 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.synth.{AuralNode, Txn, AudioBus, Resource, DynamicUser, Synth, Sys}
+import de.sciss.lucre.synth.{NodeRef, Node, AuralNode, Txn, AudioBus, Resource, DynamicUser, Synth, Sys}
 import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
 
@@ -75,8 +75,8 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
 
   def addControl(pair: ControlSet): Unit = setMap += pair
 
-  var keyedUsers      = List.empty[DynamicUser]
-  var keyedResources  = List.empty[Resource   ]
+  private var keyedUsers      = List.empty[DynamicUser]
+  private var keyedResources  = List.empty[Resource   ]
 
   def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
   def addResource(resource: Resource   ): Unit = keyedResources ::= resource
@@ -87,4 +87,25 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
   */
 final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc.Obj[S]) {
   var resources = List.empty[AsyncResource[S]]
+}
+
+final class SynthUpdater[S <: Sys[S]](val obj: Proc.Obj[S], val node: Node, key: String, nodeRef: NodeRef.Full)
+  extends NodeDependencyBuilder[S] {
+
+  private var setMap = Vector.empty[ControlSet]
+
+  private var keyedUsers      = List.empty[DynamicUser]
+  private var keyedResources  = List.empty[Resource   ]
+
+  def addControl(pair: ControlSet): Unit = setMap :+= pair
+
+  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
+  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
+
+  def finish()(implicit tx: Txn): Unit = {
+    if (keyedUsers.nonEmpty || keyedResources.nonEmpty)
+      nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
+
+    if (setMap.nonEmpty) node.set(setMap: _*)
+  }
 }
