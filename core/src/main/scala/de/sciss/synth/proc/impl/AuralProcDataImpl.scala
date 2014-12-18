@@ -546,16 +546,24 @@ object AuralProcDataImpl {
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     /** Sub-classes may override this if invoking the super-method. */
-    protected def buildAttrValueInput(b: NodeDependencyBuilder[S], key: String, value: Elem[S])
+    protected def buildAttrValueInput(b: NodeDependencyBuilder[S], key: String, value: Elem[S], numChannels: Int)
                                      (implicit tx: S#Tx): Unit = {
       val ctlName = graph.Attribute.controlName(key)
+
+      def setControl(value: Float): Unit =
+        b.addControl(if (numChannels == 1) key -> value else key -> Vector.fill(numChannels)(value))
+
+      def chanCheck(expected: Int): Unit =
+        if (numChannels != expected)
+          sys.error(s"Mismatch: Attribute $key has $numChannels channels, expected $expected")
+
       value match {
         case a: IntElem     [S] =>
-          b.addControl(ctlName -> a.peer.value.toFloat)
+          setControl(a.peer.value)
         case a: DoubleElem  [S] =>
-          b.addControl(ctlName -> a.peer.value.toFloat)
+          setControl(a.peer.value.toFloat)
         case a: BooleanElem [S] =>
-          b.addControl(ctlName -> (if (a.peer.value) 1f else 0f))
+          setControl(if (a.peer.value) 1f else 0f)
         case a: FadeSpec.Elem[S] =>
           val spec = a.peer.value
           // dur, shape-id, shape-curvature, floor
@@ -565,10 +573,12 @@ object AuralProcDataImpl {
               case _              => 0f
             }, spec.floor
           )
+          chanCheck(values.size)
           b.addControl(ctlName -> values)
 
         case a: DoubleVecElem[S] =>
           val values = a.peer.value.map(_.toFloat)
+          chanCheck(values.size)
           b.addControl(ctlName -> values)
 
         case a: AudioGraphemeElem[S] =>
@@ -579,14 +589,27 @@ object AuralProcDataImpl {
             sys.error(s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
           val numCh = spec.numChannels // numChL.toInt
           if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
+          chanCheck(numCh)
           val bus = Bus.control(server, numCh)
           val res = BusNodeSetter.mapper(ctlName, bus, b.node)
           b.addUser(res)
           val w = AudioArtifactScalarWriter(bus, audioElem.value)
           b.addResource(w)
 
+        case a: Scan.Elem[S] =>
+          scanView(a.peer).fold {
+            Console.err.println(s"Warning: view for scan ${a.peer} used as attribute key $key not found.")
+          } { view =>
+            val bus = view.bus
+            chanCheck(bus.numChannels)
+            val res = BusNodeSetter.mapper(ctlName, bus, b.node)
+            b.addUser(res)
+            // XXX TODO:
+            // - adapt number-of-channels if they don't match (using auxiliary synth)
+          }
+
         case _ =>
-          sys.error(s"Cannot cast attribute $value to a scalar value")
+          sys.error(s"Cannot use attribute $value as a scalar value")
       }
     }
 
@@ -595,9 +618,8 @@ object AuralProcDataImpl {
                       (implicit tx: S#Tx): Unit = {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
-          // XXX TODO - numChannels is not tested
           b.obj.attr.getElem(key).foreach { a =>
-            buildAttrValueInput(b, key, a)
+            buildAttrValueInput(b, key, a, numChannels = numChannels)
           }
 
         case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming

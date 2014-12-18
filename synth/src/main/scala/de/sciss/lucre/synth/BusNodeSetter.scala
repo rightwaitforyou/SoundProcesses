@@ -30,28 +30,101 @@ trait ControlBusNodeSetter extends BusNodeSetter with DynamicControlBusUser {
   def migrateTo(newBus: ControlBus)(implicit tx: Txn): ControlBusNodeSetter
 }
 
+/** A factory for setting node controls to read from buses. */
 object BusNodeSetter {
+  /** Creates a user that sets a control to an audio bus index. It registers a reader
+    * with the given bus.
+    *
+    * @param controlName  the name of the control to set
+    * @param bus          the audio-bus from which to read
+    * @param node         the node which reads from the bus.
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def reader(controlName: String, bus: AudioBus, node: Node): AudioBusNodeSetter =
     new AudioReaderImpl(controlName, bus, node)
 
+  /** Creates a user that sets a control to a control bus index. It registers a reader
+    * with the given bus.
+    *
+    * @param controlName  the name of the control to set
+    * @param bus          the control-bus from which to read
+    * @param node         the node which reads from the bus.
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def reader(controlName: String, bus: ControlBus, node: Node): ControlBusNodeSetter =
     new ControlReaderImpl(controlName, bus, node)
 
+  /** Creates a user that sets a control to an audio bus index. It registers a writer
+    * with the given bus.
+    *
+    * @param controlName  the name of the control to set
+    * @param bus          the audio-bus to which to write
+    * @param node         the node which writes to the bus.
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def writer(controlName: String, bus: AudioBus, node: Node): AudioBusNodeSetter =
     new AudioWriterImpl(controlName, bus, node)
 
+  /** Creates a user that setes a control to a control bus index. It registers a writer
+    * with the given bus.
+    *
+    * @param controlName  the name of the control to set
+    * @param bus          the control-bus to which to write
+    * @param node         the node which writes to the bus.
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def writer(controlName: String, bus: ControlBus, node: Node): ControlBusNodeSetter =
     new ControlWriterImpl(controlName, bus, node)
 
+  /** Creates a user that sets a control to an audio bus index. It registers both a
+    * reader and a writer with the given bus.
+    *
+    * @param controlName  the name of the control to set
+    * @param bus          the audio-bus from which to read and to which to write
+    * @param node         the node which reads from and writes to the bus.
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def readerWriter(controlName: String, bus: AudioBus, node: Node): AudioBusNodeSetter =
     new AudioReaderWriterImpl(controlName, bus, node)
 
+  /** Creates a user that sets a control to a control bus index. It registers both a
+    * reader and a writer with the given bus.
+    *
+    * @param controlName  the name of the control to set
+    * @param bus          the control-bus from which to read and to which to write
+    * @param node         the node which reads from and writes to the bus.
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def readerWriter(controlName: String, bus: ControlBus, node: Node): ControlBusNodeSetter =
     new ControlReaderWriterImpl(controlName, bus, node)
 
+  /** Creates a user that sets a control be mapped to an audio bus (using `n_mapan`). It registers a
+    * reader with the given bus.
+    *
+    * @param controlName  the name of the control to be mapped to a bus signal
+    * @param bus          the audio-bus from which to read
+    * @param node         the node which reads from the control
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def mapper(controlName: String, bus: AudioBus, node: Node): AudioBusNodeSetter =
     new AudioMapperImpl(controlName, bus, node)
 
+  /** Creates a user that sets a control be mapped to a control bus (using `n_mapn`). It registers a
+    * reader with the given bus.
+    *
+    * @param controlName  the name of the control to be mapped to a bus signal
+    * @param bus          the control-bus from which to read
+    * @param node         the node which reads from the control
+    *
+    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
+    */
   def mapper(controlName: String, bus: ControlBus, node: Node): ControlBusNodeSetter =
     new ControlMapperImpl( controlName, bus, node )
 

@@ -185,8 +185,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       """
         |Expected behaviour:
         |A scan be used as attribute input.
-        |NOTE: this is currently NOT supported
-        |(since Attribute is designated for scalar values)
+        |A sine is heard whose frequency is modulated by
+        |another sine whose frequency increases over time.
         |
         |""".stripMargin)
 
