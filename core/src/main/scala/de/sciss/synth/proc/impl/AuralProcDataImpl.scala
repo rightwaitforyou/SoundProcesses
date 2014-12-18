@@ -551,7 +551,7 @@ object AuralProcDataImpl {
       val ctlName = graph.Attribute.controlName(key)
 
       def setControl(value: Float): Unit =
-        b.addControl(if (numChannels == 1) key -> value else key -> Vector.fill(numChannels)(value))
+        b.addControl(if (numChannels == 1) ctlName -> value else ctlName -> Vector.fill(numChannels)(value))
 
       def chanCheck(expected: Int): Unit =
         if (numChannels != expected)

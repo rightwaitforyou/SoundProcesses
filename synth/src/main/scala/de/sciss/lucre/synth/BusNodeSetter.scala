@@ -104,8 +104,8 @@ object BusNodeSetter {
   def readerWriter(controlName: String, bus: ControlBus, node: Node): ControlBusNodeSetter =
     new ControlReaderWriterImpl(controlName, bus, node)
 
-  /** Creates a user that sets a control be mapped to an audio bus (using `n_mapan`). It registers a
-    * reader with the given bus.
+  /** Sets a control be mapped to an audio bus (using `n_mapan`). It registers a
+    * reader with the given bus that is freed along with the provided node.
     *
     * @param controlName  the name of the control to be mapped to a bus signal
     * @param bus          the audio-bus from which to read
@@ -116,14 +116,12 @@ object BusNodeSetter {
   def mapper(controlName: String, bus: AudioBus, node: Node): AudioBusNodeSetter =
     new AudioMapperImpl(controlName, bus, node)
 
-  /** Creates a user that sets a control be mapped to a control bus (using `n_mapn`). It registers a
-    * reader with the given bus.
+  /** Sets a control be mapped to a control bus (using `n_mapn`). It registers a
+    * reader with the given bus that is freed along with the provided node.
     *
     * @param controlName  the name of the control to be mapped to a bus signal
     * @param bus          the control-bus from which to read
     * @param node         the node which reads from the control
-    *
-    * @return the bus user that can be engaged via `add()` and disengaged via `remove()`
     */
   def mapper(controlName: String, bus: ControlBus, node: Node): ControlBusNodeSetter =
     new ControlMapperImpl( controlName, bus, node )

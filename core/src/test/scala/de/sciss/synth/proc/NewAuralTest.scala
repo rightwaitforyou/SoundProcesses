@@ -185,8 +185,13 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       """
         |Expected behaviour:
         |A scan be used as attribute input.
-        |A sine is heard whose frequency begins, after 2 seconds,
-        |to be modulated by another sine of increasing frequency.
+        |A sine is heard.
+        |After 2 seconds, its frequency begins to be modulated by
+        |another sine of decreasing frequency.
+        |After another 2 seconds, the sound is stopped.
+        |After another second, the transport plays again, the
+        |modulation is heard immediately.
+        |After another 2 seconds, a slow constant modulation of 4 Hz is heard.
         |
         |""".stripMargin)
 
@@ -198,7 +203,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       }
 
       val p2 = proc {
-        val sig   = Line.ar(0, 1000, 4)
+        val sig   = Line.ar(1000, 0, 4)
         graph.ScanOut("out", sig)
       }
 
@@ -220,7 +225,20 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         val scan    = p2.elem.peer.scans.add("out")
         val scanObj = Obj(Scan.Elem(scan))
         p1.attr.put("key", scanObj)
-        stopAndQuit(5.0)
+
+        after(2.0) { implicit tx =>
+          t.stop()
+          after(1.0) { implicit tx =>
+            t.play()
+            after(2.0) { implicit tx =>
+              val imp     = ExprImplicits[S]
+              import imp._
+              val p1      = p1H()
+              p1.attr.put("key", Obj(IntElem(4)))
+              stopAndQuit(2.0)
+            }
+          }
+        }
       }
     }
   }

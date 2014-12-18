@@ -103,9 +103,10 @@ final class SynthUpdater[S <: Sys[S]](val obj: Proc.Obj[S], val node: Node, key:
   def addResource(resource: Resource   ): Unit = keyedResources ::= resource
 
   def finish()(implicit tx: Txn): Unit = {
-    if (keyedUsers.nonEmpty || keyedResources.nonEmpty)
-      nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
-
     if (setMap.nonEmpty) node.set(setMap: _*)
+    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
+      nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
+      keyedUsers.foreach(_.add())
+    }
   }
 }

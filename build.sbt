@@ -40,7 +40,7 @@ lazy val fileUtilVersion        = "1.1.1"
 
 // ---- test-only ----
 
-lazy val scalaTestVersion       = "2.2.2"
+lazy val scalaTestVersion       = "2.2.3"
 
 lazy val loggingEnabled         = true
 
