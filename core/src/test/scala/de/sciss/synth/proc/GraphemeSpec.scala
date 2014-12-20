@@ -16,7 +16,7 @@ class GraphemeSpec extends ConfluentEventSpec {
   import Grapheme.{Value, Modifiable, Update, Segment, Expr, TimedElem}
 
   ignore /* "Grapheme" */ should "notify observers about all relevant events" in { system =>
-    val obs = new Observation[S]
+    val obs = new Observation
     val (gH1, gH2) = system.step { implicit tx =>
       val g1  = Grapheme[S](1)
       val g2  = Grapheme[S](2)
@@ -112,7 +112,7 @@ class GraphemeSpec extends ConfluentEventSpec {
         Update(g2, Vec(Segment.Undefined(Span(20000L, 30000L))))
       )
 
-      assert(!g1.remove(e5.timeValue - 1, e5.mag)) // assert it was not found
+      assert(!g1.remove((e5.timeValue - 1) -> e5.mag)) // assert it was not found
       assert(g1.remove(e5)) // assert it was found
       obs.assertEquals(
         Update(g1, Vec(Segment.Const(Span(10000L, 30000L), Vec(882.0))))

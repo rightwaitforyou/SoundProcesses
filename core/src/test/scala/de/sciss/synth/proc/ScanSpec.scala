@@ -20,7 +20,7 @@ class ScanSpec extends ConfluentEventSpec {
   // lucre.confluent.showLog = true
 
   ignore /* "Proc" */ should "notify observers about all relevant events" in { system =>
-    val obs = new Observation[S]
+    val obs = new Observation
     val ph = system.step { implicit tx =>
       val p = Proc[S]
       p.changed.react(obs.register)
@@ -69,7 +69,7 @@ class ScanSpec extends ConfluentEventSpec {
       val gr = grH()
       val Some(scan) = p.scans.get("freq")
 
-      gr.add(0L, curve(1234.0)) // should be observed only directly through proc (but not scan)
+      gr.add(0L -> curve(1234.0)) // should be observed only directly through proc (but not scan)
       obs.assertEquals()
       //    Proc.Update( p, Vec( Proc.GraphemeChange( "gr",
       //       Grapheme.Update( gr, Vec( Grapheme.Segment.Const( Span.from( 0L ), Vec( 1234.0 ))))
@@ -84,7 +84,7 @@ class ScanSpec extends ConfluentEventSpec {
       )
       obs.clear()
 
-      gr.add(2000L, curve(5678.0)) // ...
+      gr.add(2000L -> curve(5678.0)) // ...
       obs.assertEquals(
         Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(
           Scan.GraphemeChange(gr, Vec(Grapheme.Segment.Curve(Span(0L, 2000L), Vec((1234.0, 5678.0, linear))),
@@ -97,7 +97,7 @@ class ScanSpec extends ConfluentEventSpec {
       scan.removeSource(grSource)
       val timeVar = lucre.expr.Long  .newVar[S](3000L)
       val ampVar  = lucre.expr.Double.newVar[S](9876.0)
-      gr.add(timeVar, curve(ampVar)) // should not be observed
+      gr.add(timeVar -> curve(ampVar)) // should not be observed
       val grSourceNew = Scan.Link.Grapheme(gr)
       scan.addSource(grSourceNew) // should be observed
       obs.assertEquals(

@@ -59,10 +59,11 @@ package object proc {
       proc.impl.ElemImpl.Int(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, IntElem]] =
-        if (obj.elem.isInstanceOf[IntElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, IntElem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[IntElem[S]]) Some(obj.asInstanceOf[Obj[S]])
         else None
     }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, IntElem]
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, IntElem[S]] = ElemImpl.Int.serializer[S]
   }
@@ -78,10 +79,11 @@ package object proc {
       proc.impl.ElemImpl.Double(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, DoubleElem]] =
-        if (obj.elem.isInstanceOf[DoubleElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, DoubleElem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[DoubleElem[S]]) Some(obj.asInstanceOf[Obj[S]])
         else None
     }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, DoubleElem]
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, DoubleElem[S]] = ElemImpl.Double.serializer[S]
   }
@@ -97,10 +99,11 @@ package object proc {
       proc.impl.ElemImpl.Long(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, LongElem]] =
-        if (obj.elem.isInstanceOf[LongElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, LongElem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[LongElem[S]]) Some(obj.asInstanceOf[Obj[S]])
         else None
     }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, LongElem]
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, LongElem[S]] = ElemImpl.Long.serializer[S]
   }
@@ -116,10 +119,11 @@ package object proc {
       proc.impl.ElemImpl.Boolean(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, BooleanElem]] =
-        if (obj.elem.isInstanceOf[BooleanElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, BooleanElem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[BooleanElem[S]]) Some(obj.asInstanceOf[Obj[S]])
         else None
     }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, BooleanElem]
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, BooleanElem[S]] = ElemImpl.Boolean.serializer[S]
   }
@@ -135,10 +139,11 @@ package object proc {
       proc.impl.ElemImpl.String(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, StringElem]] =
-        if (obj.elem.isInstanceOf[StringElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, StringElem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[StringElem[S]]) Some(obj.asInstanceOf[Obj[S]])
         else None
     }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, StringElem]
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, StringElem[S]] = ElemImpl.String.serializer[S]
   }
@@ -154,10 +159,11 @@ package object proc {
       proc.impl.ElemImpl.DoubleVec(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, DoubleVecElem]] =
-        if (obj.elem.isInstanceOf[DoubleVecElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, DoubleVecElem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[DoubleVecElem[S]]) Some(obj.asInstanceOf[Obj[S]])
         else None
     }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, DoubleVecElem]
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, DoubleVecElem[S]] = ElemImpl.DoubleVec.serializer[S]
   }
@@ -173,10 +179,11 @@ package object proc {
       proc.impl.ElemImpl.AudioGrapheme(peer)
 
     object Obj {
-      def unapply[S <: Sys[S]](obj: Obj[S]): Option[proc.Obj.T[S, AudioGraphemeElem]] =
-        if (obj.elem.isInstanceOf[AudioGraphemeElem[S]]) Some(obj.asInstanceOf[proc.Obj.T[S, AudioGraphemeElem]])
+      def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Obj[S]] =
+        if (obj.elem.isInstanceOf[AudioGraphemeElem[S]]) Some(obj.asInstanceOf[Obj[S]])
         else None
     }
+    type Obj[S <: Sys[S]] = proc.Obj.T[S, AudioGraphemeElem]
 
     implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, AudioGraphemeElem[S]] = ElemImpl.AudioGrapheme.serializer[S]
   }

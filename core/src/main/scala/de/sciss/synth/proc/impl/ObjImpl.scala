@@ -165,10 +165,10 @@ object ObjImpl {
       //          tag.unapply(obj.elem.peer)
       //        }
 
-      def apply[E[~ <: Sys[~]] <: Elem[~]](key: String)
-                                          (implicit tx: S#Tx, companion: Elem.Companion[E]): Option[E[S]#Peer] =
+      def apply[E2[~ <: Sys[~]] <: Elem[~]](key: String)
+                                          (implicit tx: S#Tx, companion: Elem.Companion[E2]): Option[E2[S]#Peer] =
           get(key).flatMap { obj =>
-            if (obj.elem.typeID == companion.typeID) Some(obj.elem.peer.asInstanceOf[E[S]#Peer]) else None
+            if (obj.elem.typeID == companion.typeID) Some(obj.elem.peer.asInstanceOf[E2[S]#Peer]) else None
           }
     }
 

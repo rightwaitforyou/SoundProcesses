@@ -30,7 +30,7 @@ trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
     }
   }
 
-  final class Observation[S <: stm.Sys[S]] {
+  final class Observation {
     private val seqRef = TxnLocal(init = Vec.empty[Any])
 
     def register(tx: S#Tx)(upd: Any): Unit = {

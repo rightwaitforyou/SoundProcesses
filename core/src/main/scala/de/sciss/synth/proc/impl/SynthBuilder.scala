@@ -64,7 +64,7 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
   // copies the node-dependency-builder stuff to a map entry
   def storeKey(key: String): Unit =
     if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-      attrMap += key -> (keyedUsers, keyedResources)
+      attrMap += key -> (keyedUsers -> keyedResources)
       keyedUsers      = Nil
       keyedResources  = Nil
     }
