@@ -38,6 +38,8 @@ lazy val audioWidgetsVersion    = "1.7.0"
 
 lazy val fileUtilVersion        = "1.1.1"
 
+lazy val topologyVersion        = "1.0.0-SNAPSHOT"
+
 // ---- test-only ----
 
 lazy val scalaTestVersion       = "2.2.3"
@@ -127,6 +129,7 @@ lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitem
 lazy val lucresynth = project.in(file("synth")).settings(
   description := "Transactional extension for ScalaCollider",
   libraryDependencies ++= Seq(
+    "de.sciss" %% "topology"        % topologyVersion,
     "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
     "de.sciss" %% "lucreevent-core" % lucreEventVersion,
     "de.sciss" %% "scalacollider"   % scalaColliderVersion

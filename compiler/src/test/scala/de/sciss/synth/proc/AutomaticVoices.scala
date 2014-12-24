@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.swing.IntSpinnerView
 import de.sciss.lucre.synth.impl.ServerImpl
-import de.sciss.lucre.synth.{NodeGraph, Server, InMemory}
+import de.sciss.lucre.synth.{NodeGraph, Server}
 import de.sciss.synth.swing.NodeTreePanel
 import de.sciss.synth.swing.j.JServerStatusPanel
 import de.sciss.synth.{GE, proc, SynthGraph}

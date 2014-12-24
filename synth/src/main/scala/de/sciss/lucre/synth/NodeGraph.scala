@@ -18,10 +18,11 @@ import de.sciss.lucre.synth.impl.DummyNodeGraphImpl
 import de.sciss.synth.{UGenGraph, SynthGraph}
 import de.sciss.synth
 import de.sciss.lucre.synth.{Node => LNode}
+import de.sciss.topology.Topology
 
-import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TMap, TSet}
 import scala.concurrent.Future
+import scala.util.Try
 
 object NodeGraph {
 
@@ -63,27 +64,27 @@ object NodeGraph {
     apply(node.server).removeNode(node)
 
   def addEdge(edge: Edge)(implicit tx: Txn): Unit = {
-    val world                 = apply(edge.source.server)
-    val res                   = world.addEdge(edge)
-    val (_, source, affected) = res.getOrElse(sys.error(s"Edge $edge is cyclic"))
+    val world         = apply(edge.source.server)
+    val res           = world.addEdge(edge)
+    val (_, moveOpt)  = res.get // OrElse(sys.error(s"Edge $edge is cyclic"))
 
     // if (verbose) println("NEW TOPO = " + newTopo + "; SOURCE = " + source + "; AFFECTED = " + affected)
-    if (affected.isEmpty) return
 
-    val isAfter = source == edge.source
-
-    var succ = source.node
-    var pred: LNode = null
-    val iter = affected.iterator
-    while (iter.hasNext) {
-      pred = succ
-      val curr = iter.next().node
-      if (isAfter) {
-        curr.moveAfter (pred)
-      } else {
-        curr.moveBefore(pred)
+    moveOpt.foreach { move =>
+      val isAfter = move.isAfter
+      var succ    = move.reference.node
+      var pred: LNode = null
+      val iter = move.affected.iterator
+      while (iter.hasNext) {
+        pred = succ
+        val curr = iter.next().node
+        if (isAfter) {
+          curr.moveAfter (pred)
+        } else {
+          curr.moveBefore(pred)
+        }
+        succ = curr
       }
-      succ = curr
     }
   }
 
@@ -110,7 +111,8 @@ trait NodeGraph {
   def addNode   (node: NodeRef)(implicit tx: Txn): Unit
   def removeNode(node: NodeRef)(implicit tx: Txn): Unit
 
-  def addEdge   (edge: NodeGraph.Edge)(implicit tx: Txn): Option[(Topology[NodeRef, NodeGraph.Edge], NodeRef, Vec[NodeRef])]
+  // def addEdge   (edge: NodeGraph.Edge)(implicit tx: Txn): Option[(Topology[NodeRef, NodeGraph.Edge], NodeRef, Vec[NodeRef])]
+  def addEdge   (edge: NodeGraph.Edge)(implicit tx: Txn): Try[(Topology[NodeRef, NodeGraph.Edge], Option[Topology.Move[NodeRef]])]
   def removeEdge(edge: NodeGraph.Edge)(implicit tx: Txn): Unit
 
   def send(bundles: Txn.Bundles): Future[Unit]

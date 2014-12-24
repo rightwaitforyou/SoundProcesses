@@ -21,10 +21,12 @@ import de.sciss.osc
 import de.sciss.synth.ugen.{Constant, ControlUGenOutProxy, UGenOutProxy}
 import de.sciss.synth.{SynthDef => SSynthDef, Escape, UGen, Rate, message, UGenGraph}
 import NodeGraph.Edge
+import de.sciss.topology.Topology
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.stm.{TMap, InTxn, Ref}
+import scala.util.{Failure, Try}
 
 object NodeGraphImpl {
   final val DEBUG = false
@@ -105,13 +107,13 @@ object NodeGraphImpl {
 }
 object DummyNodeGraphImpl extends NodeGraph {
   def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef =
-    SynthDefImpl(server, SSynthDef("offline", UGenGraph(Vec.empty, Vec.empty, Vec.empty, Vec.empty)))
+    SynthDefImpl(server, SSynthDef("offline", UGenGraph(Vector.empty, Vector.empty, Vector.empty, Vector.empty)))
 
   private[synth] def messageTimeStamp: Ref[Int] = Ref(0)
 
   def addNode   (node: NodeRef)(implicit tx: Txn) = ()
   def removeNode(node: NodeRef)(implicit tx: Txn) = ()
-  def addEdge   (edge: Edge   )(implicit tx: Txn) = None
+  def addEdge   (edge: Edge   )(implicit tx: Txn) = Failure(Topology.CycleDetected())
   def removeEdge(edge: Edge   )(implicit tx: Txn) = ()
 
   def send(bundles: Bundles): Future[Unit] = Future.successful(())
@@ -170,7 +172,7 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     topologyRef.transform(_.removeVertex(node))(tx.peer)
   }
 
-  def addEdge(edge: Edge)(implicit tx: Txn): Option[(T, NodeRef, Vec[NodeRef])] = {
+  def addEdge(edge: Edge)(implicit tx: Txn): Try[(T, Option[Topology.Move[NodeRef]])] = { // Option[(T, NodeRef, Vec[NodeRef])]
     log(s"NodeGraph.addEdge($edge)")
     val res = topologyRef.get(tx.peer).addEdge(edge)
     res.foreach(tup => topologyRef.set(tup._1)(tx.peer))
