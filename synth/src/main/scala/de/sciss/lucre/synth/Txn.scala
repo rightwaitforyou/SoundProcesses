@@ -22,7 +22,7 @@ import de.sciss.synth.message
 import de.sciss.lucre.stm.TxnLike
 
 object Txn {
-  def wrap(implicit itx: InTxn): Txn = new TxnPlainImpl(itx)
+  def wrap(itx: InTxn): Txn = new TxnPlainImpl(itx)
 
   /** A data type encapsulating all the outgoing OSC bundles for this transaction.
     *
