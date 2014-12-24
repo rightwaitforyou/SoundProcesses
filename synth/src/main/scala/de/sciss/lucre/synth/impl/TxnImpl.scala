@@ -22,7 +22,7 @@ import scala.concurrent.stm.{Txn => ScalaTxn}
 object TxnImpl {
   var timeoutFun: () => Unit = () => ()
 
-  private final val noBundles = Txn.Bundles(0, Vector.empty)
+  private final val noBundles = Vector.empty: Txn.Bundles
 }
 
 sealed trait TxnImpl extends Txn { tx =>
@@ -32,13 +32,13 @@ sealed trait TxnImpl extends Txn { tx =>
 
   final protected def flush(): Unit =
     bundlesMap.foreach { case (server, bundles) =>
-      log(s"flush $server -> ${bundles.payload.size} bundles")
+      log(s"flush $server -> ${bundles.size} bundles")
       NodeGraph.send(server, bundles)
     }
 
   protected def markBundlesDirty(): Unit
 
-  final def addMessage(resource: Resource, m: osc.Message with message.Send, dependencies: Seq[Resource]): Unit = {
+  final def addMessage(resource: Resource, m: Txn.Message, dependencies: Seq[Resource]): Unit = {
     val server        = resource.server
     if (!server.peer.isRunning) return
 
@@ -48,8 +48,7 @@ sealed trait TxnImpl extends Txn { tx =>
     implicit val itx  = peer
     val txnStampRef   = NodeGraph.messageTimeStamp(server)(tx)
     val txnStamp      = txnStampRef.get
-    val bOld          = bundlesMap.getOrElse(server, noBundles)
-    val payOld        = bOld.payload
+    val payOld        = bundlesMap.getOrElse(server, noBundles)
     val szOld         = payOld.size
     val txnStartStamp = txnStamp - szOld
 
@@ -85,101 +84,32 @@ sealed trait TxnImpl extends Txn { tx =>
       markBundlesDirty()
       txnStampRef += 2
       val vm    = Vector(m)
-      val msgs  = if (msgAsync) Vector(vm, Vector.empty) else Vector(Vector.empty, vm)
-      Txn.Bundles(txnStartStamp, msgs)
+      val msgs  = if (msgAsync)
+        Vector(new Txn.Bundle(txnStartStamp, vm), new Txn.Bundle(txnStartStamp + 1, Vector.empty))
+      else
+        Vector(new Txn.Bundle(txnStartStamp, Vector.empty), new Txn.Bundle(txnStartStamp + 1, vm))
+      msgs: Txn.Bundles
 
     } else {
       if (resourceStampNew == txnStamp) {
         // append to back
         val vm      = Vector(m)
         val payNew  = if (msgAsync)
-          payOld :+ vm :+ Vector.empty
+          payOld :+ new Txn.Bundle(txnStartStamp, vm) :+ new Txn.Bundle(txnStartStamp + 1, Vector.empty)
         else
-          payOld :+ Vector.empty :+ vm
+          payOld :+ new Txn.Bundle(txnStartStamp, Vector.empty) :+ new Txn.Bundle(txnStartStamp + 1, vm)
         txnStampRef += 2
-        bOld.copy(payload = payNew)
+        payNew: Txn.Bundles
+        // bOld.copy(payload = payNew)
 
       } else {
         // we don't need the assertion, since we are going to call payload.apply which would
         // through an out of bounds exception if the assertion wouldn't hold
         //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
         val payIdx = resourceStampNew - txnStartStamp
-        val payNew = payOld.updated(payIdx, payOld(payIdx) :+ m)
-        bOld.copy(payload = payNew)
-      }
-    }
-
-    bundlesMap += server -> bNew
-  }
-
-  private def addMessageOLD(resource: Resource, m: osc.Message with message.Send, dependencies: Seq[Resource]): Unit = {
-
-    val server        = resource.server
-    if (!server.peer.isRunning) return
-
-    val resourceStampOld = resource.timeStamp(tx)
-    if (resourceStampOld < 0) sys.error(s"Already disposed : $resource")
-
-    implicit val itx  = peer
-    val txnCnt        = NodeGraph.messageTimeStamp(server)(tx)
-    val txnStopCnt    = txnCnt.get
-    val bOld          = bundlesMap.getOrElse(server, noBundles)
-    val txnStartCnt   = txnStopCnt - bOld.payload.size
-
-    // calculate the maximum time stamp from the dependencies. this includes
-    // the resource as its own dependency (since we should send out messages
-    // in monotonic order)
-    var depStampMax = math.max(txnStartCnt << 1, resourceStampOld)
-    dependencies.foreach { dep =>
-      val depStamp = dep.timeStamp(tx)
-      if (depStamp < 0) sys.error(s"Dependency already disposed : $dep")
-      if (depStamp > depStampMax) depStampMax = depStamp
-      // dep.addDependent(resource)(tx)  // validates dependent's server
-    }
-
-    // val dAsync     = (dTsMax & 1) == 1
-    val msgAsync = !m.isSynchronous
-
-    // if the message is asynchronous, it suffices to ensure that the time stamp async bit is set.
-    // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
-    // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
-    val resourceStampNew = if (msgAsync) depStampMax | 1 else (depStampMax + 1) & ~1
-
-    log(s"addMessage($resource, $m) -> stamp = $resourceStampNew")
-    if (resourceStampNew != resourceStampOld) resource.timeStamp_=(resourceStampNew)(tx)
-
-    val bNew = if (bOld.payload.isEmpty) {
-      markBundlesDirty()
-      //         log("registering after commit handler")
-      //         afterCommit(flush())
-      val txnStartCntNew = resourceStampNew >> 1
-      assert(txnStartCntNew == txnStartCnt)
-      txnCnt += 1
-      Txn.Bundles(txnStartCntNew, Vector(Vector(m)))
-
-    } else {
-      val cntOld      = bOld.firstStamp
-      val resourceCnt = resourceStampNew >> 1
-      val payOld      = bOld.payload
-      val szOld       = payOld.size
-      //         if (resourceCnt == cntOld - 1) {   // prepend to front
-      //            val payNew = Vec(message) +: payOld
-      //            bOld.copy(firstCnt = resourceCnt, payload = payNew)
-      //
-      //         } else
-      if (resourceCnt == cntOld + szOld) {
-        // append to back
-        val payNew = payOld :+ Vector(m)
-        txnCnt += 1
-        bOld.copy(payload = payNew)
-
-      } else {
-        // we don't need the assertion, since we are going to call payload.apply which would
-        // through an out of bounds exception if the assertion wouldn't hold
-        //            assert(idxNew >= idxOld && idxNew < idxOld + szOld)
-        val payIdx = resourceCnt - cntOld
-        val payNew = payOld.updated(payIdx, payOld(payIdx) :+ m)
-        bOld.copy(payload = payNew)
+        val payNew = payOld.updated(payIdx, payOld(payIdx).append(m))
+        payNew: Txn.Bundles
+        // bOld.copy(payload = payNew)
       }
     }
 

@@ -102,11 +102,6 @@ object NodeGraphImpl {
 
     override val hashCode: Int = self.hashCode // make it a val
   }
-
-  private final class MappedBundle(/* val depStamp: Int, */ val msgs: Vec[osc.Message with message.Send],
-                                   /* val allSync: Boolean, */ val stamp: Int) {
-    def depStamp = stamp - 1
-  }
 }
 object DummyNodeGraphImpl extends NodeGraph {
   def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef =
@@ -197,10 +192,9 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
 
   import server.executionContext
 
-  private final class Scheduled(val msgs: Vec[osc.Message with message.Send], /* allSync: Boolean, */ stamp: Int,
-                                promise: Promise[Unit]) {
+  private final class Scheduled(val bundle: Txn.Bundle, promise: Promise[Unit]) {
     def apply(): Future[Unit] = {
-      val fut = sendNow(msgs, /* allSync, */ stamp)
+      val fut = sendNow(bundle)
       promise.completeWith(fut)
       fut
     }
@@ -225,9 +219,8 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     reduceFutures(futures)
   }
 
-  private def sendNow(msgs: Vec[osc.Message with message.Send], /* allSync: Boolean, */ stamp: Int): Future[Unit] = {
-    // XXX TODO -- if there are issues with bundle-reply stamps missing,
-    // the alternative is to enable the following line:
+  private def sendNow(bundle: Txn.Bundle): Future[Unit] = {
+    import bundle.{msgs, stamp}
     if (msgs.isEmpty) return sendAdvance(stamp) // Future.successful(())
 
     val allSync = (stamp & 1) == 1
@@ -252,36 +245,18 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
   }
 
   def send(bundles: Txn.Bundles): Future[Unit] = {
-    // basically:
-    // bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
-    //   val dep = bundles.firstCnt - 1 + idx
-    //   if (seen(dep) || msgs.forall(_.isSynchronous)) {
-    //     sendOutStraight()
-    //     notifySeen(dep)
-    //   } else {
-    //     addToWaitList()
-    //   }
-    // }
-
-    val stampOff  = bundles.firstStamp
-    val mapped    = bundles.payload.zipWithIndex.map { case (msgs, idx) /* if msgs.nonEmpty */ =>
-      val stamp   = stampOff + idx
-      // val depStamp= stamp - 1
-      // val allSync = msgs.forall(_.isSynchronous)
-      new MappedBundle(/* depStamp, */ msgs, /* allSync, */ stamp)
-    }
     val res = sync.synchronized {
-      val (now, later) = mapped.partition(bundleReplySeen >= _.depStamp)
+      val (now, later) = bundles.partition(bundleReplySeen >= _.depStamp)
       // it is important to process the 'later' bundles first,
       // because now they might rely on some `bundleReplySeen` that is
       // increased by processing the `now` bundles.
       val futuresLater  = later.map { m =>
         val p   = Promise[Unit]()
-        val sch = new Scheduled(m.msgs, /* m.allSync, */ m.stamp, p)
+        val sch = new Scheduled(m, p)
         bundleWaiting += m.depStamp -> (bundleWaiting.getOrElse(m.depStamp, Vector.empty) :+ sch)
         p.future
       }
-      val futuresNow    = now  .map { m => sendNow(m.msgs, /* m.allSync, */ m.stamp) }
+      val futuresNow    = now.map(sendNow)
       reduceFutures(futuresNow ++ futuresLater)
     }
 

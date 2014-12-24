@@ -24,12 +24,19 @@ import de.sciss.lucre.stm.TxnLike
 object Txn {
   def wrap(itx: InTxn): Txn = new TxnPlainImpl(itx)
 
-  /** A data type encapsulating all the outgoing OSC bundles for this transaction.
-    *
-    * @param firstStamp   the counter value of the first bundle in the payload
-    * @param payload      the succession of bundles, represented as a sequence of a sequence of messages
+  type Message = osc.Message with message.Send
+
+  /** A data type encapsulating an outgoing OSC bundle for this transaction.
     */
-  final case class Bundles(firstStamp: Int, payload: Vec[Vec[osc.Message with message.Send]])
+  final class Bundle(val stamp: Int, val msgs: Vec[Message]) {
+    // def copy(newMsgs: Vec[Message]): Bundle = new Bundle(stamp, newMsgs)
+    def append(msg: Message): Bundle = new Bundle(stamp, msgs :+ msg)
+
+    /** A bundle depends on messages with any smaller time stamp (this stamp minus one). */
+    def depStamp = stamp - 1
+  }
+
+  type Bundles = Vec[Bundle]
 }
 
 /** The `Txn` trait is declared without representation type parameter in order to keep the real-time sound
