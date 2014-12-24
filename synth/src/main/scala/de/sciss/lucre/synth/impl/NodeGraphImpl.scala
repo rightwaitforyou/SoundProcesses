@@ -24,7 +24,7 @@ import NodeGraph.Edge
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.concurrent.stm.{TMap, TSet, InTxn, Ref}
+import scala.concurrent.stm.{TMap, InTxn, Ref}
 
 object NodeGraphImpl {
   var DEBUG = false
@@ -102,6 +102,9 @@ object NodeGraphImpl {
 
     override val hashCode: Int = self.hashCode // make it a val
   }
+
+  private final class MappedBundle(val depCnt: Int, val msgs: Vec[osc.Message with message.Send],
+                                   val allSync: Boolean, val cnt: Int)
 }
 object DummyNodeGraphImpl extends NodeGraph {
   def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef =
@@ -143,13 +146,13 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     //      val u = graph.expand
 
     // val equ = new GraphEquality(graph)
-    val baos  = new ByteArrayOutputStream
-    val dos   = new DataOutputStream(baos)
+    val bos   = new ByteArrayOutputStream
+    val dos   = new DataOutputStream(bos)
     // graph.write(dos)
     Escape.write(graph, dos)
     dos.flush()
     dos.close()
-    val bytes = baos.toByteArray
+    val bytes = bos.toByteArray
     val equ: IndexedSeq[Byte] = bytes // opposed to plain `Array[Byte]`, this has correct definition of `equals`
     log(s"request for synth graph ${equ.hashCode()}")
 
@@ -270,27 +273,28 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     // basically:
     // bundles.payload.zipWithIndex.foreach { case (msgs, idx) =>
     //   val dep = bundles.firstCnt - 1 + idx
-    //   if( seen( dep ) || msgs.forall( _.isSynchronous ) {
+    //   if (seen(dep) || msgs.forall(_.isSynchronous)) {
     //     sendOutStraight()
-    //     notifySeen( dep )
+    //     notifySeen(dep)
     //   } else {
     //     addToWaitList()
     //   }
+    // }
 
     val cntOff = bundles.firstCnt
     val mapped = bundles.payload.zipWithIndex.map { case (msgs, idx) =>
       val cnt     = cntOff + idx
       val depCnt  = cnt - 1
       val allSync = msgs.forall(_.isSynchronous)
-      (depCnt, msgs, allSync, cnt)
+      new MappedBundle(depCnt, msgs, allSync, cnt)
     }
     val res = sync.synchronized {
-      val (now, later) = mapped.partition(bundleReplySeen >= _._1)
-      val futuresNow    = now.map   { case (_     , msgs, allSync, cnt) => sendNow(msgs, allSync, cnt) }
-      val futuresLater  = later.map { case (depCnt, msgs, allSync, cnt) =>
+      val (now, later) = mapped.partition(bundleReplySeen >= _.depCnt)
+      val futuresNow    = now  .map { m => sendNow(m.msgs, m.allSync, m.cnt) }
+      val futuresLater  = later.map { m =>
         val p   = Promise[Unit]()
-        val sch = new Scheduled(msgs, allSync, cnt, p)
-        bundleWaiting += depCnt -> (bundleWaiting.getOrElse(depCnt, Vec.empty) :+ sch)
+        val sch = new Scheduled(m.msgs, m.allSync, m.cnt, p)
+        bundleWaiting += m.depCnt -> (bundleWaiting.getOrElse(m.depCnt, Vec.empty) :+ sch)
         p.future
       }
       reduceFutures(futuresNow ++ futuresLater)

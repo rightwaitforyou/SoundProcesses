@@ -20,7 +20,7 @@
 - tx.addMessage then processes these calls appropriately:
   ~ system maintains index / async of last sent bundle sendIdx / sendAsync;
     where sendAsync indicates whether the client has seen the bundle completed (e.g. /synced)
-  ~ the dependencies are traversed, and the target bundle index bndlIdx / async flag bndlAsync are determinated.
+  ~ the dependencies are traversed, and the target bundle index bndlIdx / async flag bndlAsync are determined.
     begin with bndlIdx = sendIdx + 1; bndlAsync = false
     for each changing state S, see its bundle index sIdx / async flag sAsync:
        if( sIdx > bndlIdx || ((sIdx == bndlIdx) && (sAsync || !bndlAsync)) ) {
@@ -70,7 +70,7 @@ or
 (4) BundlePrepare( direct = buf.allocMsg :: buf.readMsg :: Nil, async = Nil ) :: Nil
 (5) BundlePrepare( direct = Nil, async = Nil ) :: Nil
 
-bundle prepration:
+bundle preparation:
 a0, ..., ai
 ---
 b0, ..., bj
@@ -118,26 +118,26 @@ mapMsg
 moveToHeadMsg, moveToTailMsg, moveBeforeMsg, moveAfterMsg
 freeMsg
 
---- synthdef ---
+--- synth-def ---
 recvMsg
 (freeMsg)	--> currently not implemented
 
-a "throwaway" approach would mean that buffer.free/close, node.free, and synthdef.free make the objects inaccessible for subsequent client operations
+a "throwaway" approach would mean that buffer.free/close, node.free, and synthDef.free make the objects inaccessible for subsequent client operations
 
 note:
 - most dependencies are within-the-resource (e.g. true for all buffer operations)
-- few are cross-resoures (synth.newMsg depending on buffers)
+- few are cross-resources (synth.newMsg depending on buffers)
 
 more observations:
-- synths are always played straight after instantiation. we can thus simplify the synth resource by not allowing instantation without automatic playback
-- similarily for buffers; we can distinguish cueing for DiskIn and DiskOut, FFT, or 'user buffers' (which may have successive reads / writes, but which
+- synths are always played straight after instantiation. we can thus simplify the synth resource by not allowing instantiation without automatic playback
+- similarly for buffers; we can distinguish cueing for DiskIn and DiskOut, FFT, or 'user buffers' (which may have successive reads / writes, but which
   nevertheless will be immediately allocated)
 
 it thus suffices to maintain only one state, `disposed`, which is initially false and may be only set once to `true`
 
 Buffer.diskIn  --> yields object which can only close
-Buffer.diskOut --> dito.
-Buffer.fft     --> dito.
+Buffer.diskOut --> ditto.
+Buffer.fft     --> ditto.
 Buffer.user    --> can read and write, free
 
 ...
@@ -193,43 +193,43 @@ the case that needs attention:
 
 ::::::::::::::::::::::::::::
 
-isortedmap[Int, Bundles]
+iSortedMap[Int, Bundles]
 
 flush:
-   map.foreach { case (stamp, b) =>
-     synchronized {
-        if( stamp <= lastSeen ) sendOut( stamp, b )
-        else await += await.getOrElse( stamp, Vector.empty ) :+ b
-     }
-   }
+  map.foreach { case (stamp, b) =>
+    synchronized {
+      if (stamp <= lastSeen) sendOut(stamp, b)
+      else await += await.getOrElse(stamp, Vector.empty) :+ b
+    }
+  }
 
-sendOut( stamp, b):
-   if( b.forall( _.isSynchronous ) {
-      server ! b
-      seen( stamp + 1 )
-   } else {
-      server !? (TIMEOUT_MILLIS, b :+ syncMsg, {
-         case syncedMsg => seen( stamp + 1 )
-         case TIMEOUT => warn(); seen( stamp + 1 )
-      })
-   }
+sendOut(stamp, b):
+  if (b.forall(_.isSynchronous) {
+    server ! b
+    seen(stamp + 1)
+  } else {
+    server !? (TIMEOUT_MILLIS, b :+ syncMsg, {
+      case syncedMsg => seen(stamp + 1)
+      case TIMEOUT   => warn(); seen(stamp + 1)
+    })
+  }
 
-seen( stamp ):
-   synchronized {
-      if( stamp > lastSeen ) {
-         val from = lastSeen + 1
-         lastSeen = stamp
-         (from to stamp).foreach { seen =>
-            await.get( seen ).foreach { b => await -= seen; sendOut( seen, b )}
-         }
+seen(stamp):
+  synchronized {
+    if (stamp > lastSeen) {
+      val from = lastSeen + 1
+      lastSeen = stamp
+      (from to stamp).foreach { seen =>
+        await.get(seen).foreach { b => await -= seen; sendOut(seen, b) }
       }
-   }
+    }
+  }
 
 ::::::::::::::::::::::::::::
 
-Group( s )()
-   stamp = 0 (init)
-   play --> stamp = 0
-   when sending, looks for hasSeen( -1 ) which is true
+Group(s)()
+  stamp = 0 (init)
+  play --> stamp = 0
+  when sending, looks for hasSeen(-1) which is true
 
 a successive transaction will have a bundle index of at least 1 (because txn sent out 1 bundle)
