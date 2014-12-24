@@ -2,7 +2,7 @@ lazy val logicalName            = "SoundProcesses"
 
 name                            := logicalName
 
-version            in ThisBuild := "2.11.0-SNAPSHOT"
+version            in ThisBuild := "2.11.0"
 
 organization       in ThisBuild := "de.sciss"
 
@@ -38,15 +38,13 @@ lazy val audioWidgetsVersion    = "1.7.0"
 
 lazy val fileUtilVersion        = "1.1.1"
 
-lazy val topologyVersion        = "1.0.0-SNAPSHOT"
+lazy val topologyVersion        = "1.0.0"
 
 // ---- test-only ----
 
 lazy val scalaTestVersion       = "2.2.3"
 
 lazy val loggingEnabled         = true
-
-// retrieveManaged in ThisBuild := true
 
 lazy val bdb                    = "bdb"  // either "bdb" or "bdb6"
 
