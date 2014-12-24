@@ -1,22 +1,22 @@
-lazy val logicalName = "SoundProcesses"
+lazy val logicalName            = "SoundProcesses"
 
-name                      := logicalName
+name                            := logicalName
 
-version      in ThisBuild := "2.11.0-SNAPSHOT"
+version            in ThisBuild := "2.11.0-SNAPSHOT"
 
-organization in ThisBuild := "de.sciss"
+organization       in ThisBuild := "de.sciss"
 
-homepage     in ThisBuild := Some(url(s"https://github.com/Sciss/$logicalName"))
+homepage           in ThisBuild := Some(url(s"https://github.com/Sciss/$logicalName"))
 
-description               := "A framework for creating and managing ScalaCollider based sound processes"
+description                     := "A framework for creating and managing ScalaCollider based sound processes"
 
-licenses     in ThisBuild := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
+licenses           in ThisBuild := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion in ThisBuild := "2.11.4"
+scalaVersion       in ThisBuild := "2.11.4"
 
 crossScalaVersions in ThisBuild := Seq("2.11.4", "2.10.4")
 
-resolvers    in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
+resolvers          in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
 lazy val lucreCoreVersion       = "2.1.1"
 
@@ -46,7 +46,7 @@ lazy val loggingEnabled         = true
 
 // retrieveManaged in ThisBuild := true
 
-lazy val bdb = "bdb"  // either "bdb" or "bdb6"
+lazy val bdb                    = "bdb"  // either "bdb" or "bdb6"
 
 scalacOptions in ThisBuild ++= {
   // "-Xlint" -- produces problems with implicit objects and traits in package object

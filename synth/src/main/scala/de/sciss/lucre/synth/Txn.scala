@@ -38,6 +38,5 @@ object Txn {
   * `addMessage` method for staging OSC messages which are flushed at the end of a successful transaction.
   */
 trait Txn extends TxnLike {
-  def addMessage(resource: Resource, m: osc.Message with message.Send,
-                 dependencies: Seq[Resource] = Nil, noErrors: Boolean = false): Unit
+  def addMessage(resource: Resource, m: osc.Message with message.Send, dependencies: Seq[Resource] = Nil): Unit
 }

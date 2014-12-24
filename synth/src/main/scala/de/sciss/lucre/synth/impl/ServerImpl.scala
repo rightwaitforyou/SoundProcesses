@@ -288,7 +288,7 @@ object ServerImpl {
       }
     }
 
-    def !!(b0: osc.Bundle): Future[Unit] = {
+    def !! (b0: osc.Bundle): Future[Unit] = {
       val b   = if (USE_COMPRESSION) compress(b0) else b0
       val tt  = b.timetag
       if (DEBUG_SIZE) {

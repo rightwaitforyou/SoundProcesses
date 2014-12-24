@@ -20,39 +20,31 @@ import de.sciss.synth.message
 import scala.concurrent.stm.{Txn => ScalaTxn}
 
 object TxnImpl {
-  //   private val errOffMsg   = osc.Message( "/error", -1 )
-  //   private val errOnMsg    = osc.Message( "/error", -2 )
-
   var timeoutFun: () => Unit = () => ()
 
   private final val noBundles = Txn.Bundles(0, Vector.empty)
-
-  //   var TIMEOUT_MILLIS = 10000L
 }
 
-sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
-  tx =>
-
+sealed trait TxnImpl extends Txn { tx =>
   import TxnImpl._
 
   private var bundlesMap = Map.empty[Server, Txn.Bundles]
 
   final protected def flush(): Unit =
     bundlesMap.foreach { case (server, bundles) =>
-      log("flush " + server + " -> " + bundles.payload.size + " bundles")
+      log(s"flush $server -> ${bundles.payload.size} bundles")
       NodeGraph.send(server, bundles)
     }
 
   protected def markBundlesDirty(): Unit
 
-  final def addMessage(resource: Resource, m: osc.Message with message.Send, dependencies: Seq[Resource],
-                       noErrors: Boolean): Unit = {
+  final def addMessage(resource: Resource, m: osc.Message with message.Send, dependencies: Seq[Resource]): Unit = {
 
     val server        = resource.server
     if (!server.peer.isRunning) return
 
-    val resourceStampOld  = resource.timeStamp(tx)
-    if(resourceStampOld < 0) sys.error(s"Already disposed : $resource")
+    val resourceStampOld = resource.timeStamp(tx)
+    if (resourceStampOld < 0) sys.error(s"Already disposed : $resource")
 
     implicit val itx  = peer
     val txnCnt        = NodeGraph.messageTimeStamp(server)(tx)
@@ -68,10 +60,10 @@ sealed trait TxnImpl /* [ S <: Sys[ S ]] */ extends Txn /* Sys.Txn[ S ] */ {
       val depStamp = dep.timeStamp(tx)
       if (depStamp < 0) sys.error(s"Dependency already disposed : $dep")
       if (depStamp > depStampMax) depStampMax = depStamp
-      //         dep.addDependent( resource )( tx )  // validates dependent's server
+      // dep.addDependent( resource )( tx )  // validates dependent's server
     }
 
-    //      val dAsync     = (dTsMax & 1) == 1
+    // val dAsync     = (dTsMax & 1) == 1
     val msgAsync = !m.isSynchronous
 
     // if the message is asynchronous, it suffices to ensure that the time stamp async bit is set.
@@ -129,7 +121,7 @@ trait TxnFullImpl[S <: Sys[S]] extends TxnImpl with Sys.Txn[S] {
 }
 
 final class TxnPlainImpl(val peer: InTxn) extends TxnImpl {
-  override def toString = "proc.Txn<plain>@" + hashCode().toHexString
+  override def toString = s"proc.Txn<plain>@${hashCode().toHexString}"
 
   def afterCommit(code: => Unit): Unit = ScalaTxn.afterCommit(_ => code)(peer)
 

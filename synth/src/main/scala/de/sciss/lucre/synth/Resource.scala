@@ -58,7 +58,4 @@ trait Resource extends Disposable[Txn] {
 
   private[synth] def timeStamp                    (implicit tx: Txn): TimeStamp
   private[synth] def timeStamp_=(value: TimeStamp)(implicit tx: Txn): Unit
-
-  //   private[proc] def addDependent(    dependent: Resource )( implicit tx: Txn ) : Unit
-  //   private[proc] def removeDependent( dependent: Resource )( implicit tx: Txn ) : Unit
 }
