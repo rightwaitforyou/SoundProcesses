@@ -46,15 +46,17 @@ sealed trait TxnImpl extends Txn { tx =>
     if (resourceStampOld < 0) sys.error(s"Already disposed : $resource")
 
     implicit val itx  = peer
-    val txnCnt        = NodeGraph.messageTimeStamp(server)(tx)
-    val txnStopCnt    = txnCnt.get
+    val txnStampRef   = NodeGraph.messageTimeStamp(server)(tx)
+    val txnStamp      = txnStampRef.get
     val bOld          = bundlesMap.getOrElse(server, noBundles)
-    val txnStartCnt   = txnStopCnt - bOld.payload.size
+    val payOld        = bOld.payload
+    val szOld         = payOld.size
+    val txnStartStamp = txnStamp - szOld
 
     // calculate the maximum time stamp from the dependencies. this includes
     // the resource as its own dependency (since we should send out messages
     // in monotonic order)
-    var depStampMax = math.max(txnStartCnt << 1, resourceStampOld)
+    var depStampMax = math.max(txnStartStamp, resourceStampOld)
     dependencies.foreach { dep =>
       val depStamp = dep.timeStamp(tx)
       if (depStamp < 0) sys.error(s"Dependency already disposed : $dep")
@@ -68,36 +70,40 @@ sealed trait TxnImpl extends Txn { tx =>
     // if the message is asynchronous, it suffices to ensure that the time stamp async bit is set.
     // otherwise clear the async flag (& ~1), and if the maximum dependency is async, increase the time stamp
     // (from bit 1, i.e. `+ 2`); this second case is efficiently produced through 'rounding up' (`(_ + 1) & ~1`).
-    val resourceStampNew = if (msgAsync) depStampMax | 1 else (depStampMax + 1) & ~1
+    // val resourceStampNew = if (msgAsync) depStampMax | 1 else (depStampMax + 1) & ~1
+
+    // (A sync  1, B sync  1) --> A | 1
+    // (A async 0, B sync  1) --> A | 1
+    // (A sync  1, B async 0) --> (A + 1) & ~1 == A + 2
+    // (A async 0, B async 0) --> (A + 1) & ~1 == A
+    val resourceStampNew = if (msgAsync) (depStampMax + 1) & ~1 else depStampMax | 1
 
     log(s"addMessage($resource, $m) -> stamp = $resourceStampNew")
     if (resourceStampNew != resourceStampOld) resource.timeStamp_=(resourceStampNew)(tx)
 
-    val bNew = if (bOld.payload.isEmpty) {
+    val bNew = if (szOld == 0) {
       markBundlesDirty()
-      //         log("registering after commit handler")
-      //         afterCommit(flush())
-      val txnStartCntNew = resourceStampNew >> 1
-      assert(txnStartCntNew == txnStartCnt)
-      txnCnt += 1
-      Txn.Bundles(txnStartCntNew, Vector(Vector(m)))
+      txnStampRef += 2
+      val vm    = Vector(m)
+      val msgs  = if (msgAsync) Vector(vm, Vector.empty) else Vector(Vector.empty, vm)
+      Txn.Bundles(txnStartStamp, msgs)
 
     } else {
-      val cntOld      = bOld.firstCnt
-      val resourceCnt = resourceStampNew >> 1
-      val payOld      = bOld.payload
-      val szOld       = payOld.size
-      if (resourceCnt == cntOld + szOld) {
+      if (resourceStampNew == txnStamp) {
         // append to back
-        val payNew = payOld :+ Vector(m)
-        txnCnt += 1
+        val vm      = Vector(m)
+        val payNew  = if (msgAsync)
+          payOld :+ vm :+ Vector.empty
+        else
+          payOld :+ Vector.empty :+ vm
+        txnStampRef += 2
         bOld.copy(payload = payNew)
 
       } else {
         // we don't need the assertion, since we are going to call payload.apply which would
         // through an out of bounds exception if the assertion wouldn't hold
         //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
-        val payIdx = resourceCnt - cntOld
+        val payIdx = resourceStampNew - txnStartStamp
         val payNew = payOld.updated(payIdx, payOld(payIdx) :+ m)
         bOld.copy(payload = payNew)
       }
@@ -152,7 +158,7 @@ sealed trait TxnImpl extends Txn { tx =>
       Txn.Bundles(txnStartCntNew, Vector(Vector(m)))
 
     } else {
-      val cntOld      = bOld.firstCnt
+      val cntOld      = bOld.firstStamp
       val resourceCnt = resourceStampNew >> 1
       val payOld      = bOld.payload
       val szOld       = payOld.size

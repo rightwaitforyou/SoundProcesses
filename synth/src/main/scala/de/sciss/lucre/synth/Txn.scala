@@ -26,10 +26,10 @@ object Txn {
 
   /** A data type encapsulating all the outgoing OSC bundles for this transaction.
     *
-    * @param firstCnt   the counter value of the first bundle in the payload
-    * @param payload    the succession of bundles, represented as a sequence of a sequence of messages
+    * @param firstStamp   the counter value of the first bundle in the payload
+    * @param payload      the succession of bundles, represented as a sequence of a sequence of messages
     */
-  final case class Bundles(firstCnt: Int, payload: Vec[Vec[osc.Message with message.Send]])
+  final case class Bundles(firstStamp: Int, payload: Vec[Vec[osc.Message with message.Send]])
 }
 
 /** The `Txn` trait is declared without representation type parameter in order to keep the real-time sound
