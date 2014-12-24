@@ -441,7 +441,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
                   scanOut <- in2H ().elem.peer.scans.get("out")
                   scanIn  <- procH().elem.peer.scans.get("in" )
                 } {
-                  println("--connect dust--")
+                  println("--disconnect dust--")
                   scanOut ~/> scanIn
                 }
 

@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.stm.{TMap, InTxn, Ref}
 
 object NodeGraphImpl {
-  var DEBUG = false
+  final val DEBUG = false
 
   private val uniqueDefID = Ref(0)
 
@@ -129,10 +129,7 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
 
   private type T = Topology[NodeRef, Edge]
 
-  // XXX TODO - remove. It's here for bin-compat
-  private val ugenGraphs = Ref(Map.empty[GraphEquality, SynthDef])
-
-  private[this] val ugenGraphsNew = TMap.empty[IndexedSeq[Byte], SynthDef]
+  private[this] val ugenGraphs = TMap.empty[IndexedSeq[Byte], SynthDef]
 
   private val topologyRef = Ref[T](Topology.empty)
 
@@ -158,33 +155,12 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     val equ: IndexedSeq[Byte] = bytes // opposed to plain `Array[Byte]`, this has correct definition of `equals`
     log(s"request for synth graph ${equ.hashCode()}")
 
-    ugenGraphsNew.getOrElseUpdate(equ, {
+    ugenGraphs.getOrElseUpdate(equ, {
       log(s"synth graph ${equ.hashCode()} is new")
       val name  = abbreviate(s"${nameHint.getOrElse("proc")}_${nextDefID()}")
       val peer  = SSynthDef(name, graph)
       val rd    = impl.SynthDefImpl(server, peer) // (bytes)
       rd.recv()
-      rd
-    })
-  }
-
-  // XXX TODO -- needed for bin-compat, makes MiMa happy because of the access of `ugenGraphs`
-  def getSynthDefOLD(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef = {
-    implicit val itx = tx.peer
-    // XXX note: unfortunately we have side effects in the expansion, such as
-    // includeParam for ProcAudioOutput ... And anyways, we might allow for
-    // indeterminate GE.Lazies, thus we need to check for UGenGraph equality,
-    // not SynthGraph equality
-    // val u = graph.expand
-    val equ = new GraphEquality(graph)
-    log(s"request for synth graph ${equ.hashCode}")
-    ugenGraphs.get.getOrElse(equ, {
-      log(s"synth graph ${equ.hashCode} is new")
-      val name = abbreviate(s"${nameHint.getOrElse("proc")}_${nextDefID()}")
-      val peer = SSynthDef(name, graph)
-      val rd = impl.SynthDefImpl(server, peer)
-      rd.recv()
-      ugenGraphs.transform(_ + (equ -> rd))
       rd
     })
   }
@@ -252,7 +228,7 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
   private def sendNow(msgs: Vec[osc.Message with message.Send], /* allSync: Boolean, */ stamp: Int): Future[Unit] = {
     // XXX TODO -- if there are issues with bundle-reply stamps missing,
     // the alternative is to enable the following line:
-    // if (msgs.isEmpty) return Future.successful(())
+    if (msgs.isEmpty) return sendAdvance(stamp) // Future.successful(())
 
     val allSync = (stamp & 1) == 1
     if (DEBUG) println(s"SEND NOW $msgs - allSync? $allSync; stamp = $stamp")
@@ -288,9 +264,7 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     // }
 
     val stampOff  = bundles.firstStamp
-    // XXX TODO -- if there are issues with bundle-reply stamps missing,
-    // the alternative is to replace the following `collect` with `map` (and no guard)
-    val mapped    = bundles.payload.zipWithIndex.collect { case (msgs, idx) if msgs.nonEmpty =>
+    val mapped    = bundles.payload.zipWithIndex.map { case (msgs, idx) /* if msgs.nonEmpty */ =>
       val stamp   = stampOff + idx
       // val depStamp= stamp - 1
       // val allSync = msgs.forall(_.isSynchronous)
@@ -298,13 +272,16 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
     }
     val res = sync.synchronized {
       val (now, later) = mapped.partition(bundleReplySeen >= _.depStamp)
-      val futuresNow    = now  .map { m => sendNow(m.msgs, /* m.allSync, */ m.stamp) }
+      // it is important to process the 'later' bundles first,
+      // because now they might rely on some `bundleReplySeen` that is
+      // increased by processing the `now` bundles.
       val futuresLater  = later.map { m =>
         val p   = Promise[Unit]()
         val sch = new Scheduled(m.msgs, /* m.allSync, */ m.stamp, p)
         bundleWaiting += m.depStamp -> (bundleWaiting.getOrElse(m.depStamp, Vector.empty) :+ sch)
         p.future
       }
+      val futuresNow    = now  .map { m => sendNow(m.msgs, /* m.allSync, */ m.stamp) }
       reduceFutures(futuresNow ++ futuresLater)
     }
 
