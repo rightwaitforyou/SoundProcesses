@@ -2,7 +2,7 @@
  *  TransportImpl.scala
  *  (SoundProcesses)
  *
- *  Copyright (c) 2010-2014 Hanns Holger Rutz. All rights reserved.
+ *  Copyright (c) 2010-2015 Hanns Holger Rutz. All rights reserved.
  *
  *	This software is published under the GNU General Public License v2+
  *
@@ -28,7 +28,10 @@ object TransportImpl {
                         (implicit tx: S#Tx, workspace: WorkspaceHandle[S]): Transport[S] = {
     val res = mkTransport(Some(auralSystem), scheduler)
     auralSystem.addClient(res)
-    auralSystem.serverOption.foreach(res.auralStarted)
+    auralSystem.serverOption.foreach { server =>
+      implicit val auralContext = AuralContext(server, scheduler)
+      res.auralStartedTx(server)
+    }
     res
   }
 
@@ -209,6 +212,7 @@ object TransportImpl {
 
     def auralStarted(server: Server)(implicit tx: Txn): Unit = {
       // XXX TODO -- what was the reasoning for the txn decoupling?
+      // (perhaps the discrepancy between Txn and S#Tx ?)
       tx.afterCommit {
         SoundProcesses.atomic { implicit tx: S#Tx =>
           implicit val auralContext = AuralContext(server, scheduler)
