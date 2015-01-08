@@ -20,7 +20,7 @@ import java.nio.ByteBuffer
 import de.sciss.lucre.stm
 import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.osc
-import de.sciss.processor.{GenericProcessor, Processor}
+import de.sciss.processor.GenericProcessor
 import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.synth.io.{SampleFormat, AudioFileType}
 
@@ -42,17 +42,30 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
   private final class Impl(config: Config) extends ProcessorImpl[Product, GenericProcessor[File]]
     with GenericProcessor[File] {
 
-    // XXX TODO: due to a bug in Processor, this is currently not called:
-    // - note: should be fixed in current version
+    @volatile private var proc: Process = null
 
-    // override protected def cleanUp() {
-    // }
+    private val needsOSCFile  = config.server.nrtCommandPath.isEmpty  // we need to generate that file
+    private val needsDummyOut = config.server.outputBusChannels == 0  // scsynth doesn't allow this. must have 1 dummy channel
+    private val needsOutFile  = config.server.nrtOutputPath.isEmpty && !needsDummyOut // we need to generate
+
+    private var oscFile     : File = null
+    private var dummyOutFile: File = null
+
+    private def killProc(): Unit = {
+      val _proc = proc
+      proc      = null
+      if (_proc != null) _proc.destroy()
+    }
+
+    override protected def cleanUp(): Unit = {
+      killProc()
+      if (needsOSCFile && oscFile != null) oscFile.delete()
+      if (dummyOutFile != null) dummyOutFile.delete()
+    }
+
+    override protected def notifyAborted(): Unit = killProc()
 
     protected def body(): File = {
-      val needsOSCFile  = config.server.nrtCommandPath.isEmpty  // we need to generate that file
-      val needsDummyOut = config.server.outputBusChannels == 0  // scsynth doesn't allow this. must have 1 dummy channel
-      val needsOutFile  = config.server.nrtOutputPath.isEmpty && !needsDummyOut // we need to generate
-
       // ---- configuration ----
 
       // the server config (either directly from input, or updated according to the necessary changes)
@@ -68,8 +81,8 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           b.outputBusChannels = 1
         }
         if (needsDummyOut || needsOutFile) {
-          val f = File.createTempFile("bounce", s".${b.nrtHeaderFormat.extension}")
-          b.nrtOutputPath = f.getCanonicalPath
+          dummyOutFile = File.createTempFile("bounce", s".${b.nrtHeaderFormat.extension}")
+          b.nrtOutputPath = dummyOutFile.getCanonicalPath
         }
         b.build
       } else {
@@ -179,7 +192,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       // ---- write OSC file ----
 
-      val oscFile = new File(sCfg.nrtCommandPath)
+      oscFile = new File(sCfg.nrtCommandPath)
       if (oscFile.exists()) require(oscFile.delete(), s"Could not delete existing OSC file $oscFile")
 
       // XXX TODO: this should be factored out, probably go into ScalaOSC or ScalaCollider
@@ -213,44 +226,47 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       logTransport("---- BOUNCE: scsynth ----")
       logTransport(procArgs.mkString(" "))
 
-      lazy val log: ProcessLogger = new ProcessLogger {
+      val log: ProcessLogger = new ProcessLogger {
         def buffer[A](f: => A): A = f
 
-        // ??
-        def out(line: => String): Unit =
+        def out(lineL: => String): Unit = {
+          val line: String = lineL
           if (line.startsWith("nextOSCPacket")) {
             val time = line.substring(14).toFloat
             val prog = time / dur
             progress = prog
-            try {
-              checkAborted()
-            } catch {
-              case Processor.Aborted() =>
-                proc.destroy()
+            //            try {
+            //              checkAborted()
+            //            } catch {
+            //              case Processor.Aborted() =>
+            //                proc.destroy()
+            //            }
+          } else {
+            // ignore the 'start time <num>' message, and also the 'Found <num> LADSPA plugins' on Linux
+            if (!line.startsWith("start time ") && !line.endsWith(" LADSPA plugins")) {
+              Console.out.println(line)
             }
-          } else if (line != "start time 0") {
-            Console.out.println(line)
           }
+        }
 
         def err(line: => String): Unit = Console.err.println(line)
       }
-      lazy val proc: Process = procBuilder.run(log)
 
-      val res = blocking(proc.exitValue()) // blocks
-      if (needsOSCFile) oscFile.delete()
-      val outputFile = new File(sCfg.nrtOutputPath)
-      if (needsDummyOut) outputFile.delete()
+      val _proc = procBuilder.run(log)
+      proc = _proc
       checkAborted()
-      if (res != 0) throw new RuntimeException(s"scsynth failed with exit code $res")
+      val res = blocking(_proc.exitValue()) // blocks
+      proc = null
 
-      // XXX TODO: clean up
+      checkAborted()
+      if (res != 0) throw Bounce.ServerFailed(res)
 
       cursor.step { implicit tx =>
         transport.dispose()
       }
       // scheduler.dispose()
 
-      outputFile
+      new File(config.server.nrtOutputPath)
     }
   }
 }

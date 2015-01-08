@@ -93,6 +93,10 @@ object Bounce {
 
     override def productPrefix = "Config"
   }
+
+  final case class ServerFailed(code: Int) extends Exception {
+    override def toString = s"$productPrefix($code)"
+  }
 }
 trait Bounce[S <: Sys[S]] extends ProcessorFactory {
   type Product  = File
