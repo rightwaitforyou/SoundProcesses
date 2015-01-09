@@ -20,14 +20,14 @@ import java.nio.ByteBuffer
 import de.sciss.lucre.stm
 import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.osc
-import de.sciss.processor.GenericProcessor
+import de.sciss.processor.Processor
 import de.sciss.processor.impl.ProcessorImpl
+import de.sciss.synth.{Server => SServer}
 import de.sciss.synth.io.{SampleFormat, AudioFileType}
 
 import scala.annotation.tailrec
 import scala.concurrent.{Future, Promise, Await, blocking}
 import scala.concurrent.duration.Duration
-import scala.sys.process.{Process, ProcessLogger}
 import scala.util.Success
 
 final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx,
@@ -39,31 +39,20 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
     new Impl(config)
   }
 
-  private final class Impl(config: Config) extends ProcessorImpl[Product, GenericProcessor[File]]
-    with GenericProcessor[File] {
-
-    @volatile private var proc: Process = null
+  private final class Impl(config: Config) extends ProcessorImpl[Product, Processor[File]]
+    with Processor[File] {
 
     private val needsOSCFile  = config.server.nrtCommandPath.isEmpty  // we need to generate that file
     private val needsDummyOut = config.server.outputBusChannels == 0  // scsynth doesn't allow this. must have 1 dummy channel
     private val needsOutFile  = config.server.nrtOutputPath.isEmpty && !needsDummyOut // we need to generate
 
     private var oscFile     : File = null
-    private var dummyOutFile: File = null
-
-    private def killProc(): Unit = {
-      val _proc = proc
-      proc      = null
-      if (_proc != null) _proc.destroy()
-    }
+    private var outFile     : File = null
 
     override protected def cleanUp(): Unit = {
-      killProc()
-      if (needsOSCFile && oscFile != null) oscFile.delete()
-      if (dummyOutFile != null) dummyOutFile.delete()
+      if (needsOSCFile  && oscFile != null) oscFile.delete()
+      if (needsDummyOut && outFile != null) outFile.delete()
     }
-
-    override protected def notifyAborted(): Unit = killProc()
 
     protected def body(): File = {
       // ---- configuration ----
@@ -81,8 +70,8 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           b.outputBusChannels = 1
         }
         if (needsDummyOut || needsOutFile) {
-          dummyOutFile = File.createTempFile("bounce", s".${b.nrtHeaderFormat.extension}")
-          b.nrtOutputPath = dummyOutFile.getCanonicalPath
+          outFile = File.createTempFile("bounce", s".${b.nrtHeaderFormat.extension}")
+          b.nrtOutputPath = outFile.getCanonicalPath
         }
         b.build
       } else {
@@ -220,53 +209,19 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       val dur = span.length / Timeline.SampleRate
 
-      val procArgs = sCfg.toNonRealtimeArgs
-      val procBuilder = Process(procArgs, Some(new File(sCfg.program).getParentFile))
-
       logTransport("---- BOUNCE: scsynth ----")
-      logTransport(procArgs.mkString(" "))
 
-      val log: ProcessLogger = new ProcessLogger {
-        def buffer[A](f: => A): A = f
-
-        def out(lineL: => String): Unit = {
-          val line: String = lineL
-          if (line.startsWith("nextOSCPacket")) {
-            val time = line.substring(14).toFloat
-            val prog = time / dur
-            progress = prog
-            //            try {
-            //              checkAborted()
-            //            } catch {
-            //              case Processor.Aborted() =>
-            //                proc.destroy()
-            //            }
-          } else {
-            // ignore the 'start time <num>' message, and also the 'Found <num> LADSPA plugins' on Linux
-            if (!line.startsWith("start time ") && !line.endsWith(" LADSPA plugins")) {
-              Console.out.println(line)
-            }
-          }
-        }
-
-        def err(line: => String): Unit = Console.err.println(line)
-      }
-
-      val _proc = procBuilder.run(log)
-      proc = _proc
-      checkAborted()
-      val res = blocking(_proc.exitValue()) // blocks
-      proc = null
-
-      checkAborted()
-      if (res != 0) throw Bounce.ServerFailed(res)
+      val nrtFut = SServer.renderNRT(dur = dur, config = sCfg)
+      nrtFut.start()
+      val nrtRes = await(nrtFut)
+      if (nrtRes != 0) throw Bounce.ServerFailed(nrtRes)
 
       cursor.step { implicit tx =>
         transport.dispose()
       }
       // scheduler.dispose()
 
-      new File(config.server.nrtOutputPath)
+      if (needsOutFile) outFile else new File(config.server.nrtOutputPath)
     }
   }
 }

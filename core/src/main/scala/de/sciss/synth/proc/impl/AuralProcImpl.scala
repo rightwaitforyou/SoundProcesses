@@ -21,7 +21,7 @@ import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.{proc, addToHead, ControlSet}
+import de.sciss.synth.{proc, ControlSet}
 import de.sciss.synth.proc.{logAural => logA}
 import proc.{UGenGraphBuilder => UGB}
 import Timeline.SampleRate

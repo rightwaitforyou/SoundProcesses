@@ -14,27 +14,29 @@
 package de.sciss.synth.proc
 package impl
 
-import java.io.{ByteArrayOutputStream, ByteArrayInputStream, File}
-import de.sciss.processor.Processor
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream, File}
+
+import de.sciss.lucre.event.Sys
+import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.{event => evt}
+import de.sciss.processor.ProcessorLike
+import de.sciss.processor.impl.ProcessorImpl
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth
 import de.sciss.synth.proc
-import scala.concurrent.{ExecutionContext, Await, Promise, Future, blocking}
-import de.sciss.processor.impl.ProcessorImpl
-import collection.immutable.{Seq => ISeq}
-import scala.util.{Success, Failure}
+
+import scala.collection.immutable.{IndexedSeq => Vec, Seq => ISeq}
 import scala.concurrent.duration.Duration
-import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
-import de.sciss.lucre.{event => evt}
-import evt.Sys
-import de.sciss.lucre.expr.Expr
-import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise, blocking}
+import scala.util.{Failure, Success}
 
 object CodeImpl {
   private final val COOKIE  = 0x436F6465  // "Code"
 
   def unpackJar(bytes: Array[Byte]): Map[String, Array[Byte]] = {
     import java.util.jar._
-    import scala.annotation.tailrec
+
+import scala.annotation.tailrec
 
     val in = new JarInputStream(new ByteArrayInputStream(bytes))
     val b  = Map.newBuilder[String, Array[Byte]]
@@ -173,13 +175,13 @@ object CodeImpl {
 
   object Wrapper {
     implicit object FileTransform
-      extends Wrapper[(File, File, Processor[Any, _] => Unit), Future[Unit], Code.FileTransform] {
+      extends Wrapper[(File, File, ProcessorLike[Any, Any] => Unit), Future[Unit], Code.FileTransform] {
 
       def id = Code.FileTransform.id
 
       def binding: Option[String] = Some("FileTransformContext")
 
-      def wrap(args: (File, File, Processor[Any, _] => Unit))(fun: => Any): Future[Unit] = {
+      def wrap(args: (File, File, ProcessorLike[Any, Any] => Unit))(fun: => Any): Future[Unit] = {
         val (in, out, procHandler) = args
         val proc = new FileTransformContext(in, out, () => fun)
         procHandler(proc)

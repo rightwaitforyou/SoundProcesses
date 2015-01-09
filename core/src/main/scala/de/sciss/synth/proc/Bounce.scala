@@ -17,7 +17,7 @@ import java.io.File
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.synth.{Server, Sys}
-import de.sciss.processor.{GenericProcessor, ProcessorFactory}
+import de.sciss.processor.ProcessorFactory
 import de.sciss.span.Span
 import de.sciss.synth.proc.impl.{BounceImpl => Impl}
 
@@ -101,5 +101,5 @@ object Bounce {
 trait Bounce[S <: Sys[S]] extends ProcessorFactory {
   type Product  = File
   type Config   = Bounce.Config[S]
-  type Repr     = GenericProcessor[Product]
+  type Repr     = Generic
 }

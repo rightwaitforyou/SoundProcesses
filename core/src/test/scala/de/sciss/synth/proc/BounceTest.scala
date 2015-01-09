@@ -50,7 +50,7 @@ object BounceTest extends App {
   bCfg.span               = Span(frame(0.15), frame(0.3)) // start in the middle of the proc span
   val sCfg                = bCfg.server
   //sCfg.nrtCommandPath = "/Users/hhrutz/Desktop/test.osc"
-  // sCfg.nrtOutputPath  = "/Users/hhrutz/Desktop/test.aif"
+  // sCfg.nrtOutputPath      = "/tmp/test.aif"
   //sCfg.programPath    = "/Applications/SuperCollider_3.6.5/SuperCollider.app/Contents/Resources/scsynth"
 
   // this is default now:
@@ -61,7 +61,7 @@ object BounceTest extends App {
   // this is default now:
   // sCfg.blockSize          = 1       // sample accurate placement of synths
 
-  val process             = bounce(bCfg)
+  val process             = bounce.apply(bCfg)
   import ExecutionContext.Implicits.global
 
   val t = new Thread {

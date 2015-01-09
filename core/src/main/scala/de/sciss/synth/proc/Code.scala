@@ -18,7 +18,7 @@ import de.sciss.serial.{Serializer, Writable, DataInput, DataOutput, ImmutableSe
 import impl.{CodeImpl => Impl}
 import java.io.File
 import scala.concurrent.{ExecutionContext, Future, blocking}
-import de.sciss.processor.Processor
+import de.sciss.processor.{ProcessorLike, Processor}
 import de.sciss.synth
 import scala.annotation.switch
 import de.sciss.synth.proc
@@ -90,7 +90,7 @@ object Code {
     final val name  = "File Transform"
   }
   final case class FileTransform(source: String) extends Code {
-    type In     = (File, File, Processor[Any, _] => Unit)
+    type In     = (File, File, ProcessorLike[Any, Any] => Unit)
     type Out    = Future[Unit]
     def id      = FileTransform.id
 

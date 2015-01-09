@@ -17,6 +17,6 @@ import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.Sys
 import de.sciss.processor.Processor
 
-trait AsyncResource[S <: Sys[S]] extends Processor[Any, AsyncResource[S]] with Disposable[S#Tx] {
+trait AsyncResource[S <: Sys[S]] extends Processor[Any] with Disposable[S#Tx] {
   def install(b: SynthBuilder[S])(implicit tx: S#Tx): Unit
 }
