@@ -32,10 +32,14 @@ object ServerImpl {
   /** If `true`, applies a few optimizations to messages within a bundle, in order to reduce its size */
   var USE_COMPRESSION = true
 
-  private final val MaxPacketSize = 0x8000 // 0x10000 // 64K
+  private final val MaxOnlinePacketSize   = 0x8000 // 0x10000 // 64K
+  private final val MaxOfflinePacketSize  = 0x2000 // 8192
 
   private final case class OnlineImpl(peer: SServer) extends Impl {
     override def toString = peer.toString()
+
+    def maxPacketSize: Int      = MaxOnlinePacketSize
+    def isLocal      : Boolean  = peer.isLocal
 
     //    private def printExcessPacket(p: osc.Packet, sz: Int): Unit = {
     //      Console.err.println(s"ERROR: Packet size $sz exceeds $MaxPacketSize")
@@ -233,7 +237,7 @@ object ServerImpl {
           val next  = iter.next()
           val sz1   = next.encodedSize(Server.codec) + 4
           val sz2   = sz + sz1
-          if (sz2 >= MaxPacketSize) {
+          if (sz2 > MaxOnlinePacketSize) {
             val res = builder.result()
             if (res.isEmpty) sys.error(s"Cannot encode packet -- too large ($sz1)")
             val a1  = fun(res)
@@ -259,7 +263,7 @@ object ServerImpl {
       p match {
         case b: osc.Bundle if DEBUG_SIZE =>
           val sz0 = Server.codec.encodedBundleSize(b)
-          if (sz0 < MaxPacketSize) {
+          if (sz0 <= MaxOnlinePacketSize) {
             peer ! b
           } else {
             // Since the bundle is synchronous, it is not trivial to split it
@@ -272,7 +276,7 @@ object ServerImpl {
             // temporarily pause the server's default group. That way no
             // damage can be done, but it may result in a short noticable bit
             // of silence. That's as good as it gets, I suppose...
-            Console.err.println(s"WARNING: Bundle size $sz0 exceeds $MaxPacketSize. Splitting into multiple bundles")
+            Console.err.println(s"WARNING: Bundle size $sz0 exceeds $MaxOnlinePacketSize. Splitting into multiple bundles")
             val gid   = peer.defaultGroup.id
             val iter  =
               Iterator.single(message.NodeRun(gid -> false)) ++ b.packets.iterator ++
@@ -293,16 +297,16 @@ object ServerImpl {
       val tt  = b.timetag
       if (DEBUG_SIZE) {
         val sz0     = Server.codec.encodedBundleSize(b)
-        if (sz0 + 20 < MaxPacketSize) {
+        if (sz0 + 20 <= MaxOnlinePacketSize) {
           perform_!!(tt, b.packets)
         } else {
           val iter = b.packets.iterator
-          val futs = splitAndSend[Vec[Future[Unit]], Future[Unit]](init = Vector.empty,
-                                                                   iter = iter, addSize = 20 /* /sync */) { packets =>
+          val futures = splitAndSend[Vec[Future[Unit]], Future[Unit]](init = Vector.empty,
+                                                                      iter = iter, addSize = 20) { packets =>
             perform_!!(tt, packets)
           } (_ :+ _)
           import ExecutionContext.Implicits.global
-          Future.reduce[Unit, Unit](futs)((_, _) => ())
+          Future.reduce[Unit, Unit](futures)((_, _) => ())
         }
       } else {
         perform_!!(tt, b.packets)
@@ -323,6 +327,9 @@ object ServerImpl {
 
   private final case class OfflineImpl(peer: SServer) extends Impl with Server.Offline {
     override def toString = s"$peer @offline"
+
+    def isLocal      : Boolean  = true
+    def maxPacketSize: Int      = MaxOfflinePacketSize
 
     private val sync = new AnyRef
 
@@ -356,10 +363,10 @@ object ServerImpl {
       val sz = Server.codec.encodedBundleSize(b1)
       // SuperCollider versions until 2014 have a hard-coded limit of 8K bundles in NRT!
       // cf. https://github.com/supercollider/supercollider/commit/f3f0f81de4259aa44983f1041589f895c91798a1
-      val szOk = sz <= 8192
+      val szOk = sz <= MaxOfflinePacketSize
       if (szOk || b1.length == 1) {
         log(s"addBundle $b1")
-        if (!szOk) log("addBundle - bundle exceeds 8k!")
+        if (!szOk) log(s"addBundle - bundle exceeds ${MaxOfflinePacketSize/1024}k!")
         _bundles :+= b1
       } else {
         val tt = b1.timetag

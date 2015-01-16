@@ -64,6 +64,9 @@ trait Server {
 
   final def sampleRate: Double = peer.sampleRate
 
+  def isLocal      : Boolean
+  def maxPacketSize: Int
+
   implicit def executionContext: ExecutionContext
 
   // ---- transactional methods ----

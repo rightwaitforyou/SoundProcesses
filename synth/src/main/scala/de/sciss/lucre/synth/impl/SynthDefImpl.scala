@@ -32,12 +32,11 @@ final case class SynthDefImpl(server: Server, peer: SSynthDef) extends ResourceI
   def recv()(implicit tx: Txn): Unit = {
     requireOffline()
     val mRecv = peer.recvMsg
-    // XXX TODO - limit is a bit arbitrary
-    val m = if (mRecv.bytes.limit() < 30000 || !server.peer.isLocal) mRecv else {
+    val m = if (mRecv.bytes.limit() <= (server.maxPacketSize - 20) || !server.peer.isLocal) mRecv else {
       val file = File.createTempFile("temp", s".${SSynthDef.extension}")
       val path = file.getAbsolutePath
       file.deleteOnExit()
-      // hmmm, not too pretty doing this inside a transaction...
+      // not too pretty doing this inside a transaction...
       SSynthDef.write(path, peer :: Nil)
       SynthDefLoad(path, None)
     }
