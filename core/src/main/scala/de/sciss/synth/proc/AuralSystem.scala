@@ -25,6 +25,10 @@ object AuralSystem {
     res
   }
 
+  /** Creates an offline-server based aural system.
+    * It is important that the `AuralSystem` is eventually
+    * disposed again, calling the `stop` method.
+    */
   def offline(server: Server.Offline)(implicit tx: Txn): AuralSystem = {
     val res = apply()
     res.offline(server)

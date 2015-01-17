@@ -35,7 +35,9 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
   extends Bounce[S] {
 
   protected def prepare(config: Config): Prepared = {
-    require(config.server.sampleRate > 0, "The sample-rate of the server configuration must be explicitly specified")
+    if (config.server.sampleRate <= 0)
+      throw new IllegalArgumentException("The sample-rate of the server configuration must be explicitly specified")
+
     new Impl(config)
   }
 
@@ -48,10 +50,12 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
     private var oscFile     : File = null
     private var outFile     : File = null
+    private var aural: AuralSystem = null
 
     override protected def cleanUp(): Unit = {
       if (needsOSCFile  && oscFile != null) oscFile.delete()
       if (needsDummyOut && outFile != null) outFile.delete()
+      if (aural != null) cursor.step { implicit tx => aural.stop() }
     }
 
     protected def body(): File = {
@@ -82,20 +86,21 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       val server = Server.offline(sCfg)
 
-      val (span, scheduler, transport) = cursor.step { implicit tx =>
+      val (span, scheduler, transport, __aural) = cursor.step { implicit tx =>
         val _scheduler  = Scheduler.offline[S]
         val _span       = config.span
 
         // val _transp = TransportOLD.offline[S, I](group, sampleRate)
-        val aural = AuralSystem.offline(server)
-        val _transport = Transport(aural, _scheduler)
+        val _aural = AuralSystem.offline(server)
+        val _transport = Transport(_aural, _scheduler)
         config.group.foreach { h =>
           _transport.addObject(h())
         }
         _transport.seek(_span.start)
         _transport.play()
-        (_span, _scheduler, _transport)
+        (_span, _scheduler, _transport, _aural)
       }
+      aural = __aural
 
       val srRatio = server.sampleRate / Timeline.SampleRate
 

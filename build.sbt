@@ -26,13 +26,13 @@ lazy val lucreEventVersion      = "2.7.2"
 
 lazy val lucreConfluentVersion  = "2.9.0"
 
-lazy val scalaColliderVersion   = "1.16.0"
+lazy val scalaColliderVersion   = "1.17.0-SNAPSHOT"
 
 lazy val spanVersion            = "1.2.1"
 
 lazy val lucreSwingVersion      = "0.6.2"
 
-lazy val scalaColliderSwingVersion = "1.22.0"
+lazy val scalaColliderSwingVersion = "1.23.0-SNAPSHOT"
 
 lazy val audioWidgetsVersion    = "1.7.2"
 
