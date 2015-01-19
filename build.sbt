@@ -1,52 +1,52 @@
-lazy val logicalName            = "SoundProcesses"
+lazy val logicalName               = "SoundProcesses"
 
-name                            := logicalName
+name                              := logicalName
 
-version            in ThisBuild := "2.13.0-SNAPSHOT"
+version            in ThisBuild   := "2.13.0"
 
-organization       in ThisBuild := "de.sciss"
+organization       in ThisBuild   := "de.sciss"
 
-homepage           in ThisBuild := Some(url(s"https://github.com/Sciss/$logicalName"))
+homepage           in ThisBuild   := Some(url(s"https://github.com/Sciss/$logicalName"))
 
-description                     := "A framework for creating and managing ScalaCollider based sound processes"
+description                       := "A framework for creating and managing ScalaCollider based sound processes"
 
-licenses           in ThisBuild := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
+licenses           in ThisBuild   := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
 
-scalaVersion       in ThisBuild := "2.11.5"
+scalaVersion       in ThisBuild   := "2.11.5"
 
-crossScalaVersions in ThisBuild := Seq("2.11.5", "2.10.4")
+crossScalaVersions in ThisBuild   := Seq("2.11.5", "2.10.4")
 
-resolvers          in ThisBuild += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
+resolvers          in ThisBuild   += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
-lazy val lucreCoreVersion       = "2.1.1"
+lazy val lucreCoreVersion          = "2.1.1"
 
-lazy val lucreDataVersion       = "2.3.0"
+lazy val lucreDataVersion          = "2.3.0"
 
-lazy val lucreEventVersion      = "2.7.2"
+lazy val lucreEventVersion         = "2.7.2"
 
-lazy val lucreConfluentVersion  = "2.9.0"
+lazy val lucreConfluentVersion     = "2.9.0"
 
-lazy val scalaColliderVersion   = "1.17.0-SNAPSHOT"
+lazy val scalaColliderVersion      = "1.17.1"
 
-lazy val spanVersion            = "1.2.1"
+lazy val spanVersion               = "1.3.0"
 
-lazy val lucreSwingVersion      = "0.6.2"
+lazy val lucreSwingVersion         = "0.7.0"
 
-lazy val scalaColliderSwingVersion = "1.23.0-SNAPSHOT"
+lazy val scalaColliderSwingVersion = "1.23.0"
 
-lazy val audioWidgetsVersion    = "1.7.2"
+lazy val audioWidgetsVersion       = "1.8.0"
 
-lazy val fileUtilVersion        = "1.1.1"
+lazy val fileUtilVersion           = "1.1.1"
 
-lazy val topologyVersion        = "1.0.0"
+lazy val topologyVersion           = "1.0.0"
 
 // ---- test-only ----
 
-lazy val scalaTestVersion       = "2.2.3"
+lazy val scalaTestVersion          = "2.2.3"
 
-lazy val loggingEnabled         = true
+lazy val loggingEnabled            = true
 
-lazy val bdb                    = "bdb"  // either "bdb" or "bdb6"
+lazy val bdb                       = "bdb"  // either "bdb" or "bdb6"
 
 scalacOptions in ThisBuild ++= {
   // "-Xlint" -- produces problems with implicit objects and traits in package object
