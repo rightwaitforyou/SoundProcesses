@@ -94,7 +94,7 @@ final class StreamBuffer(key: String, idx: Int, synth: Node, buf: Buffer.Modifia
   private val replyName = StreamBuffer.replyName(key)
   private val nodeID    = synth.peer.id
 
-  private val trigResp = de.sciss.synth.message.Responder.add(synth.server.peer) {
+  private val trigResp = de.sciss.synth.message.Responder(synth.server.peer) {
     case m @ osc.Message(`replyName`, `nodeID`, `idx`, trigValF: Float) =>
       // println(s"RECEIVED TR $trigValF...")
       // logAural(m.toString())
