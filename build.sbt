@@ -2,7 +2,7 @@ lazy val logicalName               = "SoundProcesses"
 
 name                              := logicalName
 
-version            in ThisBuild   := "2.13.0"
+version            in ThisBuild   := "2.14.0"
 
 organization       in ThisBuild   := "de.sciss"
 
@@ -32,7 +32,7 @@ lazy val spanVersion               = "1.3.0"
 
 lazy val lucreSwingVersion         = "0.7.0"
 
-lazy val scalaColliderSwingVersion = "1.23.0"
+lazy val scalaColliderSwingVersion = "1.24.0"
 
 lazy val audioWidgetsVersion       = "1.8.0"
 
