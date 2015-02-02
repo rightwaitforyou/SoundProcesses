@@ -365,7 +365,13 @@ object ActionImpl {
 
       override def toString() = s"$prefix.Elem$id"
 
-      def mkCopy()(implicit tx: S#Tx): Action.Elem[S] = Action.Elem(peer)
+      def mkCopy()(implicit tx: S#Tx): Action.Elem[S] = {
+        val cpy = peer match {
+          case Action.Var(vr) => Action.Var(vr())
+          case other => other
+        }
+        Action.Elem(cpy)
+      }
     }
 
     private final class PassiveImpl[S <: Sys[S]](val peer: Action[S])

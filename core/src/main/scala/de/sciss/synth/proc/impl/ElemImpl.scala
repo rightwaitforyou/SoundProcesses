@@ -307,6 +307,7 @@ object ElemImpl {
     extends ActiveElemImpl[S] with AudioGraphemeImpl[S] {
 
     def mkCopy()(implicit tx: S#Tx): AudioGraphemeElem[S] = {
+      peer.artifact
       val artifactCopy  = peer.artifact // XXX TODO copy
       val spec          = peer.spec
       val offsetCopy    = Long  .copyExpr[S](peer.offset)

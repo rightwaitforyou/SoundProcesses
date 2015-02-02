@@ -136,7 +136,13 @@ import scala.annotation.tailrec
 
       override def toString() = s"$prefix$id"
 
-      def mkCopy()(implicit tx: S#Tx): Code.Elem[S] = Code.Elem(peer)
+      def mkCopy()(implicit tx: S#Tx): Code.Elem[S] = {
+        val cpy = peer match {
+          case Expr.Var(vr) => Code.Expr.newVar(vr())
+          case other => other
+        }
+        Code.Elem(cpy)
+      }
     }
   }
 
