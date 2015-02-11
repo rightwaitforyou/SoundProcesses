@@ -42,7 +42,7 @@ lazy val topologyVersion           = "1.0.0"
 
 // ---- test-only ----
 
-lazy val scalaTestVersion          = "2.2.3"
+lazy val scalaTestVersion          = "2.2.4"
 
 lazy val loggingEnabled            = true
 
