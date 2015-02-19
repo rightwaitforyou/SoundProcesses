@@ -171,8 +171,7 @@ object Code {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer         = _Expr[S, Code]
     type PeerUpdate   = model.Change[Code]
-
-    def mkCopy()(implicit tx: S#Tx): Elem[S]
+    type This         = Elem[S]
   }
 
   object Obj {

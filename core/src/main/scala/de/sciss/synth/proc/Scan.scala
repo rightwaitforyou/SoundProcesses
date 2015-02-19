@@ -96,6 +96,7 @@ object Scan {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Scan[S]
     type PeerUpdate = Scan.Update[S]
+    type This       = Elem[S]
   }
 
   /** Convenient short-cut */

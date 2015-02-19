@@ -52,6 +52,7 @@ object Ensemble {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Ensemble[S]
     type PeerUpdate = Ensemble.Update[S]
+    type This       = Elem[S]
   }
 
   /** Convenient short-cut */

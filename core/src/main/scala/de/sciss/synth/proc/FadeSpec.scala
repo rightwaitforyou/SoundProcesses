@@ -166,6 +166,7 @@ object FadeSpec {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = _Expr[S, FadeSpec]
     type PeerUpdate = model.Change[FadeSpec]
-  } // FadeSpec.Elem[S]
+    type This       = Elem[S]
+  }
 }
 final case class FadeSpec(numFrames: Long, curve: Curve = linear, floor: Float = 0f)

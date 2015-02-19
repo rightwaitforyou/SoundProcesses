@@ -70,6 +70,7 @@ object Proc {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Proc[S]
     type PeerUpdate = Proc.Update[S]
+    type This       = Elem[S]
   }
 
   /** Convenient short-cut */

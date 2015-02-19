@@ -70,6 +70,7 @@ package object proc {
   trait IntElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Expr[S, Int]
     type PeerUpdate = model.Change[Int]
+    type This       = IntElem[S]
   }
 
   implicit object DoubleElem extends Elem.Companion[DoubleElem] {
@@ -90,6 +91,7 @@ package object proc {
   trait DoubleElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Expr[S, Double]
     type PeerUpdate = model.Change[Double]
+    type This       = DoubleElem[S]
   }
 
   implicit object LongElem extends Elem.Companion[LongElem] {
@@ -110,6 +112,7 @@ package object proc {
   trait LongElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Expr[S, Long]
     type PeerUpdate = model.Change[Long]
+    type This       = LongElem[S]
   }
 
   implicit object BooleanElem extends Elem.Companion[BooleanElem] {
@@ -130,6 +133,7 @@ package object proc {
   trait BooleanElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Expr[S, Boolean]
     type PeerUpdate = model.Change[Boolean]
+    type This       = BooleanElem[S]
   }
 
   implicit object StringElem extends Elem.Companion[StringElem] {
@@ -150,6 +154,7 @@ package object proc {
   trait StringElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Expr[S, String]
     type PeerUpdate = model.Change[String]
+    type This       = StringElem[S]
   }
 
   implicit object DoubleVecElem extends Elem.Companion[DoubleVecElem] {
@@ -170,6 +175,7 @@ package object proc {
   trait DoubleVecElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Expr[S, Vec[Double]]
     type PeerUpdate = model.Change[Vec[Double]]
+    type This       = DoubleVecElem[S]
   }
 
   implicit object AudioGraphemeElem extends Elem.Companion[AudioGraphemeElem] {
@@ -190,6 +196,7 @@ package object proc {
   trait AudioGraphemeElem[S <: Sys[S]] extends Elem[S] {
     type Peer       = Grapheme.Expr.Audio[S]
     type PeerUpdate = model.Change[Grapheme.Value.Audio]
+    type This       = AudioGraphemeElem[S]
   }
 
   implicit object FolderElem extends Elem.Companion[FolderElem] {
@@ -218,6 +225,7 @@ package object proc {
     type Peer       = Folder[S]
     // type PeerUpdate = Folder.Update[S]
     type PeerUpdate = expr.List.Update[S, Obj[S], Obj.Update[S]] // SCALAC BUG
+    type This       = FolderElem[S]
   }
 
   implicit object ArtifactLocationElem extends proc.Elem.Companion[ArtifactLocationElem] {
@@ -239,6 +247,7 @@ package object proc {
   trait ArtifactLocationElem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = ArtifactLocation[S]
     type PeerUpdate = ArtifactLocation.Update[S]
+    type This       = ArtifactLocationElem[S]
   }
 
   implicit object ArtifactElem extends proc.Elem.Companion[ArtifactElem] {
@@ -260,5 +269,6 @@ package object proc {
   trait ArtifactElem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Artifact[S]
     type PeerUpdate = Change[Artifact.Value] // Artifact.Update[S]
+    type This       = ArtifactElem[S]
   }
 }

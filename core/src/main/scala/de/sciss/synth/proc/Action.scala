@@ -67,7 +67,7 @@ object Action {
 
   object Universe {
     def apply[S <: Sys[S]](self: Action.Obj[S], workspace: WorkspaceHandle[S],
-                           values: Vec[Float] = Vector.empty): Universe[S] =
+                           values: Vec[Float] = Vector.empty)(implicit cursor: stm.Cursor[S]): Universe[S] =
       new Impl.UniverseImpl(self, workspace, values)
   }
   trait Universe[S <: Sys[S]] {
@@ -83,6 +83,8 @@ object Action {
       * `graph.Reaction` (otherwise empty).
       */
     def values: Vec[Float]
+
+    implicit def cursor: stm.Cursor[S]
   }
 
   // ---- element ----
@@ -98,8 +100,7 @@ object Action {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer         = Action[S]
     type PeerUpdate   = Unit
-
-    def mkCopy()(implicit tx: S#Tx): Elem[S]
+    type This         = Elem[S]
   }
 
   object Obj {

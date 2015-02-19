@@ -133,6 +133,7 @@ object ActionImpl {
   // ---- universe ----
 
   final class UniverseImpl[S <: Sys[S]](val self: Action.Obj[S], workspace: WorkspaceHandle[S], val values: Vec[Float])
+                                       (implicit val cursor: stm.Cursor[S])
     extends Action.Universe[S] {
 
     def root(implicit tx: S#Tx): Folder[S] = workspace.root
@@ -376,7 +377,7 @@ object ActionImpl {
 
     private final class PassiveImpl[S <: Sys[S]](val peer: Action[S])
       extends Action.Elem[S]
-      with proc.impl.PassiveElemImpl[S] with Impl {
+      with proc.impl.PassiveElemImpl[S, Action.Elem[S]] with Impl {
 
       override def toString = s"$prefix.Elem($peer)"
     }

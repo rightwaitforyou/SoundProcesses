@@ -53,7 +53,7 @@ object ElemImpl {
   }
 
   private final class IntConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Int])
-    extends PassiveElemImpl[S] with IntImpl[S]
+    extends IntImpl[S] with PassiveElemImpl[S, IntElem[S]]
 
   private final class IntActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Int])
     extends ActiveElemImpl[S] with IntImpl[S] {
@@ -80,7 +80,7 @@ object ElemImpl {
   }
 
   private final class LongConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Long])
-    extends PassiveElemImpl[S] with LongImpl[S]
+    extends LongImpl[S] with PassiveElemImpl[S, LongElem[S]]
 
   private final class LongActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Long])
     extends ActiveElemImpl[S] with LongImpl[S] {
@@ -107,7 +107,7 @@ object ElemImpl {
   }
 
   private final class DoubleConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Double])
-    extends PassiveElemImpl[S] with DoubleImpl[S]
+    extends DoubleImpl[S] with PassiveElemImpl[S, DoubleElem[S]]
 
   private final class DoubleActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Double])
     extends ActiveElemImpl[S] with DoubleImpl[S] {
@@ -134,7 +134,7 @@ object ElemImpl {
   }
 
   private final class BooleanConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _Boolean])
-    extends PassiveElemImpl[S] with BooleanImpl[S]
+    extends BooleanImpl[S] with PassiveElemImpl[S, BooleanElem[S]]
 
   private final class BooleanActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _Boolean])
     extends ActiveElemImpl[S] with BooleanImpl[S] {
@@ -161,7 +161,7 @@ object ElemImpl {
   }
 
   private final class StringConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _String])
-    extends PassiveElemImpl[S] with StringImpl[S]
+    extends StringImpl[S] with PassiveElemImpl[S, StringElem[S]]
 
   private final class StringActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _String])
     extends ActiveElemImpl[S] with StringImpl[S] {
@@ -200,7 +200,7 @@ object ElemImpl {
   }
 
   private final class FadeSpecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, _FadeSpec])
-    extends PassiveElemImpl[S] with FadeSpecImpl[S]
+    extends FadeSpecImpl[S] with PassiveElemImpl[S, _FadeSpec.Elem[S]]
 
   private final class FadeSpecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, _FadeSpec])
     extends ActiveElemImpl[S] with FadeSpecImpl[S] {
@@ -249,7 +249,7 @@ object ElemImpl {
   }
 
   private final class DoubleVecConstImpl[S <: Sys[S]](val peer: _Expr.Const[S, Vec[_Double]])
-    extends PassiveElemImpl[S] with DoubleVecImpl[S]
+    extends DoubleVecImpl[S] with PassiveElemImpl[S, DoubleVecElem[S]]
 
   private final class DoubleVecActiveImpl[S <: Sys[S]](val targets: evt.Targets[S], val peer: _Expr[S, Vec[_Double]])
     extends ActiveElemImpl[S] with DoubleVecImpl[S] {
@@ -381,7 +381,10 @@ object ElemImpl {
 
     protected def peerEvent = peer.changed
 
-    def mkCopy()(implicit tx: S#Tx): ArtifactElem[S] = Artifact(peer)
+    def mkCopy()(implicit tx: S#Tx): ArtifactElem[S] = {
+      val peerCpy = _Artifact.Modifiable.copy(peer)
+      Artifact(peerCpy)
+    }
   }
 
   // ---- Timeline ----

@@ -109,10 +109,13 @@ trait BasicElemImpl[S <: Sys[S]]
   final protected def reader: evt.Reader[S, Elem[S]] = Elem.serializer
 }
 
-trait PassiveElemImpl[S <: Sys[S]]
+trait PassiveElemImpl[S <: Sys[S], Repr <: Elem[S]]
   extends BasicElemImpl[S] with evt.impl.Constant {
+  _ : Repr =>
 
-  final def mkCopy()(implicit tx: S#Tx): this.type = this
+  override type This = Repr
+
+  final def mkCopy()(implicit tx: S#Tx): This = this
 
   final def changed: EventLike[S, Update[S, PeerUpdate]] = evt.Dummy[S, Update[S, PeerUpdate]]
 

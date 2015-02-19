@@ -54,6 +54,7 @@ object Timeline {
   trait Elem[S <: Sys[S]] extends proc.Elem[S] {
     type Peer       = Timeline[S]
     type PeerUpdate = Timeline.Update[S]
+    type This       = Elem[S]
   }
 
   /** Convenient short-cut */
