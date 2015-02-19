@@ -132,7 +132,8 @@ object ActionImpl {
 
   // ---- universe ----
 
-  final class UniverseImpl[S <: Sys[S]](val self: Action.Obj[S], workspace: WorkspaceHandle[S], val values: Vec[Float])
+  final class UniverseImpl[S <: Sys[S]](val self: Action.Obj[S], workspace: WorkspaceHandle[S],
+                                        val invoker: Option[Obj[S]], val values: Vec[Float])
                                        (implicit val cursor: stm.Cursor[S])
     extends Action.Universe[S] {
 

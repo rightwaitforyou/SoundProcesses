@@ -49,7 +49,7 @@ object AuralActionImpl extends AuralObj.Factory {
         val actionObj = obj()
         if (!actionObj.muted) {
           val action    = actionObj.elem.peer
-          val universe  = Action.Universe(actionObj, context.workspaceHandle)(context.scheduler.cursor)
+          val universe  = Action.Universe(actionObj, context.workspaceHandle, invoker = None)(context.scheduler.cursor)
           action.execute(universe)
         }
       }

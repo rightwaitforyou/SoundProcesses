@@ -54,7 +54,8 @@ class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, 
         case f: Float => f
       } (breakOut)
       SoundProcesses.atomic { implicit tx: S#Tx =>
-        objH().attr.get(key).foreach { valueOpaque =>
+        val invoker = objH()
+        invoker.attr.get(key).foreach { valueOpaque =>
           // for some reason we cannot pattern match for Action.Obj(action);
           // scalac gives us
           // "inferred type arguments [S] do not conform to method unapply type
@@ -63,7 +64,8 @@ class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, 
           if (valueOpaque.elem.isInstanceOf[proc.Action.Elem[S]]) {
             val action = valueOpaque.asInstanceOf[proc.Action.Obj[S]]
             if (DEBUG) println("...and found action")
-            val universe = proc.Action.Universe(action, context.workspaceHandle, values)
+            val universe = proc.Action.Universe(action, context.workspaceHandle,
+              invoker = Some(invoker), values = values)
             action.elem.peer.execute(universe)
           }
         }

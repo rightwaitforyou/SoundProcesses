@@ -66,9 +66,9 @@ object Action {
   }
 
   object Universe {
-    def apply[S <: Sys[S]](self: Action.Obj[S], workspace: WorkspaceHandle[S],
+    def apply[S <: Sys[S]](self: Action.Obj[S], workspace: WorkspaceHandle[S], invoker: Option[proc.Obj[S]] = None,
                            values: Vec[Float] = Vector.empty)(implicit cursor: stm.Cursor[S]): Universe[S] =
-      new Impl.UniverseImpl(self, workspace, values)
+      new Impl.UniverseImpl(self, workspace, invoker, values)
   }
   trait Universe[S <: Sys[S]] {
     /** The action object itself, most prominently giving access to
@@ -83,6 +83,12 @@ object Action {
       * `graph.Reaction` (otherwise empty).
       */
     def values: Vec[Float]
+
+    /** Parent component from which the action is invoked. For example
+      * if used from within a synth-graph, this will be some `Proc.Obj`.
+      * `None` if the action is directly invoked without dedicated parent.
+      */
+    def invoker: Option[proc.Obj[S]]
 
     implicit def cursor: stm.Cursor[S]
   }
