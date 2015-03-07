@@ -14,7 +14,7 @@ licenses           in ThisBuild   := Seq("GPL v2+" -> url("http://www.gnu.org/li
 
 scalaVersion       in ThisBuild   := "2.11.6"
 
-crossScalaVersions in ThisBuild   := Seq("2.11.6", "2.10.4")
+crossScalaVersions in ThisBuild   := Seq("2.11.6", "2.10.5")
 
 resolvers          in ThisBuild   += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 
