@@ -35,8 +35,10 @@ object Elem {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] = Impl.read(in, access)
 
-  trait Companion[E[~ <: Sys[~]]] {
+  trait Companion[E[~ <: Sys[~]] <: Elem[~]] {
     def typeID: scala.Int
+
+    def apply[S <: Sys[S]](peer: E[S]#Peer)(implicit tx: S#Tx): E[S]
   }
 
   trait Extension {
