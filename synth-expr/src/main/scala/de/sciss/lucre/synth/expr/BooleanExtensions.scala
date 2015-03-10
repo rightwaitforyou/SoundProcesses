@@ -11,8 +11,7 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
-package expr
+package de.sciss.lucre.synth.expr
 
 import de.sciss.lucre
 import de.sciss.lucre.{event => evt}
@@ -20,6 +19,7 @@ import de.sciss.lucre.event.{Targets, Sys}
 import de.sciss.model.Change
 import de.sciss.serial.{DataOutput, DataInput}
 import de.sciss.lucre.expr.{Type, Expr, Boolean => BooleanEx, Int => IntEx}
+
 import scala.annotation.switch
 
 object BooleanExtensions  {

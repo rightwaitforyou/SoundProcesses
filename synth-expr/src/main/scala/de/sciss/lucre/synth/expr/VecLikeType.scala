@@ -15,7 +15,6 @@ package de.sciss.lucre.synth.expr
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.{ImmutableSerializer, DataOutput, DataInput}
-import de.sciss.lucre.event.{Targets, Sys}
 import de.sciss.lucre.expr.ExprType
 import de.sciss.lucre.expr
 import de.sciss.lucre

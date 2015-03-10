@@ -2,7 +2,7 @@ lazy val logicalName               = "SoundProcesses"
 
 name                              := logicalName
 
-version            in ThisBuild   := "2.17.0"
+version            in ThisBuild   := "2.17.1-SNAPSHOT"
 
 organization       in ThisBuild   := "de.sciss"
 

@@ -11,18 +11,17 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
-package expr
+package de.sciss.lucre.synth.expr
 
-import de.sciss.lucre.{event => evt, expr}
-import de.sciss.lucre.event.{Node, Targets, Sys}
-import de.sciss.lucre.expr.{Type, Expr}
-import de.sciss.span.Span
-import de.sciss.serial.{DataOutput, DataInput}
-import scala.annotation.switch
 import de.sciss.lucre
 import de.sciss.lucre.bitemp
+import de.sciss.lucre.event.{Targets, Sys}
+import de.sciss.lucre.expr.{Type, Expr}
 import de.sciss.span
+import de.sciss.span.Span
+import de.sciss.serial.DataInput
+
+import scala.annotation.switch
 
 object SpanExtensions  {
   import bitemp.Span.{newConst, read, typeID}

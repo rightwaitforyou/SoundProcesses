@@ -11,16 +11,15 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
-package expr
+package de.sciss.lucre.synth.expr
 
-import de.sciss.lucre
+import de.sciss.lucre.bitemp.BiExpr
+import de.sciss.lucre.expr.{Expr, ExprType1}
 import de.sciss.lucre.{bitemp, event => evt}
-import bitemp.BiExpr
-import de.sciss.lucre.expr.{ExprType1, Expr}
-import language.implicitConversions
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth
+import de.sciss.{lucre, synth}
+
+import scala.language.implicitConversions
 
 object ExprImplicits {
   def apply[S <: evt.Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]

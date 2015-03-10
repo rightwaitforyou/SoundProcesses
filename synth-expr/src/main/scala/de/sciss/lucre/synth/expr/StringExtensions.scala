@@ -11,15 +11,12 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
-package expr
+package de.sciss.lucre.synth.expr
 
-import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.event.{Targets, Sys}
-import de.sciss.serial.DataInput
-import de.sciss.lucre.expr.{Type, Expr}
-import scala.annotation.switch
 import de.sciss.lucre
+import de.sciss.lucre.event.{Targets, Sys}
+import de.sciss.lucre.expr.{Type, Expr}
+import de.sciss.serial.DataInput
 
 object StringExtensions  {
   import de.sciss.lucre.expr.String.{newConst, read, typeID, registerExtension}

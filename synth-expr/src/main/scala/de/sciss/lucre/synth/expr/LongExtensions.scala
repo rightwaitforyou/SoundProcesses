@@ -11,15 +11,14 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
-package expr
+package de.sciss.lucre.synth.expr
 
-import de.sciss.lucre.{event => evt, expr}
-import de.sciss.lucre.event.{Node, Targets, Sys}
-import annotation.switch
-import de.sciss.lucre.expr.{Type, Expr}
-import de.sciss.serial.{DataOutput, DataInput}
 import de.sciss.lucre
+import de.sciss.lucre.event.{Targets, Sys}
+import de.sciss.lucre.expr.{Type, Expr}
+import de.sciss.serial.DataInput
+
+import scala.annotation.switch
 
 object LongExtensions /* extends BiTypeImpl[Long] */ {
   import de.sciss.lucre.expr.Long.{newConst, read, typeID, registerExtension}

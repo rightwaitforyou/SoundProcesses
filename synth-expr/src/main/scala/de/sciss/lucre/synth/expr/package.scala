@@ -18,10 +18,10 @@ import de.sciss.lucre.stm
 import de.sciss.synth
 import de.sciss.lucre.expr.impl.ExprTypeImplA
 import de.sciss.lucre.expr.{Expr, Type1A, ExprType}
-import de.sciss.lucre.event.Sys
+import de.sciss.lucre.{event => evt}
 
 package object expr {
-  private type ExprTypeA[A] = ExprType[A] with Type1A[({type Repr[~ <: Sys[~]] = Expr[~, A]})#Repr]
+  private type ExprTypeA[A] = ExprType[A] with Type1A[({type Repr[~ <: evt.Sys[~]] = Expr[~, A]})#Repr]
 
   // this is plain stupid... another reason why the scan should reproduce the proc and key (problem though: proc -> timed-proc)
   implicit def IdentifierSerializer[S <: stm.Sys[S]]: Serializer[S#Tx, S#Acc, S#ID] =

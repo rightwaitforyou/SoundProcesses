@@ -11,14 +11,14 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
-package expr
+package de.sciss.lucre.synth.expr
 
+import de.sciss.lucre
 import de.sciss.lucre.event.{Targets, Sys}
-import annotation.switch
 import de.sciss.lucre.expr.{Type, Expr, Int => IntEx, Boolean => BooleanEx}
 import de.sciss.serial.DataInput
-import de.sciss.lucre
+
+import scala.annotation.switch
 
 object IntExtensions {
   private[this] type Ex[S <: Sys[S]] = Expr[S, Int]
