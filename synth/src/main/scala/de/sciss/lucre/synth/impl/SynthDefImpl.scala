@@ -31,8 +31,9 @@ final case class SynthDefImpl(server: Server, peer: SSynthDef) extends ResourceI
     */
   def recv()(implicit tx: Txn): Unit = {
     requireOffline()
-    val mRecv = peer.recvMsg
-    val m = if (mRecv.bytes.limit() <= (server.maxPacketSize - 20) || !server.peer.isLocal) mRecv else {
+    val mRecv     = peer.recvMsg
+    val bndlSize  = ((mRecv.bytes.limit() + 7) & ~3) + 32  // [ "#bundle" 8, timetag 8, sz 4, [ "/d_recv" 8, tags 4, byte-buf ]]
+    val m = if (bndlSize <= server.maxPacketSize || !server.peer.isLocal) mRecv else {
       val file = File.createTempFile("temp", s".${SSynthDef.extension}")
       val path = file.getAbsolutePath
       file.deleteOnExit()
