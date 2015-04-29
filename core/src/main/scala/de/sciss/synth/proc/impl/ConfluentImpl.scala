@@ -47,13 +47,13 @@ private[proc] object ConfluentImpl {
   private final class RegularTxn(val system: S, val durable: /* evt. */ Durable#Tx,
                                  val inputAccess: S#Acc, val isRetroactive: Boolean,
                                  val cursorCache: confluent.Cache[S#Tx])
-    extends confluent.impl.ConfluentImpl.RegularTxnMixin[S, evt.Durable] with TxnImpl {
+    extends confluent.impl.RegularTxnMixin[S, evt.Durable] with TxnImpl {
 
     lazy val peer = durable.peer
   }
 
   private final class RootTxn(val system: S, val peer: InTxn)
-    extends confluent.impl.ConfluentImpl.RootTxnMixin[S, stm.Durable] with TxnImpl {
+    extends confluent.impl.RootTxnMixin[S, stm.Durable] with TxnImpl {
 
     lazy val durable: /* evt. */ Durable#Tx = {
       log("txn durable")
