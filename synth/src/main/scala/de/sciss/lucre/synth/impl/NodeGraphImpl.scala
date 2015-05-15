@@ -52,6 +52,9 @@ object NodeGraphImpl {
     true
   }
 
+  def mkName(nameHint: Option[String])(implicit tx: InTxn): String =
+    abbreviate(s"${nameHint.getOrElse("proc")}_${nextDefID()}")
+
   private def abbreviate(name: String): String = {
     val len = name.length
     if ((len <= 16) && allCharsOk(name)) return name
@@ -154,7 +157,7 @@ final class NodeGraphImpl(/* val */ server: Server) extends NodeGraph {
 
     ugenGraphs.getOrElseUpdate(equ, {
       log(s"synth graph ${equ.hashCode()} is new")
-      val name  = abbreviate(s"${nameHint.getOrElse("proc")}_${nextDefID()}")
+      val name  = mkName(nameHint)
       val peer  = SSynthDef(name, graph)
       val rd    = impl.SynthDefImpl(server, peer) // (bytes)
       rd.recv()
