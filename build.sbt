@@ -1,51 +1,35 @@
-lazy val logicalName               = "SoundProcesses"
+lazy val baseName  = "SoundProcesses"
+lazy val baseNameL = baseName.toLowerCase
 
-name                              := logicalName
+lazy val projectVersion = "2.19.0-SNAPSHOT"
 
-version            in ThisBuild   := "2.18.1"
+lazy val commonSettings = Seq(
+  version            := projectVersion,
+  organization       := "de.sciss",
+  homepage           := Some(url(s"https://github.com/Sciss/$baseName")),
+  description        := "A framework for creating and managing ScalaCollider based sound processes",
+  licenses           := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt")),
+  scalaVersion       := "2.11.6",
+  crossScalaVersions := Seq("2.11.6", "2.10.5"),
+  resolvers          += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
+) ++ publishSettings
 
-organization       in ThisBuild   := "de.sciss"
-
-homepage           in ThisBuild   := Some(url(s"https://github.com/Sciss/$logicalName"))
-
-description                       := "A framework for creating and managing ScalaCollider based sound processes"
-
-licenses           in ThisBuild   := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt"))
-
-scalaVersion       in ThisBuild   := "2.11.6"
-
-crossScalaVersions in ThisBuild   := Seq("2.11.6", "2.10.5")
-
-resolvers          in ThisBuild   += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
-
-lazy val lucreCoreVersion          = "2.1.1"
-
-lazy val lucreDataVersion          = "2.3.0"
-
-lazy val lucreEventVersion         = "2.7.3"
-
-lazy val lucreConfluentVersion     = "2.11.0"
-
-lazy val scalaColliderVersion      = "1.17.1"
-
-lazy val spanVersion               = "1.3.0"
-
-lazy val lucreSwingVersion         = "0.9.1"
-
-lazy val scalaColliderSwingVersion = "1.25.0"
-
-lazy val audioWidgetsVersion       = "1.9.0"
-
+lazy val lucreCoreVersion          = "2.2.0-SNAPSHOT"
+lazy val lucreDataVersion          = "2.4.0-SNAPSHOT"
+lazy val lucreEventVersion         = "2.8.0-SNAPSHOT"
+lazy val lucreConfluentVersion     = "2.12.0-SNAPSHOT"
+lazy val scalaColliderVersion      = "1.18.0-SNAPSHOT"
+lazy val spanVersion               = "1.4.0-SNAPSHOT"
+lazy val lucreSwingVersion         = "0.10.0-SNAPSHOT"
+lazy val scalaColliderSwingVersion = "1.26.0-SNAPSHOT"
+lazy val audioWidgetsVersion       = "1.10.0-SNAPSHOT"
 lazy val fileUtilVersion           = "1.1.1"
-
 lazy val topologyVersion           = "1.0.0"
 
 // ---- test-only ----
 
-lazy val scalaTestVersion          = "2.2.4"
-
+lazy val scalaTestVersion          = "2.2.5"
 lazy val loggingEnabled            = true
-
 lazy val bdb                       = "bdb"  // either "bdb" or "bdb6"
 
 scalacOptions in ThisBuild ++= {
@@ -94,10 +78,12 @@ initialCommands in console :=
 
 // ---- sub-projects ----
 
-lazy val soundprocesses = project.in(file("."))
-  .aggregate(lucrebitemp, lucresynth, `lucresynth-expr`, `soundprocesses-core`, `soundprocesses-views` ,`soundprocesses-compiler`)
-  .dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`, `soundprocesses-core`, `soundprocesses-views`, `soundprocesses-compiler`)
-  .settings(
+lazy val root = Project(id = baseNameL, base = file(".")).
+  aggregate(bitemp, synth, expr, core, views, compiler).
+  dependsOn(bitemp, synth, expr, core, views, compiler).
+  settings(commonSettings).
+  settings(
+    name := baseName,
     publishArtifact in(Compile, packageBin) := false, // there are no binaries
     publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
     publishArtifact in(Compile, packageSrc) := false, // there are no sources
@@ -105,40 +91,49 @@ lazy val soundprocesses = project.in(file("."))
     autoScalaLibrary := false
   )
 
-lazy val lucrebitemp = project.in(file("bitemp")).settings(
-  description := "Bitemporal Lucre extensions using Long expressions for time",
-  libraryDependencies ++= Seq(
-    "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
-    "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
-    "de.sciss"      %% "span"            % spanVersion
+lazy val bitemp = Project(id = "lucrebitemp", base = file("bitemp")).
+  settings(commonSettings).
+  settings(
+    description := "Bitemporal Lucre extensions using Long expressions for time",
+    libraryDependencies ++= Seq(
+      "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
+      "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
+      "de.sciss"      %% "span"            % spanVersion
+    )
   )
-)
 
-lazy val `lucresynth-expr` = project.in(file("synth-expr")).dependsOn(lucrebitemp).settings(
-  description := "Bitemporal expression types for SoundProcesses",
-  libraryDependencies ++= Seq(
-    "de.sciss"      %% "scalacollider"  % scalaColliderVersion,
-    "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test",
-    "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
-    "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion % "test"
+lazy val expr = Project(id = "lucresynth-expr", base = file("synth-expr")).
+  dependsOn(bitemp).
+  settings(commonSettings).
+  settings(
+    description := "Bitemporal expression types for SoundProcesses",
+    libraryDependencies ++= Seq(
+      "de.sciss"      %% "scalacollider"  % scalaColliderVersion,
+      "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test",
+      "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
+      "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion % "test"
+    )
   )
-)
 
-lazy val lucresynth = project.in(file("synth")).settings(
-  description := "Transactional extension for ScalaCollider",
-  libraryDependencies ++= Seq(
-    "de.sciss" %% "topology"        % topologyVersion,
-    "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
-    "de.sciss" %% "lucreevent-core" % lucreEventVersion,
-    "de.sciss" %% "scalacollider"   % scalaColliderVersion
-    // "de.sciss" %% "scalaosc" % scalaOSCVersion
+lazy val synth = Project(id = "lucresynth", base = file("synth")).
+  settings(commonSettings).
+  settings(
+    description := "Transactional extension for ScalaCollider",
+    libraryDependencies ++= Seq(
+      "de.sciss" %% "topology"        % topologyVersion,
+      "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
+      "de.sciss" %% "lucreevent-core" % lucreEventVersion,
+      "de.sciss" %% "scalacollider"   % scalaColliderVersion
+      // "de.sciss" %% "scalaosc" % scalaOSCVersion
+    )
   )
-)
 
-lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp, lucresynth, `lucresynth-expr`)
-  .settings(buildInfoSettings: _*).settings(
+lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
+  dependsOn(bitemp, synth, expr).
+  enablePlugins(BuildInfoPlugin).
+  settings(commonSettings).
+  settings(
     description :=  "A framework for creating and managing ScalaCollider based sound processes",
-    sourceGenerators in Compile <+= buildInfo,
     buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
       BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
       BuildInfoKey.map(licenses) { case (_, Seq((lic, _))) => "license" -> lic }
@@ -153,8 +148,10 @@ lazy val `soundprocesses-core` = project.in(file("core")).dependsOn(lucrebitemp,
     )
   )
 
-lazy val `soundprocesses-views` = project.in(file("views")).dependsOn(`soundprocesses-core`)
-  .settings(
+lazy val views = Project(id = s"$baseNameL-views", base = file("views")).
+  dependsOn(core).
+  settings(commonSettings).
+  settings(
     description :=  "Views for Sound Processes",
     libraryDependencies ++= Seq(
       "de.sciss" %% "lucreswing"       % lucreSwingVersion,
@@ -162,8 +159,10 @@ lazy val `soundprocesses-views` = project.in(file("views")).dependsOn(`soundproc
     )
   )
 
-lazy val `soundprocesses-compiler` = project.in(file("compiler")).dependsOn(`soundprocesses-core`)
-  .settings(
+lazy val compiler = Project(id = s"$baseNameL-compiler", base = file("compiler")).
+  dependsOn(core).
+  settings(commonSettings).
+  settings(
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
       "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,
@@ -176,23 +175,21 @@ lazy val `soundprocesses-compiler` = project.in(file("compiler")).dependsOn(`sou
 
 // ---- publishing ----
 
-publishMavenStyle in ThisBuild := true
-
-publishTo in ThisBuild :=
-  Some(if (isSnapshot.value)
-    "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
-  else
-    "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-  )
-
-publishArtifact in Test := false
-
-pomIncludeRepository in ThisBuild := { _ => false }
-
-pomExtra in ThisBuild := { val n = logicalName
+lazy val publishSettings = Seq(
+  publishMavenStyle := true,
+  publishTo := {
+    Some(if (isSnapshot.value)
+      "Sonatype Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+    else
+      "Sonatype Releases"  at "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+    )
+  },
+  publishArtifact in Test := false,
+  pomIncludeRepository := { _ => false },
+  pomExtra := {
 <scm>
-  <url>git@github.com:Sciss/{n}.git</url>
-  <connection>scm:git:git@github.com:Sciss/{n}.git</connection>
+  <url>git@github.com:Sciss/{baseName}.git</url>
+  <connection>scm:git:git@github.com:Sciss/{baseName}.git</connection>
 </scm>
 <developers>
   <developer>
@@ -201,14 +198,12 @@ pomExtra in ThisBuild := { val n = logicalName
     <url>http://www.sciss.de</url>
   </developer>
 </developers>
-}
+  }
+)
 
 // ---- ls.implicit.ly ----
 
-seq(lsSettings :_*)
-
-(LsKeys.tags   in LsKeys.lsync) := Seq("sound", "music", "sound-synthesis", "computer-music")
-
-(LsKeys.ghUser in LsKeys.lsync) := Some("Sciss")
-
-(LsKeys.ghRepo in LsKeys.lsync) := Some(logicalName)
+// seq(lsSettings :_*)
+// (LsKeys.tags   in LsKeys.lsync) := Seq("sound", "music", "sound-synthesis", "computer-music")
+// (LsKeys.ghUser in LsKeys.lsync) := Some("Sciss")
+// (LsKeys.ghRepo in LsKeys.lsync) := Some(logicalName)
