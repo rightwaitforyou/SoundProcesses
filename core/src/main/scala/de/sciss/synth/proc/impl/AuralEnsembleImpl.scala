@@ -14,6 +14,7 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.Sys

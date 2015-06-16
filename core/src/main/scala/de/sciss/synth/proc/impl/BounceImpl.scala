@@ -193,7 +193,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           transport.stop()
           synRec  .free()
           // synMute .free()
-          buf     .dispose()
+          buf.dispose()
           tx.afterCommit {
             p.tryComplete(Success(()))
           }

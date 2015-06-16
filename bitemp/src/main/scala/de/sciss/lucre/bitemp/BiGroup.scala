@@ -14,6 +14,7 @@
 package de.sciss.lucre
 package bitemp
 
+import de.sciss.lucre.geom.LongSquare
 import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.event.{Publisher, EventLike, Sys}
 import impl.{BiGroupImpl => Impl}
@@ -27,6 +28,12 @@ import de.sciss.lucre.stm.Identifiable
 import de.sciss.{model => m}
 
 object BiGroup {
+  private[bitemp] val MAX_SQUARE  = LongSquare(0, 0, 0x2000000000000000L)
+  private[bitemp] val MAX_SIDE    = MAX_SQUARE.side
+
+  val MinCoordinate = MAX_SQUARE.left
+  val MaxCoordinate = MAX_SQUARE.right
+
   // ---- updates ----
 
   final case class Update[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], changes: Vec[Change[S, Elem, U]])

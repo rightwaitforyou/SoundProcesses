@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.data.SkipOctree
+import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2D, LongSquare, LongSpace}
 import de.sciss.lucre.stm.{IdentifierMap, Disposable}
 import de.sciss.lucre.stm

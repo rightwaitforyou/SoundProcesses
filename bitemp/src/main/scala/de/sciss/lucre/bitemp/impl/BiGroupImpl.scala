@@ -30,17 +30,12 @@ import de.sciss.{model => m}
 import de.sciss.lucre.bitemp.BiGroup
 
 object BiGroupImpl {
-  import BiGroup.{Leaf, TimedElem, Modifiable}
+  import BiGroup.{Leaf, TimedElem, Modifiable, MinCoordinate => MIN_COORD, MaxCoordinate => MAX_COORD, MAX_SQUARE, MAX_SIDE}
 
   var showLog = false
 
   @elidable(elidable.CONFIG) private def log(what: => String): Unit =
     if (showLog) println(s"<bigroup> $what")
-
-  private val MAX_SQUARE  = LongSquare(0, 0, 0x2000000000000000L)
-  private val MIN_COORD   = MAX_SQUARE.left
-  private val MAX_COORD   = MAX_SQUARE.right
-  private val MAX_SIDE    = MAX_SQUARE.side
 
   //   private final case class Entry[ Elem ]( )
 

@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import AuralObj.Factory
+import de.sciss.lucre.event.impl.DummyObservableImpl
 import de.sciss.lucre.synth.Sys
 import de.sciss.lucre.stm
 
