@@ -14,15 +14,15 @@ lazy val commonSettings = Seq(
   resolvers          += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 ) ++ publishSettings
 
-lazy val lucreCoreVersion          = "2.2.0-SNAPSHOT"
-lazy val lucreDataVersion          = "2.4.0-SNAPSHOT"
-lazy val lucreEventVersion         = "2.8.0-SNAPSHOT"
-lazy val lucreConfluentVersion     = "2.12.0-SNAPSHOT"
-lazy val scalaColliderVersion      = "1.18.0-SNAPSHOT"
-lazy val spanVersion               = "1.4.0-SNAPSHOT"
-lazy val lucreSwingVersion         = "0.10.0-SNAPSHOT"
-lazy val scalaColliderSwingVersion = "1.26.0-SNAPSHOT"
-lazy val audioWidgetsVersion       = "1.10.0-SNAPSHOT"
+lazy val lucreCoreVersion          = "2.1.2"
+lazy val lucreDataVersion          = "2.3.2"
+lazy val lucreEventVersion         = "2.7.4"
+lazy val lucreConfluentVersion     = "2.11.2"
+lazy val scalaColliderVersion      = "1.17.2"
+lazy val spanVersion               = "1.3.1"
+lazy val lucreSwingVersion         = "0.9.1"
+lazy val scalaColliderSwingVersion = "1.25.1"
+lazy val audioWidgetsVersion       = "1.9.1"
 lazy val fileUtilVersion           = "1.1.1"
 lazy val topologyVersion           = "1.0.0"
 

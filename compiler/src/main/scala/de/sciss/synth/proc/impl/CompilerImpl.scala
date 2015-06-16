@@ -25,15 +25,17 @@ import scala.tools.nsc.{ConsoleWriter, NewLinePrintWriter}
 import scala.tools.nsc.interpreter.{Results, IMain}
 
 object CompilerImpl {
-  def apply(): Code.Compiler = {
+  def apply(): Code.Compiler = new Impl({
     val cSet = new nsc.Settings()
     cSet.classpath.value += File.pathSeparator + sys.props("java.class.path")
     val c = new IMainImpl(cSet)
     c.initializeSynchronous()
-    new Impl(c)
-  }
+    c
+  })
 
-  private final class Impl(intp: IMainImpl) extends Code.Compiler {
+  private final class Impl(intp0: => IMainImpl) extends Code.Compiler {
+    private lazy val intp = intp0
+
     override def toString = s"Compiler@${hashCode().toHexString}"
 
     // note: the Scala compiler is _not_ reentrant!!

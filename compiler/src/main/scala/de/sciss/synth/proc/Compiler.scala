@@ -16,5 +16,10 @@ package de.sciss.synth.proc
 import impl.{CompilerImpl => Impl}
 
 object Compiler {
+  /** Creates a new compiler. Note that the
+    * peer `IMain` is lazily initialized, so
+    * if you spawn compilation in a future,
+    * you effectively get an asynchronous initialization.
+    */
   def apply(): Code.Compiler = Impl()
 }

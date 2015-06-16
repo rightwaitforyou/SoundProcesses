@@ -90,8 +90,8 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
         val _scheduler  = Scheduler.offline[S]
         val _span       = config.span
 
-        // val _transp = TransportOLD.offline[S, I](group, sampleRate)
         val _aural = AuralSystem.offline(server)
+        config.init.apply(tx, server)
         val _transport = Transport(_aural, _scheduler)
         config.group.foreach { h =>
           _transport.addObject(h())
