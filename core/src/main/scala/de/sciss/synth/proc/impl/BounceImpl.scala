@@ -164,27 +164,27 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
         println("-----------------------------2")
         config.beforePlay.apply(tx, server)
 
-        val gRec = SynthGraph {
+        val graph = SynthGraph {
           import synth._
           import ugen._
-          val sig     = InFeedback.ar(0, numChannels)
-          val frames  = DiskOut.ar("$bnc_disk".ir, sig)
-          sig   .poll(HPZ1.ar(sig).abs, "signa")
-          frames.poll(5, "frame")
-        }
-        val gMute = SynthGraph {
-          import synth._
-          import ugen._
+          val sig     = In.ar(0, numChannels)
+          /* val frames  = */ DiskOut.ar("$bnc_disk".ir, sig)
+          // sig   .poll(HPZ1.ar(sig).abs, "sig-in")
+          // frames.poll(5, "disk-frame")
           val silent = Vector.fill(numChannels)(0)
           ReplaceOut.ar(0, silent)
         }
+        //        val gMute = SynthGraph {
+        //          import synth._
+        //          import ugen._
+        //        }
         val buf = Buffer.diskOut(server)(
           path          = resultFile.path,
           fileType      = config.server.nrtHeaderFormat,
           sampleFormat  = config.server.nrtSampleFormat
         )
         //  (List[ControlSet]("$bnc_disk" -> buf.id), List[Resource](buf))
-        val synRec = Synth.play(gRec, nameHint = Some("diskout"))(server.defaultGroup, addAction = addToTail,
+        val synRec = Synth.play(graph, nameHint = Some("diskout"))(server.defaultGroup, addAction = addToTail,
           args = List("$bnc_disk" -> buf.id), dependencies = buf :: Nil)
         // val synMute = Synth.play(gMute, nameHint = Some("mute"))(synRec, addAction = addAfter)
 
@@ -198,7 +198,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
             p.tryComplete(Success(()))
           }
         }
-        // scheduleProgress.apply(tx)
+        scheduleProgress.apply(tx)
       }
 
       Await.result(p.future, Duration.Inf)

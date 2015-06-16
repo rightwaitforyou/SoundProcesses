@@ -1,10 +1,12 @@
 package de.sciss.synth.proc
 
-import de.sciss.synth.{ugen, SynthGraph}
-import de.sciss.span.Span
-import scala.concurrent.ExecutionContext
-import de.sciss.processor.Processor
 import de.sciss.lucre.stm.store.BerkeleyDB
+import de.sciss.processor.Processor
+import de.sciss.span.Span
+import de.sciss.synth.proc.Implicits._
+import de.sciss.synth.{SynthGraph, proc, ugen}
+
+import scala.concurrent.ExecutionContext
 
 // XXX TODO: this should be a ScalaTest spec, opening the file after bouncing, and
 // verifying the contents (easy with a sine).
@@ -27,7 +29,7 @@ object BounceTest extends App {
       |A sound file of duration 150ms. a sine tone of 200 Hz
       |is seen for 50ms (or 10 periods), the remaining 100ms are silent.
       |
-      |When using --realtime, the file has a duration of approx. 3s.
+      |When using --realtime, the sound last 1s and the file has a duration of approx. 3s.
       |""".stripMargin)
 
   val groupH = system.step { implicit tx =>
@@ -37,12 +39,15 @@ object BounceTest extends App {
     val proc      = Proc[S]
     val peer      = Proc.Elem(proc)
     val obj       = Obj(peer)
-    proc.graph() = SynthGraph {
+    obj.name      = "sinosc"
+    proc.graph()  = SynthGraph {
       import ugen._
-      Out.ar(0, SinOsc.ar(200))
+      val sig = SinOsc.ar(200)
+      // sig.poll(5, "sig-out")
+      Out.ar(0, sig)
     }
     val group     = Timeline[S]
-    group.add(Span(frame(0.1), frame(0.2)), obj)
+    group.add(Span(frame(if (realtime) 0.25 else 0.1), frame(if (realtime) 1.25 else 0.2)), obj)
     // import ProcGroup.serializer
     tx.newHandle(Obj(Timeline.Elem(group)))
   }
@@ -51,8 +56,7 @@ object BounceTest extends App {
   val bounce              = Bounce[S, I]
   val bCfg                = Bounce.Config[S]
   bCfg.group              = groupH :: Nil
-  val stopTime = if (realtime) 3.15 else 0.3
-  bCfg.span               = Span(frame(0.15), frame(stopTime)) // start in the middle of the proc span
+  bCfg.span               = Span(frame(0.15), frame(if (realtime) 3.15 else 0.3)) // start in the middle of the proc span
   bCfg.realtime           = realtime
   val sCfg                = bCfg.server
   //sCfg.nrtCommandPath = "/Users/hhrutz/Desktop/test.osc"
