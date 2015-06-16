@@ -22,7 +22,7 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.synth.{Buffer, Server, Synth, Sys, Txn}
 import de.sciss.processor.Processor
 import de.sciss.processor.impl.ProcessorImpl
-import de.sciss.synth.io.{AudioFileType, SampleFormat}
+import de.sciss.synth.io.{AudioFile, AudioFileType, SampleFormat}
 import de.sciss.synth.{Server => SServer, addAfter, SynthGraph, addToTail}
 import de.sciss.{osc, synth}
 
@@ -30,10 +30,16 @@ import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise, blocking}
 import scala.util.Success
+import scala.util.control.NonFatal
 
+object BounceImpl {
+  var DEBUG = false
+}
 final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor[S], bridge: S#Tx => I#Tx,
                                                      workspace: WorkspaceHandle[S])
   extends Bounce[S] {
+
+  import BounceImpl.DEBUG
 
   protected def prepare(config: Config): Prepared = {
     if (config.server.sampleRate <= 0)
@@ -117,6 +123,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           def auralStarted(s: Server)(implicit tx: Txn): Unit = {
             // config.init.apply(...)
             tx.afterCommit {
+              if (DEBUG) s.peer.dumpOSC()
               pServer.trySuccess(s)
             }
           }
@@ -129,6 +136,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           _transport.addObject(h())
         }
         _transport.seek(_span.start)
+        if (DEBUG) println(sCfg)
         _aural.start(config = sCfg)
         (_span, _scheduler, _transport, _aural)
       }
@@ -161,7 +169,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       val p = Promise[Unit]()
       promiseSync.synchronized(promise = Some(p))
       /* val _token = */ cursor.step { implicit tx =>
-        println("-----------------------------2")
+        // println("-----------------------------2")
         config.beforePlay.apply(tx, server)
 
         val graph = SynthGraph {
@@ -181,7 +189,8 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
         val buf = Buffer.diskOut(server)(
           path          = resultFile.path,
           fileType      = config.server.nrtHeaderFormat,
-          sampleFormat  = config.server.nrtSampleFormat
+          sampleFormat  = config.server.nrtSampleFormat,
+          numChannels   = numChannels
         )
         //  (List[ControlSet]("$bnc_disk" -> buf.id), List[Resource](buf))
         val synRec = Synth.play(graph, nameHint = Some("diskout"))(server.defaultGroup, addAction = addToTail,
@@ -195,7 +204,13 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           // synMute .free()
           buf.dispose()
           tx.afterCommit {
-            p.tryComplete(Success(()))
+            val syncMsg = server.peer.syncMsg()
+            val SyncId  = syncMsg.id
+            val futSync = server.peer.!!(syncMsg) {
+              case de.sciss.synth.message.Synced(SyncId) =>
+            }
+            p.tryCompleteWith(futSync)
+            // p.tryComplete(Success(()))
           }
         }
         scheduleProgress.apply(tx)

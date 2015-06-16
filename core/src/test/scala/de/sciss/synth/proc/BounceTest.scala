@@ -16,7 +16,7 @@ object BounceTest extends App {
 
   implicit val system = Durable(BerkeleyDB.tmp())
 
-  val realtime = args.headOption.contains("--realtime")
+  val realtime = args.headOption == Some("--realtime")
 
   de.sciss.lucre.synth.showLog = true
   showTransportLog  = !realtime
