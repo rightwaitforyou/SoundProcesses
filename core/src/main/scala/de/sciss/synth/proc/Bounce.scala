@@ -57,9 +57,15 @@ object Bounce {
     /** An arbitrary function may be provided which is called when the server is initialized (logical time zero).
       * This entry is typically used to set up extra routing synths, master volume, etc.
       */
-    def init: (S#Tx, Server) => Unit
+    def beforePrepare: (S#Tx, Server) => Unit
+    def beforePlay   : (S#Tx, Server) => Unit
+
+    /** Whether to run the server in real-time or offline. */
+    def realtime: Boolean
   }
   object Config {
+    val NoOp = (_: Any, _: Any) => ()
+
     def apply[S <: Sys[S]]: ConfigBuilder[S] = new ConfigBuilder
 
     implicit def build[S <: Sys[S]](b: ConfigBuilder[S]): Config[S] = b.build
@@ -75,20 +81,31 @@ object Bounce {
     }
     def group_=(value: GroupH[S]): Unit = _group = value
 
+    /** The default span is from zero to one second. */
     var span  : Span                    = Span(0L, Timeline.SampleRate.toLong)
+    /** The default server configuration is ScalaCollider's
+      * default, a block-size of one, no input and one output channel.
+      */
     val server: Server.ConfigBuilder    = Server.Config()
-    var init  : (S#Tx, Server) => Unit  = (_, _) => ()
+
+    var beforePrepare: (S#Tx, Server) => Unit  = Config.NoOp
+    var beforePlay   : (S#Tx, Server) => Unit  = Config.NoOp
+
+    /** The default mode is offline (realtime == `false`) */
+    var realtime: Boolean = false
 
     // some sensible defaults
     server.blockSize          = 1
     server.inputBusChannels   = 0
     server.outputBusChannels  = 1
 
-    def build: Config[S] = ConfigImpl(group = group, span = span, server = server, init = init)
+    def build: Config[S] = ConfigImpl(group = group, span = span, server = server,
+      beforePrepare = beforePrepare, beforePlay = beforePlay, realtime = realtime)
   }
 
-  private final case class ConfigImpl[S <: Sys[S]](group: GroupH[S], span: Span,
-                                      server: Server.Config, init: (S#Tx, Server) => Unit)
+  private final case class ConfigImpl[S <: Sys[S]](group: GroupH[S], span: Span, server: Server.Config,
+                                                   beforePrepare: (S#Tx, Server) => Unit,
+                                                   beforePlay   : (S#Tx, Server) => Unit, realtime: Boolean)
     extends Config[S] {
 
     override def productPrefix = "Config"

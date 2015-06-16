@@ -14,8 +14,10 @@ object BounceTest extends App {
 
   implicit val system = Durable(BerkeleyDB.tmp())
 
+  val realtime = args.headOption.contains("--realtime")
+
   de.sciss.lucre.synth.showLog = true
-  showTransportLog  = true
+  showTransportLog  = !realtime
 
   def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
 
@@ -24,6 +26,8 @@ object BounceTest extends App {
       |
       |A sound file of duration 150ms. a sine tone of 200 Hz
       |is seen for 50ms (or 10 periods), the remaining 100ms are silent.
+      |
+      |When using --realtime, the file has a duration of approx. 3s.
       |""".stripMargin)
 
   val groupH = system.step { implicit tx =>
@@ -47,7 +51,9 @@ object BounceTest extends App {
   val bounce              = Bounce[S, I]
   val bCfg                = Bounce.Config[S]
   bCfg.group              = groupH :: Nil
-  bCfg.span               = Span(frame(0.15), frame(0.3)) // start in the middle of the proc span
+  val stopTime = if (realtime) 3.15 else 0.3
+  bCfg.span               = Span(frame(0.15), frame(stopTime)) // start in the middle of the proc span
+  bCfg.realtime           = realtime
   val sCfg                = bCfg.server
   //sCfg.nrtCommandPath = "/Users/hhrutz/Desktop/test.osc"
   // sCfg.nrtOutputPath      = "/tmp/test.aif"
@@ -57,6 +63,9 @@ object BounceTest extends App {
   // sCfg.inputBusChannels   = 0
   sCfg.outputBusChannels  = 1
   sCfg.sampleRate         = 44100
+  if (realtime) {
+    sCfg.pickPort()
+  }
 
   // this is default now:
   // sCfg.blockSize          = 1       // sample accurate placement of synths
