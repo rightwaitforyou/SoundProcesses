@@ -107,8 +107,8 @@ object NodeGraph {
                                     (implicit tx: Txn): SynthDef =
     apply(server).acquireSynthDef(graph, nameHint)
 
-  private[synth] def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit =
-    apply(sd.server).releaseSynthDef(sd)
+  //  private[synth] def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit =
+  //    apply(sd.server).releaseSynthDef(sd)
 }
 trait NodeGraph {
   // def server: Server
@@ -136,11 +136,11 @@ trait NodeGraph {
     */
   def acquireSynthDef(graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef
 
-  /** Releases a synth def on the server. Decrements the cache use count,
-    * and if it reaches zero, lazily purges the def on the server as soon
-    * as more slots are required.
-    */
-  def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit
+  //  /** Releases a synth def on the server. Decrements the cache use count,
+  //    * and if it reaches zero, lazily purges the def on the server as soon
+  //    * as more slots are required.
+  //    */
+  //  def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit
 
   /** Queries the current topology */
   def topology(implicit tx: Txn): Topology[NodeRef, NodeGraph.Edge]

@@ -141,6 +141,7 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
     ),
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
+      // "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
       "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
       "de.sciss"      %% "lucreevent-artifact" % lucreEventVersion,
       "de.sciss"      %% "fileutil"       % fileUtilVersion,
@@ -166,7 +167,7 @@ lazy val compiler = Project(id = s"$baseNameL-compiler", base = file("compiler")
   settings(
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
-      "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
+      // "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
       "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,
       "de.sciss"       %% s"lucrestm-$bdb"          % lucreCoreVersion          % "test",
       "de.sciss"       %% "fileutil"                % fileUtilVersion           % "test",

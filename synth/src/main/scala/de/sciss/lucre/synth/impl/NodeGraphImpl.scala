@@ -127,21 +127,18 @@ object DummyNodeGraphImpl extends NodeGraph {
   def topology(implicit tx: Txn): Topology[NodeRef, Edge] = Topology.empty
 }
 
-private[impl] final class SynthDefUse(val df: SynthDef, val equ: IndexedSeq[Byte], val count: Int) {
-  def increment: SynthDefUse = new SynthDefUse(df, equ, count + 1)
-  def decrement: SynthDefUse = new SynthDefUse(df, equ, count - 1)
-}
+//private[impl] final class SynthDefUse(val df: SynthDef, val equ: IndexedSeq[Byte], val count: Int) {
+//  def increment: SynthDefUse = new SynthDefUse(df, equ, count + 1)
+//  def decrement: SynthDefUse = new SynthDefUse(df, equ, count - 1)
+//}
 
 final class NodeGraphImpl(server: Server) extends NodeGraph {
   import NodeGraphImpl._
 
   private type T = Topology[NodeRef, Edge]
 
-  private[this] val ugenGraphMap  = TMap.empty[IndexedSeq[Byte], SynthDefUse]
-  private[this] val synthDefMap   = TMap.empty[SynthDef        , SynthDefUse]
-
-  // number of defs only
-  private[this] val numDefsOnline = Ref(0)
+  private[this] val ugenGraphMap  = TMap.empty[IndexedSeq[Byte], SynthDef]
+  private[this] val synthDefLRU   = Ref(Vector.empty[(IndexedSeq[Byte], SynthDef)])
 
   // limit on number of online defs XXX TODO -- head room rather arbitrary
   private[this] val maxDefs       = math.max(128, server.config.maxSynthDefs - 128)
@@ -162,59 +159,38 @@ final class NodeGraphImpl(server: Server) extends NodeGraph {
     val equ: IndexedSeq[Byte] = bytes // opposed to plain `Array[Byte]`, this has correct definition of `equals`
     log(s"request for synth graph ${equ.hashCode()}")
 
-    val use0 = ugenGraphMap.getOrElse(equ, {
+    ugenGraphMap.get(equ).fold[SynthDef] {
       log(s"synth graph ${equ.hashCode()} is new")
       val name  = mkName(nameHint)
       val peer  = SSynthDef(name, graph)
       val rd    = impl.SynthDefImpl(server, peer)
-      val num   = numDefsOnline()
-      val free  = if (num < maxDefs) 0
-      else {
-        // purge unused defs -- there are two options:
-        // either purge an individual def, or purge all currently unused.
-        // we go for the second approach at the moment.
-        // an even more sophisticated approach would sort things by LRU
-        val keysB   = Vector.newBuilder[IndexedSeq[Byte]]
-        val defsB   = Vector.newBuilder[SynthDef]
-
-        ugenGraphMap.foreach { case (key, use1) =>
-          // a more sophisticated search could include
-          // _any_ def as long as it was not submitted
-          // during the ongoing transaction
-          if (use1.count == 0) {
-            keysB += key
-            defsB += use1.df
-          }
-        }
-
-        val keysToPurge = keysB.result()
-        log(s"purging ${keysToPurge.size} unused synth-defs")
-        if (keysToPurge.isEmpty) throw new IndexOutOfBoundsException("Reached maximum number of online synth defs")
-        ugenGraphMap --= keysToPurge
-        val defsToPurge = defsB.result()
-        synthDefMap  --= defsToPurge
-        defsToPurge.foreach(_.dispose())
-        keysToPurge.size
+      val lru   = synthDefLRU.transformAndGet((equ, rd) +: _)
+      if (lru.size == maxDefs) {
+        val init :+ Tuple2(lastEqu, lastDf) = lru
+        log(s"purging synth-def ${lastDf.name}")
+        ugenGraphMap.remove(lastEqu)
+        synthDefLRU() = init
       }
       rd.recv()
-      val use = new SynthDefUse(rd, equ, count = 1)
-      ugenGraphMap.put(equ, use.increment)
-      numDefsOnline() = num - free + 1
-      use
-    })
-    val use = use0.increment
-    ugenGraphMap.put(use.equ, use)
-    synthDefMap .put(use.df , use)
-    use.df
+      ugenGraphMap.put(equ, rd)
+      rd
+    } { rd =>
+      synthDefLRU.transform { xs =>
+        val idx = xs.indexWhere(_._1 == equ)
+        val ys = xs.patch(idx, Nil, 1)  // remove from old spot
+        (equ, rd) +: ys // put to head as most recently used item
+      }
+      rd
+    }
   }
 
-  def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit = {
-    implicit val itx = tx.peer
-    val use0 = synthDefMap.getOrElse(sd, throw new NoSuchElementException(s"SynthDef ${sd.name} was not acquired"))
-    val use  = use0.decrement
-    ugenGraphMap.put(use.equ, use)
-    synthDefMap .put(use.df , use)
-  }
+//  def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit = {
+//    implicit val itx = tx.peer
+//    val use0 = synthDefLRU.getOrElse(sd, throw new NoSuchElementException(s"SynthDef ${sd.name} was not acquired"))
+//    val use  = use0.decrement
+//    ugenGraphMap.put(use.equ, use)
+//    synthDefLRU .put(use.df , use)
+//  }
 
   def addNode(node: NodeRef)(implicit tx: Txn): Unit = {
     log(s"NodeGraph.addNode($node)")
