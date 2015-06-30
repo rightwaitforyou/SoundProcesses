@@ -19,7 +19,7 @@ import scala.concurrent.stm.{TxnExecutor, Ref}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.{Server => SServer, ServerConnection}
 import TxnExecutor.{defaultAtomic => atomic}
-import de.sciss.lucre.synth.{NodeGraph, Server, Txn}
+import de.sciss.lucre.synth.{Server, Txn}
 import de.sciss.lucre.stm.Disposable
 import de.sciss.synth.proc.{logAural => logA}
 
@@ -99,7 +99,7 @@ object AuralSystemImpl {
     private case class StateRunning(server: Server) extends State {
       def dispose()(implicit tx: Txn): Unit = {
         logA("Stopped server")
-        NodeGraph.removeServer(server)
+        // NodeGraph.removeServer(server)
         clients.get(tx.peer).foreach(_.auralStopped())
 
         afterCommit {
@@ -132,7 +132,7 @@ object AuralSystemImpl {
 
       def init()(implicit tx: Txn): Unit = {
         logA("Started server")
-        NodeGraph.addServer(server)
+        // NodeGraph.addServer(server)
         clients.get(tx.peer).foreach(_.auralStarted(server))
 
         afterCommit(ac())

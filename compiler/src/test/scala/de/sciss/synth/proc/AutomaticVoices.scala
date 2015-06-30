@@ -16,20 +16,18 @@ package de.sciss.synth.proc
 import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.impl.UndoManagerImpl
-import de.sciss.lucre.swing.IntSpinnerView
-import de.sciss.lucre.synth.impl.ServerImpl
-import de.sciss.lucre.synth.{NodeGraph, Server}
-import de.sciss.synth.swing.NodeTreePanel
-import de.sciss.synth.swing.j.JServerStatusPanel
-import de.sciss.synth.{GE, proc, SynthGraph}
-import de.sciss.{osc, synth, lucre}
-import de.sciss.lucre.expr.{Expr, Boolean => BooleanEx, Int => IntEx}
+import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, Int => IntEx}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.swing.{defer, deferTx}
-import de.sciss.numbers.Implicits._
-import proc.Implicits._
-import SoundProcesses.atomic
+import de.sciss.lucre.swing.{IntSpinnerView, defer, deferTx}
+import de.sciss.lucre.synth.Server
+import de.sciss.lucre.synth.impl.ServerImpl
+import de.sciss.synth.proc.Implicits._
+import de.sciss.synth.proc.SoundProcesses.atomic
+import de.sciss.synth.swing.NodeTreePanel
+import de.sciss.synth.swing.j.JServerStatusPanel
+import de.sciss.synth.{GE, SynthGraph, proc}
+import de.sciss.{lucre, osc, synth}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
@@ -57,7 +55,7 @@ object AutomaticVoices {
 
   def main(args: Array[String]): Unit = {
     showAuralLog = ShowLog
-    ServerImpl.DEBUG_SIZE = true
+    ServerImpl.VERIFY_BUNDLE_SIZE = true
 
     val compiler = proc.Compiler()
     println("Making action...")
@@ -125,8 +123,8 @@ object AutomaticVoices {
 
       val butTopology = Button("Topology") {
         atomic[S, Unit] { implicit tx =>
-          aural.serverOption.map { s =>
-            val top = NodeGraph(s).topology
+          aural.serverOption.foreach { s =>
+            val top = s.topology
             tx.afterCommit {
               println("---- TOPOLOGY ----")
               top.edges.foreach(println)
@@ -137,7 +135,7 @@ object AutomaticVoices {
 
       val butTree = Button("Tree") {
         atomic[S, Unit] { implicit tx =>
-          aural.serverOption.map { s =>
+          aural.serverOption.foreach { s =>
             s.peer.dumpTree()
           }
         }
@@ -366,7 +364,6 @@ object AutomaticVoices {
         |}
         |""".stripMargin
     implicit val compiler = c
-    import compiler.executionContext
     val code  = Code.Action(source)
     val name  = "Done"
     val bytes = code.execute(name)
@@ -499,7 +496,7 @@ object AutomaticVoices {
   }
 
   import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
-  import IntEx    .{serializer => intSer , varSerializer => intVarSer }
+  import IntEx.{serializer => intSer, varSerializer => intVarSer}
 
   def mkWorld(done: Action[S])(implicit tx: S#Tx): World = {
     val sensors = Vec.tabulate(NumSpeakers) { speaker =>

@@ -33,7 +33,7 @@ sealed trait TxnImpl extends Txn { tx =>
   final protected def flush(): Unit =
     bundlesMap.foreach { case (server, bundles) =>
       log(s"flush $server -> ${bundles.size} bundles")
-      NodeGraph.send(server, bundles)
+      server.send(bundles)
     }
 
   protected def markBundlesDirty(): Unit
@@ -46,7 +46,7 @@ sealed trait TxnImpl extends Txn { tx =>
     if (resourceStampOld < 0) sys.error(s"Already disposed : $resource")
 
     implicit val itx  = peer
-    val txnStampRef   = NodeGraph.messageTimeStamp(server)(tx)
+    val txnStampRef   = server.messageTimeStamp // .get(tx.peer)
     val txnStamp      = txnStampRef.get
     val payOld        = bundlesMap.getOrElse(server, noBundles)
     val szOld         = payOld.size

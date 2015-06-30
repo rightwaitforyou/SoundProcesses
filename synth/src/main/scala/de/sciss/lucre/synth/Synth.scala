@@ -20,8 +20,9 @@ import impl.{SynthImpl => Impl}
 
 object Synth {
   def apply(server: Server, graph: SynthGraph, nameHint: Option[String] = None)(implicit tx: Txn): Synth = {
-    val df  = NodeGraph.acquireSynthDef(server, graph, nameHint)
-    val res = create(df)
+    val ugenGraph = graph.expand(de.sciss.synth.impl.DefaultUGenGraphBuilderFactory)
+    val df        = server.acquireSynthDef(ugenGraph, nameHint)
+    val res       = create(df)
     // releaseDefOnEnd(res)
     res
   }
@@ -45,10 +46,10 @@ object Synth {
            dependencies: List[Resource] = Nil)(implicit tx: Txn): Synth = {
 
     // XXX TODO - DRY - NodeGraphImpl
-    val name    = impl.NodeGraphImpl.mkName(nameHint)(tx.peer)
+    val server  = target.server
+    val name    = server.mkSynthDefName(nameHint)
     val uGraph  = graph.expand(de.sciss.synth.impl.DefaultUGenGraphBuilderFactory)
     val peer    = SSynthDef(name, uGraph)
-    val server  = target.server
     val rd      = impl.SynthDefImpl(server, peer) // (bytes)
     rd.recv()
 
@@ -62,7 +63,7 @@ object Synth {
 
   /* private[synth] */ def expanded(server: Server, graph: UGenGraph, nameHint: Option[String] = None)
                             (implicit tx: Txn): Synth = {
-    val df = NodeGraph.acquireSynthDef(server, graph, nameHint)
+    val df = server.acquireSynthDef(graph, nameHint)
     val res = create(df)
     // releaseDefOnEnd(res)
     res

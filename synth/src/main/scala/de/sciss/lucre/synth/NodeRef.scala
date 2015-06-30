@@ -15,6 +15,7 @@ package de.sciss.lucre.synth
 
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.impl.{NodeRefImpl => Impl}
+import de.sciss.topology.Topology
 
 object NodeRef {
   // def apply(n: Node): NodeRef = Impl(n)
@@ -30,6 +31,13 @@ object NodeRef {
   trait Group extends Full with Disposable[Txn] {
     def addInstanceNode   (n: Full)(implicit tx: Txn): Unit
     def removeInstanceNode(n: Full)(implicit tx: Txn): Boolean
+  }
+
+  final case class Edge(source: NodeRef, sink: NodeRef)
+    extends Topology.Edge[NodeRef] {
+
+    def sourceVertex = source
+    def targetVertex = sink
   }
 }
 trait NodeRef {

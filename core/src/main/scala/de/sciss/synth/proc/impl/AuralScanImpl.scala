@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{expr, Synth, NodeGraph, NodeRef, AudioBus, Sys}
+import de.sciss.lucre.synth.{Server, expr, Synth, NodeRef, AudioBus, Sys}
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.{addBefore, SynthGraph}
 import AuralObj.ProcData
@@ -111,22 +111,23 @@ object AuralScanImpl {
     synth.read (sourceBus -> "in" )
     synth.write(sinkBus   -> "out")
 
-    val edge1     = NodeGraph.Edge(sourceNode, synthRef)
-    val edge2     = NodeGraph.Edge(synthRef  , sinkNode)
-    NodeGraph.addNode(synthRef)
-    NodeGraph.addEdge(edge1)
-    NodeGraph.addEdge(edge2)
+    val edge1     = NodeRef.Edge(sourceNode, synthRef)
+    val edge2     = NodeRef.Edge(synthRef  , sinkNode)
+    server.addVertex(synthRef)
+    server.addEdge(edge1)
+    server.addEdge(edge2)
     new LinkNode(edge1, edge2, synthRef)
   }
-  private final class LinkNode[S <: Sys[S]](edge1: NodeGraph.Edge, edge2: NodeGraph.Edge, synthRef: NodeRef)
+  private final class LinkNode[S <: Sys[S]](edge1: NodeRef.Edge, edge2: NodeRef.Edge, synthRef: NodeRef)
     extends Disposable[S#Tx] {
 
     override def toString = s"LinkNode($edge1, $edge2, $synthRef)"
 
     def dispose()(implicit tx: S#Tx): Unit = {
-      NodeGraph.removeEdge(edge1)
-      NodeGraph.removeEdge(edge2)
-      NodeGraph.removeNode(synthRef)
+      val server = synthRef.server
+      server.removeEdge(edge1)
+      server.removeEdge(edge2)
+      server.removeVertex(synthRef)
       synthRef.node.free()
     }
   }

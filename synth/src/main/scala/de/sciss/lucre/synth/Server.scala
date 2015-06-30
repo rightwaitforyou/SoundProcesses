@@ -13,12 +13,17 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.topology.Topology
+
+import scala.concurrent.stm.{Ref, InTxn}
 import scala.concurrent.{ExecutionContext, Future}
 import collection.immutable.{IndexedSeq => Vec}
 import language.implicitConversions
-import de.sciss.synth.{Server => SServer, Client => SClient}
+import de.sciss.synth.{Server => SServer, Client => SClient, UGenGraph}
 import impl.{ServerImpl => Impl}
 import de.sciss.osc
+
+import scala.util.Try
 
 object Server {
   def apply(peer: SServer): Server = Impl(peer)
@@ -102,4 +107,39 @@ trait Server {
     * The realtime server just ignores these futures.
     */
   def commit(future: Future[Unit]): Unit
+
+  // ------------ former NodeGraph ------------
+
+  def addVertex   (node: NodeRef)(implicit tx: Txn): Unit
+  def removeVertex(node: NodeRef)(implicit tx: Txn): Unit
+
+  def addEdge   (edge: NodeRef.Edge)(implicit tx: Txn): Try[(Topology[NodeRef, NodeRef.Edge], Option[Topology.Move[NodeRef]])]
+  def removeEdge(edge: NodeRef.Edge)(implicit tx: Txn): Unit
+
+  private[synth] def send(bundles: Txn.Bundles): Future[Unit]
+
+  private[synth] def messageTimeStamp: Ref[Int]
+
+  /** Acquires a synth def to be used in this transaction on the server.
+    * If the ugen graph was already sent to the server, it returns the
+    * corresponding synth def, and no `recv()` is necessary. The internal
+    * use counter is increment. Otherwise produces a fresh synth def and
+    * stores it in the cache.
+    *
+    * If the number of synth defs on the server would exceed the maximum,
+    * a number of synth-def disposals are issued for those that have a
+    * use count of zero.
+    */
+  def acquireSynthDef(graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef
+
+  //  /** Releases a synth def on the server. Decrements the cache use count,
+  //    * and if it reaches zero, lazily purges the def on the server as soon
+  //    * as more slots are required.
+  //    */
+  //  def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit
+
+  /** Queries the current topology */
+  def topology(implicit tx: Txn): Topology[NodeRef, NodeRef.Edge]
+
+  def mkSynthDefName(nameHint: Option[String])(implicit tx: Txn): String
 }

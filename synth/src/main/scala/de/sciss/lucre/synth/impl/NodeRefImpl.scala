@@ -25,7 +25,7 @@ object NodeRefImpl {
 
   def Group(name: String, in0: NodeRef.Full)(implicit tx: Txn): NodeRef.Group = {
     val res = new GroupImpl(name, in0)
-    NodeGraph.addNode(res)
+    in0.server.addVertex(res)
     res
   }
 
@@ -92,7 +92,7 @@ object NodeRefImpl {
         val group = nodeRef.swap(null).node
         group.free()
       }
-      NodeGraph.removeNode(this)
+      server.removeVertex(this)
     }
   }
 }

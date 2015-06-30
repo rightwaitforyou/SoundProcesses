@@ -2,16 +2,16 @@ package de.sciss.synth.proc
 
 import de.sciss.synth
 import synth.SynthGraph
-import de.sciss.lucre.synth.{NodeGraph, InMemory, Synth, Server}
+import de.sciss.lucre.synth.{InMemory, Synth, Server}
 
 object NewTxnTest extends App {
   val sys = InMemory()
   synth.Server.run() { srv =>
     val s = Server(srv)
     srv.dumpOSC()
-    sys.step { implicit tx =>
-      NodeGraph.addServer(s)
-    }
+    //    sys.step { implicit tx =>
+    //      NodeGraph.addServer(s)
+    //    }
 
     val x = sys.step { implicit tx =>
       val g = SynthGraph {

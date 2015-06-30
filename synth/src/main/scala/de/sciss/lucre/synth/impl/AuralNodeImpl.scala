@@ -25,7 +25,7 @@ object AuralNodeImpl {
            (implicit tx: Txn): AuralNode = {
     val res = new Impl(synth, inputBuses = inputBuses, outputBuses = outputBuses,
       resources = resources, attrMap0 = attrMap)
-    NodeGraph.addNode(res)
+    synth.server.addVertex(res)
     res
   }
 
@@ -117,7 +117,7 @@ object AuralNodeImpl {
       resources.foreach(_.dispose())
       attrMap  .foreach(_._2.foreach(_.dispose()))
       attrMap.clear()
-      NodeGraph.removeNode(this)
+      server.removeVertex(this)
     }
 
     def getInputBus (key: String): Option[AudioBus] = inputBuses .get(key)

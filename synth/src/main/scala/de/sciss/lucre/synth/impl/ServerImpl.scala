@@ -14,26 +14,40 @@
 package de.sciss.lucre.synth
 package impl
 
+import java.io.{ByteArrayOutputStream, DataOutputStream}
+
+import de.sciss.osc
 import de.sciss.osc.Timetag
+import de.sciss.synth.{AllocatorExhausted, Client => SClient, ControlABusMap, ControlSet, Escape, Server => SServer, UGenGraph, addToHead, message}
+import de.sciss.topology.Topology
 
 import scala.annotation.tailrec
+import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future}
-import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.synth.{Server => SServer, Client => SClient, ControlABusMap, ControlSet, AllocatorExhausted, addToHead, message}
-import de.sciss.osc
+import scala.concurrent.stm.{Ref, TMap}
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.util.Try
 
 object ServerImpl {
   def apply  (peer: SServer): Server          = new OnlineImpl (peer)
   def offline(peer: SServer): Server.Offline  = new OfflineImpl(peer)
 
   /** If `true`, checks against bundle size overflow (64K) and prints the bundle before crashing. */
-  var DEBUG_SIZE      = true
+  var VERIFY_BUNDLE_SIZE = true
   /** If `true`, applies a few optimizations to messages within a bundle, in order to reduce its size */
   var USE_COMPRESSION = true
+  /** If `true` debug sending out stuff */
+  var DEBUG = false
 
   private final val MaxOnlinePacketSize   = 0x8000 // 0x10000 // 64K
   private final val MaxOfflinePacketSize  = 0x2000 // 8192
+
+  def reduceFutures(futures: Vec[Future[Unit]])(implicit executionContext: ExecutionContext): Future[Unit] =
+    futures match {
+      case Vec()        => Future.successful(())
+      case Vec(single)  => single
+      case more         => Future.reduce(futures)((_, _) => ())
+    }
 
   private final case class OnlineImpl(peer: SServer) extends Impl {
     override def toString = peer.toString()
@@ -41,24 +55,6 @@ object ServerImpl {
     def maxPacketSize: Int      = MaxOnlinePacketSize
     def isLocal      : Boolean  = peer.isLocal
     def isRealtime   : Boolean  = true
-
-    //    private def printExcessPacket(p: osc.Packet, sz: Int): Unit = {
-    //      Console.err.println(s"ERROR: Packet size $sz exceeds $MaxPacketSize")
-    //      osc.Packet.printTextOn(p, Server.codec, Console.err)
-    //    }
-    //
-    //    // returns `true` if packet size ok, `false` if too large
-    //    private def checkPacket(p: osc.Packet): Boolean = {
-    //      val sz = p match {
-    //        case b: osc.Bundle  => Server.codec.encodedBundleSize (b)
-    //        case m: osc.Message => Server.codec.encodedMessageSize(m)
-    //      }
-    //      val ok = sz < MaxPacketSize
-    //      if (!ok) {
-    //        printExcessPacket(p, sz)
-    //      }
-    //      ok
-    //    }
 
     // ---- compression ----
 
@@ -262,7 +258,7 @@ object ServerImpl {
       }
 
       p match {
-        case b: osc.Bundle if DEBUG_SIZE =>
+        case b: osc.Bundle if VERIFY_BUNDLE_SIZE =>
           val sz0 = Server.codec.encodedBundleSize(b)
           if (sz0 <= MaxOnlinePacketSize) {
             peer ! b
@@ -296,7 +292,7 @@ object ServerImpl {
     def !! (b0: osc.Bundle): Future[Unit] = {
       val b   = if (USE_COMPRESSION) compress(b0) else b0
       val tt  = b.timetag
-      if (DEBUG_SIZE) {
+      if (VERIFY_BUNDLE_SIZE) {
         val sz0     = Server.codec.encodedBundleSize(b)
         if (sz0 + 20 <= MaxOnlinePacketSize) {
           perform_!!(tt, b.packets)
@@ -306,7 +302,7 @@ object ServerImpl {
                                                                       iter = iter, addSize = 20) { packets =>
             perform_!!(tt, packets)
           } (_ :+ _)
-          import ExecutionContext.Implicits.global
+          // import ExecutionContext.Implicits.global
           Future.reduce[Unit, Unit](futures)((_, _) => ())
         }
       } else {
@@ -345,8 +341,8 @@ object ServerImpl {
     def committed(): Future[Unit] = sync.synchronized {
       val futures       = filteredCommits
       _commits          = Vector.empty
-      implicit val exec = peer.clientConfig.executionContext
-      NodeGraphImpl.reduceFutures(futures)
+      // implicit val exec = peer.clientConfig.executionContext
+      ServerImpl.reduceFutures(futures)
     }
 
     def bundles(addDefaultGroup: Boolean): Vec[osc.Bundle] = sync.synchronized {
@@ -376,7 +372,7 @@ object ServerImpl {
       }
     }
 
-    def !(p: osc.Packet): Unit = {
+    def ! (p: osc.Packet): Unit = {
       val b = p match {
         case m : osc.Message  => osc.Bundle.secs(time, m)
         case b0: osc.Bundle   => b0
@@ -384,7 +380,7 @@ object ServerImpl {
       addBundle(b)
     }
 
-    def !!(bndl: osc.Bundle): Future[Unit] = {
+    def !! (bndl: osc.Bundle): Future[Unit] = {
       addBundle(bndl)
       Future.successful(())
     }
@@ -398,47 +394,238 @@ object ServerImpl {
       }
   }
 
-  private abstract class Impl extends Server {
+  private abstract class Impl extends Server { server =>
 
-    def executionContext: ExecutionContext = peer.clientConfig.executionContext
+    implicit def executionContext: ExecutionContext = peer.clientConfig.executionContext
 
-    private val controlBusAllocator = BlockAllocator("control", peer.config.controlBusChannels)
-    private val audioBusAllocator   = BlockAllocator("audio"  , peer.config.audioBusChannels, peer.config.internalBusIndex)
-    private val bufferAllocator     = BlockAllocator("buffer" , peer.config.audioBuffers)
-    private val nodeAllocator       = NodeIDAllocator(peer.clientConfig.clientID, peer.clientConfig.nodeIDOffset)
+    final private[this] val controlBusAllocator = BlockAllocator("control", peer.config.controlBusChannels)
+    final private[this] val audioBusAllocator   = BlockAllocator("audio"  , peer.config.audioBusChannels, peer.config.internalBusIndex)
+    final private[this] val bufferAllocator     = BlockAllocator("buffer" , peer.config.audioBuffers)
+    final private[this] val nodeAllocator       = NodeIDAllocator(peer.clientConfig.clientID, peer.clientConfig.nodeIDOffset)
 
-    val defaultGroup: Group = Group.wrap(this, peer.defaultGroup) // .default( this )
+    final val defaultGroup: Group = Group.wrap(this, peer.defaultGroup)
 
-    def config      : Server .Config = peer.config
-    def clientConfig: SClient.Config = peer.clientConfig
+    final def config      : Server .Config = peer.config
+    final def clientConfig: SClient.Config = peer.clientConfig
 
-    def allocControlBus(numChannels: Int)(implicit tx: Txn): Int = {
+    final def allocControlBus(numChannels: Int)(implicit tx: Txn): Int = {
       val res = controlBusAllocator.alloc(numChannels)(tx.peer)
       if (res < 0) throw AllocatorExhausted("Control buses exhausted for " + this)
       res
     }
 
-    def allocAudioBus(numChannels: Int)(implicit tx: Txn): Int = {
+    final def allocAudioBus(numChannels: Int)(implicit tx: Txn): Int = {
       val res = audioBusAllocator.alloc(numChannels)(tx.peer)
       if (res < 0) throw AllocatorExhausted("Audio buses exhausted for " + this)
       res
     }
 
-    def freeControlBus(index: Int, numChannels: Int)(implicit tx: Txn): Unit =
+    final def freeControlBus(index: Int, numChannels: Int)(implicit tx: Txn): Unit =
       controlBusAllocator.free(index, numChannels)(tx.peer)
 
-    def freeAudioBus(index: Int, numChannels: Int)(implicit tx: Txn): Unit =
+    final def freeAudioBus(index: Int, numChannels: Int)(implicit tx: Txn): Unit =
       audioBusAllocator.free(index, numChannels)(tx.peer)
 
-    def allocBuffer(numConsecutive: Int)(implicit tx: Txn): Int = {
+    final def allocBuffer(numConsecutive: Int)(implicit tx: Txn): Int = {
       val res = bufferAllocator.alloc(numConsecutive)(tx.peer)
       if (res < 0) throw AllocatorExhausted("Buffers exhausted for " + this)
       res
     }
 
-    def freeBuffer(index: Int, numConsecutive: Int)(implicit tx: Txn): Unit =
+    final def freeBuffer(index: Int, numConsecutive: Int)(implicit tx: Txn): Unit =
       bufferAllocator.free(index, numConsecutive)(tx.peer)
 
-    def nextNodeID()(implicit tx: Txn): Int = nodeAllocator.alloc()(tx.peer)
+    final def nextNodeID()(implicit tx: Txn): Int = nodeAllocator.alloc()(tx.peer)
+    
+    // ---- former Server ----
+
+    private type T = Topology[NodeRef, NodeRef.Edge]
+
+    final private[this] val ugenGraphMap  = TMap.empty[IndexedSeq[Byte], SynthDef]
+    final private[this] val synthDefLRU   = Ref(Vector.empty[(IndexedSeq[Byte], SynthDef)])
+
+    // limit on number of online defs XXX TODO -- head room rather arbitrary
+    final private[this] val maxDefs       = math.max(128, server.config.maxSynthDefs - 128)
+
+    final private[this] val topologyRef = Ref[T](Topology.empty)
+
+    final def topology(implicit tx: Txn): T = topologyRef.get(tx.peer)
+
+    final def acquireSynthDef(graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef = {
+      implicit val itx = tx.peer
+
+      val bos   = new ByteArrayOutputStream
+      val dos   = new DataOutputStream(bos)
+      Escape.write(graph, dos)
+      dos.flush()
+      dos.close()
+      val bytes = bos.toByteArray
+      val equ: IndexedSeq[Byte] = bytes // opposed to plain `Array[Byte]`, this has correct definition of `equals`
+      log(s"request for synth graph ${equ.hashCode()}")
+
+      ugenGraphMap.get(equ).fold[SynthDef] {
+        log(s"synth graph ${equ.hashCode()} is new")
+        val name  = mkSynthDefName(nameHint)
+        val peer  = de.sciss.synth.SynthDef(name, graph)
+        val rd    = impl.SynthDefImpl(server, peer)
+        val lru   = synthDefLRU.transformAndGet((equ, rd) +: _)
+        if (lru.size == maxDefs) {
+          val init :+ Tuple2(lastEqu, lastDf) = lru
+          log(s"purging synth-def ${lastDf.name}")
+          lastDf.dispose()
+          ugenGraphMap.remove(lastEqu)
+          synthDefLRU() = init
+        }
+        rd.recv()
+        ugenGraphMap.put(equ, rd)
+        rd
+      } { rd =>
+        synthDefLRU.transform { xs =>
+          val idx = xs.indexWhere(_._1 == equ)
+          val ys = xs.patch(idx, Nil, 1)  // remove from old spot
+          (equ, rd) +: ys // put to head as most recently used item
+        }
+        rd
+      }
+    }
+
+    final def addVertex(node: NodeRef)(implicit tx: Txn): Unit = {
+      log(s"Server.addVertex($node)")
+      topologyRef.transform(_.addVertex(node))(tx.peer)
+    }
+
+    final def removeVertex(node: NodeRef)(implicit tx: Txn): Unit = {
+      log(s"Server.removeVertex($node)")
+      topologyRef.transform(_.removeVertex(node))(tx.peer)
+    }
+
+    final def addEdge(edge: NodeRef.Edge)(implicit tx: Txn): Try[(T, Option[Topology.Move[NodeRef]])] = {
+      log(s"Server.addEdge($edge)")
+      val res = topologyRef.get(tx.peer).addEdge(edge)
+      res.foreach(tup => topologyRef.set(tup._1)(tx.peer))
+      res
+    }
+
+    final def removeEdge(edge: NodeRef.Edge)(implicit tx: Txn): Unit = {
+      log(s"Server.removeEdge($edge)")
+      topologyRef.transform(_.removeEdge(edge))(tx.peer)
+    }
+
+    final private[this] val uniqueDefID = Ref(0)
+    
+    final private[this] def allCharsOk(name: String): Boolean = {
+      val len = name.length
+      var i   = 0
+      while (i < len) {
+        val c   = name.charAt(i).toInt
+        val ok  = c > 36 && c < 123 || c != 95 // in particular, disallow underscore
+        if (!ok) return false
+        i += 1
+      }
+      true
+    }
+
+    final def mkSynthDefName(nameHint: Option[String])(implicit tx: Txn): String =
+      abbreviate(s"${nameHint.getOrElse("proc")}_${nextDefID()}")
+
+    final private[this] def abbreviate(name: String): String = {
+      val len = name.length
+      if ((len <= 16) && allCharsOk(name)) return name
+
+      val sb  = new StringBuffer(16)
+      var i   = 0
+      while (i < len && sb.length() < 16) {
+        val c = name.charAt(i).toInt
+        val ok = c > 36 && c < 123 || c != 95 // in particular, disallow underscore
+        if (ok) sb.append(c.toChar)
+        i += 1
+      }
+      sb.toString
+    }
+
+    final private[this] def nextDefID()(implicit tx: Txn): Int =
+      uniqueDefID.getAndTransform(_ + 1)(tx.peer)
+
+    // ---- sending ----
+
+    final private[this] val msgStampRef = Ref(0)
+
+    final private[synth] def messageTimeStamp: Ref[Int] = msgStampRef
+
+    final private[this] val sync            = new AnyRef
+    final private[this] var bundleWaiting   = Map.empty[Int, Vec[Scheduled]]
+    final private[this] var bundleReplySeen = -1
+
+    final private[this] class Scheduled(val bundle: Txn.Bundle, promise: Promise[Unit]) {
+      def apply(): Future[Unit] = {
+        val fut = sendNow(bundle)
+        promise.completeWith(fut)
+        fut
+      }
+    }
+
+    final private[this] def sendAdvance(stamp: Int): Future[Unit] = {
+      if (DEBUG) println(s"ADVANCE $stamp")
+      val futures: Vec[Future[Unit]] = sync.synchronized {
+        val i = bundleReplySeen + 1
+        if (i <= stamp) {
+          bundleReplySeen = stamp
+          val funs = (i to stamp).flatMap { j =>
+            bundleWaiting.get(j) match {
+              case Some(_funs)  => bundleWaiting -= j; _funs
+              case _            => Vector.empty
+            }
+          }
+          funs.map(_.apply())
+        }
+        else Vector.empty
+      }
+      reduceFutures(futures)
+    }
+
+    final private[this] def sendNow(bundle: Txn.Bundle): Future[Unit] = {
+      import bundle.{msgs, stamp}
+      if (msgs.isEmpty) return sendAdvance(stamp) // Future.successful(())
+
+      val allSync = (stamp & 1) == 1
+      if (DEBUG) println(s"SEND NOW $msgs - allSync? $allSync; stamp = $stamp")
+      if (allSync) {
+        val p = msgs match {
+          case Vec(msg) /* if allSync */ => msg
+          case _ => osc.Bundle.now(msgs: _*)
+        }
+        server ! p
+        sendAdvance(stamp)
+
+      } else {
+        val bndl  = osc.Bundle.now(msgs: _*)
+        val fut   = server.!!(bndl)
+        val futR  = fut.recover {
+          case message.Timeout() =>
+            log("TIMEOUT while sending OSC bundle!")
+        }
+        futR.flatMap(_ => sendAdvance(stamp))
+      }
+    }
+
+    final def send(bundles: Txn.Bundles): Future[Unit] = {
+      val res = sync.synchronized {
+        val (now, later) = bundles.partition(bundleReplySeen >= _.depStamp)
+        // it is important to process the 'later' bundles first,
+        // because now they might rely on some `bundleReplySeen` that is
+        // increased by processing the `now` bundles.
+        val futuresLater  = later.map { m =>
+          val p   = Promise[Unit]()
+          val sch = new Scheduled(m, p)
+          bundleWaiting += m.depStamp -> (bundleWaiting.getOrElse(m.depStamp, Vector.empty) :+ sch)
+          p.future
+        }
+        val futuresNow    = now.map(sendNow)
+        reduceFutures(futuresNow ++ futuresLater)
+      }
+
+      server.commit(res)
+      res
+    }
   }
 }
