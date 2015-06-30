@@ -64,6 +64,7 @@ trait Server {
 
   final def sampleRate: Double = peer.sampleRate
 
+  def isRealtime   : Boolean
   def isLocal      : Boolean
   def maxPacketSize: Int
 
@@ -93,7 +94,7 @@ trait Server {
 
   /** Sends out a packet with an added sync message. The returned future is completed with the
     * sync message's reply having arrived. */
-  def !!(b: osc.Bundle): Future[Unit]
+  def !! (b: osc.Bundle): Future[Unit]
 
   /** Signalizes that no more messages are sent from the currently committing transaction.
     * The offline server collects these futures, in order to allow an outside process

@@ -47,19 +47,24 @@ object NodeImpl {
 }
 
 trait NodeImpl extends ResourceImpl with Node {
-  import de.sciss.lucre.synth.impl.NodeImpl._
+  import NodeImpl._
 
-  private val onEndFuns = Ref(EmptyOnEnd)
+  private[this] val onEndFuns = Ref(EmptyOnEnd)
 
   peer.onEnd {
-    val funs = onEndFuns.single.get
+    val funs = onEndFuns.single.swap(EmptyOnEnd)
     if (funs.nonEmpty) {
       spawn { implicit itx =>
         implicit val ptx: Txn = Txn.wrap(itx)
-        funs.direct.foreach(_.apply()   )
-        funs.inTxn .foreach(_.apply(ptx))
+        setOnline(value = false)
+        processOnEnd(funs)
       }
     }
+  }
+
+  private[this] def processOnEnd(funs: OnEnd)(implicit tx: Txn): Unit = {
+    funs.direct.foreach(_.apply()  )
+    funs.inTxn .foreach(_.apply(tx))
   }
 
   // there is still a ScalaCollider actor problem with
@@ -153,6 +158,10 @@ trait NodeImpl extends ResourceImpl with Node {
     if (isOnline) {
       tx.addMessage(this, peer.freeMsg)
       setOnline(value = false)
+      if (!server.isRealtime) {
+        val funs = onEndFuns.swap(EmptyOnEnd)(tx.peer)
+        if (funs.nonEmpty) processOnEnd(funs)
+      }
     }
   }
 

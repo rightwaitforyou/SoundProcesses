@@ -40,6 +40,7 @@ object ServerImpl {
 
     def maxPacketSize: Int      = MaxOnlinePacketSize
     def isLocal      : Boolean  = peer.isLocal
+    def isRealtime   : Boolean  = true
 
     //    private def printExcessPacket(p: osc.Packet, sz: Int): Unit = {
     //      Console.err.println(s"ERROR: Packet size $sz exceeds $MaxPacketSize")
@@ -329,6 +330,7 @@ object ServerImpl {
     override def toString = s"$peer @offline"
 
     def isLocal      : Boolean  = true
+    def isRealtime   : Boolean  = false
     def maxPacketSize: Int      = MaxOfflinePacketSize
 
     private val sync = new AnyRef

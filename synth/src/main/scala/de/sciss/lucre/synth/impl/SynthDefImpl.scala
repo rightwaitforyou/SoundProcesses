@@ -24,8 +24,7 @@ final case class SynthDefImpl(server: Server, peer: SSynthDef) extends ResourceI
 
   def name: String = peer.name
 
-  /** Actually checks if the def is already online.
-    * Only if that is not the case, the receive message will be queued.
+  /** Queues a receive message.
     * If the SynthDef is too large, it will be written to a temporary
     * file and `/d_load` used instead.
     */

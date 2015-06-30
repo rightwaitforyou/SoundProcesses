@@ -1,7 +1,7 @@
 lazy val baseName  = "SoundProcesses"
 lazy val baseNameL = baseName.toLowerCase
 
-lazy val projectVersion = "2.19.0"
+lazy val projectVersion = "2.20.0-SNAPSHOT"
 
 lazy val commonSettings = Seq(
   version            := projectVersion,
@@ -9,8 +9,8 @@ lazy val commonSettings = Seq(
   homepage           := Some(url(s"https://github.com/Sciss/$baseName")),
   description        := "A framework for creating and managing ScalaCollider based sound processes",
   licenses           := Seq("GPL v2+" -> url("http://www.gnu.org/licenses/gpl-2.0.txt")),
-  scalaVersion       := "2.11.6",
-  crossScalaVersions := Seq("2.11.6", "2.10.5"),
+  scalaVersion       := "2.11.7",
+  crossScalaVersions := Seq("2.11.7", "2.10.5"),
   resolvers          += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 ) ++ publishSettings
 
@@ -18,10 +18,11 @@ lazy val lucreCoreVersion          = "2.1.2"
 lazy val lucreDataVersion          = "2.3.2"
 lazy val lucreEventVersion         = "2.7.4"
 lazy val lucreConfluentVersion     = "2.11.2"
-lazy val scalaColliderVersion      = "1.17.2"
+lazy val scalaColliderUGensVersion = "1.13.2"   // WTF sbt -- https://stackoverflow.com/questions/31138524
+lazy val scalaColliderVersion      = "1.17.3"
+lazy val scalaColliderSwingVersion = "1.25.2"
 lazy val spanVersion               = "1.3.1"
 lazy val lucreSwingVersion         = "0.9.1"
-lazy val scalaColliderSwingVersion = "1.25.1"
 lazy val audioWidgetsVersion       = "1.9.1"
 lazy val fileUtilVersion           = "1.1.1"
 lazy val topologyVersion           = "1.0.0"
@@ -165,6 +166,7 @@ lazy val compiler = Project(id = s"$baseNameL-compiler", base = file("compiler")
   settings(
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
+      "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
       "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,
       "de.sciss"       %% s"lucrestm-$bdb"          % lucreCoreVersion          % "test",
       "de.sciss"       %% "fileutil"                % fileUtilVersion           % "test",

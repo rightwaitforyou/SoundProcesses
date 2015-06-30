@@ -29,8 +29,9 @@ final case class SynthImpl(peer: SSynth, definition: SynthDef) extends NodeImpl 
     requireOffline()
     require(target.server == s && target.isOnline, s"Target $target must be running and using the same server")
     if (dependencies.nonEmpty) {
-      dependencies.foreach(r => require(r.server == s && r.isOnline,
-        s"Dependency $r must be running and using the same server"))
+      dependencies.foreach(r => if (r.server != s || !r.isOnline)
+        throw new IllegalStateException(s"Dependency $r must be running and using the same server")
+      )
     }
     tx.addMessage(this, peer.newMsg(definition.name, target.peer, args, addAction),
       dependencies = target :: definition :: dependencies)

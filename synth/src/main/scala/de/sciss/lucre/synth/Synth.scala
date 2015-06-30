@@ -20,9 +20,16 @@ import impl.{SynthImpl => Impl}
 
 object Synth {
   def apply(server: Server, graph: SynthGraph, nameHint: Option[String] = None)(implicit tx: Txn): Synth = {
-    val df = NodeGraph.getSynthDef(server, graph, nameHint)
-    create(df)
+    val df  = NodeGraph.acquireSynthDef(server, graph, nameHint)
+    val res = create(df)
+    releaseDefOnEnd(res)
+    res
   }
+
+  private def releaseDefOnEnd(x: Synth)(implicit tx: Txn): Unit =
+    x.onEndTxn { implicit tx =>
+      NodeGraph.releaseSynthDef(x.definition)
+    }
 
   def play(graph: SynthGraph, nameHint: Option[String] = None)
           (target: Node, args: ISeq[ControlSet] = Nil, addAction: AddAction = addToHead,
@@ -55,8 +62,10 @@ object Synth {
 
   /* private[synth] */ def expanded(server: Server, graph: UGenGraph, nameHint: Option[String] = None)
                             (implicit tx: Txn): Synth = {
-    val df = NodeGraph.getSynthDef(server, graph, nameHint)
-    create(df)
+    val df = NodeGraph.acquireSynthDef(server, graph, nameHint)
+    val res = create(df)
+    releaseDefOnEnd(res)
+    res
   }
 
   private def create(df: SynthDef)(implicit tx: Txn): Synth = {

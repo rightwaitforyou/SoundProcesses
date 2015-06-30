@@ -99,11 +99,16 @@ object NodeGraph {
   private[synth] def messageTimeStamp(server: Server)(implicit tx: Txn): Ref[Int] =
     apply(server).messageTimeStamp
 
-  private[synth] def getSynthDef(server: Server, graph: SynthGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef =
-    getSynthDef(server, graph.expand(synth.impl.DefaultUGenGraphBuilderFactory), nameHint)
+  private[synth] def acquireSynthDef(server: Server, graph: SynthGraph, nameHint: Option[String])
+                                    (implicit tx: Txn): SynthDef =
+    acquireSynthDef(server, graph.expand(synth.impl.DefaultUGenGraphBuilderFactory), nameHint)
 
-  private[synth] def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef =
-    apply(server).getSynthDef(server, graph, nameHint)
+  private[synth] def acquireSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])
+                                    (implicit tx: Txn): SynthDef =
+    apply(server).acquireSynthDef(graph, nameHint)
+
+  private[synth] def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit =
+    apply(sd.server).releaseSynthDef(sd)
 }
 trait NodeGraph {
   // def server: Server
@@ -119,7 +124,23 @@ trait NodeGraph {
 
   private[synth] def messageTimeStamp: Ref[Int]
 
-  def getSynthDef(server: Server, graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef
+  /** Acquires a synth def to be used in this transaction on the server.
+    * If the ugen graph was already sent to the server, it returns the
+    * corresponding synth def, and no `recv()` is necessary. The internal
+    * use counter is increment. Otherwise produces a fresh synth def and
+    * stores it in the cache.
+    *
+    * If the number of synth defs on the server would exceed the maximum,
+    * a number of synth-def disposals are issued for those that have a
+    * use count of zero.
+    */
+  def acquireSynthDef(graph: UGenGraph, nameHint: Option[String])(implicit tx: Txn): SynthDef
+
+  /** Releases a synth def on the server. Decrements the cache use count,
+    * and if it reaches zero, lazily purges the def on the server as soon
+    * as more slots are required.
+    */
+  def releaseSynthDef(sd: SynthDef)(implicit tx: Txn): Unit
 
   /** Queries the current topology */
   def topology(implicit tx: Txn): Topology[NodeRef, NodeGraph.Edge]
