@@ -14,36 +14,140 @@
 package de.sciss.lucre
 package bitemp.impl
 
-import de.sciss.lucre.{event => evt}
-import evt.{Event, EventLike, impl => evti, Sys}
-import de.sciss.lucre.data.{DeterministicSkipOctree, SkipOctree, Iterator}
-import collection.immutable.{IndexedSeq => Vec}
-import collection.breakOut
-import scala.annotation.{elidable, switch}
-import geom.{LongDistanceMeasure2D, LongPoint2DLike, LongPoint2D, LongSquare, LongSpace}
-import LongSpace.TwoDim
-import expr.Expr
-import de.sciss.span.{SpanLike, Span}
-import de.sciss.serial.{DataOutput, DataInput, Serializer}
-import de.sciss.lucre.geom.LongRectangle
-import de.sciss.{model => m}
 import de.sciss.lucre.bitemp.BiGroup
+import de.sciss.lucre.data.{DeterministicSkipOctree, Iterator, SkipOctree}
+import de.sciss.lucre.event.{Event, EventLike, Sys, impl => evti}
+import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.geom.LongSpace.TwoDim
+import de.sciss.lucre.geom.{DistanceMeasure, LongDistanceMeasure2D, LongPoint2D, LongPoint2DLike, LongRectangle, LongSpace}
+import de.sciss.lucre.{event => evt}
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
+import de.sciss.span.{Span, SpanLike}
+import de.sciss.{model => m}
+
+import scala.annotation.{elidable, switch}
+import scala.collection.breakOut
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object BiGroupImpl {
-  import BiGroup.{Leaf, TimedElem, Modifiable, MinCoordinate => MIN_COORD, MaxCoordinate => MAX_COORD, MAX_SQUARE, MAX_SIDE}
+  import BiGroup.{Leaf, MaxCoordinate, MaxSide, MaxSquare, MinCoordinate, Modifiable, TimedElem}
 
+  def spanToPoint(span: SpanLike): LongPoint2D = span match {
+    case Span(start, stop)  => LongPoint2D(start,     stop     )
+    case Span.From(start)   => LongPoint2D(start,     MaxCoordinate)
+    case Span.Until(stop)   => LongPoint2D(MinCoordinate, stop     )
+    case Span.All           => LongPoint2D(MinCoordinate, MaxCoordinate)
+    case Span.Void          => LongPoint2D(MaxCoordinate, MinCoordinate) // ?? what to do with this case ?? forbid?
+  }
+
+  def searchSpanToPoint(span: SpanLike): LongPoint2D = span match {
+    case Span(start, stop)  => LongPoint2D(start,     stop         )
+    case Span.From(start)   => LongPoint2D(start,     MaxCoordinate + 1)
+    case Span.Until(stop)   => LongPoint2D(MinCoordinate, stop         )
+    case Span.All           => LongPoint2D(MinCoordinate, MaxCoordinate + 1)
+    case Span.Void          => LongPoint2D(MaxCoordinate, MinCoordinate    ) // ?? what to do with this case ?? forbid?
+  }
+
+  final def intersectTime[S <: stm.Sys[S], A](tree: Tree[S, A])(time: Long)
+                                           (implicit tx: S#Tx): Iterator[S#Tx, A] = {
+    val start = time
+    val stop = time + 1
+    //         val shape = Rectangle( ti, MinCoordinate, MaxCoordinate - ti + 1, ti - MinCoordinate + 1 )
+    // horizontally: until query_stop; vertically: from query_start
+    // start < query.stop && stop > query.start
+    val shape = LongRectangle(MinCoordinate, start + 1, stop - MinCoordinate, MaxCoordinate - start)
+    tree.rangeQuery(shape)
+  }
+
+  final def intersectSpan[S <: stm.Sys[S], A](tree: Tree[S, A])(span: SpanLike)
+                                           (implicit tx: S#Tx): Iterator[S#Tx, A] = {
+    // horizontally: until query_stop; vertically: from query_start
+    span match {
+      case Span(start, stop) =>
+        val shape = LongRectangle(MinCoordinate, start + 1, stop - MinCoordinate, MaxCoordinate - start)
+        tree.rangeQuery(shape)
+
+      case Span.From(start) =>
+        val shape = LongRectangle(MinCoordinate, start + 1, MaxSide, MaxCoordinate - start)
+        tree.rangeQuery(shape)
+
+      case Span.Until(stop) =>
+        val shape = LongRectangle(MinCoordinate, MinCoordinate, stop - MinCoordinate, MaxSide)
+        tree.rangeQuery(shape)
+
+      case Span.All  => tree.iterator
+      case Span.Void => Iterator.empty
+    }
+  }
+
+  final def rangeSearch[S <: stm.Sys[S], A](tree: Tree[S, A])(start: SpanLike, stop: SpanLike)
+                                             (implicit tx: S#Tx): Iterator[S#Tx, A] = {
+    if (start == Span.Void || stop == Span.Void) return Iterator.empty
+
+    val startP = searchSpanToPoint(start)
+    val stopP  = searchSpanToPoint(stop)
+    val shape  = LongRectangle(startP.x, stopP.x, startP.y - startP.x /* + 1 */ , stopP.y - stopP.x /* + 1 */)
+    //println( "RANGE " + shape )
+    tree.rangeQuery(shape)
+  }
+
+  // this can be easily implemented with two rectangular range searches
+  final def eventsAt[S <: stm.Sys[S], A](tree: Tree[S, A])(time: Long)
+                                          (implicit tx: S#Tx): (Iterator[S#Tx, A], Iterator[S#Tx, A]) = {
+    val startShape = LongRectangle(time, MinCoordinate, 1, MaxSide)
+    val stopShape  = LongRectangle(MinCoordinate, time, MaxSide, 1)
+    (tree.rangeQuery(startShape), tree.rangeQuery(stopShape))
+  }
+
+  final def nearestEventAfter[S <: stm.Sys[S], T2](tree: Tree[S, (SpanLike, T2)])(time: Long)
+                                                   (implicit tx: S#Tx): Option[Long] = {
+    val point = LongPoint2D(time, time) // + 1
+    val span  = tree.nearestNeighborOption(point, AdvanceNextNeighborMetric).map(_._1).getOrElse(Span.Void)
+    span match {
+      case sp @ Span.From(start) => assert(start >= time, sp); Some(start) // else None
+      case sp @ Span.Until(stop) => assert(stop  >= time, sp); Some(stop ) // else None
+      case sp @ Span(start, stop) =>
+        if (start >= time) {
+          Some(start)
+        } else {
+          assert(stop >= time, sp)
+          Some(stop)
+        }
+      case _ => None // All or Void
+    }
+  }
+
+  final def nearestEventBefore[S <: Sys[S], T2](tree: Tree[S, (SpanLike, T2)])(time: Long)
+                                                    (implicit tx: S#Tx): Option[Long] = {
+    val point = LongPoint2D(time, time)
+    val span  = tree.nearestNeighborOption(point, RegressNextNeighborMetric).map(_._1).getOrElse(Span.Void)
+    span match {
+      case sp @ Span.From(start)  => assert(start <= time, sp); Some(start) // else None
+      case sp @ Span.Until(stop)  => assert(stop  <= time, sp); Some(stop ) // else None
+      case sp @ Span(start, stop) =>
+        if (stop <= time) {
+          Some(stop)
+        } else {
+          assert(start <= time, sp)
+          Some(start)
+        }
+      case _ => None // All or Void
+    }
+  }
+
+  // ... accepted are points with x > LRP || y > LRP ...
+  final val AdvanceNextNeighborMetric: DistanceMeasure.Ops[Long, LongSpace.TwoDim] = LongDistanceMeasure2D.nextSpanEvent(MaxSquare)
+  final val RegressNextNeighborMetric: DistanceMeasure.Ops[Long, LongSpace.TwoDim] = LongDistanceMeasure2D.prevSpanEvent(MaxSquare)
+  
   var showLog = false
 
   @elidable(elidable.CONFIG) private def log(what: => String): Unit =
     if (showLog) println(s"<bigroup> $what")
 
-  //   private final case class Entry[ Elem ]( )
-
+  type Tree    [S <: stm.Sys[S], A] = SkipOctree[S, TwoDim, A]
   type LeafImpl[S <: Sys[S], Elem, U] = (SpanLike, Vec[TimedElemImpl[S, Elem, U]])
-  type Tree    [S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
-
-  // private def opNotSupported: Nothing = sys.error("Operation not supported")
-
+  type TreeImpl[S <: Sys[S], Elem, U] = SkipOctree[S, TwoDim, LeafImpl[S, Elem, U]]
+  
   def verifyConsistency[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], reportOnly: Boolean)
                                              (implicit tx: S#Tx): Vec[String] = {
     group match {
@@ -53,23 +157,6 @@ object BiGroupImpl {
         case _ => sys.error("Not a deterministic octree implementation")
       }
     }
-  }
-
-
-  private def spanToPoint(span: SpanLike): LongPoint2D = span match {
-    case Span(start, stop)  => LongPoint2D(start,     stop     )
-    case Span.From(start)   => LongPoint2D(start,     MAX_COORD)
-    case Span.Until(stop)   => LongPoint2D(MIN_COORD, stop     )
-    case Span.All           => LongPoint2D(MIN_COORD, MAX_COORD)
-    case Span.Void          => LongPoint2D(MAX_COORD, MIN_COORD) // ?? what to do with this case ?? forbid?
-  }
-
-  private def searchSpanToPoint(span: SpanLike): LongPoint2D = span match {
-    case Span(start, stop)  => LongPoint2D(start,     stop         )
-    case Span.From(start)   => LongPoint2D(start,     MAX_COORD + 1)
-    case Span.Until(stop)   => LongPoint2D(MIN_COORD, stop         )
-    case Span.All           => LongPoint2D(MIN_COORD, MAX_COORD + 1)
-    case Span.Void          => LongPoint2D(MAX_COORD, MIN_COORD    ) // ?? what to do with this case ?? forbid?
   }
 
   def serializer[S <: Sys[S], Elem, U](eventView: Elem => EventLike[S, U])(
@@ -103,17 +190,13 @@ object BiGroupImpl {
     }
   }
 
-  // ... accepted are points with x > LRP || y > LRP ...
-  private val advanceNNMetric = LongDistanceMeasure2D.nextSpanEvent(MAX_SQUARE)
-  private val regressNNMetric = LongDistanceMeasure2D.prevSpanEvent(MAX_SQUARE)
-
   private[lucre] final class TimedElemImpl[S <: Sys[S], Elem, U](group          : Impl[S, Elem, U],
                                                           protected val targets : evt.Targets[S],
                                                           val span              : Expr[S, SpanLike],
                                                           val value             : Elem)
     extends evti.StandaloneLike[S, BiGroup.Update[S, Elem, U], TimedElem[S, Elem]] with TimedElem[S, Elem] {
 
-    import group.{eventView, elemSerializer}
+    import group.{elemSerializer, eventView}
 
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
       var res     = Vector.empty[BiGroup.Change[S, Elem, U]]
@@ -163,16 +246,16 @@ object BiGroupImpl {
 
     implicit final def pointView: (Leaf[S, Elem], S#Tx) => LongPoint2DLike = (tup, tx) => spanToPoint(tup._1)
 
-    protected def tree: Tree[S, Elem, U]
+    protected def tree: TreeImpl[S, Elem, U]
     def eventView(elem: Elem): EventLike[S, U]
     implicit def elemSerializer: Serializer[S#Tx, S#Acc, Elem]
 
     // ---- implemented ----
 
-    protected final def newTree()(implicit tx: S#Tx): Tree[S, Elem, U] =
-      SkipOctree.empty[S, TwoDim, LeafImpl[S, Elem, U]](MAX_SQUARE)
+    protected final def newTree()(implicit tx: S#Tx): TreeImpl[S, Elem, U] =
+      SkipOctree.empty[S, TwoDim, LeafImpl[S, Elem, U]](BiGroup.MaxSquare)
 
-    protected final def readTree(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Tree[S, Elem, U] =
+    protected final def readTree(in: DataInput, access: S#Acc)(implicit tx: S#Tx): TreeImpl[S, Elem, U] =
       SkipOctree.read[S, TwoDim, LeafImpl[S, Elem, U]](in, access)
 
     final def treeHandle = tree
@@ -407,92 +490,24 @@ object BiGroupImpl {
 
     final def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Leaf[S, Elem]] = tree.iterator
 
-    final def intersect(time: Long)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] = {
-      val start = time
-      val stop = time + 1
-      //         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
-      // horizontally: until query_stop; vertically: from query_start
-      // start < query.stop && stop > query.start
-      val shape = LongRectangle(MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start)
-      rangeSearch(shape)
-    }
+    final def intersect(time: Long)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] =
+      BiGroupImpl.intersectTime(tree)(time)
 
-    final def intersect(span: SpanLike)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] = {
-      // horizontally: until query_stop; vertically: from query_start
-      span match {
-        case Span(start, stop) =>
-          val shape = LongRectangle(MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start)
-          rangeSearch(shape)
+    final def intersect(span: SpanLike)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] =
+      BiGroupImpl.intersectSpan(tree)(span)
 
-        case Span.From(start) =>
-          val shape = LongRectangle(MIN_COORD, start + 1, MAX_SIDE, MAX_COORD - start)
-          rangeSearch(shape)
-
-        case Span.Until(stop) =>
-          val shape = LongRectangle(MIN_COORD, MIN_COORD, stop - MIN_COORD, MAX_SIDE)
-          rangeSearch(shape)
-
-        case Span.All  => tree.iterator
-        case Span.Void => Iterator.empty
-      }
-    }
-
-    final def rangeSearch(start: SpanLike, stop: SpanLike)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] = {
-      if (start == Span.Void || stop == Span.Void) return Iterator.empty
-
-      val startP = searchSpanToPoint(start)
-      val stopP  = searchSpanToPoint(stop)
-      val shape  = LongRectangle(startP.x, stopP.x, startP.y - startP.x /* + 1 */ , stopP.y - stopP.x /* + 1 */)
-      //println( "RANGE " + shape )
-      rangeSearch(shape)
-    }
+    final def rangeSearch(start: SpanLike, stop: SpanLike)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] =
+      BiGroupImpl.rangeSearch(tree)(start, stop)
 
     // this can be easily implemented with two rectangular range searches
-    final def eventsAt(time: Long)(implicit tx: S#Tx): (Iterator[S#Tx, Leaf[S, Elem]], Iterator[S#Tx, Leaf[S, Elem]]) = {
-      val startShape = LongRectangle(time, MIN_COORD, 1, MAX_SIDE)
-      val stopShape  = LongRectangle(MIN_COORD, time, MAX_SIDE, 1)
-      (rangeSearch(startShape), rangeSearch(stopShape))
-    }
+    final def eventsAt(time: Long)(implicit tx: S#Tx): (Iterator[S#Tx, Leaf[S, Elem]], Iterator[S#Tx, Leaf[S, Elem]]) =
+      BiGroupImpl.eventsAt(tree)(time)
 
-    final def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long] = {
-      val point = LongPoint2D(time, time) // + 1
-      val span  = tree.nearestNeighborOption(point, advanceNNMetric).map(_._1).getOrElse(Span.Void)
-      span match {
-        case sp @ Span.From(start) => assert(start >= time, sp); Some(start) // else None
-        case sp @ Span.Until(stop) => assert(stop  >= time, sp); Some(stop ) // else None
-        case sp @ Span(start, stop) =>
-          if (start >= time) {
-            Some(start)
-          } else {
-            assert(stop >= time, sp)
-            Some(stop)
-          }
-        case _ => None // All or Void
-      }
-    }
+    final def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long] =
+      BiGroupImpl.nearestEventAfter(tree)(time)
 
-    final def nearestEventBefore(time: Long)(implicit tx: S#Tx): Option[Long] = {
-      val point = LongPoint2D(time, time)
-      val span  = tree.nearestNeighborOption(point, regressNNMetric).map(_._1).getOrElse(Span.Void)
-      span match {
-        case sp @ Span.From(start)  => assert(start <= time, sp); Some(start) // else None
-        case sp @ Span.Until(stop)  => assert(stop  <= time, sp); Some(stop ) // else None
-        case sp @ Span(start, stop) =>
-          if (stop <= time) {
-            Some(stop)
-          } else {
-            assert(start <= time, sp)
-            Some(start)
-          }
-        case _ => None // All or Void
-      }
-    }
-
-    private def rangeSearch(shape: LongRectangle)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]] = {
-      val res = tree.rangeQuery(shape) // .flatMap ....
-      //if( showLog ) println( "Range in " + shape + " --> right = " + shape.right + "; bottom = " + shape.bottom + " --> found some? " + !res.isEmpty )
-      res
-    }
+    final def nearestEventBefore(time: Long)(implicit tx: S#Tx): Option[Long] =
+      BiGroupImpl.nearestEventBefore(tree)(time)
 
     //      final def collectionChanged : Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]] = CollectionEvent
     //      final def elementChanged    : Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]] = ElementEvent
@@ -510,7 +525,7 @@ object BiGroupImpl {
 
       protected val targets = evt.Targets[S]
 
-      val tree: Tree[S, Elem, U] = newTree()
+      val tree: TreeImpl[S, Elem, U] = newTree()
     }
 
   private def read[S <: Sys[S], Elem, U](in: DataInput, access: S#Acc, _targets: evt.Targets[S],
@@ -524,6 +539,6 @@ object BiGroupImpl {
 
       protected val targets: evt.Targets[S] = _targets
 
-      val tree: Tree[S, Elem, U] = readTree(in, access)
+      val tree: TreeImpl[S, Elem, U] = readTree(in, access)
     }
 }

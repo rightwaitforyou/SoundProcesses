@@ -14,25 +14,24 @@
 package de.sciss.lucre
 package bitemp
 
+import de.sciss.lucre.bitemp.impl.{BiGroupImpl => Impl}
+import de.sciss.lucre.data.Iterator
+import de.sciss.lucre.event.{EventLike, Publisher, Sys}
+import de.sciss.lucre.expr.{Expr, ExprType1}
 import de.sciss.lucre.geom.LongSquare
-import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.event.{Publisher, EventLike, Sys}
-import impl.{BiGroupImpl => Impl}
-import collection.immutable.{IndexedSeq => Vec}
-import expr.{Expr, ExprType1}
-import data.Iterator
-import de.sciss.span.{SpanLike => SpanLikeV}
-import de.sciss.serial.DataInput
-import de.sciss.serial
 import de.sciss.lucre.stm.Identifiable
-import de.sciss.{model => m}
+import de.sciss.lucre.{event => evt}
+import de.sciss.serial.DataInput
+import de.sciss.span.{SpanLike => SpanLikeV}
+import de.sciss.{model => m, serial}
+
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object BiGroup {
-  private[bitemp] val MAX_SQUARE  = LongSquare(0, 0, 0x2000000000000000L)
-  private[bitemp] val MAX_SIDE    = MAX_SQUARE.side
-
-  val MinCoordinate = MAX_SQUARE.left
-  val MaxCoordinate = MAX_SQUARE.right
+  final val MaxSquare     = LongSquare(0, 0, 0x2000000000000000L)
+  final val MaxSide       = MaxSquare.side
+  final val MinCoordinate = MaxSquare.left
+  final val MaxCoordinate = MaxSquare.right
 
   // ---- updates ----
 
@@ -176,19 +175,19 @@ trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] with Publisher[S, BiGrou
     */
   def rangeSearch(start: SpanLikeV, stop: SpanLikeV)(implicit tx: S#Tx): Iterator[S#Tx, Leaf[S, Elem]]
 
-  /** Queries the closest event (an element's span starting or stopping) later than the given time
+  /** Queries the closest event (an element's span starting or stopping) at the given time or later
     *
     * @param time the query time
-    * @return a time, greater than the query time, at which the next event occurs, or `None` if
-    *         there are no events after the query time
+    * @return a time, greater than or equal to the query time, at which the next event occurs, or `None` if
+    *         there are no events at or after the query time
     */
   def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
 
-  /** Queries the closest event (an element's span starting or stopping) earlier than the given time
+  /** Queries the closest event (an element's span starting or stopping) at the given time or earlier
     *
     * @param time the query time
-    * @return a time, smaller than the query time, at which the previous event occurs, or `None` if
-    *         there are no events before the query time
+    * @return a time, smaller than or equal to the query time, at which the previous event occurs, or `None` if
+    *         there are no events at or before the query time
     */
   def nearestEventBefore(time: Long)(implicit tx: S#Tx): Option[Long]
 

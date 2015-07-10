@@ -14,47 +14,22 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.bitemp.BiGroup
+import de.sciss.lucre.bitemp.impl.BiGroupImpl
 import de.sciss.lucre.data.SkipOctree
 import de.sciss.lucre.event.impl.ObservableImpl
-import de.sciss.lucre.geom.{LongDistanceMeasure2D, LongRectangle, LongPoint2D, LongSquare, LongSpace}
-import de.sciss.lucre.stm.{IdentifierMap, Disposable}
-import de.sciss.lucre.stm
-import de.sciss.lucre.synth.{expr, Sys}
+import de.sciss.lucre.geom.LongSpace
+import de.sciss.lucre.stm.{Disposable, IdentifierMap}
+import de.sciss.lucre.synth.{Sys, expr}
+import de.sciss.lucre.{data, stm}
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.lucre.data
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{TSet, Ref}
+import scala.concurrent.stm.{Ref, TSet}
 
 object AuralTimelineImpl {
-  private val MAX_SQUARE  = LongSquare(0, 0, 0x2000000000000000L)
-  private val MIN_COORD   = MAX_SQUARE.left
-  private val MAX_COORD   = MAX_SQUARE.right
-  private val MAX_SIDE    = MAX_SQUARE.side
-
   private type Leaf[S <: Sys[S]] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], AuralObj[S])])
-
-  // XXX TODO - DRY - large overlap with BiGroupImpl
-  private def spanToPoint(span: SpanLike): LongPoint2D = span match {
-    case Span(start, stop)  => LongPoint2D(start,     stop     )
-    case Span.From(start)   => LongPoint2D(start,     MAX_COORD)
-    case Span.Until(stop)   => LongPoint2D(MIN_COORD, stop     )
-    case Span.All           => LongPoint2D(MIN_COORD, MAX_COORD)
-    case Span.Void          => LongPoint2D(MAX_COORD, MIN_COORD) // ?? what to do with this case ?? forbid?
-  }
-
-  //  private def searchSpanToPoint(span: SpanLike): LongPoint2D = span match {
-  //    case Span(start, stop)  => LongPoint2D(start,     stop         )
-  //    case Span.From(start)   => LongPoint2D(start,     MAX_COORD + 1)
-  //    case Span.Until(stop)   => LongPoint2D(MIN_COORD, stop         )
-  //    case Span.All           => LongPoint2D(MIN_COORD, MAX_COORD + 1)
-  //    case Span.Void          => LongPoint2D(MAX_COORD, MIN_COORD    ) // ?? what to do with this case ?? forbid?
-  //  }
-
-  // ... accepted are points with x > LRP || y > LRP ...
-  private val advanceNNMetric = LongDistanceMeasure2D.nextSpanEvent(MAX_SQUARE)
-  // private val regressNNMetric = LongDistanceMeasure2D.prevSpanEvent(MAX_SQUARE)
 
   def apply[S <: Sys[S]](tlObj: Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
     val tl                = tlObj.elem.peer
@@ -65,9 +40,9 @@ object AuralTimelineImpl {
     //    val dummyEvent        = evt.Dummy[system.I, Unit]
     //    implicit val dummySer = DummySerializerFactory[system.I].dummySerializer[AuralObj[S]]
     //    val map               = BiGroup.Modifiable[system.I, AuralObj[S], Unit](_ => dummyEvent)
-    implicit val pointView = (l: Leaf[S], tx: I#Tx) => spanToPoint(l._1)
+    implicit val pointView = (l: Leaf[S], tx: I#Tx) => BiGroupImpl.spanToPoint(l._1)
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
-    val tree = SkipOctree.empty[I, LongSpace.TwoDim, Leaf[S]](MAX_SQUARE)
+    val tree = SkipOctree.empty[I, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
 
     val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
     // Note: in the future, we might want to
@@ -163,7 +138,7 @@ object AuralTimelineImpl {
       // create a view for the element and add it to the tree and map
       val view = AuralObj(timed.value)
       viewMap.put(timed.id, view)
-      tree.transformAt(spanToPoint(span)) { opt =>
+      tree.transformAt(BiGroupImpl.spanToPoint(span)) { opt =>
         import expr.IdentifierSerializer
         val tup       = (tx.newHandle(timed.id), view)
         val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
@@ -226,7 +201,7 @@ object AuralTimelineImpl {
 
       // remove view for the element from tree and map
       viewMap.remove(timed.id)
-      tree.transformAt(spanToPoint(span)) { opt =>
+      tree.transformAt(BiGroupImpl.spanToPoint(span)) { opt =>
         opt.flatMap { case (span1, views) =>
           val i = views.indexWhere(_._2 == view)
           val views1 = if (i >= 0) {
@@ -380,46 +355,16 @@ object AuralTimelineImpl {
 
     // ---- bi-group functionality TODO - DRY ----
 
-    private def intersect(frame: Long)(implicit tx: S#Tx): data.Iterator[I#Tx, Leaf[S]] = {
-      val start = frame
-      val stop  = frame + 1
-      //         val shape = Rectangle( ti, MIN_COORD, MAX_COORD - ti + 1, ti - MIN_COORD + 1 )
-      // horizontally: until query_stop; vertically: from query_start
-      // start < query.stop && stop > query.start
-      val shape = LongRectangle(MIN_COORD, start + 1, stop - MIN_COORD, MAX_COORD - start)
-      rangeSearch(shape)
-    }
+    private def intersect(frame: Long)(implicit tx: S#Tx): data.Iterator[I#Tx, Leaf[S]] =
+      BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
     // this can be easily implemented with two rectangular range searches
     // return: (things-that-start, things-that-stop)
-    private def eventsAt(frame: Long)(implicit tx: S#Tx): (data.Iterator[I#Tx, Leaf[S]], data.Iterator[I#Tx, Leaf[S]]) = {
-      val startShape = LongRectangle(frame, MIN_COORD, 1, MAX_SIDE)
-      val stopShape  = LongRectangle(MIN_COORD, frame, MAX_SIDE, 1)
-      (rangeSearch(startShape), rangeSearch(stopShape))
-    }
+    private def eventsAt(frame: Long)(implicit tx: S#Tx): (data.Iterator[I#Tx, Leaf[S]], data.Iterator[I#Tx, Leaf[S]]) =
+      BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
 
     // Long.MaxValue indicates _no event_; frame is inclusive!
-    private def nearestEventAfter(frame: Long)(implicit tx: S#Tx): Long = {
-      implicit val itx: I#Tx = iSys(tx)
-      val point = LongPoint2D(frame, frame) // + 1
-      val span  = tree.nearestNeighborOption(point, advanceNNMetric).map(_._1).getOrElse(Span.Void)
-      span match {
-        case sp @ Span.From(start) => assert(start >= frame, sp); start // else None
-        case sp @ Span.Until(stop) => assert(stop  >= frame, sp); stop  // else None
-        case sp @ Span(start, stop) =>
-          if (start >= frame) {
-            start
-          } else {
-            assert(stop >= frame, sp)
-            stop
-          }
-        case _ => Long.MaxValue // All or Void
-      }
-    }
-
-    private def rangeSearch(shape: LongRectangle)(implicit tx: S#Tx): data.Iterator[I#Tx, Leaf[S]] = {
-      implicit val itx: I#Tx = iSys(tx)
-      tree.rangeQuery(shape)
-    }
+    private def nearestEventAfter(frame: Long)(implicit tx: S#Tx): Long =
+      BiGroupImpl.nearestEventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
   }
 }
