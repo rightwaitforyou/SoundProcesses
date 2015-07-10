@@ -32,8 +32,10 @@ object AuralTimelineImpl {
   private type Leaf[S <: Sys[S]] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], AuralObj[S])])
 
   def apply[S <: Sys[S]](tlObj: Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
-    val tl                = tlObj.elem.peer
     val system            = tx.system
+    val (tree, viewMap, res) = prepare[S, system.I](tlObj, system)
+
+    val tl                = tlObj.elem.peer
     type I                = system.I
     implicit val iSys     = system.inMemoryTx _
     implicit val itx      = iSys(tx)
@@ -42,9 +44,7 @@ object AuralTimelineImpl {
     //    val map               = BiGroup.Modifiable[system.I, AuralObj[S], Unit](_ => dummyEvent)
     implicit val pointView = (l: Leaf[S], tx: I#Tx) => BiGroupImpl.spanToPoint(l._1)
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
-    val tree = SkipOctree.empty[I, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
 
-    val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
     // Note: in the future, we might want to
     // restrict the view build-up to a particular
     // time window. Right now, let's just eagerly
@@ -62,9 +62,34 @@ object AuralTimelineImpl {
         tree.add(span -> views)
     }
 
-    val res = new Impl[S, I](tx.newHandle(tlObj), tree, viewMap)
     res.init(tlObj)
     res
+  }
+
+  /** An empty view that does not add the timeline's children,
+    * nor does it listen for events on the timeline.
+    */
+  def empty[S <: Sys[S]](tlObj: Timeline.Obj[S])
+                        (implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline.Manual[S] = {
+    val system = tx.system
+    val (_, _, res) = prepare[S, system.I](tlObj, system)
+    res
+  }
+
+  private def prepare[S <: Sys[S], I1 <: stm.Sys[I1]](tlObj: Timeline.Obj[S], system: S { type I = I1 })
+                        (implicit tx: S#Tx,
+                         context: AuralContext[S]): (SkipOctree[I1, LongSpace.TwoDim, Leaf[S]],
+                                                     IdentifierMap[S#ID, S#Tx, AuralObj[S]],
+                                                     Impl[S, I1]) = {
+    implicit val iSys     = system.inMemoryTx _
+    implicit val itx      = iSys(tx)
+    implicit val pointView = (l: Leaf[S], tx: I1#Tx) => BiGroupImpl.spanToPoint(l._1)
+    implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
+    val tree = SkipOctree.empty[I1, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
+
+    val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
+    val res = new Impl[S, I1](tx.newHandle(tlObj), tree, viewMap)
+    (tree, viewMap, res)
   }
 
   private final class PlayTime(val wallClock: Long, val timeRef: TimeRef.Apply) {
@@ -81,7 +106,7 @@ object AuralTimelineImpl {
                                                          tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]],
                                                          viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
                                                         (implicit context: AuralContext[S], iSys: S#Tx => I#Tx)
-    extends AuralObj.Timeline[S] with ObservableImpl[S, AuralObj.State] { impl =>
+    extends AuralObj.Timeline.Manual[S] with ObservableImpl[S, AuralObj.State] { impl =>
 
     def typeID: Int = Timeline.typeID
 
@@ -130,6 +155,9 @@ object AuralTimelineImpl {
         }
       }
     }
+
+    def addObject   (timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = elemAdded  (timed.span.value, timed)
+    def removeObject(timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = elemRemoved(timed.span.value, timed)
 
     private def elemAdded(span: SpanLike, timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = {
       logA(s"timeline - elemAdded($span, ${timed.value})")
@@ -336,7 +364,7 @@ object AuralTimelineImpl {
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {
-      tlObserver.dispose()
+      if (tlObserver != null) tlObserver.dispose()
       freeNodes()
       // XXX TODO - we really need an iterator for id-map
       // viewMap.foreach { view => contents.fire(AuralObj.Timeline.ViewRemoved(this, view)) }

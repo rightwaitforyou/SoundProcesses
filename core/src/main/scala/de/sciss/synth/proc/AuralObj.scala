@@ -145,8 +145,17 @@ object AuralObj {
     def apply[S <: Sys[S]](obj: _Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] =
       AuralTimelineImpl(obj)
 
+    /** Creates an empty view that can be manually populated by calling `addObject`. */
+    def empty[S <: Sys[S]](obj: _Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): Manual[S] =
+      AuralTimelineImpl.empty(obj)
+
     sealed trait Update[S <: Sys[S]] {
       def timeline: Timeline[S]
+    }
+
+    trait Manual[S <: Sys[S]] extends Timeline[S] {
+      def addObject   (timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
+      def removeObject(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
     }
 
     final case class ViewAdded[S <: Sys[S]](timeline: Timeline[S], timed: S#ID, view: AuralObj[S])
