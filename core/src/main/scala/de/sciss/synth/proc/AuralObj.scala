@@ -14,9 +14,11 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
+import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
 import de.sciss.lucre.{stm, event => evt}
+import de.sciss.span.SpanLike
 import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralProcImpl, AuralTimelineImpl, AuralObjImpl => Impl}
 
 import scala.language.higherKinds
@@ -154,8 +156,10 @@ object AuralObj {
     }
 
     trait Manual[S <: Sys[S]] extends Timeline[S] {
-      def addObject   (timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
-      def removeObject(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
+      // def addObject   (timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
+      // def removeObject(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
+      def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit
+      def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit
     }
 
     final case class ViewAdded[S <: Sys[S]](timeline: Timeline[S], timed: S#ID, view: AuralObj[S])

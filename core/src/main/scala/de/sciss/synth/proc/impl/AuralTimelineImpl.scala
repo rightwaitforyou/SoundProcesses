@@ -18,6 +18,7 @@ import de.sciss.lucre.bitemp.BiGroup
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
 import de.sciss.lucre.data.SkipOctree
 import de.sciss.lucre.event.impl.ObservableImpl
+import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.geom.LongSpace
 import de.sciss.lucre.stm.{Disposable, IdentifierMap}
 import de.sciss.lucre.synth.{Sys, expr}
@@ -143,32 +144,32 @@ object AuralTimelineImpl {
     def init(tl: Timeline.Obj[S])(implicit tx: S#Tx): Unit = {
       tlObserver = tl.elem.peer.changed.react { implicit tx => upd =>
         upd.changes.foreach {
-          case Timeline.Added  (span, timed)    => elemAdded  (span, timed)
-          case Timeline.Removed(span, timed)    => elemRemoved(span, timed)
+          case Timeline.Added  (span, timed)    => elemAdded  (timed.id, span, timed.value)
+          case Timeline.Removed(span, timed)    => elemRemoved(timed.id, span, timed.value)
           case Timeline.Moved  (timed, spanCh)  =>
             // for simplicity just remove and re-add
             // ; in the future this could be optimized
             // (e.g., not deleting and re-creating the AuralObj)
-            elemRemoved(spanCh.before, timed)
-            elemAdded  (spanCh.now   , timed)
+            elemRemoved(timed.id, spanCh.before, timed.value)
+            elemAdded  (timed.id, spanCh.now   , timed.value)
           case Timeline.Element(_, _) =>  // we don't care
         }
       }
     }
 
-    def addObject   (timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = elemAdded  (timed.span.value, timed)
-    def removeObject(timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = elemRemoved(timed.span.value, timed)
+    def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemAdded  (id, span.value, obj)
+    def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemRemoved(id, span.value, obj)
 
-    private def elemAdded(span: SpanLike, timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = {
-      logA(s"timeline - elemAdded($span, ${timed.value})")
+    private def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
+      logA(s"timeline - elemAdded($span, $obj)")
       implicit val itx: I#Tx = iSys(tx)
 
       // create a view for the element and add it to the tree and map
-      val view = AuralObj(timed.value)
-      viewMap.put(timed.id, view)
+      val view = AuralObj(obj)
+      viewMap.put(tid, view)
       tree.transformAt(BiGroupImpl.spanToPoint(span)) { opt =>
         import expr.IdentifierSerializer
-        val tup       = (tx.newHandle(timed.id), view)
+        val tup       = (tx.newHandle(tid), view)
         val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
         Some(newViews)
       }
@@ -190,7 +191,7 @@ object AuralTimelineImpl {
       if (elemPlays) {
         val tr1 = tr0.intersect(span)
         logA(s"...playView: $tr1")
-        playView(timed.id, view, tr1)
+        playView(tid, view, tr1)
       }
 
       // re-validate the next scheduling position
@@ -218,24 +219,24 @@ object AuralTimelineImpl {
       }
     }
 
-    private def elemRemoved(span: SpanLike, timed: Timeline.Timed[S])(implicit tx: S#Tx): Unit = {
-      logA(s"timeline - elemRemoved($span, ${timed.value})")
+    private def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
+      logA(s"timeline - elemRemoved($span, $obj)")
       implicit val itx: I#Tx = iSys(tx)
 
-      val view = viewMap.get(timed.id).getOrElse {
-        Console.err.println(s"Warning: timeline - elemRemoved - no view for $timed found")
+      val view = viewMap.get(tid).getOrElse {
+        Console.err.println(s"Warning: timeline - elemRemoved - no view for $obj found")
         return
       }
 
       // remove view for the element from tree and map
-      viewMap.remove(timed.id)
+      viewMap.remove(tid)
       tree.transformAt(BiGroupImpl.spanToPoint(span)) { opt =>
         opt.flatMap { case (span1, views) =>
           val i = views.indexWhere(_._2 == view)
           val views1 = if (i >= 0) {
             views.patch(i, Nil, 1)
           } else {
-            Console.err.println(s"Warning: timeline - elemRemoved - view for $timed not in tree")
+            Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
             views
           }
           if (views1.isEmpty) None else Some(span1 -> views1)
