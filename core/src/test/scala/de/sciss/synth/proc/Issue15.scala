@@ -20,6 +20,8 @@ class Issue15 extends ConfluentEventSpec {
   "AttrMap" should "dispatch events after repeated listener (un)registration" in { system =>
     val obs = new Observation
 
+    de.sciss.lucre.event.showLog = true
+
     // ---- we create the "workspace" ----
     val (fH, pObjH, tlH, timedIDH, spanH) = system.step { implicit tx =>
       val p         = Proc[S]
@@ -91,7 +93,7 @@ class Issue15 extends ConfluentEventSpec {
     // ---- we "mute and un-mute" ----
     muteObservation()
 
-    // ---- we "close" the timeline view ----
+    // ---- we "close" the timeline view; this produces the illegal state somehow ----
     system.step { implicit tx =>
       obs1.dispose()
     }
