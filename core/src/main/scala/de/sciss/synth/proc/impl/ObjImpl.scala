@@ -106,14 +106,14 @@ object ObjImpl {
       final def node: Obj[S] with evt.Node[S] = obj
     }
 
-    private object StateEvent
-      extends evt.impl.TriggerImpl[S, Obj.UpdateT[S, E], Obj[S]]
-      with evt.InvariantEvent     [S, Obj.UpdateT[S, E], Obj[S]]
-      with evt.impl.Root          [S, Obj.UpdateT[S, E]]
-      with ObjectEvent {
-
-      final val slot = 2
-    }
+    //    private object StateEvent
+    //      extends evt.impl.TriggerImpl[S, Obj.UpdateT[S, E], Obj[S]]
+    //      with evt.InvariantEvent     [S, Obj.UpdateT[S, E], Obj[S]]
+    //      with evt.impl.Root          [S, Obj.UpdateT[S, E]]
+    //      with ObjectEvent {
+    //
+    //      final val slot = 2
+    //    }
 
     object attr
       extends AttrMap.Modifiable[S]
@@ -121,7 +121,8 @@ object ObjImpl {
       with evt.InvariantEvent[S, Obj.UpdateT[S, E], Obj[S]]
       with ObjectEvent
       // with impl.KeyMapImpl[S, String, Obj[S], Elem.Update[S, E#PeerUpdate]]
-      with impl.KeyMapImpl[S, String, Obj[S], Obj.UpdateT[S, E]] {
+      with impl.KeyMapImpl[S, String, Obj[S], Obj.UpdateT[S, E]]
+      with evt.impl.Generator[S, Obj.UpdateT[S, E], Obj[S]] {
 
       final val slot = 0
 
@@ -136,7 +137,8 @@ object ObjImpl {
         added.foreach { tup =>
           b += Obj.AttrAdded(tup._1, tup._2)
         }
-        StateEvent(Obj.UpdateT(obj, b.result()))
+        // StateEvent(Obj.UpdateT(obj, b.result()))
+        fire(Obj.UpdateT(obj, b.result()))
       }
 
       final protected def isConnected(implicit tx: S#Tx): Boolean = obj.targets.nonEmpty
@@ -148,12 +150,14 @@ object ObjImpl {
       def contains(key: String)(implicit tx: S#Tx): Boolean = map.contains(key)
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.UpdateT[S, E]] = {
-        val changes = foldUpdate(pull)
-        if (changes.isEmpty) None
-        else Some(Obj.UpdateT(obj,
-          changes.map({
-            case (key, u) => Obj.AttrChange(key, u.obj, u.changes)
-          })(breakOut)))
+        val ch0   = if (pull.isOrigin(this)) pull.resolve[Obj.UpdateT[S, E]].changes else Vector.empty
+        val mapCh = foldUpdate(pull)
+        val ch1   = if (mapCh.isEmpty) Vector.empty else mapCh.map {
+          case (key, u) => Obj.AttrChange(key, u.obj, u.changes)
+        } (breakOut)
+
+        val changes = if (ch0.isEmpty) ch1 else if (ch1.isEmpty) ch0 else ch0 ++ ch1
+        if (changes.isEmpty) None else Some(Obj.UpdateT(obj, changes))
       }
 
       protected def map: SkipList.Map[S, String, Entry] = attributeMap
@@ -177,17 +181,17 @@ object ObjImpl {
       with evt.InvariantEvent   [S, Obj.UpdateT[S, E], Obj[S]]
       with ObjectEvent {
 
-      final val slot = 3
+      final val slot = 2 // 3
 
       def connect   ()(implicit tx: S#Tx): Unit = {
         attr         ---> this
         elem.changed ---> this
-        StateEvent   ---> this
+        // StateEvent   ---> this
       }
       def disconnect()(implicit tx: S#Tx): Unit = {
         attr         -/-> this
         elem.changed -/-> this
-        StateEvent   -/-> this
+        // StateEvent   -/-> this
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Obj.UpdateT[S, E]] = {
@@ -195,7 +199,7 @@ object ObjImpl {
         if (pull.contains(attr     )) pull(attr       ).foreach(e => b ++= e.changes)
         val elemCh = elem.changed
         if (pull.contains(elemCh))     pull(elemCh    ).foreach(e => b  += Obj.ElemChange(e.change))
-        if (pull.contains(StateEvent)) pull(StateEvent).foreach(e => b ++= e.changes)
+        // if (pull.contains(StateEvent)) pull(StateEvent).foreach(e => b ++= e.changes)
 
         val changes = b.result()
         if (changes.nonEmpty) Some(Obj.UpdateT(obj, changes)) else None
@@ -205,7 +209,7 @@ object ObjImpl {
     def select(slot: Int): Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
       case attr       .slot => attr
-      case StateEvent .slot => StateEvent
+      // case StateEvent .slot => StateEvent
     }
 
     def changed: Event[S, Obj.UpdateT[S, E], Obj[S]] = ChangeEvent
