@@ -37,9 +37,9 @@ object BiGroup {
 
   final case class Update[S <: Sys[S], Elem, U](group: BiGroup[S, Elem, U], changes: Vec[Change[S, Elem, U]])
 
-  sealed trait Change[S <: Sys[S], Elem, +U]
+  sealed trait Change[S <: Sys[S], +Elem, +U]
 
-  sealed trait Collection[S <: Sys[S], Elem] extends Change[S, Elem, Nothing] {
+  sealed trait Collection[S <: Sys[S], +Elem] extends Change[S, Elem, Nothing] {
     def elem: TimedElem[S, Elem]
     def span: SpanLikeV // Span.HasStart
   }
@@ -62,7 +62,7 @@ object BiGroup {
 
   // ---- structural data ----
 
-  type Leaf[S <: Sys[S], Elem] = (SpanLikeV /* Span.HasStart */ , Vec[TimedElem[S, Elem]])
+  type Leaf[S <: Sys[S], +Elem] = (SpanLikeV /* Span.HasStart */ , Vec[TimedElem[S, Elem]])
 
   object TimedElem {
     def apply[S <: Sys[S], Elem](id: S#ID, span: Expr[S, SpanLikeV], value: Elem): TimedElem[S, Elem] =
@@ -72,7 +72,7 @@ object BiGroup {
       extends TimedElem[S, Elem]
   }
 
-  trait TimedElem[S <: Sys[S], Elem] extends Identifiable[S#ID] {
+  trait TimedElem[S <: Sys[S], +Elem] extends Identifiable[S#ID] {
     def span : Expr[S, SpanLikeV]
     def value: Elem
 
