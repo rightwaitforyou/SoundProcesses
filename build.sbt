@@ -17,7 +17,7 @@ lazy val commonSettings = Seq(
 lazy val lucreCoreVersion          = "2.1.2"
 lazy val lucreDataVersion          = "2.3.2"
 lazy val lucreEventVersion         = "2.7.5-SNAPSHOT"
-lazy val lucreConfluentVersion     = "2.11.2"
+lazy val lucreConfluentVersion     = "2.11.3-SNAPSHOT"
 lazy val scalaColliderUGensVersion = "1.13.2"   // WTF sbt -- https://stackoverflow.com/questions/31138524
 lazy val scalaColliderVersion      = "1.17.3"
 lazy val scalaColliderSwingVersion = "1.25.2"
@@ -142,7 +142,7 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
       // "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
-      "de.sciss"      %% "lucreconfluent"       % lucreConfluentVersion,
+      "de.sciss"      %% "lucreconfluent"       % lucreConfluentVersion force(),
       "de.sciss"      %% "lucreevent-artifact"  % lucreEventVersion,
       "de.sciss"      %% "lucreevent-core"      % lucreEventVersion force(),
       "de.sciss"      %% "fileutil"             % fileUtilVersion,
@@ -155,7 +155,7 @@ lazy val views = Project(id = s"$baseNameL-views", base = file("views")).
   dependsOn(core).
   settings(commonSettings).
   settings(
-    description :=  "Views for Sound Processes",
+    description := "Views for Sound Processes",
     libraryDependencies ++= Seq(
       "de.sciss" %% "lucreswing"       % lucreSwingVersion,
       "de.sciss" %% "audiowidgets-app" % audioWidgetsVersion

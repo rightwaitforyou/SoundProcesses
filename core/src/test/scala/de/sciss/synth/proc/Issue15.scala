@@ -3,9 +3,9 @@ package synth
 package proc
 
 import de.sciss.lucre.bitemp.{SpanLike => SpanLikeEx, BiGroup}
-import de.sciss.lucre.expr.{Boolean => BooleanEx}
+import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr}
 import de.sciss.lucre.stm.Disposable
-import de.sciss.span.Span
+import de.sciss.span.{SpanLike, Span}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
@@ -27,13 +27,13 @@ class Issue15 extends ConfluentEventSpec {
       val pObj      = Obj(Proc.Elem(p))
       pObj.attr // initialize for debugger
       val tl        = Timeline[S]
-      val span      = SpanLikeEx.newVar(SpanLikeEx.newConst[S](Span(0L, 10000L)))
+      val span      = SpanLikeEx.newConst[S](Span(0L, 10000L)): Expr[S, SpanLike]
       val timed     = tl.add(span, pObj)
       val _pObjH    = tx.newHandle(pObj)
       val _tlH      = tx.newHandle(tl)
       import de.sciss.lucre.synth.expr.IdentifierSerializer
       val _timedIDH = tx.newHandle(timed.id)(IdentifierSerializer[S])
-      import SpanLikeEx.varSerializer
+      import SpanLikeEx.serializer
       val _spanH    = tx.newHandle(span)
       val f         = Folder[S]
       val tlObj     = Obj(Timeline.Elem(tl))
@@ -76,7 +76,7 @@ class Issue15 extends ConfluentEventSpec {
 
         val pObj    = pObjH()
         val tl      = tlH()
-        val muteObj = Obj(BooleanElem(BooleanEx.newVar(BooleanEx.newConst[S](true))))
+        val muteObj = Obj(BooleanElem(BooleanEx.newConst[S](true)))
         val timed   = BiGroup.TimedElem(timedIDH(), spanH(), pObj)
         pObj.attr.put(ObjKeys.attrMute, muteObj)
         obs.assertEquals(BiGroup.Update(tl, Vec(
@@ -84,6 +84,9 @@ class Issue15 extends ConfluentEventSpec {
             Obj.AttrAdded(ObjKeys.attrMute, muteObj)
           )))
         )))
+
+        printChildren("AFTER FIRST MUTATION")
+
         tx.newHandle(muteObj)
       }
 
@@ -107,6 +110,9 @@ class Issue15 extends ConfluentEventSpec {
 
     // ---- we "mute and un-mute" ----
     muteObservation()
+
+    de.sciss.lucre.confluent.showLog = true
+    de.sciss.lucre.stm      .showLog = true
 
     // ---- we "close" the timeline view; this produces the illegal state somehow ----
     system.step { implicit tx =>
