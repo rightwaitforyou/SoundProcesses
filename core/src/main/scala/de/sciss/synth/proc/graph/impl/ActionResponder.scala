@@ -39,7 +39,7 @@ object ActionResponder {
   var DEBUG = false
 }
 class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, synth: Node)
-                                  (implicit cursor: stm.Cursor[S], context: AuralContext[S])
+                                  (implicit context: AuralContext[S])
   extends DynamicUser {
 
   import ActionResponder._
@@ -53,6 +53,8 @@ class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, 
       val values: Vec[Float] = raw.collect {
         case f: Float => f
       } (breakOut)
+
+      import context.scheduler.cursor
       SoundProcesses.atomic { implicit tx: S#Tx =>
         val invoker = objH()
         invoker.attr.get(key).foreach { valueOpaque =>
