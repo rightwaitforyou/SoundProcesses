@@ -16,7 +16,7 @@ lazy val commonSettings = Seq(
 
 lazy val lucreCoreVersion          = "2.1.2"
 lazy val lucreDataVersion          = "2.3.2"
-lazy val lucreEventVersion         = "2.7.4"
+lazy val lucreEventVersion         = "2.7.5-SNAPSHOT"
 lazy val lucreConfluentVersion     = "2.11.2"
 lazy val scalaColliderUGensVersion = "1.13.2"   // WTF sbt -- https://stackoverflow.com/questions/31138524
 lazy val scalaColliderVersion      = "1.17.3"
@@ -98,7 +98,7 @@ lazy val bitemp = Project(id = "lucrebitemp", base = file("bitemp")).
     description := "Bitemporal Lucre extensions using Long expressions for time",
     libraryDependencies ++= Seq(
       "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
-      "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
+      "de.sciss"      %% "lucreevent-expr" % lucreEventVersion force(),
       "de.sciss"      %% "span"            % spanVersion
     )
   )
@@ -123,7 +123,7 @@ lazy val synth = Project(id = "lucresynth", base = file("synth")).
     libraryDependencies ++= Seq(
       "de.sciss" %% "topology"        % topologyVersion,
       "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
-      "de.sciss" %% "lucreevent-core" % lucreEventVersion,
+      "de.sciss" %% "lucreevent-core" % lucreEventVersion force(),
       "de.sciss" %% "scalacollider"   % scalaColliderVersion
       // "de.sciss" %% "scalaosc" % scalaOSCVersion
     )
@@ -134,7 +134,7 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
   enablePlugins(BuildInfoPlugin).
   settings(commonSettings).
   settings(
-    description :=  "A framework for creating and managing ScalaCollider based sound processes",
+    description := "A framework for creating and managing ScalaCollider based sound processes",
     buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
       BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
       BuildInfoKey.map(licenses) { case (_, Seq((lic, _))) => "license" -> lic }
@@ -142,11 +142,12 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
       // "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
-      "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion,
-      "de.sciss"      %% "lucreevent-artifact" % lucreEventVersion,
-      "de.sciss"      %% "fileutil"       % fileUtilVersion,
-      "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
-      "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test"
+      "de.sciss"      %% "lucreconfluent"       % lucreConfluentVersion,
+      "de.sciss"      %% "lucreevent-artifact"  % lucreEventVersion,
+      "de.sciss"      %% "lucreevent-core"      % lucreEventVersion force(),
+      "de.sciss"      %% "fileutil"             % fileUtilVersion,
+      "org.scalatest" %% "scalatest"            % scalaTestVersion      % "test",
+      "de.sciss"      %% s"lucrestm-$bdb"       % lucreCoreVersion      % "test"
     )
   )
 

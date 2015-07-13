@@ -16,8 +16,7 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 
   */
 class Issue15 extends ConfluentEventSpec {
-
-  ignore /* "AttrMap" */ should "dispatch events after repeated listener (un)registration" in { system =>
+  "AttrMap" should "dispatch events after repeated listener (un)registration" in { system =>
     val obs = new Observation
 
     de.sciss.lucre.event.showLog = true
@@ -26,6 +25,7 @@ class Issue15 extends ConfluentEventSpec {
     val (fH, pObjH, tlH, timedIDH, spanH) = system.step { implicit tx =>
       val p         = Proc[S]
       val pObj      = Obj(Proc.Elem(p))
+      pObj.attr // initialize for debugger
       val tl        = Timeline[S]
       val span      = SpanLikeEx.newVar(SpanLikeEx.newConst[S](Span(0L, 10000L)))
       val timed     = tl.add(span, pObj)
@@ -43,6 +43,14 @@ class Issue15 extends ConfluentEventSpec {
       (_fH, _pObjH, _tlH, _timedIDH, _spanH)
     }
 
+    def printChildren(header: String)(implicit tx: S#Tx): Unit = {
+      val tl = tlH()
+      val ch = de.sciss.lucre.event.Peek.targets(tl)
+      println(s"\n---- $header ----")
+      ch.foreach(println)
+      println()
+    }
+
     // ---- we "open the folder" view; this is crucial for the bug to appear ----
     system.step { implicit tx =>
       val f = fH()
@@ -55,6 +63,7 @@ class Issue15 extends ConfluentEventSpec {
       val tl   = tlH()
       val _obs = tl.changed.react(obs.register)
       obs.assertEmpty()
+      printChildren(s"AFTER TL OBSERVATION (${_obs})")
       _obs
     }
 
@@ -63,6 +72,8 @@ class Issue15 extends ConfluentEventSpec {
 
     def muteObservation(): Unit = {
       val muteH = system.step { implicit tx =>
+        printChildren("BEFORE FIRST MUTATION")
+
         val pObj    = pObjH()
         val tl      = tlH()
         val muteObj = Obj(BooleanElem(BooleanEx.newVar(BooleanEx.newConst[S](true))))
@@ -77,6 +88,8 @@ class Issue15 extends ConfluentEventSpec {
       }
 
       system.step { implicit tx =>
+        printChildren("BEFORE SECOND MUTATION")
+
         val pObj    = pObjH()
         val tl      = tlH()
         val muteObj = muteH()
@@ -87,6 +100,8 @@ class Issue15 extends ConfluentEventSpec {
             Obj.AttrRemoved(ObjKeys.attrMute, muteObj)
           )))
         )))
+
+        printChildren("AFTER SECOND MUTATION")
       }
     }
 
@@ -95,7 +110,9 @@ class Issue15 extends ConfluentEventSpec {
 
     // ---- we "close" the timeline view; this produces the illegal state somehow ----
     system.step { implicit tx =>
+      printChildren("BEFORE DISPOSAL")
       obs1.dispose()
+      printChildren("AFTER DISPOSAL")
     }
 
     // ---- we "open" the view again ----
