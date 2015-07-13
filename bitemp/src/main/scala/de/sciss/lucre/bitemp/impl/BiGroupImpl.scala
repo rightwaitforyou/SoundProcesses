@@ -20,6 +20,7 @@ import de.sciss.lucre.event.{Event, EventLike, Sys, impl => evti}
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.geom.LongSpace.TwoDim
 import de.sciss.lucre.geom.{DistanceMeasure, LongDistanceMeasure2D, LongPoint2D, LongPoint2DLike, LongRectangle, LongSpace}
+import de.sciss.lucre.stm.Identifiable
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.span.{Span, SpanLike}
@@ -198,6 +199,14 @@ object BiGroupImpl {
 
     import group.{elemSerializer, eventView}
 
+    override def toString = s"TimedElem$id"
+
+    /** Tricky override to allow comparison with BiGroup.TimedElem.Wrapper */
+    override def equals(that: Any): Boolean = that match {
+      case m: Identifiable[_] => this.id == m.id
+      case _ => super.equals(that)
+    }
+
     def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[BiGroup.Update[S, Elem, U]] = {
       var res     = Vector.empty[BiGroup.Change[S, Elem, U]]
       val spanEvt = span.changed
@@ -293,7 +302,7 @@ object BiGroupImpl {
 
       protected def reader: evt.Reader[S, BiGroup[S, Elem, U]] = serializer(eventView)
 
-      override def toString() = s"$node..ElementEvent"
+      override def toString() = s"$node.ElementEvent"
       final val slot = 1
       def node: BiGroup[S, Elem, U] = group
 
@@ -352,7 +361,7 @@ object BiGroupImpl {
       def node: BiGroup.Modifiable[S, Elem, U] = group
 
       def connect()(implicit tx: S#Tx): Unit = {
-        log(s"$this.connect")
+        log(s"$this.connect()")
         CollectionEvent ---> this
         ElementEvent    ---> this
       }

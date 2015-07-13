@@ -19,7 +19,7 @@ import de.sciss.lucre.data.Iterator
 import de.sciss.lucre.event.{EventLike, Publisher, Sys}
 import de.sciss.lucre.expr.{Expr, ExprType1}
 import de.sciss.lucre.geom.LongSquare
-import de.sciss.lucre.stm.Identifiable
+import de.sciss.lucre.stm.{Mutable, Identifiable}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.DataInput
 import de.sciss.span.{SpanLike => SpanLikeV}
@@ -69,7 +69,23 @@ object BiGroup {
       Wrapper(id, span, value)
 
     private final case class Wrapper[S <: Sys[S], Elem](id: S#ID, span: Expr[S, SpanLikeV], value: Elem)
-      extends TimedElem[S, Elem]
+      extends TimedElem[S, Elem] {
+
+      override def toString = s"TimedElem$id"
+
+      override def equals(that: Any): Boolean = that match {
+        case m: Identifiable[_] => this.id == m.id
+        case _ => super.equals(that)
+      }
+
+      //      override def equals(that: Any): Boolean = that match {
+      //        case m: TimedElem[_, _] =>
+      //          id == m.id
+      //        case _ => super.equals(that)
+      //      }
+
+      override def hashCode = id.hashCode()
+    }
   }
 
   trait TimedElem[S <: Sys[S], +Elem] extends Identifiable[S#ID] {
