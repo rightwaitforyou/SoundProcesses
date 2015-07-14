@@ -1,7 +1,7 @@
 lazy val baseName  = "SoundProcesses"
 lazy val baseNameL = baseName.toLowerCase
 
-lazy val projectVersion = "2.21.0-SNAPSHOT"
+lazy val projectVersion = "2.21.0"
 
 lazy val commonSettings = Seq(
   version            := projectVersion,
@@ -15,10 +15,9 @@ lazy val commonSettings = Seq(
 ) ++ publishSettings
 
 lazy val lucreCoreVersion          = "2.1.2"
-lazy val lucreDataVersion          = "2.3.3-SNAPSHOT"
-lazy val lucreEventVersion         = "2.7.5-SNAPSHOT"
-lazy val lucreConfluentVersion     = "2.11.3-SNAPSHOT"
-lazy val scalaColliderUGensVersion = "1.13.2"   // WTF sbt -- https://stackoverflow.com/questions/31138524
+lazy val lucreDataVersion          = "2.3.3"
+lazy val lucreEventVersion         = "2.7.5"
+lazy val lucreConfluentVersion     = "2.11.3"
 lazy val scalaColliderVersion      = "1.17.3"
 lazy val scalaColliderSwingVersion = "1.25.2"
 lazy val spanVersion               = "1.3.1"
@@ -97,8 +96,8 @@ lazy val bitemp = Project(id = "lucrebitemp", base = file("bitemp")).
   settings(
     description := "Bitemporal Lucre extensions using Long expressions for time",
     libraryDependencies ++= Seq(
-      "de.sciss"      %% "lucredata-core"  % lucreDataVersion force(),
-      "de.sciss"      %% "lucreevent-expr" % lucreEventVersion force(),
+      "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
+      "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
       "de.sciss"      %% "span"            % spanVersion
     )
   )
@@ -123,9 +122,8 @@ lazy val synth = Project(id = "lucresynth", base = file("synth")).
     libraryDependencies ++= Seq(
       "de.sciss" %% "topology"        % topologyVersion,
       "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
-      "de.sciss" %% "lucreevent-core" % lucreEventVersion force(),
+      "de.sciss" %% "lucreevent-core" % lucreEventVersion,
       "de.sciss" %% "scalacollider"   % scalaColliderVersion
-      // "de.sciss" %% "scalaosc" % scalaOSCVersion
     )
   )
 
@@ -141,11 +139,8 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
     ),
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
-      // "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
-      "de.sciss"      %% "lucreconfluent"       % lucreConfluentVersion force(),
+      "de.sciss"      %% "lucreconfluent"       % lucreConfluentVersion,
       "de.sciss"      %% "lucreevent-artifact"  % lucreEventVersion,
-      "de.sciss"      %% "lucreevent-core"      % lucreEventVersion force(),
-      "de.sciss"      %% "lucredata-core"       % lucreDataVersion force(),
       "de.sciss"      %% "fileutil"             % fileUtilVersion,
       "org.scalatest" %% "scalatest"            % scalaTestVersion      % "test",
       "de.sciss"      %% s"lucrestm-$bdb"       % lucreCoreVersion      % "test"
@@ -169,7 +164,6 @@ lazy val compiler = Project(id = s"$baseNameL-compiler", base = file("compiler")
   settings(
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
-      // "de.sciss"      %% "scalacolliderugens-core" % scalaColliderUGensVersion,  // WTF sbt
       "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,
       "de.sciss"       %% s"lucrestm-$bdb"          % lucreCoreVersion          % "test",
       "de.sciss"       %% "fileutil"                % fileUtilVersion           % "test",
