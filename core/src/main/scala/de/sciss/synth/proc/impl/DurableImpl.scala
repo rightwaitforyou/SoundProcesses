@@ -14,11 +14,12 @@
 package de.sciss.synth.proc
 package impl
 
-import concurrent.stm.InTxn
-import de.sciss.lucre.{event => evt, stm}
-import stm.{DataStoreFactory, DataStore}
+import de.sciss.lucre.stm.{DataStore, DataStoreFactory}
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.synth.impl.TxnFullImpl
+import de.sciss.lucre.{event => evt, stm}
+
+import scala.concurrent.stm.InTxn
 
 private[proc] object DurableImpl {
   def apply(factory: DataStoreFactory[DataStore], mainName: String, eventName: String): Durable = {
@@ -35,7 +36,7 @@ private[proc] object DurableImpl {
 
     lazy val inMemory: /* evt. */ InMemory#Tx = system.inMemory.wrap(peer)
 
-    override def toString = "proc.Durable#Tx@" + hashCode.toHexString
+    override def toString = s"proc.Durable#Tx@${hashCode.toHexString}"
   }
 
   private final class System(protected val store: DataStore, protected val eventStore: DataStore)
@@ -48,6 +49,6 @@ private[proc] object DurableImpl {
 
     def wrap(peer: InTxn): S#Tx = new TxnImpl(this, peer)
 
-    override def toString = "proc.Durable@" + hashCode.toHexString
+    override def toString = s"proc.Durable@${hashCode.toHexString}"
   }
 }

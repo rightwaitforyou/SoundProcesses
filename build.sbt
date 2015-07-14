@@ -15,7 +15,7 @@ lazy val commonSettings = Seq(
 ) ++ publishSettings
 
 lazy val lucreCoreVersion          = "2.1.2"
-lazy val lucreDataVersion          = "2.3.2"
+lazy val lucreDataVersion          = "2.3.3-SNAPSHOT"
 lazy val lucreEventVersion         = "2.7.5-SNAPSHOT"
 lazy val lucreConfluentVersion     = "2.11.3-SNAPSHOT"
 lazy val scalaColliderUGensVersion = "1.13.2"   // WTF sbt -- https://stackoverflow.com/questions/31138524
@@ -97,7 +97,7 @@ lazy val bitemp = Project(id = "lucrebitemp", base = file("bitemp")).
   settings(
     description := "Bitemporal Lucre extensions using Long expressions for time",
     libraryDependencies ++= Seq(
-      "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
+      "de.sciss"      %% "lucredata-core"  % lucreDataVersion force(),
       "de.sciss"      %% "lucreevent-expr" % lucreEventVersion force(),
       "de.sciss"      %% "span"            % spanVersion
     )
@@ -145,6 +145,7 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
       "de.sciss"      %% "lucreconfluent"       % lucreConfluentVersion force(),
       "de.sciss"      %% "lucreevent-artifact"  % lucreEventVersion,
       "de.sciss"      %% "lucreevent-core"      % lucreEventVersion force(),
+      "de.sciss"      %% "lucredata-core"       % lucreDataVersion force(),
       "de.sciss"      %% "fileutil"             % fileUtilVersion,
       "org.scalatest" %% "scalatest"            % scalaTestVersion      % "test",
       "de.sciss"      %% s"lucrestm-$bdb"       % lucreCoreVersion      % "test"
