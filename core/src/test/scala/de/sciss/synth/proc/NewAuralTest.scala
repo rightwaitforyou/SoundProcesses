@@ -539,7 +539,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
       val gAudio  = Grapheme[S](spec.numChannels)
       gAudio.add(0L -> vAudio) // ... çoit trop complexe ...
-      sAudio.addSource(Scan.Link.Grapheme(gAudio))
+      sAudio.add(Scan.Link.Grapheme(gAudio))
 
       val _proc2 = proc {
         val in  = graph.ScanIn("in")

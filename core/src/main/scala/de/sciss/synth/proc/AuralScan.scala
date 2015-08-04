@@ -24,9 +24,9 @@ object AuralScan {
   }
 
   /** Creates a new aural scan view and registers it with the context under `scan.id`. */
-  def apply[S <: Sys[S]](data: AuralObj.ProcData[S], key: String, scan: Scan[S], bus: AudioBus)
+  def apply[S <: Sys[S]](data: AuralObj.ProcData[S], key: String, scan: Scan[S], bus: AudioBus, isInput: Boolean)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] =
-    Impl(data = data, key = key, scan = scan, bus = bus)
+    Impl(data = data, key = key, scan = scan, bus = bus, isInput = isInput)
 
   trait Owned[S <: Sys[S]] extends AuralScan[S] {
 

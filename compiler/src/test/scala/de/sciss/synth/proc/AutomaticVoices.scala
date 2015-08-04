@@ -307,7 +307,7 @@ object AutomaticVoices {
       layerIn  <- l.input    ().elem.peer.inputs .get("in" )
       layerOut <- l.output   ().elem.peer.outputs.get("out")
     } {
-      val oldLayerIn = layerIn.sources.collect {
+      val oldLayerIn = layerIn.iterator.collect {
         case l @ Scan.Link.Scan(_) => l
       } .toSet
       val oldLayerOut = layerOut.iterator.collect {
@@ -315,9 +315,9 @@ object AutomaticVoices {
       } .toSet
 
       // disconnect old inputs
-      oldLayerIn .foreach(layerIn .removeSource)
+      oldLayerIn .foreach(layerIn .remove)
       // disconnect old outputs
-      oldLayerOut.foreach(layerOut.remove  )
+      oldLayerOut.foreach(layerOut.remove)
       // connect old layer inputs to old layer outputs
       oldLayerIn.foreach { in =>
         oldLayerOut.foreach { out =>
@@ -332,7 +332,7 @@ object AutomaticVoices {
       layerOut <- l.output   ().elem.peer.outputs.get("out")
       diffIn   <- w.diffusion().elem.peer.inputs .get("in" )
     } {
-      val oldDiffIn = diffIn.sources.collect {
+      val oldDiffIn = diffIn.iterator.collect {
         case l @ Scan.Link.Scan(_) => l
       } .toSet
       val layerOutL = Scan.Link.Scan(layerOut)
@@ -340,11 +340,11 @@ object AutomaticVoices {
       if (!oldDiffIn.contains(layerOutL)) {
         unlinkLayer(l)
         // disconnect old diff inputs
-        oldDiffIn  .foreach(diffIn  .removeSource)
+        oldDiffIn  .foreach(diffIn  .remove)
         // connect old diff inputs as new layer inputs
-        oldDiffIn  .foreach(layerIn .addSource   )
+        oldDiffIn  .foreach(layerIn .add   )
         // connect layer output to diff input
-        diffIn.addSource(layerOutL)
+        diffIn.add(layerOutL)
       }
     }
 

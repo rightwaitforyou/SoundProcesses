@@ -26,18 +26,14 @@ import de.sciss.lucre.synth.InMemory
 object ScanImpl {
   import Scan.Link
 
-  private final val SER_VERSION = 0x536E  // "Sn"
+  private final val SER_VERSION = 0x536F  // was "Sn"
 
   sealed trait Update[S]
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = {
-    ??? // XXX TODO --- have to go through all source
-
-    val targets           = evt.Targets[S] // XXX TODO: partial?
-    val scanSourceList    = List.Modifiable[S, Scan    [S]]
-    val graphemeSourceList= List.Modifiable[S, Grapheme[S], Grapheme.Update[S]]
-    val sinkList          = List.Modifiable[S, Link[S]]
-    new Impl(targets, scanSourceList, graphemeSourceList, sinkList)
+    val targets = evt.Targets[S] // XXX TODO: partial?
+    val list    = List.Modifiable[S, Link[S]]
+    new Impl(targets, list)
   }
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = {
@@ -53,13 +49,11 @@ object ScanImpl {
 
   private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Scan[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Scan[S] = {
-      val serVer    = in.readShort()
-      require(serVer == SER_VERSION, s"Incompatible serialized (found $serVer, required $SER_VERSION)")
+      val serVer = in.readShort()
+      if (serVer != SER_VERSION) sys.error(s"Incompatible serialized (found $serVer, required $SER_VERSION)")
 
-      val scanSourceList      = List.Modifiable.read[S, Scan[S]]                        (in, access)
-      val graphemeSourceList  = List.Modifiable.read[S, Grapheme[S], Grapheme.Update[S]](in, access)
-      val sinkList            = List.Modifiable.read[S, Link[S]](in, access)
-      new Impl(targets, scanSourceList, graphemeSourceList, sinkList)
+      val list = List.Modifiable.read[S, Link[S]](in, access)
+      new Impl(targets, list)
     }
   }
 
@@ -79,7 +73,7 @@ object ScanImpl {
           peer.write(out)
       }
 
-    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Link[S] = {
+    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Link[S] =
       (in.readByte(): @switch) match {
         case 0 =>
           val peer = Grapheme.read[S](in, access)
@@ -87,43 +81,26 @@ object ScanImpl {
         case 1 =>
           val peer = Scan.read[S](in, access)
           Link.Scan(peer)
-        case cookie => sys.error("Unexpected cookie " + cookie)
+        case cookie => sys.error(s"Unexpected cookie $cookie")
       }
-    }
   }
 
   // TODO: the crappy sinkList is only needed because the id map does not have an iterator...
   // we should really figure out how to add iterator functionality to the id map!!!
-  private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
-                                        protected val scanSourceList    : List.Modifiable[S, Scan[S], Unit],
-                                        protected val graphemeSourceList: List.Modifiable[S, Grapheme[S], Grapheme.Update[S]],
-                                        protected val sinkList          : List.Modifiable[S, Link[S], Unit])
+  private final class Impl[S <: Sys[S]](protected val targets : evt.Targets[S],
+                                        protected val list    : List.Modifiable[S, Link[S], Unit])
     extends Scan[S]
     with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
-    with evti.Generator[S, Scan.Update[S], Scan[S]] {
+    with evti.Generator[S, Scan.Update[S], Scan[S]]
+    with evti.Root[S, Scan.Update[S]] {
 
     override def toString() = s"Scan$id"
 
-    def iterator  (implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = sinkList.iterator
-    def sources(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = new data.Iterator[S#Tx, Link[S]] {
-      val scanIt  = scanSourceList.iterator
-      val graphIt = graphemeSourceList.iterator
-
-      def hasNext(implicit tx: S#Tx) = scanIt.hasNext || graphIt.hasNext
-
-      def next()(implicit tx: S#Tx): Link[S] = if (scanIt.hasNext)
-        Link.Scan(scanIt.next())
-      else
-        Link.Grapheme(graphIt.next())
-    }
+    def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = list.iterator
 
     def add(sink: Link[S])(implicit tx: S#Tx): Boolean = {
-      // val sinkID = sink.id
-      // if (sinkMap.contains(sinkID)) return false
-      if (sinkList.indexOf(sink) >= 0) return false
-
-      // sinkMap.put(sinkID, sink)
-      sinkList.addLast(sink) // addHead faster than addLast; but perhaps we should use addLast to have a better iterator order?
+      if (list.indexOf(sink) >= 0) return false
+      list.addLast(sink) // addHead faster than addLast; but perhaps we should use addLast to have a better iterator order?
       sink match {
         case Link.Scan(peer) => peer.add(Link.Scan(this))
         case _ =>
@@ -133,11 +110,8 @@ object ScanImpl {
     }
 
     def remove(sink: Link[S])(implicit tx: S#Tx): Boolean = {
-      // val sinkID = sink.id
-      // if (!sinkMap.contains(sinkID)) return false
-      if (sinkList.indexOf(sink) < 0) return false
-      // sinkMap.remove(sinkID)
-      sinkList.remove(sink)
+      if (list.indexOf(sink) < 0) return false
+      list.remove(sink)
       sink match {
         case Link.Scan(peer) => peer.remove(Link.Scan(this))
         case _ =>
@@ -146,79 +120,30 @@ object ScanImpl {
       true
     }
 
-    def addSource(source: Link[S])(implicit tx: S#Tx): Boolean = {
-      val res = source match {
-        case Link.Scan    (peer) => addScanSource    (peer)
-        case Link.Grapheme(peer) => addGraphemeSource(peer)
-      }
-      if (res) fire(Scan.Update(this, Vec(Scan.SourceAdded(source))))
-      res
-    }
-
-    private def addScanSource(source: Scan[S])(implicit tx: S#Tx): Boolean = {
-      if (scanSourceList.indexOf(source) >= 0) return false
-
-      scanSourceList.addLast(source)
-      source.add(Link.Scan(this))
-      true
-    }
-
-    private def addGraphemeSource(source: Grapheme[S])(implicit tx: S#Tx): Boolean = {
-      if (graphemeSourceList.indexOf(source) >= 0) return false
-
-      graphemeSourceList.addLast(source)
-      true
-    }
-
-    def removeSource(source: Link[S])(implicit tx: S#Tx): Boolean = {
-      val res = source match {
-        case Link.Scan    (peer) => removeScanSource    (peer)
-        case Link.Grapheme(peer) => removeGraphemeSource(peer)
-      }
-      if (res) fire(Scan.Update(this, Vec(Scan.SourceRemoved(source))))
-      res
-    }
-
-    private def removeScanSource(source: Scan[S])(implicit tx: S#Tx): Boolean = {
-      val res = scanSourceList.remove(source)
-      if (res) {
-        source.remove(Link.Scan(this))
-      }
-      res
-    }
-
-    private def removeGraphemeSource(source: Grapheme[S])(implicit tx: S#Tx): Boolean =
-      graphemeSourceList.remove(source)
-
     def changed: Event[S, Scan.Update[S], Scan[S]] = this
 
-    def connect   ()(implicit tx: S#Tx): Unit = graphemeSourceList.changed ---> this
-    def disconnect()(implicit tx: S#Tx): Unit = graphemeSourceList.changed -/-> this
+//    def connect   ()(implicit tx: S#Tx): Unit = list.changed ---> this
+//    def disconnect()(implicit tx: S#Tx): Unit = list.changed -/-> this
 
-    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
-      val gen = pull.isOrigin(this)
-      val u1 = if (!gen) Vec.empty else pull.resolve[Scan.Update[S]].changes
-      val u2 = if ( gen) u1        else pull(graphemeSourceList.changed).fold(u1) { ll =>
-        val gcs = ll.changes.collect {
-          case List.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
-        }
-        if (u1.isEmpty) gcs else if (gcs.isEmpty) u1 else u1 ++ gcs
-      }
-      if (u2.isEmpty) None else Some(Scan.Update(this, u2))
-    }
+//    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
+//      val gen = pull.isOrigin(this)
+//      val u1 = if (!gen) Vec.empty else pull.resolve[Scan.Update[S]].changes
+//      val u2 = u1
+////      val u2 = if ( gen) u1        else pull(graphemeSourceList.changed).fold(u1) { ll =>
+////        val gcs = ll.changes.collect {
+////          case List.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
+////        }
+////        if (u1.isEmpty) gcs else if (gcs.isEmpty) u1 else u1 ++ gcs
+////      }
+//      if (u2.isEmpty) None else Some(Scan.Update(this, u2))
+//    }
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
-      scanSourceList    .write(out)
-      graphemeSourceList.write(out)
-      sinkList          .write(out)
+      list.write(out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx): Unit = {
-      scanSourceList    .dispose()
-      graphemeSourceList.dispose()
-      sinkList          .dispose()
-    }
+    protected def disposeData()(implicit tx: S#Tx): Unit = list.dispose()
 
     protected def reader: evt.Reader[S, Scan[S]] = serializer
   }

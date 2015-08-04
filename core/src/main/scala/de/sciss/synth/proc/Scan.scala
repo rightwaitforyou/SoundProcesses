@@ -80,8 +80,8 @@ object Scan {
     def link = source
   }
 
-  final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
-                                               changes: Vec[Grapheme.Segment]) extends Change[S]
+//  final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
+//                                               changes: Vec[Grapheme.Segment]) extends Change[S]
 
   // ---- Elem ----
 

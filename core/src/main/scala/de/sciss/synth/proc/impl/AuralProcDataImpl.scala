@@ -242,7 +242,7 @@ object AuralProcDataImpl {
     private def testOutScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       state.scanOuts.get(key).foreach { numCh =>
         scanOutViews.get(key)(tx.peer).fold[Unit] {
-          mkAuralScan(key, scan, numCh, scanOutViews)
+          mkAuralScan(key, scan, numCh, isInput = false)
         } { view =>
           checkScanNumChannels(view, numCh)
         }
@@ -401,27 +401,28 @@ object AuralProcDataImpl {
      * if no, creates an audio-bus for later use.
      */
     private[this] def activateAuralScanIn(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
-      activateAuralScan(key, numChannels, scanInViews)
+      activateAuralScan(key = key, numChannels = numChannels, isInput = true)
 
     private[this] def activateAuralScanOut(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
-      activateAuralScan(key, numChannels, scanOutViews)
+      activateAuralScan(key = key, numChannels = numChannels, isInput = false)
 
       /* Ensures that an aural-scan for a given key exists. If it exists,
      * checks that the number of channels is correct. Otherwise, checks
      * if a scan for the key exists. If yes, instantiates the aural-scan,
      * if no, creates an audio-bus for later use.
      */
-    private[this] def activateAuralScan(key: String, numChannels: Int, views: TMap[String, AuralScan.Owned[S]])
+    private[this] def activateAuralScan(key: String, numChannels: Int, isInput: Boolean)
                                        (implicit tx: S#Tx): Unit = {
+      val views = if (isInput) scanInViews else scanOutViews
       views.get(key)(tx.peer).fold {
         val scans = procCached().elem.peer.outputs
         scans.get(key).fold[Unit] {
           mkBus(key, numChannels)
         } { scan =>
-          mkAuralScan(key, scan, numChannels, views)
+          mkAuralScan(key = key, scan = scan, numChannels = numChannels, isInput = isInput)
         }
       } { view =>
-        checkScanNumChannels(view, numChannels)
+        checkScanNumChannels(view, numChannels = numChannels)
       }
     }
 
@@ -443,10 +444,11 @@ object AuralProcDataImpl {
     }
 
     /* Creates a new aural scan */
-    private def mkAuralScan(key: String, scan: Scan[S], numChannels: Int, views: TMap[String, AuralScan.Owned[S]])
+    private def mkAuralScan(key: String, scan: Scan[S], numChannels: Int, isInput: Boolean)
                            (implicit tx: S#Tx): AuralScan[S] = {
       val bus   = mkBus(key, numChannels)
-      val view  = AuralScan(data = this, key = key, scan = scan, bus = bus)
+      val views = if (isInput) scanInViews else scanOutViews
+      val view  = AuralScan(data = this, key = key, scan = scan, bus = bus, isInput = isInput)
       views.put(key, view)(tx.peer)
       // note: the view will iterate over the
       //       sources and sinks itself upon initialization,
@@ -458,9 +460,9 @@ object AuralProcDataImpl {
       view
     }
 
-    private def checkScanNumChannels(view: AuralScan[S], numCh: Int): Unit = {
+    private def checkScanNumChannels(view: AuralScan[S], numChannels: Int): Unit = {
       val numCh1 = view.bus.numChannels
-      if (numCh1 != numCh) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numCh)")
+      if (numCh1 != numChannels) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numChannels)")
     }
 
     //    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit = {
@@ -556,7 +558,7 @@ object AuralProcDataImpl {
     }
 
     private def scanInNumChannels(scan: Scan[S])(implicit tx: S#Tx): Int = {
-      val chans = scan.sources.toList.map {
+      val chans = scan.iterator.toList.map {
         case Link.Grapheme(peer) =>
           // val chansOpt = peer.valueAt(time).map(_.numChannels)
           // chansOpt.getOrElse(numChannels)

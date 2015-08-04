@@ -16,16 +16,16 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Server, expr, Synth, NodeRef, AudioBus, Sys}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Synth, Sys, expr}
+import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.{addBefore, SynthGraph}
-import AuralObj.ProcData
 import de.sciss.synth.proc.{logAural => logA}
+import de.sciss.synth.{SynthGraph, addBefore}
 
-import scala.concurrent.stm.{TMap, Ref}
+import scala.concurrent.stm.{Ref, TMap}
 
 object AuralScanImpl {
-  def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], bus: AudioBus)
+  def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], bus: AudioBus, isInput: Boolean)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] = {
     val id    = scan.id
     import expr.IdentifierSerializer
@@ -42,24 +42,23 @@ object AuralScanImpl {
     def scanViewProxy(peer: S#ID)(implicit tx: S#Tx): Option[AuralScan.Proxy[S]] =
       context.getAux[AuralScan.Proxy[S]](peer)
 
-    scan.sources.foreach {
-      case Link.Grapheme(peer) =>
-      case Link.Scan    (peer) =>
-        scanView(peer.id).foreach { sourceView =>
-          sourceView.addSink  (view      )
-          view      .addSource(sourceView)
-        }
-    }
     scan.iterator.foreach {
       case Link.Grapheme(peer) => // XXX TODO: currently not supported
       case Link.Scan    (peer) =>
-        scanViewProxy(peer.id).foreach {
-          case sinkView: AuralScan[S] =>
-            view    .addSink  (sinkView)
-            sinkView.addSource(view    )
-          case proxy: AuralScan.Incomplete[S] =>
-            proxy.data.sinkAdded(proxy.key, view)
-        }
+        if (isInput)
+          scanView(peer.id).foreach { sourceView =>
+            sourceView.addSink  (view      )
+            view      .addSource(sourceView)
+          }
+
+        else
+          scanViewProxy(peer.id).foreach {
+            case sinkView: AuralScan[S] =>
+              view    .addSink  (sinkView)
+              sinkView.addSource(view    )
+            case proxy: AuralScan.Incomplete[S] =>
+              proxy.data.sinkAdded(proxy.key, view)
+          }
     }
 
     // the observer registers source and sink additions and removals.
@@ -76,7 +75,7 @@ object AuralScanImpl {
           case proxy: AuralScan.Incomplete[S] => proxy.data.sinkAdded(proxy.key, view)
         }
         case Scan.SinkRemoved  (peer) => scanView(peer.id).foreach(view.removeSink)
-        case Scan.GraphemeChange(_, _) => // XXX TODO: currently not supported
+        // case Scan.GraphemeChange(_, _) => // XXX TODO: currently not supported
       }
     }
 
