@@ -26,7 +26,7 @@ import language.higherKinds
 import de.sciss.lucre.synth.InMemory
 
 object ProcImpl {
-  private final val SER_VERSION = 0x5073  // was "Pr"
+  private final val SER_VERSION = 0x5074  // was "Pr"
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Proc[S] = new New[S]
 
@@ -63,7 +63,8 @@ object ProcImpl {
 
     import Proc._
 
-    protected def scanMap: SkipList.Map[S, String, ScanEntry[S]]
+    protected def scanInMap : SkipList.Map[S, String, ScanEntry[S]]
+    protected def scanOutMap: SkipList.Map[S, String, ScanEntry[S]]
 
     // ---- key maps ----
 
@@ -72,7 +73,8 @@ object ProcImpl {
       final def node: Proc[S] with evt.Node[S] = proc
     }
 
-    object scans
+    final class ScansImpl(final val slot: Int,
+                          protected val map: SkipList.Map[S, String, KeyMapImpl.Entry[S, String, Scan[S], Scan.Update[S]]])
       extends Scans.Modifiable[S]
       with evti.EventImpl [S, Proc.Update[S], Proc[S]]
       with evt.InvariantEvent[S, Proc.Update[S], Proc[S]]
@@ -81,7 +83,7 @@ object ProcImpl {
 
       // ---- key-map-impl details ----
 
-      final protected def fire(added: Option[(String, Scan[S])], removed: Option[(String, Scan[S])])
+      protected def fire(added: Option[(String, Scan[S])], removed: Option[(String, Scan[S])])
                               (implicit tx: S#Tx): Unit = {
         val b = Vector.newBuilder[Proc.ScanMapChange[S]]
         b.sizeHint(2)
@@ -97,9 +99,7 @@ object ProcImpl {
         StateEvent(Proc.Update(proc, b.result()))
       }
 
-      final protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
-
-      final val slot = 1
+      protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
 
       def add(key: String)(implicit tx: S#Tx): Scan[S] =
         get(key).getOrElse {
@@ -117,10 +117,11 @@ object ProcImpl {
           })(breakOut)))
       }
 
-      protected def map: SkipList.Map[S, String, Entry] = scanMap
-
       protected def valueInfo = scanEntryInfo[S]
     }
+
+    final val inputs  = new ScansImpl(1, scanInMap )
+    final val outputs = new ScansImpl(2, scanOutMap)
 
     private object StateEvent
       extends evti.TriggerImpl[S, Proc.Update[S], Proc[S]]
@@ -128,7 +129,7 @@ object ProcImpl {
       with evti.Root          [S, Proc.Update[S]]
       with ProcEvent {
 
-      final val slot = 2
+      final val slot = 3
     }
 
     private object ChangeEvent
@@ -136,31 +137,37 @@ object ProcImpl {
       with evt.InvariantEvent   [S, Proc.Update[S], Proc[S]]
       with ProcEvent {
 
-      final val slot = 3
+      final val slot = 4
 
       def connect   ()(implicit tx: S#Tx): Unit = {
         graph.changed ---> this
-        scans         ---> this
+        inputs        ---> this
+        outputs       ---> this
         StateEvent    ---> this
       }
       def disconnect()(implicit tx: S#Tx): Unit = {
         graph.changed -/-> this
-        scans         -/-> this
+        inputs        -/-> this
+        outputs       -/-> this
         StateEvent    -/-> this
       }
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
-        val graphCh  = graph.changed
-        val graphOpt = if (pull.contains(graphCh   )) pull(graphCh   ) else None
-        val scansOpt = if (pull.contains(scans     )) pull(scans     ) else None
-        val stateOpt = if (pull.contains(StateEvent)) pull(StateEvent) else None
+        val graphCh     = graph.changed
+        val graphOpt    = if (pull.contains(graphCh   )) pull(graphCh   ) else None
+        val scanInsOpt  = if (pull.contains(inputs    )) pull(inputs    ) else None
+        val scanOutsOpt = if (pull.contains(outputs   )) pull(outputs   ) else None
+        val stateOpt    = if (pull.contains(StateEvent)) pull(StateEvent) else None
 
         val seq0 = graphOpt.fold(Vec.empty[Change[S]]) { u =>
           Vector(GraphChange(u))
         }
-        val seq2 = scansOpt.fold(seq0) { u =>
+        val seq1 = scanInsOpt.fold(seq0) { u =>
           if (seq0.isEmpty) u.changes else seq0 ++ u.changes
+        }
+        val seq2 = scanOutsOpt.fold(seq0) { u =>
+          if (seq1.isEmpty) u.changes else seq1 ++ u.changes
         }
         val seq3 = stateOpt.fold(seq2) { u =>
           if (seq2.isEmpty) u.changes else seq2 ++ u.changes
@@ -171,7 +178,8 @@ object ProcImpl {
 
     final def select(slot: Int /*, invariant: Boolean */): Event[S, Any, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
-      case scans      .slot => scans
+      case 1 /* inputs .slot */ => inputs
+      case 2 /* outputs.slot */ => outputs
       case StateEvent .slot => StateEvent
     }
 
@@ -181,12 +189,14 @@ object ProcImpl {
     final protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
       graph       .write(out)
-      scanMap     .write(out)
+      scanInMap   .write(out)
+      scanOutMap  .write(out)
     }
 
     final protected def disposeData()(implicit tx: S#Tx): Unit = {
       graph       .dispose()
-      scanMap     .dispose()
+      scanInMap   .dispose()
+      scanOutMap  .dispose()
     }
 
     override def toString() = s"Proc$id"
@@ -195,7 +205,8 @@ object ProcImpl {
   private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {
     protected val targets       = evt.Targets[S](tx0)
     val graph                   = SynthGraphs.newVar(SynthGraphs.empty)
-    protected val scanMap       = SkipList.Map.empty[S, String, ScanEntry[S]]
+    protected val scanInMap     = SkipList.Map.empty[S, String, ScanEntry[S]]
+    protected val scanOutMap    = SkipList.Map.empty[S, String, ScanEntry[S]]
   }
 
   private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S])
@@ -208,6 +219,7 @@ object ProcImpl {
     }
 
     val graph                   = SynthGraphs.readVar(in, access)
-    protected val scanMap       = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
+    protected val scanInMap     = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
+    protected val scanOutMap    = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
   }
 }

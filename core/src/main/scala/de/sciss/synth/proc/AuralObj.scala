@@ -59,7 +59,9 @@ object AuralObj {
       */
     def nodeOption(implicit tx: S#Tx): Option[NodeRef]
 
-    def getScan(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
+    def getScanIn (key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
+
+    def getScanOut(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
 
     //    /** Queries the number of channel associated with a scanned input.
     //      * Throws a control throwable when no value can be determined, making

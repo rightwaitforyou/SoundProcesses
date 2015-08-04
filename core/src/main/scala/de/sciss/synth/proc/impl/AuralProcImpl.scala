@@ -235,7 +235,7 @@ object AuralProcImpl {
 
         // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
         //           we cannot use ControlSet any more, but need other mechanism
-        b.obj.elem.peer.scans.get(key).foreach { scan =>
+        b.obj.elem.peer.inputs.get(key).foreach { scan =>
           val src = scan.sources
           if (src.isEmpty) {
             // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus

@@ -52,9 +52,10 @@ object AuralProcDataImpl {
     // running attribute inputs
     private val attrMap   = TMap.empty[String, Disposable[S#Tx]]
 
-    private val scanBuses = TMap.empty[String, AudioBus]
-    private val scanViews = TMap.empty[String, AuralScan.Owned[S]]
-    private val procViews = TSet.empty[AuralObj.Proc[S]]
+    private val scanBuses     = TMap.empty[String, AudioBus]
+    private val scanInViews   = TMap.empty[String, AuralScan.Owned[S]]
+    private val scanOutViews  = TMap.empty[String, AuralScan.Owned[S]]
+    private val procViews     = TSet.empty[AuralObj.Proc[S]]
 
     private val procLoc   = TxnLocal[Proc.Obj[S]]() // cache-only purpose
 
@@ -94,9 +95,16 @@ object AuralProcDataImpl {
 
     final def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
 
-    final def getScan(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] = {
+    final def getScanIn(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] =
+      getScan(key, scanInViews)
+
+    final def getScanOut(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] =
+      getScan(key, scanOutViews)
+
+    private[this] def getScan(key: String, views: TMap[String, AuralScan.Owned[S]])
+                             (implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] = {
       implicit val itx = tx.peer
-      scanViews.get(key).fold[Option[Either[AudioBus, AuralScan[S]]]] {
+      views.get(key).fold[Option[Either[AudioBus, AuralScan[S]]]] {
         scanBuses.get(key).map(Left(_))
       } { v =>
         Some(Right(v))
@@ -105,7 +113,12 @@ object AuralProcDataImpl {
 
     private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"playScans ${procCached()}")
-      scanViews.foreach { case (_, view) =>
+
+      scanInViews.foreach { case (_, view) =>
+        view.play(n)
+      }(tx.peer)
+
+      scanOutViews.foreach { case (_, view) =>
         view.play(n)
       }(tx.peer)
     }
@@ -228,8 +241,8 @@ object AuralProcDataImpl {
 
     private def testOutScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
       state.scanOuts.get(key).foreach { numCh =>
-        scanViews.get(key)(tx.peer).fold[Unit] {
-          mkAuralScan(key, scan, numCh)
+        scanOutViews.get(key)(tx.peer).fold[Unit] {
+          mkAuralScan(key, scan, numCh, scanOutViews)
         } { view =>
           checkScanNumChannels(view, numCh)
         }
@@ -255,9 +268,10 @@ object AuralProcDataImpl {
       val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
       if (groupImpl.removeInstanceNode(n)) {
         nodeRef() = None
-        scanViews.foreach(_._2.stop   ())
-        attrMap  .foreach(_._2.dispose())
-        attrMap  .clear()
+        scanInViews .foreach(_._2.stop   ())
+        scanOutViews.foreach(_._2.stop   ())
+        attrMap     .foreach(_._2.dispose())
+        attrMap     .clear()
       }
     }
 
@@ -273,14 +287,16 @@ object AuralProcDataImpl {
     private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       nodeRef  .swap(None).foreach(_.dispose())
-      scanViews.foreach(_._2.dispose())
-      scanViews.clear()
+      scanInViews.foreach(_._2.dispose())
+      scanInViews.clear()
+      scanOutViews.foreach(_._2.dispose())
+      scanOutViews.clear()
       attrMap  .foreach(_._2.dispose())
       attrMap  .clear()
       scanBuses.clear()
       val rj = stateRef().rejectedInputs
       if (rj.nonEmpty) {
-        val scans = procCached().elem.peer.scans
+        val scans = procCached().elem.peer.inputs
         rj.foreach {
           case UGB.ScanKey(key) =>
             scans.get(key).foreach { scan =>
@@ -327,7 +343,7 @@ object AuralProcDataImpl {
         logA(s"buildAdvanced ${procCached()}; rejectedInputs = ${now.rejectedInputs.mkString(",")}")
 
         // store proxies so future sinks can detect this incomplete proc
-        val scans = procCached().elem.peer.scans
+        val scans = procCached().elem.peer.inputs
         now.rejectedInputs.foreach {
           case UGB.ScanKey(key) =>
             scans.get(key).foreach { scan =>
@@ -348,7 +364,7 @@ object AuralProcDataImpl {
         logA(s"...newOuts = ${newOuts.mkString(",")}")
 
         newOuts.foreach { case (key, numCh) =>
-          activateAuralScan(key, numCh)
+          activateAuralScanOut(key, numCh)
         }
       }
 
@@ -362,7 +378,7 @@ object AuralProcDataImpl {
         newIns.foreach {
           case (UGB.ScanKey(key), UGB.Input.Scan.Value(numCh)) =>
             // val numCh = meta.numChannels
-            activateAuralScan(key, numCh)
+            activateAuralScanIn(key, numCh)
           case _ =>
         }
       }
@@ -384,13 +400,25 @@ object AuralProcDataImpl {
      * if a scan for the key exists. If yes, instantiates the aural-scan,
      * if no, creates an audio-bus for later use.
      */
-    private def activateAuralScan(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
-      scanViews.get(key)(tx.peer).fold {
-        val scans = procCached().elem.peer.scans
+    private[this] def activateAuralScanIn(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
+      activateAuralScan(key, numChannels, scanInViews)
+
+    private[this] def activateAuralScanOut(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
+      activateAuralScan(key, numChannels, scanOutViews)
+
+      /* Ensures that an aural-scan for a given key exists. If it exists,
+     * checks that the number of channels is correct. Otherwise, checks
+     * if a scan for the key exists. If yes, instantiates the aural-scan,
+     * if no, creates an audio-bus for later use.
+     */
+    private[this] def activateAuralScan(key: String, numChannels: Int, views: TMap[String, AuralScan.Owned[S]])
+                                       (implicit tx: S#Tx): Unit = {
+      views.get(key)(tx.peer).fold {
+        val scans = procCached().elem.peer.outputs
         scans.get(key).fold[Unit] {
           mkBus(key, numChannels)
         } { scan =>
-          mkAuralScan(key, scan, numChannels)
+          mkAuralScan(key, scan, numChannels, views)
         }
       } { view =>
         checkScanNumChannels(view, numChannels)
@@ -415,10 +443,11 @@ object AuralProcDataImpl {
     }
 
     /* Creates a new aural scan */
-    private def mkAuralScan(key: String, scan: Scan[S], numChannels: Int)(implicit tx: S#Tx): AuralScan[S] = {
+    private def mkAuralScan(key: String, scan: Scan[S], numChannels: Int, views: TMap[String, AuralScan.Owned[S]])
+                           (implicit tx: S#Tx): AuralScan[S] = {
       val bus   = mkBus(key, numChannels)
       val view  = AuralScan(data = this, key = key, scan = scan, bus = bus)
-      scanViews.put(key, view)(tx.peer)
+      views.put(key, view)(tx.peer)
       // note: the view will iterate over the
       //       sources and sinks itself upon initialization,
       //       and establish the playing links if found
@@ -521,7 +550,7 @@ object AuralProcDataImpl {
       val procObj = procCached()    /** Sub-classes may override this if invoking the super-method. */
 
       val proc    = procObj.elem.peer
-      val numCh0  = proc.scans.get(req.name).fold(-1)(scanInNumChannels)
+      val numCh0  = proc.inputs.get(req.name).fold(-1)(scanInNumChannels)
       val numCh   = if (numCh0 == -1) req.fixed else numCh0
       if (numCh == -1) throw MissingIn(req) else numCh
     }

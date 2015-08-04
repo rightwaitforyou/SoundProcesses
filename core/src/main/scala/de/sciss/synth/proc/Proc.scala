@@ -96,6 +96,12 @@ trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */
   def graph: Expr.Var[S, SynthGraph]
 
-  /** The real-time inputs and outputs of the process. */
-  def scans: Scans.Modifiable[S]
+  //  /** The real-time inputs and outputs of the process. */
+  //  def scans: Scans.Modifiable[S]
+
+  /** The real-time inputs of the process. */
+  def inputs: Scans.Modifiable[S]
+
+  /** The real-time outputs of the process. */
+  def outputs: Scans.Modifiable[S]
 }

@@ -452,13 +452,16 @@ object ElemImpl {
       val newPeer     = _Proc[S]
       newPeer.graph() = peer.graph()
       // peer.scans.keys.foreach(newPeer.scans.add)
-      peer.scans.iterator.foreach { case (key, scan) =>
-        val scanNew = newPeer.scans.add(key)
-        scan.sources.foreach { link =>
-          scanNew.addSource(link)
+      peer.inputs.iterator.foreach { case (key, scan) =>
+        val scanNew = newPeer.inputs.add(key)
+        scan.iterator.foreach { link =>
+          scanNew.add(link)
         }
-        scan.sinks.foreach { link =>
-          scanNew.addSink(link)
+      }
+      peer.outputs.iterator.foreach { case (key, scan) =>
+        val scanNew = newPeer.outputs.add(key)
+        scan.iterator.foreach { link =>
+          scanNew.add(link)
         }
       }
       Proc(newPeer)
@@ -495,12 +498,9 @@ object ElemImpl {
     protected def peerEvent = peer.changed
 
     def mkCopy()(implicit tx: S#Tx): _Scan.Elem[S] = {
-      val newPeer     = _Scan[S]
-      peer.sources.foreach { link =>
-        newPeer.addSource(link)
-      }
-      peer.sinks.foreach { link =>
-        newPeer.addSink(link)
+      val newPeer = _Scan[S]
+      peer.iterator.foreach { link =>
+        newPeer.add(link)
       }
       _Scan.Elem(newPeer)
     }

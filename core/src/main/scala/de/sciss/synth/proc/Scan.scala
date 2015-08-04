@@ -123,41 +123,20 @@ object Scan {
 trait Scan[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Scan.Update[S]] {
   import Scan._
 
-  /** Returns an iterator over all currently connected sinks. */
-  def sinks(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]]
+  /** Returns an iterator over all currently connected nodes. */
+  def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]]
 
-  // for now, links are not in t_p; this is probably fine, because
-  // we have graphemes for such a 'declarative' view, and the scan as needle is really
-  // more the 'procedural' approach
-
-  /** Adds a new sink to this scan.
+  /** Adds a new link to this scan.
    *
-   *  @param  sink the link to add
-   *  @return `true` if the link was new in the list of sinks for this scan, `false` it was already connected
+   *  @param  link the link to add
+   *  @return `true` if the link was new in the list for this scan, `false` it was already connected
    */
-  def addSink   (sink: Link[S])(implicit tx: S#Tx): Boolean
+  def add(link: Link[S])(implicit tx: S#Tx): Boolean
 
-  /** Removes a new sink from this scan.
+  /** Removes a new link from this scan.
    *
-   *  @param  sink the link to remove
-   *  @return `true` if the link was found in the list of sinks for this scan, `false` otherwise
+   *  @param  link the link to remove
+   *  @return `true` if the link was found in the list for this scan, `false` otherwise
    */
-  def removeSink(sink: Link[S])(implicit tx: S#Tx): Boolean
-
-  /** Returns an iterator over all currently connected sources. */
-  def sources(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]]
-
-  /** Adds a new source to this scan.
-   *
-   *  @param  source the link to add
-   *  @return `true` if the link was new in the list of sources for this scan, `false` it was already connected
-   */
-  def addSource(source: Link[S])(implicit tx: S#Tx): Boolean
-
-  /** Removes a new source from this scan.
-   *
-   *  @param  source the link to remove
-   *  @return `true` if the link was found in the list of source for this scan, `false` otherwise
-   */
-  def removeSource(source: Link[S])(implicit tx: S#Tx): Boolean
+  def remove(link: Link[S])(implicit tx: S#Tx): Boolean
 }

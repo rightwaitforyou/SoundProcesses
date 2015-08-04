@@ -143,16 +143,20 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       quit()
     }
 
-  def addScan(proc: Proc.Obj[S], key: String)(implicit tx: S#Tx): Scan[S] = {
-    proc.elem.peer.scans.add(key)
+  def addScanIn(proc: Proc.Obj[S], key: String)(implicit tx: S#Tx): Scan[S] = {
+    proc.elem.peer.inputs.add(key)
+  }
+
+  def addScanOut(proc: Proc.Obj[S], key: String)(implicit tx: S#Tx): Scan[S] = {
+    proc.elem.peer.outputs.add(key)
   }
 
   implicit class ScanOps(val `this`: Scan[S]) /* extends AnyVal */ {
     def ~> (that: Scan[S])(implicit tx: S#Tx): Unit =
-      `this`.addSink(Scan.Link.Scan(that))
+      `this`.add(Scan.Link.Scan(that))
 
     def ~/> (that: Scan[S])(implicit tx: S#Tx): Unit =
-      `this`.removeSink(Scan.Link.Scan(that))
+      `this`.remove(Scan.Link.Scan(that))
   }
 
   implicit def timeRange(in: (Double, Double)): Span = {
@@ -222,7 +226,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       after(2.0) { implicit tx =>
         val p2      = p2H()
         val p1      = p1H()
-        val scan    = p2.elem.peer.scans.add("out")
+        val scan    = p2.elem.peer.outputs.add("out")
         val scanObj = Obj(Scan.Elem(scan))
         p1.attr.put("key", scanObj)
 
@@ -328,7 +332,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         DC.kr(1).poll(0, label = "gen")
         graph.ScanOut(sig)
       }
-      val source = addScan(gen, "out")
+      val source = addScanOut(gen, "out")
 
       val filter = proc {
         val in  = graph.ScanInFix("in", 1)
@@ -336,7 +340,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         DC.kr(1).poll(0, label = "filter")
         Out.ar(0, Pan2.ar(sig))
       }
-      val sink = addScan(filter, "in")
+      val sink = addScanIn(filter, "in")
 
       source ~> sink
 
@@ -385,7 +389,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         val sig = gen + in
         Out.ar(0, Pan2.ar(sig))
       }
-      addScan(_proc, "in")
+      addScanIn(_proc, "in")
       val t = Transport[S]
       t.addObject(_proc)
       t.play()
@@ -397,7 +401,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
           val sig = PinkNoise.ar(0.2)
           graph.ScanOut("out", sig)
         }
-        addScan(in1, "out")
+        addScanOut(in1, "out")
         val in1H = tx.newHandle(in1)
         t.addObject(in1)
 
@@ -405,14 +409,14 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
           val sig = Dust.ar(50) * 0.7
           graph.ScanOut("out", sig)
         }
-        addScan(in2, "out")
+        addScanOut(in2, "out")
         val in2H = tx.newHandle(in2)
         t.addObject(in2)
 
         after(2.0) { implicit tx =>
           for {
-            scanOut <- in1H ().elem.peer.scans.get("out")
-            scanIn  <- procH().elem.peer.scans.get("in" )
+            scanOut <- in1H ().elem.peer.outputs.get("out")
+            scanIn  <- procH().elem.peer.inputs .get("in" )
           } {
             println("--connect noise--")
             scanOut ~> scanIn
@@ -420,8 +424,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
           after(2.0) { implicit tx =>
             for {
-              scanOut <- in2H ().elem.peer.scans.get("out")
-              scanIn  <- procH().elem.peer.scans.get("in" )
+              scanOut <- in2H ().elem.peer.outputs.get("out")
+              scanIn  <- procH().elem.peer.inputs .get("in" )
             } {
               println("--connect dust--")
               scanOut ~> scanIn
@@ -429,8 +433,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
             after(2.0) { implicit tx =>
               for {
-                scanOut <- in1H ().elem.peer.scans.get("out")
-                scanIn  <- procH().elem.peer.scans.get("in" )
+                scanOut <- in1H ().elem.peer.outputs.get("out")
+                scanIn  <- procH().elem.peer.inputs .get("in" )
               } {
                 println("--disconnect noise--")
                 scanOut ~/> scanIn
@@ -438,8 +442,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
               after(2.0) { implicit tx =>
                 for {
-                  scanOut <- in2H ().elem.peer.scans.get("out")
-                  scanIn  <- procH().elem.peer.scans.get("in" )
+                  scanOut <- in2H ().elem.peer.outputs.get("out")
+                  scanIn  <- procH().elem.peer.inputs.get("in" )
                 } {
                   println("--disconnect dust--")
                   scanOut ~/> scanIn
@@ -526,7 +530,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       p.graph() = g
       val _proc1 = Obj(Proc.Elem(p))
 
-      val sAudio = addScan(_proc1, "sig")
+      val sAudio = addScanIn(_proc1, "sig")
       import de.sciss.file._
       val f       = userHome / "Music" / "tapes" / "machinaecoelestis.aif"
       val spec    = AudioFile.readSpec(f)
@@ -546,7 +550,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         Out.ar(0, sig)
       }
 
-      addScan(_proc1, "out") ~> addScan(_proc2, "in")
+      addScanOut(_proc1, "out") ~> addScanIn(_proc2, "in")
 
       val _tl = timeline()
       _tl += (1.0 -> 8.0, _proc1)
@@ -688,7 +692,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       // the problem occurs (occurred! now it's fixed) when we add the scan _before_ creating
       // adding _proc2. like here:
       println("--add scan--")
-      addScan(_proc2, "out") ~> addScan(_proc1, "in")
+      addScanOut(_proc2, "out") ~> addScanIn(_proc1, "in")
       println("--add proc2--")
       tlObj += (2.0 ->  4.0, _proc2)
       println("--alright--")
@@ -733,8 +737,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         graph.ScanOut("out", PinkNoise.ar(Seq(0.5, 0.5)))
       }
 
-      val scanOut = addScan(_view2.obj(), "out")
-      val scanBar = addScan(_view1.obj(), "bar")
+      val scanOut = addScanOut(_view2.obj(), "out")
+      val scanBar = addScanIn (_view1.obj(), "bar")
 
       scanOut ~> scanBar
 
@@ -942,8 +946,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       //      val test = de.sciss.lucre.event.Peek.targets(proc2)
       //      println(s"---1, num-children is ${test.size}")
       // reversed steps
-      val scanIn  = addScan(proc2, "in" )
-      val scanOut = addScan(proc1, "out")
+      val scanIn  = addScanIn (proc2, "in" )
+      val scanOut = addScanOut(proc1, "out")
       scanOut ~> scanIn
     }
 
@@ -1004,8 +1008,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       view1.play()
       val proc1   = view1.obj()
       val proc2   = view2.obj()
-      val scanOut = addScan(proc1, "out")
-      val scanIn  = addScan(proc2, "in" )
+      val scanOut = addScanOut(proc1, "out")
+      val scanIn  = addScanIn (proc2, "in" )
       scanOut ~> scanIn
 //      println("--issue play2--")
 //      view2.play()
@@ -1060,8 +1064,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       view2.play()
       val proc1   = view1.obj()
       val proc2   = view2.obj()
-      val scanOut = addScan(proc1, "out")
-      val scanIn  = addScan(proc2, "in" )
+      val scanOut = addScanOut(proc1, "out")
+      val scanIn  = addScanIn (proc2, "in" )
       scanOut ~> scanIn
     }
 

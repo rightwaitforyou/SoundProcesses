@@ -50,7 +50,7 @@ object AuralScanImpl {
           view      .addSource(sourceView)
         }
     }
-    scan.sinks.foreach {
+    scan.iterator.foreach {
       case Link.Grapheme(peer) => // XXX TODO: currently not supported
       case Link.Scan    (peer) =>
         scanViewProxy(peer.id).foreach {

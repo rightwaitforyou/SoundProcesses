@@ -304,33 +304,33 @@ object AutomaticVoices {
 
   def unlinkLayer(l: Layer)(implicit tx: S#Tx): Unit =
     for {
-      layerIn  <- l.input    ().elem.peer.scans.get("in" )
-      layerOut <- l.output   ().elem.peer.scans.get("out")
+      layerIn  <- l.input    ().elem.peer.inputs .get("in" )
+      layerOut <- l.output   ().elem.peer.outputs.get("out")
     } {
       val oldLayerIn = layerIn.sources.collect {
         case l @ Scan.Link.Scan(_) => l
       } .toSet
-      val oldLayerOut = layerOut.sinks.collect {
+      val oldLayerOut = layerOut.iterator.collect {
         case l @ Scan.Link.Scan(_) => l
       } .toSet
 
       // disconnect old inputs
       oldLayerIn .foreach(layerIn .removeSource)
       // disconnect old outputs
-      oldLayerOut.foreach(layerOut.removeSink  )
+      oldLayerOut.foreach(layerOut.remove  )
       // connect old layer inputs to old layer outputs
       oldLayerIn.foreach { in =>
         oldLayerOut.foreach { out =>
-          in.peer.addSink(out)
+          in.peer.add(out)
         }
       }
     }
 
   def layerToFront(w: World, l: Layer)(implicit tx: S#Tx): Unit =
     for {
-      layerIn  <- l.input    ().elem.peer.scans.get("in" )
-      layerOut <- l.output   ().elem.peer.scans.get("out")
-      diffIn   <- w.diffusion().elem.peer.scans.get("in" )
+      layerIn  <- l.input    ().elem.peer.inputs .get("in" )
+      layerOut <- l.output   ().elem.peer.outputs.get("out")
+      diffIn   <- w.diffusion().elem.peer.inputs .get("in" )
     } {
       val oldDiffIn = diffIn.sources.collect {
         case l @ Scan.Link.Scan(_) => l
@@ -374,10 +374,10 @@ object AutomaticVoices {
 
   implicit class ScanOps(val `this`: Scan[S]) extends AnyVal {
     def ~> (that: Scan[S])(implicit tx: S#Tx): Unit =
-      `this`.addSink(Scan.Link.Scan(that))
+      `this`.add(Scan.Link.Scan(that))
 
     def ~/> (that: Scan[S])(implicit tx: S#Tx): Unit =
-      `this`.removeSink(Scan.Link.Scan(that))
+      `this`.remove(Scan.Link.Scan(that))
   }
 
   private lazy val transGraphs: Vec[SynthGraph] = {
@@ -518,7 +518,7 @@ object AutomaticVoices {
       }
       Out.ar(0, mix)
     }
-    diff.scans.add("in")
+    diff.inputs.add("in")
     val diffObj = Obj(Proc.Elem(diff))
     diffObj.name = "diff"
 
@@ -609,7 +609,7 @@ object AutomaticVoices {
     // layer-ensemble input from predecessor
     val pred        = Proc[S]
     pred.graph()    = throughGraph
-    pred.scans.add("in")
+    pred.inputs.add("in")
     val predObj     = Obj(Proc.Elem(pred))
     predObj.name = s"pred$li"
     lFolder.addLast(predObj)
@@ -620,7 +620,7 @@ object AutomaticVoices {
     val splitObj    = Obj(Proc.Elem(split))
     splitObj.name = s"split$li"
     lFolder.addLast(splitObj)
-    pred.scans.add("out") ~> split.scans.add("in")
+    pred.outputs.add("out") ~> split.inputs.add("in")
 
     // aka foreground splitter
     val succ        = Proc[S]
@@ -628,7 +628,7 @@ object AutomaticVoices {
     val succObj     = Obj(Proc.Elem(succ))
     succObj.name = s"succ$li"
     lFolder.addLast(succObj)
-    gen.scans.add("out") ~> succ.scans.add("in")
+    gen.outputs.add("out") ~> succ.inputs.add("in")
 
     // aka collector
     val coll        = Proc[S]
@@ -640,11 +640,11 @@ object AutomaticVoices {
     // layer-ensemble output to successor
     val out       = Proc[S]
     out.graph()   = throughGraph
-    out.scans.add("out")
+    out.outputs.add("out")
     val outObj    = Obj(Proc.Elem(out))
     outObj.name   = s"foo$li"
     lFolder.addLast(outObj)
-    coll.scans.add("out") ~> out.scans.add("in")
+    coll.outputs.add("out") ~> out.inputs.add("in")
 
     class Channel(val stateObj: Obj[S], val state: Expr.Var[S, Int], val fPlaying: Expr[S, Boolean],
                   val active: Expr[S, Boolean], val predOut: Scan[S], val succOut: Scan[S], val collIn: Scan[S],
@@ -657,9 +657,9 @@ object AutomaticVoices {
       val fPlaying  = state >= 2 // ongoing transition per channel
       if (PrintStates) fPlaying.changed.react(_ => ch => println(s"fPlaying${li}_$si -> ${ch.now}"))
 
-      val predOut   = split .scans.add(s"out$si")
-      val succOut   = succ  .scans.add(s"out$si")
-      val collIn    = coll  .scans.add(s"in$si")
+      val predOut   = split .outputs.add(s"out$si")
+      val succOut   = succ  .outputs.add(s"out$si")
+      val collIn    = coll  .inputs .add(s"in$si")
 
       val procB     = Proc[S]   // transition bypass/engage per channel
       procB.graph() = switchGraph
@@ -671,9 +671,9 @@ object AutomaticVoices {
       bFolder.addLast(procBObj)
       val ensB      = Ensemble(bFolder, 0L, bPlaying)
       val ensBObj   = Obj(Ensemble.Elem(ensB))
-      val predInB   = procB .scans.add("pred")
-      val succInB   = procB .scans.add("succ")
-      val outB      = procB .scans.add("out")
+      val predInB   = procB .inputs .add("pred")
+      val succInB   = procB .inputs .add("succ")
+      val outB      = procB .outputs.add("out" )
       lFolder.addLast(ensBObj)
       predOut ~> predInB
       succOut ~> succInB
@@ -723,9 +723,9 @@ object AutomaticVoices {
 
         val procT     = Proc[S]
         procT.graph() = g
-        val predInT   = procT.scans.add("pred")
-        val succInT   = procT.scans.add("succ")
-        val outT      = procT.scans.add("out")
+        val predInT   = procT.inputs .add("pred")
+        val succInT   = procT.inputs .add("succ")
+        val outT      = procT.outputs.add("out")
 
         channel.predOut ~> predInT
         channel.succOut ~> succInT
@@ -741,7 +741,7 @@ object AutomaticVoices {
     }
 
     // short debug solution; just connect all layer outputs to main diffusion
-    if (!Shadowing) coll.scans.add("out") ~> diff.scans.add("in")
+    if (!Shadowing) coll.outputs.add("out") ~> diff.inputs.add("in")
 
     val states = vecChannels.map { channel => tx.newHandle(channel.state) }
     val l = new Layer(

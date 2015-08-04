@@ -31,6 +31,8 @@ object ScanImpl {
   sealed trait Update[S]
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = {
+    ??? // XXX TODO --- have to go through all source
+
     val targets           = evt.Targets[S] // XXX TODO: partial?
     val scanSourceList    = List.Modifiable[S, Scan    [S]]
     val graphemeSourceList= List.Modifiable[S, Grapheme[S], Grapheme.Update[S]]
@@ -102,7 +104,7 @@ object ScanImpl {
 
     override def toString() = s"Scan$id"
 
-    def sinks  (implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = sinkList.iterator
+    def iterator  (implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = sinkList.iterator
     def sources(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = new data.Iterator[S#Tx, Link[S]] {
       val scanIt  = scanSourceList.iterator
       val graphIt = graphemeSourceList.iterator
@@ -115,7 +117,7 @@ object ScanImpl {
         Link.Grapheme(graphIt.next())
     }
 
-    def addSink(sink: Link[S])(implicit tx: S#Tx): Boolean = {
+    def add(sink: Link[S])(implicit tx: S#Tx): Boolean = {
       // val sinkID = sink.id
       // if (sinkMap.contains(sinkID)) return false
       if (sinkList.indexOf(sink) >= 0) return false
@@ -123,21 +125,21 @@ object ScanImpl {
       // sinkMap.put(sinkID, sink)
       sinkList.addLast(sink) // addHead faster than addLast; but perhaps we should use addLast to have a better iterator order?
       sink match {
-        case Link.Scan(peer) => peer.addSource(Link.Scan(this))
+        case Link.Scan(peer) => peer.add(Link.Scan(this))
         case _ =>
       }
       fire(Scan.Update(this, Vec(Scan.SinkAdded(sink))))
       true
     }
 
-    def removeSink(sink: Link[S])(implicit tx: S#Tx): Boolean = {
+    def remove(sink: Link[S])(implicit tx: S#Tx): Boolean = {
       // val sinkID = sink.id
       // if (!sinkMap.contains(sinkID)) return false
       if (sinkList.indexOf(sink) < 0) return false
       // sinkMap.remove(sinkID)
       sinkList.remove(sink)
       sink match {
-        case Link.Scan(peer) => peer.removeSource(Link.Scan(this))
+        case Link.Scan(peer) => peer.remove(Link.Scan(this))
         case _ =>
       }
       fire(Scan.Update(this, Vec(Scan.SinkRemoved(sink))))
@@ -157,7 +159,7 @@ object ScanImpl {
       if (scanSourceList.indexOf(source) >= 0) return false
 
       scanSourceList.addLast(source)
-      source.addSink(Link.Scan(this))
+      source.add(Link.Scan(this))
       true
     }
 
@@ -180,7 +182,7 @@ object ScanImpl {
     private def removeScanSource(source: Scan[S])(implicit tx: S#Tx): Boolean = {
       val res = scanSourceList.remove(source)
       if (res) {
-        source.removeSink(Link.Scan(this))
+        source.remove(Link.Scan(this))
       }
       res
     }

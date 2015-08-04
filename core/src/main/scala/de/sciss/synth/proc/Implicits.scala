@@ -40,11 +40,11 @@ object Implicits {
   implicit class ScanOps[S <: Sys[S]](val `this`: Scan[S]) extends AnyVal {
     /** Connects this scan as source to that scan as sink. */
     def ~> (that: Scan[S])(implicit tx: S#Tx): Unit =
-      `this`.addSink(Scan.Link.Scan(that))
+      `this`.add(Scan.Link.Scan(that))
 
     /** Disconnects this scan as source from that scan as sink. */
     def ~/> (that: Scan[S])(implicit tx: S#Tx): Unit =
-      `this`.removeSink(Scan.Link.Scan(that))
+      `this`.remove(Scan.Link.Scan(that))
   }
 
   // Scala 2.10.4 has a compiler bug that prevents putting this
@@ -60,12 +60,12 @@ object Implicits {
 
     private def getLayerIn(implicit tx: S#Tx): Scan[S] = {
       val inObj = pair._1
-      inObj.elem.peer.scans.get("in").getOrElse(sys.error(s"Proc ${inObj.name} does not have scan 'in'"))
+      inObj.elem.peer.inputs.get("in").getOrElse(sys.error(s"Proc ${inObj.name} does not have scan 'in'"))
     }
 
     private def getLayerOut(implicit tx: S#Tx): Scan[S] = {
       val outObj = pair._2
-      outObj.elem.peer.scans.get("out").getOrElse(sys.error(s"Proc ${outObj.name} does not have scan 'out'"))
+      outObj.elem.peer.outputs.get("out").getOrElse(sys.error(s"Proc ${outObj.name} does not have scan 'out'"))
     }
 
     /** Removes the signal chain signified by the input proc pair from its predecessors and successors.
@@ -76,28 +76,28 @@ object Implicits {
       val layerIn   = getLayerIn
       val layerOut  = getLayerOut
 
-      val oldLayerIn  = getScanLinks(layerIn.sources)
-      val oldLayerOut = getScanLinks(layerOut.sinks)
+      val oldLayerIn  = getScanLinks(layerIn .iterator)
+      val oldLayerOut = getScanLinks(layerOut.iterator)
 
       // disconnect old inputs
-      oldLayerIn .foreach(layerIn .removeSource)
+      oldLayerIn .foreach(layerIn .remove)
       // disconnect old outputs
-      oldLayerOut.foreach(layerOut.removeSink  )
+      oldLayerOut.foreach(layerOut.remove)
       // connect old layer inputs to old layer outputs
       oldLayerIn.foreach { in =>
         oldLayerOut.foreach { out =>
-          in.peer.addSink(out)
+          in.peer.add(out)
         }
       }
     }
 
     def linkAfter(out: Proc.Obj[S])(implicit tx: S#Tx): Unit = {
-      val target = out.elem.peer.scans.get("out").getOrElse(sys.error(s"Successor ${out.name} does not have scan 'out'"))
+      val target = out.elem.peer.outputs.get("out").getOrElse(sys.error(s"Successor ${out.name} does not have scan 'out'"))
       link1(target, isAfter = true)
     }
 
     def linkBefore(in: Proc.Obj[S])(implicit tx: S#Tx): Unit = {
-      val target = in.elem.peer.scans.get("in").getOrElse(sys.error(s"Predecessor ${in.name} does not have scan 'in'"))
+      val target = in.elem.peer.inputs.get("in").getOrElse(sys.error(s"Predecessor ${in.name} does not have scan 'in'"))
       link1(target, isAfter = false)
     }
 
@@ -105,7 +105,7 @@ object Implicits {
       val layerIn  = getLayerIn
       val layerOut = getLayerOut
 
-      val targetIt  = if (isAfter) target.sinks else target.sources
+      val targetIt  = target.iterator
       val oldTargetLinks = getScanLinks(targetIt)
       val layerLink = Scan.Link.Scan(if (isAfter) layerIn else layerOut)
       // only act if we're not there
@@ -113,18 +113,18 @@ object Implicits {
         unlink()
         if (isAfter) {
           // disconnect old diff outputs
-          oldTargetLinks.foreach(target.removeSink)
+          oldTargetLinks.foreach(target.remove)
           // connect old diff inputs as new layer inputs
-          oldTargetLinks.foreach(layerOut.addSink)
+          oldTargetLinks.foreach(layerOut.add)
           // connect layer output to diff input
-          target.addSink(layerLink)
+          target.add(layerLink)
         } else {
           // disconnect old diff inputs
-          oldTargetLinks.foreach(target.removeSource)
+          oldTargetLinks.foreach(target.remove)
           // connect old diff inputs as new layer inputs
-          oldTargetLinks.foreach(layerIn.addSource)
+          oldTargetLinks.foreach(layerIn.add  )
           // connect layer output to diff input
-          target.addSource(layerLink)
+          target.add(layerLink)
         }
       }
     }
