@@ -68,14 +68,20 @@ object AuralScanImpl {
     // this event and call into the symmetric method.
     val obs = scan.changed.react { implicit tx => upd =>
       upd.changes.foreach {
-        case Scan.SourceAdded  (peer) => scanView(peer.id).foreach(view.addSource   )
-        case Scan.SourceRemoved(peer) => scanView(peer.id).foreach(view.removeSource)
-        case Scan.SinkAdded    (peer) => scanViewProxy(peer.id).foreach {
-          case sinkView: AuralScan[S] => view.addSink(sinkView)
-          case proxy: AuralScan.Incomplete[S] => proxy.data.sinkAdded(proxy.key, view)
-        }
-        case Scan.SinkRemoved  (peer) => scanView(peer.id).foreach(view.removeSink)
-        // case Scan.GraphemeChange(_, _) => // XXX TODO: currently not supported
+        case Scan.Added(peer) =>
+          if (isInput)
+            scanView(peer.id).foreach(view.addSource   )
+          else
+            scanViewProxy(peer.id).foreach {
+              case sinkView: AuralScan[S] => view.addSink(sinkView)
+              case proxy: AuralScan.Incomplete[S] => proxy.data.sinkAdded(proxy.key, view)
+            }
+
+        case Scan.Removed(peer) =>
+          if (isInput)
+            scanView(peer.id).foreach(view.removeSource)
+          else
+            scanView(peer.id).foreach(view.removeSink)
       }
     }
 

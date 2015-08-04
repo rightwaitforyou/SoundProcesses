@@ -57,73 +57,80 @@ object ProcImpl {
     val valueSerializer = Scan.serializer[I]
   }
 
+  final class ScansImpl[S <: Sys[S]](proc: Impl[S], val slot: Int, isInput: Boolean)
+    extends Scans.Modifiable[S]
+    with evti.EventImpl [S, Proc.Update[S], Proc[S]]
+    with evt.InvariantEvent[S, Proc.Update[S], Proc[S]]
+    with impl.KeyMapImpl[S, String, Scan[S], Scan.Update[S]] {
+
+    // ---- key-map-impl details ----
+
+    protected def map = if (isInput) proc.scanInMap else proc.scanOutMap
+
+    protected def fire(added: Option[(String, Scan[S])], removed: Option[(String, Scan[S])])
+                      (implicit tx: S#Tx): Unit = {
+      val b = Vector.newBuilder[Proc.ScanMapChange[S]]
+      b.sizeHint(2)
+      // convention: first the removals, then the additions. thus, overwriting a key yields
+      // successive removal and addition of the same key.
+      removed.foreach { tup =>
+        b += (if (isInput) Proc.InputRemoved[S](tup._1, tup._2) else Proc.OutputRemoved[S](tup._1, tup._2))
+      }
+      added.foreach {  tup =>
+        b += (if (isInput) Proc.InputAdded[S](tup._1, tup._2) else Proc.OutputAdded[S](tup._1, tup._2))
+      }
+
+      proc.StateEvent(Proc.Update(proc, b.result()))
+    }
+
+    protected def reader: evt.Reader[S, Proc[S]] = ProcImpl.serializer
+    def node: Proc[S] with evt.Node[S] = proc
+
+    protected def isConnected(implicit tx: S#Tx): Boolean = proc.isConnected
+
+    def add(key: String)(implicit tx: S#Tx): Scan[S] =
+      get(key).getOrElse {
+        val res = Scan[S]
+        add(key, res)
+        res
+      }
+
+    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
+      val changes = foldUpdate(pull)
+      if (changes.isEmpty) None
+      else Some(Proc.Update(proc,
+        changes.map({
+          case (key, u) =>
+            if (isInput) Proc.InputChange (key, u.scan, u.changes)
+            else         Proc.OutputChange(key, u.scan, u.changes)
+        })(breakOut)))
+    }
+
+    protected def valueInfo = scanEntryInfo[S]
+  }
+
   private sealed trait Impl[S <: Sys[S]]
     extends Proc[S] {
     proc =>
 
     import Proc._
 
-    protected def scanInMap : SkipList.Map[S, String, ScanEntry[S]]
-    protected def scanOutMap: SkipList.Map[S, String, ScanEntry[S]]
+    def scanInMap : SkipList.Map[S, String, ScanEntry[S]]
+    def scanOutMap: SkipList.Map[S, String, ScanEntry[S]]
 
     // ---- key maps ----
+
+    def isConnected(implicit tx: S#Tx): Boolean = targets.nonEmpty
 
     sealed trait ProcEvent {
       final protected def reader: evt.Reader[S, Proc[S]] = ProcImpl.serializer
       final def node: Proc[S] with evt.Node[S] = proc
     }
 
-    final class ScansImpl(final val slot: Int,
-                          protected val map: SkipList.Map[S, String, KeyMapImpl.Entry[S, String, Scan[S], Scan.Update[S]]])
-      extends Scans.Modifiable[S]
-      with evti.EventImpl [S, Proc.Update[S], Proc[S]]
-      with evt.InvariantEvent[S, Proc.Update[S], Proc[S]]
-      with ProcEvent
-      with impl.KeyMapImpl[S, String, Scan[S], Scan.Update[S]] {
+    final val inputs  = new ScansImpl(this, 1, isInput = true )
+    final val outputs = new ScansImpl(this, 2, isInput = false)
 
-      // ---- key-map-impl details ----
-
-      protected def fire(added: Option[(String, Scan[S])], removed: Option[(String, Scan[S])])
-                              (implicit tx: S#Tx): Unit = {
-        val b = Vector.newBuilder[Proc.ScanMapChange[S]]
-        b.sizeHint(2)
-        // convention: first the removals, then the additions. thus, overwriting a key yields
-        // successive removal and addition of the same key.
-        removed.foreach { tup =>
-          b += Proc.ScanRemoved[S](tup._1, tup._2)
-        }
-        added.foreach {  tup =>
-          b += Proc.ScanAdded[S](tup._1, tup._2)
-        }
-
-        StateEvent(Proc.Update(proc, b.result()))
-      }
-
-      protected def isConnected(implicit tx: S#Tx): Boolean = proc.targets.nonEmpty
-
-      def add(key: String)(implicit tx: S#Tx): Scan[S] =
-        get(key).getOrElse {
-          val res = Scan[S]
-          add(key, res)
-          res
-        }
-
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
-        val changes = foldUpdate(pull)
-        if (changes.isEmpty) None
-        else Some(Proc.Update(proc,
-          changes.map({
-            case (key, u) => Proc.ScanChange(key, u.scan, u.changes)
-          })(breakOut)))
-      }
-
-      protected def valueInfo = scanEntryInfo[S]
-    }
-
-    final val inputs  = new ScansImpl(1, scanInMap )
-    final val outputs = new ScansImpl(2, scanOutMap)
-
-    private object StateEvent
+    object StateEvent
       extends evti.TriggerImpl[S, Proc.Update[S], Proc[S]]
       with evt.InvariantEvent [S, Proc.Update[S], Proc[S]]
       with evti.Root          [S, Proc.Update[S]]
@@ -203,10 +210,10 @@ object ProcImpl {
   }
 
   private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {
-    protected val targets       = evt.Targets[S](tx0)
-    val graph                   = SynthGraphs.newVar(SynthGraphs.empty)
-    protected val scanInMap     = SkipList.Map.empty[S, String, ScanEntry[S]]
-    protected val scanOutMap    = SkipList.Map.empty[S, String, ScanEntry[S]]
+    protected val targets   = evt.Targets[S](tx0)
+    val graph               = SynthGraphs.newVar(SynthGraphs.empty)
+    val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
+    val scanOutMap          = SkipList.Map.empty[S, String, ScanEntry[S]]
   }
 
   private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S])
@@ -215,11 +222,11 @@ object ProcImpl {
 
     {
       val serVer = in.readShort()
-      require(serVer == SER_VERSION, s"Incompatible serialized (found $serVer, required $SER_VERSION)")
+      if (serVer != SER_VERSION) sys.error(s"Incompatible serialized (found $serVer, required $SER_VERSION)")
     }
 
-    val graph                   = SynthGraphs.readVar(in, access)
-    protected val scanInMap     = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
-    protected val scanOutMap    = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
+    val graph         = SynthGraphs.readVar(in, access)
+    val scanInMap     = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
+    val scanOutMap    = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
   }
 }

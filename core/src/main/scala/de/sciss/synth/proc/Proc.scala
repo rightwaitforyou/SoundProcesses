@@ -49,12 +49,19 @@ object Proc {
     def key: String
     def scan: Scan[S]
   }
-  final case class ScanAdded  [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
-  final case class ScanRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+  final case class InputAdded   [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+  final case class InputRemoved [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+  final case class OutputAdded  [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+  final case class OutputRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
 
-  final case class ScanChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
+  final case class InputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
     extends Change[S] {
-    override def toString = s"ScanChange($key, $scan, $changes)"
+    override def toString = s"InputChange($key, $scan, $changes)"
+  }
+
+  final case class OutputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
+    extends Change[S] {
+    override def toString = s"OutputChange($key, $scan, $changes)"
   }
 
   // ---- Elem ----

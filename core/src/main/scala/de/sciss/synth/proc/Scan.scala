@@ -57,28 +57,28 @@ object Scan {
   final case class Update[S <: Sys[S]](scan: Scan[S], changes: Vec[Change[S]])
   sealed trait Change      [S <: Sys[S]]
   sealed trait LinkChange  [S <: Sys[S]] extends Change[S]      { def link  : Link[S] }
-  sealed trait SinkChange  [S <: Sys[S]] extends LinkChange[S]  { def sink  : Link[S] }
-  sealed trait SourceChange[S <: Sys[S]] extends LinkChange[S]  { def source: Link[S] }
+//  sealed trait SinkChange  [S <: Sys[S]] extends LinkChange[S]  { def sink  : Link[S] }
+//  sealed trait SourceChange[S <: Sys[S]] extends LinkChange[S]  { def source: Link[S] }
 
-  final case class SinkAdded[S <: Sys[S]](sink: Link[S]) extends SinkChange[S] {
+  final case class Added[S <: Sys[S]](link: Link[S]) extends LinkChange[S] {
     // override def toString = s"[$scan ---> $sink]"
-    def link = sink
+//    def link = sink
   }
 
-  final case class SinkRemoved[S <: Sys[S]](sink: Link[S]) extends SinkChange[S] {
+  final case class Removed[S <: Sys[S]](link: Link[S]) extends LinkChange[S] {
     // override def toString = s"[$scan -/-> $sink]"
-    def link = sink
+//    def link = sink
   }
 
-  final case class SourceAdded[S <: Sys[S]](source: Link[S]) extends SourceChange[S] {
-    // override def toString = s"[$scan <--- $source]"
-    def link = source
-  }
-
-  final case class SourceRemoved[S <: Sys[S]](source: Link[S]) extends SourceChange[S] {
-    // override def toString = s"[$scan <-/- $source]"
-    def link = source
-  }
+//  final case class SourceAdded[S <: Sys[S]](source: Link[S]) extends SourceChange[S] {
+//    // override def toString = s"[$scan <--- $source]"
+//    def link = source
+//  }
+//
+//  final case class SourceRemoved[S <: Sys[S]](source: Link[S]) extends SourceChange[S] {
+//    // override def toString = s"[$scan <-/- $source]"
+//    def link = source
+//  }
 
 //  final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
 //                                               changes: Vec[Grapheme.Segment]) extends Change[S]

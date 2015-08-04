@@ -98,25 +98,25 @@ object ScanImpl {
 
     def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = list.iterator
 
-    def add(sink: Link[S])(implicit tx: S#Tx): Boolean = {
-      if (list.indexOf(sink) >= 0) return false
-      list.addLast(sink) // addHead faster than addLast; but perhaps we should use addLast to have a better iterator order?
-      sink match {
+    def add(link: Link[S])(implicit tx: S#Tx): Boolean = {
+      if (list.indexOf(link) >= 0) return false
+      list.addLast(link) // addHead faster than addLast; but perhaps we should use addLast to have a better iterator order?
+      link match {
         case Link.Scan(peer) => peer.add(Link.Scan(this))
         case _ =>
       }
-      fire(Scan.Update(this, Vec(Scan.SinkAdded(sink))))
+      fire(Scan.Update(this, Vec(Scan.Added(link))))
       true
     }
 
-    def remove(sink: Link[S])(implicit tx: S#Tx): Boolean = {
-      if (list.indexOf(sink) < 0) return false
-      list.remove(sink)
-      sink match {
+    def remove(link: Link[S])(implicit tx: S#Tx): Boolean = {
+      if (list.indexOf(link) < 0) return false
+      list.remove(link)
+      link match {
         case Link.Scan(peer) => peer.remove(Link.Scan(this))
         case _ =>
       }
-      fire(Scan.Update(this, Vec(Scan.SinkRemoved(sink))))
+      fire(Scan.Update(this, Vec(Scan.Removed(link))))
       true
     }
 

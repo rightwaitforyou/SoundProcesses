@@ -2,10 +2,10 @@ package de.sciss
 package synth
 package proc
 
-import collection.immutable.{IndexedSeq => Vec}
-import lucre.expr.Expr
-import span.Span
+import de.sciss.lucre.expr.Expr
 import de.sciss.synth.Curve.linear
+
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 /*
  To run only this suite:
@@ -41,9 +41,9 @@ class ScanSpec extends ConfluentEventSpec {
 
       // val gr2 = Grapheme.Modifiable[S]
       obs.assertEquals(
-        Proc.Update[S](p, Vec(Proc.ScanAdded  ("amp" , scan1))),
-        Proc.Update[S](p, Vec(Proc.ScanAdded  ("freq", scan2))),
-        Proc.Update[S](p, Vec(Proc.ScanRemoved("amp" , scan1)))
+        Proc.Update[S](p, Vec(Proc.InputAdded  ("amp" , scan1))),
+        Proc.Update[S](p, Vec(Proc.InputAdded  ("freq", scan2))),
+        Proc.Update[S](p, Vec(Proc.InputRemoved("amp" , scan1)))
         // Proc.Update( p, Vec( Proc.AssociationAdded( Proc.GraphemeKey( "test" )))),
         // Proc.Update( p, Vec( Proc.AssociationRemoved( Proc.GraphemeKey( "test" )))),
         // Proc.Update( p, Vec( Proc.AssociationAdded( Proc.GraphemeKey( "gr" ))))
@@ -80,13 +80,13 @@ class ScanSpec extends ConfluentEventSpec {
       val grSource = Scan.Link.Grapheme(gr)
       scan.add(grSource) // should be observed
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded(grSource)))))
+        Proc.Update(p, Vec(Proc.InputChange("freq", scan, Vec(Scan.Added(grSource)))))
       )
       obs.clear()
 
       gr.add(2000L -> curve(5678.0)) // ...
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(
+        Proc.Update(p, Vec(Proc.InputChange("freq", scan, Vec(
 //          Scan.GraphemeChange(gr, Vec(Grapheme.Segment.Curve(Span(0L, 2000L), Vec((1234.0, 5678.0, linear))),
 //            Grapheme.Segment.Const(Span.from(2000L), Vec(5678.0)))
 //          )
@@ -101,8 +101,8 @@ class ScanSpec extends ConfluentEventSpec {
       val grSourceNew = Scan.Link.Grapheme(gr)
       scan.add(grSourceNew) // should be observed
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.SourceRemoved(grSource   ))))),
-        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(Scan.SourceAdded  (grSourceNew)))))
+        Proc.Update(p, Vec(Proc.InputChange("freq", scan, Vec(Scan.Removed(grSource   ))))),
+        Proc.Update(p, Vec(Proc.InputChange("freq", scan, Vec(Scan.Added  (grSourceNew)))))
       )
       obs.clear()
 
@@ -110,7 +110,7 @@ class ScanSpec extends ConfluentEventSpec {
       timeVar() = 4000L // ...
       //lucre.event.showLog = false
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(
+        Proc.Update(p, Vec(Proc.InputChange("freq", scan, Vec(
 //          Scan.GraphemeChange(
 //            gr, Vec(Grapheme.Segment.Curve(Span(2000L, 4000L), Vec((5678.0, 9876.0, linear))),
 //              Grapheme.Segment.Const(Span.from(4000L), Vec(9876.0)))
@@ -121,7 +121,7 @@ class ScanSpec extends ConfluentEventSpec {
 
       ampVar() = 5432.0 // ...
       obs.assertEquals(
-        Proc.Update(p, Vec(Proc.ScanChange("freq", scan, Vec(
+        Proc.Update(p, Vec(Proc.InputChange("freq", scan, Vec(
 //          Scan.GraphemeChange(
 //            gr, Vec(Grapheme.Segment.Curve(Span(2000L, 4000L), Vec((5678.0, 5432.0, linear))),
 //              Grapheme.Segment.Const(Span.from(4000L), Vec(5432.0)))

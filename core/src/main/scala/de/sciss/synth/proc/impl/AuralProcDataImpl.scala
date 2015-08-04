@@ -77,10 +77,13 @@ object AuralProcDataImpl {
         upd.changes.foreach {
           case Obj.ElemChange(Proc.Update(_, pCh)) =>
             pCh.foreach {
-              case Proc.GraphChange(Change(_, newGraph)) => newSynthGraph(newGraph)
-              case Proc.ScanAdded  (key, scan)      => scanAdded  (key, scan)
-              case Proc.ScanRemoved(key, scan)      => scanRemoved(key, scan)
-              case Proc.ScanChange (key, scan, sCh) => scanChange (key, scan, sCh)
+              case Proc.GraphChange(Change(_, newGraph))  => newSynthGraph(newGraph)
+              case Proc.InputAdded   (key, scan)          => scanInAdded (key, scan)
+              case Proc.OutputAdded  (key, scan)          => scanOutAdded(key, scan)
+              case Proc.InputRemoved (key, scan)          => scanRemoved (key, scan)
+              case Proc.OutputRemoved(key, scan)          => scanRemoved (key, scan)
+              case Proc.InputChange  (key, scan, sCh)     => scanInChange(key, scan, sCh)
+              case Proc.OutputChange (key, scan, sCh)     => // nada
             }
 
           case Obj.AttrAdded  (key, value)          => attrAdded  (key, value)
@@ -141,9 +144,13 @@ object AuralProcDataImpl {
 
     // ---- scan events ----
 
-    private def scanAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
-      logA(s"ScanAdded  to   ${procCached()} ($key)")
+    private def scanInAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
+      logA(s"scanInAdded  to   ${procCached()} ($key)")
       testInScan (key, scan)
+    }
+
+    private def scanOutAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
+      logA(s"scanOutAdded  to   ${procCached()} ($key)")
       testOutScan(key, scan)
     }
 
@@ -151,10 +158,10 @@ object AuralProcDataImpl {
       logA(s"ScanRemoved from ${procCached()} ($key)")
     }
 
-    private def scanChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
-      logA(s"ScanChange in   ${procCached()} ($key)")
+    private def scanInChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
+      logA(s"scanInChange in   ${procCached()} ($key)")
       changes.foreach {
-        case Scan.SourceAdded(_) => testInScan(key, scan)
+        case Scan.Added(_) => testInScan(key, scan)
         case _ =>
       }
     }
