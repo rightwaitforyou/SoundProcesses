@@ -408,12 +408,12 @@ object AuralProcDataImpl {
      * if no, creates an audio-bus for later use.
      */
     private[this] def activateAuralScanIn(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
-      activateAuralScan(key = key, numChannels = numChannels, isInput = true)
+      activateAuralScan(key = key, numChannels = numChannels, isInput = true )
 
     private[this] def activateAuralScanOut(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
       activateAuralScan(key = key, numChannels = numChannels, isInput = false)
 
-      /* Ensures that an aural-scan for a given key exists. If it exists,
+    /* Ensures that an aural-scan for a given key exists. If it exists,
      * checks that the number of channels is correct. Otherwise, checks
      * if a scan for the key exists. If yes, instantiates the aural-scan,
      * if no, creates an audio-bus for later use.
@@ -422,7 +422,8 @@ object AuralProcDataImpl {
                                        (implicit tx: S#Tx): Unit = {
       val views = if (isInput) scanInViews else scanOutViews
       views.get(key)(tx.peer).fold {
-        val scans = procCached().elem.peer.outputs
+        val proc  = procCached().elem.peer
+        val scans = if (isInput) proc.inputs else proc.outputs
         scans.get(key).fold[Unit] {
           mkBus(key, numChannels)
         } { scan =>

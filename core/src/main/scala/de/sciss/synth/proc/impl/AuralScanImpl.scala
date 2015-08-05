@@ -119,8 +119,14 @@ object AuralScanImpl {
     val edge1     = NodeRef.Edge(sourceNode, synthRef)
     val edge2     = NodeRef.Edge(synthRef  , sinkNode)
     server.addVertex(synthRef)
-    server.addEdge(edge1)
-    server.addEdge(edge2)
+    val foo1 = server.addEdge(edge1).get._2
+    val foo2 = server.addEdge(edge2).get._2
+
+    println("EDGE 1")
+    println(foo1)
+    println("EDGE 2")
+    println(foo1)
+
     new LinkNode(edge1, edge2, synthRef)
   }
   private final class LinkNode[S <: Sys[S]](edge1: NodeRef.Edge, edge2: NodeRef.Edge, synthRef: NodeRef)

@@ -1069,6 +1069,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       scanOut ~> scanIn
     }
 
+    Thread.sleep(100)
+    context.server.peer.dumpTree(controls = true)
+
     stopAndQuit()
   }
 
