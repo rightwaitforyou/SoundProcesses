@@ -100,36 +100,38 @@ object BiGroupImpl {
     (tree.rangeQuery(startShape), tree.rangeQuery(stopShape))
   }
 
-  final def nearestEventAfter[S <: stm.Sys[S], T2](tree: Tree[S, (SpanLike, T2)])(time: Long)
+  final def eventAfter[S <: stm.Sys[S], T2](tree: Tree[S, (SpanLike, T2)])(time: Long)
                                                    (implicit tx: S#Tx): Option[Long] = {
-    val point = LongPoint2D(time, time) // + 1
+    val t1    = time + 1
+    val point = LongPoint2D(t1, t1) // + 1
     val span  = tree.nearestNeighborOption(point, AdvanceNextNeighborMetric).map(_._1).getOrElse(Span.Void)
     span match {
-      case sp @ Span.From(start) => assert(start >= time, sp); Some(start) // else None
-      case sp @ Span.Until(stop) => assert(stop  >= time, sp); Some(stop ) // else None
+      case sp @ Span.From(start) => assert(start >= t1, sp); Some(start) // else None
+      case sp @ Span.Until(stop) => assert(stop  >= t1, sp); Some(stop ) // else None
       case sp @ Span(start, stop) =>
-        if (start >= time) {
+        if (start >= t1) {
           Some(start)
         } else {
-          assert(stop >= time, sp)
+          assert(stop >= t1, sp)
           Some(stop)
         }
       case _ => None // All or Void
     }
   }
 
-  final def nearestEventBefore[S <: Sys[S], T2](tree: Tree[S, (SpanLike, T2)])(time: Long)
-                                                    (implicit tx: S#Tx): Option[Long] = {
-    val point = LongPoint2D(time, time)
+  final def eventBefore[S <: Sys[S], T2](tree: Tree[S, (SpanLike, T2)])(time: Long)
+                                        (implicit tx: S#Tx): Option[Long] = {
+    val t1    = time - 1
+    val point = LongPoint2D(t1, t1)
     val span  = tree.nearestNeighborOption(point, RegressNextNeighborMetric).map(_._1).getOrElse(Span.Void)
     span match {
-      case sp @ Span.From(start)  => assert(start <= time, sp); Some(start) // else None
-      case sp @ Span.Until(stop)  => assert(stop  <= time, sp); Some(stop ) // else None
+      case sp @ Span.From(start)  => assert(start <= t1, sp); Some(start) // else None
+      case sp @ Span.Until(stop)  => assert(stop  <= t1, sp); Some(stop ) // else None
       case sp @ Span(start, stop) =>
-        if (stop <= time) {
+        if (stop <= t1) {
           Some(stop)
         } else {
-          assert(start <= time, sp)
+          assert(start <= t1, sp)
           Some(start)
         }
       case _ => None // All or Void
@@ -512,11 +514,17 @@ object BiGroupImpl {
     final def eventsAt(time: Long)(implicit tx: S#Tx): (Iterator[S#Tx, Leaf[S, Elem]], Iterator[S#Tx, Leaf[S, Elem]]) =
       BiGroupImpl.eventsAt(tree)(time)
 
-    final def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long] =
-      BiGroupImpl.nearestEventAfter(tree)(time)
+    final def eventAfter(time: Long)(implicit tx: S#Tx): Option[Long] =
+      BiGroupImpl.eventAfter(tree)(time)
 
-    final def nearestEventBefore(time: Long)(implicit tx: S#Tx): Option[Long] =
-      BiGroupImpl.nearestEventBefore(tree)(time)
+    final def eventBefore(time: Long)(implicit tx: S#Tx): Option[Long] =
+      BiGroupImpl.eventBefore(tree)(time)
+
+    final def firstEvent(implicit tx: S#Tx): Option[Long] =
+      BiGroupImpl.eventAfter(tree)(BiGroup.MinCoordinate)
+
+    final def lastEvent(implicit tx: S#Tx): Option[Long] =
+      BiGroupImpl.eventBefore(tree)(BiGroup.MaxCoordinate)
 
     //      final def collectionChanged : Event[ S, BiGroup.Collection[ S, Elem, U ], BiGroup[ S, Elem, U ]] = CollectionEvent
     //      final def elementChanged    : Event[ S, BiGroup.Element[    S, Elem, U ], BiGroup[ S, Elem, U ]] = ElementEvent

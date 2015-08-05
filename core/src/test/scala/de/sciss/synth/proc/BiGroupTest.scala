@@ -49,11 +49,11 @@ class BiGroupTest[S <: evt.Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
   }
 
   def after(time: Long) = t { implicit tx =>
-    bi.nearestEventAfter(time)
+    bi.eventAfter(time)
   }
 
   def before(time: Long) = t { implicit tx =>
-    bi.nearestEventBefore(time)
+    bi.eventBefore(time)
   }
 
   def eventsAt(time: Long) = t { implicit tx =>

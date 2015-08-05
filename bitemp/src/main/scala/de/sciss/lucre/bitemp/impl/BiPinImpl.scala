@@ -15,15 +15,16 @@ package de.sciss.lucre
 package bitemp
 package impl
 
+import de.sciss.lucre.data.SkipList
+import de.sciss.lucre.event.{Event, EventLike, Sys, impl => evti}
+import de.sciss.lucre.expr.ExprType1
 import de.sciss.lucre.{event => evt}
-import evt.{Event, EventLike, impl => evti, Sys}
-import data.SkipList
-import collection.immutable.{IndexedSeq => Vec}
-import collection.breakOut
-import annotation.switch
-import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.model
-import expr.ExprType1
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
+
+import scala.annotation.switch
+import scala.collection.breakOut
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object BiPinImpl {
   import BiPin.{Leaf, Modifiable}
@@ -113,7 +114,7 @@ object BiPinImpl {
     //      protected def tree: Tree[ S, A ]
     //      implicit protected def biType: ExprType1[ A ]
 
-    override def toString() = "BiPin" + tree.id
+    override def toString() = s"BiPin${tree.id}"
 
     def modifiableOption: Option[BiPin.Modifiable[S, A]] = Some(this)
 
@@ -277,7 +278,7 @@ object BiPinImpl {
       case _ => Vec.empty
     }
 
-    def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long] = tree.ceil(time).map(_._1)
+    def eventAfter(time: Long)(implicit tx: S#Tx): Option[Long] = tree.ceil(time + 1).map(_._1)
 
     def at     (time: Long)(implicit tx: S#Tx): Option[Elem] = intersect(time).headOption
     def valueAt(time: Long)(implicit tx: S#Tx): Option[A]    = intersect(time).headOption.map(_.magValue)

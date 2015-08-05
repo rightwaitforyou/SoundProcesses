@@ -446,7 +446,8 @@ trait Grapheme[S <: evt.Sys[S]] extends evt.Node[S] with Publisher[S, Grapheme.U
   def valueAt(time: Long)(implicit tx: S#Tx): Option[Value]
   def segment(time: Long)(implicit tx: S#Tx): Option[Segment.Defined]
 
-  def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
+  def eventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
+  def firstEvent(implicit tx: S#Tx): Option[Long]
 
   def numChannels: Int
 

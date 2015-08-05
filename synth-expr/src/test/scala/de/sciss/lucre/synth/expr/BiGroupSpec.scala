@@ -1,16 +1,18 @@
 package de.sciss.lucre.synth.expr
 
-import de.sciss.lucre.expr.Expr
-import de.sciss.span.{SpanLike, Span}
-import de.sciss.lucre.{bitemp, event}
-import collection.immutable.{IndexedSeq => Vec}
-import scala.annotation.tailrec
 import de.sciss.lucre.bitemp.BiGroup
+import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.{bitemp, event}
+import de.sciss.span.{Span, SpanLike}
 
-/**
- * To run only this suite:
- *
- * test-only de.sciss.lucre.bitemp.expr.BiGroupSpec
+import scala.annotation.tailrec
+import scala.collection.immutable.{IndexedSeq => Vec}
+
+/*
+ To run only this suite:
+
+ test-only de.sciss.lucre.synth.expr.BiGroupSpec
+
  */
 class BiGroupSpec extends ConfluentEventSpec {
   type IntEx = Expr[S, Int]
@@ -100,7 +102,7 @@ class BiGroupSpec extends ConfluentEventSpec {
 
         (-1L +: manual).sliding(2, 1).foreach { case Vec(pred, succ) =>
           // println(s"Querying ${pred+1} - expecting $succ")
-          val query = g.nearestEventAfter(pred + 1)
+          val query = g.eventAfter(pred)
           assert(query === Some(succ))
         }
       }

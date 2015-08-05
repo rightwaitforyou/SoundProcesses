@@ -19,7 +19,7 @@ import de.sciss.lucre.data.Iterator
 import de.sciss.lucre.event.{EventLike, Publisher, Sys}
 import de.sciss.lucre.expr.{Expr, ExprType1}
 import de.sciss.lucre.geom.LongSquare
-import de.sciss.lucre.stm.{Mutable, Identifiable}
+import de.sciss.lucre.stm.Identifiable
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.DataInput
 import de.sciss.span.{SpanLike => SpanLikeV}
@@ -197,7 +197,7 @@ trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] with Publisher[S, BiGrou
     * @return a time, greater than or equal to the query time, at which the next event occurs, or `None` if
     *         there are no events at or after the query time
     */
-  def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
+  def eventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
 
   /** Queries the closest event (an element's span starting or stopping) at the given time or earlier
     *
@@ -205,7 +205,13 @@ trait BiGroup[S <: Sys[S], Elem, U] extends evt.Node[S] with Publisher[S, BiGrou
     * @return a time, smaller than or equal to the query time, at which the previous event occurs, or `None` if
     *         there are no events at or before the query time
     */
-  def nearestEventBefore(time: Long)(implicit tx: S#Tx): Option[Long]
+  def eventBefore(time: Long)(implicit tx: S#Tx): Option[Long]
+
+  /** Finds the first occurring event, if there is any. Ignores objects with `Span.All`. */
+  def firstEvent(implicit tx: S#Tx): Option[Long]
+
+  /** Finds the last occurring event, if there is any. Ignores objects with `Span.All`. */
+  def lastEvent (implicit tx: S#Tx): Option[Long]
 
   /** Queries all elements which produce an event (starting or stopping) at a given time.
     *

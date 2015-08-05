@@ -105,7 +105,9 @@ object GraphemeImpl {
 
     def at(time: Long)(implicit tx: S#Tx): Option[TimedElem[S]] = pin.at(time)
 
-    def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long] = pin.nearestEventAfter(time)
+    def eventAfter(time: Long)(implicit tx: S#Tx): Option[Long] = pin.eventAfter(time)
+
+    def firstEvent(implicit tx: S#Tx): Option[Long] = pin.eventAfter(Long.MinValue)
 
     // ---- extensions ----
 
@@ -117,7 +119,7 @@ object GraphemeImpl {
           case _ => tail
         }
 
-      loop(Long.MaxValue - 1, Nil)
+      loop(Long.MinValue, Nil)
     }
 
     def valueAt(time: Long)(implicit tx: S#Tx): Option[Value] = {
@@ -146,11 +148,10 @@ object GraphemeImpl {
     }
 
     private def segmentFromFloor(floorTime: Long, floorValue: Value)(implicit tx: S#Tx): Segment.Defined = {
-      val t1 = floorTime + 1
       floorValue match {
         case floorCurve: Value.Curve =>
           val floorCurveVals: Vec[Double] = floorCurve.values.map(_._1)(breakOut)
-          pin.ceil(t1) match {
+          pin.ceil(floorTime + 1) match {
             case Some(ceilElem) =>
               val (ceilTime, ceilVal) = ceilElem.value
               segmentFromSpan(floorTime, floorCurveVals, ceilTime, ceilVal)
@@ -159,7 +160,7 @@ object GraphemeImpl {
           }
 
         case av: Value.Audio =>
-          val span = pin.nearestEventAfter(t1) match {
+          val span = pin.eventAfter(floorTime) match {
             case Some(ceilTime) => Span(floorTime, ceilTime)
             case _ => Span.from(floorTime)
           }
@@ -168,7 +169,7 @@ object GraphemeImpl {
     }
 
     private def segmentAfterRemoved(removeTime: Long)(implicit tx: S#Tx): Segment = segment(removeTime).getOrElse {
-      val span = pin.nearestEventAfter(removeTime + 1) match {
+      val span = pin.eventAfter(removeTime) match {
         case Some(ceilTime) => Span(removeTime, ceilTime)
         case _ => Span.from(removeTime)
       }

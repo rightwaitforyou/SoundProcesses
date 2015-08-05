@@ -338,7 +338,7 @@ object AuralTimelineImpl {
 
     private def scheduleNext(currentFrame: Long)(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
-      val targetFrame = nearestEventAfter(currentFrame + 1)
+      val targetFrame = eventAfter(currentFrame)
       val token = if (targetFrame == Long.MaxValue) -1 else {
         logA(s"timeline - scheduleNext($currentFrame) -> $targetFrame")
         val targetTime = sched.time + (targetFrame - currentFrame)
@@ -392,8 +392,8 @@ object AuralTimelineImpl {
     private def eventsAt(frame: Long)(implicit tx: S#Tx): (data.Iterator[I#Tx, Leaf[S]], data.Iterator[I#Tx, Leaf[S]]) =
       BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
 
-    // Long.MaxValue indicates _no event_; frame is inclusive!
-    private def nearestEventAfter(frame: Long)(implicit tx: S#Tx): Long =
-      BiGroupImpl.nearestEventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
+    // Long.MaxValue indicates _no event_; frame is exclusive!
+    private def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
+      BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
   }
 }

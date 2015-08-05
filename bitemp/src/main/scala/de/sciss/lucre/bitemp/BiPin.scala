@@ -129,13 +129,13 @@ sealed trait BiPin[S <: Sys[S], A] extends Writable with Disposable[S#Tx] {
   //   def elementChanged:     EventLike[ S, BiPin.Element[    S, A ], BiPin[ S, A ]]
   def changed: EventLike[S, BiPin.Update[S, A]]
 
-  /** Finds the entry with the smallest time which is greater than _or equal_ to the query time.
+  /** Finds the entry with the smallest time which is greater than the query time.
     *
     * @param time the query time
     * @return     the time corresponding to the next entry, or `None` if there is no entry
-    *             at or later than the given time
+    *             later than the given time
     */
-  def nearestEventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
+  def eventAfter(time: Long)(implicit tx: S#Tx): Option[Long]
 
   def debugList()(implicit tx: S#Tx): List[(Long, A)]
 }
