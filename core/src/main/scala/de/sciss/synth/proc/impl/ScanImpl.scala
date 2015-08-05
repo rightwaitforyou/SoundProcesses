@@ -98,6 +98,9 @@ object ScanImpl {
 
     def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = list.iterator
 
+    def isEmpty (implicit tx: S#Tx): Boolean = list.isEmpty
+    def nonEmpty(implicit tx: S#Tx): Boolean = list.nonEmpty
+
     def add(link: Link[S])(implicit tx: S#Tx): Boolean = {
       if (list.indexOf(link) >= 0) return false
       list.addLast(link) // addHead faster than addLast; but perhaps we should use addLast to have a better iterator order?

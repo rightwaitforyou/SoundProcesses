@@ -126,6 +126,9 @@ trait Scan[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Scan.Update[S]] {
   /** Returns an iterator over all currently connected nodes. */
   def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]]
 
+  def isEmpty (implicit tx: S#Tx): Boolean
+  def nonEmpty(implicit tx: S#Tx): Boolean
+
   /** Adds a new link to this scan.
    *
    *  @param  link the link to add
