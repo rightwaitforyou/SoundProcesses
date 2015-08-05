@@ -516,7 +516,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |A tape proc is fed through a global spatialization proc.
         |It is heard after 1s, beginning with the text "So I took a turn...".
         |The sound is panned rapidly between left and right stereo channel.
-        |After 1s the sound is muted (on the tape), after another 1s unmuted,
+        |After 1s the sound is muted (on the tape), after another 1s un-muted,
         |then the same happens, but the mute is engaged with the global proc.
         |
         |""".stripMargin)
