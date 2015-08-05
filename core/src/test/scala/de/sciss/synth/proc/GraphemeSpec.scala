@@ -6,10 +6,12 @@ import collection.immutable.{IndexedSeq => Vec}
 import span.Span
 import de.sciss.synth.Curve.{parametric, step, welch, sine, exponential, linear}
 
-/** To run only this suite:
-  *
-  * test-only de.sciss.synth.proc.GraphemeSpec
-  */
+/*
+  To run only this suite:
+  
+  test-only de.sciss.synth.proc.GraphemeSpec
+
+ */
 class GraphemeSpec extends ConfluentEventSpec {
   import imp._
 

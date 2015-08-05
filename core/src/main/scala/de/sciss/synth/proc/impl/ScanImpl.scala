@@ -50,7 +50,7 @@ object ScanImpl {
   private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Scan[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Scan[S] = {
       val serVer = in.readShort()
-      if (serVer != SER_VERSION) sys.error(s"Incompatible serialized (found $serVer, required $SER_VERSION)")
+      if (serVer != SER_VERSION) sys.error(s"Incompatible serialized version (found $serVer, required $SER_VERSION)")
 
       val list = List.Modifiable.read[S, Link[S]](in, access)
       new Impl(targets, list)
@@ -85,8 +85,6 @@ object ScanImpl {
       }
   }
 
-  // TODO: the crappy sinkList is only needed because the id map does not have an iterator...
-  // we should really figure out how to add iterator functionality to the id map!!!
   private final class Impl[S <: Sys[S]](protected val targets : evt.Targets[S],
                                         protected val list    : List.Modifiable[S, Link[S], Unit])
     extends Scan[S]

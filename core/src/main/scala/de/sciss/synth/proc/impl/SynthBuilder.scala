@@ -26,6 +26,8 @@ import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
 final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, val timeRef: TimeRef)
   extends NodeDependencyBuilder[S] {
 
+  override def toString = s"SynthBuilder($obj, $synth, $timeRef)"
+
   val setMap        = Vector.newBuilder[ControlSet]
 
   /** Users are elements which must be added after the

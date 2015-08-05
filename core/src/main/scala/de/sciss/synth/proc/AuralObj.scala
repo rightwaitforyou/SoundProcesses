@@ -114,7 +114,9 @@ object AuralObj {
     def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGenGraphBuilder.Value)
                       (implicit tx: S#Tx): Unit
 
-      // called from scan-view if source is not materialized yet
+    // called from scan-view if source is not materialized yet.
+    // XXX TODO --- the method name is confusing. The `key` refers to
+    // to an _input_ scan for which a _source_ is now available.
     def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit
 
     implicit def context: AuralContext[S]

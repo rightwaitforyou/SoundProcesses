@@ -29,7 +29,7 @@ object BounceTest extends App {
       |A sound file of duration 150ms. a sine tone of 200 Hz
       |is seen for 50ms (or 10 periods), the remaining 100ms are silent.
       |
-      |When using --realtime, the sound last 1s and the file has a duration of approx. 3s.
+      |When using --realtime, the sound lasts 1s and the file has a duration of approx. 3s.
       |""".stripMargin)
 
   val groupH = system.step { implicit tx =>

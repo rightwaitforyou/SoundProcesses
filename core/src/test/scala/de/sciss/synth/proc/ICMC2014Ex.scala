@@ -3,8 +3,6 @@ package de.sciss.synth.proc
 import de.sciss.lucre.event.Sys
 import de.sciss.lucre.expr.Expr
 import de.sciss.span.Span
-import de.sciss.lucre.synth.expr
-import de.sciss.lucre.bitemp
 
 trait ICMC2014Ex[S <: Sys[S]] {
   val imp = ExprImplicits[S]

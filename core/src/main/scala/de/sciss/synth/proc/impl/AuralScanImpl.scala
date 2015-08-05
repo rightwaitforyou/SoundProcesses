@@ -30,7 +30,7 @@ object AuralScanImpl {
     val id    = scan.id
     import expr.IdentifierSerializer
     val view  = new Impl[S](data = data, key = key, bus = bus, idH = tx.newHandle(id))
-    logA(s"AuralScan(${data.procCached()}, $key, bus = $bus)")
+    logA(s"AuralScan(${data.procCached()}, $key, bus = $bus, isInput = $isInput)")
     context.putAux[AuralScan.Proxy[S]](id, view)
 
     def scanView(peer: S#ID)(implicit tx: S#Tx): Option[AuralScan[S]] =

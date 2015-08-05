@@ -6,10 +6,11 @@ import collection.immutable.{IndexedSeq => Vec}
 import span.Span
 import de.sciss.synth.Curve.step
 
-/**
- * To test only this suite:
- *
- * test-only de.sciss.synth.proc.GraphemeSerializationSpec
+/*
+ To test only this suite:
+
+ test-only de.sciss.synth.proc.GraphemeSerializationSpec
+
  */
 class GraphemeSerializationSpec extends ConfluentEventSpec {
   "Grapheme" should "serialize and deserialize" in { system =>

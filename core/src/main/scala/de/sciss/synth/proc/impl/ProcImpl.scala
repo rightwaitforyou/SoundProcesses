@@ -173,7 +173,7 @@ object ProcImpl {
         val seq1 = scanInsOpt.fold(seq0) { u =>
           if (seq0.isEmpty) u.changes else seq0 ++ u.changes
         }
-        val seq2 = scanOutsOpt.fold(seq0) { u =>
+        val seq2 = scanOutsOpt.fold(seq1) { u =>
           if (seq1.isEmpty) u.changes else seq1 ++ u.changes
         }
         val seq3 = stateOpt.fold(seq2) { u =>
