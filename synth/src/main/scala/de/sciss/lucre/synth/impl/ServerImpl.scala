@@ -26,7 +26,6 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.collection.mutable
 import scala.concurrent.stm.{Ref, TMap}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.Try
 
 object ServerImpl {
   def apply  (peer: SServer): Server          = new OnlineImpl (peer)
@@ -408,6 +407,9 @@ object ServerImpl {
     final def config      : Server .Config = peer.config
     final def clientConfig: SClient.Config = peer.clientConfig
 
+    final def sampleRate: Double              = peer.sampleRate
+    final def counts    : message.StatusReply = peer.counts
+
     final def allocControlBus(numChannels: Int)(implicit tx: Txn): Int = {
       val res = controlBusAllocator.alloc(numChannels)(tx.peer)
       if (res < 0) throw AllocatorExhausted("Control buses exhausted for " + this)
@@ -499,11 +501,27 @@ object ServerImpl {
       topologyRef.transform(_.removeVertex(node))(tx.peer)
     }
 
-    final def addEdge(edge: NodeRef.Edge)(implicit tx: Txn): Try[(T, Option[Topology.Move[NodeRef]])] = {
+    final def addEdge(edge: NodeRef.Edge)(implicit tx: Txn): Boolean = {
       log(s"Server.addEdge($edge)")
       val res = topologyRef.get(tx.peer).addEdge(edge)
-      res.foreach(tup => topologyRef.set(tup._1)(tx.peer))
-      res
+      res.foreach { case (topNew, moveOpt) =>
+        topologyRef.set(topNew)(tx.peer)
+        moveOpt.foreach {
+          case Topology.MoveAfter (ref, aff) =>
+            val refNode = ref.node
+            aff.reverseIterator.foreach { x =>
+              val xNode = x.node
+              xNode.moveAfter(refNode)
+            }
+          case Topology.MoveBefore(ref, aff) =>
+            val refNode = ref.node
+            aff.foreach { x =>
+              val xNode = x.node
+              xNode.moveBefore(refNode)
+            }
+        }
+      }
+      res.isSuccess
     }
 
     final def removeEdge(edge: NodeRef.Edge)(implicit tx: Txn): Unit = {

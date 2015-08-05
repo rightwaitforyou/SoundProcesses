@@ -106,7 +106,7 @@ object AuralScanImpl {
       import de.sciss.synth._
       import ugen._
 
-      val sig = In.ar("in".kr, numCh) // InFeedback?
+      val sig = InFeedback.ar("in".kr, numCh)
       Out.ar("out".kr, sig)
     }
 
@@ -116,28 +116,26 @@ object AuralScanImpl {
     synth.read (sourceBus -> "in" )
     synth.write(sinkBus   -> "out")
 
-    val edge1     = NodeRef.Edge(sourceNode, synthRef)
-    val edge2     = NodeRef.Edge(synthRef  , sinkNode)
+    val edge1       = NodeRef.Edge(sourceNode, synthRef)
+    val edge2       = NodeRef.Edge(synthRef  , sinkNode)
     server.addVertex(synthRef)
-    val foo1 = server.addEdge(edge1).get._2
-    val foo2 = server.addEdge(edge2).get._2
+    val edge1Added  = server.addEdge(edge1)
+    val edge2Added  = server.addEdge(edge2)
 
-    println("EDGE 1")
-    println(foo1)
-    println("EDGE 2")
-    println(foo1)
-
-    new LinkNode(edge1, edge2, synthRef)
+    new LinkNode(edge1 = edge1, edge1Added = edge1Added, edge2 = edge2, edge2Added = edge2Added, synthRef = synthRef)
   }
-  private final class LinkNode[S <: Sys[S]](edge1: NodeRef.Edge, edge2: NodeRef.Edge, synthRef: NodeRef)
+
+  private final class LinkNode[S <: Sys[S]](edge1: NodeRef.Edge, edge1Added: Boolean,
+                                            edge2: NodeRef.Edge, edge2Added: Boolean, synthRef: NodeRef)
     extends Disposable[S#Tx] {
 
-    override def toString = s"LinkNode($edge1, $edge2, $synthRef)"
+    override def toString =
+      s"LinkNode($edge1${if (edge1Added) "" else " !"}, $edge2${if (edge2Added) "" else " !"}, $synthRef)"
 
     def dispose()(implicit tx: S#Tx): Unit = {
       val server = synthRef.server
-      server.removeEdge(edge1)
-      server.removeEdge(edge2)
+      if (edge1Added) server.removeEdge(edge1)
+      if (edge2Added) server.removeEdge(edge2)
       server.removeVertex(synthRef)
       synthRef.node.free()
     }

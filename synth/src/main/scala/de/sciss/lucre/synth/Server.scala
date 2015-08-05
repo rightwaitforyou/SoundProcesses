@@ -13,17 +13,15 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.lucre.synth.impl.{ServerImpl => Impl}
+import de.sciss.osc
+import de.sciss.synth.{Client => SClient, Server => SServer, message, UGenGraph}
 import de.sciss.topology.Topology
 
-import scala.concurrent.stm.{Ref, InTxn}
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.concurrent.stm.Ref
 import scala.concurrent.{ExecutionContext, Future}
-import collection.immutable.{IndexedSeq => Vec}
-import language.implicitConversions
-import de.sciss.synth.{Server => SServer, Client => SClient, UGenGraph}
-import impl.{ServerImpl => Impl}
-import de.sciss.osc
-
-import scala.util.Try
+import scala.language.implicitConversions
 
 object Server {
   def apply(peer: SServer): Server = Impl(peer)
@@ -67,7 +65,8 @@ object Server {
 trait Server {
   def peer: SServer
 
-  final def sampleRate: Double = peer.sampleRate
+  def sampleRate: Double
+  def counts    : message.StatusReply
 
   def isRealtime   : Boolean
   def isLocal      : Boolean
@@ -113,7 +112,7 @@ trait Server {
   def addVertex   (node: NodeRef)(implicit tx: Txn): Unit
   def removeVertex(node: NodeRef)(implicit tx: Txn): Unit
 
-  def addEdge   (edge: NodeRef.Edge)(implicit tx: Txn): Try[(Topology[NodeRef, NodeRef.Edge], Option[Topology.Move[NodeRef]])]
+  def addEdge   (edge: NodeRef.Edge)(implicit tx: Txn): Boolean // Try[(Topology[NodeRef, NodeRef.Edge], Option[Topology.Move[NodeRef]])]
   def removeEdge(edge: NodeRef.Edge)(implicit tx: Txn): Unit
 
   private[synth] def send(bundles: Txn.Bundles): Future[Unit]
