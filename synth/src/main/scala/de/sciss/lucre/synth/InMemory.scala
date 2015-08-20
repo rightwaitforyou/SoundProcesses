@@ -14,13 +14,16 @@
 package de.sciss.lucre
 package synth
 
+import de.sciss.lucre.stm.InMemoryLike
 import impl.{InMemoryImpl => Impl}
 
 object InMemory {
   def apply(): InMemory = Impl()
+
+  trait Txn extends Sys.Txn[InMemory] with InMemoryLike.Txn[InMemory]
 }
 
-trait InMemory extends event.InMemoryLike[InMemory] with Sys[InMemory] {
-  type Tx = Sys.Txn[InMemory]
+trait InMemory extends InMemoryLike[InMemory] with Sys[InMemory] {
+  type Tx = InMemory.Txn
   type I  = InMemory
 }

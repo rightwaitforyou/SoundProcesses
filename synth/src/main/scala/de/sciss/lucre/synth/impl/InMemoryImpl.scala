@@ -14,6 +14,9 @@
 package de.sciss.lucre.synth
 package impl
 
+import de.sciss.lucre.event.Observer
+import de.sciss.lucre.stm.IdentifierMap
+
 import concurrent.stm.InTxn
 import de.sciss.lucre.{stm, event => evt}
 import evt.impl.ReactionMapImpl
@@ -22,8 +25,8 @@ object InMemoryImpl {
   def apply(): InMemory = new System
 
   private final class TxnImpl(val system: InMemory, val peer: InTxn)
-    extends stm.impl.InMemoryImpl.TxnMixin[InMemory] with evt.impl.InMemoryImpl.TxnMixin[InMemory]
-    with TxnFullImpl[InMemory] {
+    extends stm.impl.InMemoryImpl.TxnMixin[InMemory]
+    with TxnFullImpl[InMemory] with InMemory.Txn {
 
     override def toString = s"proc.InMemory#Tx@${hashCode.toHexString}"
 

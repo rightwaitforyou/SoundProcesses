@@ -18,7 +18,7 @@ lazy val lucreVersion              = "3.0.0-SNAPSHOT"
 lazy val scalaColliderVersion      = "1.17.3"
 lazy val scalaColliderSwingVersion = "1.25.2"
 lazy val spanVersion               = "1.3.1"
-lazy val lucreSwingVersion         = "0.9.1"
+lazy val lucreSwingVersion         = "1.0.0-SNAPSHOT"
 lazy val audioWidgetsVersion       = "1.9.1"
 lazy val fileUtilVersion           = "1.1.1"
 lazy val topologyVersion           = "1.0.0"
@@ -106,7 +106,7 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
       "de.sciss"      %% "lucre-confluent"  % lucreVersion,
-      "de.sciss"      %% "lucre-artifact"   % lucreVersion,
+      "de.sciss"      %% "lucre-expr"       % lucreVersion,
       "de.sciss"      %% "fileutil"         % fileUtilVersion,
       "org.scalatest" %% "scalatest"        % scalaTestVersion  % "test",
       "de.sciss"      %% s"lucre-$bdb"      % lucreVersion      % "test"

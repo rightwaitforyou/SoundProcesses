@@ -13,12 +13,12 @@
 
 package de.sciss.lucre.synth
 
-import de.sciss.lucre.{event => evt, synth}
+import de.sciss.lucre.{stm, synth}
 
 object Sys {
-  trait Txn[S <: Sys[S]] extends evt.Txn[S] with synth.Txn
+  trait Txn[S <: Sys[S]] extends stm.Txn[S] with synth.Txn
 }
 
-trait Sys[S <: Sys[S]] extends evt.Sys[S] {
+trait Sys[S <: Sys[S]] extends stm.Sys[S] {
   type Tx <: Sys.Txn[S]
 }

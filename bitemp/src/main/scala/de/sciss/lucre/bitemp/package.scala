@@ -13,10 +13,10 @@
 
 package de.sciss.lucre
 
+import de.sciss.lucre.stm.Sys
 import de.sciss.serial.{DataOutput, DataInput}
 import de.sciss.span
 import expr.{Expr, ExprType1, Type1A}
-import event.Sys
 
 package object bitemp {
   private type ExprType1A[A] = ExprType1[A] with Type1A[({type Repr[~ <: Sys[~]] = Expr[~, A]})#Repr]
