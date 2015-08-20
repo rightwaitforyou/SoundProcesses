@@ -1,7 +1,7 @@
 lazy val baseName  = "SoundProcesses"
 lazy val baseNameL = baseName.toLowerCase
 
-lazy val projectVersion = "2.22.0-SNAPSHOT"
+lazy val projectVersion = "3.0.0-SNAPSHOT"
 
 lazy val commonSettings = Seq(
   version            := projectVersion,
@@ -14,10 +14,7 @@ lazy val commonSettings = Seq(
   resolvers          += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 ) ++ publishSettings
 
-lazy val lucreCoreVersion          = "2.1.2"
-lazy val lucreDataVersion          = "2.3.3"
-lazy val lucreEventVersion         = "2.7.5"
-lazy val lucreConfluentVersion     = "2.11.3"
+lazy val lucreVersion              = "3.0.0-SNAPSHOT"
 lazy val scalaColliderVersion      = "1.17.3"
 lazy val scalaColliderSwingVersion = "1.25.2"
 lazy val spanVersion               = "1.3.1"
@@ -46,36 +43,6 @@ testOptions in Test += Tests.Argument("-oF")
 
 fork in run := true  // required for shutdown hook, and also the scheduled thread pool, it seems
 
-initialCommands in console :=
-   """// thanks to Rex Kerr for this trick (http://www.scala-lang.org/node/11813)
-     |def shortResults[T](t: => T): T = {
-     |  val s = t.toString
-     |  val name = s.takeWhile(_ != ':')
-     |  val idx = s.indexOf(" = ")
-     |  val full = if (idx >= 0) name + s.substring(idx) else s
-     |  val short = if (full.length > 799) full.substring(0, 796) + "..." else full
-     |  print(short)
-     |  t
-     |}
-     |import de.sciss.synth._; import ugen._; import proc._
-     |import de.sciss.lucre.stm.InMemory
-     |import de.sciss.lucre.expr.Expr
-     |import de.sciss.span.Span
-     |import de.sciss.lucre.{event => evt}
-     |import de.sciss.lucre.expr.{Int => IntEx, Long => LongEx, Double => DoubleEx}
-     |import de.sciss.lucre.bitemp.{Span => SpanEx}
-     |println("To disable result types:\n :power\n :wrap shortResults\n: silent")""".stripMargin +
-   "\nprintln(\"\"\"" +
-   """
-     |val vis = VisTest()
-     |import vis._
-     |val p     = t { implicit tx => val res = proc("test"); res.changed.react { u => println("Proc observed: " + u)}; res }
-     |val scan  = t { implicit tx => p.scans.add("freq")}
-     |val g     = t { implicit tx => grapheme }
-     |t { implicit tx => scan.source = Some(g)}
-     |t { implicit tx => g.add(0L, curve(456.7))}
-     |""".stripMargin + "\"\"\")"
-
 // ---- sub-projects ----
 
 lazy val root = Project(id = baseNameL, base = file(".")).
@@ -96,9 +63,9 @@ lazy val bitemp = Project(id = "lucrebitemp", base = file("bitemp")).
   settings(
     description := "Bitemporal Lucre extensions using Long expressions for time",
     libraryDependencies ++= Seq(
-      "de.sciss"      %% "lucredata-core"  % lucreDataVersion,
-      "de.sciss"      %% "lucreevent-expr" % lucreEventVersion,
-      "de.sciss"      %% "span"            % spanVersion
+      "de.sciss"      %% "lucre-core"  % lucreVersion,
+      "de.sciss"      %% "lucre-expr"  % lucreVersion,
+      "de.sciss"      %% "span"        % spanVersion
     )
   )
 
@@ -108,10 +75,10 @@ lazy val expr = Project(id = "lucresynth-expr", base = file("synth-expr")).
   settings(
     description := "Bitemporal expression types for SoundProcesses",
     libraryDependencies ++= Seq(
-      "de.sciss"      %% "scalacollider"  % scalaColliderVersion,
-      "de.sciss"      %% s"lucrestm-$bdb" % lucreCoreVersion      % "test",
-      "org.scalatest" %% "scalatest"      % scalaTestVersion      % "test",
-      "de.sciss"      %% "lucreconfluent" % lucreConfluentVersion % "test"
+      "de.sciss"      %% "scalacollider"   % scalaColliderVersion,
+      "de.sciss"      %% s"lucre-$bdb"     % lucreVersion          % "test",
+      "org.scalatest" %% "scalatest"       % scalaTestVersion      % "test",
+      "de.sciss"      %% "lucre-confluent" % lucreVersion          % "test"
     )
   )
 
@@ -121,8 +88,7 @@ lazy val synth = Project(id = "lucresynth", base = file("synth")).
     description := "Transactional extension for ScalaCollider",
     libraryDependencies ++= Seq(
       "de.sciss" %% "topology"        % topologyVersion,
-      "de.sciss" %% "lucrestm-core"   % lucreCoreVersion,
-      "de.sciss" %% "lucreevent-core" % lucreEventVersion,
+      "de.sciss" %% "lucre-core"      % lucreVersion,
       "de.sciss" %% "scalacollider"   % scalaColliderVersion
     )
   )
@@ -139,11 +105,11 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
     ),
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
-      "de.sciss"      %% "lucreconfluent"       % lucreConfluentVersion,
-      "de.sciss"      %% "lucreevent-artifact"  % lucreEventVersion,
-      "de.sciss"      %% "fileutil"             % fileUtilVersion,
-      "org.scalatest" %% "scalatest"            % scalaTestVersion      % "test",
-      "de.sciss"      %% s"lucrestm-$bdb"       % lucreCoreVersion      % "test"
+      "de.sciss"      %% "lucre-confluent"  % lucreVersion,
+      "de.sciss"      %% "lucre-artifact"   % lucreVersion,
+      "de.sciss"      %% "fileutil"         % fileUtilVersion,
+      "org.scalatest" %% "scalatest"        % scalaTestVersion  % "test",
+      "de.sciss"      %% s"lucre-$bdb"      % lucreVersion      % "test"
     )
   )
 
@@ -165,7 +131,7 @@ lazy val compiler = Project(id = s"$baseNameL-compiler", base = file("compiler")
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
       "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,
-      "de.sciss"       %% s"lucrestm-$bdb"          % lucreCoreVersion          % "test",
+      "de.sciss"       %% s"lucre-$bdb"             % lucreVersion              % "test",
       "de.sciss"       %% "fileutil"                % fileUtilVersion           % "test",
       "de.sciss"       %% "lucreswing"              % lucreSwingVersion         % "test",
       "de.sciss"       %% "scalacolliderswing-core" % scalaColliderSwingVersion % "test"
@@ -200,9 +166,3 @@ lazy val publishSettings = Seq(
   }
 )
 
-// ---- ls.implicit.ly ----
-
-// seq(lsSettings :_*)
-// (LsKeys.tags   in LsKeys.lsync) := Seq("sound", "music", "sound-synthesis", "computer-music")
-// (LsKeys.ghUser in LsKeys.lsync) := Some("Sciss")
-// (LsKeys.ghRepo in LsKeys.lsync) := Some(logicalName)
