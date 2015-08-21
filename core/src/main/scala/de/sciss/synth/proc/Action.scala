@@ -13,17 +13,16 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.event.Sys
-import de.sciss.lucre.stm.{TxnLike, Disposable}
-import de.sciss.lucre.{stm, event => evt}
-import de.sciss.serial.{DataInput, Serializer, Writable}
+import de.sciss.lucre.stm.{Sys, TxnLike}
+import de.sciss.lucre.{event => evt, stm}
+import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc
 import de.sciss.synth.proc.impl.{ActionImpl => Impl}
 
-import scala.concurrent.Future
 import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.concurrent.Future
 
-object Action {
+object Action extends stm.Obj.Type {
   final val typeID = 19
 
   final val attrSource = "action-source"
@@ -66,7 +65,7 @@ object Action {
   }
 
   object Universe {
-    def apply[S <: Sys[S]](self: Action.Obj[S], workspace: WorkspaceHandle[S], invoker: Option[proc.Obj[S]] = None,
+    def apply[S <: Sys[S]](self: Action[S], workspace: WorkspaceHandle[S], invoker: Option[proc.Obj[S]] = None,
                            values: Vec[Float] = Vector.empty)(implicit cursor: stm.Cursor[S]): Universe[S] =
       new Impl.UniverseImpl(self, workspace, invoker, values)
   }
@@ -74,7 +73,7 @@ object Action {
     /** The action object itself, most prominently giving access to
       * linked objects via its attributes.
       */
-    def self: Action.Obj[S]
+    def self: Action[S]
 
     /** Root folder of the workspace containing the action. */
     def root(implicit tx: S#Tx): Folder[S]
@@ -93,29 +92,8 @@ object Action {
     implicit def cursor: stm.Cursor[S]
   }
 
-  // ---- element ----
-
-  implicit object Elem extends proc.Elem.Companion[Elem] {
-    def typeID = Action.typeID
-
-    def apply[S <: Sys[S]](peer: Action[S])(implicit tx: S#Tx): Action.Elem[S] = Impl.ElemImpl(peer)
-
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Action.Elem[S]] = Impl.ElemImpl.serializer
-  }
-
-  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
-    type Peer         = Action[S]
-    type PeerUpdate   = Unit
-    type This         = Elem[S]
-  }
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Action.Obj[S]] =
-      if (obj.elem.isInstanceOf[Action.Elem[S]]) Some(obj.asInstanceOf[Action.Obj[S]])
-      else None
-  }
-  type Obj[S <: Sys[S]] = proc.Obj.T[S, Action.Elem]
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): stm.Obj[S] = ???
 }
-trait Action[S <: Sys[S]] extends Writable with Disposable[S#Tx] with evt.Publisher[S, Unit] {
+trait Action[S <: Sys[S]] extends stm.Obj[S] with evt.Publisher[S, Unit] {
   def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit
 }

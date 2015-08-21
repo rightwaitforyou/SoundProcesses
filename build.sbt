@@ -14,14 +14,14 @@ lazy val commonSettings = Seq(
   resolvers          += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 ) ++ publishSettings
 
-lazy val lucreVersion              = "3.0.0-SNAPSHOT"
-lazy val scalaColliderVersion      = "1.17.3"
-lazy val scalaColliderSwingVersion = "1.25.2"
-lazy val spanVersion               = "1.3.1"
-lazy val lucreSwingVersion         = "1.0.0-SNAPSHOT"
-lazy val audioWidgetsVersion       = "1.9.1"
-lazy val fileUtilVersion           = "1.1.1"
-lazy val topologyVersion           = "1.0.0"
+lazy val lucreVersion               = "3.0.0-SNAPSHOT"
+lazy val scalaColliderVersion       = "1.17.3"
+lazy val scalaColliderSwingVersion  = "1.25.2"
+lazy val spanVersion                = "1.3.1"
+lazy val lucreSwingVersion          = "1.0.0-SNAPSHOT"
+lazy val audioWidgetsVersion        = "1.9.1"
+lazy val fileUtilVersion            = "1.1.1"
+lazy val topologyVersion            = "1.0.0"
 
 // ---- test-only ----
 
@@ -45,11 +45,11 @@ fork in run := true  // required for shutdown hook, and also the scheduled threa
 
 // ---- sub-projects ----
 
-lazy val root = Project(id = baseNameL, base = file(".")).
-  aggregate(bitemp, synth, expr, core, views, compiler).
-  dependsOn(bitemp, synth, expr, core, views, compiler).
-  settings(commonSettings).
-  settings(
+lazy val root = Project(id = baseNameL, base = file("."))
+  .aggregate(synth, core, views, compiler)
+  .dependsOn(synth, core, views, compiler)
+  .settings(commonSettings)
+  .settings(
     name := baseName,
     publishArtifact in(Compile, packageBin) := false, // there are no binaries
     publishArtifact in(Compile, packageDoc) := false, // there are no javadocs
@@ -58,33 +58,22 @@ lazy val root = Project(id = baseNameL, base = file(".")).
     autoScalaLibrary := false
   )
 
-lazy val bitemp = Project(id = "lucrebitemp", base = file("bitemp")).
-  settings(commonSettings).
-  settings(
-    description := "Bitemporal Lucre extensions using Long expressions for time",
-    libraryDependencies ++= Seq(
-      "de.sciss"      %% "lucre-core"  % lucreVersion,
-      "de.sciss"      %% "lucre-expr"  % lucreVersion,
-      "de.sciss"      %% "span"        % spanVersion
-    )
-  )
+//lazy val expr = Project(id = "lucresynth-expr", base = file("synth-expr"))
+//  .settings(commonSettings)
+//  .settings(
+//    description := "Bitemporal expression types for SoundProcesses",
+//    libraryDependencies ++= Seq(
+//      "de.sciss"      %% "scalacollider"   % scalaColliderVersion,
+//      "de.sciss"      %% "lucre-expr"      % lucreVersion,
+//      "de.sciss"      %% s"lucre-$bdb"     % lucreVersion          % "test",
+//      "org.scalatest" %% "scalatest"       % scalaTestVersion      % "test",
+//      "de.sciss"      %% "lucre-confluent" % lucreVersion          % "test"
+//    )
+//  )
 
-lazy val expr = Project(id = "lucresynth-expr", base = file("synth-expr")).
-  dependsOn(bitemp).
-  settings(commonSettings).
-  settings(
-    description := "Bitemporal expression types for SoundProcesses",
-    libraryDependencies ++= Seq(
-      "de.sciss"      %% "scalacollider"   % scalaColliderVersion,
-      "de.sciss"      %% s"lucre-$bdb"     % lucreVersion          % "test",
-      "org.scalatest" %% "scalatest"       % scalaTestVersion      % "test",
-      "de.sciss"      %% "lucre-confluent" % lucreVersion          % "test"
-    )
-  )
-
-lazy val synth = Project(id = "lucresynth", base = file("synth")).
-  settings(commonSettings).
-  settings(
+lazy val synth = Project(id = "lucresynth", base = file("synth"))
+  .settings(commonSettings)
+  .settings(
     description := "Transactional extension for ScalaCollider",
     libraryDependencies ++= Seq(
       "de.sciss" %% "topology"        % topologyVersion,
@@ -93,11 +82,11 @@ lazy val synth = Project(id = "lucresynth", base = file("synth")).
     )
   )
 
-lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
-  dependsOn(bitemp, synth, expr).
-  enablePlugins(BuildInfoPlugin).
-  settings(commonSettings).
-  settings(
+lazy val core = Project(id = s"$baseNameL-core", base = file("core"))
+  .dependsOn(synth)
+  .enablePlugins(BuildInfoPlugin)
+  .settings(commonSettings)
+  .settings(
     description := "A framework for creating and managing ScalaCollider based sound processes",
     buildInfoKeys := Seq(name, organization, version, scalaVersion, description,
       BuildInfoKey.map(homepage) { case (k, opt)           => k -> opt.get },
@@ -113,10 +102,10 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core")).
     )
   )
 
-lazy val views = Project(id = s"$baseNameL-views", base = file("views")).
-  dependsOn(core).
-  settings(commonSettings).
-  settings(
+lazy val views = Project(id = s"$baseNameL-views", base = file("views"))
+  .dependsOn(core)
+  .settings(commonSettings)
+  .settings(
     description := "Views for Sound Processes",
     libraryDependencies ++= Seq(
       "de.sciss" %% "lucreswing"       % lucreSwingVersion,
@@ -124,10 +113,10 @@ lazy val views = Project(id = s"$baseNameL-views", base = file("views")).
     )
   )
 
-lazy val compiler = Project(id = s"$baseNameL-compiler", base = file("compiler")).
-  dependsOn(core).
-  settings(commonSettings).
-  settings(
+lazy val compiler = Project(id = s"$baseNameL-compiler", base = file("compiler"))
+  .dependsOn(core)
+  .settings(commonSettings)
+  .settings(
     description := "Compiler-support for Sound Processes",
     libraryDependencies ++= Seq(
       "org.scala-lang" %  "scala-compiler"          % scalaVersion.value,

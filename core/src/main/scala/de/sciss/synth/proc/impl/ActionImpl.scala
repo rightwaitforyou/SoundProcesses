@@ -16,9 +16,9 @@ package impl
 
 import de.sciss.lucre.{event => evt}
 import de.sciss.synth.proc
-import de.sciss.lucre.event.{Reader, InMemory, EventLike, Sys}
+import de.sciss.lucre.event.EventLike
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{TxnLike, IDPeek}
+import de.sciss.lucre.stm.{NoSys, Sys, TxnLike, IDPeek}
 import de.sciss.serial.{Serializer, DataInput, DataOutput}
 
 import scala.annotation.switch
@@ -132,7 +132,7 @@ object ActionImpl {
 
   // ---- universe ----
 
-  final class UniverseImpl[S <: Sys[S]](val self: Action.Obj[S], workspace: WorkspaceHandle[S],
+  final class UniverseImpl[S <: Sys[S]](val self: Action[S], workspace: WorkspaceHandle[S],
                                         val invoker: Option[Obj[S]], val values: Vec[Float])
                                        (implicit val cursor: stm.Cursor[S])
     extends Action.Universe[S] {
@@ -142,15 +142,17 @@ object ActionImpl {
 
   // ---- serialization ----
 
-  def serializer[S <: Sys[S]]: evt.EventLikeSerializer[S, Action[S]] = anySer.asInstanceOf[Ser[S]]
+  def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Action[S]] = anySer.asInstanceOf[Ser[S]]
 
   def varSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Action.Var[S]] = anyVarSer.asInstanceOf[VarSer[S]]
 
-  private val anySer    = new Ser   [InMemory]
-  private val anyVarSer = new VarSer[InMemory]
+  private val anySer    = new Ser   [NoSys]
+  private val anyVarSer = new VarSer[NoSys]
 
-  private final class Ser[S <: Sys[S]] extends evt.EventLikeSerializer[S, Action[S]] {
-    def readConstant(in: DataInput)(implicit tx: S#Tx): Action[S] =
+  private final class Ser[S <: Sys[S]] extends stm.Obj.Serializer[S, Action[S]] {
+    def typeID: Int = Action.typeID
+
+    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Action[S] =
       (readCookieAndTpe(in): @switch) match {
         case CONST_JAR    =>
           val name    = in.readUTF()
@@ -166,16 +168,17 @@ object ActionImpl {
 
         case CONST_EMPTY  => new ConstEmptyImpl[S]
 
+        case CONST_VAR =>
+          readIdentifiedVar(in, access, targets)
+
         case other => sys.error(s"Unexpected action cookie $other")
       }
-
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Action[S] with evt.Node[S] =
-      ActionImpl.readVar(in, access, targets)
   }
 
-  private final class VarSer[S <: Sys[S]] extends evt.NodeSerializer[S, Action.Var[S]] {
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])
-            (implicit tx: S#Tx): Action.Var[S] with evt.Node[S] =
+  private final class VarSer[S <: Sys[S]] extends stm.Obj.Serializer[S, Action.Var[S]] {
+    def typeID: Int = Action.typeID
+
+    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Action.Var[S] =
       ActionImpl.readVar(in, access, targets)
   }
 
@@ -187,14 +190,17 @@ object ActionImpl {
   }
 
   private def readVar[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                  (implicit tx: S#Tx): Action.Var[S] with evt.Node[S] =
+                                  (implicit tx: S#Tx): Action.Var[S] =
     readCookieAndTpe(in) /* : @switch */ match {
-      case CONST_VAR =>
-        val peer = tx.readVar[Action[S]](targets.id, in)
-        new VarImpl[S](targets, peer)
-
-      case other => sys.error(s"Unexpected action cookie $other")
+      case CONST_VAR  => readIdentifiedVar(in, access, targets)
+      case other      => sys.error(s"Unexpected action cookie $other")
     }
+
+  private def readIdentifiedVar[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                  (implicit tx: S#Tx): Action.Var[S] = {
+    val peer = tx.readVar[Action[S]](targets.id, in)
+    new VarImpl[S](targets, peer)
+  }
 
   // ---- constant implementation ----
 
@@ -203,10 +209,8 @@ object ActionImpl {
   // this is why workspace should have a general caching system
   private val clMap = new mutable.WeakHashMap[Sys[_], MemoryClassLoader]
 
-  private sealed trait ConstImpl[S <: Sys[S]] extends Action[S] with evt.impl.Constant {
-    def dispose()(implicit tx: S#Tx): Unit = ()
-
-    def changed: EventLike[S, Unit] = evt.Dummy[S, Unit]
+  private sealed trait ConstImpl[S <: Sys[S]] extends Action[S] with evt.impl.ConstImpl[S, Unit] {
+    def typeID: Int = Action.typeID
   }
 
   private final case class ConstBodyImpl[S <: Sys[S]](id: String)
@@ -288,8 +292,6 @@ object ActionImpl {
       out.writeByte(CONST_VAR)
       peer.write(out)
     }
-
-    protected def reader: Reader[S, Action[S]] = ActionImpl.serializer
   }
 
   // ---- class loader ----
@@ -324,63 +326,12 @@ object ActionImpl {
       }
   }
 
-
   // ---- elem ----
-
-  object ElemImpl extends proc.impl.ElemCompanionImpl[Action.Elem] {
-    def typeID = Action.typeID
-
-    // Elem.registerExtension(this)
-
-    def apply[S <: Sys[S]](peer: Action[S])(implicit tx: S#Tx): Action.Elem[S] = {
-      val targets = evt.Targets[S]
-      new ActiveImpl[S](targets, peer)
-    }
-
-    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Action.Elem[S] =
-      serializer[S].read(in, access)
-
-    // ---- Elem.Extension ----
-
-    /** Read identified active element */
-    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): Action.Elem[S] with evt.Node[S] = {
-      val peer = ActionImpl.serializer.read(in, access)
-      new ActiveImpl[S](targets, peer)
-    }
-
-    /** Read identified constant element */
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Action.Elem[S] =
-      sys.error("Constant Action not supported")
-
-    // ---- implementation ----
-
-    private sealed trait Impl {
-      def typeID = Action.typeID
-      def prefix = "Action"
-    }
-
-    private final class ActiveImpl[S <: Sys[S]](protected val targets: evt.Targets[S],
-                                                val peer: Action[S])
-      extends Action.Elem[S]
-      with proc.impl.ActiveElemImpl[S] with Impl {
-
-      override def toString() = s"$prefix.Elem$id"
-
-      def mkCopy()(implicit tx: S#Tx): Action.Elem[S] = {
-        val cpy = peer match {
-          case Action.Var(vr) => Action.Var(vr())
-          case other => other
-        }
-        Action.Elem(cpy)
-      }
-    }
-
-    private final class PassiveImpl[S <: Sys[S]](val peer: Action[S])
-      extends Action.Elem[S]
-      with proc.impl.PassiveElemImpl[S, Action.Elem[S]] with Impl {
-
-      override def toString = s"$prefix.Elem($peer)"
-    }
-  }
+//  def mkCopy()(implicit tx: S#Tx): Action.Elem[S] = {
+//    val cpy = peer match {
+//      case Action.Var(vr) => Action.Var(vr())
+//      case other => other
+//    }
+//    Action.Elem(cpy)
+//  }
 }
