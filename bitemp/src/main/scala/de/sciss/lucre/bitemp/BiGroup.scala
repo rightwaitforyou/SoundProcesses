@@ -16,10 +16,10 @@ package bitemp
 
 import de.sciss.lucre.bitemp.impl.{BiGroupImpl => Impl}
 import de.sciss.lucre.data.Iterator
-import de.sciss.lucre.event.{EventLike, Publisher, Sys}
+import de.sciss.lucre.event.{EventLike, Publisher}
 import de.sciss.lucre.expr.{Expr, ExprType1}
 import de.sciss.lucre.geom.LongSquare
-import de.sciss.lucre.stm.Identifiable
+import de.sciss.lucre.stm.{Sys, Identifiable}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.DataInput
 import de.sciss.span.{SpanLike => SpanLikeV}
