@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.IdentifierMap
+import de.sciss.lucre.stm.{Obj, IdentifierMap}
 import de.sciss.lucre.synth.{Txn, Server, Sys}
 import de.sciss.span.Span
 import de.sciss.synth.proc

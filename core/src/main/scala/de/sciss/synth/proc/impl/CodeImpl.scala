@@ -16,7 +16,6 @@ package impl
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, File}
 
-import de.sciss.lucre.event.Sys
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.{event => evt}
 import de.sciss.processor.ProcessorLike
@@ -98,53 +97,53 @@ import scala.annotation.tailrec
 
   // ---- elem ----
 
-  object ElemImpl extends proc.impl.ElemCompanionImpl[Code.Elem] {
-    def typeID = Code.typeID // 0x20001
-
-    // Elem.registerExtension(this)
-
-    def apply[S <: Sys[S]](peer: Expr[S, Code])(implicit tx: S#Tx): Code.Elem[S] = {
-      val targets = evt.Targets[S]
-      new Impl[S](targets, peer)
-    }
-
-    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Code.Elem[S] =
-      serializer[S].read(in, access)
-
-    // ---- Elem.Extension ----
-
-    /** Read identified active element */
-    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): Code.Elem[S] with evt.Node[S] = {
-      val peer = Code.Expr.read(in, access)
-      new Impl[S](targets, peer)
-    }
-
-    /** Read identified constant element */
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Code.Elem[S] =
-      sys.error("Constant Code not supported")
-
-    // ---- implementation ----
-
-    private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
-                                          val peer: Expr[S, Code])
-      extends Code.Elem[S]
-      with proc.impl.ActiveElemImpl[S] {
-
-      def typeID = ElemImpl.typeID
-      def prefix = "Code"
-
-      override def toString: String = s"$prefix$id"
-
-      def mkCopy()(implicit tx: S#Tx): Code.Elem[S] = {
-        val cpy = peer match {
-          case Expr.Var(vr) => Code.Expr.newVar(vr())
-          case other => other
-        }
-        Code.Elem(cpy)
-      }
-    }
-  }
+//  object ElemImpl extends proc.impl.ElemCompanionImpl[Code.Elem] {
+//    def typeID = Code.typeID // 0x20001
+//
+//    // Elem.registerExtension(this)
+//
+//    def apply[S <: Sys[S]](peer: Expr[S, Code])(implicit tx: S#Tx): Code.Elem[S] = {
+//      val targets = evt.Targets[S]
+//      new Impl[S](targets, peer)
+//    }
+//
+//    def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Code.Elem[S] =
+//      serializer[S].read(in, access)
+//
+//    // ---- Elem.Extension ----
+//
+//    /** Read identified active element */
+//    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+//                                   (implicit tx: S#Tx): Code.Elem[S] with evt.Node[S] = {
+//      val peer = Code.Expr.read(in, access)
+//      new Impl[S](targets, peer)
+//    }
+//
+//    /** Read identified constant element */
+//    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Code.Elem[S] =
+//      sys.error("Constant Code not supported")
+//
+//    // ---- implementation ----
+//
+//    private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S],
+//                                          val peer: Expr[S, Code])
+//      extends Code.Elem[S]
+//      with proc.impl.ActiveElemImpl[S] {
+//
+//      def typeID = ElemImpl.typeID
+//      def prefix = "Code"
+//
+//      override def toString: String = s"$prefix$id"
+//
+//      def mkCopy()(implicit tx: S#Tx): Code.Elem[S] = {
+//        val cpy = peer match {
+//          case Expr.Var(vr) => Code.Expr.newVar(vr())
+//          case other => other
+//        }
+//        Code.Elem(cpy)
+//      }
+//    }
+//  }
 
   // ---- imports ----
 

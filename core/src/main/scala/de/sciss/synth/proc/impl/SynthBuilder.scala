@@ -23,7 +23,7 @@ import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
   *
   * @see  [[AuralProcImpl]]
   */
-final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, val timeRef: TimeRef)
+final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val timeRef: TimeRef)
   extends NodeDependencyBuilder[S] {
 
   override def toString = s"SynthBuilder($obj, $synth, $timeRef)"
@@ -87,11 +87,11 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc.Obj[S], val synth: Synth, va
 /** An object used in the preparatory phase of playing a process. It allows
   * the addition of asynchronous processors.
   */
-final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc.Obj[S]) {
+final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc[S]) {
   var resources = List.empty[AsyncResource[S]]
 }
 
-final class SynthUpdater[S <: Sys[S]](val obj: Proc.Obj[S], val node: Node, key: String, nodeRef: NodeRef.Full)
+final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], val node: Node, key: String, nodeRef: NodeRef.Full)
   extends NodeDependencyBuilder[S] {
 
   private var setMap = Vector.empty[ControlSet]

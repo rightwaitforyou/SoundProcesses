@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{Disposable, IdentifierMap}
+import de.sciss.lucre.stm.{Obj, Disposable, IdentifierMap}
 import de.sciss.lucre.synth.{Server, Sys}
 
 import scala.concurrent.stm.Ref

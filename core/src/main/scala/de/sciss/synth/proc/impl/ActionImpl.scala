@@ -14,18 +14,15 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.{event => evt}
-import de.sciss.synth.proc
-import de.sciss.lucre.event.EventLike
-import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Obj, NoSys, Sys, TxnLike, IDPeek}
-import de.sciss.serial.{Serializer, DataInput, DataOutput}
+import de.sciss.lucre.stm.{IDPeek, NoSys, Obj, Sys, TxnLike}
+import de.sciss.lucre.{event => evt, stm}
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 import scala.annotation.switch
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.collection.mutable
-import scala.concurrent.{Promise, Future, blocking}
 import scala.concurrent.stm.{InTxn, TMap, TSet}
+import scala.concurrent.{Future, Promise, blocking}
 
 object ActionImpl {
   // private val count = TxnLocal(0) // to distinguish different action class-names within the same transaction
@@ -270,18 +267,21 @@ object ActionImpl {
   }
 
   private final class VarImpl[S <: Sys[S]](protected val targets: evt.Targets[S], peer: S#Var[Action[S]])
-    extends Action.Var[S] with evt.impl.SingleGenerator[S, Unit, Action[S]] {
+    extends Action.Var[S]
+    with evt.impl.SingleNode[S, Unit] {
 
     def apply()(implicit tx: S#Tx): Action[S] = peer()
 
     def update(value: Action[S])(implicit tx: S#Tx): Unit = {
       val old = peer()
       peer()  = value
-      if (old != value) fire(())
+      if (old != value) changed.fire(())
     }
 
-    // stupidly defined on stm.Var
-    def transform(fun: Action[S] => Action[S])(implicit tx: S#Tx): Unit = update(fun(apply()))
+    object changed extends Changed with evt.impl.Generator[S, Unit]
+
+//    // stupidly defined on stm.Var
+//    def transform(fun: Action[S] => Action[S])(implicit tx: S#Tx): Unit = update(fun(apply()))
 
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = peer().execute(universe)
 

@@ -63,7 +63,6 @@ object ProcImpl {
   final class ScansImpl[S <: Sys[S]](proc: Impl[S], val slot: Int, isInput: Boolean)
     extends Scans.Modifiable[S]
     with evti.EventImpl [S, Proc.Update[S], Proc[S]]
-    with evt.InvariantEvent[S, Proc.Update[S], Proc[S]]
     with impl.KeyMapImpl[S, String, Scan[S], Scan.Update[S]] {
 
     // ---- key-map-impl details ----
@@ -127,7 +126,6 @@ object ProcImpl {
     def isConnected(implicit tx: S#Tx): Boolean = targets.nonEmpty
 
     sealed trait ProcEvent {
-      final protected def reader: evt.Reader[S, Proc[S]] = ProcImpl.serializer
       final def node: Proc[S] with evt.Node[S] = proc
     }
 
@@ -136,7 +134,6 @@ object ProcImpl {
 
     object StateEvent
       extends evti.TriggerImpl[S, Proc.Update[S], Proc[S]]
-      with evt.InvariantEvent [S, Proc.Update[S], Proc[S]]
       with evti.Root          [S, Proc.Update[S]]
       with ProcEvent {
 
@@ -145,7 +142,6 @@ object ProcImpl {
 
     private object ChangeEvent
       extends evt.impl.EventImpl[S, Proc.Update[S], Proc[S]]
-      with evt.InvariantEvent   [S, Proc.Update[S], Proc[S]]
       with ProcEvent {
 
       final val slot = 4

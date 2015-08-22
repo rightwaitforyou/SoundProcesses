@@ -52,10 +52,12 @@ object GraphemeImpl {
   //   private val anyModSer   = new ModSer[ evt.InMemory ]
 
   private final class Ser[S <: Sys[S]] extends Obj.Serializer[S, Grapheme[S]] {
+    def typeID: Int = Grapheme.typeID
+
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Grapheme[S] = {
       implicit val elemType = Expr // .serializer[ S ]
       val numChannels = in.readInt()
-      val pin         = BiPin.Modifiable.read[S, Value](in, access)
+      val pin         = BiPin.Modifiable.read[S, Expr[S]](in, access)
       new Impl(targets, numChannels, pin)
     }
   }
@@ -71,14 +73,14 @@ object GraphemeImpl {
   def modifiable[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = {
     val targets = evt.Targets[S] // XXX TODO: partial?
     implicit val elemType = Expr
-    val pin = BiPin.Modifiable[S, Value]
+    val pin = BiPin.Modifiable[S, Expr[S]]
     new Impl(targets, numChannels, pin)
   }
 
   // ---- actual implementation ----
 
   private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S], val numChannels: Int,
-                                        pin: BiPin.Modifiable[S, Grapheme.Value])
+                                        pin: BiPin.Modifiable[S, Grapheme.Expr[S]])
     extends Modifiable[S] with evti.StandaloneLike[S, Grapheme.Update[S], Grapheme[S]] {
     graph =>
 
@@ -197,8 +199,6 @@ object GraphemeImpl {
 
     // ---- node and event ----
 
-    protected def reader: evt.Reader[S, Grapheme[S]] = serializer[S]
-
     def connect   ()(implicit tx: S#Tx): Unit = pin.changed ---> this
     def disconnect()(implicit tx: S#Tx): Unit = pin.changed -/-> this
 
@@ -256,12 +256,13 @@ object GraphemeImpl {
               //     ceilTime: if ceilTime is undefined, or if it is `Audio`, the span I--ceil is a
               //     constant, otherwise if it is `Curve` we need to calculate the curve segment.
 
-              case BiPin.Element(elem, elemCh) =>
-                val (timeCh, magCh) = elemCh.unzip
-                val seqAdd = segmentsAfterAdded(timeCh.now, magCh.now)
-                if (timeCh.isSignificant) {
-                  segmentAfterRemoved(timeCh.before) +: seqAdd
-                } else seqAdd
+// ELEM
+//              case BiPin.Element(elem, elemCh) =>
+//                val (timeCh, magCh) = elemCh.unzip
+//                val seqAdd = segmentsAfterAdded(timeCh.now, magCh.now)
+//                if (timeCh.isSignificant) {
+//                  segmentAfterRemoved(timeCh.before) +: seqAdd
+//                } else seqAdd
             }
             seq.foldLeft(res)(incorporate)
         }

@@ -74,7 +74,7 @@ object TimelineImpl {
 
     override def modifiableOption: Option[Timeline.Modifiable[S]] = Some(this)
 
-    def eventView(obj: Obj[S]): EventLike[S, Timeline.Update[S]] = obj.changed
+    // def eventView(obj: Obj[S]): EventLike[S, Timeline.Update[S]] = obj.changed
 
     def elemSerializer: Serializer[S#Tx, S#Acc, Obj[S]] = Obj.serializer[S]
 

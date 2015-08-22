@@ -17,7 +17,7 @@ package impl
 import de.sciss.lucre.stm.DataStore
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.synth.impl.TxnFullImpl
-import de.sciss.lucre.{confluent, event => evt, stm}
+import de.sciss.lucre.{confluent, stm}
 
 import scala.concurrent.stm.InTxn
 
@@ -40,14 +40,14 @@ private[proc] object ConfluentImpl {
     new System(storeFactory, eventStore, durable)
   }
 
-  private sealed trait TxnImpl extends Confluent.Txn with ConfluentReactiveImpl.TxnMixin[S] with TxnFullImpl[S] {
+  private sealed trait TxnImpl extends Confluent.Txn with confluent.impl.TxnMixin[S] with TxnFullImpl[S] {
     final lazy val inMemory: /* evt. */ InMemory#Tx = system.inMemory.wrap(peer)
   }
 
   private final class RegularTxn(val system: S, val durable: /* evt. */ Durable#Tx,
                                  val inputAccess: S#Acc, val isRetroactive: Boolean,
                                  val cursorCache: confluent.Cache[S#Tx])
-    extends confluent.impl.RegularTxnMixin[S, evt.Durable] with TxnImpl {
+    extends confluent.impl.RegularTxnMixin[S, stm.Durable] with TxnImpl {
 
     lazy val peer = durable.peer
   }
@@ -63,7 +63,7 @@ private[proc] object ConfluentImpl {
 
   private final class System(protected val storeFactory: DataStore.Factory,
                              protected val eventStore: DataStore, val durable: /* evt. */ Durable)
-    extends confluent.reactive.impl.ConfluentReactiveImpl.Mixin[S]
+    extends confluent.impl.Mixin[S]
     with Confluent {
 
     def inMemory              = durable.inMemory

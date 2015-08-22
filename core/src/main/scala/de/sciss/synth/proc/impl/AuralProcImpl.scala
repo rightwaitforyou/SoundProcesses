@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
+import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Buffer, Synth, Sys}
@@ -29,6 +30,8 @@ import Timeline.SampleRate
 
 import scala.concurrent.Future
 import scala.concurrent.stm.Ref
+
+import TransitoryAPI._
 
 object AuralProcImpl {
   def apply[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
@@ -98,7 +101,7 @@ object AuralProcImpl {
     private val targetStateRef      = Ref[TargetState   ](TargetStop      )
     private val playingRef          = Ref[PlayingRef    ](PlayingNone     )
 
-    final def obj: stm.Source[S#Tx, Proc.Obj[S]] = _data.obj
+    final def obj: stm.Source[S#Tx, Proc[S]] = _data.obj
 
     final def typeID: Int = Proc.typeID
 
@@ -235,7 +238,7 @@ object AuralProcImpl {
 
         // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
         //           we cannot use ControlSet any more, but need other mechanism
-        b.obj.elem.peer.inputs.get(key).foreach { scan =>
+        b.obj.inputs.get(key).foreach { scan =>
           val src = scan.iterator
           if (src.isEmpty) {
             // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
@@ -282,11 +285,11 @@ object AuralProcImpl {
     protected def buildAsyncAttrInput(b: AsyncProcBuilder[S], key: String, value: UGB.Value)
                                      (implicit tx: S#Tx): Unit = value match {
       case UGB.Input.Buffer.Value(numFr, numCh, true) =>   // ----------------------- random access buffer
-        b.obj.attr.getElem(key).fold[Unit] {
+        b.obj.attrGet(key).fold[Unit] {
           sys.error(s"Missing attribute $key for buffer content")
         } {
           case a: AudioGraphemeElem[S] =>
-            val audioElem = a.peer
+            val audioElem = a
             val spec      = audioElem.spec
             val f         = audioElem.artifact.value
             val offset    = audioElem.offset  .value
@@ -355,7 +358,7 @@ object AuralProcImpl {
       val ug            = ugen.result
       implicit val itx  = tx.peer
 
-      val nameHint      = p.attr[StringElem](ObjKeys.attrName).map(_.value)
+      val nameHint      = p.attr[Expr[S, String]](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
       val builder       = new SynthBuilder(p, synth, timeRef)

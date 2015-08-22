@@ -15,24 +15,25 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, data}
-import data.SkipList
-import evt.{EventLike, impl => evti}
-import de.sciss.serial.{DataOutput, DataInput, Serializer}
+import de.sciss.lucre.data.SkipList
+import de.sciss.lucre.event.{EventLike, impl => evti}
+import de.sciss.lucre.stm.{Obj, Sys}
+import de.sciss.lucre.{data, event => evt}
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 object KeyMapImpl {
-  trait ValueInfo[S <: evt.Sys[S], Key, Value, ValueUpd] {
+  trait ValueInfo[S <: Sys[S], Key, Value, ValueUpd] {
     def valueEvent(value: Value): EventLike[S, ValueUpd]
 
     def keySerializer  : Serializer[S#Tx, S#Acc, Key]
     def valueSerializer: Serializer[S#Tx, S#Acc, Value]
   }
 
-  implicit def entrySerializer[S <: evt.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
-  : evt.Serializer[S, Entry[S, Key, Value, ValueUpd]] = new EntrySer[S, Key, Value, ValueUpd]
+  implicit def entrySerializer[S <: Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
+  : Serializer[S#Tx, S#Acc, Entry[S, Key, Value, ValueUpd]] = new EntrySer[S, Key, Value, ValueUpd]
 
-  private final class EntrySer[S <: evt.Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
-    extends evt.NodeSerializer[S, Entry[S, Key, Value, ValueUpd]] {
+  private final class EntrySer[S <: Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
+    extends Obj.Serializer[S, Entry[S, Key, Value, ValueUpd]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Entry[S, Key, Value, ValueUpd] = {
       val key   = info.keySerializer.read(in, access)
       val value = info.valueSerializer.read(in, access)
@@ -40,10 +41,9 @@ object KeyMapImpl {
     }
   }
 
-  final class Entry[S <: evt.Sys[S], Key, Value, ValueUpd](protected val targets: evt.Targets[S], val key: Key,
+  final class Entry[S <: Sys[S], Key, Value, ValueUpd](protected val targets: evt.Targets[S], val key: Key,
                                                        val value: Value)(implicit info: ValueInfo[S, Key, Value, ValueUpd])
     extends evti.StandaloneLike[S, (Key, ValueUpd), Entry[S, Key, Value, ValueUpd]] {
-    protected def reader: evt.Reader[S, Entry[S, Key, Value, ValueUpd]] = entrySerializer
 
     def connect   ()(implicit tx: S#Tx): Unit = info.valueEvent(value) ---> this
     def disconnect()(implicit tx: S#Tx): Unit = info.valueEvent(value) -/-> this
@@ -68,8 +68,8 @@ object KeyMapImpl {
   * @tparam Value     the value type, which has an event attached to it (found via `valueInfo`)
   * @tparam ValueUpd  the value updates fired
   */
-trait KeyMapImpl[S <: evt.Sys[S], Key, Value, ValueUpd] {
-  _: evt.VirtualNodeSelector[S] =>
+trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
+  // _: evt.VirtualNodeSelector[S] =>
 
   protected type Entry = KeyMapImpl.Entry    [S, Key, Value, ValueUpd]
   protected type Info  = KeyMapImpl.ValueInfo[S, Key, Value, ValueUpd]

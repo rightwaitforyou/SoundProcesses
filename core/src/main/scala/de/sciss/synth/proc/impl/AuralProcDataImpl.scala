@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.file._
+import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Obj, Disposable}
 import de.sciss.lucre.synth.{Buffer, BusNodeSetter, AudioBus, Bus, NodeRef, Sys}
@@ -32,6 +33,8 @@ import de.sciss.synth.{ControlSet, SynthGraph}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
+
+import TransitoryAPI._
 
 object AuralProcDataImpl {
   def apply[S <: Sys[S]](proc: Proc[S])
@@ -60,6 +63,7 @@ object AuralProcDataImpl {
     private val procLoc   = TxnLocal[Proc[S]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
+    private var attrObserver: Disposable[S#Tx] = _
 
     private var _obj: stm.Source[S#Tx, Proc[S]] = _
 
@@ -75,22 +79,21 @@ object AuralProcDataImpl {
 
       procObserver = proc.changed.react { implicit tx => upd =>
         upd.changes.foreach {
-          case Obj.ElemChange(Proc.Update(_, pCh)) =>
-            pCh.foreach {
-              case Proc.GraphChange(Change(_, newGraph))  => newSynthGraph(newGraph)
-              case Proc.InputAdded   (key, scan)          => scanInAdded (key, scan)
-              case Proc.OutputAdded  (key, scan)          => scanOutAdded(key, scan)
-              case Proc.InputRemoved (key, scan)          => scanRemoved (key, scan)
-              case Proc.OutputRemoved(key, scan)          => scanRemoved (key, scan)
-              case Proc.InputChange  (key, scan, sCh)     => scanInChange(key, scan, sCh)
-              case Proc.OutputChange (key, scan, sCh)     => // nada
-            }
-
-          case Obj.AttrAdded  (key, value)          => attrAdded  (key, value)
-          case Obj.AttrRemoved(key, value)          => attrRemoved(key, value)
-          case Obj.AttrChange (key, value, aCh)     => attrChange (key, value, aCh)
+          case Proc.GraphChange(Change(_, newGraph))  => newSynthGraph(newGraph)
+          case Proc.InputAdded   (key, scan)          => scanInAdded (key, scan)
+          case Proc.OutputAdded  (key, scan)          => scanOutAdded(key, scan)
+          case Proc.InputRemoved (key, scan)          => scanRemoved (key, scan)
+          case Proc.OutputRemoved(key, scan)          => scanRemoved (key, scan)
+          case Proc.InputChange  (key, scan, sCh)     => scanInChange(key, scan, sCh)
+          case Proc.OutputChange (key, scan, sCh)     => // nada
         }
       }
+      attrObserver = proc.attrChanged.react { implicit tx => {
+        case AttrAdded  (key, value)          => attrAdded  (key, value)
+        case AttrRemoved(key, value)          => attrRemoved(key, value)
+// ELEM
+//        case AttrChange (key, value, aCh)     => attrChange (key, value, aCh)
+      }}
 
       tryBuild()
       this
@@ -184,24 +187,25 @@ object AuralProcDataImpl {
       } attrNodeUnset1(n, key)
     }
 
-    private def attrChange(key: String, value: Obj[S], changes: Vec[Obj.Change[S, Any]])(implicit tx: S#Tx): Unit = {
+    private def attrChange(key: String, value: Obj[S], changes: Vec[AttrUpdate[S]])(implicit tx: S#Tx): Unit = {
       logA(s"AttrChange in   ${procCached()} ($key)")
-      // currently, instead of processing the changes
-      // for individual types, we'll just re-evaluate
-      // the value and set it that way
-      val isElem = changes.exists {
-        case Obj.ElemChange(_) => true
-        case _ => false
-      }
-      if (isElem) {
-        for {
-          n <- nodeRef.get(tx.peer)
-          v <- state.acceptedInputs.get(UGB.AttributeKey(key))
-        } {
-          attrNodeUnset1(n, key)
-          attrNodeSet1  (n, key, v, value)
-        }
-      }
+// ELEM
+//      // currently, instead of processing the changes
+//      // for individual types, we'll just re-evaluate
+//      // the value and set it that way
+//      val isElem = changes.exists {
+//        case Obj.ElemChange(_) => true
+//        case _ => false
+//      }
+//      if (isElem) {
+//        for {
+//          n <- nodeRef.get(tx.peer)
+//          v <- state.acceptedInputs.get(UGB.AttributeKey(key))
+//        } {
+//          attrNodeUnset1(n, key)
+//          attrNodeSet1  (n, key, v, value)
+//        }
+//      }
     }
 
     private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
@@ -288,6 +292,7 @@ object AuralProcDataImpl {
     /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
       procObserver.dispose()
+      attrObserver.dispose()
       disposeNodeRefAndScans()
     }
 
@@ -350,7 +355,7 @@ object AuralProcDataImpl {
         logA(s"buildAdvanced ${procCached()}; rejectedInputs = ${now.rejectedInputs.mkString(",")}")
 
         // store proxies so future sinks can detect this incomplete proc
-        val scans = procCached().elem.peer.inputs
+        val scans = procCached().inputs
         now.rejectedInputs.foreach {
           case UGB.ScanKey(key) =>
             scans.get(key).foreach { scan =>
@@ -422,7 +427,7 @@ object AuralProcDataImpl {
                                        (implicit tx: S#Tx): Unit = {
       val views = if (isInput) scanInViews else scanOutViews
       views.get(key)(tx.peer).fold {
-        val proc  = procCached().elem.peer
+        val proc  = procCached()
         val scans = if (isInput) proc.inputs else proc.outputs
         scans.get(key).fold[Unit] {
           mkBus(key, numChannels)
@@ -507,12 +512,12 @@ object AuralProcDataImpl {
 
       case i: UGB.Input.Buffer =>
         val procObj = procCached()
-        val (numFr, numCh) = procObj.attr.getElem(i.name).fold((-1L, -1)) {
+        val (numFr, numCh) = procObj.attrGet(i.name).fold((-1L, -1)) {
           case a: DoubleVecElem[S] =>
-            val v = a.peer.value   // XXX TODO: would be better to write a.peer.size.value
+            val v = a.value   // XXX TODO: would be better to write a.peer.size.value
             (v.size.toLong, 1)
           case a: AudioGraphemeElem[S] =>
-            val spec = a.peer.spec
+            val spec = a.spec
             (spec.numFrames, spec.numChannels)
 
           case _ => (-1L, -1)
@@ -530,7 +535,7 @@ object AuralProcDataImpl {
 
     final def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanBuses.get(key)(tx.peer)
 
-    final def procCached()(implicit tx: S#Tx): Proc.Obj[S] = {
+    final def procCached()(implicit tx: S#Tx): Proc[S] = {
       implicit val itx = tx.peer
       if (procLoc.isInitialized) procLoc.get
       else {
@@ -548,10 +553,10 @@ object AuralProcDataImpl {
 
     private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
       val procObj = procCached()
-      procObj.attr.getElem(key).fold(-1) {
+      procObj.attrGet(key).fold(-1) {
         case a: DoubleVecElem    [S] => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
-        case _: FadeSpec.Elem    [S] => 4
+        case _: FadeSpec.Expr    [S] => 4
         case _ => -1
       }
     }
@@ -559,7 +564,7 @@ object AuralProcDataImpl {
     private def requestScanInNumChannels(req: UGenGraphBuilder.Input.Scan)(implicit tx: S#Tx): Int = {
       val procObj = procCached()    /** Sub-classes may override this if invoking the super-method. */
 
-      val proc    = procObj.elem.peer
+      val proc    = procObj
       val numCh0  = proc.inputs.get(req.name).fold(-1)(scanInNumChannels)
       val numCh   = if (numCh0 == -1) req.fixed else numCh0
       if (numCh == -1) throw MissingIn(req) else numCh
@@ -585,7 +590,7 @@ object AuralProcDataImpl {
 
     //////////////////////////////////////////////////////////////////////////////////////////////
     /** Sub-classes may override this if invoking the super-method. */
-    protected def buildAttrValueInput(b: NodeDependencyBuilder[S], key: String, value: Elem[S], numChannels: Int)
+    protected def buildAttrValueInput(b: NodeDependencyBuilder[S], key: String, value: Obj[S], numChannels: Int)
                                      (implicit tx: S#Tx): Unit = {
       val ctlName = graph.Attribute.controlName(key)
 
@@ -597,14 +602,14 @@ object AuralProcDataImpl {
           sys.error(s"Mismatch: Attribute $key has $numChannels channels, expected $expected")
 
       value match {
-        case a: IntElem     [S] =>
-          setControl(a.peer.value)
-        case a: DoubleElem  [S] =>
-          setControl(a.peer.value.toFloat)
-        case a: BooleanElem [S] =>
-          setControl(if (a.peer.value) 1f else 0f)
-        case a: FadeSpec.Elem[S] =>
-          val spec = a.peer.value
+        case a: Expr[S, Int] =>
+          setControl(a.value)
+        case a: Expr[S, Double] =>
+          setControl(a.value.toFloat)
+        case a: Expr[S, Boolean] =>
+          setControl(if (a.value) 1f else 0f)
+        case a: FadeSpec.Expr[S] =>
+          val spec = a.value
           // dur, shape-id, shape-curvature, floor
           val values = Vec(
             (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
@@ -616,16 +621,16 @@ object AuralProcDataImpl {
           b.addControl(ctlName -> values)
 
         case a: DoubleVecElem[S] =>
-          val values = a.peer.value.map(_.toFloat)
+          val values = a.value.map(_.toFloat)
           chanCheck(values.size)
           b.addControl(ctlName -> values)
 
         case a: AudioGraphemeElem[S] =>
           val ctlName   = graph.Attribute.controlName(key)
-          val audioElem = a.peer
+          val audioElem = a
           val spec      = audioElem.spec
           if (spec.numFrames != 1)
-            sys.error(s"Audio grapheme ${a.peer} must have exactly 1 frame to be used as scalar attribute")
+            sys.error(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
           val numCh = spec.numChannels // numChL.toInt
           if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
           chanCheck(numCh)
@@ -635,9 +640,9 @@ object AuralProcDataImpl {
           val w = AudioArtifactScalarWriter(bus, audioElem.value)
           b.addResource(w)
 
-        case a: Scan.Elem[S] =>
-          scanView(a.peer).fold {
-            Console.err.println(s"Warning: view for scan ${a.peer} used as attribute key $key not found.")
+        case a: Scan[S] =>
+          scanView(a).fold {
+            Console.err.println(s"Warning: view for scan $a used as attribute key $key not found.")
           } { view =>
             val bus = view.bus
             chanCheck(bus.numChannels)
@@ -657,7 +662,7 @@ object AuralProcDataImpl {
                       (implicit tx: S#Tx): Unit = {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
-          b.obj.attr.getElem(key).foreach { a =>
+          b.obj.attrGet(key).foreach { a =>
             buildAttrValueInput(b, key, a, numChannels = numChannels)
           }
 
@@ -676,14 +681,14 @@ object AuralProcDataImpl {
               val bestSzLo  = bestSzHi >> 1
               if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
             }
-            val (rb, gain) = b.obj.attr.getElem(key).fold[(Buffer, Float)] {
+            val (rb, gain) = b.obj.attrGet(key).fold[(Buffer, Float)] {
               // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
               // So instead of aborting when the attribute is not set, fall back to zero
               val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
               (_buf, 0f)
             } {
               case a: AudioGraphemeElem[S] =>
-                val audioElem = a.peer
+                val audioElem = a
                 val spec      = audioElem.spec
                 val path      = audioElem.artifact.value.getAbsolutePath
                 val offset    = audioElem.offset  .value
@@ -719,11 +724,11 @@ object AuralProcDataImpl {
           }
 
         case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
-          val rb = b.obj.attr.getElem(key).fold[Buffer] {
+          val rb = b.obj.attrGet(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for buffer content")
           } {
             case a: AudioGraphemeElem[S] =>
-              val audioElem = a.peer
+              val audioElem = a
               val spec      = audioElem.spec
               val path      = audioElem.artifact.value.getAbsolutePath
               val offset    = audioElem.offset  .value
@@ -748,11 +753,11 @@ object AuralProcDataImpl {
           b.addUser(resp)
 
         case UGB.Input.DiskOut.Value(numCh) =>
-          val rb = b.obj.attr.getElem(key).fold[Buffer] {
+          val rb = b.obj.attrGet(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for disk-out artifact")
           } {
-            case a: ArtifactElem[S] =>
-              val artifact  = a.peer
+            case a: Artifact[S] =>
+              val artifact  = a
               val f         = artifact.value.absolute
               val ext       = f.ext.toLowerCase
               val tpe       = AudioFileType.writable.find(_.extensions.contains(ext)).getOrElse(AudioFileType.AIFF)

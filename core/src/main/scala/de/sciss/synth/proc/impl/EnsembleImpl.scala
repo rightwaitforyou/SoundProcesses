@@ -28,7 +28,7 @@ object EnsembleImpl {
   def apply[S <: Sys[S]](folder: Folder /* Elem.Obj */[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
                         (implicit tx: S#Tx): Ensemble[S] = {
     val targets = evt.Targets[S]
-    new Impl(targets, folder, offset, playing)
+    new Impl(targets, folder, offset, playing).connect()
   }
 
   def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Ensemble[S]] = anySer.asInstanceOf[Ser[S]]
@@ -66,15 +66,13 @@ object EnsembleImpl {
   private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], folderEx: Folder /* Elem.Obj */[S],
                                         offsetEx: Expr[S, Long], playingEx: Expr[S, Boolean])
     extends Ensemble[S]
-    with evt.impl.StandaloneLike[S, Ensemble.Update[S], Ensemble[S]] {
+    with evt.impl.SingleNode[S, Ensemble.Update[S]] { self =>
 
     override def toString: String = s"Ensemble$id"
 
     def folder (implicit tx: S#Tx): Folder /* Elem.Obj */ [S] = folderEx
     def offset (implicit tx: S#Tx): Expr[S, Long]     = offsetEx
     def playing(implicit tx: S#Tx): Expr[S, Boolean]  = playingEx
-
-    def changed: EventLike[S, Update[S]] = this
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeInt(COOKIE)
@@ -83,39 +81,42 @@ object EnsembleImpl {
       playingEx.write(out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx): Unit = ()
+    protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
 
     // ---- event ----
 
-    def connect   ()(implicit tx: S#Tx): Unit = {
-      folderEx .changed ---> this
-      offsetEx .changed ---> this
-      playingEx.changed ---> this
+    def connect()(implicit tx: S#Tx): this.type = {
+      folderEx .changed ---> changed
+      offsetEx .changed ---> changed
+      playingEx.changed ---> changed
+      this
     }
 
-    def disconnect()(implicit tx: S#Tx): Unit = {
-      folderEx .changed -/-> this
-      offsetEx .changed -/-> this
-      playingEx.changed -/-> this
+    private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+      folderEx .changed -/-> changed
+      offsetEx .changed -/-> changed
+      playingEx.changed -/-> changed
     }
 
-    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Ensemble.Update[S]] = {
-      val folderEvt = folderEx /* .elem.peer */ .changed
-      val l1 = if (pull.contains(folderEvt))
-        pull(folderEvt).fold(List.empty[Ensemble.Change[S]])(Ensemble.Folder(_) :: Nil)
-      else Nil
+    object changed extends Changed {
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Ensemble.Update[S]] = {
+        val folderEvt = folderEx /* .elem.peer */ .changed
+        val l1 = if (pull.contains(folderEvt))
+          pull(folderEvt).fold(List.empty[Ensemble.Change[S]])(Ensemble.Folder(_) :: Nil)
+        else Nil
 
-      val offsetEvt = offsetEx.changed
-      val l2 = if (pull.contains(offsetEvt))
-        pull(offsetEvt).fold(l1)(Ensemble.Offset[S](_) :: l1)
-      else l1
+        val offsetEvt = offsetEx.changed
+        val l2 = if (pull.contains(offsetEvt))
+          pull(offsetEvt).fold(l1)(Ensemble.Offset[S](_) :: l1)
+        else l1
 
-      val playingEvt = playingEx.changed
-      val l3 = if (pull.contains(playingEvt))
-        pull(playingEvt).fold(l2)(Ensemble.Playing[S](_) :: l2)
-      else l2
+        val playingEvt = playingEx.changed
+        val l3 = if (pull.contains(playingEvt))
+          pull(playingEvt).fold(l2)(Ensemble.Playing[S](_) :: l2)
+        else l2
 
-      if (l3.isEmpty) None else Some(Ensemble.Update(this, l3))
+        if (l3.isEmpty) None else Some(Ensemble.Update(self, l3))
+      }
     }
   }
 }
