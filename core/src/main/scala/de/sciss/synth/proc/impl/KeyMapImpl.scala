@@ -17,46 +17,49 @@ package impl
 
 import de.sciss.lucre.data.SkipList
 import de.sciss.lucre.event.{EventLike, impl => evti}
-import de.sciss.lucre.stm.{Obj, Sys}
+import de.sciss.lucre.stm.{Disposable, Obj, Sys}
 import de.sciss.lucre.{data, event => evt}
-import de.sciss.serial.{DataInput, DataOutput, Serializer}
+import de.sciss.serial.{Writable, DataInput, DataOutput, Serializer}
 
 object KeyMapImpl {
-  trait ValueInfo[S <: Sys[S], Key, Value, ValueUpd] {
-    def valueEvent(value: Value): EventLike[S, ValueUpd]
+  trait ValueInfo[S <: Sys[S], Key, Value] {
+    // def valueEvent(value: Value): EventLike[S, ValueUpd]
 
     def keySerializer  : Serializer[S#Tx, S#Acc, Key]
     def valueSerializer: Serializer[S#Tx, S#Acc, Value]
   }
 
-  implicit def entrySerializer[S <: Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
-  : Serializer[S#Tx, S#Acc, Entry[S, Key, Value, ValueUpd]] = new EntrySer[S, Key, Value, ValueUpd]
+  implicit def entrySerializer[S <: Sys[S], Key, Value](implicit info: ValueInfo[S, Key, Value])
+  : Serializer[S#Tx, S#Acc, Entry[S, Key, Value]] = new EntrySer[S, Key, Value]
 
-  private final class EntrySer[S <: Sys[S], Key, Value, ValueUpd](implicit info: ValueInfo[S, Key, Value, ValueUpd])
-    extends Obj.Serializer[S, Entry[S, Key, Value, ValueUpd]] {
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Entry[S, Key, Value, ValueUpd] = {
+  private final class EntrySer[S <: Sys[S], Key, Value](implicit info: ValueInfo[S, Key, Value])
+    extends Serializer[S#Tx, S#Acc, Entry[S, Key, Value]] {
+
+    def write(e: Entry[S, Key, Value], out: DataOutput): Unit = e.write(out)
+
+    def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Entry[S, Key, Value] = {
       val key   = info.keySerializer.read(in, access)
       val value = info.valueSerializer.read(in, access)
-      new Entry(targets, key, value)
+      new Entry(key, value)
     }
   }
 
-  final class Entry[S <: Sys[S], Key, Value, ValueUpd](protected val targets: evt.Targets[S], val key: Key,
-                                                       val value: Value)(implicit info: ValueInfo[S, Key, Value, ValueUpd])
-    extends evti.StandaloneLike[S, (Key, ValueUpd), Entry[S, Key, Value, ValueUpd]] {
+  final class Entry[S <: Sys[S], Key, Value](val key: Key,
+                                             val value: Value)(implicit info: ValueInfo[S, Key, Value])
+    extends Writable with Disposable[S#Tx] { // extends evti.StandaloneLike[S, (Key, ValueUpd), Entry[S, Key, Value, ValueUpd]] {
 
-    def connect   ()(implicit tx: S#Tx): Unit = info.valueEvent(value) ---> this
-    def disconnect()(implicit tx: S#Tx): Unit = info.valueEvent(value) -/-> this
+//    def connect   ()(implicit tx: S#Tx): Unit = info.valueEvent(value) ---> this
+//    def disconnect()(implicit tx: S#Tx): Unit = info.valueEvent(value) -/-> this
 
-    protected def writeData(out: DataOutput): Unit = {
+    def write(out: DataOutput): Unit = {
       info.keySerializer  .write(key  , out)
       info.valueSerializer.write(value, out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx) = ()
+    def dispose()(implicit tx: S#Tx) = ()
 
-    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[(Key, ValueUpd)] =
-      pull(info.valueEvent(value)).map(key -> _)
+//    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[(Key, ValueUpd)] =
+//      pull(info.valueEvent(value)).map(key -> _)
   }
 }
 
@@ -66,19 +69,16 @@ object KeyMapImpl {
   * @tparam S         the system used
   * @tparam Key       the type of key, such as `String`
   * @tparam Value     the value type, which has an event attached to it (found via `valueInfo`)
-  * @tparam ValueUpd  the value updates fired
   */
-trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
+trait KeyMapImpl[S <: Sys[S], Key, Value] {
   // _: evt.VirtualNodeSelector[S] =>
+  // _: evt.impl.MappingNode[S] with evt.Publisher[S, ]
 
-  protected type Entry = KeyMapImpl.Entry    [S, Key, Value, ValueUpd]
-  protected type Info  = KeyMapImpl.ValueInfo[S, Key, Value, ValueUpd]
+  protected type Entry = KeyMapImpl.Entry    [S, Key, Value]
+  protected type Info  = KeyMapImpl.ValueInfo[S, Key, Value]
 
   /** The underlying non-reactive map */
   protected def map: SkipList.Map[S, Key, Entry]
-
-  /** Whether the underlying selector is currently connected or not */
-  protected def isConnected(implicit tx: S#Tx): Boolean
 
   /** Wrap the given set of added and removed keys in an appropriate update message
     * and dispatch it.
@@ -98,41 +98,34 @@ trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
     }
 
   final def add(key: Key, value: Value)(implicit tx: S#Tx): Unit = {
-    val con = isConnected
-    val tgt = evt.Targets[S] // XXX TODO : partial?
-    val n = new KeyMapImpl.Entry(tgt, key, value)
+    val n = new KeyMapImpl.Entry(key, value)
     val optRemoved: Option[(Key, Value)] = map.add(key -> n).map { oldNode =>
-      if (con) this -= oldNode
+      // this -= oldNode
       key -> oldNode.value
     }
-    if (con) {
-      this += n
-      fire(added = Some(key -> value), removed = optRemoved)
-    }
+    // this += n
+    fire(added = Some(key -> value), removed = optRemoved)
   }
 
   final def remove(key: Key)(implicit tx: S#Tx): Boolean =
     map.remove(key).exists { oldNode =>
-      val con = isConnected
-      if (con) {
-        this -= oldNode
-        fire(added = None, removed = Some(key -> oldNode.value))
-      }
+      // this -= oldNode
+      fire(added = None, removed = Some(key -> oldNode.value))
       true
     }
 
-  @inline private def +=(entry: Entry)(implicit tx: S#Tx): Unit = entry ---> this
-  @inline private def -=(entry: Entry)(implicit tx: S#Tx): Unit = entry -/-> this
+  //  @inline private def +=(entry: Entry)(implicit tx: S#Tx): Unit = entry ---> this
+  //  @inline private def -=(entry: Entry)(implicit tx: S#Tx): Unit = entry -/-> this
 
-  final def connect()(implicit tx: S#Tx): Unit =
-    map.iterator.foreach {
-      case (_, node) => this += node
-    }
-
-  final def disconnect()(implicit tx: S#Tx): Unit =
-    map.iterator.foreach {
-      case (_, node) => this -= node
-    }
+//  final def connect()(implicit tx: S#Tx): Unit =
+//    map.iterator.foreach {
+//      case (_, node) => this += node
+//    }
+//
+//  final def disconnect()(implicit tx: S#Tx): Unit =
+//    map.iterator.foreach {
+//      case (_, node) => this -= node
+//    }
 
   //   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, Vec[ ValueUpd ]] = {
   //      pull.parents( this ).foldLeft( Map.empty[ Key, Vec[ ValueUpd ]]) { case (map, sel) =>
@@ -144,17 +137,17 @@ trait KeyMapImpl[S <: Sys[S], Key, Value, ValueUpd] {
   //      }
   //   }
 
-  final protected def foldUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Map[Key, ValueUpd] = {
-    pull.parents(this).foldLeft(Map.empty[Key, ValueUpd]) {
-      case (map, sel) =>
-        val entryEvt = sel.devirtualize[(Key, ValueUpd), Entry](KeyMapImpl.entrySerializer)
-        pull(entryEvt) match {
-          case Some((key, upd)) =>
-            assert(!map.contains(key))
-            map + (key -> upd)
-          case None =>
-            map
-        }
-    }
-  }
+//  final protected def foldUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Map[Key, ValueUpd] = {
+//    pull.parents(this).foldLeft(Map.empty[Key, ValueUpd]) {
+//      case (map, sel) =>
+//        val entryEvt = sel.devirtualize[(Key, ValueUpd), Entry](KeyMapImpl.entrySerializer)
+//        pull(entryEvt) match {
+//          case Some((key, upd)) =>
+//            assert(!map.contains(key))
+//            map + (key -> upd)
+//          case None =>
+//            map
+//        }
+//    }
+//  }
 }

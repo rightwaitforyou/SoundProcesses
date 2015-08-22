@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.file._
+import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Obj, Disposable}
@@ -513,10 +514,10 @@ object AuralProcDataImpl {
       case i: UGB.Input.Buffer =>
         val procObj = procCached()
         val (numFr, numCh) = procObj.attrGet(i.name).fold((-1L, -1)) {
-          case a: DoubleVecElem[S] =>
+          case a: Expr[S, Vec[Double]] =>
             val v = a.value   // XXX TODO: would be better to write a.peer.size.value
             (v.size.toLong, 1)
-          case a: AudioGraphemeElem[S] =>
+          case a: Grapheme.Expr.Audio[S] =>
             val spec = a.spec
             (spec.numFrames, spec.numChannels)
 
@@ -554,9 +555,9 @@ object AuralProcDataImpl {
     private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
       val procObj = procCached()
       procObj.attrGet(key).fold(-1) {
-        case a: DoubleVecElem    [S] => a.peer.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: AudioGraphemeElem[S] => a.peer.spec.numChannels
-        case _: FadeSpec.Expr    [S] => 4
+        case a: Expr[S, Vec[Double]]    => a.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: Grapheme.Expr.Audio [S] => a.spec.numChannels
+        case _: FadeSpec.Expr       [S] => 4
         case _ => -1
       }
     }
@@ -620,12 +621,12 @@ object AuralProcDataImpl {
           chanCheck(values.size)
           b.addControl(ctlName -> values)
 
-        case a: DoubleVecElem[S] =>
+        case a: Expr[S, Vec[Double]] =>
           val values = a.value.map(_.toFloat)
           chanCheck(values.size)
           b.addControl(ctlName -> values)
 
-        case a: AudioGraphemeElem[S] =>
+        case a: Grapheme.Expr.Audio[S] =>
           val ctlName   = graph.Attribute.controlName(key)
           val audioElem = a
           val spec      = audioElem.spec
@@ -687,7 +688,7 @@ object AuralProcDataImpl {
               val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
               (_buf, 0f)
             } {
-              case a: AudioGraphemeElem[S] =>
+              case a: Grapheme.Expr.Audio[S] =>
                 val audioElem = a
                 val spec      = audioElem.spec
                 val path      = audioElem.artifact.value.getAbsolutePath
@@ -727,7 +728,7 @@ object AuralProcDataImpl {
           val rb = b.obj.attrGet(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for buffer content")
           } {
-            case a: AudioGraphemeElem[S] =>
+            case a: Grapheme.Expr.Audio[S] =>
               val audioElem = a
               val spec      = audioElem.spec
               val path      = audioElem.artifact.value.getAbsolutePath

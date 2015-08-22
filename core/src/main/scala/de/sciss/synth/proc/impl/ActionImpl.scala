@@ -49,7 +49,7 @@ object ActionImpl {
     p.future
   }
 
-  def empty[S <: Sys[S]](implicit tx: S#Tx): Action[S] = new ConstEmptyImpl[S]
+  def empty[S <: Sys[S]](implicit tx: S#Tx): Action[S] = new ConstEmptyImpl[S](tx.newID)
 
   def newVar[S <: Sys[S]](init: Action[S])(implicit tx: S#Tx): Action.Var[S] = {
     val targets = evt.Targets[S]
@@ -58,20 +58,20 @@ object ActionImpl {
   }
 
   def newConst[S <: Sys[S]](name: String, jar: Array[Byte])(implicit tx: S#Tx): Action[S] =
-    new ConstFunImpl(name, jar)
+    new ConstFunImpl(tx.newID(), name, jar)
 
   private val mapPredef = TMap.empty[String, Action.Body]
 
-  def predef[S <: Sys[S]](id: String)(implicit tx: S#Tx): Action[S] = {
-    if (!mapPredef.contains(id)(tx.peer))
-      throw new IllegalArgumentException(s"Predefined action '$id' is not registered")
+  def predef[S <: Sys[S]](actionID: String)(implicit tx: S#Tx): Action[S] = {
+    if (!mapPredef.contains(actionID)(tx.peer))
+      throw new IllegalArgumentException(s"Predefined action '$actionID' is not registered")
 
-    new ConstBodyImpl[S](id)
+    new ConstBodyImpl[S](tx.newID(), actionID)
   }
 
-  def registerPredef(id: String, body: Action.Body)(implicit tx: TxnLike): Unit =
-    if (mapPredef.put(id, body)(tx.peer).nonEmpty)
-      throw new IllegalArgumentException(s"Predefined action '$id' was already registered")
+  def registerPredef(actionID: String, body: Action.Body)(implicit tx: TxnLike): Unit =
+    if (mapPredef.put(actionID, body)(tx.peer).nonEmpty)
+      throw new IllegalArgumentException(s"Predefined action '$actionID' was already registered")
 
   private def classLoader[S <: Sys[S]](implicit tx: S#Tx): MemoryClassLoader = sync.synchronized {
     clMap.getOrElseUpdate(tx.system, {
@@ -157,13 +157,13 @@ object ActionImpl {
           val jar     = new Array[Byte](jarSize)
           in.readFully(jar)
           // val system  = tx.system
-          new ConstFunImpl[S](name, jar)
+          ??? // RRR targets vs id new ConstFunImpl[S](name, jar)
 
         case CONST_BODY   =>
-          val id  = in.readUTF()
-          new ConstBodyImpl[S](id)
+          val actionID = in.readUTF()
+          ??? // RRR targets vs id new ConstBodyImpl[S](actionID)
 
-        case CONST_EMPTY  => new ConstEmptyImpl[S]
+        case CONST_EMPTY  => ??? // RRR targets vs id new ConstEmptyImpl[S]
 
         case CONST_VAR =>
           readIdentifiedVar(in, access, targets)
@@ -210,24 +210,24 @@ object ActionImpl {
     def typeID: Int = Action.typeID
   }
 
-  private final case class ConstBodyImpl[S <: Sys[S]](id: String)
+  private final class ConstBodyImpl[S <: Sys[S]](val id: S#ID, val actionID: String)
     extends ConstImpl[S] {
 
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
-      val fun = mapPredef.getOrElse(id, sys.error(s"Predefined action '$id' not registered"))
+      val fun = mapPredef.getOrElse(actionID, sys.error(s"Predefined action '$actionID' not registered"))
       fun(universe)
     }
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeInt(COOKIE)
       out.writeByte(CONST_BODY)
-      out.writeUTF(id)
+      out.writeUTF(actionID)
     }
   }
 
   // XXX TODO - should be called ConstJarImpl in next major version
-  private final class ConstFunImpl[S <: Sys[S]](val name: String, jar: Array[Byte])
+  private final class ConstFunImpl[S <: Sys[S]](val id: S#ID, val name: String, jar: Array[Byte])
     extends ConstImpl[S] {
 
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = {
@@ -250,15 +250,15 @@ object ActionImpl {
     }
   }
 
-  private final class ConstEmptyImpl[S <: Sys[S]] extends ConstImpl[S] {
+  private final class ConstEmptyImpl[S <: Sys[S]](val id: S#ID) extends ConstImpl[S] {
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = ()
 
-    override def equals(that: Any): Boolean = that match {
-      case e: ConstEmptyImpl[_] => true
-      case _ => super.equals(that)
-    }
-
-    override def hashCode(): Int = 0
+//    override def equals(that: Any): Boolean = that match {
+//      case e: ConstEmptyImpl[_] => true
+//      case _ => super.equals(that)
+//    }
+//
+//    override def hashCode(): Int = 0
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeInt(COOKIE)
@@ -270,6 +270,8 @@ object ActionImpl {
     extends Action.Var[S]
     with evt.impl.SingleNode[S, Unit] {
 
+    def typeID: Int = Action.typeID
+
     def apply()(implicit tx: S#Tx): Action[S] = peer()
 
     def update(value: Action[S])(implicit tx: S#Tx): Unit = {
@@ -278,7 +280,8 @@ object ActionImpl {
       if (old != value) changed.fire(())
     }
 
-    object changed extends Changed with evt.impl.Generator[S, Unit]
+    // XXX TODO --- replace by RootGenerator
+    object changed extends Changed with evt.impl.Generator[S, Unit] with evt.impl.Root[S, Unit]
 
 //    // stupidly defined on stm.Var
 //    def transform(fun: Action[S] => Action[S])(implicit tx: S#Tx): Unit = update(fun(apply()))

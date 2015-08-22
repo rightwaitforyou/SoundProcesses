@@ -196,15 +196,16 @@ object Grapheme {
         }
       }
 
-      def readValue(in: DataInput): Value.Curve = Value.Curve.serializer.read(in)
+      def valueSerializer: ImmutableSerializer[Value.Curve] = Value.Curve.serializer
 
-      def writeValue(v: Value.Curve, out: DataOutput): Unit = v.write(out)
+//      def readValue(in: DataInput): Value.Curve = Value.Curve.serializer.read(in)
+//      def writeValue(v: Value.Curve, out: DataOutput): Unit = v.write(out)
 
-      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
-                                               targets: evt.Targets[S])(implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
-        if (cookie != curveCookie) sys.error(s"Unexpected cookie $cookie")
-        readIdentifiedTuple(in, access, targets)
-      }
+//      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
+//                                               targets: evt.Targets[S])(implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
+//        if (cookie != curveCookie) sys.error(s"Unexpected cookie $cookie")
+//        readIdentifiedTuple(in, access, targets)
+//      }
 
       private[Grapheme] def readIdentifiedTuple[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                             (implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
@@ -237,15 +238,16 @@ object Grapheme {
         }
       }
 
-      def readValue(in: DataInput): Value.Audio = Value.Audio.serializer.read(in)
+      def valueSerializer: ImmutableSerializer[Value.Audio] = Value.Audio.serializer
 
-      def writeValue(v: Value.Audio, out: DataOutput): Unit = v.write(out)
+//      def readValue(in: DataInput): Value.Audio = Value.Audio.serializer.read(in)
+//      def writeValue(v: Value.Audio, out: DataOutput): Unit = v.write(out)
 
-      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
-                                           targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
-        require(cookie == audioCookie, s"Unexpected cookie $cookie")
-        readIdentifiedTuple(in, access, targets)
-      }
+//      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
+//                                           targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
+//        require(cookie == audioCookie, s"Unexpected cookie $cookie")
+//        readIdentifiedTuple(in, access, targets)
+//      }
 
       private[Grapheme] def readIdentifiedTuple[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                              (implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
@@ -266,6 +268,8 @@ object Grapheme {
     private final class CurveImpl[S <: Sys[S]](protected val targets: evt.Targets[S],
                                                    val values: Vec[(_Expr[S, Double], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
+
+      def typeID: Int = Curve.typeID
 
       def value(implicit tx: S#Tx): Value.Curve = {
         val v = values.map {
@@ -334,6 +338,8 @@ object Grapheme {
                                                    val spec: AudioFileSpec, val offset: _Expr[S, Long],
                                                    val gain: _Expr[S, Double])
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
+
+      def typeID: Int = Audio.typeID
 
       def value(implicit tx: S#Tx): Value.Audio = {
         val artVal    = artifact.value
@@ -404,20 +410,20 @@ object Grapheme {
 
     def valueSerializer: ImmutableSerializer[Value] = Value.serializer
 
-    override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                            (implicit tx: S#Tx): Expr[S] with evt.Node[S] = {
-      (cookie: @switch) match {
-        case `curveCookie` => Curve.readIdentifiedTuple(in, access, targets)
-        case `audioCookie` => Audio.readIdentifiedTuple(in, access, targets)
-        case _ => sys.error(s"Unexpected cookie $cookie")
-      }
-    }
+//    override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+//                                            (implicit tx: S#Tx): Expr[S] with evt.Node[S] = {
+//      (cookie: @switch) match {
+//        case `curveCookie` => Curve.readIdentifiedTuple(in, access, targets)
+//        case `audioCookie` => Audio.readIdentifiedTuple(in, access, targets)
+//        case _ => sys.error(s"Unexpected cookie $cookie")
+//      }
+//    }
   }
 
   //  type Elem[S <: Sys[S]] = Expr[S, Value]
   sealed trait Expr[S <: Sys[S]] extends _Expr[S, Value]
 
-  type TimedElem[S <: Sys[S]] = BiPin.Entry[S, Value]
+  type TimedElem[S <: Sys[S]] = BiPin.Entry[S, Expr[S]]
 
   trait Modifiable[S <: Sys[S]] extends Grapheme[S] {
     def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit

@@ -288,7 +288,7 @@ object AuralProcImpl {
         b.obj.attrGet(key).fold[Unit] {
           sys.error(s"Missing attribute $key for buffer content")
         } {
-          case a: AudioGraphemeElem[S] =>
+          case a: Grapheme.Expr.Audio[S] =>
             val audioElem = a
             val spec      = audioElem.spec
             val f         = audioElem.artifact.value

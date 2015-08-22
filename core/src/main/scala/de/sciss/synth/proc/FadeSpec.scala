@@ -58,8 +58,10 @@ object FadeSpec {
     //    def longType    : BiType[Long    ] = Longs
     //    def spanLikeType: BiType[SpanLike] = SpanLikes
 
-    def readValue (                 in : DataInput ): FadeSpec  = FadeSpec.serializer.read (       in )
-    def writeValue(value: FadeSpec, out: DataOutput): Unit      = FadeSpec.serializer.write(value, out)
+    def valueSerializer: ImmutableSerializer[FadeSpec] = FadeSpec.serializer
+
+//    def readValue (                 in : DataInput ): FadeSpec  = FadeSpec.serializer.read (       in )
+//    def writeValue(value: FadeSpec, out: DataOutput): Unit      = FadeSpec.serializer.write(value, out)
 
     def apply[S <: Sys[S]](numFrames: _Expr[S, Long], shape: _Expr[S, Curve], floor: _Expr[S, Double])
                               (implicit tx: S#Tx): Expr[S] = {
@@ -73,15 +75,15 @@ object FadeSpec {
         case _ => None
       }
 
-    // XXX TODO: not cool. Should use `1` for `elemCookie`
-    override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                                              (implicit tx: S#Tx): Ex[S] with evt.Node[S] = {
-      require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
-      val numFrames = lucre      .expr.Long  .read(in, access)
-      val shape     = ??? : _Expr[S, Curve] // RRR lucre.synth.expr.Curve .read(in, access)
-      val floor     = lucre      .expr.Double.read(in, access)
-      new Impl(targets, numFrames, shape, floor)
-    }
+//    // XXX TODO: not cool. Should use `1` for `elemCookie`
+//    override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+//                                              (implicit tx: S#Tx): Ex[S] with evt.Node[S] = {
+//      require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
+//      val numFrames = lucre      .expr.Long  .read(in, access)
+//      val shape     = ??? : _Expr[S, Curve] // RRR lucre.synth.expr.Curve .read(in, access)
+//      val floor     = lucre      .expr.Double.read(in, access)
+//      new Impl(targets, numFrames, shape, floor)
+//    }
 
     private final class Impl[S <: Sys[S]](protected val targets: Targets[S],
                                               val numFrames: _Expr[S, Long],

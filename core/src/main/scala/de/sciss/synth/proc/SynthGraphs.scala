@@ -246,23 +246,22 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   private final val emptyCookie   = 2
   private final val tapeCookie    = 3
 
-  def readValue (                   in : DataInput ): SynthGraph  = ValueSerializer.read (       in )
-  def writeValue(value: SynthGraph, out: DataOutput): Unit        = ValueSerializer.write(value, out)
+  def valueSerializer: ImmutableSerializer[SynthGraph] = ValueSerializer
 
-  // XXX TODO: unused, remove
-  lazy val install: Unit = ()
+//  def readValue (                   in : DataInput ): SynthGraph  = ValueSerializer.read (       in )
+//  def writeValue(value: SynthGraph, out: DataOutput): Unit        = ValueSerializer.write(value, out)
 
-  // XXX TODO: not cool. Should use `1` to `3` for cookies
-  override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                                      (implicit tx: S#Tx): Ex[S] with evt.Node[S] =
-    cookie match {
-      case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` => ??? // RRR new Predefined(targets, cookie)
-
-      //      case `mapCookie`  =>
-      //        val key     = in.readUTF()
-      //        val graph   = map.synchronized(map(key))
-      //        new MapImpl(key, graph)
-    }
+//  // XXX TODO: not cool. Should use `1` to `3` for cookies
+//  override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+//                                      (implicit tx: S#Tx): Ex[S] with evt.Node[S] =
+//    cookie match {
+//      case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` => ??? // RRR new Predefined(targets, cookie)
+//
+//      //      case `mapCookie`  =>
+//      //        val key     = in.readUTF()
+//      //        val graph   = map.synchronized(map(key))
+//      //        new MapImpl(key, graph)
+//    }
 
   // private final class MapImpl[S <: Sys[S]]
 

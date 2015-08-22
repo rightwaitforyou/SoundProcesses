@@ -15,7 +15,7 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.event.{Event, impl => evti}
+import de.sciss.lucre.event.{impl => evti}
 import de.sciss.lucre.expr.List
 import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.{data, event => evt}
@@ -32,8 +32,8 @@ object ScanImpl {
   sealed trait Update[S]
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = {
-    val targets = evt.Targets[S] // XXX TODO: partial?
-    val list    = List.Modifiable[S, Link[S]]
+    val targets = evt.Targets[S]
+    val list    = ??? // RRR List.Modifiable[S, Link[S]]
     new Impl(targets, list)
   }
 
@@ -52,7 +52,7 @@ object ScanImpl {
       val serVer = in.readShort()
       if (serVer != SER_VERSION) sys.error(s"Incompatible serialized version (found $serVer, required $SER_VERSION)")
 
-      val list = List.Modifiable.read[S, Link[S]](in, access)
+      val list = ??? // RRR List.Modifiable.read[S, Link[S]](in, access)
       new Impl(targets, list)
     }
   }
@@ -87,9 +87,9 @@ object ScanImpl {
   private final class Impl[S <: Sys[S]](protected val targets : evt.Targets[S],
                                         protected val list    : List.Modifiable[S, Link[S]])
     extends Scan[S]
-    with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
-    with evti.Generator[S, Scan.Update[S]]
-    with evti.Root[S, Scan.Update[S]] {
+    with evti.SingleNode[S, Scan.Update[S]] {
+
+    def typeID: Int = Scan.typeID
 
     override def toString: String = s"Scan$id"
 
@@ -105,7 +105,7 @@ object ScanImpl {
         case Link.Scan(peer) => peer.add(Link.Scan(this))
         case _ =>
       }
-      fire(Scan.Update(this, Vec(Scan.Added(link))))
+      changed.fire(Scan.Update(this, Vec(Scan.Added(link))))
       true
     }
 
@@ -116,11 +116,13 @@ object ScanImpl {
         case Link.Scan(peer) => peer.remove(Link.Scan(this))
         case _ =>
       }
-      fire(Scan.Update(this, Vec(Scan.Removed(link))))
+      changed.fire(Scan.Update(this, Vec(Scan.Removed(link))))
       true
     }
 
-    def changed: Event[S, Scan.Update[S]] = this
+    object changed extends Changed
+      with evti.Generator[S, Scan.Update[S]]
+      with evti.Root[S, Scan.Update[S]]
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
@@ -129,7 +131,7 @@ object ScanImpl {
 
     protected def disposeData()(implicit tx: S#Tx): Unit = {
       list.dispose()
-      disconnect()
+      // disconnect()
     }
   }
 }

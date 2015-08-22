@@ -22,7 +22,7 @@ import de.sciss.serial.{DataInput, Serializer, Writable}
 import de.sciss.synth.proc
 import impl.{EnsembleImpl => Impl}
 
-object Ensemble {
+object Ensemble extends Obj.Type {
   final val typeID = 0x10007
 
   def apply[S <: Sys[S]](folder: proc.Folder /* Elem.Obj */[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
@@ -39,6 +39,8 @@ object Ensemble {
   final case class Folder [S <: Sys[S]](peer: expr.List.Update[S, Obj[S]] /* SCALAC BUG: proc.Folder.Update[S] */) extends Change[S]
   final case class Offset [S <: Sys[S]](peer: model.Change[Long   ]) extends Change[S]
   final case class Playing[S <: Sys[S]](peer: model.Change[Boolean]) extends Change[S]
+
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] = ??? // RRR
 }
 
 /** An `Ensemble` is sort of a persistent transport model.
@@ -48,7 +50,7 @@ object Ensemble {
   * from stopped to playing, the `offset` member determines
   * the "seek" position.
   */
-trait Ensemble[S <: Sys[S]] extends Writable with Disposable[S#Tx] with Publisher[S, Ensemble.Update[S]] {
+trait Ensemble[S <: Sys[S]] extends Obj[S] with Publisher[S, Ensemble.Update[S]] {
   def folder (implicit tx: S#Tx): Folder /* Elem.Obj */ [S]
   def offset (implicit tx: S#Tx): Expr[S, Long]
   def playing(implicit tx: S#Tx): Expr[S, Boolean]

@@ -191,7 +191,7 @@ object AuralObj {
   // ---- ensemble ----
 
   object Ensemble extends AuralObj.Factory {
-    type E[S <: Sys[S]] = _Ensemble[S]
+    type Repr[S <: Sys[S]] = _Ensemble[S]
 
     def typeID = _Ensemble.typeID
 
@@ -207,7 +207,7 @@ object AuralObj {
   // ---- action ----
 
   object Action extends AuralObj.Factory {
-    type E[S <: Sys[S]] = _Action[S]
+    type Repr[S <: Sys[S]] = _Action[S]
 
     def typeID = _Action.typeID
 

@@ -68,6 +68,8 @@ object EnsembleImpl {
     extends Ensemble[S]
     with evt.impl.SingleNode[S, Ensemble.Update[S]] { self =>
 
+    def typeID: Int = Ensemble.typeID
+
     override def toString: String = s"Ensemble$id"
 
     def folder (implicit tx: S#Tx): Folder /* Elem.Obj */ [S] = folderEx

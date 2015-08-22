@@ -74,26 +74,28 @@ object GraphemeImpl {
     val targets = evt.Targets[S] // XXX TODO: partial?
     implicit val elemType = Expr
     val pin = BiPin.Modifiable[S, Expr[S]]
-    new Impl(targets, numChannels, pin)
+    new Impl(targets, numChannels, pin).connect()
   }
 
   // ---- actual implementation ----
 
   private final class Impl[S <: Sys[S]](protected val targets: evt.Targets[S], val numChannels: Int,
                                         pin: BiPin.Modifiable[S, Grapheme.Expr[S]])
-    extends Modifiable[S] with evti.StandaloneLike[S, Grapheme.Update[S], Grapheme[S]] {
+    extends Modifiable[S] with evti.SingleNode[S, Grapheme.Update[S]] {
     graph =>
+
+    def typeID: Int = Grapheme.typeID
 
     override def toString: String = s"Grapheme$id"
 
     def modifiableOption: Option[Modifiable[S]] = Some(this)
 
-    def changed: Event[S, Grapheme.Update[S]] = this
+    object changed extends Changed with evti.Root[S, Grapheme.Update[S]]
 
     // ---- forwarding to pin ----
 
     def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit     = {
-      val elemCh = elem.magValue.numChannels
+      val elemCh = elem.value.value.numChannels
       if (elemCh != numChannels)
         throw new IllegalArgumentException(
           s"Trying to add element with $elemCh channels to grapheme with $numChannels channels"
@@ -124,16 +126,16 @@ object GraphemeImpl {
       loop(Long.MinValue, Nil)
     }
 
-    def valueAt(time: Long)(implicit tx: S#Tx): Option[Value] = {
-      pin.floor(time).map(_.magValue)
-    }
+    def valueAt(time: Long)(implicit tx: S#Tx): Option[Value] =
+      pin.floor(time).map(_.value.value)
 
-    def segment(time: Long)(implicit tx: S#Tx): Option[Segment.Defined] = {
+    def segment(time: Long)(implicit tx: S#Tx): Option[Segment.Defined] =
       pin.floor(time).map { elem =>
-        val (floorTime, floorVal) = elem.value
+        val floorTime = elem.key  .value
+        val floorVal  = elem.value.value
+        // val (floorTime, floorVal) = elem.value
         segmentFromFloor(floorTime, floorVal)
       }
-    }
 
     private def segmentFromSpan(floorTime: Long, floorCurveVals: Vec[Double],
                                 ceilTime: Long, ceilValue: Value): Segment.Defined = {
@@ -155,7 +157,9 @@ object GraphemeImpl {
           val floorCurveVals: Vec[Double] = floorCurve.values.map(_._1)(breakOut)
           pin.ceil(floorTime + 1) match {
             case Some(ceilElem) =>
-              val (ceilTime, ceilVal) = ceilElem.value
+              val ceilTime = ceilElem.key  .value
+              val ceilVal  = ceilElem.value.value
+              // val (ceilTime, ceilVal) = ceilElem.value
               segmentFromSpan(floorTime, floorCurveVals, ceilTime, ceilVal)
             case None =>
               Segment.Const(Span.from(floorTime), floorCurveVals)
@@ -181,7 +185,9 @@ object GraphemeImpl {
     private def segmentsAfterAdded(addTime: Long, addValue: Value)(implicit tx: S#Tx): Vec[Segment] = {
       val floorSegm = pin.floor(addTime - 1) match {
         case Some(floorElem) =>
-          val (floorTime, floorValue) = floorElem.value
+          val floorTime  = floorElem.key.value
+          val floorValue = floorElem.value.value
+          // val (floorTime, floorValue) = floorElem.value
           val s = floorValue match {
             case floorCurve: Value.Curve =>
               val floorCurveVals: Vec[Double] = floorCurve.values.map(_._1)(breakOut)
@@ -199,8 +205,12 @@ object GraphemeImpl {
 
     // ---- node and event ----
 
-    def connect   ()(implicit tx: S#Tx): Unit = pin.changed ---> this
-    def disconnect()(implicit tx: S#Tx): Unit = pin.changed -/-> this
+    def connect()(implicit tx: S#Tx): this.type = {
+      pin.changed ---> changed
+      this
+    }
+
+    private[this] def disconnect()(implicit tx: S#Tx): Unit = pin.changed -/-> changed
 
     private def incorporate(in: Vec[Segment], add: Segment): Vec[Segment] = {
       val addSpan = add.span
@@ -228,8 +238,8 @@ object GraphemeImpl {
         val segm: Vec[Segment] = upd.changes.foldLeft(Vec.empty[Segment]) {
           case (res, ch) =>
             val seq = ch match {
-              case BiPin.Added((addTime, addVal), _)  => segmentsAfterAdded(addTime, addVal)
-              case BiPin.Removed((remTime, _), _)     => Vec(segmentAfterRemoved(remTime))
+              case BiPin.Added  (addTime, entry)    => segmentsAfterAdded(addTime, entry.value.value)
+              case BiPin.Removed(remTime, entry)    => Vec(segmentAfterRemoved(remTime))
 
               // the BiPin.Collection update assumes the 'pin' character
               // of the elements. that means that for example, an insertion
@@ -256,13 +266,12 @@ object GraphemeImpl {
               //     ceilTime: if ceilTime is undefined, or if it is `Audio`, the span I--ceil is a
               //     constant, otherwise if it is `Curve` we need to calculate the curve segment.
 
-// ELEM
-//              case BiPin.Element(elem, elemCh) =>
-//                val (timeCh, magCh) = elemCh.unzip
-//                val seqAdd = segmentsAfterAdded(timeCh.now, magCh.now)
-//                if (timeCh.isSignificant) {
-//                  segmentAfterRemoved(timeCh.before) +: seqAdd
-//                } else seqAdd
+              case BiPin.Moved(timeCh, elem) =>
+                // val (timeCh, magCh) = elemCh.unzip
+                val seqAdd = segmentsAfterAdded(timeCh.now, elem.value.value /* magCh.now */)
+                if (timeCh.isSignificant) {
+                  segmentAfterRemoved(timeCh.before) +: seqAdd
+                } else seqAdd
             }
             seq.foldLeft(res)(incorporate)
         }
@@ -270,7 +279,11 @@ object GraphemeImpl {
       }
     }
 
-    protected def disposeData()(implicit tx: S#Tx): Unit = pin.dispose()
+    protected def disposeData()(implicit tx: S#Tx): Unit = {
+      disconnect()
+      pin.dispose()
+    }
+
     protected def writeData(out: DataOutput)      : Unit = {
       out.writeInt(numChannels)
       pin.write(out)

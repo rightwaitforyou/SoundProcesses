@@ -21,7 +21,7 @@ object TransitoryAPI {
     def attrPut   (key: String, value: Obj[S])(implicit tx: S#Tx): Unit     = ???
     def attrRemove(key: String               )(implicit tx: S#Tx): Boolean  = ???
 
-    def attrChanged: EventLike[S, AttrUpdate[S]]
+    def attrChanged: EventLike[S, AttrUpdate[S]] = ???
   }
 
   sealed trait AttrUpdate[S <: Sys[S]] {

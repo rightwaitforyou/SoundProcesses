@@ -16,14 +16,12 @@ package proc
 package impl
 
 import de.sciss.lucre.data.SkipList
-import de.sciss.lucre.event.{Event, impl => evti}
-import de.sciss.lucre.stm.{Obj, NoSys, Sys}
+import de.sciss.lucre.event.{impl => evti}
+import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.{event => evt}
-import de.sciss.serial.{Serializer, DataInput, DataOutput, ImmutableSerializer}
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Serializer}
 
-import scala.annotation.switch
-import scala.collection.breakOut
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.higherKinds
 
@@ -46,24 +44,24 @@ object ProcImpl {
       new Read(in, access, targets)
   }
 
-  private type ScanEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan[S], Scan.Update[S]]
+  private type ScanEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan[S]]
 
   private type I = InMemory
 
-  implicit def scanEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]] =
-    anyScanEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Scan[S], Scan.Update[S]]]
+  implicit def scanEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Scan[S]] =
+    anyScanEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Scan[S]]]
 
-  private val anyScanEntryInfo = new KeyMapImpl.ValueInfo[I, String, Scan[I], Scan.Update[I]] {
-    def valueEvent(value: Scan[I]) = value.changed
+  private val anyScanEntryInfo = new KeyMapImpl.ValueInfo[NoSys, String, Scan[NoSys]] {
+    // def valueEvent(value: Scan[NoSys]) = value.changed
 
     val keySerializer   = ImmutableSerializer.String
-    val valueSerializer = Scan.serializer[I]
+    val valueSerializer = Scan.serializer[NoSys]
   }
 
   final class ScansImpl[S <: Sys[S]](proc: Impl[S], val slot: Int, isInput: Boolean)
     extends Scans.Modifiable[S]
-    with evti.EventImpl [S, Proc.Update[S], Proc[S]]
-    with impl.KeyMapImpl[S, String, Scan[S], Scan.Update[S]] {
+    // with evti.EventImpl [S, Proc.Update[S], Proc[S]]
+    with impl.KeyMapImpl[S, String, Scan[S]] {
 
     // ---- key-map-impl details ----
 
@@ -82,12 +80,12 @@ object ProcImpl {
         b += (if (isInput) Proc.InputAdded[S](tup._1, tup._2) else Proc.OutputAdded[S](tup._1, tup._2))
       }
 
-      proc.StateEvent(Proc.Update(proc, b.result()))
+      proc.changed.fire(Proc.Update(proc, b.result()))
     }
 
-    def node: Proc[S] with evt.Node[S] = proc
+    // def node: Proc[S] with evt.Node[S] = proc
 
-    protected def isConnected(implicit tx: S#Tx): Boolean = proc.isConnected
+    // protected def isConnected(implicit tx: S#Tx): Boolean = proc.isConnected
 
     def add(key: String)(implicit tx: S#Tx): Scan[S] =
       get(key).getOrElse {
@@ -96,25 +94,25 @@ object ProcImpl {
         res
       }
 
-    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
-      val changes = foldUpdate(pull)
-      if (changes.isEmpty) None
-      else Some(Proc.Update(proc,
-        changes.map({
-          case (key, u) =>
-            if (isInput) Proc.InputChange (key, u.scan, u.changes)
-            else         Proc.OutputChange(key, u.scan, u.changes)
-        })(breakOut)))
-    }
+//    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
+//      val changes = foldUpdate(pull)
+//      if (changes.isEmpty) None
+//      else Some(Proc.Update(proc,
+//        changes.map({
+//          case (key, u) =>
+//            if (isInput) Proc.InputChange (key, u.scan, u.changes)
+//            else         Proc.OutputChange(key, u.scan, u.changes)
+//        })(breakOut)))
+//    }
 
     protected def valueInfo = scanEntryInfo[S]
   }
 
   private sealed trait Impl[S <: Sys[S]]
-    extends Proc[S] {
+    extends Proc[S] with evt.impl.SingleNode[S, Proc.Update[S]] {
     proc =>
 
-    def typeID: Int = Proc.typeID
+    final def typeID: Int = Proc.typeID
 
     import Proc._
 
@@ -125,73 +123,76 @@ object ProcImpl {
 
     def isConnected(implicit tx: S#Tx): Boolean = targets.nonEmpty
 
-    sealed trait ProcEvent {
-      final def node: Proc[S] with evt.Node[S] = proc
-    }
+//    sealed trait ProcEvent {
+//      final def node: Proc[S] with evt.Node[S] = proc
+//    }
 
     final val inputs  = new ScansImpl(this, 1, isInput = true )
     final val outputs = new ScansImpl(this, 2, isInput = false)
 
-    object StateEvent
-      extends evti.TriggerImpl[S, Proc.Update[S], Proc[S]]
-      with evti.Root          [S, Proc.Update[S]]
-      with ProcEvent {
+//    object StateEvent
+//      extends evti.TriggerImpl[S, Proc.Update[S], Proc[S]]
+//      with evti.Root          [S, Proc.Update[S]]
+//      with ProcEvent {
+//
+//      final val slot = 3
+//    }
 
-      final val slot = 3
+    final def connect()(implicit tx: S#Tx): this.type = {
+      graph.changed ---> changed
+      // inputs        ---> changed
+      // outputs       ---> changed
+      // StateEvent    ---> this
+      this
     }
 
-    private object ChangeEvent
-      extends evt.impl.EventImpl[S, Proc.Update[S], Proc[S]]
-      with ProcEvent {
+    private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+      graph.changed -/-> changed
+      // inputs        -/-> changed
+      // outputs       -/-> changed
+      // StateEvent    -/-> this
+    }
 
-      final val slot = 4
+    object changed extends Changed
+      with evt.impl.Generator[S, Proc.Update[S]]
+      // with evt.impl.Root[S, Proc.Update[S]]
+      // extends evt.impl.EventImpl[S, Proc.Update[S], Proc[S]]
+       {
 
-      def connect   ()(implicit tx: S#Tx): Unit = {
-        graph.changed ---> this
-        inputs        ---> this
-        outputs       ---> this
-        StateEvent    ---> this
-      }
-      def disconnect()(implicit tx: S#Tx): Unit = {
-        graph.changed -/-> this
-        inputs        -/-> this
-        outputs       -/-> this
-        StateEvent    -/-> this
-      }
+      // final val slot = 4
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
         // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
         val graphCh     = graph.changed
         val graphOpt    = if (pull.contains(graphCh   )) pull(graphCh   ) else None
-        val scanInsOpt  = if (pull.contains(inputs    )) pull(inputs    ) else None
-        val scanOutsOpt = if (pull.contains(outputs   )) pull(outputs   ) else None
-        val stateOpt    = if (pull.contains(StateEvent)) pull(StateEvent) else None
+//        val scanInsOpt  = if (pull.contains(inputs    )) pull(inputs    ) else None
+//        val scanOutsOpt = if (pull.contains(outputs   )) pull(outputs   ) else None
+        val stateOpt    = if (pull.isOrigin(this      )) pull(this      ) else None
 
         val seq0 = graphOpt.fold(Vec.empty[Change[S]]) { u =>
           Vector(GraphChange(u))
         }
-        val seq1 = scanInsOpt.fold(seq0) { u =>
-          if (seq0.isEmpty) u.changes else seq0 ++ u.changes
-        }
-        val seq2 = scanOutsOpt.fold(seq1) { u =>
-          if (seq1.isEmpty) u.changes else seq1 ++ u.changes
-        }
-        val seq3 = stateOpt.fold(seq2) { u =>
-          if (seq2.isEmpty) u.changes else seq2 ++ u.changes
+//        val seq1 = seq0
+//          scanInsOpt.fold(seq0) { u =>
+//          if (seq0.isEmpty) u.changes else seq0 ++ u.changes
+//        }
+//        val seq2 = seq1
+//        scanOutsOpt.fold(seq1) { u =>
+//          if (seq1.isEmpty) u.changes else seq1 ++ u.changes
+//        }
+        val seq3 = stateOpt.fold(seq0 /* seq2 */) { u =>
+          if (seq0 /* seq2 */.isEmpty) u.changes else seq0 /* seq2 */ ++ u.changes
         }
         if (seq3.isEmpty) None else Some(Proc.Update(proc, seq3))
       }
     }
 
-    final def event(slot: Int /*, invariant: Boolean */): Event[S, Any] = (slot: @switch) match {
-      case ChangeEvent.slot => ChangeEvent
-      case 1 /* inputs .slot */ => inputs
-      case 2 /* outputs.slot */ => outputs
-      case StateEvent .slot => StateEvent
-    }
-
-    //      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
-    final def changed: evt.Event[S, Update[S]] = ChangeEvent
+//    final def event(slot: Int /*, invariant: Boolean */): Event[S, Any] = (slot: @switch) match {
+//      case ChangeEvent.slot => ChangeEvent
+//      case 1 /* inputs .slot */ => inputs
+//      case 2 /* outputs.slot */ => outputs
+//      case StateEvent .slot => StateEvent
+//    }
 
     final protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
