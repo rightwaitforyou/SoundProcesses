@@ -14,15 +14,15 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{DataStore, DataStoreFactory}
+import de.sciss.lucre.stm.DataStore
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.synth.impl.TxnFullImpl
-import de.sciss.lucre.{event => evt, stm}
+import de.sciss.lucre.stm
 
 import scala.concurrent.stm.InTxn
 
 private[proc] object DurableImpl {
-  def apply(factory: DataStoreFactory[DataStore], mainName: String, eventName: String): Durable = {
+  def apply(factory: DataStore.Factory, mainName: String, eventName: String): Durable = {
     val mainStore   = factory.open(mainName)
     val eventStore  = factory.open(eventName, overwrite = true)
     new System(mainStore, eventStore)
@@ -31,7 +31,7 @@ private[proc] object DurableImpl {
   def apply(mainStore: DataStore, eventStore: DataStore): Durable = new System(mainStore, eventStore)
 
   private final class TxnImpl(val system: System, val peer: InTxn)
-    extends stm.impl.DurableImpl.TxnMixin[Durable] with evt.impl.DurableImpl.DurableTxnMixin[Durable]
+    extends stm.impl.DurableImpl.TxnMixin[Durable] with stm.impl.DurableImpl.TxnMixin[Durable]
     with TxnFullImpl[Durable] with Durable.Txn {
 
     lazy val inMemory: /* evt. */ InMemory#Tx = system.inMemory.wrap(peer)
@@ -40,8 +40,10 @@ private[proc] object DurableImpl {
   }
 
   private final class System(protected val store: DataStore, protected val eventStore: DataStore)
-    extends evt.impl.DurableImpl.DurableMixin[Durable, evt.InMemory] with Durable
-    with evt.impl.ReactionMapImpl.Mixin[Durable] {
+    extends stm.impl.DurableImpl.Mixin[Durable, /* stm. */ InMemory]
+    with Durable {
+    // with evt.impl.ReactionMapImpl.Mixin[Durable] {
+
     private type S = Durable
 
     val inMemory: /* evt. */ InMemory = /* evt. */ InMemory()

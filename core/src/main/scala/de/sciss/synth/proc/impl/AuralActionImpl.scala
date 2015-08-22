@@ -16,7 +16,6 @@ package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.synth.Sys
-import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.stm
 import de.sciss.synth.proc.Implicits._
 
@@ -25,15 +24,15 @@ import scala.concurrent.stm.Ref
 object AuralActionImpl extends AuralObj.Factory {
   // AuralObj.addFactory(this)
 
-  type E[S <: evt.Sys[S]] = Action.Elem[S]
+  type Repr[S <: Sys[S]] = Action[S]
   def typeID = Action.typeID
 
-  def apply[S <: Sys[S]](obj: Action.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Action[S] = {
+  def apply[S <: Sys[S]](obj: Action[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Action[S] = {
     val objH = tx.newHandle(obj)
     new Impl(objH)
   }
 
-  private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Action.Obj[S]])(implicit context: AuralContext[S])
+  private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Action[S]])(implicit context: AuralContext[S])
     extends AuralObj.Action[S] with ObservableImpl[S, AuralObj.State] {
 
     def typeID = Action.typeID
@@ -49,7 +48,7 @@ object AuralActionImpl extends AuralObj.Factory {
       if (oldState != AuralObj.Playing) {
         val actionObj = obj()
         if (!actionObj.muted) {
-          val action    = actionObj.elem.peer
+          val action    = actionObj
           val universe  = Action.Universe(actionObj, context.workspaceHandle, invoker = None)(context.scheduler.cursor)
           action.execute(universe)
         }

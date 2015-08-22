@@ -20,8 +20,8 @@ import de.sciss.lucre.data.SkipOctree
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.geom.LongSpace
-import de.sciss.lucre.stm.{Disposable, IdentifierMap}
-import de.sciss.lucre.synth.{Sys, expr}
+import de.sciss.lucre.stm.{Obj, Disposable, IdentifierMap}
+import de.sciss.lucre.synth.Sys
 import de.sciss.lucre.{data, stm}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc.{logAural => logA}
@@ -32,11 +32,11 @@ import scala.concurrent.stm.{Ref, TSet}
 object AuralTimelineImpl {
   private type Leaf[S <: Sys[S]] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], AuralObj[S])])
 
-  def apply[S <: Sys[S]](tlObj: Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
+  def apply[S <: Sys[S]](tlObj: Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
     val system            = tx.system
     val (tree, viewMap, res) = prepare[S, system.I](tlObj, system)
 
-    val tl                = tlObj.elem.peer
+    val tl                = tlObj
     type I                = system.I
     implicit val iSys     = system.inMemoryTx _
     implicit val itx      = iSys(tx)
@@ -56,7 +56,7 @@ object AuralTimelineImpl {
           val obj   = timed.value
           val view  = AuralObj(obj)
           viewMap.put(timed.id, view)
-          import expr.IdentifierSerializer
+          // import expr.IdentifierSerializer
           (tx.newHandle(timed.id), view)
         }
         // logA(s"timeline - init. add $span -> $views")
@@ -70,14 +70,14 @@ object AuralTimelineImpl {
   /** An empty view that does not add the timeline's children,
     * nor does it listen for events on the timeline.
     */
-  def empty[S <: Sys[S]](tlObj: Timeline.Obj[S])
+  def empty[S <: Sys[S]](tlObj: Timeline[S])
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline.Manual[S] = {
     val system = tx.system
     val (_, _, res) = prepare[S, system.I](tlObj, system)
     res
   }
 
-  private def prepare[S <: Sys[S], I1 <: stm.Sys[I1]](tlObj: Timeline.Obj[S], system: S { type I = I1 })
+  private def prepare[S <: Sys[S], I1 <: stm.Sys[I1]](tlObj: Timeline[S], system: S { type I = I1 })
                         (implicit tx: S#Tx,
                          context: AuralContext[S]): (SkipOctree[I1, LongSpace.TwoDim, Leaf[S]],
                                                      IdentifierMap[S#ID, S#Tx, AuralObj[S]],
@@ -103,7 +103,7 @@ object AuralTimelineImpl {
     override def toString = s"[token = $token, frame = $frame / ${TimeRef.framesToSecs(frame)}]"
   }
 
-  private final class Impl[S <: Sys[S], I <: stm.Sys[I]](val obj: stm.Source[S#Tx, Timeline.Obj[S]],
+  private final class Impl[S <: Sys[S], I <: stm.Sys[I]](val obj: stm.Source[S#Tx, Timeline[S]],
                                                          tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]],
                                                          viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
                                                         (implicit context: AuralContext[S], iSys: S#Tx => I#Tx)
@@ -141,18 +141,19 @@ object AuralTimelineImpl {
       }
     }
 
-    def init(tl: Timeline.Obj[S])(implicit tx: S#Tx): Unit = {
-      tlObserver = tl.elem.peer.changed.react { implicit tx => upd =>
+    def init(tl: Timeline[S])(implicit tx: S#Tx): Unit = {
+      tlObserver = tl.changed.react { implicit tx => upd =>
         upd.changes.foreach {
           case Timeline.Added  (span, timed)    => elemAdded  (timed.id, span, timed.value)
           case Timeline.Removed(span, timed)    => elemRemoved(timed.id, span, timed.value)
-          case Timeline.Moved  (timed, spanCh)  =>
+          case Timeline.Moved  (spanCh, timed)  =>
             // for simplicity just remove and re-add
             // ; in the future this could be optimized
             // (e.g., not deleting and re-creating the AuralObj)
             elemRemoved(timed.id, spanCh.before, timed.value)
             elemAdded  (timed.id, spanCh.now   , timed.value)
-          case Timeline.Element(_, _) =>  // we don't care
+// ELEM
+//          case Timeline.Element(_, _) =>  // we don't care
         }
       }
     }
@@ -168,7 +169,7 @@ object AuralTimelineImpl {
       val view = AuralObj(obj)
       viewMap.put(tid, view)
       tree.transformAt(BiGroupImpl.spanToPoint(span)) { opt =>
-        import expr.IdentifierSerializer
+        // import expr.IdentifierSerializer
         val tup       = (tx.newHandle(tid), view)
         val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
         Some(newViews)

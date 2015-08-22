@@ -13,10 +13,10 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.event.{Publisher, Sys}
+import de.sciss.lucre.event.Publisher
 import de.sciss.lucre.expr
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.stm.{Obj, Sys, Disposable}
 import de.sciss.model
 import de.sciss.serial.{DataInput, Serializer, Writable}
 import de.sciss.synth.proc
@@ -36,33 +36,9 @@ object Ensemble {
   final case class Update[S <: Sys[S]](ensemble: Ensemble[S], changes: List[Change[S]])
 
   sealed trait Change[S]
-  final case class Folder [S <: Sys[S]](peer: expr.List.Update[S, proc.Obj[S], proc.Obj.Update[S]] /* SCALAC BUG: proc.Folder.Update[S] */) extends Change[S]
+  final case class Folder [S <: Sys[S]](peer: expr.List.Update[S, Obj[S]] /* SCALAC BUG: proc.Folder.Update[S] */) extends Change[S]
   final case class Offset [S <: Sys[S]](peer: model.Change[Long   ]) extends Change[S]
   final case class Playing[S <: Sys[S]](peer: model.Change[Boolean]) extends Change[S]
-
-  // ---- Elem ----
-
-  implicit object Elem extends proc.Elem.Companion[Elem] {
-    def typeID = Ensemble.typeID
-
-    def apply[S <: Sys[S]](peer: Ensemble[S])(implicit tx: S#Tx): Ensemble.Elem[S] = Impl.ElemImpl(peer)
-
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Ensemble.Elem[S]] = Impl.ElemImpl.serializer[S]
-  }
-  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
-    type Peer       = Ensemble[S]
-    type PeerUpdate = Ensemble.Update[S]
-    type This       = Elem[S]
-  }
-
-  /** Convenient short-cut */
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Ensemble.Obj[S]] =
-      if (obj.elem.isInstanceOf[Ensemble.Elem[S]]) Some(obj.asInstanceOf[Ensemble.Obj[S]])
-      else None
-  }
-  type Obj[S <: Sys[S]] = proc.Obj.T[S, Ensemble.Elem]
 }
 
 /** An `Ensemble` is sort of a persistent transport model.

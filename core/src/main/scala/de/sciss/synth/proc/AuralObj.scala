@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.stm.{Obj, Disposable}
 import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
 import de.sciss.lucre.{stm, event => evt}
 import de.sciss.span.SpanLike
@@ -29,9 +29,9 @@ object AuralObj {
   trait Factory {
     def typeID: Int
 
-    type E[~ <: evt.Sys[~]] <: Elem[~]
+    type Repr[~ <: Sys[~]] <: Obj[~]
 
-    def apply[S <: Sys[S]](obj: Obj.T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S]
+    def apply[S <: Sys[S]](obj: Repr[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S]
   }
 
   def addFactory(f: Factory): Unit = Impl.addFactory(f)
@@ -51,7 +51,7 @@ object AuralObj {
   // ---- proc ----
 
   trait ProcData[S <: Sys[S]] extends Disposable[S#Tx] {
-    def obj: stm.Source[S#Tx, _Proc.Obj[S]]
+    def obj: stm.Source[S#Tx, _Proc[S]]
 
     /** The node reference associated with the process. A `Some` value indicates that
       * at least one instance view is playing, whereas a `None` value indicates that
@@ -88,7 +88,7 @@ object AuralObj {
      * The data instance is thus asked to provide a transaction-local
      * cache for resolving the proc from its `stm.Source`.
      */
-    def procCached()(implicit tx: S#Tx): _Proc.Obj[S]
+    def procCached()(implicit tx: S#Tx): _Proc[S]
 
     // def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
 
@@ -123,17 +123,17 @@ object AuralObj {
   }
 
   object Proc extends AuralObj.Factory {
-    type E[S <: evt.Sys[S]] = _Proc.Elem[S]
+    type Repr[S <: Sys[S]] = _Proc[S]
 
     def typeID = _Proc.typeID
 
-    def apply[S <: Sys[S]](obj: _Proc.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] =
+    def apply[S <: Sys[S]](obj: _Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] =
       AuralProcImpl(obj)
   }
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
     def data: ProcData[S]
 
-    override def obj: stm.Source[S#Tx, _Proc.Obj[S]]
+    override def obj: stm.Source[S#Tx, _Proc[S]]
 
     def targetState(implicit tx: S#Tx): AuralObj.State
 
@@ -144,15 +144,15 @@ object AuralObj {
   // ---- timeline ----
 
   object Timeline extends AuralObj.Factory {
-    type E[S <: evt.Sys[S]] = _Timeline.Elem[S]
+    type Repr[S <: Sys[S]] = _Timeline[S]
 
     def typeID = _Timeline.typeID
 
-    def apply[S <: Sys[S]](obj: _Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] =
+    def apply[S <: Sys[S]](obj: _Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] =
       AuralTimelineImpl(obj)
 
     /** Creates an empty view that can be manually populated by calling `addObject`. */
-    def empty[S <: Sys[S]](obj: _Timeline.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): Manual[S] =
+    def empty[S <: Sys[S]](obj: _Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): Manual[S] =
       AuralTimelineImpl.empty(obj)
 
     sealed trait Update[S <: Sys[S]] {
@@ -173,7 +173,7 @@ object AuralObj {
       extends Update[S]
   }
   trait Timeline[S <: Sys[S]] extends AuralObj[S] {
-    override def obj: stm.Source[S#Tx, _Timeline.Obj[S]]
+    override def obj: stm.Source[S#Tx, _Timeline[S]]
 
     /** Monitors the _active_ views, i.e. views which are
       * intersecting with the current transport position.
@@ -191,15 +191,15 @@ object AuralObj {
   // ---- ensemble ----
 
   object Ensemble extends AuralObj.Factory {
-    type E[S <: evt.Sys[S]] = _Ensemble.Elem[S]
+    type E[S <: Sys[S]] = _Ensemble[S]
 
     def typeID = _Ensemble.typeID
 
-    def apply[S <: Sys[S]](obj: _Ensemble.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] =
+    def apply[S <: Sys[S]](obj: _Ensemble[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] =
       AuralEnsembleImpl(obj)
   }
   trait Ensemble[S <: Sys[S]] extends AuralObj[S] {
-    override def obj: stm.Source[S#Tx, _Ensemble.Obj[S]]
+    override def obj: stm.Source[S#Tx, _Ensemble[S]]
 
     def views(implicit tx: S#Tx): Set[AuralObj[S]]
   }
@@ -207,15 +207,15 @@ object AuralObj {
   // ---- action ----
 
   object Action extends AuralObj.Factory {
-    type E[S <: evt.Sys[S]] = _Action.Elem[S]
+    type E[S <: Sys[S]] = _Action[S]
 
     def typeID = _Action.typeID
 
-    def apply[S <: Sys[S]](obj: _Action.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Action[S] =
+    def apply[S <: Sys[S]](obj: _Action[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Action[S] =
       AuralActionImpl(obj)
   }
   trait Action[S <: Sys[S]] extends AuralObj[S] {
-    override def obj: stm.Source[S#Tx, _Action.Obj[S]]
+    override def obj: stm.Source[S#Tx, _Action[S]]
 
     // def views(implicit tx: S#Tx): Set[AuralObj[S]]
   }

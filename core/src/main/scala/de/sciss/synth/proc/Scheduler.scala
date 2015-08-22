@@ -13,8 +13,8 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.event.Sys
 import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Sys
 import impl.{SchedulerImpl => Impl}
 
 object Scheduler {

@@ -31,7 +31,7 @@ import scala.concurrent.Future
 import scala.concurrent.stm.Ref
 
 object AuralProcImpl {
-  def apply[S <: Sys[S]](proc: Proc.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
+  def apply[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
     val data  = AuralProcDataImpl(proc)
     val res   = new Impl[S]
     res.init(data)

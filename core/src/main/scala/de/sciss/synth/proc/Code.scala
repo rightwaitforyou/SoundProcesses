@@ -13,23 +13,22 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr.impl.ExprTypeImplA
-import de.sciss.serial.{Serializer, Writable, DataInput, DataOutput, ImmutableSerializer}
-import impl.{CodeImpl => Impl}
 import java.io.File
-import scala.concurrent.{ExecutionContext, Future, blocking}
-import de.sciss.processor.{ProcessorLike, Processor}
+
+import de.sciss.lucre.expr.impl.ExprTypeImpl
+import de.sciss.processor.ProcessorLike
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Writable}
 import de.sciss.synth
+import de.sciss.synth.proc.impl.{CodeImpl => Impl}
+
 import scala.annotation.switch
-import de.sciss.synth.proc
-import de.sciss.lucre.{event => evt}
-import evt.Sys
-import de.sciss.lucre.expr.{Expr => _Expr}
-import de.sciss.model
 import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 object Code {
   final val typeID      = 0x20001
+
+  def init(): Unit = Expr.init()
 
   final val UserPackage = "user"
 
@@ -150,37 +149,16 @@ object Code {
 
   // ---- expr ----
 
-  object Expr extends ExprTypeImplA[Code] {
+  object Expr extends ExprTypeImpl[Code] {
     def typeID = Code.typeID
 
-    def readValue(in: DataInput): Code = Code.read(in)
-    def writeValue(value: Code, out: DataOutput): Unit = value.write(out)
+    def valueSerializer: ImmutableSerializer[Code] = Code.serializer
 
-    protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                        (implicit tx: S#Tx): Code.Expr.ExN[S] = {
-      sys.error(s"No tuple operations defined for Code ($cookie)")
-    }
+//    protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+//                                        (implicit tx: S#Tx): Code.Expr.ExN[S] = {
+//      sys.error(s"No tuple operations defined for Code ($cookie)")
+//    }
   }
-  // ---- element ----
-  object Elem {
-    def apply[S <: Sys[S]](peer: _Expr[S, Code])(implicit tx: S#Tx): Code.Elem[S] = Impl.ElemImpl(peer)
-
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Code.Elem[S]] = Impl.ElemImpl.serializer
-  }
-
-  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
-    type Peer         = _Expr[S, Code]
-    type PeerUpdate   = model.Change[Code]
-    type This         = Elem[S]
-  }
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Code.Obj[S]] =
-      if (obj.elem.isInstanceOf[Code.Elem[S]]) Some(obj.asInstanceOf[Code.Obj[S]])
-      else None
-  }
-
-  type Obj[S <: Sys[S]] = proc.Obj.T[S, Code.Elem]
 }
 sealed trait Code extends Writable { me =>
   /** The interfacing input type */

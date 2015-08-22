@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AudioBus, NodeRef, Synth, Sys, expr}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Synth, Sys}
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.{logAural => logA}
@@ -28,7 +28,7 @@ object AuralScanImpl {
   def apply[S <: Sys[S]](data: ProcData[S], key: String, scan: Scan[S], bus: AudioBus, isInput: Boolean)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralScan.Owned[S] = {
     val id    = scan.id
-    import expr.IdentifierSerializer
+    // import expr.IdentifierSerializer
     val view  = new Impl[S](data = data, key = key, bus = bus, idH = tx.newHandle(id))
     logA(s"AuralScan(${data.procCached()}, $key, bus = $bus, isInput = $isInput)")
     context.putAux[AuralScan.Proxy[S]](id, view)

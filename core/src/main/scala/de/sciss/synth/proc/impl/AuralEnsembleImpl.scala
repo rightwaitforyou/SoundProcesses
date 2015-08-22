@@ -23,14 +23,14 @@ import de.sciss.model.Change
 import scala.concurrent.stm.Ref
 
 object AuralEnsembleImpl {
-  def apply[S <: Sys[S]](obj: Ensemble.Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] = {
+  def apply[S <: Sys[S]](obj: Ensemble[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] = {
     val transport = Transport[S]
-    val ensemble  = obj.elem.peer
+    val ensemble  = obj
     ensemble.folder.iterator.foreach(transport.addObject)
     new Impl(tx.newHandle(obj), transport).init(ensemble)
   }
   
-  private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Ensemble.Obj[S]], transport: Transport[S])
+  private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Ensemble[S]], transport: Transport[S])
     extends AuralObj.Ensemble[S] with ObservableImpl[S, AuralObj.State] {
     
     def typeID = Ensemble.typeID
@@ -81,7 +81,7 @@ object AuralEnsembleImpl {
       }
     }
 
-    private def ensemble(implicit tx: S#Tx): Ensemble[S] = obj().elem.peer
+    private def ensemble(implicit tx: S#Tx): Ensemble[S] = obj()
 
     private def startTransport(ens: Ensemble[S])(implicit tx: S#Tx): Unit = {
       transport.stop()

@@ -15,19 +15,19 @@ package de.sciss
 package synth
 package proc
 
-import lucre.{stm, confluent}
-import confluent.reactive.ConfluentReactiveLike
-import stm.{DataStore, DataStoreFactory}
-import impl.{ConfluentImpl => Impl}
-import language.implicitConversions
+import de.sciss.lucre.confluent
+import de.sciss.lucre.stm.DataStore
 import de.sciss.lucre.synth.{InMemory, Sys}
+import de.sciss.synth.proc.impl.{ConfluentImpl => Impl}
+
+import scala.language.implicitConversions
 
 object Confluent {
   private type S = Confluent
 
-  def apply(storeFactory: DataStoreFactory[DataStore]): S = Impl(storeFactory)
+  def apply(storeFactory: DataStore.Factory): S = Impl(storeFactory)
 
-  trait Txn extends ConfluentReactiveLike.Txn[S] with Sys.Txn[S] {
+  trait Txn extends confluent.Txn[S] with Sys.Txn[S] {
 //    private[proc] def durable : Durable#Tx
 //    private[proc] def inMemory: InMemory#Tx
   }
@@ -36,7 +36,7 @@ object Confluent {
 //  implicit def durable (tx: S#Tx): Durable #Tx = tx.durable
 }
 
-trait Confluent extends ConfluentReactiveLike[Confluent] with Sys[Confluent] {
+trait Confluent extends confluent.Sys[Confluent] with Sys[Confluent] {
   protected type S  = Confluent
   type D            = Durable
   type I            = InMemory

@@ -13,7 +13,7 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Sys, TxnLike}
+import de.sciss.lucre.stm.{Obj, Sys, TxnLike}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc
@@ -65,7 +65,7 @@ object Action extends stm.Obj.Type {
   }
 
   object Universe {
-    def apply[S <: Sys[S]](self: Action[S], workspace: WorkspaceHandle[S], invoker: Option[proc.Obj[S]] = None,
+    def apply[S <: Sys[S]](self: Action[S], workspace: WorkspaceHandle[S], invoker: Option[Obj[S]] = None,
                            values: Vec[Float] = Vector.empty)(implicit cursor: stm.Cursor[S]): Universe[S] =
       new Impl.UniverseImpl(self, workspace, invoker, values)
   }
@@ -87,7 +87,7 @@ object Action extends stm.Obj.Type {
       * if used from within a synth-graph, this will be some `Proc.Obj`.
       * `None` if the action is directly invoked without dedicated parent.
       */
-    def invoker: Option[proc.Obj[S]]
+    def invoker: Option[Obj[S]]
 
     implicit def cursor: stm.Cursor[S]
   }

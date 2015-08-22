@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.file._
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.stm.{Obj, Disposable}
 import de.sciss.lucre.synth.{Buffer, BusNodeSetter, AudioBus, Bus, NodeRef, Sys}
 import de.sciss.model.Change
 import de.sciss.numbers
@@ -34,7 +34,7 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
 
 object AuralProcDataImpl {
-  def apply[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])
+  def apply[S <: Sys[S]](proc: Proc[S])
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
     context.acquire[AuralObj.ProcData[S]](proc)(new Impl[S].init(proc))
 
@@ -57,18 +57,18 @@ object AuralProcDataImpl {
     private val scanOutViews  = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews     = TSet.empty[AuralObj.Proc[S]]
 
-    private val procLoc   = TxnLocal[Proc.Obj[S]]() // cache-only purpose
+    private val procLoc   = TxnLocal[Proc[S]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
 
-    private var _obj: stm.Source[S#Tx, Proc.Obj[S]] = _
+    private var _obj: stm.Source[S#Tx, Proc[S]] = _
 
     final def obj = _obj
 
     override def toString = s"AuralObj.ProcData@${hashCode().toHexString}"
 
     /** Sub-classes may override this if invoking the super-method. */
-    def init(proc: Proc.Obj[S])(implicit tx: S#Tx): this.type = {
+    def init(proc: Proc[S])(implicit tx: S#Tx): this.type = {
       _obj = tx.newHandle(proc)
       val ugenInit = UGB.init(proc)
       stateRef.set(ugenInit)(tx.peer)
@@ -303,7 +303,7 @@ object AuralProcDataImpl {
       scanBuses.clear()
       val rj = stateRef().rejectedInputs
       if (rj.nonEmpty) {
-        val scans = procCached().elem.peer.inputs
+        val scans = procCached().inputs
         rj.foreach {
           case UGB.ScanKey(key) =>
             scans.get(key).foreach { scan =>

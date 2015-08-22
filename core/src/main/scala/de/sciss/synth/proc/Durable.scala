@@ -13,29 +13,29 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{stm, event => evt}
-import impl.{DurableImpl => Impl}
-import stm.{DataStoreFactory, DataStore}
-import language.implicitConversions
+import de.sciss.lucre.stm.{DataStore, DurableLike}
 import de.sciss.lucre.synth.{InMemory, Sys}
+import de.sciss.synth.proc.impl.{DurableImpl => Impl}
+
+import scala.language.implicitConversions
 
 object Durable {
   private type S = Durable
 
-  def apply(factory: DataStoreFactory[DataStore], mainName: String = "data", eventName: String = "event"): S =
-    Impl(factory, mainName, eventName)
+  def apply(factory: DataStore.Factory, mainName: String = "data", eventName: String = "event"): S =
+    Impl(factory, mainName = mainName, eventName = eventName)
 
   def apply(mainStore: DataStore, eventStore: DataStore): S =
     Impl(mainStore, eventStore)
 
   implicit def inMemory(tx: Durable#Tx): InMemory#Tx = tx.inMemory
 
-  trait Txn extends Sys.Txn[Durable] with evt.DurableLike.Txn[Durable] {
+  trait Txn extends Sys.Txn[Durable] with DurableLike.Txn[Durable] {
     def inMemory: InMemory#Tx
   }
 }
 
-trait Durable extends evt.DurableLike[Durable] with Sys[Durable] {
+trait Durable extends DurableLike[Durable] with Sys[Durable] {
   final type Tx = Durable.Txn // Sys.Txn[Durable] with evt.DurableLike.Txn[Durable]
   final type I  = InMemory
 }

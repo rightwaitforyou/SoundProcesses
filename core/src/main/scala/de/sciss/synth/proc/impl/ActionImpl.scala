@@ -18,7 +18,7 @@ import de.sciss.lucre.{event => evt}
 import de.sciss.synth.proc
 import de.sciss.lucre.event.EventLike
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{NoSys, Sys, TxnLike, IDPeek}
+import de.sciss.lucre.stm.{Obj, NoSys, Sys, TxnLike, IDPeek}
 import de.sciss.serial.{Serializer, DataInput, DataOutput}
 
 import scala.annotation.switch

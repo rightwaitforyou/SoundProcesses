@@ -13,14 +13,14 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.stm.{NoSys, Sys}
 import de.sciss.synth.SynthGraph
 import de.sciss.lucre.expr.Expr
 import language.implicitConversions
 
 object ExprImplicits {
-  def apply[S <: evt.Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
-  private[this] val Imp = new ExprImplicits[evt.InMemory]
+  def apply[S <: Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
+  private[this] val Imp = new ExprImplicits[NoSys]
 }
 
 /** This class helps overcome the limitation of scala's implicit resolution -- by resolving an expression
@@ -29,7 +29,7 @@ object ExprImplicits {
   * that require an existing expression (e.g. `longOps2`). This is so that primitive standard operations remain
   * outside the implicit scope (e.g. addition on longs).
   */
-class ExprImplicits[S <: evt.Sys[S]] protected extends de.sciss.lucre.synth.expr.ExprImplicits[S] {
-  implicit final def synthGraphConst(s: SynthGraph    ): Expr[S, SynthGraph    ] = SynthGraphs  .newConst(s)
-  implicit final def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Expr.newConst(v)
+class ExprImplicits[S <: Sys[S]] protected /* extends de.sciss.lucre.synth.expr.ExprImplicits[S] */ {
+  implicit final def synthGraphConst(s: SynthGraph    ): Expr[S, SynthGraph    ] = ??? // RRR SynthGraphs  .newConst(s)
+  implicit final def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = ??? // RRR Grapheme.Expr.newConst(v)
 }

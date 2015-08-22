@@ -14,10 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.event.EventLike
+import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, Long => LongEx}
+import de.sciss.lucre.stm.{Obj, NoSys, Sys}
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.event.{InMemory, EventLike, Sys}
-import de.sciss.lucre.expr.{Expr, Long => LongEx, Boolean => BooleanEx}
-import de.sciss.serial.{DataInput, DataOutput}
+import de.sciss.serial.{Serializer, DataInput, DataOutput}
 import de.sciss.synth.proc
 import de.sciss.synth.proc.Ensemble.Update
 
@@ -30,11 +31,13 @@ object EnsembleImpl {
     new Impl(targets, folder, offset, playing)
   }
 
-  def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Ensemble[S]] = anySer.asInstanceOf[Ser[S]]
+  def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Ensemble[S]] = anySer.asInstanceOf[Ser[S]]
 
-  private val anySer = new Ser[InMemory]
+  private val anySer = new Ser[NoSys]
 
-  private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Ensemble[S]] {
+  private final class Ser[S <: Sys[S]] extends Obj.Serializer[S, Ensemble[S]] {
+    def typeID: Int = Ensemble.typeID
+
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Ensemble[S] with evt.Node[S] = {
       val cookie  = in.readInt()
       if (cookie != COOKIE) sys.error(s"Unexpected cookie (found $cookie, expected $COOKIE)")
@@ -46,59 +49,17 @@ object EnsembleImpl {
     }
   }
 
-  // ---- Elem ----
-
-  object ElemImpl extends proc.impl.ElemCompanionImpl[Ensemble.Elem] {
-    val typeID = Ensemble.typeID
-
-    def readIdentified[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                   (implicit tx: S#Tx): Ensemble.Elem[S] with evt.Node[S] = {
-      val peer = Ensemble.read(in, access)
-      new ElemImpl(targets, peer)
-    }
-
-    def readIdentifiedConstant[S <: Sys[S]](in: DataInput)(implicit tx: S#Tx): Ensemble.Elem[S] =
-      sys.error("Constant ProcGroup not supported")
-
-    def apply[S <: Sys[S]](peer: Ensemble[S])(implicit tx: S#Tx): Ensemble.Elem[S] =
-      new ElemImpl(evt.Targets[S], peer)
-  }
-
-  private final class ElemImpl[S <: Sys[S]](val targets: evt.Targets[S],
-                                            val peer: Ensemble[S])
-    extends proc.impl.ActiveElemImpl[S] with Ensemble.Elem[S] {
-
-    def typeID = Ensemble.typeID
-    def prefix = "Ensemble"
-
-    protected def peerEvent = peer.changed
-
-    def mkCopy()(implicit tx: S#Tx): Ensemble.Elem[S] = {
-      // val folderOrig  = peer.folder
-      // val folderCopy: FolderElem.Obj[S] = Obj.copyT[S, FolderElem](folderOrig, folderOrig.elem)  // P.I.T.A.
-      // val folderCopy = Folder[S]
-      // folderOrig.iterator.foreach(folderCopy.addLast)
-      val folderCopy  = peer.folder   // XXX TODO
-      val offsetCopy  = peer.offset   // XXX TODO
-      val playingCopy = peer.playing  // XXX TODO
-      val copy = Ensemble(folderCopy, offsetCopy, playingCopy)
-      Ensemble.Elem(copy)
-//
-//      val newPeer     = _Proc[S]
-//      newPeer.graph() = peer.graph()
-//      // peer.scans.keys.foreach(newPeer.scans.add)
-//      peer.scans.iterator.foreach { case (key, scan) =>
-//        val scanNew = newPeer.scans.add(key)
-//        scan.sources.foreach { link =>
-//          scanNew.addSource(link)
-//        }
-//        scan.sinks.foreach { link =>
-//          scanNew.addSink(link)
-//        }
-//      }
-//      Proc(newPeer)
-    }
-  }
+//  def mkCopy()(implicit tx: S#Tx): Ensemble.Elem[S] = {
+//    // val folderOrig  = peer.folder
+//    // val folderCopy: FolderElem.Obj[S] = Obj.copyT[S, FolderElem](folderOrig, folderOrig.elem)  // P.I.T.A.
+//    // val folderCopy = Folder[S]
+//    // folderOrig.iterator.foreach(folderCopy.addLast)
+//    val folderCopy  = peer.folder   // XXX TODO
+//    val offsetCopy  = peer.offset   // XXX TODO
+//    val playingCopy = peer.playing  // XXX TODO
+//    val copy = Ensemble(folderCopy, offsetCopy, playingCopy)
+//    Ensemble.Elem(copy)
+//  }
 
   // ---- impl ----
 
@@ -107,7 +68,7 @@ object EnsembleImpl {
     extends Ensemble[S]
     with evt.impl.StandaloneLike[S, Ensemble.Update[S], Ensemble[S]] {
 
-    override def toString() = s"Ensemble$id"
+    override def toString: String = s"Ensemble$id"
 
     def folder (implicit tx: S#Tx): Folder /* Elem.Obj */ [S] = folderEx
     def offset (implicit tx: S#Tx): Expr[S, Long]     = offsetEx
@@ -125,8 +86,6 @@ object EnsembleImpl {
     protected def disposeData()(implicit tx: S#Tx): Unit = ()
 
     // ---- event ----
-
-    protected def reader: evt.Reader[S, Ensemble[S]] = serializer[S]
 
     def connect   ()(implicit tx: S#Tx): Unit = {
       folderEx .changed ---> this

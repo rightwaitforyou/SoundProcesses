@@ -14,10 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
-import AuralObj.Factory
 import de.sciss.lucre.event.impl.DummyObservableImpl
-import de.sciss.lucre.synth.Sys
 import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Obj
+import de.sciss.lucre.synth.Sys
+import de.sciss.synth.proc.AuralObj.Factory
 
 object AuralObjImpl {
   private val sync = new AnyRef
@@ -31,8 +32,8 @@ object AuralObjImpl {
   def factories: Iterable[Factory] = map.values
 
   def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
-    val tid = obj.elem.typeID
-    map.get(tid).fold(Generic(obj))(f => f(obj.asInstanceOf[Obj.T[S, f.E]]))
+    val tid = obj.typeID
+    map.get(tid).fold(Generic(obj))(f => f(obj.asInstanceOf[f.A[S]]))
   }
 
   private var map = scala.Predef.Map[Int, Factory](
@@ -50,29 +51,6 @@ object AuralObjImpl {
   object Generic {
     def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx): AuralObj[S] =
       new Impl(tx.newHandle(obj))
-
-    //    private object dummyPrep extends GenericProcessor[Unit] {
-    //      private val peer = Future.successful(())
-    //
-    //      def abort(): Unit = ()
-    //      def progress: Double = 1.0
-    //
-    //      def removeListener(pf: Listener[Update[Unit, GenericProcessor[Unit]]]): Unit    = ()
-    //      def addListener   (pf: Listener[Update[Unit, GenericProcessor[Unit]]]): pf.type = pf
-    //
-    //      def isCompleted: Boolean = peer.isCompleted
-    //
-    //      def onComplete[U](f: Try[Unit] => U)(implicit executor: ExecutionContext): Unit =
-    //        peer.onComplete(f)
-    //
-    //      def value: Option[Try[Unit]] = peer.value
-    //
-    //      def result(atMost: Duration)(implicit permit: CanAwait): Unit = peer.result(atMost)
-    //      def ready (atMost: Duration)(implicit permit: CanAwait): this.type = {
-    //        peer.ready(atMost)
-    //        this
-    //      }
-    //    }
 
     private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Obj[S]])
       extends AuralObj[S] with DummyObservableImpl[S] {
@@ -93,24 +71,4 @@ object AuralObjImpl {
       def state(implicit tx: S#Tx): AuralObj.State = AuralObj.Stopped
     }
   }
-
-//  // -------- AudioGrapheme --------
-//
-//  object AudioGrapheme extends Factory {
-//    type E[S <: evt.Sys[S]] = AudioGraphemeElem[S]
-//
-//    def typeID = ElemImpl.AudioGrapheme.typeID
-//
-//    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ...
-//  }
-//
-//  // -------- Folder --------
-//
-//  object Folder extends Factory {
-//    type E[S <: evt.Sys[S]] = FolderElem[S]
-//
-//    def typeID = FolderElemImpl.typeID
-//
-//    def apply[S <: Sys[S]](obj: T[S, E])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = ...
-//  }
 }

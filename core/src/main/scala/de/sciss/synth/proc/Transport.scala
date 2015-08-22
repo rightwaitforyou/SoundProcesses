@@ -16,7 +16,7 @@ package proc
 
 import de.sciss.lucre.stm
 import de.sciss.lucre.synth.Sys
-import stm.{Disposable, Cursor}
+import de.sciss.lucre.stm.{Obj, Disposable, Cursor}
 import de.sciss.lucre.event.Observable
 import impl.{TransportImpl => Impl}
 

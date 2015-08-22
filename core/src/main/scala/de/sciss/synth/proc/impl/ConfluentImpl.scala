@@ -14,12 +14,12 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.{stm, confluent, event => evt}
-import confluent.reactive.impl.ConfluentReactiveImpl
-import stm.{DataStore, DataStoreFactory}
-import concurrent.stm.InTxn
-import de.sciss.lucre.synth.impl.TxnFullImpl
+import de.sciss.lucre.stm.DataStore
 import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.synth.impl.TxnFullImpl
+import de.sciss.lucre.{confluent, event => evt, stm}
+
+import scala.concurrent.stm.InTxn
 
 /*
  * XXX TODO: don't repeat yourself. Should factor out more stuff in ConfluentReactiveImpl
@@ -27,7 +27,7 @@ import de.sciss.lucre.synth.InMemory
 private[proc] object ConfluentImpl {
   private type S = Confluent
 
-  def apply(storeFactory: DataStoreFactory[DataStore]): S = {
+  def apply(storeFactory: DataStore.Factory): S = {
     // We can share the event store between confluent and durable, because there are
     // no key collisions. Durable uses 32-bit ints exclusively, and confluent maintains
     // a DurablePersistentMap, which uses 32 + 64 bit keys.
@@ -61,7 +61,7 @@ private[proc] object ConfluentImpl {
     }
   }
 
-  private final class System(protected val storeFactory: DataStoreFactory[DataStore],
+  private final class System(protected val storeFactory: DataStore.Factory,
                              protected val eventStore: DataStore, val durable: /* evt. */ Durable)
     extends confluent.reactive.impl.ConfluentReactiveImpl.Mixin[S]
     with Confluent {

@@ -14,13 +14,13 @@
 package de.sciss.synth
 package proc
 
+import de.sciss.lucre.stm.Sys
 import de.sciss.lucre.{event => evt, expr}
 import expr.Expr
 import impl.{ProcImpl => Impl}
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.serial.{Serializer, DataInput}
 import de.sciss.model
-import evt.Sys
 import de.sciss.lucre.event.Publisher
 
 object Proc {
@@ -64,39 +64,14 @@ object Proc {
     override def toString = s"OutputChange($key, $scan, $changes)"
   }
 
-  // ---- Elem ----
+  /** Source code of the graph function. */
+  final val attrSource = "graph-source"
 
-  implicit object Elem extends proc.Elem.Companion[Proc.Elem] {
-    def typeID: Int = Proc.typeID
+  final val scanMainIn  = "in"
+  final val scanMainOut = "out"
 
-    def apply[S <: Sys[S]](peer: Proc[S])(implicit tx: S#Tx): Proc.Elem[S] =
-      proc.impl.ElemImpl.Proc(peer)
-
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Proc.Elem[S]] = proc.impl.ElemImpl.Proc.serializer[S]
-  }
-  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
-    type Peer       = Proc[S]
-    type PeerUpdate = Proc.Update[S]
-    type This       = Elem[S]
-  }
-
-  /** Convenient short-cut */
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Proc.Obj[S]] =
-      if (obj.elem.isInstanceOf[Proc.Elem[S]]) Some(obj.asInstanceOf[Proc.Obj[S]])
-      else None
-
-    /** Source code of the graph function. */
-    final val attrSource = "graph-source"
-
-    final val scanMainIn  = "in"
-    final val scanMainOut = "out"
-
-    /** Audio input file (tape) grapheme. */
-    final val graphAudio  = "sig"
-  }
-  type Obj[S <: Sys[S]] = proc.Obj.T[S, Proc.Elem]
+  /** Audio input file (tape) grapheme. */
+  final val graphAudio  = "sig"
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
 trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {

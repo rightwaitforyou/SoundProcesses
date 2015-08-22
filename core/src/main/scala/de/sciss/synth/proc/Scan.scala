@@ -14,14 +14,14 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.{event => evt, data}
-import impl.{ScanImpl => Impl}
 import de.sciss.lucre.event.Publisher
-import language.implicitConversions
-import de.sciss.serial.{Serializer, DataInput}
-import de.sciss.lucre.stm.Identifiable
-import collection.immutable.{IndexedSeq => Vec}
-import evt.Sys
+import de.sciss.lucre.stm.{Identifiable, Sys}
+import de.sciss.lucre.{data, event => evt}
+import de.sciss.serial.DataInput
+import de.sciss.synth.proc.impl.{ScanImpl => Impl}
+
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.implicitConversions
 
 object Scan {
   final val typeID = 0x10009
@@ -51,7 +51,7 @@ object Scan {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = Impl.read(in, access)
 
-  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Scan[S]] = Impl.serializer
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Scan[S]] = Impl.serializer
 
   /** A scan event fires updates of this type. */
   final case class Update[S <: Sys[S]](scan: Scan[S], changes: Vec[Change[S]])
@@ -83,30 +83,6 @@ object Scan {
 //  final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
 //                                               changes: Vec[Grapheme.Segment]) extends Change[S]
 
-  // ---- Elem ----
-
-  implicit object Elem extends proc.Elem.Companion[Scan.Elem] {
-    def typeID: Int = Scan.typeID
-
-    def apply[S <: Sys[S]](peer: Scan[S])(implicit tx: S#Tx): Scan.Elem[S] =  proc.impl.ElemImpl.Scan(peer)
-
-    implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Scan.Elem[S]] =
-      proc.impl.ElemImpl.Scan.serializer[S]
-  }
-  trait Elem[S <: Sys[S]] extends proc.Elem[S] {
-    type Peer       = Scan[S]
-    type PeerUpdate = Scan.Update[S]
-    type This       = Elem[S]
-  }
-
-  /** Convenient short-cut */
-
-  object Obj {
-    def unapply[S <: Sys[S]](obj: proc.Obj[S]): Option[Scan.Obj[S]] =
-      if (obj.elem.isInstanceOf[Scan.Elem[S]]) Some(obj.asInstanceOf[Scan.Obj[S]])
-      else None
-  }
-  type Obj[S <: Sys[S]] = proc.Obj.T[S, Scan.Elem]
 }
 
 /** A `Scan` represents a real-time signal which can either function as a reader linked to another scan
