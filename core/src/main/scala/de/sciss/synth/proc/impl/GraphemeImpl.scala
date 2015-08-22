@@ -17,10 +17,10 @@ package impl
 
 import de.sciss.lucre
 import de.sciss.lucre.bitemp.BiPin
-import de.sciss.lucre.event.{Event, Sys, impl => evti}
-import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.event.{Event, impl => evti}
+import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
-import de.sciss.serial.{DataInput, DataOutput}
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.span.Span
 import de.sciss.synth.proc.Grapheme.Segment
 
@@ -41,17 +41,17 @@ object GraphemeImpl {
     modifiableSerializer[S].read(in, access)
   }
 
-  implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Grapheme[S]] =
-    anySer.asInstanceOf[evt.NodeSerializer[S, Grapheme[S]]]
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Grapheme[S]] =
+    anySer.asInstanceOf[Ser[S]]
 
-  implicit def modifiableSerializer[S <: Sys[S]]: evt.NodeSerializer[S, Grapheme.Modifiable[S]] =
-    anySer.asInstanceOf[evt.NodeSerializer[S, Grapheme.Modifiable[S]]] // whatever...
+  implicit def modifiableSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Grapheme.Modifiable[S]] =
+    anySer.asInstanceOf[Serializer[S#Tx, S#Acc, Grapheme.Modifiable[S]]] // whatever... right now it is modifiable
 
-  private val anySer = new Ser[InMemory]
+  private val anySer = new Ser[NoSys]
 
   //   private val anyModSer   = new ModSer[ evt.InMemory ]
 
-  private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Grapheme[S]] {
+  private final class Ser[S <: Sys[S]] extends Obj.Serializer[S, Grapheme[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Grapheme[S] = {
       implicit val elemType = Expr // .serializer[ S ]
       val numChannels = in.readInt()
@@ -82,11 +82,11 @@ object GraphemeImpl {
     extends Modifiable[S] with evti.StandaloneLike[S, Grapheme.Update[S], Grapheme[S]] {
     graph =>
 
-    override def toString() = "Grapheme" + id
+    override def toString: String = s"Grapheme$id"
 
     def modifiableOption: Option[Modifiable[S]] = Some(this)
 
-    def changed: Event[S, Grapheme.Update[S], Grapheme[S]] = this
+    def changed: Event[S, Grapheme.Update[S]] = this
 
     // ---- forwarding to pin ----
 

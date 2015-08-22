@@ -29,15 +29,15 @@ object UGenGraphBuilderImpl {
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-  def apply[S <: Sys[S]](context: Context[S], proc: Proc.Obj[S])
+  def apply[S <: Sys[S]](context: Context[S], proc: Proc[S])
                         (implicit tx: S#Tx): State[S] = {
     val in = init(proc)
     in.retry(context)
   }
 
-  def init[S <: Sys[S]](proc: Proc.Obj[S])
+  def init[S <: Sys[S]](proc: Proc[S])
                        (implicit tx: S#Tx): Incomplete[S] = {
-    val g   = proc.elem.peer.graph.value
+    val g   = proc.graph.value
     val in  = new IncompleteImpl[S](
       remaining = g.sources, controlProxies = g.controlProxies,
       ugens = Vec.empty, controlValues = Vec.empty, controlNames = Vec.empty,

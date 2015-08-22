@@ -290,7 +290,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       if (showTransportLog) {
         logTransport("---- BOUNCE: bundles ----")
-        bundles.foreach(b => logTransport(b.toString()))
+        bundles.foreach(b => logTransport(b.toString))
       }
 
       // ---- write OSC file ----

@@ -17,8 +17,8 @@ package impl
 import java.util.concurrent.TimeUnit
 
 import de.sciss.lucre.data.SkipList
-import de.sciss.lucre.event.Sys
 import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Sys
 import de.sciss.serial.ImmutableSerializer
 import de.sciss.synth.proc
 import proc.{logTransport => logT}

@@ -17,7 +17,7 @@ package proc
 import de.sciss.lucre.event.Publisher
 import de.sciss.lucre.stm.{Identifiable, Sys}
 import de.sciss.lucre.{data, event => evt}
-import de.sciss.serial.DataInput
+import de.sciss.serial.{Serializer, DataInput}
 import de.sciss.synth.proc.impl.{ScanImpl => Impl}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -33,13 +33,13 @@ object Scan {
     /** A link to a grapheme (random access). */
     final case class Grapheme[S <: Sys[S]](peer: proc.Grapheme[S]) extends Link[S] {
       def id = peer.id
-      override def toString = peer.toString()
+      override def toString = peer.toString
     }
 
     /** A link to another scan (real-time). */
     final case class Scan[S <: Sys[S]](peer: proc.Scan[S]) extends Link[S] {
       def id = peer.id
-      override def toString = peer.toString()
+      override def toString = peer.toString
     }
   }
 

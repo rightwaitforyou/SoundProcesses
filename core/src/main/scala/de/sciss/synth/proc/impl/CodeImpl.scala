@@ -134,7 +134,7 @@ import scala.annotation.tailrec
       def typeID = ElemImpl.typeID
       def prefix = "Code"
 
-      override def toString() = s"$prefix$id"
+      override def toString: String = s"$prefix$id"
 
       def mkCopy()(implicit tx: S#Tx): Code.Elem[S] = {
         val cpy = peer match {

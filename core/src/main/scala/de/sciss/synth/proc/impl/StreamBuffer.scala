@@ -97,7 +97,7 @@ final class StreamBuffer(key: String, idx: Int, synth: Node, buf: Buffer.Modifia
   private val trigResp = de.sciss.synth.message.Responder(synth.server.peer) {
     case m @ osc.Message(`replyName`, `nodeID`, `idx`, trigValF: Float) =>
       // println(s"RECEIVED TR $trigValF...")
-      // logAural(m.toString())
+      // logAural(m.toString)
       val trigVal = trigValF.toInt + 1
       scala.concurrent.stm.atomic { itx =>
         implicit val tx = Txn.wrap(itx)

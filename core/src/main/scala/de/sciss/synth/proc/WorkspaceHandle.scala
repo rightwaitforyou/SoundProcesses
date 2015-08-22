@@ -13,14 +13,13 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.event.{InMemory, Sys}
-import de.sciss.lucre.stm.{TxnLike, Disposable}
+import de.sciss.lucre.stm.{NoSys, Sys, TxnLike, Disposable}
 
 object WorkspaceHandle {
   object Implicits {
     implicit def dummy[S <: Sys[S]]: WorkspaceHandle[S] = dummyVal.asInstanceOf[DummyImpl[S]]
 
-    private val dummyVal = new DummyImpl[InMemory]
+    private val dummyVal = new DummyImpl[NoSys]
 
     private class DummyImpl[S <: Sys[S]] extends WorkspaceHandle[S] {
       def addDependent   (dep: Disposable[S#Tx])(implicit tx: TxnLike) = ()

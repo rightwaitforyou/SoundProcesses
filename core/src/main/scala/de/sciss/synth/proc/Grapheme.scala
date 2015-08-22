@@ -15,37 +15,41 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.lucre.artifact.Artifact
-import lucre.{event => evt, bitemp, expr}
-import de.sciss.lucre.expr.{ExprType1, Expr => _Expr}
-import bitemp.BiExpr
-import collection.immutable.{IndexedSeq => Vec}
-import annotation.switch
-import impl.{GraphemeImpl => Impl}
-import synth.io.AudioFileSpec
-import de.sciss.lucre.event.Publisher
-import span.Span
-import serial.{Writable, DataInput, DataOutput, ImmutableSerializer, Serializer}
 import java.io.File
-import language.implicitConversions
+
+import de.sciss.lucre.artifact.Artifact
+import de.sciss.lucre.bitemp.BiPin
+import de.sciss.lucre.event.Publisher
+import de.sciss.lucre.expr.{Expr => _Expr}
+import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{event => evt, expr}
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Serializer, Writable}
+import de.sciss.span.Span
+import de.sciss.synth.io.AudioFileSpec
+import de.sciss.synth.proc.impl.{GraphemeImpl => Impl}
 import de.sciss.{model => m}
-import evt.Sys
+
+import scala.annotation.switch
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.implicitConversions
 
 object Grapheme {
+  final val typeID = 0x10003
+
   // If necessary for some views, we could eventually add the Elems, too,
   // like `changes: Vec[ (Elem[ S ], Value) ]`. Then the question would be
   // if Elem should have an id method? I.e. we'll have `add( elem: Elem[ S ]) : StoredElem[ S ]`
   // where `trait StoredElem[ S <: Sys[ S ]] { def elem: Elem[ S ]; def id: S#ID }`?
-  final case class Update[S <: evt.Sys[S]](grapheme: Grapheme[S], changes: Vec[Segment])
+  final case class Update[S <: Sys[S]](grapheme: Grapheme[S], changes: Vec[Segment])
 
-  implicit def serializer[S <: Sys[S]]: evt.Serializer[S, Grapheme[S]] = Impl.serializer[S]
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Grapheme[S]] = Impl.serializer[S]
 
   // 0 reserved for variables
   private final val curveCookie = 1
   private final val audioCookie = 2
 
   object Value {
-    implicit val biType: ExprType1[Value] = Expr
+    // implicit val biType: ExprType1[Value] = Expr
 
     implicit object serializer extends ImmutableSerializer[Value] {
       def write(v: Value, out: DataOutput): Unit = v.write(out)
@@ -172,15 +176,15 @@ object Grapheme {
     def isDefined: Boolean
   }
 
-  object Expr extends expr.impl.ExprTypeImplA[Value] {
+  object Expr extends expr.impl.ExprTypeImpl[Value] {
     final val typeID = 11
 
-    object Curve extends expr.impl.ExprTypeImplA[Value.Curve] {
+    object Curve extends expr.impl.ExprTypeImpl[Value.Curve] {
       final val typeID = 12
 
       def apply[S <: Sys[S]](values: (_Expr[S, Double], synth.Curve)*)(implicit tx: S#Tx): Curve[S] = {
-        val targets = evt.Targets.partial[S] // XXX TODO partial?
-        new CurveImpl(targets, values.toIndexedSeq)
+        val targets = evt.Targets[S]
+        new CurveImpl(targets, values.toIndexedSeq).connect()
       }
 
       def unapplySeq[S <: Sys[S]](expr: Expr[S]): Option[Seq[(_Expr[S, Double], synth.Curve)]] = {
@@ -196,16 +200,16 @@ object Grapheme {
 
       def writeValue(v: Value.Curve, out: DataOutput): Unit = v.write(out)
 
-      override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
+      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
                                                targets: evt.Targets[S])(implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
-        require(cookie == curveCookie, s"Unexpected cookie $cookie")
+        if (cookie != curveCookie) sys.error(s"Unexpected cookie $cookie")
         readIdentifiedTuple(in, access, targets)
       }
 
-      private[Grapheme] def readIdentifiedTuple[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                                                (implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
+      private[Grapheme] def readIdentifiedTuple[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+                                                            (implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
         val sz      = in.readInt()
-        val values  = Vec.fill(sz) {
+        val values  = Vector.fill(sz) {
           val mag   = lucre.expr.Double.read(in, access)
           val shape = synth.Curve.serializer.read(in)
           (mag, shape)
@@ -213,15 +217,15 @@ object Grapheme {
         new CurveImpl(targets, values)
       }
     }
-    sealed trait Curve[S <: evt.Sys[S]] extends Expr[S] with _Expr[S, Value.Curve]
+    sealed trait Curve[S <: Sys[S]] extends Expr[S] with _Expr[S, Value.Curve]
 
-    object Audio extends expr.impl.ExprTypeImplA[Value.Audio] {
+    object Audio extends expr.impl.ExprTypeImpl[Value.Audio] {
       final val typeID = 13
 
       def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: _Expr[S, Long], gain: _Expr[S, Double])
                                 (implicit tx: S#Tx): Audio[S] = {
-        val targets = evt.Targets.partial[S] // XXX TODO partial?
-        new AudioImpl(targets, artifact, spec, offset, gain)
+        val targets = evt.Targets[S]
+        new AudioImpl(targets, artifact, spec, offset, gain).connect()
       }
 
       def unapply[S <: Sys[S]](expr: Expr[S]): Option[(Artifact[S], AudioFileSpec, _Expr[S, Long], _Expr[S, Double])] = {
@@ -237,13 +241,13 @@ object Grapheme {
 
       def writeValue(v: Value.Audio, out: DataOutput): Unit = v.write(out)
 
-      override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
+      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
                                            targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
         require(cookie == audioCookie, s"Unexpected cookie $cookie")
         readIdentifiedTuple(in, access, targets)
       }
 
-      private[Grapheme] def readIdentifiedTuple[S <: evt.Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+      private[Grapheme] def readIdentifiedTuple[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                                              (implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
         val artifact  = Artifact.read(in, access)
         val spec      = AudioFileSpec.Serializer.read(in)
@@ -252,14 +256,14 @@ object Grapheme {
         new AudioImpl(targets, artifact, spec, offset, gain)
       }
     }
-    sealed trait Audio[S <: evt.Sys[S]] extends Expr[S] with _Expr[S, Value.Audio] {
+    sealed trait Audio[S <: Sys[S]] extends Expr[S] with _Expr[S, Value.Audio] {
       def artifact: Artifact[S]
       def offset  : _Expr[S, Long  ]
       def gain    : _Expr[S, Double]
       def spec    : AudioFileSpec
     }
 
-    private final class CurveImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S],
+    private final class CurveImpl[S <: Sys[S]](protected val targets: evt.Targets[S],
                                                    val values: Vec[(_Expr[S, Double], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
 
@@ -270,44 +274,46 @@ object Grapheme {
         Value.Curve(v: _*)
       }
 
-      def connect()(implicit tx: S#Tx): Unit =
+      def connect()(implicit tx: S#Tx): this.type = {
         values.foreach { tup =>
-          tup._1.changed ---> this
+          tup._1.changed ---> changed
         }
-
-      def disconnect()(implicit tx: S#Tx): Unit =
-        values.foreach { tup =>
-          tup._1.changed -/-> this
-        }
-
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Curve]] = {
-        val beforeVals  = Vec.newBuilder[(Double, synth.Curve)]
-        val nowVals     = Vec.newBuilder[(Double, synth.Curve)]
-        values.foreach {
-          case (mag, shape) =>
-            val magEvt = mag.changed
-            if (pull.contains(magEvt)) {
-              pull(magEvt) match {
-                case Some(m.Change(magBefore, magNow)) =>
-                  beforeVals += magBefore -> shape
-                  nowVals    += magNow    -> shape
-                case _ =>
-                  val mv      = mag.value
-                  beforeVals += mv -> shape
-                  nowVals    += mv -> shape
-              }
-            } else {
-              val mv      = mag.value
-              beforeVals += mv -> shape
-              nowVals    += mv -> shape
-            }
-        }
-        val before  = Value.Curve(beforeVals.result(): _*)
-        val now     = Value.Curve(nowVals.result(): _*)
-        if (before == now) None else Some(model.Change(before, now))
+        this
       }
 
-      protected def reader = Curve.serializer[S]
+      private[this] def disconnect()(implicit tx: S#Tx): Unit =
+        values.foreach { tup =>
+          tup._1.changed -/-> changed
+        }
+
+      object changed extends Changed {
+        def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Curve]] = {
+          val beforeVals  = Vec.newBuilder[(Double, synth.Curve)]
+          val nowVals     = Vec.newBuilder[(Double, synth.Curve)]
+          values.foreach {
+            case (mag, shape) =>
+              val magEvt = mag.changed
+              if (pull.contains(magEvt)) {
+                pull(magEvt) match {
+                  case Some(m.Change(magBefore, magNow)) =>
+                    beforeVals += magBefore -> shape
+                    nowVals    += magNow    -> shape
+                  case _ =>
+                    val mv      = mag.value
+                    beforeVals += mv -> shape
+                    nowVals    += mv -> shape
+                }
+              } else {
+                val mv      = mag.value
+                beforeVals += mv -> shape
+                nowVals    += mv -> shape
+              }
+          }
+          val before  = Value.Curve(beforeVals.result(): _*)
+          val now     = Value.Curve(nowVals.result(): _*)
+          if (before == now) None else Some(model.Change(before, now))
+        }
+      }
 
       protected def writeData(out: DataOutput): Unit = {
         out.writeByte(curveCookie)
@@ -319,10 +325,12 @@ object Grapheme {
         }
       }
 
-      override def toString() = "Elem.Curve" + id
+      protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
+
+      override def toString: String = s"Elem.Curve$id"
     }
 
-    private final class AudioImpl[S <: evt.Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
+    private final class AudioImpl[S <: Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
                                                    val spec: AudioFileSpec, val offset: _Expr[S, Long],
                                                    val gain: _Expr[S, Double])
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
@@ -334,46 +342,47 @@ object Grapheme {
         Value.Audio(artVal, spec, offsetVal, gainVal)
       }
 
-      def connect()(implicit tx: S#Tx): Unit = {
-        artifact.changed ---> this
-        offset  .changed ---> this
-        gain    .changed ---> this
+      def connect()(implicit tx: S#Tx): this.type = {
+        artifact.changed ---> changed
+        offset  .changed ---> changed
+        gain    .changed ---> changed
+        this
       }
 
-      def disconnect()(implicit tx: S#Tx): Unit = {
-        artifact.changed -/-> this
-        offset  .changed -/-> this
-        gain    .changed -/-> this
+      private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+        artifact.changed -/-> changed
+        offset  .changed -/-> changed
+        gain    .changed -/-> changed
       }
 
-      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Audio]] = {
-        val artEvt = artifact.changed
-        val artOpt = if (pull.contains(artEvt)) pull(artEvt) else None
-        val (artBefore, artNow) = artOpt.fold({
-          val art = artifact.value
-          (art, art)
-        })(_.toTuple)
+      object changed extends Changed {
+        def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Audio]] = {
+          val artEvt = artifact.changed
+          val artOpt = if (pull.contains(artEvt)) pull(artEvt) else None
+          val (artBefore, artNow) = artOpt.fold({
+            val art = artifact.value
+            (art, art)
+          })(_.toTuple)
 
-        val offsetEvt = offset.changed
-        val offsetOpt = if (pull.contains(offsetEvt)) pull(offsetEvt) else None
-        val (offsetBefore, offsetNow) = offsetOpt.fold({
-          val ov = offset.value
-          (ov, ov)
-        })(_.toTuple)
+          val offsetEvt = offset.changed
+          val offsetOpt = if (pull.contains(offsetEvt)) pull(offsetEvt) else None
+          val (offsetBefore, offsetNow) = offsetOpt.fold({
+            val ov = offset.value
+            (ov, ov)
+          })(_.toTuple)
 
-        val gainEvt = gain.changed
-        val gainOpt = if (pull.contains(gainEvt)) pull(gainEvt) else None
-        val (gainBefore, gainNow) = gainOpt.fold({
-          val gv = gain.value
-          (gv, gv)
-        })(_.toTuple)
+          val gainEvt = gain.changed
+          val gainOpt = if (pull.contains(gainEvt)) pull(gainEvt) else None
+          val (gainBefore, gainNow) = gainOpt.fold({
+            val gv = gain.value
+            (gv, gv)
+          })(_.toTuple)
 
-        val before  = Value.Audio(artBefore, spec, offsetBefore, gainBefore)
-        val now     = Value.Audio(artNow   , spec, offsetNow   , gainNow   )
-        if (before == now) None else Some(model.Change(before, now))
+          val before  = Value.Audio(artBefore, spec, offsetBefore, gainBefore)
+          val now     = Value.Audio(artNow   , spec, offsetNow   , gainNow   )
+          if (before == now) None else Some(model.Change(before, now))
+        }
       }
-
-      protected def reader = Audio.serializer[S]
 
       protected def writeData(out: DataOutput): Unit = {
         out.writeByte(audioCookie)
@@ -383,7 +392,9 @@ object Grapheme {
         gain.write(out)
       }
 
-      override def toString() = "Elem.Audio" + id
+      protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
+
+      override def toString: String = s"Elem.Audio$id"
     }
 
     // ---- bi-type ----
@@ -391,27 +402,26 @@ object Grapheme {
     //    def longType    : BiType[Long    ] = Longs
     //    def spanLikeType: BiType[SpanLike] = SpanLikes
 
-    def readValue(in: DataInput): Value = Value.serializer.read(in)
-    def writeValue(value: Value, out: DataOutput): Unit = value.write(out)
+    def valueSerializer: ImmutableSerializer[Value] = Value.serializer
 
-    override protected def readNode[S <: evt.Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
+    override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                             (implicit tx: S#Tx): Expr[S] with evt.Node[S] = {
       (cookie: @switch) match {
         case `curveCookie` => Curve.readIdentifiedTuple(in, access, targets)
         case `audioCookie` => Audio.readIdentifiedTuple(in, access, targets)
-        case _ => sys.error("Unexpected cookie " + cookie)
+        case _ => sys.error(s"Unexpected cookie $cookie")
       }
     }
   }
 
   //  type Elem[S <: Sys[S]] = Expr[S, Value]
-  sealed trait Expr[S <: evt.Sys[S]] extends _Expr[S, Value]
+  sealed trait Expr[S <: Sys[S]] extends _Expr[S, Value]
 
-  type TimedElem[S <: evt.Sys[S]] = BiExpr[S, Value]
+  type TimedElem[S <: Sys[S]] = BiPin.Entry[S, Value]
 
-  trait Modifiable[S <: evt.Sys[S]] extends Grapheme[S] {
-    def add   (elem: BiExpr[S, Value])(implicit tx: S#Tx): Unit
-    def remove(elem: BiExpr[S, Value])(implicit tx: S#Tx): Boolean
+  trait Modifiable[S <: Sys[S]] extends Grapheme[S] {
+    def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit
+    def remove(elem: TimedElem[S])(implicit tx: S#Tx): Boolean
     def clear()(implicit tx: S#Tx): Unit
   }
 
@@ -432,8 +442,8 @@ object Grapheme {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = Impl.read(in, access)
 }
-trait Grapheme[S <: evt.Sys[S]] extends evt.Node[S] with Publisher[S, Grapheme.Update[S]] {
-  import Grapheme.{Value, Segment, Modifiable, TimedElem}
+trait Grapheme[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Grapheme.Update[S]] {
+  import Grapheme.{Modifiable, Segment, TimedElem, Value}
 
   /** The idea of all traits which distinguish between read-only and modifiable sub-type is that
     * eventually the super-type acts somewhat like an expression. It might be possible to map

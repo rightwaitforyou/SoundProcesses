@@ -15,10 +15,10 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
+import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.event.{EventLike, Sys}
+import de.sciss.lucre.event.EventLike
 import de.sciss.serial.{DataInput, Serializer}
-import de.sciss.synth.proc.Obj.Update
 
 object TimelineImpl {
   def apply[S <: Sys[S]](implicit tx: S#Tx): Timeline.Modifiable[S] =
@@ -48,16 +48,20 @@ object TimelineImpl {
       val tree = readTree(in,access)
     }
 
-  private val anySer    = new Ser   [evt.InMemory]
-  private val anyModSer = new ModSer[evt.InMemory]
+  private val anySer    = new Ser   [NoSys]
+  private val anyModSer = new ModSer[NoSys]
 
-  private class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Timeline[S]] {
+  private class Ser[S <: Sys[S]] extends Obj.Serializer[S, Timeline[S]] {
+    def typeID: Int = Timeline.typeID
+
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Timeline[S] = {
       TimelineImpl.read(in, access, targets)
     }
   }
 
-  private class ModSer[S <: Sys[S]] extends evt.NodeSerializer[S, Timeline.Modifiable[S]] {
+  private class ModSer[S <: Sys[S]] extends Obj.Serializer[S, Timeline.Modifiable[S]] {
+    def typeID: Int = Timeline.typeID
+
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Timeline.Modifiable[S] = {
       TimelineImpl.read(in, access, targets)
     }
@@ -66,14 +70,14 @@ object TimelineImpl {
   // ---- impl ----
 
   private abstract class Impl[S <: Sys[S]](protected val targets: evt.Targets[S])
-    extends BiGroupImpl.Impl[S, Obj[S], Obj.Update[S]] with Timeline.Modifiable[S] {
+    extends BiGroupImpl.Impl[S, Obj[S]] with Timeline.Modifiable[S] {
 
     override def modifiableOption: Option[Timeline.Modifiable[S]] = Some(this)
 
-    def eventView(obj: Obj[S]): EventLike[S, Update[S]] = obj.changed
+    def eventView(obj: Obj[S]): EventLike[S, Timeline.Update[S]] = obj.changed
 
     def elemSerializer: Serializer[S#Tx, S#Acc, Obj[S]] = Obj.serializer[S]
 
-    override def toString() = s"Timeline${tree.id}"
+    override def toString: String = s"Timeline${tree.id}"
   }
 }

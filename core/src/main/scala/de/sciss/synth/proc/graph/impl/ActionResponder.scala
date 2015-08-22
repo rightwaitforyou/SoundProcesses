@@ -16,6 +16,7 @@ package graph
 package impl
 
 import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.synth.{Txn, DynamicUser, Node, Sys}
 import de.sciss.{osc, synth}
 import de.sciss.synth.{proc, GE, message}
@@ -23,6 +24,8 @@ import de.sciss.synth.{proc, GE, message}
 import scala.collection.breakOut
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.Ref
+
+import TransitoryAPI._
 
 object ActionResponder {
   // via SendReply
@@ -49,7 +52,7 @@ class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, 
   private val trigResp = message.Responder(synth.server.peer) {
     case m @ osc.Message(Name, NodeID, 0, raw @ _*) =>
       if (DEBUG) println(s"ActionResponder($key, $NodeID) - received trigger")
-      // logAural(m.toString())
+      // logAural(m.toString)
       val values: Vec[Float] = raw.collect {
         case f: Float => f
       } (breakOut)
@@ -57,19 +60,16 @@ class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, 
       import context.scheduler.cursor
       SoundProcesses.atomic { implicit tx: S#Tx =>
         val invoker = objH()
-        invoker.attr.get(key).foreach { valueOpaque =>
+        invoker.attr[proc.Action[S]](key).foreach { action =>
           // for some reason we cannot pattern match for Action.Obj(action);
           // scalac gives us
           // "inferred type arguments [S] do not conform to method unapply type
           // parameter bounds [S <: de.sciss.lucre.event.Sys[S]]"
           // - WHY??
-          if (valueOpaque.elem.isInstanceOf[proc.Action.Elem[S]]) {
-            val action = valueOpaque.asInstanceOf[proc.Action.Obj[S]]
-            if (DEBUG) println("...and found action")
-            val universe = proc.Action.Universe(action, context.workspaceHandle,
-              invoker = Some(invoker), values = values)
-            action.elem.peer.execute(universe)
-          }
+          if (DEBUG) println("...and found action")
+          val universe = proc.Action.Universe(action, context.workspaceHandle,
+            invoker = Some(invoker), values = values)
+          action.execute(universe)
         }
       }
   }

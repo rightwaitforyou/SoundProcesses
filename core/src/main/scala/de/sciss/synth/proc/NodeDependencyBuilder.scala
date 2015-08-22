@@ -13,6 +13,7 @@
 
 package de.sciss.synth.proc
 
+import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.synth.{Node, DynamicUser, Resource, Sys}
 import de.sciss.synth.ControlSet
 

@@ -15,8 +15,8 @@ package de.sciss.synth.proc
 
 import java.util.concurrent.{Executors, ScheduledExecutorService}
 
-import de.sciss.lucre.event.Sys
 import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Sys
 
 import scala.concurrent.{Future, ExecutionContext}
 import scala.concurrent.stm.Txn

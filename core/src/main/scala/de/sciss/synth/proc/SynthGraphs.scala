@@ -13,16 +13,18 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{event => evt, expr}
-import evt.{Targets, Sys}
-import scala.annotation.switch
-import de.sciss.model
-import de.sciss.synth.{Lazy, MaybeRate, SynthGraph}
-import de.sciss.serial.{ImmutableSerializer, DataOutput, DataInput}
-import de.sciss.lucre.expr.Expr
-import de.sciss.synth.ugen.{ControlProxyLike, Constant}
 import java.util
 
+import de.sciss.lucre.event.Targets
+import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{event => evt, expr}
+import de.sciss.model
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
+import de.sciss.synth.ugen.{Constant, ControlProxyLike}
+import de.sciss.synth.{Lazy, MaybeRate, SynthGraph}
+
+import scala.annotation.switch
 import scala.util.control.NonFatal
 
 object SynthGraphs extends expr.impl.ExprTypeImpl[SynthGraph] {
@@ -254,7 +256,7 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                       (implicit tx: S#Tx): Ex[S] with evt.Node[S] =
     cookie match {
-      case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` => new Predefined(targets, cookie)
+      case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` => ??? // RRR new Predefined(targets, cookie)
 
       //      case `mapCookie`  =>
       //        val key     = in.readUTF()
@@ -279,12 +281,12 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   private lazy val tapeSynthGraph: SynthGraph =
     SynthGraph {
       import de.sciss.synth._
-      val sig   = graph.ScanIn(Proc.Obj.graphAudio)
+      val sig   = graph.ScanIn(Proc.graphAudio)
       val gain  = graph.Attribute.kr(ObjKeys.attrGain, 1)
       val mute  = graph.Attribute.kr(ObjKeys.attrMute, 0)
       val env   = graph.FadeInOut.ar
       val amp   = env * ((1 - mute) * gain)
-      graph.ScanOut(Proc.Obj.scanMainOut, sig * amp)
+      graph.ScanOut(Proc.scanMainOut, sig * amp)
     }
 
   private val emptySynthGraph = SynthGraph {}
@@ -294,21 +296,20 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   def empty  [S <: Sys[S]](implicit tx: S#Tx): Ex[S] = apply(emptyCookie  )
 
   private def apply[S <: Sys[S]](cookie: Int)(implicit tx: S#Tx): Ex[S] = {
-    val targets = evt.Targets[S]
-    new Predefined(targets, cookie)
+    val id = tx.newID()
+    new Predefined(id, cookie)
   }
 
   // XXX TODO -- we should allow other constant values in Type. now we have a wasted evt.Targets...
-  private final class Predefined[S <: Sys[S]](protected val targets: Targets[S], cookie: Int)
+  private final class Predefined[S <: Sys[S]](val id: S#ID, cookie: Int)
     extends Expr[S, SynthGraph]
-    with evt.Node[S]
-    with evt.impl.SingleGenerator[S, model.Change[SynthGraph], Ex[S]] {
+    with evt.impl.ConstImpl[S, model.Change[SynthGraph]] {
+
+    def typeID: Int = SynthGraphs.typeID
 
     protected def writeData(out: DataOutput): Unit = out.writeByte(cookie)
 
     protected def disposeData()(implicit tx: S#Tx) = ()
-
-    protected def reader: evt.Reader[S, SynthGraphs.Ex[S]] = serializer
 
     def value(implicit tx: S#Tx): SynthGraph = cookie match {
       // case `oldTapeCookie`  => oldTapeSynthGraph

@@ -15,15 +15,17 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, data}
-import evt.{Event, impl => evti, Sys}
-import data.SkipList
-import annotation.switch
-import collection.breakOut
-import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.serial.{DataOutput, ImmutableSerializer, DataInput}
-import language.higherKinds
+import de.sciss.lucre.data.SkipList
+import de.sciss.lucre.event.{Event, impl => evti}
+import de.sciss.lucre.stm.{Obj, NoSys, Sys}
 import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.{event => evt}
+import de.sciss.serial.{Serializer, DataInput, DataOutput, ImmutableSerializer}
+
+import scala.annotation.switch
+import scala.collection.breakOut
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.higherKinds
 
 object ProcImpl {
   private final val SER_VERSION = 0x5074  // was "Pr"
@@ -33,12 +35,13 @@ object ProcImpl {
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] =
     serializer[S].read(in, access)
 
-  def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Proc[S]] =
-    anySer.asInstanceOf[evt.NodeSerializer[S, Proc[S]]]
+  def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Proc[S]] = anySer.asInstanceOf[Ser[S]]
 
-  private val anySer = new Serializer[InMemory]
+  private val anySer = new Ser[NoSys]
 
-  private class Serializer[S <: Sys[S]] extends evt.NodeSerializer[S, Proc[S]] {
+  private class Ser[S <: Sys[S]] extends Obj.Serializer[S, Proc[S]] {
+    def typeID: Int = Proc.typeID
+
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Proc[S] =
       new Read(in, access, targets)
   }
@@ -83,7 +86,6 @@ object ProcImpl {
       proc.StateEvent(Proc.Update(proc, b.result()))
     }
 
-    protected def reader: evt.Reader[S, Proc[S]] = ProcImpl.serializer
     def node: Proc[S] with evt.Node[S] = proc
 
     protected def isConnected(implicit tx: S#Tx): Boolean = proc.isConnected
@@ -112,6 +114,8 @@ object ProcImpl {
   private sealed trait Impl[S <: Sys[S]]
     extends Proc[S] {
     proc =>
+
+    def typeID: Int = Proc.typeID
 
     import Proc._
 
@@ -183,7 +187,7 @@ object ProcImpl {
       }
     }
 
-    final def select(slot: Int /*, invariant: Boolean */): Event[S, Any, Any] = (slot: @switch) match {
+    final def event(slot: Int /*, invariant: Boolean */): Event[S, Any] = (slot: @switch) match {
       case ChangeEvent.slot => ChangeEvent
       case 1 /* inputs .slot */ => inputs
       case 2 /* outputs.slot */ => outputs
@@ -191,7 +195,7 @@ object ProcImpl {
     }
 
     //      final def stateChanged : evt.Event[ S, StateChange[ S ], Proc[ S ]] = StateEvent
-    final def changed: evt.Event[S, Update[S], Proc[S]] = ChangeEvent
+    final def changed: evt.Event[S, Update[S]] = ChangeEvent
 
     final protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
@@ -206,7 +210,7 @@ object ProcImpl {
       scanOutMap  .dispose()
     }
 
-    override def toString() = s"Proc$id"
+    override def toString: String = s"Proc$id"
   }
 
   private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {

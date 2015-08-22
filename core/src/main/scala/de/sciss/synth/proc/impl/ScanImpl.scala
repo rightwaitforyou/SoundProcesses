@@ -15,13 +15,14 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.{event => evt, data, expr}
-import evt.{impl => evti, Event, Sys}
-import annotation.switch
-import expr.List
-import de.sciss.serial.{DataOutput, Serializer, DataInput}
-import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.event.{Event, impl => evti}
+import de.sciss.lucre.expr.List
+import de.sciss.lucre.stm.{NoSys, Obj, Sys}
+import de.sciss.lucre.{data, event => evt}
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
+
+import scala.annotation.switch
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object ScanImpl {
   import Scan.Link
@@ -40,14 +41,13 @@ object ScanImpl {
     serializer[S].read(in, access)
   }
 
-  implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Scan[S]] =
-    anySer.asInstanceOf[evt.NodeSerializer[S, Scan[S]]]
+  def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Scan[S]] = anySer.asInstanceOf[Ser[S]]
 
-  private type I = InMemory
+  private val anySer = new Ser[NoSys]
 
-  private val anySer: evt.NodeSerializer[I, Scan[I]] = new Ser[I]
+  private final class Ser[S <: Sys[S]] extends Obj.Serializer[S, Scan[S]] {
+    def typeID: Int = Scan.typeID
 
-  private final class Ser[S <: Sys[S]] extends evt.NodeSerializer[S, Scan[S]] {
     def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Scan[S] = {
       val serVer = in.readShort()
       if (serVer != SER_VERSION) sys.error(s"Incompatible serialized version (found $serVer, required $SER_VERSION)")
@@ -57,10 +57,9 @@ object ScanImpl {
     }
   }
 
-  implicit def linkSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Link[S]] =
-    anyLinkSer.asInstanceOf[Serializer[S#Tx, S#Acc, Link[S]]]
+  implicit def linkSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Link[S]] = anyLinkSer.asInstanceOf[LinkSer[S]]
 
-  private val anyLinkSer: Serializer[I#Tx, I#Acc, Link[I]] = new LinkSer[I]
+  private val anyLinkSer = new LinkSer[NoSys]
 
   private final class LinkSer[S <: Sys[S]] extends Serializer[S#Tx, S#Acc, Link[S]] {
     def write(link: Link[S], out: DataOutput): Unit =
@@ -86,13 +85,13 @@ object ScanImpl {
   }
 
   private final class Impl[S <: Sys[S]](protected val targets : evt.Targets[S],
-                                        protected val list    : List.Modifiable[S, Link[S], Unit])
+                                        protected val list    : List.Modifiable[S, Link[S]])
     extends Scan[S]
     with evti.StandaloneLike[S, Scan.Update[S], Scan[S]]
-    with evti.Generator[S, Scan.Update[S], Scan[S]]
+    with evti.Generator[S, Scan.Update[S]]
     with evti.Root[S, Scan.Update[S]] {
 
-    override def toString() = s"Scan$id"
+    override def toString: String = s"Scan$id"
 
     def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = list.iterator
 
@@ -121,31 +120,16 @@ object ScanImpl {
       true
     }
 
-    def changed: Event[S, Scan.Update[S], Scan[S]] = this
-
-//    def connect   ()(implicit tx: S#Tx): Unit = list.changed ---> this
-//    def disconnect()(implicit tx: S#Tx): Unit = list.changed -/-> this
-
-//    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Scan.Update[S]] = {
-//      val gen = pull.isOrigin(this)
-//      val u1 = if (!gen) Vec.empty else pull.resolve[Scan.Update[S]].changes
-//      val u2 = u1
-////      val u2 = if ( gen) u1        else pull(graphemeSourceList.changed).fold(u1) { ll =>
-////        val gcs = ll.changes.collect {
-////          case List.Element(_, gc) => Scan.GraphemeChange(gc.grapheme, gc.changes)
-////        }
-////        if (u1.isEmpty) gcs else if (gcs.isEmpty) u1 else u1 ++ gcs
-////      }
-//      if (u2.isEmpty) None else Some(Scan.Update(this, u2))
-//    }
+    def changed: Event[S, Scan.Update[S]] = this
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
       list.write(out)
     }
 
-    protected def disposeData()(implicit tx: S#Tx): Unit = list.dispose()
-
-    protected def reader: evt.Reader[S, Scan[S]] = serializer
+    protected def disposeData()(implicit tx: S#Tx): Unit = {
+      list.dispose()
+      disconnect()
+    }
   }
 }

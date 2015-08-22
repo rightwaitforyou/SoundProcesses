@@ -56,7 +56,7 @@ object FolderElemImpl extends ElemCompanionImpl[FolderElem] {
     def prefix = "Folder"
 
     // XXX TODO: not nice
-    override def toString() = s"$prefix$id"
+    override def toString: String = s"$prefix$id"
 
     def mkCopy()(implicit tx: S#Tx): FolderElem[S] = FolderElemImpl(peer) // XXX TODO - copy list?
   }

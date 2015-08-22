@@ -37,10 +37,10 @@ object UGenGraphBuilder {
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
     * be stored in a `TxnLocal`, but not a full STM ref.
     */
-  def apply[S <: Sys[S]](context: Context[S], proc: Proc.Obj[S])
+  def apply[S <: Sys[S]](context: Context[S], proc: Proc[S])
                         (implicit tx: S#Tx): State[S] = Impl(context, proc)
 
-  def init[S <: Sys[S]](proc: Obj.T[S, Proc.Elem])(implicit tx: S#Tx): Incomplete[S] = Impl.init(proc)
+  def init[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx): Incomplete[S] = Impl.init(proc)
 
   case class ScanIn(numChannels: Int, fixed: Boolean)
 

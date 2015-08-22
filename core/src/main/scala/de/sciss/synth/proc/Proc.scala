@@ -14,14 +14,15 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.stm.Sys
-import de.sciss.lucre.{event => evt, expr}
-import expr.Expr
-import impl.{ProcImpl => Impl}
-import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.serial.{Serializer, DataInput}
-import de.sciss.model
 import de.sciss.lucre.event.Publisher
+import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{event => evt}
+import de.sciss.model
+import de.sciss.serial.{DataInput, Serializer}
+import de.sciss.synth.proc.impl.{ProcImpl => Impl}
+
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 object Proc {
   final val typeID = 0x10005
@@ -32,7 +33,7 @@ object Proc {
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] = Impl.read(in, access)
 
-  implicit def serializer[S <: Sys[S]]: evt.NodeSerializer[S, Proc[S]] = Impl.serializer[S]
+  implicit def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Proc[S]] = Impl.serializer[S]
 
   // ---- event types ----
 

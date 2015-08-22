@@ -516,7 +516,7 @@
 //
 //  private final val sync = new AnyRef
 //
-//  def debug() = extensions.toString()
+//  def debug() = extensions.toString
 //
 //  @volatile private var extensions = Map[Int, Elem.Extension](
 //    Int             .typeID -> Int             ,
