@@ -66,7 +66,8 @@ object Scan extends Obj.Type {
       }
     }
 
-    def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] = ???  // RRR
+    def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] =
+      Impl.readIdentifiedLink(in, access)
   }
 
   /** This trait describes a source or sink link to/from a sink. */

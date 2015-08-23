@@ -22,7 +22,7 @@ import de.sciss.synth.proc.impl.{ActionImpl => Impl}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.Future
 
-object Action extends stm.Obj.Type {
+object Action extends Obj.Type {
   final val typeID = 19
 
   final val attrSource = "action-source"
@@ -92,7 +92,8 @@ object Action extends stm.Obj.Type {
     implicit def cursor: stm.Cursor[S]
   }
 
-  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): stm.Obj[S] = ??? // RRR
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
+    Impl.readIdentifiedObj(in, access)
 }
 trait Action[S <: Sys[S]] extends Obj[S] with evt.Publisher[S, Unit] {
   def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit

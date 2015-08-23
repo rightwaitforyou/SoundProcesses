@@ -15,11 +15,11 @@ package de.sciss
 package synth
 package proc
 
+import de.sciss.lucre.event.{Pull, Targets}
+import de.sciss.lucre.expr.{Expr => _Expr}
 import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.lucre.{event => evt, expr}
-import lucre.expr.{Expr => _Expr}
-import de.sciss.serial.{Serializer, DataOutput, DataInput, ImmutableSerializer}
-import de.sciss.lucre.event.{Pull, Targets}
+import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
 
@@ -83,7 +83,7 @@ object FadeSpec extends Obj.Type {
 //                                              (implicit tx: S#Tx): Ex[S] with evt.Node[S] = {
 //      require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
 //      val numFrames = lucre      .expr.Long  .read(in, access)
-//      val shape     = ??? : _Expr[S, Curve] // RRR lucre.synth.expr.Curve .read(in, access)
+//      val shape     = .... : _Expr[S, Curve] // RRR lucre.synth.expr.Curve .read(in, access)
 //      val floor     = lucre      .expr.Double.read(in, access)
 //      new Impl(targets, numFrames, shape, floor)
 //    }
@@ -156,6 +156,7 @@ object FadeSpec extends Obj.Type {
   }
   sealed trait Expr[S <: Sys[S]] extends _Expr[S, FadeSpec]
 
-  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] = ???
+  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
+    Expr.readIdentifiedObj(in, access)
 }
 final case class FadeSpec(numFrames: Long, curve: Curve = linear, floor: Float = 0f)
