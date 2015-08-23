@@ -2,6 +2,9 @@ package de.sciss
 package synth
 package proc
 
+import de.sciss.lucre.expr
+import de.sciss.lucre.expr.Expr
+
 import collection.immutable.{IndexedSeq => Vec}
 import span.Span
 import de.sciss.synth.Curve.step
@@ -19,11 +22,16 @@ class GraphemeSerializationSpec extends ConfluentEventSpec {
       tx.newHandle(g)(Grapheme.Modifiable.serializer[S])
     }
 
-    import imp._
+    // import imp._
+    import expr.Ops._
+    import ExprImplicits._
+
+    type LE = Expr[S, Long]
+    type GE = Expr[S, Grapheme.Value]
 
     system.step { implicit tx =>
       val g = gH()
-      g.add(1234L -> Grapheme.Value.Curve(5678.9 -> step))
+      ??? // RRR g.add((1234L: LE) -> Grapheme.Expr.Curve[S](Grapheme.Value.Curve(5678.9 -> step)))
     }
 
     system.step { implicit tx =>

@@ -3,8 +3,8 @@ package synth
 package proc
 
 import de.sciss.lucre.bitemp.BiGroup
-import de.sciss.lucre.expr.{SpanLike => SpanLikeEx}
-import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr}
+import de.sciss.lucre.{event => evt}
+import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, SpanLike => SpanLikeEx}
 import de.sciss.lucre.stm.{Identifier, Disposable}
 import de.sciss.span.{SpanLike, Span}
 
@@ -50,7 +50,7 @@ class Issue15 extends ConfluentEventSpec {
 
     def assertChildren(header: String, size: Int)(implicit tx: S#Tx): Unit = {
       val tl = tlH()
-      val ch = de.sciss.lucre.event.Peek.targets(tl.asInstanceOf[Node[S]])
+      val ch = de.sciss.lucre.event.Peek.targets(tl.asInstanceOf[evt.Node[S]])
       assert(ch.size === size)
       if (DEBUG) {
         println(s"\n---- $header ----")
@@ -84,8 +84,8 @@ class Issue15 extends ConfluentEventSpec {
 
         val pObj    = pObjH()
         val tl      = tlH()
-        val muteObj = BooleanEx.newConst[S](true)
-        val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
+        val muteObj = BooleanEx.newConst[S](true) : Expr[S, Boolean]
+        // val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
         pObj.attrPut(ObjKeys.attrMute, muteObj)
         obs.assertEquals()
 //        BiGroup.Update(tl, Vec(
@@ -96,6 +96,7 @@ class Issue15 extends ConfluentEventSpec {
 
         assertChildren("AFTER FIRST MUTATION", 4)
 
+        import BooleanEx.serializer
         tx.newHandle(muteObj)
       }
 
@@ -105,7 +106,7 @@ class Issue15 extends ConfluentEventSpec {
         val pObj    = pObjH()
         val tl      = tlH()
         val muteObj = muteH()
-        val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
+        // val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
         pObj.attrRemove(ObjKeys.attrMute)
         obs.assertEquals()
 //        BiGroup.Update(tl, Vec(

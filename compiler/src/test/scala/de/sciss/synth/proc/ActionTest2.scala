@@ -1,16 +1,15 @@
 package de.sciss.synth.proc
 
 import de.sciss.file.File
-import de.sciss.lucre.confluent.reactive.ConfluentReactive
 import de.sciss.lucre.stm.store.BerkeleyDB
 
 import scala.concurrent.ExecutionContext
 
 object ActionTest2 extends App {
-  type S = ConfluentReactive
+  type S = Confluent
   val dir     = File.createTemp(directory = true)
   val factory = BerkeleyDB.factory(dir)
-  val system  = ConfluentReactive(factory)
+  val system  = Confluent(factory)
   val (_, cursor0) = system.cursorRoot(_ => ()) { implicit tx => _ => system.newCursor() }
   implicit val cursor = cursor0
 

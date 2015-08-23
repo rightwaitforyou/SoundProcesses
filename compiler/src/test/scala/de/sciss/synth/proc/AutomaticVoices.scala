@@ -17,7 +17,8 @@ import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.impl.UndoManagerImpl
 import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, Int => IntEx}
-import de.sciss.lucre.stm
+import de.sciss.lucre.stm.Obj
+import de.sciss.lucre.{expr, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.swing.{IntSpinnerView, defer, deferTx}
 import de.sciss.lucre.synth.Server
@@ -31,6 +32,8 @@ import de.sciss.{lucre, osc, synth}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
+
+import TransitoryAPI._
 
 object AutomaticVoices {
   val DumpOSC         = false
@@ -50,8 +53,7 @@ object AutomaticVoices {
   type S = Confluent
   // type S = InMemory
 
-  private[this] val imp = ExprImplicits[S]
-  import imp._
+  import expr.Ops._
 
   def main(args: Array[String]): Unit = {
     showAuralLog = ShowLog
@@ -68,7 +70,8 @@ object AutomaticVoices {
     implicit val cursor = _cursor
     //    val sys = InMemory()
     //    implicit val cursor = sys
-    lucre.synth.expr.initTypes()
+    // lucre.synth.expr.initTypes()
+
     atomic[S, Unit] { implicit tx =>
       val action = Action[S](actionName, actionBytes)
       println("Making the world...")
@@ -81,14 +84,14 @@ object AutomaticVoices {
     }
   }
 
-  class Layer(val ensemble:     stm.Source[S#Tx, Ensemble.Obj[S]],
+  class Layer(val ensemble:     stm.Source[S#Tx, Ensemble[S]],
               val states  : Vec[stm.Source[S#Tx, Expr.Var[S, Int    ]]],
               val playing :     stm.Source[S#Tx, Expr.Var[S, Boolean]],
               val transId :     stm.Source[S#Tx, Expr.Var[S, Int    ]],
-              val input   :     stm.Source[S#Tx, Proc.Obj[S]],
-              val output  :     stm.Source[S#Tx, Proc.Obj[S]])
+              val input   :     stm.Source[S#Tx, Proc[S]],
+              val output  :     stm.Source[S#Tx, Proc[S]])
 
-  class World(val diffusion     :     stm.Source[S#Tx, Proc.Obj[S]],
+  class World(val diffusion     :     stm.Source[S#Tx, Proc[S]],
               val layers        : Vec[Layer],
               val sensors       : Vec[stm.Source[S#Tx, Expr.Var[S, Int    ]]],
               val transId       :     stm.Source[S#Tx, Expr.Var[S, Int    ]],
@@ -248,7 +251,7 @@ object AutomaticVoices {
     val transport = Transport[S](aural)
     transport.addObject(w.diffusion())
     w.layers.zipWithIndex.foreach { case (l, li) =>
-      // println(s"Adding layer $li (playing = ${l.playing().value}; bypass = ${l.bypass().elem.peer.playing.value})")
+      // println(s"Adding layer $li (playing = ${l.playing().value}; bypass = ${l.bypass().playing.value})")
       // transport.addObject(l.input   ())
       // transport.addObject(l.output  ())
       transport.addObject(l.ensemble())
@@ -304,8 +307,8 @@ object AutomaticVoices {
 
   def unlinkLayer(l: Layer)(implicit tx: S#Tx): Unit =
     for {
-      layerIn  <- l.input    ().elem.peer.inputs .get("in" )
-      layerOut <- l.output   ().elem.peer.outputs.get("out")
+      layerIn  <- l.input    ().inputs .get("in" )
+      layerOut <- l.output   ().outputs.get("out")
     } {
       val oldLayerIn = layerIn.iterator.collect {
         case l @ Scan.Link.Scan(_) => l
@@ -328,9 +331,9 @@ object AutomaticVoices {
 
   def layerToFront(w: World, l: Layer)(implicit tx: S#Tx): Unit =
     for {
-      layerIn  <- l.input    ().elem.peer.inputs .get("in" )
-      layerOut <- l.output   ().elem.peer.outputs.get("out")
-      diffIn   <- w.diffusion().elem.peer.inputs .get("in" )
+      layerIn  <- l.input    ().inputs .get("in" )
+      layerOut <- l.output   ().outputs.get("out")
+      diffIn   <- w.diffusion().inputs .get("in" )
     } {
       val oldDiffIn = diffIn.iterator.collect {
         case l @ Scan.Link.Scan(_) => l
@@ -505,6 +508,8 @@ object AutomaticVoices {
       sensor
     }
 
+    import ExprImplicits._
+
     val diff = Proc[S]
     diff.graph() = SynthGraph {
       import synth._
@@ -519,7 +524,7 @@ object AutomaticVoices {
       Out.ar(0, mix)
     }
     diff.inputs.add("in")
-    val diffObj = Obj(Proc.Elem(diff))
+    val diffObj = diff // Obj(Proc.Elem(diff))
     diffObj.name = "diff"
 
     val vecLayer = Vec.tabulate(NumLayers) { li =>
@@ -597,12 +602,14 @@ object AutomaticVoices {
     // layer-level ensemble
     val lFolder = Folder[S]
 
+    import ExprImplicits._
+
     // the actual sound layer
     val gen       = Proc[S]
     gen.graph()   = genGraph
-    val genObj    = Obj(Proc.Elem(gen))
-    val liObj     = Obj(IntElem(li))
-    genObj.attr.put("li", liObj)
+    val genObj    = gen // Obj(Proc.Elem(gen))
+    val liObj     = li // Obj(IntElem(li))
+    genObj.attrPut("li", liObj)
     genObj.name = s"gen$li"
     lFolder.addLast(genObj)
 
@@ -610,14 +617,14 @@ object AutomaticVoices {
     val pred        = Proc[S]
     pred.graph()    = throughGraph
     pred.inputs.add("in")
-    val predObj     = Obj(Proc.Elem(pred))
+    val predObj     = pred // Obj(Proc.Elem(pred))
     predObj.name = s"pred$li"
     lFolder.addLast(predObj)
 
     // aka background splitter
     val split       = Proc[S]
     split.graph()   = splitGraph
-    val splitObj    = Obj(Proc.Elem(split))
+    val splitObj    = split // Obj(Proc.Elem(split))
     splitObj.name = s"split$li"
     lFolder.addLast(splitObj)
     pred.outputs.add("out") ~> split.inputs.add("in")
@@ -625,7 +632,7 @@ object AutomaticVoices {
     // aka foreground splitter
     val succ        = Proc[S]
     succ.graph()    = splitGraph
-    val succObj     = Obj(Proc.Elem(succ))
+    val succObj     = succ // Obj(Proc.Elem(succ))
     succObj.name = s"succ$li"
     lFolder.addLast(succObj)
     gen.outputs.add("out") ~> succ.inputs.add("in")
@@ -633,7 +640,7 @@ object AutomaticVoices {
     // aka collector
     val coll        = Proc[S]
     coll.graph()    = collGraph
-    val collObj     = Obj(Proc.Elem(coll))
+    val collObj     = coll // Obj(Proc.Elem(coll))
     collObj.name = s"coll$li"
     lFolder.addLast(collObj)
 
@@ -641,18 +648,18 @@ object AutomaticVoices {
     val out       = Proc[S]
     out.graph()   = throughGraph
     out.outputs.add("out")
-    val outObj    = Obj(Proc.Elem(out))
+    val outObj    = out // Obj(Proc.Elem(out))
     outObj.name   = s"foo$li"
     lFolder.addLast(outObj)
     coll.outputs.add("out") ~> out.inputs.add("in")
 
     class Channel(val stateObj: Obj[S], val state: Expr.Var[S, Int], val fPlaying: Expr[S, Boolean],
                   val active: Expr[S, Boolean], val predOut: Scan[S], val succOut: Scan[S], val collIn: Scan[S],
-                  val doneObj: Action.Obj[S])
+                  val doneObj: Action[S])
 
     val vecChannels = Vec.tabulate[Channel](NumSpeakers) { si =>
       val state     = IntEx.newVar[S](0)  // 0 - bypass, 1 - engaged, 2 - fade-in, 3 - fade-out
-      val stateObj  = Obj(IntElem(state))
+      val stateObj  = state // Obj(IntElem(state))
       if (PrintStates) state.changed.react(_ => ch => println(s"state${li}_$si -> ${ch.now}"))
       val fPlaying  = state >= 2 // ongoing transition per channel
       if (PrintStates) fPlaying.changed.react(_ => ch => println(s"fPlaying${li}_$si -> ${ch.now}"))
@@ -663,14 +670,15 @@ object AutomaticVoices {
 
       val procB     = Proc[S]   // transition bypass/engage per channel
       procB.graph() = switchGraph
-      val procBObj  = Obj(Proc.Elem(procB))
-      procBObj.attr.put("state", stateObj)
+      val procBObj  = procB // Obj(Proc.Elem(procB))
+      procBObj.attrPut("state", stateObj)
       procBObj.name = s"by$li$si"
       val bPlaying  = state <  2
       val bFolder   = Folder[S]
       bFolder.addLast(procBObj)
-      val ensB      = Ensemble(bFolder, 0L, bPlaying)
-      val ensBObj   = Obj(Ensemble.Elem(ensB))
+
+      val ensB      = Ensemble[S](bFolder, 0L, bPlaying)
+      val ensBObj   = ensB // Obj(Ensemble.Elem(ensB))
       val predInB   = procB .inputs .add("pred")
       val succInB   = procB .inputs .add("succ")
       val outB      = procB .outputs.add("out" )
@@ -681,8 +689,8 @@ object AutomaticVoices {
 
       val active    = state > 0
 
-      val doneObj   = Obj(Action.Elem(done))
-      doneObj.attr.put("state", stateObj)
+      val doneObj   = done // Obj(Action.Elem(done))
+      doneObj.attrPut("state", stateObj)
 
       new Channel(stateObj = stateObj, state = state, fPlaying = fPlaying, active = active,
         predOut = predOut, succOut = succOut, collIn = collIn, doneObj = doneObj)
@@ -695,7 +703,7 @@ object AutomaticVoices {
     // if (PrintStates) lPlaying.changed.react(_ => ch => println(s"lPlaying$li -> ${ch.now}"))
 
     val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
-    val ensLObj = Obj(Ensemble.Elem(ensL))
+    val ensLObj = ensL // Obj(Ensemble.Elem(ensL))
 
     //    val bypassPlaying = !lPlaying
     //    val bypassF       = Folder[S]
@@ -713,13 +721,13 @@ object AutomaticVoices {
       val tPlaying    = transId sig_== gi
       val tFolder     = Folder[S]
       val ensT        = Ensemble[S](tFolder, 0L, tPlaying)
-      val ensTObj     = Obj(Ensemble.Elem(ensT))
+      val ensTObj     = ensT // Obj(Ensemble.Elem(ensT))
       lFolder.addLast(ensTObj)
 
       vecChannels.zipWithIndex.foreach { case (channel, si) =>
         val fFolder   = Folder[S]
-        val ensF      = Ensemble(fFolder, 0L, channel.fPlaying)
-        tFolder.addLast(Obj(Ensemble.Elem(ensF)))
+        val ensF      = Ensemble[S](fFolder, 0L, channel.fPlaying)
+        tFolder.addLast(ensF) // Obj(Ensemble.Elem(ensF)))
 
         val procT     = Proc[S]
         procT.graph() = g
@@ -731,10 +739,10 @@ object AutomaticVoices {
         channel.succOut ~> succInT
         outT            ~> channel.collIn
 
-        val procTObj  = Obj(Proc.Elem(procT))
+        val procTObj  = procT // Obj(Proc.Elem(procT))
         procTObj.name = s"t$gi$si"
-        procTObj.attr.put("state", channel.stateObj)
-        procTObj.attr.put("done" , channel.doneObj )
+        procTObj.attrPut("state", channel.stateObj)
+        procTObj.attrPut("done" , channel.doneObj )
 
         fFolder.addLast(procTObj)
       }
@@ -762,8 +770,6 @@ object AutomaticVoices {
   }
 
   private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {
-    val imp = ExprImplicits[S]
-    import imp._
     reduce(in.map(_.toInt))(_ + _)
   }
 

@@ -5,7 +5,7 @@ import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.{expr, bitemp, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.expr.{Boolean => BooleanEx}
+import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr}
 import de.sciss.lucre.synth.{Sys, Server}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
@@ -15,6 +15,8 @@ import WorkspaceHandle.Implicits._
 
 import scala.concurrent.stm.Txn
 import scala.language.implicitConversions
+
+import TransitoryAPI._
 
 object NewAuralTest extends App {
   val confluent = true   // currently test4 has a problem with event-variables in confluent
@@ -40,6 +42,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   showAuralLog      = true
   showTransportLog  = true
   // de.sciss.lucre.synth.showLog = true
+
+  import expr.Ops._
 
   val as = AuralSystem()
   cursor.step { implicit tx =>
@@ -132,10 +136,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
 
-  def putDouble(proc: Proc.Obj[S], key: String, value: Double)(implicit tx: S#Tx): Unit = {
-    val imp = ExprImplicits[S]
-    import imp._
-    proc.attr.put(key, Obj(DoubleElem(value)))
+  def putDouble(proc: Proc[S], key: String, value: Double)(implicit tx: S#Tx): Unit = {
+    // val imp = ExprImplicits[S]
+    // import imp._
+    proc.attrPut(key, value)
   }
 
   def stopAndQuit(delay: Double = 4.0): Unit =
@@ -144,12 +148,12 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       quit()
     }
 
-  def addScanIn(proc: Proc.Obj[S], key: String)(implicit tx: S#Tx): Scan[S] = {
-    proc.elem.peer.inputs.add(key)
+  def addScanIn(proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = {
+    proc.inputs.add(key)
   }
 
-  def addScanOut(proc: Proc.Obj[S], key: String)(implicit tx: S#Tx): Scan[S] = {
-    proc.elem.peer.outputs.add(key)
+  def addScanOut(proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = {
+    proc.outputs.add(key)
   }
 
   implicit class ScanOps(val `this`: Scan[S]) /* extends AnyVal */ {
@@ -169,12 +173,12 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   implicit class TimelineOps(tl: Timeline[S]) /* extends AnyVal */ {
     def += (span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
       val tlm = tl.modifiableOption.get  // yo
-      tlm.add(bitemp.SpanLike.newConst(span), obj)
+      tlm.add(expr.SpanLike.newConst(span), obj)
     }
 
     def -= (span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-      val tlm = tl.elem.peer.modifiableOption.get  // yo
-      val res = tlm.remove(bitemp.SpanLike.newConst(span), obj)
+      val tlm = tl.modifiableOption.get  // yo
+      val res = tlm.remove(expr.SpanLike.newConst(span), obj)
       if (!res) Console.err.println(s"Warning: object $obj at $span not found in timeline")
     }
   }
@@ -215,9 +219,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val p1H = tx.newHandle(p1)
       val p2H = tx.newHandle(p2)
 
-    //      val scan = p2.elem.peer.scans.add("out")
+    //      val scan = p2.scans.add("out")
     //      val scanObj = Obj(Scan.Elem(scan))
-    //      p1.attr.put("key", scanObj)
+    //      p1.attrPut("key", scanObj)
 
       val t     = Transport[S]
       t.addObject(p1)
@@ -227,19 +231,19 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       after(2.0) { implicit tx =>
         val p2      = p2H()
         val p1      = p1H()
-        val scan    = p2.elem.peer.outputs.add("out")
+        val scan    = p2.outputs.add("out")
         val scanObj = scan // Obj(Scan.Elem(scan))
-        p1.attr.put("key", scanObj)
+        p1.attrPut("key", scanObj)
 
         after(2.0) { implicit tx =>
           t.stop()
           after(1.0) { implicit tx =>
             t.play()
             after(2.0) { implicit tx =>
-              val imp     = ExprImplicits[S]
-              import imp._
+//              val imp     = ExprImplicits[S]
+//              import imp._
               val p1      = p1H()
-              p1.attr.put("key", 4) // Obj(IntElem(4)))
+              p1.attrPut("key", 4: Expr[S, Int]) // Obj(IntElem(4)))
               stopAndQuit(2.0)
             }
           }
@@ -261,8 +265,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |""".stripMargin)
 
     cursor.step { implicit tx =>
-      val imp     = ExprImplicits[S]
-      import imp._
+//      val imp     = ExprImplicits[S]
+//      import imp._
 
       val pRec = proc {
         val freq  = LFNoise0.ar(Seq(5, 5)).linlin(-1, 1, 70, 90).roundTo(1).midicps
@@ -274,7 +278,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val loc   = ArtifactLocation[S](f.parent)
       val art   = loc.add(f)
       val artH  = tx.newHandle(art)
-      pRec.attr.put("disk", Obj(ArtifactElem(art)))
+      pRec.attrPut("disk", art)
 
       val t     = Transport[S]
       t.addObject(pRec)
@@ -293,7 +297,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
             val sig   = graph.DiskIn.ar("disk")
             Out.ar(0, sig)  // let it be heard
           }
-          pPlay.attr.put("disk", Obj(AudioGraphemeElem(gr)))
+          pPlay.attrPut("disk", gr)
           t.removeObject(pRecH())
           t.addObject(pPlay)
           t.play()
@@ -320,9 +324,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |""".stripMargin)
 
     cursor.step { implicit tx =>
-      val imp     = ExprImplicits[S]
-      import imp._
-      import expr.Ops._
+//      val imp     = ExprImplicits[S]
+//      import imp._
+
       val playing = BooleanEx.newVar(false)
       val foldIn  = Folder[S]
       val ensIn   = Ensemble(foldIn , 0L, true)     // inner ensemble already active
@@ -417,8 +421,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
         after(2.0) { implicit tx =>
           for {
-            scanOut <- in1H ().elem.peer.outputs.get("out")
-            scanIn  <- procH().elem.peer.inputs .get("in" )
+            scanOut <- in1H ().outputs.get("out")
+            scanIn  <- procH().inputs .get("in" )
           } {
             println("--connect noise--")
             scanOut ~> scanIn
@@ -426,8 +430,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
           after(2.0) { implicit tx =>
             for {
-              scanOut <- in2H ().elem.peer.outputs.get("out")
-              scanIn  <- procH().elem.peer.inputs .get("in" )
+              scanOut <- in2H ().outputs.get("out")
+              scanIn  <- procH().inputs .get("in" )
             } {
               println("--connect dust--")
               scanOut ~> scanIn
@@ -435,8 +439,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
             after(2.0) { implicit tx =>
               for {
-                scanOut <- in1H ().elem.peer.outputs.get("out")
-                scanIn  <- procH().elem.peer.inputs .get("in" )
+                scanOut <- in1H ().outputs.get("out")
+                scanIn  <- procH().inputs .get("in" )
               } {
                 println("--disconnect noise--")
                 scanOut ~/> scanIn
@@ -444,8 +448,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
               after(2.0) { implicit tx =>
                 for {
-                  scanOut <- in2H ().elem.peer.outputs.get("out")
-                  scanIn  <- procH().elem.peer.inputs.get("in" )
+                  scanOut <- in2H ().outputs.get("out")
+                  scanIn  <- procH().inputs.get("in" )
                 } {
                   println("--disconnect dust--")
                   scanOut ~/> scanIn
@@ -471,8 +475,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |
         |""".stripMargin)
 
-    val imp     = ExprImplicits[S]
-    import imp._
+//    val imp     = ExprImplicits[S]
+//    import imp._
 
     val procAural = cursor.step { implicit tx =>
       import de.sciss.file._
@@ -492,7 +496,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val artif   = loc.add(f)
       val oAudio  = Grapheme.Expr.Audio(artif, spec, offset = 0L, gain = 2.0)
 
-      _proc.attr.put("metal", Obj(AudioGraphemeElem(oAudio)))
+      _proc.attrPut("metal", oAudio)
 
       AuralObj(_proc)
     }
@@ -523,8 +527,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |
         |""".stripMargin)
 
-    val imp     = ExprImplicits[S]
-    import imp._
+//    val imp     = ExprImplicits[S]
+//    import imp._
 
     val (tr, proc1H, proc2H) = cursor.step { implicit tx =>
       val p     = Proc[S]
@@ -540,7 +544,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
       val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
       val gAudio  = Grapheme[S](spec.numChannels)
-      gAudio.add(0L -> vAudio) // ... çoit trop complexe ...
+      ??? // RRR gAudio.add(0L -> vAudio) // ... çoit trop complexe ...
       sAudio.add(Scan.Link.Grapheme(gAudio))
 
       val _proc2 = proc {
@@ -571,22 +575,22 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       after(2.0) { implicit tx =>
         println("--mute tape--")
         val p1 = proc1H()
-        p1.attr.put(ObjKeys.attrMute, Obj(BooleanElem(true)))
+        p1.attrPut(ObjKeys.attrMute, true)
 
         after(1.0) { implicit tx =>
           println("--unmute tape--")
           val p1 = proc1H()
-          p1.attr.put(ObjKeys.attrMute, Obj(BooleanElem(false)))
+          p1.attrPut(ObjKeys.attrMute, false)
 
           after(1.0) { implicit tx =>
             println("--mute main--")
             val p2 = proc2H()
-            p2.attr.put(ObjKeys.attrMute, Obj(BooleanElem(true)))
+            p2.attrPut(ObjKeys.attrMute, true)
 
             after(1.0) { implicit tx =>
               println("--unmute main--")
               val p2 = proc2H()
-              p2.attr.put(ObjKeys.attrMute, Obj(BooleanElem(false)))
+              p2.attrPut(ObjKeys.attrMute, false)
 
               after(2.0) { implicit tx =>
                 tr.stop()
@@ -623,13 +627,14 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       }
 
       import de.sciss.synth._
-      val imp = ExprImplicits[S]
-      import imp._
+//      val imp = ExprImplicits[S]
+//      import imp._
+      import ExprImplicits._
 
-      val fadeExprIn  = FadeSpec.Expr[S](frame(4.0), linear, 0.0)
-      val fadeExprOut = FadeSpec.Expr[S](frame(3.0), exponential, -40.0.dbamp)
-      _proc1.attr.put("fadeIn" , Obj(FadeSpec.Elem(fadeExprIn )))
-      _proc1.attr.put("fadeOut", Obj(FadeSpec.Elem(fadeExprOut)))
+      val fadeExprIn  = ??? : FadeSpec.Expr[S] // RRR FadeSpec.Expr[S](frame(4.0), linear, 0.0)
+      val fadeExprOut = ??? : FadeSpec.Expr[S] // RRR FadeSpec.Expr[S](frame(3.0), exponential, -40.0.dbamp)
+      _proc1.attrPut("fadeIn" , fadeExprIn )
+      _proc1.attrPut("fadeOut", fadeExprOut)
 
       val _tl = timeline()
       _tl += (2.0 -> 10.0, _proc1)
@@ -854,7 +859,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val tlObj = _tl.obj()
       tlObj += (1.0 -> 3.0, _view1.obj())
       tlObj += (2.0 -> 4.0, _view2.obj())
-      val it = tlObj.elem.peer.debugList
+      val it = tlObj.debugList
       println("--debug print--")
       println(it)
       _tl

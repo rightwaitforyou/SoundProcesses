@@ -19,7 +19,8 @@ import TransitoryAPI._
 
   */
 class AttributesSpec extends ConfluentEventSpec {
-  import imp._
+  // import imp._
+  import ExprImplicits._
 
   "Attrs" should "serialize and de-serialize" in { system =>
     val pH = system.step { implicit tx =>
@@ -57,7 +58,7 @@ class AttributesSpec extends ConfluentEventSpec {
       p.attrPut("string" , lucre.expr.String .newConst("123"))
 
       p.attrPut("fade"   , FadeSpec.Expr.newConst(fade))
-      p.attrPut("d-vec"  , DoubleVec.newConst(Vec(1.2, 3.4, 5.6)))
+      ??? // RRR p.attrPut("d-vec"  , DoubleVec.newConst(Vec(1.2, 3.4, 5.6)))
       val loc = ArtifactLocation[S](file("foo"))
       val art = loc.add(file("foo") / "bar")
       p.attrPut("audio"  , Grapheme.Expr.Audio(art, spec, offset = n, gain = d))

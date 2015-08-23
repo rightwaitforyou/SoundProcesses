@@ -11,7 +11,10 @@ import de.sciss.lucre
 object BiGroupTest {
   def apply(): BiGroupTest[InMemory] = new BiGroupTest(InMemory())
 }
-class BiGroupTest[S <: Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
+class BiGroupTest[S <: Sys[S]](cursor: Cursor[S]) /* extends ExprImplicits[S] */ {
+  import expr.Ops._
+  import ExprImplicits._
+
   def t[A](fun: S#Tx => A): A = cursor.step(fun)
 
   val bi = t { implicit tx =>
@@ -35,7 +38,7 @@ class BiGroupTest[S <: Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
 
   def addKeyVar(init: SpanLike = Span(33, 44), elem: Long = 77): Expr.Var[S, SpanLike] =
     t { implicit tx =>
-      val span = bitemp.SpanLike.newVar[S](init)
+      val span = expr.SpanLike.newVar[S](init)
       bi.add(span, elem)
       span
     }

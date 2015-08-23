@@ -36,8 +36,8 @@ object AsyncBounceTest extends App {
   val dur     = numFr.toDouble / sr
 
   val groupH = system.step { implicit tx =>
-    val expr      = ExprImplicits[S]
-    import expr._
+    // val expr      = ExprImplicits[S]
+    import ExprImplicits._
 
     val proc      = Proc[S]
     val peer      = proc // Proc.Elem(proc)

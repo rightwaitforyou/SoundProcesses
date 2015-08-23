@@ -1,6 +1,6 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm
+import de.sciss.lucre.{expr, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.{Server, Sys}
 import de.sciss.synth
@@ -9,6 +9,8 @@ import de.sciss.synth.SynthGraph
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.concurrent.stm.Txn
+
+import TransitoryAPI._
 
 object ActionGraphTest extends App {
   val confluent = true   // currently test4 has a problem with event-variables in confluent
@@ -36,6 +38,8 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
     as.whenStarted(s => initView(as, s))
     as.start()
   }
+
+  import expr.Ops._
 
   def initView(as: AuralSystem, s: Server): Unit = {
     if (Txn.findCurrent.isDefined) {
@@ -66,8 +70,8 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
 
     cursor.step { implicit tx =>
       val p = Proc[S]
-      val imp = ExprImplicits[S]
-      import imp._
+      import ExprImplicits._
+
       p.graph() = SynthGraph {
         import synth._
         import ugen._
@@ -78,10 +82,10 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
         graph.Action(bang, "foo")
       }
 
-      val obj = Obj(Proc.Elem(p))
-      val actionObj = Obj(Action.Elem(actionH()))
-      actionObj.attr.put("name", Obj(StringElem("Baba Ganoush")))
-      obj.attr.put("foo", actionObj)
+      val obj = p // Obj(Proc.Elem(p))
+      val actionObj = actionH() // Obj(Action.Elem(actionH()))
+      actionObj.attrPut("name", /* Obj(StringElem( */ "Baba Ganoush" /* )) */)
+      obj.attrPut("foo", actionObj)
 
       import WorkspaceHandle.Implicits._
       val t = Transport[S](as)

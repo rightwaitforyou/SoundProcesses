@@ -19,17 +19,23 @@ import de.sciss.lucre.expr.Expr
 import language.implicitConversions
 
 object ExprImplicits {
-  def apply[S <: Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
-  private[this] val Imp = new ExprImplicits[NoSys]
+//  def apply[S <: Sys[S]]: ExprImplicits[S] = Imp.asInstanceOf[ExprImplicits[S]]
+//  private[this] val Imp = new ExprImplicits[NoSys]
+
+  implicit final def synthGraphConst[S <: Sys[S]](s: SynthGraph    )(implicit tx: S#Tx): Expr[S, SynthGraph    ] =
+    SynthGraphs  .newConst[S](s)
+
+  implicit final def graphemeConst  [S <: Sys[S]](v: Grapheme.Value)(implicit tx: S#Tx): Expr[S, Grapheme.Value] =
+    Grapheme.Expr.newConst[S](v)
 }
 
-/** This class helps overcome the limitation of scala's implicit resolution -- by resolving an expression
-  * system's type parameter `S`. There are two types of conversions, those that can be run from the underlying
-  * expression type (e.g. `longOps1` provides operations which can be invoked with a plain `Long`), and those
-  * that require an existing expression (e.g. `longOps2`). This is so that primitive standard operations remain
-  * outside the implicit scope (e.g. addition on longs).
-  */
-class ExprImplicits[S <: Sys[S]] protected /* extends de.sciss.lucre.synth.expr.ExprImplicits[S] */ {
-  implicit final def synthGraphConst(s: SynthGraph    ): Expr[S, SynthGraph    ] = ??? // RRR SynthGraphs  .newConst(s)
-  implicit final def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = ??? // RRR Grapheme.Expr.newConst(v)
-}
+///** This class helps overcome the limitation of scala's implicit resolution -- by resolving an expression
+//  * system's type parameter `S`. There are two types of conversions, those that can be run from the underlying
+//  * expression type (e.g. `longOps1` provides operations which can be invoked with a plain `Long`), and those
+//  * that require an existing expression (e.g. `longOps2`). This is so that primitive standard operations remain
+//  * outside the implicit scope (e.g. addition on longs).
+//  */
+//class ExprImplicits[S <: Sys[S]] protected /* extends de.sciss.lucre.synth.expr.ExprImplicits[S] */ {
+//  implicit final def synthGraphConst(s: SynthGraph    ): Expr[S, SynthGraph    ] = SynthGraphs  .newConst[S](s)
+//  implicit final def graphemeConst  (v: Grapheme.Value): Expr[S, Grapheme.Value] = Grapheme.Expr.newConst[S](v)
+//}

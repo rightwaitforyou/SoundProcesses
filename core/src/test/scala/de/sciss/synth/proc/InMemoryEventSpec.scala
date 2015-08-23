@@ -11,7 +11,8 @@ trait InMemoryEventSpec extends fixture.FlatSpec with Matchers {
 
   implicit final protected val IntType  = lucre.expr.Int
   implicit final protected val LongType = lucre.expr.Long
-  final protected val imp = ExprImplicits[S]
+  // final protected val imp = ExprImplicits[S]
+  import ExprImplicits._
 
   expr.init()
 

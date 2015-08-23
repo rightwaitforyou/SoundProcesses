@@ -15,7 +15,8 @@ import de.sciss.synth.Curve.{parametric, step, welch, sine, exponential, linear}
 
  */
 class GraphemeSpec extends ConfluentEventSpec {
-  import imp._
+  // import imp._
+  import ExprImplicits._
 
   import Grapheme.{Value, Modifiable, Update, Segment, Expr, TimedElem}
 
@@ -32,12 +33,16 @@ class GraphemeSpec extends ConfluentEventSpec {
       (res1, res2)
     }
 
+    type LE = expr.Expr[S, Long]
+    type GE = Grapheme.Expr[S]
+    import expr.Ops._
+
     val (e1, e2, e3, e4, e5) = system.step { implicit tx =>
-      (    0L -> Value.Curve(441.0 -> linear)               : TimedElem[S],
-       10000L -> Value.Curve(882.0 -> exponential)          : TimedElem[S],
-       20000L -> Value.Curve(123.4 -> sine, 567.8 -> sine)  : TimedElem[S],
-       30000L -> Value.Curve(987.6 -> welch, 543.2 -> step) : TimedElem[S],
-       20000L -> Value.Curve(500.0 -> parametric(-4f))      : TimedElem[S]
+      (??? : TimedElem[S], // RRR (    0L: LE) -> (Value.Curve(441.0 -> linear): GE)               : TimedElem[S],
+        ??? : TimedElem[S], // RRR (10000L: LE) -> (Value.Curve(882.0 -> exponential): GE)          : TimedElem[S],
+        ??? : TimedElem[S], // RRR (20000L: LE) -> (Value.Curve(123.4 -> sine, 567.8 -> sine): GE)  : TimedElem[S],
+        ??? : TimedElem[S], // RRR (30000L: LE) -> (Value.Curve(987.6 -> welch, 543.2 -> step): GE) : TimedElem[S],
+        ??? : TimedElem[S] // RRR (20000L: LE) -> (Value.Curve(500.0 -> parametric(-4f)): GE)      : TimedElem[S]
       )
     }
 
@@ -116,7 +121,7 @@ class GraphemeSpec extends ConfluentEventSpec {
         Update(g2, Vec(Segment.Undefined(Span(20000L, 30000L))))
       )
 
-      assert(!g1.remove((e5.timeValue - 1) -> e5.mag)) // assert it was not found
+      ??? // RRR assert(!g1.remove((e5.key.value - 1) -> e5.value)) // assert it was not found
       assert(g1.remove(e5)) // assert it was found
       obs.assertEquals(
         Update(g1, Vec(Segment.Const(Span(10000L, 30000L), Vec(882.0))))

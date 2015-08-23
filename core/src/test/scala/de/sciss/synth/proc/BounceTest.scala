@@ -1,5 +1,6 @@
 package de.sciss.synth.proc
 
+import de.sciss.lucre.expr
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.processor.Processor
 import de.sciss.span.Span
@@ -32,9 +33,12 @@ object BounceTest extends App {
       |When using --realtime, the sound lasts 1s and the file has a duration of approx. 3s.
       |""".stripMargin)
 
+  import expr.Ops._
+
   val groupH = system.step { implicit tx =>
-    val expr      = ExprImplicits[S]
-    import expr._
+//    val expr      = ExprImplicits[S]
+//    import expr._
+    import ExprImplicits._
 
     val proc      = Proc[S]
     val peer      = proc // Proc.Elem(proc)
