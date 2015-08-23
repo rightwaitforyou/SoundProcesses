@@ -2,6 +2,8 @@ package de.sciss
 package synth
 package proc
 
+import de.sciss.lucre.expr
+
 import collection.immutable.{IndexedSeq => Vec}
 import span.Span
 import de.sciss.synth.Curve.{parametric, step, welch, sine, exponential, linear}
@@ -142,6 +144,8 @@ class GraphemeSpec extends ConfluentEventSpec {
 
       assert(g1.debugList() === Nil)
     }
+
+    import expr.Ops._
 
     // ok, now test with non-constant expressions
     system.step { implicit tx =>

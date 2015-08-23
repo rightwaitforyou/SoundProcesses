@@ -15,9 +15,8 @@ package de.sciss.synth.proc
 
 import java.util
 
-import de.sciss.lucre.event.Targets
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.lucre.{event => evt, expr}
 import de.sciss.model
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
@@ -302,15 +301,15 @@ object ValueSerializer extends ImmutableSerializer[SynthGraph] {
   // XXX TODO -- we should allow other constant values in Type. now we have a wasted evt.Targets...
   private final class Predefined[S <: Sys[S]](val id: S#ID, cookie: Int)
     extends Expr[S, SynthGraph]
-    with evt.impl.ConstImpl[S, model.Change[SynthGraph]] {
+    with expr.impl.ConstImpl[S, SynthGraph] {
 
-    def typeID: Int = SynthGraphs.typeID
+    def tpe: Obj.Type = SynthGraphs
 
     protected def writeData(out: DataOutput): Unit = out.writeByte(cookie)
 
     protected def disposeData()(implicit tx: S#Tx) = ()
 
-    def value(implicit tx: S#Tx): SynthGraph = cookie match {
+    def constValue: SynthGraph = cookie match {
       // case `oldTapeCookie`  => oldTapeSynthGraph
       case `emptyCookie`    => emptySynthGraph
       case `tapeCookie`     => tapeSynthGraph

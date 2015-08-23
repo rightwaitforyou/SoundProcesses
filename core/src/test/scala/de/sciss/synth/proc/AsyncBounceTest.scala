@@ -2,12 +2,15 @@ package de.sciss.synth.proc
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.ArtifactLocation
+import de.sciss.lucre.expr
 import de.sciss.synth.io.{AudioFile, AudioFileSpec}
 import de.sciss.synth.{freeSelf, ugen, SynthGraph}
 import de.sciss.span.Span
 import scala.concurrent.ExecutionContext
 import de.sciss.processor.Processor
 import de.sciss.lucre.stm.store.BerkeleyDB
+
+import TransitoryAPI._
 
 object AsyncBounceTest extends App {
   type S = Durable
@@ -17,6 +20,8 @@ object AsyncBounceTest extends App {
 
   de.sciss.lucre.synth.showLog = true
   showTransportLog  = true
+
+  import expr.Ops._
 
   def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
 
@@ -35,8 +40,8 @@ object AsyncBounceTest extends App {
     import expr._
 
     val proc      = Proc[S]
-    val peer      = Proc.Elem(proc)
-    val obj       = Obj(peer)
+    val peer      = proc // Proc.Elem(proc)
+    val obj       = peer // Obj(peer)
     proc.graph() = SynthGraph {
       import ugen._
       val b   = graph.Buffer("foo")
@@ -58,14 +63,14 @@ object AsyncBounceTest extends App {
     af.write(aBuf)
     af.close()
     val gr      = Grapheme.Expr.Audio(artif, aSpec, 0L, 1.0)
-    obj.attr.put("foo", Obj(AudioGraphemeElem(gr)))
+    obj.attrPut("foo", gr)
 
     val group     = Timeline[S]
     // XXX TODO -- not yet supported: asynchronous objects that begin after the transport position
     // group.add(Span(frame(0.2), frame(0.2 + dur * 0.5)), obj)
     group.add(Span(frame(0.0), frame(0.0 + dur * 0.5)), obj)
     // import ProcGroup.serializer
-    tx.newHandle(Obj(Timeline.Elem(group)))
+    tx.newHandle(group)
   }
 
   import WorkspaceHandle.Implicits._

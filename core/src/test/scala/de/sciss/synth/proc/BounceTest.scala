@@ -37,8 +37,8 @@ object BounceTest extends App {
     import expr._
 
     val proc      = Proc[S]
-    val peer      = Proc.Elem(proc)
-    val obj       = Obj(peer)
+    val peer      = proc // Proc.Elem(proc)
+    val obj       = proc // Obj(peer)
     obj.name      = "sinosc"
     proc.graph()  = SynthGraph {
       import ugen._
@@ -49,7 +49,7 @@ object BounceTest extends App {
     val group     = Timeline[S]
     group.add(Span(frame(if (realtime) 0.25 else 0.1), frame(if (realtime) 1.25 else 0.2)), obj)
     // import ProcGroup.serializer
-    tx.newHandle(Obj(Timeline.Elem(group)))
+    tx.newHandle(group)
   }
 
   import WorkspaceHandle.Implicits._

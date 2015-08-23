@@ -40,7 +40,8 @@ object Ensemble extends Obj.Type {
   final case class Offset [S <: Sys[S]](peer: model.Change[Long   ]) extends Change[S]
   final case class Playing[S <: Sys[S]](peer: model.Change[Boolean]) extends Change[S]
 
-  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] = ??? // RRR
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
+    Impl.readIdentifiedObj(in, access)
 }
 
 /** An `Ensemble` is sort of a persistent transport model.

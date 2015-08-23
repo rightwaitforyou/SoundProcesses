@@ -6,7 +6,7 @@ import concurrent.stm.TxnLocal
 import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.proc.{ExprImplicits, Confluent}
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.synth.expr
+import de.sciss.lucre.expr
 
 trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
   type S = Confluent
@@ -17,7 +17,7 @@ trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
   implicit final protected val LongType = lucre.expr.Long
   final protected val imp = ExprImplicits[S]
 
-  expr.initTypes()
+  expr.init()
 
   final def withFixture(test: OneArgTest): Outcome = {
     val system = Confluent(BerkeleyDB.tmp())

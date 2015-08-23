@@ -2,7 +2,8 @@ package de.sciss.synth.proc
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.ArtifactLocation
-import de.sciss.lucre.{bitemp, stm}
+import de.sciss.lucre.stm.Obj
+import de.sciss.lucre.{expr, bitemp, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.expr.{Boolean => BooleanEx}
 import de.sciss.lucre.synth.{Sys, Server}
@@ -109,13 +110,13 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     _view
   }
 
-  def proc(graph: => Unit)(implicit tx: S#Tx): Proc.Obj[S] = {
+  def proc(graph: => Unit)(implicit tx: S#Tx): Proc[S] = {
     val p = Proc[S]
     val g = SynthGraph {
       graph
     }
     p.graph() = SynthGraphs.newConst[S](g)
-    Obj(Proc.Elem(p))
+    p // Obj(Proc.Elem(p))
   }
 
   def timelineV()(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
@@ -124,9 +125,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     _view
   }
 
-  def timeline()(implicit tx: S#Tx): Timeline.Obj[S] = {
+  def timeline()(implicit tx: S#Tx): Timeline[S] = {
     val tl    = Timeline[S]
-    Obj(Timeline.Elem(tl))
+    tl // Obj(Timeline.Elem(tl))
   }
 
   def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
@@ -165,9 +166,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     Span(start, stop)
   }
 
-  implicit class TimelineOps(tl: Timeline.Obj[S]) /* extends AnyVal */ {
+  implicit class TimelineOps(tl: Timeline[S]) /* extends AnyVal */ {
     def += (span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-      val tlm = tl.elem.peer.modifiableOption.get  // yo
+      val tlm = tl.modifiableOption.get  // yo
       tlm.add(bitemp.SpanLike.newConst(span), obj)
     }
 
@@ -227,7 +228,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         val p2      = p2H()
         val p1      = p1H()
         val scan    = p2.elem.peer.outputs.add("out")
-        val scanObj = Obj(Scan.Elem(scan))
+        val scanObj = scan // Obj(Scan.Elem(scan))
         p1.attr.put("key", scanObj)
 
         after(2.0) { implicit tx =>
@@ -238,7 +239,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
               val imp     = ExprImplicits[S]
               import imp._
               val p1      = p1H()
-              p1.attr.put("key", Obj(IntElem(4)))
+              p1.attr.put("key", 4) // Obj(IntElem(4)))
               stopAndQuit(2.0)
             }
           }
@@ -321,6 +322,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     cursor.step { implicit tx =>
       val imp     = ExprImplicits[S]
       import imp._
+      import expr.Ops._
       val playing = BooleanEx.newVar(false)
       val foldIn  = Folder[S]
       val ensIn   = Ensemble(foldIn , 0L, true)     // inner ensemble already active
@@ -348,11 +350,11 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       // - `filter` and `foldIn` will be the contents of `ensOut`
       foldIn .addLast(gen)
       // foldOut.addLast(gen)
-      foldOut.addLast(Obj(Ensemble.Elem(ensIn)))
+      foldOut.addLast(ensIn) // Obj(Ensemble.Elem(ensIn)))
       foldOut.addLast(filter)
 
       val t = Transport[S]
-      t.addObject(Obj(Ensemble.Elem(ensOut)))
+      t.addObject(ensOut) // Obj(Ensemble.Elem(ensOut)))
       t.play()
 
       import BooleanEx.varSerializer
@@ -528,7 +530,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val p     = Proc[S]
       val g     = SynthGraphs.tape[S]
       p.graph() = g
-      val _proc1 = Obj(Proc.Elem(p))
+      val _proc1 = p // Obj(Proc.Elem(p))
 
       val sAudio = addScanIn(_proc1, "sig")
       import de.sciss.file._
@@ -754,7 +756,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
           val sig  = Resonz.ar(in, 555, 0.1) * 10
           Out.ar(0, sig)
         }
-        pObj.elem.peer.graph() = SynthGraphs.newConst[S](newGraph)
+        pObj.graph() = SynthGraphs.newConst[S](newGraph)
 
         stopAndQuit()
       }

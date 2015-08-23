@@ -15,7 +15,7 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.lucre.{event => evt, expr}
 import lucre.expr.{Expr => _Expr}
 import de.sciss.serial.{Serializer, DataOutput, DataInput, ImmutableSerializer}
@@ -23,10 +23,13 @@ import de.sciss.lucre.event.{Pull, Targets}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
 
-object FadeSpec {
+object FadeSpec extends Obj.Type {
   final val typeID = 14
 
-  def init(): Unit = Expr.init()
+  override def init(): Unit = {
+    super.init()
+    Expr .init()
+  }
 
   private final val COOKIE = 0x4664 // 'Fd'
 
@@ -91,7 +94,7 @@ object FadeSpec {
                                               val floor: _Expr[S, Double])
       extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Expr[S] {
 
-      def typeID: Int = FadeSpec.typeID
+      def tpe: Obj.Type = FadeSpec
 
       def value(implicit tx: S#Tx): FadeSpec = FadeSpec(numFrames.value, shape.value, floor.value.toFloat)
 
@@ -152,5 +155,7 @@ object FadeSpec {
     }
   }
   sealed trait Expr[S <: Sys[S]] extends _Expr[S, FadeSpec]
+
+  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] = ???
 }
 final case class FadeSpec(numFrames: Long, curve: Curve = linear, floor: Float = 0f)

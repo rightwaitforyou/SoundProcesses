@@ -16,7 +16,8 @@ package proc
 package impl
 
 import de.sciss.lucre.data.SkipList
-import de.sciss.lucre.event.{impl => evti}
+import de.sciss.lucre.event.{impl => evti, Targets}
+import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.{event => evt}
@@ -37,11 +38,13 @@ object ProcImpl {
 
   private val anySer = new Ser[NoSys]
 
-  private class Ser[S <: Sys[S]] extends Obj.Serializer[S, Proc[S]] {
-    def typeID: Int = Proc.typeID
+  private class Ser[S <: Sys[S]] extends ObjSerializer[S, Proc[S]] {
+    def tpe: Obj.Type = Proc
+  }
 
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Proc[S] =
-      new Read(in, access, targets)
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Proc[S] = {
+    val targets = Targets.read(in, access)
+    new Read(in, access, targets)
   }
 
   private type ScanEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan[S]]
@@ -112,7 +115,7 @@ object ProcImpl {
     extends Proc[S] with evt.impl.SingleNode[S, Proc.Update[S]] {
     proc =>
 
-    final def typeID: Int = Proc.typeID
+    final def tpe: Obj.Type = Proc
 
     import Proc._
 

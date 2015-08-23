@@ -17,7 +17,8 @@ package impl
 
 import de.sciss.lucre
 import de.sciss.lucre.bitemp.BiPin
-import de.sciss.lucre.event.{Event, impl => evti}
+import de.sciss.lucre.event.{impl => evti, Targets, Event}
+import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
@@ -33,9 +34,8 @@ object GraphemeImpl {
 
   private implicit val timeEx = lucre.expr.Long
 
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = {
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] =
     serializer[S].read(in, access)
-  }
 
   def readModifiable[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme.Modifiable[S] = {
     modifiableSerializer[S].read(in, access)
@@ -51,15 +51,15 @@ object GraphemeImpl {
 
   //   private val anyModSer   = new ModSer[ evt.InMemory ]
 
-  private final class Ser[S <: Sys[S]] extends Obj.Serializer[S, Grapheme[S]] {
-    def typeID: Int = Grapheme.typeID
+  private final class Ser[S <: Sys[S]] extends ObjSerializer[S, Grapheme[S]] {
+    def tpe: Obj.Type = Grapheme
+  }
 
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Grapheme[S] = {
-      implicit val elemType = Expr // .serializer[ S ]
-      val numChannels = in.readInt()
-      val pin         = BiPin.Modifiable.read[S, Expr[S]](in, access)
-      new Impl(targets, numChannels, pin)
-    }
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = {
+    val targets     = Targets.read(in, access)
+    val numChannels = in.readInt()
+    val pin         = BiPin.Modifiable.read[S, Expr[S]](in, access)
+    new Impl(targets, numChannels, pin)
   }
 
   //   private final class ModSer[ S <: Sys[ S ]] extends evt.NodeSerializer[ S, Grapheme.Modifiable[ S ]] {
@@ -84,7 +84,7 @@ object GraphemeImpl {
     extends Modifiable[S] with evti.SingleNode[S, Grapheme.Update[S]] {
     graph =>
 
-    def typeID: Int = Grapheme.typeID
+    def tpe: Obj.Type = Grapheme
 
     override def toString: String = s"Grapheme$id"
 

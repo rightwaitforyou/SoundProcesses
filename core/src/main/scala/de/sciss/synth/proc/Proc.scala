@@ -16,7 +16,7 @@ package proc
 
 import de.sciss.lucre.event.Publisher
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.model
 import de.sciss.serial.{DataInput, Serializer}
@@ -24,7 +24,7 @@ import de.sciss.synth.proc.impl.{ProcImpl => Impl}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
-object Proc {
+object Proc extends Obj.Type {
   final val typeID = 0x10005
 
   // ---- implementation forwards ----
@@ -73,9 +73,12 @@ object Proc {
 
   /** Audio input file (tape) grapheme. */
   final val graphAudio  = "sig"
+
+  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
+    Impl.readIdentifiedObj(in, access)
 }
 /** The `Proc` trait is the basic entity representing a sound process. */
-trait Proc[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Proc.Update[S]] {
+trait Proc[S <: Sys[S]] extends Obj[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */
   def graph: Expr.Var[S, SynthGraph]
 

@@ -15,36 +15,62 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.event.Publisher
-import de.sciss.lucre.stm.{Identifiable, Sys}
-import de.sciss.lucre.{data, event => evt}
-import de.sciss.serial.{Serializer, DataInput}
+import de.sciss.lucre.stm.{Elem, Obj, Identifiable, Sys}
+import de.sciss.lucre.{event => evt, stm, data}
+import de.sciss.serial.{DataOutput, Serializer, DataInput}
 import de.sciss.synth.proc.impl.{ScanImpl => Impl}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.implicitConversions
 
-object Scan {
+object Scan extends Obj.Type {
   final val typeID = 0x10009
 
-  object Link {
+  override def init(): Unit = {
+    super.init()
+    Link .init()
+  }
+
+  object Link extends Elem.Type {
+    final val typeID = 0x1000B
+
     implicit def grapheme[S <: Sys[S]](peer: proc.Grapheme[S]): Grapheme[S] = Grapheme(peer)
     implicit def scan    [S <: Sys[S]](peer: proc.Scan    [S]): Scan    [S] = Scan    (peer)
 
     /** A link to a grapheme (random access). */
-    final case class Grapheme[S <: Sys[S]](peer: proc.Grapheme[S]) extends Link[S] {
+    final case class Grapheme[S <: Sys[S]](peer: proc.Grapheme[S])
+      extends Link[S] with stm.impl.ConstElemImpl[S] {
+
+      def tpe: Elem.Type = Link
+
       def id = peer.id
       override def toString = peer.toString
+
+      protected def writeData(out: DataOutput): Unit = {
+        out.writeByte(0)
+        peer.write(out)
+      }
     }
 
     /** A link to another scan (real-time). */
-    final case class Scan[S <: Sys[S]](peer: proc.Scan[S]) extends Link[S] {
+    final case class Scan[S <: Sys[S]](peer: proc.Scan[S])
+      extends Link[S] with stm.impl.ConstElemImpl[S] {
+      def tpe: Elem.Type = Link
+
       def id = peer.id
       override def toString = peer.toString
+
+      protected def writeData(out: DataOutput): Unit = {
+        out.writeByte(1)
+        peer.write(out)
+      }
     }
+
+    def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Elem[S] = ???  // RRR
   }
 
   /** This trait describes a source or sink link to/from a sink. */
-  sealed trait Link[S <: Sys[S]] extends Identifiable[S#ID]
+  sealed trait Link[S <: Sys[S]] extends Elem[S] with Identifiable[S#ID]
 
   /** Constructs a new unconnected scan. */
   def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = Impl.apply
@@ -82,7 +108,8 @@ object Scan {
 
 //  final case class GraphemeChange[S <: Sys[S]](grapheme: Grapheme[S],
 //                                               changes: Vec[Grapheme.Segment]) extends Change[S]
-
+  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
+    Impl.readIdentifiedObj(in, access)
 }
 
 /** A `Scan` represents a real-time signal which can either function as a reader linked to another scan
@@ -96,7 +123,7 @@ object Scan {
   *
   * A scan's event forwards updates from any of its sources, but does not observe its sinks.
   */
-trait Scan[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Scan.Update[S]] {
+trait Scan[S <: Sys[S]] extends Obj[S] with Publisher[S, Scan.Update[S]] {
   import Scan._
 
   /** Returns an iterator over all currently connected nodes. */

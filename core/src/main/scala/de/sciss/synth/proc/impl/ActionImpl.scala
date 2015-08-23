@@ -14,6 +14,8 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.event.Targets
+import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{IDPeek, NoSys, Obj, Sys, TxnLike}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
@@ -27,7 +29,6 @@ import scala.concurrent.{Future, Promise, blocking}
 object ActionImpl {
   // private val count = TxnLocal(0) // to distinguish different action class-names within the same transaction
 
-  private final val COOKIE        = 0x61637400   // "act\0"
   private final val CONST_EMPTY   = 0
   private final val CONST_JAR     = 1
   private final val CONST_VAR     = 2
@@ -146,52 +147,54 @@ object ActionImpl {
   private val anySer    = new Ser   [NoSys]
   private val anyVarSer = new VarSer[NoSys]
 
-  private final class Ser[S <: Sys[S]] extends stm.Obj.Serializer[S, Action[S]] {
-    def typeID: Int = Action.typeID
-
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Action[S] =
-      (readCookieAndTpe(in): @switch) match {
-        case CONST_JAR    =>
-          val name    = in.readUTF()
-          val jarSize = in.readInt()
-          val jar     = new Array[Byte](jarSize)
-          in.readFully(jar)
-          // val system  = tx.system
-          ??? // RRR targets vs id new ConstFunImpl[S](name, jar)
-
-        case CONST_BODY   =>
-          val actionID = in.readUTF()
-          ??? // RRR targets vs id new ConstBodyImpl[S](actionID)
-
-        case CONST_EMPTY  => ??? // RRR targets vs id new ConstEmptyImpl[S]
-
-        case CONST_VAR =>
-          readIdentifiedVar(in, access, targets)
-
-        case other => sys.error(s"Unexpected action cookie $other")
-      }
+  private final class Ser[S <: Sys[S]] extends ObjSerializer[S, Action[S]] {
+    def tpe: Obj.Type = Action
   }
 
-  private final class VarSer[S <: Sys[S]] extends stm.Obj.Serializer[S, Action.Var[S]] {
-    def typeID: Int = Action.typeID
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Action[S] =
+    in.readByte() match {
+      case 0 =>
+        val targets = Targets.readIdentified(in, access)
+        in.readByte() match {
+          case CONST_VAR =>
+            readIdentifiedVar(in, access, targets)
+          case other => sys.error(s"Unexpected action cookie $other")
+        }
 
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Action.Var[S] =
-      ActionImpl.readVar(in, access, targets)
-  }
+      case 3 =>
+        val id = tx.readID(in, access)
+        (in.readByte(): @switch) match {
+          case CONST_JAR    =>
+            val name    = in.readUTF()
+            val jarSize = in.readInt()
+            val jar     = new Array[Byte](jarSize)
+            in.readFully(jar)
+            // val system  = tx.system
+            new ConstFunImpl[S](id, name, jar)
 
-  private def readCookieAndTpe(in: DataInput): Byte = {
-    val cookie = in.readInt()
-    if (cookie != COOKIE)
-      sys.error(s"Unexpected cookie (found ${cookie.toHexString}, expected ${COOKIE.toHexString})")
-    in.readByte()
-  }
+          case CONST_BODY   =>
+            val actionID = in.readUTF()
+            new ConstBodyImpl[S](id, actionID)
 
-  private def readVar[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                  (implicit tx: S#Tx): Action.Var[S] =
-    readCookieAndTpe(in) /* : @switch */ match {
-      case CONST_VAR  => readIdentifiedVar(in, access, targets)
-      case other      => sys.error(s"Unexpected action cookie $other")
+          case CONST_EMPTY  => new ConstEmptyImpl[S](id)
+
+          case other => sys.error(s"Unexpected action cookie $other")
+        }
     }
+
+  private final class VarSer[S <: Sys[S]] extends ObjSerializer[S, Action.Var[S]] {
+    def tpe: Obj.Type = Action
+
+//    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Action.Var[S] =
+//      ActionImpl.readVar(in, access, targets)
+  }
+
+//  private def readVar[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
+//                                  (implicit tx: S#Tx): Action.Var[S] =
+//    readCookieAndTpe(in) /* : @switch */ match {
+//      case CONST_VAR  => readIdentifiedVar(in, access, targets)
+//      case other      => sys.error(s"Unexpected action cookie $other")
+//    }
 
   private def readIdentifiedVar[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
                                   (implicit tx: S#Tx): Action.Var[S] = {
@@ -206,8 +209,8 @@ object ActionImpl {
   // this is why workspace should have a general caching system
   private val clMap = new mutable.WeakHashMap[Sys[_], MemoryClassLoader]
 
-  private sealed trait ConstImpl[S <: Sys[S]] extends Action[S] with evt.impl.ConstImpl[S, Unit] {
-    def typeID: Int = Action.typeID
+  private sealed trait ConstImpl[S <: Sys[S]] extends Action[S] with evt.impl.ConstObjImpl[S, Unit] {
+    final def tpe: Obj.Type = Action
   }
 
   private final class ConstBodyImpl[S <: Sys[S]](val id: S#ID, val actionID: String)
@@ -220,7 +223,6 @@ object ActionImpl {
     }
 
     protected def writeData(out: DataOutput): Unit = {
-      out.writeInt(COOKIE)
       out.writeByte(CONST_BODY)
       out.writeUTF(actionID)
     }
@@ -235,7 +237,6 @@ object ActionImpl {
     }
 
     protected def writeData(out: DataOutput): Unit = {
-      out.writeInt(COOKIE)
       out.writeByte(CONST_JAR)
       out.writeUTF(name)
       out.writeInt(jar.length)
@@ -260,17 +261,15 @@ object ActionImpl {
 //
 //    override def hashCode(): Int = 0
 
-    protected def writeData(out: DataOutput): Unit = {
-      out.writeInt(COOKIE)
+    protected def writeData(out: DataOutput): Unit =
       out.writeByte(CONST_EMPTY)
-    }
   }
 
   private final class VarImpl[S <: Sys[S]](protected val targets: evt.Targets[S], peer: S#Var[Action[S]])
     extends Action.Var[S]
     with evt.impl.SingleNode[S, Unit] {
 
-    def typeID: Int = Action.typeID
+    def tpe: Obj.Type = Action
 
     def apply()(implicit tx: S#Tx): Action[S] = peer()
 
@@ -280,8 +279,7 @@ object ActionImpl {
       if (old != value) changed.fire(())
     }
 
-    // XXX TODO --- replace by RootGenerator
-    object changed extends Changed with evt.impl.Generator[S, Unit] with evt.impl.Root[S, Unit]
+    object changed extends Changed with evt.impl.RootGenerator[S, Unit]
 
 //    // stupidly defined on stm.Var
 //    def transform(fun: Action[S] => Action[S])(implicit tx: S#Tx): Unit = update(fun(apply()))
@@ -291,7 +289,6 @@ object ActionImpl {
     protected def disposeData()(implicit tx: S#Tx): Unit = peer.dispose()
 
     protected def writeData(out: DataOutput): Unit = {
-      out.writeInt(COOKIE)
       out.writeByte(CONST_VAR)
       peer.write(out)
     }

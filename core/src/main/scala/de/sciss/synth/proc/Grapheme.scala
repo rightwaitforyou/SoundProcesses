@@ -21,7 +21,7 @@ import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.event.Publisher
 import de.sciss.lucre.expr.{Expr => _Expr}
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.lucre.{event => evt, expr}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Serializer, Writable}
 import de.sciss.span.Span
@@ -33,7 +33,7 @@ import scala.annotation.switch
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.implicitConversions
 
-object Grapheme {
+object Grapheme extends Obj.Type {
   final val typeID = 0x10003
 
   // If necessary for some views, we could eventually add the Elems, too,
@@ -269,7 +269,7 @@ object Grapheme {
                                                    val values: Vec[(_Expr[S, Double], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
 
-      def typeID: Int = Curve.typeID
+      def tpe: Obj.Type = Curve
 
       def value(implicit tx: S#Tx): Value.Curve = {
         val v = values.map {
@@ -339,7 +339,7 @@ object Grapheme {
                                                    val gain: _Expr[S, Double])
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
 
-      def typeID: Int = Audio.typeID
+      def tpe: Obj.Type = Audio
 
       def value(implicit tx: S#Tx): Value.Audio = {
         val artVal    = artifact.value
@@ -447,8 +447,11 @@ object Grapheme {
   }
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] = Impl.read(in, access)
+
+  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
+    Impl.readIdentifiedObj(in, access)
 }
-trait Grapheme[S <: Sys[S]] extends evt.Node[S] with Publisher[S, Grapheme.Update[S]] {
+trait Grapheme[S <: Sys[S]] extends Obj[S] with Publisher[S, Grapheme.Update[S]] {
   import Grapheme.{Modifiable, Segment, TimedElem, Value}
 
   /** The idea of all traits which distinguish between read-only and modifiable sub-type is that

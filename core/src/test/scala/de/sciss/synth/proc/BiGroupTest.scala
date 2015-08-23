@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.{stm, expr, bitemp, event => evt}
-import stm.Cursor
+import de.sciss.lucre.stm.{Sys, Cursor}
 import bitemp.BiGroup
 import expr.Expr
 import de.sciss.span.{Span, SpanLike}
@@ -11,14 +11,14 @@ import de.sciss.lucre
 object BiGroupTest {
   def apply(): BiGroupTest[InMemory] = new BiGroupTest(InMemory())
 }
-class BiGroupTest[S <: evt.Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
+class BiGroupTest[S <: Sys[S]](cursor: Cursor[S]) extends ExprImplicits[S] {
   def t[A](fun: S#Tx => A): A = cursor.step(fun)
 
   val bi = t { implicit tx =>
     implicit def longType = lucre.expr.Long
-    val res = BiGroup.Expr.Modifiable[S, Long]
+    val res = BiGroup.Modifiable[S, Expr[S, Long]]
     res.changed.react { _ => upd =>
-      println("Observed: " + upd)
+      println(s"Observed: $upd")
     }
     res
   }

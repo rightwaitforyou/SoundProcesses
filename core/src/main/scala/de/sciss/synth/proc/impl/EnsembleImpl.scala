@@ -14,8 +14,9 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.event.EventLike
+import de.sciss.lucre.event.{Targets, EventLike}
 import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, Long => LongEx}
+import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{Obj, NoSys, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{Serializer, DataInput, DataOutput}
@@ -23,8 +24,6 @@ import de.sciss.synth.proc
 import de.sciss.synth.proc.Ensemble.Update
 
 object EnsembleImpl {
-  private final val COOKIE = 0x456E00  // "En\0"
-
   def apply[S <: Sys[S]](folder: Folder /* Elem.Obj */[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
                         (implicit tx: S#Tx): Ensemble[S] = {
     val targets = evt.Targets[S]
@@ -35,18 +34,17 @@ object EnsembleImpl {
 
   private val anySer = new Ser[NoSys]
 
-  private final class Ser[S <: Sys[S]] extends Obj.Serializer[S, Ensemble[S]] {
-    def typeID: Int = Ensemble.typeID
+  private final class Ser[S <: Sys[S]] extends ObjSerializer[S, Ensemble[S]] {
+    def tpe: Obj.Type = Ensemble
+  }
 
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Ensemble[S] with evt.Node[S] = {
-      val cookie  = in.readInt()
-      if (cookie != COOKIE) sys.error(s"Unexpected cookie (found $cookie, expected $COOKIE)")
-      val folder  = Folder   .read(in, access)
-      // val folder  = Obj.readT[S, FolderElem](in, access)
-      val offset  = LongEx   .read(in, access)
-      val playing = BooleanEx.read(in, access)
-      new Impl(targets, folder, offset, playing)
-    }
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Ensemble[S] with evt.Node[S] = {
+    val targets = Targets  .read(in, access)
+    val folder  = Folder   .read(in, access)
+    // val folder  = Obj.readT[S, FolderElem](in, access)
+    val offset  = LongEx   .read(in, access)
+    val playing = BooleanEx.read(in, access)
+    new Impl(targets, folder, offset, playing)
   }
 
 //  def mkCopy()(implicit tx: S#Tx): Ensemble.Elem[S] = {
@@ -68,7 +66,7 @@ object EnsembleImpl {
     extends Ensemble[S]
     with evt.impl.SingleNode[S, Ensemble.Update[S]] { self =>
 
-    def typeID: Int = Ensemble.typeID
+    def tpe: Obj.Type = Ensemble
 
     override def toString: String = s"Ensemble$id"
 
@@ -77,7 +75,6 @@ object EnsembleImpl {
     def playing(implicit tx: S#Tx): Expr[S, Boolean]  = playingEx
 
     protected def writeData(out: DataOutput): Unit = {
-      out.writeInt(COOKIE)
       folderEx .write(out)
       offsetEx .write(out)
       playingEx.write(out)

@@ -15,9 +15,10 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
+import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.event.EventLike
+import de.sciss.lucre.event.{Targets, EventLike}
 import de.sciss.serial.{DataInput, Serializer}
 
 object TimelineImpl {
@@ -51,20 +52,17 @@ object TimelineImpl {
   private val anySer    = new Ser   [NoSys]
   private val anyModSer = new ModSer[NoSys]
 
-  private class Ser[S <: Sys[S]] extends Obj.Serializer[S, Timeline[S]] {
-    def typeID: Int = Timeline.typeID
-
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Timeline[S] = {
-      TimelineImpl.read(in, access, targets)
-    }
+  private class Ser[S <: Sys[S]] extends ObjSerializer[S, Timeline[S]] {
+    def tpe: Obj.Type = Timeline
   }
 
-  private class ModSer[S <: Sys[S]] extends Obj.Serializer[S, Timeline.Modifiable[S]] {
-    def typeID: Int = Timeline.typeID
+  private class ModSer[S <: Sys[S]] extends ObjSerializer[S, Timeline.Modifiable[S]] {
+    def tpe: Obj.Type = Timeline
+  }
 
-    def read(in: DataInput, access: S#Acc, targets: evt.Targets[S])(implicit tx: S#Tx): Timeline.Modifiable[S] = {
-      TimelineImpl.read(in, access, targets)
-    }
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline[S] = {
+    val targets = Targets.read(in, access)
+    read(in, access, targets)
   }
 
   // ---- impl ----

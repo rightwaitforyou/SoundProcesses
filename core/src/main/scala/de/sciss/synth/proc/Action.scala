@@ -92,8 +92,8 @@ object Action extends stm.Obj.Type {
     implicit def cursor: stm.Cursor[S]
   }
 
-  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): stm.Obj[S] = ???
+  def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): stm.Obj[S] = ??? // RRR
 }
-trait Action[S <: Sys[S]] extends stm.Obj[S] with evt.Publisher[S, Unit] {
+trait Action[S <: Sys[S]] extends Obj[S] with evt.Publisher[S, Unit] {
   def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit
 }

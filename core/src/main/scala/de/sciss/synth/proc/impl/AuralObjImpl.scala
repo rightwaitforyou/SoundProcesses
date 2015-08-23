@@ -32,7 +32,7 @@ object AuralObjImpl {
   def factories: Iterable[Factory] = map.values
 
   def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
-    val tid = obj.typeID
+    val tid = obj.tpe.typeID
     map.get(tid).fold(Generic(obj))(f => f(obj.asInstanceOf[f.Repr[S]]))
   }
 

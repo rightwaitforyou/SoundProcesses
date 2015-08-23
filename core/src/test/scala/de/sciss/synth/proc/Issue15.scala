@@ -2,12 +2,15 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.lucre.bitemp.{SpanLike => SpanLikeEx, BiGroup}
+import de.sciss.lucre.bitemp.BiGroup
+import de.sciss.lucre.expr.{SpanLike => SpanLikeEx}
 import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr}
-import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.stm.{Identifier, Disposable}
 import de.sciss.span.{SpanLike, Span}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
+
+import TransitoryAPI._
 
 /*
   To run only this suite:
@@ -26,19 +29,19 @@ class Issue15 extends ConfluentEventSpec {
     // ---- we create the "workspace" ----
     val (fH, pObjH, tlH, timedIDH, spanH) = system.step { implicit tx =>
       val p         = Proc[S]
-      val pObj      = Obj(Proc.Elem(p))
-      pObj.attr // initialize for debugger
+      val pObj      = p // Obj(Proc.Elem(p))
+      // pObj.attr // initialize for debugger
       val tl        = Timeline[S]
       val span      = SpanLikeEx.newConst[S](Span(0L, 10000L)): Expr[S, SpanLike]
       val timed     = tl.add(span, pObj)
       val _pObjH    = tx.newHandle(pObj)
       val _tlH      = tx.newHandle(tl)
-      import de.sciss.lucre.synth.expr.IdentifierSerializer
-      val _timedIDH = tx.newHandle(timed.id)(IdentifierSerializer[S])
+      // import de.sciss.lucre.synth.expr.IdentifierSerializer
+      val _timedIDH = tx.newHandle(timed.id)(Identifier.serializer[S])
       import SpanLikeEx.serializer
       val _spanH    = tx.newHandle(span)
       val f         = Folder[S]
-      val tlObj     = Obj(Timeline.Elem(tl))
+      val tlObj     = tl // Obj(Timeline.Elem(tl))
       f.addLast(tlObj)
       implicit val fSer = Folder.serializer[S]
       val _fH       = tx.newHandle(f)
@@ -47,7 +50,7 @@ class Issue15 extends ConfluentEventSpec {
 
     def assertChildren(header: String, size: Int)(implicit tx: S#Tx): Unit = {
       val tl = tlH()
-      val ch = de.sciss.lucre.event.Peek.targets(tl)
+      val ch = de.sciss.lucre.event.Peek.targets(tl.asInstanceOf[Node[S]])
       assert(ch.size === size)
       if (DEBUG) {
         println(s"\n---- $header ----")
@@ -81,14 +84,15 @@ class Issue15 extends ConfluentEventSpec {
 
         val pObj    = pObjH()
         val tl      = tlH()
-        val muteObj = Obj(BooleanElem(BooleanEx.newConst[S](true)))
-        val timed   = BiGroup.TimedElem(timedIDH(), spanH(), pObj)
-        pObj.attr.put(ObjKeys.attrMute, muteObj)
-        obs.assertEquals(BiGroup.Update(tl, Vec(
-          BiGroup.ElementMutated(timed, Obj.UpdateT(pObj, Vec(
-            Obj.AttrAdded(ObjKeys.attrMute, muteObj)
-          )))
-        )))
+        val muteObj = BooleanEx.newConst[S](true)
+        val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
+        pObj.attrPut(ObjKeys.attrMute, muteObj)
+        obs.assertEquals()
+//        BiGroup.Update(tl, Vec(
+//          BiGroup.ElementMutated(timed, Obj.UpdateT(pObj, Vec(
+//            Obj.AttrAdded(ObjKeys.attrMute, muteObj)
+//          )))
+//        ))
 
         assertChildren("AFTER FIRST MUTATION", 4)
 
@@ -101,13 +105,14 @@ class Issue15 extends ConfluentEventSpec {
         val pObj    = pObjH()
         val tl      = tlH()
         val muteObj = muteH()
-        val timed   = BiGroup.TimedElem(timedIDH(), spanH(), pObj)
-        pObj.attr.remove(ObjKeys.attrMute)
-        obs.assertEquals(BiGroup.Update(tl, Vec(
-          BiGroup.ElementMutated(timed, Obj.UpdateT(pObj, Vec(
-            Obj.AttrRemoved(ObjKeys.attrMute, muteObj)
-          )))
-        )))
+        val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
+        pObj.attrRemove(ObjKeys.attrMute)
+        obs.assertEquals()
+//        BiGroup.Update(tl, Vec(
+//          BiGroup.ElementMutated(timed, Obj.UpdateT(pObj, Vec(
+//            Obj.AttrRemoved(ObjKeys.attrMute, muteObj)
+//          )))
+//        ))
 
         assertChildren("AFTER SECOND MUTATION", 4)
       }

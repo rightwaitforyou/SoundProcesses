@@ -2,8 +2,8 @@ package de.sciss.synth.proc
 
 import org.scalatest.{Outcome, Matchers, fixture}
 import de.sciss.lucre
-import de.sciss.lucre.synth.{InMemory, expr}
-import de.sciss.lucre.stm
+import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.{expr, stm}
 
 trait InMemoryEventSpec extends fixture.FlatSpec with Matchers {
   type S = InMemory
@@ -13,7 +13,7 @@ trait InMemoryEventSpec extends fixture.FlatSpec with Matchers {
   implicit final protected val LongType = lucre.expr.Long
   final protected val imp = ExprImplicits[S]
 
-  expr.initTypes()
+  expr.init()
 
   final def withFixture(test: OneArgTest): Outcome = {
     val system = InMemory()

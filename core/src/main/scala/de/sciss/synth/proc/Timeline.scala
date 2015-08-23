@@ -18,7 +18,7 @@ import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc.impl.{TimelineImpl => Impl}
 
-object Timeline {
+object Timeline extends Obj.Type {
   final val SampleRate = 14112000.0 // lcm(88.2k, 96k); note: value is copied in AuralContextImpl
 
   final val typeID = 0x10006
@@ -47,7 +47,10 @@ object Timeline {
   val Moved     = BiGroup.Moved
   // val Element   = BiGroup.ElementMutated
 
-  type Timed[S <: Sys[S]] = BiGroup.TimedElem[S, Obj[S]]
+  type Timed[S <: Sys[S]] = BiGroup.Entry[S, Obj[S]]
+
+  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
+    Impl.readIdentifiedObj(in, access)
 }
 trait Timeline[S <: Sys[S]] extends BiGroup[S, Obj[S]] {
   override def modifiableOption: Option[Timeline.Modifiable[S]]
