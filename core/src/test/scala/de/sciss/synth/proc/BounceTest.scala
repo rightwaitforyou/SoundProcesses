@@ -2,6 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.expr
 import de.sciss.lucre.stm.store.BerkeleyDB
+import de.sciss.lucre.synth.InMemory
 import de.sciss.processor.Processor
 import de.sciss.span.Span
 import de.sciss.synth.proc.Implicits._
@@ -12,10 +13,12 @@ import scala.concurrent.ExecutionContext
 // XXX TODO: this should be a ScalaTest spec, opening the file after bouncing, and
 // verifying the contents (easy with a sine).
 object BounceTest extends App {
-  type S = Durable
+  type S = InMemory
+  // type S = Durable
   type I = S#I
 
-  implicit val system = Durable(BerkeleyDB.tmp())
+  // implicit val system = Durable(BerkeleyDB.tmp())
+  implicit val system = InMemory()
 
   val realtime = args.headOption == Some("--realtime")
 

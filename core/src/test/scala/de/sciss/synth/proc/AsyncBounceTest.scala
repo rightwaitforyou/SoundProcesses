@@ -3,6 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.file._
 import de.sciss.lucre.artifact.ArtifactLocation
 import de.sciss.lucre.expr
+import de.sciss.lucre.synth.InMemory
 import de.sciss.synth.io.{AudioFile, AudioFileSpec}
 import de.sciss.synth.{freeSelf, ugen, SynthGraph}
 import de.sciss.span.Span
@@ -13,18 +14,18 @@ import de.sciss.lucre.stm.store.BerkeleyDB
 import TransitoryAPI._
 
 object AsyncBounceTest {
+  // type S = InMemory
   type S = Durable
   type I = S#I
 
   def main(args: Array[String]): Unit = run()
 
   def run(): Unit = {
+    // implicit val system = InMemory()
     implicit val system = Durable(BerkeleyDB.tmp())
 
     de.sciss.lucre.synth.showLog = true
     showTransportLog  = true
-
-    import expr.Ops._
 
     def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
 

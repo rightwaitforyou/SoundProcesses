@@ -27,5 +27,5 @@ object Scans {
 trait Scans[S <: Sys[S]] {
   def get(key: String)(implicit tx: S#Tx): Option[Scan[S]]
   def keys(implicit tx: S#Tx): Set[String]
-  def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, (String, Scan[S])]
+  def iterator(implicit tx: S#Tx): Iterator[(String, Scan[S])]
 }

@@ -88,7 +88,7 @@ object ScanImpl {
 
     override def toString: String = s"Scan$id"
 
-    def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, Link[S]] = list.iterator
+    def iterator(implicit tx: S#Tx): Iterator[Link[S]] = list.iterator
 
     def isEmpty (implicit tx: S#Tx): Boolean = list.isEmpty
     def nonEmpty(implicit tx: S#Tx): Boolean = list.nonEmpty

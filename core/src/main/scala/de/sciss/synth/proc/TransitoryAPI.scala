@@ -7,21 +7,28 @@ import de.sciss.lucre.stm.{Sys, Obj}
 import scala.language.higherKinds
 
 object TransitoryAPI {
-  implicit final class objAttrOps[S <: Sys[S]](val `this`: Obj[S]) extends AnyVal {
-    def attr[Repr[~ <: Sys[~]] <: Obj[~]](key: String)(implicit tx: S#Tx): Option[Repr[S]] = ???
+  implicit final class objAttrOps[S <: Sys[S]](val `this`: Obj[S]) extends AnyVal { me =>
+    import me.{`this` => obj}
 
-    def attrGet(key: String)(implicit tx: S#Tx): Option[Obj[S]] = ???
+    def attr[Repr[~ <: Sys[~]] <: Obj[~]](key: String)(implicit tx: S#Tx): Option[Repr[S]] =
+      tx.attrGet(obj, key)
 
-    def attrContains(key: String)(implicit tx: S#Tx): Boolean = ???
+    def attrGet(key: String)(implicit tx: S#Tx): Option[Obj[S]] =
+      tx.attrGet[Obj](obj, key)
 
-    def attrKeys(implicit tx: S#Tx): Set[String] = ???
+    // def attrContains(key: String)(implicit tx: S#Tx): Boolean = ...
 
-    def attrIterator(implicit tx: S#Tx): data.Iterator[S#Tx, (String, Obj[S])] = ???
+    // def attrKeys(implicit tx: S#Tx): Set[String] = ...
+
+    // def attrIterator(implicit tx: S#Tx): Iterator[(String, Obj[S])] = ...
 
     // def attrMod(implicit tx: S#Tx): Option[AttrMap.Modifiable[S]]
 
-    def attrPut   [Repr[~ <: Sys[~]] <: Obj[~]](key: String, value: Repr[S])(implicit tx: S#Tx): Unit     = ???
-    def attrRemove(key: String               )(implicit tx: S#Tx): Boolean  = ???
+    def attrPut[Repr[~ <: Sys[~]] <: Obj[~]](key: String, value: Repr[S])(implicit tx: S#Tx): Unit =
+      tx.attrPut(obj, key, value)
+
+    def attrRemove(key: String)(implicit tx: S#Tx): Unit =
+      tx.attrRemove(obj, key)
 
     def attrChanged: EventLike[S, AttrUpdate[S]] = ???
   }

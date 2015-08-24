@@ -307,7 +307,7 @@ object AuralTimelineImpl {
       state         = AuralObj.Playing
     }
 
-    private def playViews(it: data.Iterator[I#Tx, Leaf[S]], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    private def playViews(it: Iterator[Leaf[S]], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       logA("timeline - playViews")
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
@@ -323,7 +323,7 @@ object AuralTimelineImpl {
       contents.viewAdded(timed, view)
     }
 
-    private def stopViews(it: data.Iterator[I#Tx, Leaf[S]])(implicit tx: S#Tx): Unit = {
+    private def stopViews(it: Iterator[Leaf[S]])(implicit tx: S#Tx): Unit = {
       logA("timeline - stopViews")
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
@@ -385,12 +385,12 @@ object AuralTimelineImpl {
 
     // ---- bi-group functionality TODO - DRY ----
 
-    private def intersect(frame: Long)(implicit tx: S#Tx): data.Iterator[I#Tx, Leaf[S]] =
+    private def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf[S]] =
       BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
     // this can be easily implemented with two rectangular range searches
     // return: (things-that-start, things-that-stop)
-    private def eventsAt(frame: Long)(implicit tx: S#Tx): (data.Iterator[I#Tx, Leaf[S]], data.Iterator[I#Tx, Leaf[S]]) =
+    private def eventsAt(frame: Long)(implicit tx: S#Tx): (Iterator[Leaf[S]], Iterator[Leaf[S]]) =
       BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
 
     // Long.MaxValue indicates _no event_; frame is exclusive!

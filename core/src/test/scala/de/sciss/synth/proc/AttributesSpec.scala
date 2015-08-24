@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.ConfluentEventSpec
 import de.sciss.file._
 import de.sciss.lucre.artifact.ArtifactLocation
-import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, LongObj, StringObj}
+import de.sciss.lucre.expr.{DoubleVector, BooleanObj, DoubleObj, IntObj, LongObj, StringObj}
 import de.sciss.synth.Curve
 import de.sciss.synth.io.AudioFileSpec
 import de.sciss.synth.proc.TransitoryAPI._
@@ -53,7 +53,7 @@ class AttributesSpec extends ConfluentEventSpec {
       p.attrPut("string" , StringObj .newConst[S]("123"))
 
       p.attrPut("fade"   , FadeSpec.Obj.newConst(fade))
-      ??? // RRR p.attrPut("d-vec"  , DoubleVec.newConst(Vec(1.2, 3.4, 5.6)))
+      p.attrPut("d-vec"  , DoubleVector.newConst(Vector(1.2, 3.4, 5.6)))
       val loc = ArtifactLocation[S](file("foo"))
       val art = loc.add(file("foo") / "bar")
       p.attrPut("audio"  , Grapheme.Expr.Audio(art, spec, offset = n, gain = d))
@@ -72,7 +72,7 @@ class AttributesSpec extends ConfluentEventSpec {
       assert(p.attr[BooleanObj  ]("boolean").map(_.value) === Some(true))
       assert(p.attr[StringObj   ]("string" ).map(_.value) === Some("123"))
       assert(p.attr[FadeSpec.Obj]("fade").map(_.value) === Some(fade))
-      ??? // RRR assert(p.attr[Expr[S, Vec[Double]]]("d-vec").map(_.value) === Some(Vec(1.2, 3.4, 5.6)))
+      assert(p.attr[DoubleVector]("d-vec").map(_.value) === Some(Vector(1.2, 3.4, 5.6)))
       assert(p.attr[Grapheme.Expr.Audio]("audio").map(_.value) ===
         Some(Grapheme.Value.Audio(file("foo") / "bar", spec, 1234L, 123.4)))
       assert(p.attr[ArtifactLocation]("loc").map(_.directory) === Some(file("foo")))

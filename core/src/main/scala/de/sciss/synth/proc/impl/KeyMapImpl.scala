@@ -92,7 +92,7 @@ trait KeyMapImpl[S <: Sys[S], Key, Value] {
 
   final def keys(implicit tx: S#Tx): Set[Key] = map.keysIterator.toSet
 
-  final def iterator(implicit tx: S#Tx): data.Iterator[S#Tx, (Key, Value)] =
+  final def iterator(implicit tx: S#Tx): Iterator[(Key, Value)] =
     map.iterator.map {
       case (key, entry) => key -> entry.value
     }
