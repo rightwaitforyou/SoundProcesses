@@ -35,7 +35,7 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.implicitConversions
 
 object Grapheme extends Obj.Type {
-  final val typeID = 0x10003
+  final val typeID = 0x10002
 
   // If necessary for some views, we could eventually add the Elems, too,
   // like `changes: Vec[ (Elem[ S ], Value) ]`. Then the question would be

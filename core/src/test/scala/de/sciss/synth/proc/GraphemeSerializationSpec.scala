@@ -2,12 +2,11 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.lucre.expr
-import de.sciss.lucre.expr.Expr
-
-import collection.immutable.{IndexedSeq => Vec}
-import span.Span
+import de.sciss.lucre.expr.{DoubleObj, LongObj}
+import de.sciss.span.Span
 import de.sciss.synth.Curve.step
+
+import scala.collection.immutable.{IndexedSeq => Vec}
 
 /*
  To test only this suite:
@@ -19,19 +18,21 @@ class GraphemeSerializationSpec extends ConfluentEventSpec {
   "Grapheme" should "serialize and deserialize" in { system =>
     val gH = system.step { implicit tx =>
       val g = Grapheme[S](1)
-      tx.newHandle(g)(Grapheme.Modifiable.serializer[S])
+      tx.newHandle(g)
     }
 
     // import imp._
-    import expr.Ops._
     // import ExprImplicits._
 
-    type LE = Expr[S, Long]
-    type GE = Expr[S, Grapheme.Value]
+    type LE = LongObj[S]
+    type DE = DoubleObj[S]
+    type GE = Grapheme.Expr[S]
 
     system.step { implicit tx =>
       val g = gH()
-      ??? // RRR g.add((1234L: LE) -> Grapheme.Expr.Curve[S](Grapheme.Value.Curve(5678.9 -> step)))
+      val time = 1234L: LE
+      val mag  = Grapheme.Expr.Curve[S]((5678.9: DE) -> step)
+      g.add(time -> mag)
     }
 
     system.step { implicit tx =>

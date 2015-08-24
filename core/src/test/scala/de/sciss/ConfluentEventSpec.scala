@@ -4,7 +4,7 @@ import lucre.stm
 import org.scalatest.{Outcome, Matchers, fixture}
 import concurrent.stm.TxnLocal
 import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.synth.proc.Confluent
+import de.sciss.synth.proc.{SoundProcesses, Confluent}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.expr
 
@@ -17,7 +17,7 @@ trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
 //  implicit final protected val LongType = lucre.expr.Long
   // final protected val imp = ExprImplicits[S]
 
-  expr.init()
+  SoundProcesses.init()
 
   final def withFixture(test: OneArgTest): Outcome = {
     val system = Confluent(BerkeleyDB.tmp())

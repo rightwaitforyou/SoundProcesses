@@ -91,7 +91,7 @@ object GraphemeImpl {
 
     // ---- forwarding to pin ----
 
-    def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit     = {
+    def add(elem: TimedElem[S])(implicit tx: S#Tx): Unit = {
       val elemCh = elem.value.value.numChannels
       if (elemCh != numChannels)
         throw new IllegalArgumentException(
@@ -281,7 +281,7 @@ object GraphemeImpl {
       pin.dispose()
     }
 
-    protected def writeData(out: DataOutput)      : Unit = {
+    protected def writeData(out: DataOutput): Unit = {
       out.writeInt(numChannels)
       pin.write(out)
     }

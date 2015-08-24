@@ -23,11 +23,11 @@ import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
 
-object FadeSpec extends Obj.Type {
+object FadeSpec {
   final val typeID = 14
 
-  override def init(): Unit = {
-    super.init()
+  /* override */ def init(): Unit = {
+    // super.init()
     Obj  .init()
   }
 
@@ -117,7 +117,7 @@ object FadeSpec extends Obj.Type {
                                               val floor: DoubleObj[S])
       extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Obj[S] {
 
-      def tpe: stm.Obj.Type = FadeSpec
+      def tpe: stm.Obj.Type = FadeSpec.Obj
 
       def value(implicit tx: S#Tx): FadeSpec = FadeSpec(numFrames.value, shape.value, floor.value.toFloat)
 
@@ -178,8 +178,5 @@ object FadeSpec extends Obj.Type {
     }
   }
   trait Obj[S <: Sys[S]] extends _Expr[S, FadeSpec]
-
-  override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
-    Obj.readIdentifiedObj(in, access)
 }
 final case class FadeSpec(numFrames: Long, curve: Curve = linear, floor: Float = 0f)
