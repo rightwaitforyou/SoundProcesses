@@ -15,20 +15,20 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.{expr, data}
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.expr.{String => StringEx, Boolean => BooleanEx}
+import de.sciss.lucre.expr.{StringObj, BooleanObj}
 import de.sciss.lucre.stm.{Obj, Sys}
 
 import TransitoryAPI._
 
 object Implicits {
-  implicit class ExprAsVar[A, S <: Sys[S]](val `this`: Expr[S, A]) extends AnyVal { me =>
-    import me.{`this` => ex}
-
-    /** Resolves the expression as a variable. If the expression is not a variable,
-      * throws an exception.
-      */
-    def asVar: Expr.Var[S, A] = Expr.Var.unapply(ex).getOrElse(sys.error(s"Not a variable: $ex"))
-  }
+//  implicit class ExprAsVar[S <: Sys[S], A, Repr <: Expr[S, A]](val `this`: Repr) extends AnyVal { me =>
+//    import me.{`this` => ex}
+//
+//    /** Resolves the expression as a variable. If the expression is not a variable,
+//      * throws an exception.
+//      */
+//    def asVar: Expr.Var[S, A] = Expr.Var.unapply(ex).getOrElse(sys.error(s"Not a variable: $ex"))
+//  }
 
   implicit class SecFrames(val `this`: Double) extends AnyVal { me =>
     import me.{`this` => d}
@@ -161,8 +161,7 @@ object Implicits {
     def stop()(implicit tx: S#Tx): Unit = play1(value = false)
 
     private def play1(value: Boolean)(implicit tx: S#Tx): Unit = {
-      val vr = ensemble.playing.asVar
-      import expr.Ops._
+      val BooleanObj.Var(vr) = ensemble.playing
       val prev = vr()
       if (!(Expr.isConst(prev) && prev.value == value)) vr() = value
     }
@@ -177,30 +176,30 @@ object Implicits {
       * If their is no value found, a dummy string `"&lt;unnamed&gt;"` is returned.
       */
     def name(implicit tx: S#Tx): String =
-      obj.attr[Expr[S, String]](ObjKeys.attrName).fold("<unnamed>")(_.value)
+      obj.attr[StringObj](ObjKeys.attrName).fold("<unnamed>")(_.value)
 
     /** Short cut for updating the attribute `"name"`. */
     def name_=(value: String)(implicit tx: S#Tx): Unit = {
-      val valueC = StringEx.newConst[S](value)
-      obj.attr[Expr[S, String]](ObjKeys.attrName) match {
-        case Some(Expr.Var(vr)) => vr() = valueC
+      val valueC = StringObj.newConst[S](value)
+      obj.attr[StringObj](ObjKeys.attrName) match {
+        case Some(StringObj.Var(vr)) => vr() = valueC
         case _                  =>
-          val valueVr = StringEx.newVar(valueC)
+          val valueVr = StringObj.newVar(valueC)
           obj.attrPut(ObjKeys.attrName, valueVr)
       }
     }
 
     /** Short cut for accessing the attribute `"mute"`. */
     def muted(implicit tx: S#Tx): Boolean =
-      obj.attr[Expr[S, Boolean]](ObjKeys.attrMute).exists(_.value)
+      obj.attr[BooleanObj](ObjKeys.attrMute).exists(_.value)
 
     /** Short cut for updating the attribute `"mute"`. */
     def muted_=(value: Boolean)(implicit tx: S#Tx): Unit = {
-      val valueC = BooleanEx.newConst[S](value)
-      obj.attr[Expr[S, Boolean]](ObjKeys.attrMute) match {
-        case Some(Expr.Var(vr)) => vr() = valueC
+      val valueC = BooleanObj.newConst[S](value)
+      obj.attr[BooleanObj](ObjKeys.attrMute) match {
+        case Some(BooleanObj.Var(vr)) => vr() = valueC
         case _                  =>
-          val valueVr = BooleanEx.newVar(valueC)
+          val valueVr = BooleanObj.newVar(valueC)
           obj.attrPut(ObjKeys.attrMute, valueVr)
       }
     }

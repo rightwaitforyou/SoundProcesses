@@ -38,7 +38,7 @@ object BounceTest extends App {
   val groupH = system.step { implicit tx =>
 //    val expr      = ExprImplicits[S]
 //    import expr._
-    import ExprImplicits._
+    // import ExprImplicits._
 
     val proc      = Proc[S]
     val peer      = proc // Proc.Elem(proc)

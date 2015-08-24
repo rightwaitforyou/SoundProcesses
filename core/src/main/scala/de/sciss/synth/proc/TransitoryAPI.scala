@@ -4,9 +4,11 @@ import de.sciss.lucre.data
 import de.sciss.lucre.event.{EventLike, Event}
 import de.sciss.lucre.stm.{Sys, Obj}
 
+import scala.language.higherKinds
+
 object TransitoryAPI {
   implicit final class objAttrOps[S <: Sys[S]](val `this`: Obj[S]) extends AnyVal {
-    def attr[A <: Obj[S]](key: String)(implicit tx: S#Tx): Option[A] = ???
+    def attr[Repr[~ <: Sys[~]] <: Obj[~]](key: String)(implicit tx: S#Tx): Option[Repr[S]] = ???
 
     def attrGet(key: String)(implicit tx: S#Tx): Option[Obj[S]] = ???
 
@@ -18,7 +20,7 @@ object TransitoryAPI {
 
     // def attrMod(implicit tx: S#Tx): Option[AttrMap.Modifiable[S]]
 
-    def attrPut   (key: String, value: Obj[S])(implicit tx: S#Tx): Unit     = ???
+    def attrPut   [Repr[~ <: Sys[~]] <: Obj[~]](key: String, value: Repr[S])(implicit tx: S#Tx): Unit     = ???
     def attrRemove(key: String               )(implicit tx: S#Tx): Boolean  = ???
 
     def attrChanged: EventLike[S, AttrUpdate[S]] = ???

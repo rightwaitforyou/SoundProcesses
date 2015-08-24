@@ -1,5 +1,6 @@
 package de.sciss.synth.proc
 
+import de.sciss.lucre.expr.StringObj
 import de.sciss.lucre.{expr, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.{Server, Sys}
@@ -70,7 +71,7 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
 
     cursor.step { implicit tx =>
       val p = Proc[S]
-      import ExprImplicits._
+      // import ExprImplicits._
 
       p.graph() = SynthGraph {
         import synth._
@@ -84,7 +85,7 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
 
       val obj = p // Obj(Proc.Elem(p))
       val actionObj = actionH() // Obj(Action.Elem(actionH()))
-      actionObj.attrPut("name", /* Obj(StringElem( */ "Baba Ganoush" /* )) */)
+      actionObj.attrPut[StringObj]("name", /* Obj(StringElem( */ "Baba Ganoush" /* )) */)
       obj.attrPut("foo", actionObj)
 
       import WorkspaceHandle.Implicits._

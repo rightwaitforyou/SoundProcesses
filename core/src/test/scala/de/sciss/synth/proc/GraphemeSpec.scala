@@ -3,6 +3,7 @@ package synth
 package proc
 
 import de.sciss.lucre.expr
+import de.sciss.lucre.expr.{LongObj, DoubleObj}
 
 import collection.immutable.{IndexedSeq => Vec}
 import span.Span
@@ -16,7 +17,7 @@ import de.sciss.synth.Curve.{parametric, step, welch, sine, exponential, linear}
  */
 class GraphemeSpec extends ConfluentEventSpec {
   // import imp._
-  import ExprImplicits._
+  // import ExprImplicits._
 
   import Grapheme.{Value, Modifiable, Update, Segment, Expr, TimedElem}
 
@@ -155,13 +156,13 @@ class GraphemeSpec extends ConfluentEventSpec {
     // ok, now test with non-constant expressions
     system.step { implicit tx =>
       val g1      = gH1()
-      val time1   = lucre.expr.Long  .newVar[S](0L)
-      val mag1    = lucre.expr.Double.newVar[S](1234.5)
+      val time1   = LongObj  .newVar[S](0L)
+      val mag1    = DoubleObj.newVar[S](1234.5)
       val value1  = Expr.Curve(mag1 -> linear)
       val elem1: TimedElem[S] = time1 -> value1
 
-      val time2   = lucre.expr.Long  .newVar[S](10000L)
-      val mag2    = lucre.expr.Double.newVar[S](6789.0)
+      val time2   = LongObj  .newVar[S](10000L)
+      val mag2    = DoubleObj.newVar[S](6789.0)
       val value2  = Expr.Curve(mag2 -> linear)
       val elem2: TimedElem[S] = time2 -> value2
 

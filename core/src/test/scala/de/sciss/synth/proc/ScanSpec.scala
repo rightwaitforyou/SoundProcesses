@@ -3,7 +3,7 @@ package synth
 package proc
 
 import de.sciss.lucre.expr
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{DoubleObj, LongObj, Expr}
 import de.sciss.synth.Curve.linear
 
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -62,7 +62,7 @@ class ScanSpec extends ConfluentEventSpec {
       tx.newHandle(gr)
     }
 
-    def curve(amp: Expr[S, Double], shape: Curve = linear)(implicit tx: S#Tx) =
+    def curve(amp: DoubleObj[S], shape: Curve = linear)(implicit tx: S#Tx) =
       Grapheme.Expr.Curve(amp -> shape)
 
     system.step { implicit tx =>
@@ -97,8 +97,8 @@ class ScanSpec extends ConfluentEventSpec {
       obs.clear()
 
       scan.remove(grSource)
-      val timeVar = lucre.expr.Long  .newVar[S](3000L)
-      val ampVar  = lucre.expr.Double.newVar[S](9876.0)
+      val timeVar = LongObj  .newVar[S](3000L)
+      val ampVar  = DoubleObj.newVar[S](9876.0)
       gr.add(timeVar -> curve(ampVar)) // should not be observed
       val grSourceNew = Scan.Link.Grapheme(gr)
       scan.add(grSourceNew) // should be observed

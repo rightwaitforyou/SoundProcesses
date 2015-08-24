@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.{stm, expr, bitemp, event => evt}
 import de.sciss.lucre.stm.{Sys, Cursor}
 import bitemp.BiGroup
-import expr.Expr
+import de.sciss.lucre.expr.{SpanLikeObj, LongObj, Expr}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre
@@ -13,13 +13,12 @@ object BiGroupTest {
 }
 class BiGroupTest[S <: Sys[S]](cursor: Cursor[S]) /* extends ExprImplicits[S] */ {
   import expr.Ops._
-  import ExprImplicits._
+  // import ExprImplicits._
 
   def t[A](fun: S#Tx => A): A = cursor.step(fun)
 
   val bi = t { implicit tx =>
-    implicit def longType = lucre.expr.Long
-    val res = BiGroup.Modifiable[S, Expr[S, Long]]
+    val res = BiGroup.Modifiable[S, LongObj[S]]
     res.changed.react { _ => upd =>
       println(s"Observed: $upd")
     }
@@ -29,16 +28,16 @@ class BiGroupTest[S <: Sys[S]](cursor: Cursor[S]) /* extends ExprImplicits[S] */
   def add(span: SpanLike = Span(33, 44), elem: Long = 55): Unit =
     t { implicit tx => bi.add(span, elem) }
 
-  def addValVar(span: SpanLike = Span(33, 44), init: Long = 66): Expr.Var[S, Long] =
+  def addValVar(span: SpanLike = Span(33, 44), init: Long = 66): LongObj.Var[S] =
     t { implicit tx =>
-      val elem = lucre.expr.Long.newVar[S](init)
+      val elem = LongObj.newVar[S](init)
       bi.add(span, elem)
       elem
     }
 
-  def addKeyVar(init: SpanLike = Span(33, 44), elem: Long = 77): Expr.Var[S, SpanLike] =
+  def addKeyVar(init: SpanLike = Span(33, 44), elem: Long = 77): SpanLikeObj.Var[S] =
     t { implicit tx =>
-      val span = expr.SpanLike.newVar[S](init)
+      val span = SpanLikeObj.newVar[S](init)
       bi.add(span, elem)
       span
     }

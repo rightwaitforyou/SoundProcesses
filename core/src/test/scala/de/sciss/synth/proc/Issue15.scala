@@ -4,7 +4,7 @@ package proc
 
 import de.sciss.lucre.bitemp.BiGroup
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, SpanLike => SpanLikeEx}
+import de.sciss.lucre.expr.{BooleanObj, SpanLikeObj, Expr}
 import de.sciss.lucre.stm.{Identifier, Disposable}
 import de.sciss.span.{SpanLike, Span}
 
@@ -32,13 +32,13 @@ class Issue15 extends ConfluentEventSpec {
       val pObj      = p // Obj(Proc.Elem(p))
       // pObj.attr // initialize for debugger
       val tl        = Timeline[S]
-      val span      = SpanLikeEx.newConst[S](Span(0L, 10000L)): Expr[S, SpanLike]
+      val span      = SpanLikeObj.newConst[S](Span(0L, 10000L)): SpanLikeObj[S] // Expr[S, SpanLike]
       val timed     = tl.add(span, pObj)
       val _pObjH    = tx.newHandle(pObj)
       val _tlH      = tx.newHandle(tl)
       // import de.sciss.lucre.synth.expr.IdentifierSerializer
       val _timedIDH = tx.newHandle(timed.id)(Identifier.serializer[S])
-      import SpanLikeEx.serializer
+      // import SpanLikeObj.serializer
       val _spanH    = tx.newHandle(span)
       val f         = Folder[S]
       val tlObj     = tl // Obj(Timeline.Elem(tl))
@@ -84,7 +84,7 @@ class Issue15 extends ConfluentEventSpec {
 
         val pObj    = pObjH()
         val tl      = tlH()
-        val muteObj = BooleanEx.newConst[S](true) : Expr[S, Boolean]
+        val muteObj = BooleanObj.newConst[S](true) : BooleanObj[S]
         // val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
         pObj.attrPut(ObjKeys.attrMute, muteObj)
         obs.assertEquals()
@@ -96,7 +96,7 @@ class Issue15 extends ConfluentEventSpec {
 
         assertChildren("AFTER FIRST MUTATION", 4)
 
-        import BooleanEx.serializer
+        // import BooleanObj.serializer
         tx.newHandle(muteObj)
       }
 

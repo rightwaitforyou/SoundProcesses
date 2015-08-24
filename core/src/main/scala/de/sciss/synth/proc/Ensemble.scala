@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Publisher
 import de.sciss.lucre.expr
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{LongObj, BooleanObj, Expr}
 import de.sciss.lucre.stm.{Obj, Sys, Disposable}
 import de.sciss.model
 import de.sciss.serial.{DataInput, Serializer, Writable}
@@ -25,7 +25,7 @@ import impl.{EnsembleImpl => Impl}
 object Ensemble extends Obj.Type {
   final val typeID = 0x10007
 
-  def apply[S <: Sys[S]](folder: proc.Folder /* Elem.Obj */[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
+  def apply[S <: Sys[S]](folder: proc.Folder /* Elem.Obj */[S], offset: LongObj[S], playing: BooleanObj[S])
                         (implicit tx: S#Tx): Ensemble[S] = Impl(folder, offset, playing)
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Ensemble[S] =
@@ -53,6 +53,6 @@ object Ensemble extends Obj.Type {
   */
 trait Ensemble[S <: Sys[S]] extends Obj[S] with Publisher[S, Ensemble.Update[S]] {
   def folder (implicit tx: S#Tx): Folder /* Elem.Obj */ [S]
-  def offset (implicit tx: S#Tx): Expr[S, Long]
-  def playing(implicit tx: S#Tx): Expr[S, Boolean]
+  def offset (implicit tx: S#Tx): LongObj[S]
+  def playing(implicit tx: S#Tx): BooleanObj[S]
 }

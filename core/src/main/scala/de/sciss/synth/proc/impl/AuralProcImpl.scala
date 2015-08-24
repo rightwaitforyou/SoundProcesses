@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{StringObj, Expr}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Buffer, Synth, Sys}
@@ -290,9 +290,13 @@ object AuralProcImpl {
         } {
           case a: Grapheme.Expr.Audio[S] =>
             val audioElem = a
-            val spec      = audioElem.spec
-            val f         = audioElem.artifact.value
-            val offset    = audioElem.offset  .value
+            val audioVal  = a.value
+//            val spec      = audioElem.spec
+//            val f         = audioElem.artifact.value
+//            val offset    = audioElem.offset  .value
+            val spec      = audioVal.spec
+            val f         = audioVal.artifact
+            val offset    = audioVal.offset
             // XXX TODO - for now, gain is ignored.
             // one might add an auxiliary control proxy e.g. Buffer(...).gain
             // val _gain     = audioElem.gain    .value
@@ -358,7 +362,7 @@ object AuralProcImpl {
       val ug            = ugen.result
       implicit val itx  = tx.peer
 
-      val nameHint      = p.attr[Expr[S, String]](ObjKeys.attrName).map(_.value)
+      val nameHint      = p.attr[StringObj](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
       val builder       = new SynthBuilder(p, synth, timeRef)

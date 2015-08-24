@@ -16,7 +16,7 @@ package de.sciss.synth.proc
 import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.impl.UndoManagerImpl
-import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, Int => IntEx}
+import de.sciss.lucre.expr.{BooleanObj, IntObj, Expr}
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.{expr, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
@@ -85,18 +85,18 @@ object AutomaticVoices {
   }
 
   class Layer(val ensemble:     stm.Source[S#Tx, Ensemble[S]],
-              val states  : Vec[stm.Source[S#Tx, Expr.Var[S, Int    ]]],
-              val playing :     stm.Source[S#Tx, Expr.Var[S, Boolean]],
-              val transId :     stm.Source[S#Tx, Expr.Var[S, Int    ]],
+              val states  : Vec[stm.Source[S#Tx, IntObj.Var[S]]],
+              val playing :     stm.Source[S#Tx, BooleanObj.Var[S]],
+              val transId :     stm.Source[S#Tx, IntObj.Var[S]],
               val input   :     stm.Source[S#Tx, Proc[S]],
               val output  :     stm.Source[S#Tx, Proc[S]])
 
   class World(val diffusion     :     stm.Source[S#Tx, Proc[S]],
               val layers        : Vec[Layer],
-              val sensors       : Vec[stm.Source[S#Tx, Expr.Var[S, Int    ]]],
-              val transId       :     stm.Source[S#Tx, Expr.Var[S, Int    ]],
-              val activeVoices  :     stm.Source[S#Tx, Expr    [S, Int    ]],
-              val hasFreeVoices :     stm.Source[S#Tx, Expr    [S, Boolean]])
+              val sensors       : Vec[stm.Source[S#Tx, IntObj.Var[S]]],
+              val transId       :     stm.Source[S#Tx, IntObj.Var[S]],
+              val activeVoices  :     stm.Source[S#Tx, IntObj[S]],
+              val hasFreeVoices :     stm.Source[S#Tx, BooleanObj[S]])
 
   def rrand(lo: Int, hi: Int): Int = util.Random.nextInt(hi - lo + 1) + lo
 
@@ -498,17 +498,14 @@ object AutomaticVoices {
     res
   }
 
-  import BooleanEx.{serializer => boolSer, varSerializer => boolVarSer}
-  import IntEx.{serializer => intSer, varSerializer => intVarSer}
-
   def mkWorld(done: Action[S])(implicit tx: S#Tx): World = {
     val sensors = Vec.tabulate(NumSpeakers) { speaker =>
-      val sensor = IntEx.newVar[S](-1)
+      val sensor = IntObj.newVar[S](-1)
       if (PrintStates) sensor.changed.react(_ => ch => println(s"sensor$speaker -> ${ch.now}"))
       sensor
     }
 
-    import ExprImplicits._
+//    import ExprImplicits._
 
     val diff = Proc[S]
     diff.graph() = SynthGraph {
@@ -536,7 +533,7 @@ object AutomaticVoices {
     val hasFreeVoices   = activeVoices < MaxVoices
     if (PrintStates) activeVoices.changed.react(_ => ch => println(s"activeVoices -> ${ch.now}"))
 
-    val wTransId = IntEx.newVar[S](0)
+    val wTransId = IntObj.newVar[S](0)
 
     new World(diffusion     = tx.newHandle(diffObj),
               layers        = vecLayer,
@@ -595,21 +592,21 @@ object AutomaticVoices {
     graph.ScanOut(sig)
   }
 
-  private def mkLayer(sensors: Vec[Expr[S, Int]], diff: Proc[S], done: Action[S], li: Int)
+  private def mkLayer(sensors: Vec[IntObj[S]], diff: Proc[S], done: Action[S], li: Int)
                      (implicit tx: S#Tx): Layer = {
-    val transId = IntEx.newVar[S](-1) // "sampled" in `checkWorld`
+    val transId = IntObj.newVar[S](-1) // "sampled" in `checkWorld`
 
     // layer-level ensemble
     val lFolder = Folder[S]
 
-    import ExprImplicits._
+//    import ExprImplicits._
 
     // the actual sound layer
     val gen       = Proc[S]
     gen.graph()   = genGraph
     val genObj    = gen // Obj(Proc.Elem(gen))
     val liObj     = li // Obj(IntElem(li))
-    genObj.attrPut("li", liObj)
+    genObj.attrPut[IntObj]("li", liObj)
     genObj.name = s"gen$li"
     lFolder.addLast(genObj)
 
@@ -653,12 +650,12 @@ object AutomaticVoices {
     lFolder.addLast(outObj)
     coll.outputs.add("out") ~> out.inputs.add("in")
 
-    class Channel(val stateObj: Obj[S], val state: Expr.Var[S, Int], val fPlaying: Expr[S, Boolean],
-                  val active: Expr[S, Boolean], val predOut: Scan[S], val succOut: Scan[S], val collIn: Scan[S],
+    class Channel(val stateObj: Obj[S], val state: IntObj.Var[S], val fPlaying: BooleanObj[S],
+                  val active: BooleanObj[S], val predOut: Scan[S], val succOut: Scan[S], val collIn: Scan[S],
                   val doneObj: Action[S])
 
     val vecChannels = Vec.tabulate[Channel](NumSpeakers) { si =>
-      val state     = IntEx.newVar[S](0)  // 0 - bypass, 1 - engaged, 2 - fade-in, 3 - fade-out
+      val state     = IntObj.newVar[S](0)  // 0 - bypass, 1 - engaged, 2 - fade-in, 3 - fade-out
       val stateObj  = state // Obj(IntElem(state))
       if (PrintStates) state.changed.react(_ => ch => println(s"state${li}_$si -> ${ch.now}"))
       val fPlaying  = state >= 2 // ongoing transition per channel
@@ -699,7 +696,7 @@ object AutomaticVoices {
     val activeCount = count(vecChannels.map(_.active))
     if (PrintStates) activeCount.changed.react(_ => ch => println(s"activeCount$li -> ${ch.now}"))
 
-    val lPlaying    = BooleanEx.newVar[S](false)
+    val lPlaying    = BooleanObj.newVar[S](false)
     // if (PrintStates) lPlaying.changed.react(_ => ch => println(s"lPlaying$li -> ${ch.now}"))
 
     val ensL    = Ensemble[S](lFolder, 0L, lPlaying)
@@ -769,7 +766,7 @@ object AutomaticVoices {
     l
   }
 
-  private def count(in: Vec[Expr[S, Boolean]])(implicit tx: S#Tx): Expr[S, Int] = {
+  private def count(in: Vec[BooleanObj[S]])(implicit tx: S#Tx): IntObj[S] = {
     reduce(in.map(_.toInt))(_ + _)
   }
 

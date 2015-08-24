@@ -9,10 +9,10 @@ trait InMemoryEventSpec extends fixture.FlatSpec with Matchers {
   type S = InMemory
   type FixtureParam = stm.Cursor[S]
 
-  implicit final protected val IntType  = lucre.expr.Int
-  implicit final protected val LongType = lucre.expr.Long
+//  implicit final protected val IntType  = lucre.expr.Int
+//  implicit final protected val LongType = lucre.expr.Long
   // final protected val imp = ExprImplicits[S]
-  import ExprImplicits._
+//  import ExprImplicits._
 
   expr.init()
 

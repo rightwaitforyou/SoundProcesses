@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.expr
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{SpanObj, LongObj, Expr}
 import de.sciss.lucre.stm.Sys
 import de.sciss.span.Span
 
@@ -14,12 +14,12 @@ trait ICMC2014Ex[S <: Sys[S]] {
   implicit def spanOps2(span: Span.type): expr.SpanExtensions.Ops2 =
     new expr.SpanExtensions.Ops2(span)
 
-  def placeAfter(pred: Expr.Var[S, Span],
-                 succ: Expr.Var[S, Span],
-                 gap : Expr    [S, Long])
+  def placeAfter(pred: SpanObj.Var[S],
+                 succ: SpanObj.Var[S],
+                 gap : LongObj    [S])
                 (implicit tx: S#Tx): Unit = {
     val newStart = pred.stop + gap
     val newStop  = newStart + succ().length
-    succ()       = Span(newStart, newStop)
+    succ()       = Span.apply(newStart, newStop)
   }
 }

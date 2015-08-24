@@ -14,17 +14,15 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.event.{Targets, EventLike}
-import de.sciss.lucre.expr.{Boolean => BooleanEx, Expr, Long => LongEx}
+import de.sciss.lucre.event.Targets
+import de.sciss.lucre.expr.{BooleanObj, Expr, LongObj}
 import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{Obj, NoSys, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{Serializer, DataInput, DataOutput}
-import de.sciss.synth.proc
-import de.sciss.synth.proc.Ensemble.Update
 
 object EnsembleImpl {
-  def apply[S <: Sys[S]](folder: Folder /* Elem.Obj */[S], offset: Expr[S, Long], playing: Expr[S, Boolean])
+  def apply[S <: Sys[S]](folder: Folder /* Elem.Obj */[S], offset: LongObj[S], playing: BooleanObj[S])
                         (implicit tx: S#Tx): Ensemble[S] = {
     val targets = evt.Targets[S]
     new Impl(targets, folder, offset, playing).connect()
@@ -39,11 +37,11 @@ object EnsembleImpl {
   }
 
   def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Ensemble[S] with evt.Node[S] = {
-    val targets = Targets  .read(in, access)
-    val folder  = Folder   .read(in, access)
+    val targets = Targets   .read(in, access)
+    val folder  = Folder    .read(in, access)
     // val folder  = Obj.readT[S, FolderElem](in, access)
-    val offset  = LongEx   .read(in, access)
-    val playing = BooleanEx.read(in, access)
+    val offset  = LongObj   .read(in, access)
+    val playing = BooleanObj.read(in, access)
     new Impl(targets, folder, offset, playing)
   }
 
@@ -62,7 +60,7 @@ object EnsembleImpl {
   // ---- impl ----
 
   private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], folderEx: Folder /* Elem.Obj */[S],
-                                        offsetEx: Expr[S, Long], playingEx: Expr[S, Boolean])
+                                        offsetEx: LongObj[S], playingEx: BooleanObj[S])
     extends Ensemble[S]
     with evt.impl.SingleNode[S, Ensemble.Update[S]] { self =>
 
@@ -71,8 +69,8 @@ object EnsembleImpl {
     override def toString: String = s"Ensemble$id"
 
     def folder (implicit tx: S#Tx): Folder /* Elem.Obj */ [S] = folderEx
-    def offset (implicit tx: S#Tx): Expr[S, Long]     = offsetEx
-    def playing(implicit tx: S#Tx): Expr[S, Boolean]  = playingEx
+    def offset (implicit tx: S#Tx): LongObj[S]     = offsetEx
+    def playing(implicit tx: S#Tx): BooleanObj[S]  = playingEx
 
     protected def writeData(out: DataOutput): Unit = {
       folderEx .write(out)

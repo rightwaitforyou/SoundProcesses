@@ -15,7 +15,10 @@ package de.sciss.synth.proc
 
 import java.io.File
 
+import de.sciss.lucre.event.Targets
+import de.sciss.lucre.expr
 import de.sciss.lucre.expr.impl.ExprTypeImpl
+import de.sciss.lucre.stm.Sys
 import de.sciss.processor.ProcessorLike
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Writable}
 import de.sciss.synth
@@ -26,9 +29,9 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
 object Code {
-  final val typeID      = 0x20001
+  final val typeID = 0x20001
 
-  def init(): Unit = Expr.init()
+  def init(): Unit = Obj.init()
 
   final val UserPackage = "user"
 
@@ -149,16 +152,26 @@ object Code {
 
   // ---- expr ----
 
-  object Expr extends ExprTypeImpl[Code] {
+  object Obj extends ExprTypeImpl[Code, Obj] {
+    import Code.{Obj => Repr}
+
     def typeID = Code.typeID
 
     def valueSerializer: ImmutableSerializer[Code] = Code.serializer
 
-//    protected def readTuple[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: evt.Targets[S])
-//                                        (implicit tx: S#Tx): Code.Expr.ExN[S] = {
-//      sys.error(s"No tuple operations defined for Code ($cookie)")
-//    }
+    protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
+      new _Const[S](id, value)
+
+    protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]])(implicit tx: S#Tx): Var[S] =
+      new _Var[S](targets, vr)
+
+    private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
+      extends ConstImpl[S] with Repr[S]
+
+    private[this] final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
+      extends VarImpl[S] with Repr[S]
   }
+  trait Obj[S <: Sys[S]] extends expr.Expr[S, Code]
 }
 sealed trait Code extends Writable { me =>
   /** The interfacing input type */

@@ -18,7 +18,7 @@ package proc
 import de.sciss.lucre.event.{Pull, Targets}
 import de.sciss.lucre.expr.{Expr => _Expr}
 import de.sciss.lucre.stm.{Obj, Sys}
-import de.sciss.lucre.{event => evt, expr}
+import de.sciss.lucre.{event => evt, stm, expr}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
@@ -28,7 +28,7 @@ object FadeSpec extends Obj.Type {
 
   override def init(): Unit = {
     super.init()
-    Expr .init()
+    Obj .init()
   }
 
   private final val COOKIE = 0x4664 // 'Fd'
@@ -52,8 +52,22 @@ object FadeSpec extends Obj.Type {
     }
   }
 
-  object Expr extends expr.impl.ExprTypeImpl[FadeSpec] {
+  object Obj extends expr.impl.ExprTypeImpl[FadeSpec, FadeSpec.Obj] {
     def typeID = FadeSpec.typeID
+
+    import FadeSpec.{Obj => Repr}
+
+    protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
+      new _Const[S](id, value)
+
+    protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]])(implicit tx: S#Tx): Var[S] =
+      new _Var[S](targets, vr)
+
+    private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
+      extends ConstImpl[S] with Repr[S]
+
+    private[this] final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
+      extends VarImpl[S] with Repr[S]
 
     // 0 reserved for variables
     private final val elemCookie = 1
@@ -67,12 +81,12 @@ object FadeSpec extends Obj.Type {
 //    def writeValue(value: FadeSpec, out: DataOutput): Unit      = FadeSpec.serializer.write(value, out)
 
     def apply[S <: Sys[S]](numFrames: _Expr[S, Long], shape: _Expr[S, Curve], floor: _Expr[S, Double])
-                              (implicit tx: S#Tx): Expr[S] = {
+                              (implicit tx: S#Tx): Obj[S] = {
       val targets = Targets[S]
       new Impl(targets, numFrames, shape, floor).connect()
     }
 
-    def unapply[S <: Sys[S]](expr: Expr[S]): Option[(_Expr[S, Long], _Expr[S, Curve], _Expr[S, Double])] =
+    def unapply[S <: Sys[S]](expr: Obj[S]): Option[(_Expr[S, Long], _Expr[S, Curve], _Expr[S, Double])] =
       expr match {
         case impl: Impl[S] => Some((impl.numFrames, impl.shape, impl.floor))
         case _ => None
@@ -92,9 +106,9 @@ object FadeSpec extends Obj.Type {
                                               val numFrames: _Expr[S, Long],
                                               val shape: _Expr[S, Curve],
                                               val floor: _Expr[S, Double])
-      extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Expr[S] {
+      extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Obj[S] {
 
-      def tpe: Obj.Type = FadeSpec
+      def tpe: stm.Obj.Type = FadeSpec
 
       def value(implicit tx: S#Tx): FadeSpec = FadeSpec(numFrames.value, shape.value, floor.value.toFloat)
 
@@ -154,9 +168,9 @@ object FadeSpec extends Obj.Type {
       }
     }
   }
-  sealed trait Expr[S <: Sys[S]] extends _Expr[S, FadeSpec]
+  trait Obj[S <: Sys[S]] extends _Expr[S, FadeSpec]
 
   override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
-    Expr.readIdentifiedObj(in, access)
+    Obj.readIdentifiedObj(in, access)
 }
 final case class FadeSpec(numFrames: Long, curve: Curve = linear, floor: Float = 0f)

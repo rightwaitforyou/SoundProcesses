@@ -15,9 +15,8 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre
 import de.sciss.lucre.bitemp.BiPin
-import de.sciss.lucre.event.{impl => evti, Targets, Event}
+import de.sciss.lucre.event.{impl => evti, Targets}
 import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
@@ -31,8 +30,6 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 
 object GraphemeImpl {
   import Grapheme.{Expr, Modifiable, TimedElem, Value}
-
-  private implicit val timeEx = lucre.expr.Long
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Grapheme[S] =
     serializer[S].read(in, access)

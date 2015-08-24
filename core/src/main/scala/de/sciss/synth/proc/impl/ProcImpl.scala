@@ -215,7 +215,7 @@ object ProcImpl {
 
   private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {
     protected val targets   = evt.Targets[S](tx0)
-    val graph               = SynthGraphs.newVar(SynthGraphs.empty)
+    val graph               = SynthGraphObj.newVar(SynthGraphObj.empty)
     val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
     val scanOutMap          = SkipList.Map.empty[S, String, ScanEntry[S]]
   }
@@ -229,7 +229,7 @@ object ProcImpl {
       if (serVer != SER_VERSION) sys.error(s"Incompatible serialized (found $serVer, required $SER_VERSION)")
     }
 
-    val graph         = SynthGraphs.readVar(in, access)
+    val graph         = SynthGraphObj.readVar(in, access)
     val scanInMap     = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
     val scanOutMap    = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
   }

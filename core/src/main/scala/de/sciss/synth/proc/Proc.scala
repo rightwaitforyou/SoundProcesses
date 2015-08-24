@@ -80,7 +80,7 @@ object Proc extends Obj.Type {
 /** The `Proc` trait is the basic entity representing a sound process. */
 trait Proc[S <: Sys[S]] extends Obj[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */
-  def graph: Expr.Var[S, SynthGraph]
+  def graph: SynthGraphObj.Var[S]
 
   //  /** The real-time inputs and outputs of the process. */
   //  def scans: Scans.Modifiable[S]

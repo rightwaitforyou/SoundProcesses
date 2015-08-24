@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.Artifact
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{IntObj, BooleanObj, DoubleObj, Expr}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Obj, Disposable}
 import de.sciss.lucre.synth.{Buffer, BusNodeSetter, AudioBus, Bus, NodeRef, Sys}
@@ -518,7 +518,8 @@ object AuralProcDataImpl {
             val v = a.value   // XXX TODO: would be better to write a.peer.size.value
             (v.size.toLong, 1)
           case a: Grapheme.Expr.Audio[S] =>
-            val spec = a.spec
+            // val spec = a.spec
+            val spec = a.value.spec
             (spec.numFrames, spec.numChannels)
 
           case _ => (-1L, -1)
@@ -556,8 +557,10 @@ object AuralProcDataImpl {
       val procObj = procCached()
       procObj.attrGet(key).fold(-1) {
         case a: Expr[S, Vec[Double]]    => a.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: Grapheme.Expr.Audio [S] => a.spec.numChannels
-        case _: FadeSpec.Expr       [S] => 4
+        case a: Grapheme.Expr.Audio [S] =>
+          // a.spec.numChannels
+          a.value.spec.numChannels
+        case _: FadeSpec.Obj       [S] => 4
         case _ => -1
       }
     }
@@ -603,13 +606,13 @@ object AuralProcDataImpl {
           sys.error(s"Mismatch: Attribute $key has $numChannels channels, expected $expected")
 
       value match {
-        case a: Expr[S, Int] =>
+        case a: IntObj[S] =>
           setControl(a.value)
-        case a: Expr[S, Double] =>
+        case a: DoubleObj[S] =>
           setControl(a.value.toFloat)
-        case a: Expr[S, Boolean] =>
+        case a: BooleanObj[S] =>
           setControl(if (a.value) 1f else 0f)
-        case a: FadeSpec.Expr[S] =>
+        case a: FadeSpec.Obj[S] =>
           val spec = a.value
           // dur, shape-id, shape-curvature, floor
           val values = Vec(
@@ -629,7 +632,8 @@ object AuralProcDataImpl {
         case a: Grapheme.Expr.Audio[S] =>
           val ctlName   = graph.Attribute.controlName(key)
           val audioElem = a
-          val spec      = audioElem.spec
+          // val spec      = audioElem.spec
+          val spec      = audioElem.value.spec
           if (spec.numFrames != 1)
             sys.error(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
           val numCh = spec.numChannels // numChL.toInt
@@ -690,10 +694,15 @@ object AuralProcDataImpl {
             } {
               case a: Grapheme.Expr.Audio[S] =>
                 val audioElem = a
-                val spec      = audioElem.spec
-                val path      = audioElem.artifact.value.getAbsolutePath
-                val offset    = audioElem.offset  .value
-                val _gain     = audioElem.gain    .value
+                val audioVal  = a.value
+//                val spec      = audioElem.spec
+//                val path      = audioElem.artifact.value.getAbsolutePath
+//                val offset    = audioElem.offset  .value
+//                val _gain     = audioElem.gain    .value
+                val spec      = audioVal.spec
+                val path      = audioVal.artifact.getAbsolutePath
+                val offset    = audioVal.offset
+                val _gain     = audioVal.gain
                 val _buf      = if (info.isNative) {
                   // XXX DIRTY HACK
                   val offset1 = if (key.contains("!rnd")) {
@@ -730,9 +739,13 @@ object AuralProcDataImpl {
           } {
             case a: Grapheme.Expr.Audio[S] =>
               val audioElem = a
-              val spec      = audioElem.spec
-              val path      = audioElem.artifact.value.getAbsolutePath
-              val offset    = audioElem.offset  .value
+              val audioVal  = a.value
+//              val spec      = audioElem.spec
+//              val path      = audioElem.artifact.value.getAbsolutePath
+//              val offset    = audioElem.offset  .value
+              val spec      = audioVal.spec
+              val path      = audioVal.artifact.getAbsolutePath
+              val offset    = audioVal.offset
               // XXX TODO - for now, gain is ignored.
               // one might add an auxiliary control proxy e.g. Buffer(...).gain
               // val _gain     = audioElem.gain    .value

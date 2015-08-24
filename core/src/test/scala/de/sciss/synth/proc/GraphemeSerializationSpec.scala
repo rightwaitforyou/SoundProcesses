@@ -24,7 +24,7 @@ class GraphemeSerializationSpec extends ConfluentEventSpec {
 
     // import imp._
     import expr.Ops._
-    import ExprImplicits._
+    // import ExprImplicits._
 
     type LE = Expr[S, Long]
     type GE = Expr[S, Grapheme.Value]

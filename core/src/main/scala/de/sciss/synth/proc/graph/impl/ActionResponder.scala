@@ -60,7 +60,7 @@ class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, 
       import context.scheduler.cursor
       SoundProcesses.atomic { implicit tx: S#Tx =>
         val invoker = objH()
-        invoker.attr[proc.Action[S]](key).foreach { action =>
+        invoker.attr[proc.Action](key).foreach { action =>
           // for some reason we cannot pattern match for Action.Obj(action);
           // scalac gives us
           // "inferred type arguments [S] do not conform to method unapply type
