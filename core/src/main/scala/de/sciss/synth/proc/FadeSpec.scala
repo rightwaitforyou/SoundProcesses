@@ -16,9 +16,9 @@ package synth
 package proc
 
 import de.sciss.lucre.event.{Pull, Targets}
-import de.sciss.lucre.expr.{Expr => _Expr}
+import de.sciss.lucre.expr.{Expr => _Expr, DoubleObj, LongObj, Type}
 import de.sciss.lucre.stm.{Obj, Sys}
-import de.sciss.lucre.{event => evt, stm, expr}
+import de.sciss.lucre.{stm, expr}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
@@ -28,7 +28,7 @@ object FadeSpec extends Obj.Type {
 
   override def init(): Unit = {
     super.init()
-    Obj .init()
+    Obj  .init()
   }
 
   private final val COOKIE = 0x4664 // 'Fd'
@@ -57,6 +57,11 @@ object FadeSpec extends Obj.Type {
 
     import FadeSpec.{Obj => Repr}
 
+    override def init(): Unit = {
+      super.init()
+      registerExtension(Apply)
+    }
+
     protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
       new _Const[S](id, value)
 
@@ -80,32 +85,36 @@ object FadeSpec extends Obj.Type {
 //    def readValue (                 in : DataInput ): FadeSpec  = FadeSpec.serializer.read (       in )
 //    def writeValue(value: FadeSpec, out: DataOutput): Unit      = FadeSpec.serializer.write(value, out)
 
-    def apply[S <: Sys[S]](numFrames: _Expr[S, Long], shape: _Expr[S, Curve], floor: _Expr[S, Double])
+    def apply[S <: Sys[S]](numFrames: LongObj[S], shape: CurveObj[S], floor: DoubleObj[S])
                               (implicit tx: S#Tx): Obj[S] = {
       val targets = Targets[S]
-      new Impl(targets, numFrames, shape, floor).connect()
+      new Apply(targets, numFrames, shape, floor).connect()
     }
 
-    def unapply[S <: Sys[S]](expr: Obj[S]): Option[(_Expr[S, Long], _Expr[S, Curve], _Expr[S, Double])] =
+    def unapply[S <: Sys[S]](expr: Obj[S]): Option[(LongObj[S], CurveObj[S], DoubleObj[S])] =
       expr match {
-        case impl: Impl[S] => Some((impl.numFrames, impl.shape, impl.floor))
+        case impl: Apply[S] => Some((impl.numFrames, impl.shape, impl.floor))
         case _ => None
       }
 
-//    // XXX TODO: not cool. Should use `1` for `elemCookie`
-//    override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-//                                              (implicit tx: S#Tx): Ex[S] with evt.Node[S] = {
-//      require(cookie == elemCookie, s"Unexpected cookie $cookie (requires $elemCookie)")
-//      val numFrames = lucre      .expr.Long  .read(in, access)
-//      val shape     = .... : _Expr[S, Curve] // RRR lucre.synth.expr.Curve .read(in, access)
-//      val floor     = lucre      .expr.Double.read(in, access)
-//      new Impl(targets, numFrames, shape, floor)
-//    }
+    private object Apply extends Type.Extension1[Obj] {
+      def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                    (implicit tx: S#Tx): Obj[S] = {
+        val numFrames = LongObj  .read(in, access)
+        val shape     = CurveObj .read(in, access)
+        val floor     = DoubleObj.read(in, access)
+        new Apply(targets, numFrames, shape, floor)
+      }
 
-    private final class Impl[S <: Sys[S]](protected val targets: Targets[S],
-                                              val numFrames: _Expr[S, Long],
-                                              val shape: _Expr[S, Curve],
-                                              val floor: _Expr[S, Double])
+      def name: String = "Apply"
+
+      val opHi: Int = 0
+      val opLo: Int = 0
+    }
+    private final class Apply[S <: Sys[S]](protected val targets: Targets[S],
+                                              val numFrames: LongObj[S],
+                                              val shape: CurveObj[S],
+                                              val floor: DoubleObj[S])
       extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Obj[S] {
 
       def tpe: stm.Obj.Type = FadeSpec

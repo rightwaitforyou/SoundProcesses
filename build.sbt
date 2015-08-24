@@ -58,19 +58,6 @@ lazy val root = Project(id = baseNameL, base = file("."))
     autoScalaLibrary := false
   )
 
-//lazy val expr = Project(id = "lucresynth-expr", base = file("synth-expr"))
-//  .settings(commonSettings)
-//  .settings(
-//    description := "Bitemporal expression types for SoundProcesses",
-//    libraryDependencies ++= Seq(
-//      "de.sciss"      %% "scalacollider"   % scalaColliderVersion,
-//      "de.sciss"      %% "lucre-expr"      % lucreVersion,
-//      "de.sciss"      %% s"lucre-$bdb"     % lucreVersion          % "test",
-//      "org.scalatest" %% "scalatest"       % scalaTestVersion      % "test",
-//      "de.sciss"      %% "lucre-confluent" % lucreVersion          % "test"
-//    )
-//  )
-
 lazy val synth = Project(id = "lucresynth", base = file("synth"))
   .settings(commonSettings)
   .settings(

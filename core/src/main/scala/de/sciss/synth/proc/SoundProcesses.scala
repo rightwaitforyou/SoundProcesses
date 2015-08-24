@@ -61,4 +61,21 @@ object SoundProcesses {
     log("Shutting down scheduler thread pool")
     scheduledExecutorService.shutdown()
   }
+
+  private[this] lazy val _init: Unit = {
+    de.sciss.lucre.expr.init()
+    Action  .init()
+    Code    .init()
+    CurveObj.init()
+    Ensemble.init()
+    FadeSpec.init()
+    // Folder  .init()
+    Grapheme.init()
+    Proc    .init()
+    Scan    .init()
+    Timeline.init()
+  }
+
+  /** Registers all known types. */
+  def init(): Unit = _init
 }

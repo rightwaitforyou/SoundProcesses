@@ -15,14 +15,14 @@ package de.sciss.synth.proc
 
 import java.util
 
-import de.sciss.lucre.event.Targets
+import de.sciss.lucre.event.{Event, Dummy, EventLike, Targets}
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm.{Obj, Sys}
-import de.sciss.lucre.{event => evt, expr}
-import de.sciss.model
+import de.sciss.lucre.expr
+import de.sciss.model.Change
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.ugen.{Constant, ControlProxyLike}
-import de.sciss.synth.{proc, Lazy, MaybeRate, SynthGraph}
+import de.sciss.synth.{Lazy, MaybeRate, SynthGraph, proc}
 
 import scala.annotation.switch
 import scala.util.control.NonFatal
@@ -257,25 +257,25 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
   //    map.synchronized(map += (key, graph))
 
   // private final val oldTapeCookie = 1
-  private final val emptyCookie   = 2
-  private final val tapeCookie    = 3
+  private final val emptyCookie   = 4
+  private final val tapeCookie    = 5
 
   // def valueSerializer: ImmutableSerializer[SynthGraph] = ValueSerializer
 
 //  def readValue (                   in : DataInput ): SynthGraph  = ValueSerializer.read (       in )
 //  def writeValue(value: SynthGraph, out: DataOutput): Unit        = ValueSerializer.write(value, out)
 
-//  // XXX TODO: not cool. Should use `1` to `3` for cookies
-//  override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-//                                      (implicit tx: S#Tx): Ex[S] with evt.Node[S] =
-//    cookie match {
-//      case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` => ... // RRR new Predefined(targets, cookie)
-//
-//      //      case `mapCookie`  =>
-//      //        val key     = in.readUTF()
-//      //        val graph   = map.synchronized(map(key))
-//      //        new MapImpl(key, graph)
-//    }
+  override protected def readCookie[S <: Sys[S]](in: DataInput, access: S#Acc, cookie: Byte)(implicit tx: S#Tx): Ex[S] =
+    cookie match {
+      case /* `oldTapeCookie` | */ `emptyCookie` | `tapeCookie` =>
+        val id = tx.readID(in, access)
+        new Predefined(id, cookie)
+      case _ => super.readCookie(in, access, cookie)
+      //      case `mapCookie`  =>
+      //        val key     = in.readUTF()
+      //        val graph   = map.synchronized(map(key))
+      //        new MapImpl(key, graph)
+    }
 
   // private final class MapImpl[S <: Sys[S]]
 
@@ -313,13 +313,24 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
     new Predefined(id, cookie)
   }
 
-  // XXX TODO -- we should allow other constant values in Type. now we have a wasted evt.Targets...
   private final class Predefined[S <: Sys[S]](val id: S#ID, cookie: Int)
-    extends expr.impl.ConstImpl[S, SynthGraph] with SynthGraphObj[S] {
+    extends SynthGraphObj[S] with Expr.Const[S, SynthGraph] {
+
+    def event(slot: Int): Event[S, Any] = throw new UnsupportedOperationException
 
     def tpe: Obj.Type = SynthGraphObj
 
-    protected def writeData(out: DataOutput): Unit = out.writeByte(cookie)
+    def write(out: DataOutput): Unit = {
+      out.writeInt(tpe.typeID)
+      out.writeByte(cookie)
+      id.write(out)
+    }
+
+    def value(implicit tx: S#Tx): SynthGraph = constValue
+
+    def changed: EventLike[S, Change[SynthGraph]] = Dummy[S, Change[SynthGraph]]
+
+    def dispose()(implicit tx: S#Tx) = ()
 
     def constValue: SynthGraph = cookie match {
       // case `oldTapeCookie`  => oldTapeSynthGraph

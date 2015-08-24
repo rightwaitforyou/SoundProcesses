@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.Artifact
-import de.sciss.lucre.expr.{IntObj, BooleanObj, DoubleObj, Expr}
+import de.sciss.lucre.expr.{DoubleVector, IntObj, BooleanObj, DoubleObj, Expr}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Obj, Disposable}
 import de.sciss.lucre.synth.{Buffer, BusNodeSetter, AudioBus, Bus, NodeRef, Sys}
@@ -514,7 +514,7 @@ object AuralProcDataImpl {
       case i: UGB.Input.Buffer =>
         val procObj = procCached()
         val (numFr, numCh) = procObj.attrGet(i.name).fold((-1L, -1)) {
-          case a: Expr[S, Vec[Double]] =>
+          case a: DoubleVector[S] =>
             val v = a.value   // XXX TODO: would be better to write a.peer.size.value
             (v.size.toLong, 1)
           case a: Grapheme.Expr.Audio[S] =>
@@ -556,7 +556,7 @@ object AuralProcDataImpl {
     private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
       val procObj = procCached()
       procObj.attrGet(key).fold(-1) {
-        case a: Expr[S, Vec[Double]]    => a.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: DoubleVector[S] => a.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: Grapheme.Expr.Audio [S] =>
           // a.spec.numChannels
           a.value.spec.numChannels
@@ -624,7 +624,7 @@ object AuralProcDataImpl {
           chanCheck(values.size)
           b.addControl(ctlName -> values)
 
-        case a: Expr[S, Vec[Double]] =>
+        case a: DoubleVector[S] =>
           val values = a.value.map(_.toFloat)
           chanCheck(values.size)
           b.addControl(ctlName -> values)
