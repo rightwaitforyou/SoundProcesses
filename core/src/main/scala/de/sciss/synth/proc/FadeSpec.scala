@@ -57,9 +57,11 @@ object FadeSpec {
 
     import FadeSpec.{Obj => Repr}
 
+    private[this] lazy val _init: Unit = registerExtension(Apply)
+
     override def init(): Unit = {
       super.init()
-      registerExtension(Apply)
+      _init
     }
 
     protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =

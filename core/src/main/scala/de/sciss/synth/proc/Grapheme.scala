@@ -20,7 +20,7 @@ import java.io.File
 import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.event.{Publisher, Targets}
-import de.sciss.lucre.expr.{Expr => _Expr, DoubleObj, LongObj}
+import de.sciss.lucre.expr.{Expr => _Expr, Type, DoubleObj, LongObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.lucre.{event => evt, expr}
@@ -49,6 +49,11 @@ object Grapheme extends Obj.Type {
   private final val curveCookie = 1
   private final val audioCookie = 2
 
+  override def init(): Unit = {
+    super.init()
+    Expr .init()
+  }
+
   object Value {
     // implicit val biType: ExprType1[Value] = Expr
 
@@ -72,7 +77,7 @@ object Grapheme extends Obj.Type {
         def write(v: Curve, out: DataOutput): Unit = v.write(out)
         def read(in: DataInput): Curve = {
           val cookie = in.readByte()
-          require(cookie == `curveCookie`, s"Unexpected cookie $cookie")
+          if (cookie != curveCookie) sys.error(s"Unexpected cookie $cookie")
           readIdentified(in)
         }
       }
@@ -110,7 +115,7 @@ object Grapheme extends Obj.Type {
         def write(v: Audio, out: DataOutput): Unit = v.write(out)
         def read(in: DataInput): Audio = {
           val cookie = in.readByte()
-          require(cookie == `audioCookie`, s"Unexpected cookie $cookie")
+          if (cookie != audioCookie) sys.error(s"Unexpected cookie $cookie")
           readIdentified(in)
         }
       }
@@ -180,6 +185,12 @@ object Grapheme extends Obj.Type {
   object Expr extends expr.impl.ExprTypeImpl[Value, Expr] {
     final val typeID = 11
 
+    override def init(): Unit = {
+      super.init()
+      Curve.init()
+      Audio.init()
+    }
+
     protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
       new _Const[S](id, value)
 
@@ -193,9 +204,19 @@ object Grapheme extends Obj.Type {
       extends VarImpl[S] with Expr[S]
 
     object Curve extends expr.impl.ExprTypeImpl[Value.Curve, Expr.Curve] {
+      // final val typeID = 11
       final val typeID = 12
 
       import Expr.{Curve => Repr}
+
+      // override def init(): Unit = ()  // prevent double registration
+
+      private[this] lazy val _init: Unit = registerExtension(ApplyCurve)
+
+      override def init(): Unit = {
+        super.init()
+        _init
+      }
 
       protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
         new _Const[S](id, value)
@@ -211,12 +232,12 @@ object Grapheme extends Obj.Type {
 
       def apply[S <: Sys[S]](values: (DoubleObj[S], synth.Curve)*)(implicit tx: S#Tx): Curve[S] = {
         val targets = evt.Targets[S]
-        new CurveImpl(targets, values.toIndexedSeq).connect()
+        new ApplyCurve(targets, values.toIndexedSeq).connect()
       }
 
       def unapplySeq[S <: Sys[S]](expr: Expr[S]): Option[Seq[(DoubleObj[S], synth.Curve)]] = {
-        if (expr.isInstanceOf[CurveImpl[_]]) {
-          val c = expr.asInstanceOf[CurveImpl[S]]
+        if (expr.isInstanceOf[ApplyCurve[_]]) {
+          val c = expr.asInstanceOf[ApplyCurve[S]]
           Some(c.values)
         } else {
           None
@@ -233,24 +254,23 @@ object Grapheme extends Obj.Type {
 //        if (cookie != curveCookie) sys.error(s"Unexpected cookie $cookie")
 //        readIdentifiedTuple(in, access, targets)
 //      }
-
-      private[Grapheme] def readIdentifiedTuple[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                                            (implicit tx: S#Tx): Curve[S] with evt.Node[S] = {
-        val sz      = in.readInt()
-        val values  = Vector.fill(sz) {
-          val mag   = DoubleObj.read(in, access)
-          val shape = synth.Curve.serializer.read(in)
-          (mag, shape)
-        }
-        new CurveImpl(targets, values)
-      }
     }
     sealed trait Curve[S <: Sys[S]] extends Expr[S] with _Expr[S, Value.Curve]
 
     object Audio extends expr.impl.ExprTypeImpl[Value.Audio, Expr.Audio] {
+      // final val typeID = 11
       final val typeID = 13
 
       import Expr.{Audio => Repr}
+
+      // override def init(): Unit = ()  // prevent double registration
+
+      private[this] lazy val _init: Unit = registerExtension(ApplyAudio)
+
+      override def init(): Unit = {
+        super.init()
+        _init
+      }
 
       protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
         new _Const[S](id, value)
@@ -267,12 +287,12 @@ object Grapheme extends Obj.Type {
       def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: LongObj[S], gain: DoubleObj[S])
                                 (implicit tx: S#Tx): Audio[S] = {
         val targets = evt.Targets[S]
-        new AudioImpl(targets, artifact, spec, offset, gain).connect()
+        new ApplyAudio(targets, artifact, spec, offset, gain).connect()
       }
 
       def unapply[S <: Sys[S]](expr: Expr[S]): Option[(Artifact[S], AudioFileSpec, LongObj[S], DoubleObj[S])] = {
-        if (expr.isInstanceOf[AudioImpl[_]]) {
-          val a = expr.asInstanceOf[AudioImpl[S]]
+        if (expr.isInstanceOf[ApplyAudio[_]]) {
+          val a = expr.asInstanceOf[ApplyAudio[S]]
           Some((a.artifact, a.spec, a.offset, a.gain))
         } else {
           None
@@ -289,15 +309,6 @@ object Grapheme extends Obj.Type {
 //        require(cookie == audioCookie, s"Unexpected cookie $cookie")
 //        readIdentifiedTuple(in, access, targets)
 //      }
-
-      private[Grapheme] def readIdentifiedTuple[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                                                             (implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
-        val artifact  = Artifact .read(in, access)
-        val spec      = AudioFileSpec.Serializer.read(in)
-        val offset    = LongObj  .read(in, access)
-        val gain      = DoubleObj.read(in, access)
-        new AudioImpl(targets, artifact, spec, offset, gain)
-      }
     }
     sealed trait Audio[S <: Sys[S]] extends Expr[S] with _Expr[S, Value.Audio] {
 //      def artifact: Artifact[S]
@@ -306,8 +317,25 @@ object Grapheme extends Obj.Type {
 //      def spec    : AudioFileSpec
     }
 
-    private final class CurveImpl[S <: Sys[S]](protected val targets: evt.Targets[S],
-                                                   val values: Vec[(DoubleObj[S], synth.Curve)])
+    private object ApplyCurve extends Type.Extension1[Curve] {
+      def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                    (implicit tx: S#Tx): Curve[S] = {
+        val sz      = in.readInt()
+        val values  = Vector.fill(sz) {
+          val mag   = DoubleObj.read(in, access)
+          val shape = synth.Curve.serializer.read(in)
+          (mag, shape)
+        }
+        new ApplyCurve(targets, values)
+      }
+
+      def name: String = "ApplyCurve"
+
+      val opHi = curveCookie
+      val opLo = curveCookie
+    }
+    private final class ApplyCurve[S <: Sys[S]](protected val targets: evt.Targets[S],
+                                                val values: Vec[(DoubleObj[S], synth.Curve)])
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
 
       def tpe: Obj.Type = Curve
@@ -361,7 +389,8 @@ object Grapheme extends Obj.Type {
       }
 
       protected def writeData(out: DataOutput): Unit = {
-        out.writeByte(curveCookie)
+        out.writeByte(1)  // 'node not var'
+        out.writeInt(curveCookie) // op-id
         val sz = values.size
         out.writeInt(sz)
         values.foreach { tup =>
@@ -375,7 +404,22 @@ object Grapheme extends Obj.Type {
       override def toString: String = s"Elem.Curve$id"
     }
 
-    private final class AudioImpl[S <: Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
+    private object ApplyAudio extends Type.Extension1[Audio] {
+      def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+                                    (implicit tx: S#Tx): Audio[S] = {
+        val artifact  = Artifact .read(in, access)
+        val spec      = AudioFileSpec.Serializer.read(in)
+        val offset    = LongObj  .read(in, access)
+        val gain      = DoubleObj.read(in, access)
+        new ApplyAudio(targets, artifact, spec, offset, gain)
+      }
+
+      def name: String = "ApplyAudio"
+
+      val opHi = audioCookie
+      val opLo = audioCookie
+    }
+    private final class ApplyAudio[S <: Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
                                                    val spec: AudioFileSpec, val offset: LongObj[S],
                                                    val gain: DoubleObj[S])
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
@@ -432,7 +476,8 @@ object Grapheme extends Obj.Type {
       }
 
       protected def writeData(out: DataOutput): Unit = {
-        out.writeByte(audioCookie)
+        out.writeByte(1)  // 'node not var'
+        out.writeInt(audioCookie) // op-id
         artifact.write(out)
         AudioFileSpec.Serializer.write(spec, out)
         offset.write(out)
