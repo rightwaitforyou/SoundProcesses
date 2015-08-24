@@ -16,24 +16,23 @@ package de.sciss.synth.proc
 import java.util.concurrent.TimeUnit
 
 import de.sciss.desktop.impl.UndoManagerImpl
-import de.sciss.lucre.expr.{BooleanObj, IntObj, Expr}
+import de.sciss.lucre.expr.{BooleanObj, IntObj}
 import de.sciss.lucre.stm.Obj
-import de.sciss.lucre.{expr, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.swing.{IntSpinnerView, defer, deferTx}
 import de.sciss.lucre.synth.Server
 import de.sciss.lucre.synth.impl.ServerImpl
+import de.sciss.lucre.{expr, stm}
 import de.sciss.synth.proc.Implicits._
 import de.sciss.synth.proc.SoundProcesses.atomic
+import de.sciss.synth.proc.TransitoryAPI._
 import de.sciss.synth.swing.NodeTreePanel
 import de.sciss.synth.swing.j.JServerStatusPanel
 import de.sciss.synth.{GE, SynthGraph, proc}
-import de.sciss.{lucre, osc, synth}
+import de.sciss.{osc, synth}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.duration.Duration
-
-import TransitoryAPI._
 
 object AutomaticVoices {
   val DumpOSC         = false

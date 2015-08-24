@@ -39,9 +39,7 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
     as.whenStarted(s => initView(as, s))
     as.start()
   }
-
-  import expr.Ops._
-
+  
   def initView(as: AuralSystem, s: Server): Unit = {
     if (Txn.findCurrent.isDefined) {
       Console.err.println("Damn! I could swear there is no transaction.")

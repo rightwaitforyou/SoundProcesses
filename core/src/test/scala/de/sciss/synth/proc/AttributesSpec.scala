@@ -1,16 +1,12 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.artifact.ArtifactLocation
-import de.sciss.lucre.expr
-import de.sciss.lucre.expr.{StringObj, DoubleObj, LongObj, BooleanObj, IntObj, Expr}
 import de.sciss.ConfluentEventSpec
-import de.sciss.lucre
-import de.sciss.synth.Curve
-import scala.collection.immutable.{IndexedSeq => Vec}
 import de.sciss.file._
+import de.sciss.lucre.artifact.ArtifactLocation
+import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, LongObj, StringObj}
+import de.sciss.synth.Curve
 import de.sciss.synth.io.AudioFileSpec
-
-import TransitoryAPI._
+import de.sciss.synth.proc.TransitoryAPI._
 
 /*
   To run only this suite:

@@ -15,23 +15,21 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
-import de.sciss.lucre.expr.{StringObj, Expr}
+import de.sciss.lucre.expr.StringObj
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AuralNode, AudioBus, AudioBusNodeSetter, BusNodeSetter, Buffer, Synth, Sys}
+import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Scan.Link
-import de.sciss.synth.{proc, ControlSet}
-import de.sciss.synth.proc.{logAural => logA}
-import proc.{UGenGraphBuilder => UGB}
-import Timeline.SampleRate
+import de.sciss.synth.proc.Timeline.SampleRate
+import de.sciss.synth.proc.TransitoryAPI._
+import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
+import de.sciss.synth.{ControlSet, proc}
 
 import scala.concurrent.Future
 import scala.concurrent.stm.Ref
-
-import TransitoryAPI._
 
 object AuralProcImpl {
   def apply[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
@@ -76,8 +74,8 @@ object AuralProcImpl {
   class Impl[S <: Sys[S]](implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
-    import context.server
     import context.scheduler.cursor
+    import context.server
 
     /* The ongoing build aural node build process, as stored in `playingRef`. */
     private sealed trait PlayingRef extends Disposable[S#Tx]

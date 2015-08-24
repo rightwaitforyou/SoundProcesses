@@ -2,21 +2,19 @@ package de.sciss.synth.proc
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.ArtifactLocation
+import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
-import de.sciss.lucre.{expr, bitemp, stm}
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.expr.{DoubleObj, BooleanObj, IntObj, SpanLikeObj, Expr}
-import de.sciss.lucre.synth.{Sys, Server}
+import de.sciss.lucre.synth.{Server, Sys}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
-import de.sciss.synth.Curve.{exponential, linear}
-import de.sciss.synth.io.{AudioFileType, AudioFile}
-import WorkspaceHandle.Implicits._
+import de.sciss.synth.io.{AudioFile, AudioFileType}
+import de.sciss.synth.proc.TransitoryAPI._
+import de.sciss.synth.proc.WorkspaceHandle.Implicits._
 
 import scala.concurrent.stm.Txn
 import scala.language.implicitConversions
-
-import TransitoryAPI._
 
 object NewAuralTest extends App {
   val confluent = true   // currently test4 has a problem with event-variables in confluent
@@ -42,8 +40,6 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   showAuralLog      = true
   showTransportLog  = true
   // de.sciss.lucre.synth.showLog = true
-
-  import expr.Ops._
 
   val as = AuralSystem()
   cursor.step { implicit tx =>
@@ -625,7 +621,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         Out.ar(0, sig)
       }
 
-      import de.sciss.synth._
+//      import de.sciss.synth._
 //      val imp = ExprImplicits[S]
 //      import imp._
       // import ExprImplicits._

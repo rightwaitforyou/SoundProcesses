@@ -2,8 +2,7 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.lucre.expr
-import de.sciss.lucre.expr.{DoubleObj, LongObj, Expr}
+import de.sciss.lucre.expr.{DoubleObj, LongObj}
 import de.sciss.synth.Curve.linear
 
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -15,8 +14,6 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 
  */
 class ScanSpec extends ConfluentEventSpec {
-
-  import expr.Ops._
 
   // lucre.event    .showLog = true
   // lucre.confluent.showLog = true
