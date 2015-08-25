@@ -165,12 +165,9 @@ object ProcImpl {
       // final val slot = 4
 
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
-        // val graphOpt = if (graphemes .isSource(pull)) graphemes .pullUpdate(pull) else None
         val graphCh     = graph.changed
-        val graphOpt    = if (pull.contains(graphCh   )) pull(graphCh   ) else None
-//        val scanInsOpt  = if (pull.contains(inputs    )) pull(inputs    ) else None
-//        val scanOutsOpt = if (pull.contains(outputs   )) pull(outputs   ) else None
-        val stateOpt    = if (pull.isOrigin(this      )) pull(this      ) else None
+        val graphOpt    = if (pull.contains(graphCh)) pull(graphCh) else None
+        val stateOpt    = if (pull.isOrigin(this)) Some(pull.resolve[Proc.Update[S]]) else None
 
         val seq0 = graphOpt.fold(Vec.empty[Change[S]]) { u =>
           Vector(GraphChange(u))

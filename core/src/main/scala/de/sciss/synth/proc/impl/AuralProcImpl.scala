@@ -24,7 +24,6 @@ import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.Timeline.SampleRate
-import de.sciss.synth.proc.TransitoryAPI._
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 import de.sciss.synth.{ControlSet, proc}
 
@@ -283,7 +282,7 @@ object AuralProcImpl {
     protected def buildAsyncAttrInput(b: AsyncProcBuilder[S], key: String, value: UGB.Value)
                                      (implicit tx: S#Tx): Unit = value match {
       case UGB.Input.Buffer.Value(numFr, numCh, true) =>   // ----------------------- random access buffer
-        b.obj.attrGet(key).fold[Unit] {
+        b.obj.attr.get(key).fold[Unit] {
           sys.error(s"Missing attribute $key for buffer content")
         } {
           case a: Grapheme.Expr.Audio[S] =>
@@ -360,7 +359,7 @@ object AuralProcImpl {
       val ug            = ugen.result
       implicit val itx  = tx.peer
 
-      val nameHint      = p.attr[StringObj](ObjKeys.attrName).map(_.value)
+      val nameHint      = p.attr.$[StringObj](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
       val builder       = new SynthBuilder(p, synth, timeRef)

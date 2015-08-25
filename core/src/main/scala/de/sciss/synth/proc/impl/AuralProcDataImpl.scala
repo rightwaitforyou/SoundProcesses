@@ -35,8 +35,6 @@ import de.sciss.synth.{ControlSet, SynthGraph}
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
 
-import TransitoryAPI._
-
 object AuralProcDataImpl {
   def apply[S <: Sys[S]](proc: Proc[S])
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralObj.ProcData[S] =
@@ -89,9 +87,9 @@ object AuralProcDataImpl {
           case Proc.OutputChange (key, scan, sCh)     => // nada
         }
       }
-      attrObserver = proc.attrChanged.react { implicit tx => upd => upd.changes.foreach {
-        case AttrAdded  (key, value)          => attrAdded  (key, value)
-        case AttrRemoved(key, value)          => attrRemoved(key, value)
+      attrObserver = proc.attr.changed.react { implicit tx => upd => upd.changes.foreach {
+        case Obj.AttrAdded  (key, value)          => attrAdded  (key, value)
+        case Obj.AttrRemoved(key, value)          => attrRemoved(key, value)
 // ELEM
 //        case AttrChange (key, value, aCh)     => attrChange (key, value, aCh)
       }}
@@ -188,7 +186,7 @@ object AuralProcDataImpl {
       } attrNodeUnset1(n, key)
     }
 
-    private def attrChange(key: String, value: Obj[S], changes: Vec[AttrUpdate[S]])(implicit tx: S#Tx): Unit = {
+    private def attrChange(key: String, value: Obj[S], changes: Vec[Obj.AttrUpdate[S]])(implicit tx: S#Tx): Unit = {
       logA(s"AttrChange in   ${procCached()} ($key)")
 // ELEM
 //      // currently, instead of processing the changes
@@ -513,7 +511,7 @@ object AuralProcDataImpl {
 
       case i: UGB.Input.Buffer =>
         val procObj = procCached()
-        val (numFr, numCh) = procObj.attrGet(i.name).fold((-1L, -1)) {
+        val (numFr, numCh) = procObj.attr.get(i.name).fold((-1L, -1)) {
           case a: DoubleVector[S] =>
             val v = a.value   // XXX TODO: would be better to write a.peer.size.value
             (v.size.toLong, 1)
@@ -555,7 +553,7 @@ object AuralProcDataImpl {
 
     private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
       val procObj = procCached()
-      procObj.attrGet(key).fold(-1) {
+      procObj.attr.get(key).fold(-1) {
         case a: DoubleVector[S] => a.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: Grapheme.Expr.Audio [S] =>
           // a.spec.numChannels
@@ -667,7 +665,7 @@ object AuralProcDataImpl {
                       (implicit tx: S#Tx): Unit = {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
-          b.obj.attrGet(key).foreach { a =>
+          b.obj.attr.get(key).foreach { a =>
             buildAttrValueInput(b, key, a, numChannels = numChannels)
           }
 
@@ -686,7 +684,7 @@ object AuralProcDataImpl {
               val bestSzLo  = bestSzHi >> 1
               if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
             }
-            val (rb, gain) = b.obj.attrGet(key).fold[(Buffer, Float)] {
+            val (rb, gain) = b.obj.attr.get(key).fold[(Buffer, Float)] {
               // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
               // So instead of aborting when the attribute is not set, fall back to zero
               val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
@@ -734,11 +732,10 @@ object AuralProcDataImpl {
           }
 
         case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
-          val rb = b.obj.attrGet(key).fold[Buffer] {
+          val rb = b.obj.attr.get(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for buffer content")
           } {
             case a: Grapheme.Expr.Audio[S] =>
-              val audioElem = a
               val audioVal  = a.value
 //              val spec      = audioElem.spec
 //              val path      = audioElem.artifact.value.getAbsolutePath
@@ -767,7 +764,7 @@ object AuralProcDataImpl {
           b.addUser(resp)
 
         case UGB.Input.DiskOut.Value(numCh) =>
-          val rb = b.obj.attrGet(key).fold[Buffer] {
+          val rb = b.obj.attr.get(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for disk-out artifact")
           } {
             case a: Artifact[S] =>

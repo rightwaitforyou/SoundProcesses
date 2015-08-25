@@ -11,8 +11,6 @@ import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.concurrent.stm.Txn
 
-import TransitoryAPI._
-
 object ActionGraphTest extends App {
   val confluent = true   // currently test4 has a problem with event-variables in confluent
 
@@ -83,8 +81,8 @@ class ActionGraphTest[S <: Sys[S]]()(implicit cursor: stm.Cursor[S]) {
 
       val obj = p // Obj(Proc.Elem(p))
       val actionObj = actionH() // Obj(Action.Elem(actionH()))
-      actionObj.attrPut[StringObj]("name", /* Obj(StringElem( */ "Baba Ganoush" /* )) */)
-      obj.attrPut("foo", actionObj)
+      actionObj.attr.put("name", "Baba Ganoush": StringObj[S])
+      obj.attr.put("foo", actionObj)
 
       import WorkspaceHandle.Implicits._
       val t = Transport[S](as)

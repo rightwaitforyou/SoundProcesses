@@ -15,11 +15,11 @@ package de.sciss.synth
 package proc
 package impl
 
-import de.sciss.lucre.event.{impl => evti, Targets}
+import de.sciss.lucre.event.{Targets, impl => evti}
 import de.sciss.lucre.expr.List
 import de.sciss.lucre.stm.impl.{ElemSerializer, ObjSerializer}
 import de.sciss.lucre.stm.{Elem, NoSys, Obj, Sys}
-import de.sciss.lucre.{data, event => evt}
+import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 import scala.annotation.switch
@@ -38,9 +38,8 @@ object ScanImpl {
     new Impl(targets, list)
   }
 
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = {
+  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] =
     serializer[S].read(in, access)
-  }
 
   def serializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Scan[S]] = anySer.asInstanceOf[Ser[S]]
 
@@ -68,7 +67,9 @@ object ScanImpl {
     def tpe: Elem.Type = Link
   }
 
-  def readIdentifiedLink[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Link[S] =
+  def readIdentifiedLink[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Link[S] = {
+    val constCookie = in.readByte()
+    if (constCookie != 3) sys.error(s"Unexpected cookie, found $constCookie, expected 3")
     (in.readByte(): @switch) match {
       case 0 =>
         val peer = Grapheme.read[S](in, access)
@@ -78,6 +79,7 @@ object ScanImpl {
         Link.Scan(peer)
       case cookie => sys.error(s"Unexpected cookie $cookie")
     }
+  }
 
   private final class Impl[S <: Sys[S]](protected val targets : evt.Targets[S],
                                         protected val list    : List.Modifiable[S, Link[S]])

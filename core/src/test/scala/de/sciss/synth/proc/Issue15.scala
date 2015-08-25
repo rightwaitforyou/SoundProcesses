@@ -2,15 +2,10 @@ package de.sciss
 package synth
 package proc
 
-import de.sciss.lucre.bitemp.BiGroup
+import de.sciss.lucre.expr.{BooleanObj, SpanLikeObj}
+import de.sciss.lucre.stm.{Disposable, Identifier}
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.expr.{BooleanObj, SpanLikeObj, Expr}
-import de.sciss.lucre.stm.{Identifier, Disposable}
-import de.sciss.span.{SpanLike, Span}
-
-import scala.collection.immutable.{IndexedSeq => Vec}
-
-import TransitoryAPI._
+import de.sciss.span.Span
 
 /*
   To run only this suite:
@@ -86,7 +81,7 @@ class Issue15 extends ConfluentEventSpec {
         val tl      = tlH()
         val muteObj = BooleanObj.newConst[S](true) : BooleanObj[S]
         // val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
-        pObj.attrPut(ObjKeys.attrMute, muteObj)
+        pObj.attr.put(ObjKeys.attrMute, muteObj)
         obs.assertEquals()
 //        BiGroup.Update(tl, Vec(
 //          BiGroup.ElementMutated(timed, Obj.UpdateT(pObj, Vec(
@@ -107,7 +102,7 @@ class Issue15 extends ConfluentEventSpec {
         val tl      = tlH()
         val muteObj = muteH()
         // val timed   = BiGroup.Entry(timedIDH(), spanH(), pObj)
-        pObj.attrRemove(ObjKeys.attrMute)
+        pObj.attr.remove(ObjKeys.attrMute)
         obs.assertEquals()
 //        BiGroup.Update(tl, Vec(
 //          BiGroup.ElementMutated(timed, Obj.UpdateT(pObj, Vec(

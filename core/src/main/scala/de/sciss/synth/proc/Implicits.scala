@@ -13,12 +13,8 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.{expr, data}
-import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.expr.{StringObj, BooleanObj}
+import de.sciss.lucre.expr.{BooleanObj, Expr, StringObj}
 import de.sciss.lucre.stm.{Obj, Sys}
-
-import TransitoryAPI._
 
 object Implicits {
 //  implicit class ExprAsVar[S <: Sys[S], A, Repr <: Expr[S, A]](val `this`: Repr) extends AnyVal { me =>
@@ -176,31 +172,33 @@ object Implicits {
       * If their is no value found, a dummy string `"&lt;unnamed&gt;"` is returned.
       */
     def name(implicit tx: S#Tx): String =
-      obj.attr[StringObj](ObjKeys.attrName).fold("<unnamed>")(_.value)
+      obj.attr.$[StringObj](ObjKeys.attrName).fold("<unnamed>")(_.value)
 
     /** Short cut for updating the attribute `"name"`. */
     def name_=(value: String)(implicit tx: S#Tx): Unit = {
-      val valueC = StringObj.newConst[S](value)
-      obj.attr[StringObj](ObjKeys.attrName) match {
+      val valueC  = StringObj.newConst[S](value)
+      val attr    = obj.attr
+      attr.$[StringObj](ObjKeys.attrName) match {
         case Some(StringObj.Var(vr)) => vr() = valueC
         case _                  =>
           val valueVr = StringObj.newVar(valueC)
-          obj.attrPut(ObjKeys.attrName, valueVr)
+          attr.put(ObjKeys.attrName, valueVr)
       }
     }
 
     /** Short cut for accessing the attribute `"mute"`. */
     def muted(implicit tx: S#Tx): Boolean =
-      obj.attr[BooleanObj](ObjKeys.attrMute).exists(_.value)
+      obj.attr.$[BooleanObj](ObjKeys.attrMute).exists(_.value)
 
     /** Short cut for updating the attribute `"mute"`. */
     def muted_=(value: Boolean)(implicit tx: S#Tx): Unit = {
-      val valueC = BooleanObj.newConst[S](value)
-      obj.attr[BooleanObj](ObjKeys.attrMute) match {
+      val valueC  = BooleanObj.newConst[S](value)
+      val attr    = obj.attr
+      attr.$[BooleanObj](ObjKeys.attrMute) match {
         case Some(BooleanObj.Var(vr)) => vr() = valueC
         case _                  =>
           val valueVr = BooleanObj.newVar(valueC)
-          obj.attrPut(ObjKeys.attrMute, valueVr)
+          attr.put(ObjKeys.attrMute, valueVr)
       }
     }
   }

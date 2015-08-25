@@ -25,7 +25,6 @@ import de.sciss.lucre.synth.impl.ServerImpl
 import de.sciss.lucre.{expr, stm}
 import de.sciss.synth.proc.Implicits._
 import de.sciss.synth.proc.SoundProcesses.atomic
-import de.sciss.synth.proc.TransitoryAPI._
 import de.sciss.synth.swing.NodeTreePanel
 import de.sciss.synth.swing.j.JServerStatusPanel
 import de.sciss.synth.{GE, SynthGraph, proc}
@@ -604,8 +603,8 @@ object AutomaticVoices {
     val gen       = Proc[S]
     gen.graph()   = genGraph
     val genObj    = gen // Obj(Proc.Elem(gen))
-    val liObj     = li // Obj(IntElem(li))
-    genObj.attrPut[IntObj]("li", liObj)
+    val liObj     = li: IntObj[S]
+    genObj.attr.put("li", liObj)
     genObj.name = s"gen$li"
     lFolder.addLast(genObj)
 
@@ -667,7 +666,7 @@ object AutomaticVoices {
       val procB     = Proc[S]   // transition bypass/engage per channel
       procB.graph() = switchGraph
       val procBObj  = procB // Obj(Proc.Elem(procB))
-      procBObj.attrPut("state", stateObj)
+      procBObj.attr.put("state", stateObj)
       procBObj.name = s"by$li$si"
       val bPlaying  = state <  2
       val bFolder   = Folder[S]
@@ -686,7 +685,7 @@ object AutomaticVoices {
       val active    = state > 0
 
       val doneObj   = done // Obj(Action.Elem(done))
-      doneObj.attrPut("state", stateObj)
+      doneObj.attr.put("state", stateObj)
 
       new Channel(stateObj = stateObj, state = state, fPlaying = fPlaying, active = active,
         predOut = predOut, succOut = succOut, collIn = collIn, doneObj = doneObj)
@@ -737,8 +736,9 @@ object AutomaticVoices {
 
         val procTObj  = procT // Obj(Proc.Elem(procT))
         procTObj.name = s"t$gi$si"
-        procTObj.attrPut("state", channel.stateObj)
-        procTObj.attrPut("done" , channel.doneObj )
+        val procAttr = procTObj.attr
+        procAttr.put("state", channel.stateObj)
+        procAttr.put("done" , channel.doneObj )
 
         fFolder.addLast(procTObj)
       }
