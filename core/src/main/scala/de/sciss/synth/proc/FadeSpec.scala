@@ -16,9 +16,9 @@ package synth
 package proc
 
 import de.sciss.lucre.event.{Pull, Targets}
-import de.sciss.lucre.expr.{Expr => _Expr, DoubleObj, LongObj, Type}
-import de.sciss.lucre.stm.{Obj, Sys}
-import de.sciss.lucre.{stm, expr}
+import de.sciss.lucre.expr.{DoubleObj, Expr => _Expr, LongObj, Type}
+import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.{expr, stm}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.Curve.linear
 import de.sciss.{model => m}
@@ -44,7 +44,7 @@ object FadeSpec {
 
     def read(in: DataInput): FadeSpec = {
       val cookie = in.readShort()
-      require(cookie == COOKIE, s"Unexpected cookie $cookie, expected $COOKIE")
+      if (cookie != COOKIE) sys.error(s"Unexpected cookie $cookie, expected $COOKIE")
       val numFrames = in.readLong()
       val curve     = Curve.serializer.read(in)
       val floor     = in.readFloat()
@@ -76,19 +76,10 @@ object FadeSpec {
     private[this] final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
       extends VarImpl[S] with Repr[S]
 
-    // 0 reserved for variables
-    private final val elemCookie = 1
-
-    //    def longType    : BiType[Long    ] = Longs
-    //    def spanLikeType: BiType[SpanLike] = SpanLikes
-
     def valueSerializer: ImmutableSerializer[FadeSpec] = FadeSpec.serializer
 
-//    def readValue (                 in : DataInput ): FadeSpec  = FadeSpec.serializer.read (       in )
-//    def writeValue(value: FadeSpec, out: DataOutput): Unit      = FadeSpec.serializer.write(value, out)
-
     def apply[S <: Sys[S]](numFrames: LongObj[S], shape: CurveObj[S], floor: DoubleObj[S])
-                              (implicit tx: S#Tx): Obj[S] = {
+                          (implicit tx: S#Tx): Obj[S] = {
       val targets = Targets[S]
       new Apply(targets, numFrames, shape, floor).connect()
     }
@@ -100,6 +91,8 @@ object FadeSpec {
       }
 
     private object Apply extends Type.Extension1[Obj] {
+      final val opID = 0
+
       def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                     (implicit tx: S#Tx): Obj[S] = {
         val numFrames = LongObj  .read(in, access)
@@ -110,13 +103,13 @@ object FadeSpec {
 
       def name: String = "Apply"
 
-      val opHi: Int = 0
-      val opLo: Int = 0
+      val opHi: Int = opID
+      val opLo: Int = opID
     }
     private final class Apply[S <: Sys[S]](protected val targets: Targets[S],
-                                              val numFrames: LongObj[S],
-                                              val shape: CurveObj[S],
-                                              val floor: DoubleObj[S])
+                                           val numFrames: LongObj[S],
+                                           val shape: CurveObj[S],
+                                           val floor: DoubleObj[S])
       extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Obj[S] {
 
       def tpe: stm.Obj.Type = FadeSpec.Obj
@@ -159,7 +152,8 @@ object FadeSpec {
       protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
 
       protected def writeData(out: DataOutput): Unit = {
-        out.writeByte(elemCookie)
+        out.writeByte(1)  // 'node' not 'var'
+        out.writeInt(Apply.opID)
         numFrames.write(out)
         shape    .write(out)
         floor    .write(out)

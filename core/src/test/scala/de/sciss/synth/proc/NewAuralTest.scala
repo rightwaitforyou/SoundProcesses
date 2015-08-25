@@ -477,7 +477,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
     val procAural = cursor.step { implicit tx =>
       import de.sciss.file._
-      val f       = userHome / "Music" / "tapes" / "MetallScheibe5TestN.aif"
+      val f       = userHome / "Music" / "tapes" / "Bronze1CutLp.aif" // "MetallScheibe5TestN.aif"
       val spec    = AudioFile.readSpec(f)
       println(spec)
       // val vAudio  = Grapheme.Value.Audio(f, spec, offset = 0L, gain = 2.0)
