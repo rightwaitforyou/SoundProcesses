@@ -68,7 +68,7 @@ class ScanSpec extends ConfluentEventSpec {
       val gr = grH()
       val Some(scan) = p.inputs.get("freq")
 
-      ??? // RRR gr.add(0L -> curve(1234.0)) // should be observed only directly through proc (but not scan)
+      gr.add((0L: LongObj[S]) -> (curve(1234.0): Grapheme.Expr[S])) // should be observed only directly through proc (but not scan)
       obs.assertEquals()
       //    Proc.Update( p, Vec( Proc.GraphemeChange( "gr",
       //       Grapheme.Update( gr, Vec( Grapheme.Segment.Const( Span.from( 0L ), Vec( 1234.0 ))))
@@ -83,7 +83,7 @@ class ScanSpec extends ConfluentEventSpec {
       )
       obs.clear()
 
-      ??? // RRR gr.add(2000L -> curve(5678.0)) // ...
+      gr.add((2000L: LongObj[S]) -> (curve(5678.0): Grapheme.Expr[S])) // ...
       obs.assertEquals(
         Proc.Update(p, Vec(Proc.InputChange("freq", scan, Vec(
 //          Scan.GraphemeChange(gr, Vec(Grapheme.Segment.Curve(Span(0L, 2000L), Vec((1234.0, 5678.0, linear))),

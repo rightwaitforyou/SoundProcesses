@@ -22,11 +22,9 @@ import scala.language.implicitConversions
 object Durable {
   private type S = Durable
 
-  def apply(factory: DataStore.Factory, mainName: String = "data", eventName: String = "event"): S =
-    Impl(factory, mainName = mainName, eventName = eventName)
+  def apply(factory: DataStore.Factory, mainName: String = "data"): S = Impl(factory, mainName = mainName)
 
-  def apply(mainStore: DataStore, eventStore: DataStore): S =
-    Impl(mainStore, eventStore)
+  def apply(mainStore: DataStore): S = Impl(mainStore)
 
   implicit def inMemory(tx: Durable#Tx): InMemory#Tx = tx.inMemory
 

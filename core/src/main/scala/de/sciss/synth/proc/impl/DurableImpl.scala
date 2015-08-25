@@ -22,13 +22,12 @@ import de.sciss.lucre.stm
 import scala.concurrent.stm.InTxn
 
 private[proc] object DurableImpl {
-  def apply(factory: DataStore.Factory, mainName: String, eventName: String): Durable = {
+  def apply(factory: DataStore.Factory, mainName: String): Durable = {
     val mainStore   = factory.open(mainName)
-    val eventStore  = factory.open(eventName, overwrite = true)
-    new System(mainStore, eventStore)
+    new System(mainStore)
   }
 
-  def apply(mainStore: DataStore, eventStore: DataStore): Durable = new System(mainStore, eventStore)
+  def apply(mainStore: DataStore): Durable = new System(mainStore)
 
   private final class TxnImpl(val system: System, val peer: InTxn)
     extends stm.impl.DurableImpl.TxnMixin[Durable]
@@ -39,7 +38,7 @@ private[proc] object DurableImpl {
     override def toString = s"proc.Durable#Tx@${hashCode.toHexString}"
   }
 
-  private final class System(protected val store: DataStore, protected val eventStore: DataStore)
+  private final class System(val store: DataStore)
     extends stm.impl.DurableImpl.Mixin[Durable, /* stm. */ InMemory]
     with Durable {
     // with evt.impl.ReactionMapImpl.Mixin[Durable] {

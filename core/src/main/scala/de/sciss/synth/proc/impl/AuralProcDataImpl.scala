@@ -89,7 +89,7 @@ object AuralProcDataImpl {
           case Proc.OutputChange (key, scan, sCh)     => // nada
         }
       }
-      attrObserver = proc.attrChanged.react { implicit tx => {
+      attrObserver = proc.attrChanged.react { implicit tx => upd => upd.changes.foreach {
         case AttrAdded  (key, value)          => attrAdded  (key, value)
         case AttrRemoved(key, value)          => attrRemoved(key, value)
 // ELEM

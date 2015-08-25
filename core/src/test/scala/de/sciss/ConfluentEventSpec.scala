@@ -1,21 +1,16 @@
 package de.sciss
 
-import lucre.stm
-import org.scalatest.{Outcome, Matchers, fixture}
-import concurrent.stm.TxnLocal
-import collection.immutable.{IndexedSeq => Vec}
-import de.sciss.synth.proc.{SoundProcesses, Confluent}
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.expr
+import de.sciss.synth.proc.{Confluent, SoundProcesses}
+import org.scalatest.{Matchers, Outcome, fixture}
+
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.concurrent.stm.TxnLocal
 
 trait ConfluentEventSpec extends fixture.FlatSpec with Matchers {
   type S = Confluent
   type D = S#D
   type FixtureParam = lucre.confluent.Cursor[S, D]
-
-//  implicit final protected val IntType  = lucre.expr.Int
-//  implicit final protected val LongType = lucre.expr.Long
-  // final protected val imp = ExprImplicits[S]
 
   SoundProcesses.init()
 

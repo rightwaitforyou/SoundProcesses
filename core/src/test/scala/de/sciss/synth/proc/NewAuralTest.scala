@@ -2,13 +2,14 @@ package de.sciss.synth.proc
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.ArtifactLocation
-import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
+import de.sciss.lucre.expr.{LongObj, BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.{Server, Sys}
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth
+import de.sciss.synth.Curve.{exponential, linear}
 import de.sciss.synth.io.{AudioFile, AudioFileType}
 import de.sciss.synth.proc.TransitoryAPI._
 import de.sciss.synth.proc.WorkspaceHandle.Implicits._
@@ -539,7 +540,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
       val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
       val gAudio  = Grapheme[S](spec.numChannels)
-      ??? // RRR gAudio.add(0L -> vAudio) // ... çoit trop complexe ...
+      gAudio.add((0L: LongObj[S]) -> (vAudio: Grapheme.Expr[S])) // ... çoit trop complexe ...
       sAudio.add(Scan.Link.Grapheme(gAudio))
 
       val _proc2 = proc {
@@ -626,8 +627,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //      import imp._
       // import ExprImplicits._
 
-      val fadeExprIn  = ??? : FadeSpec.Obj[S] // RRR FadeSpec.Expr[S](frame(4.0), linear, 0.0)
-      val fadeExprOut = ??? : FadeSpec.Obj[S] // RRR FadeSpec.Expr[S](frame(3.0), exponential, -40.0.dbamp)
+      val fadeExprIn  = FadeSpec.Obj[S](frame(4.0), linear, 0.0)
+      val fadeExprOut = FadeSpec.Obj[S](frame(3.0), exponential, -40.0.dbamp)
       _proc1.attrPut("fadeIn" , fadeExprIn )
       _proc1.attrPut("fadeOut", fadeExprOut)
 

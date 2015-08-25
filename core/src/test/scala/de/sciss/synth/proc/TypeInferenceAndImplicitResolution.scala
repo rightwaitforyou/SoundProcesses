@@ -11,15 +11,12 @@ object TypeInferenceAndImplicitResolution {
     val peer  = graph // AudioGraphemeElem(graph)
     val obj   = peer // Obj(peer)
 
-???
-// RRR
+    val ph    = tx.newHandle(peer)
+    val oh    = tx.newHandle(obj)
 
-//    val ph    = tx.newHandle(peer)
-//    val oh    = tx.newHandle(obj)
-//
-//    val pr: Grapheme.Expr.Audio[S] /* AudioGraphemeElem[S] */ = ph()
-//    val or: Grapheme.Expr.Audio[S] /* Obj.T[S, AudioGraphemeElem] */ = oh()
+    val pr: Grapheme.Expr.Audio[S] /* AudioGraphemeElem[S] */ = ph()
+    val or: Grapheme.Expr.Audio[S] /* Obj.T[S, AudioGraphemeElem] */ = oh()
 
-//    println(s"If this compiles, $pr and $or are fine.")
+    println(s"If this compiles, $pr and $or are fine.")
   }
 }

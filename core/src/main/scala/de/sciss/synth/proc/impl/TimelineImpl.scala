@@ -74,6 +74,8 @@ object TimelineImpl {
 
     // def eventView(obj: Obj[S]): EventLike[S, Timeline.Update[S]] = obj.changed
 
+    def tpe: Obj.Type = Timeline
+
     def elemSerializer: Serializer[S#Tx, S#Acc, Obj[S]] = Obj.serializer[S]
 
     override def toString: String = s"Timeline${tree.id}"

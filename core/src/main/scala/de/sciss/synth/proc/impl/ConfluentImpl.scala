@@ -34,10 +34,10 @@ private[proc] object ConfluentImpl {
 
     // val durable = evt.Durable(storeFactory, eventName = "d-evt")
     val mainStoreD  = storeFactory.open("d-main")
-    val eventStore  = storeFactory.open("event", overwrite = true)  // shared between durable + confluent
+    // val eventStore  = storeFactory.open("event", overwrite = true)  // shared between durable + confluent
 
-    val durable     = /* evt. */ Durable(mainStore = mainStoreD, eventStore = eventStore)
-    new System(storeFactory, eventStore, durable)
+    val durable     = /* evt. */ Durable(mainStore = mainStoreD)
+    new System(storeFactory, durable)
   }
 
   private sealed trait TxnImpl extends Confluent.Txn with confluent.impl.TxnMixin[S] with TxnFullImpl[S] {
@@ -62,7 +62,7 @@ private[proc] object ConfluentImpl {
   }
 
   private final class System(protected val storeFactory: DataStore.Factory,
-                             protected val eventStore: DataStore, val durable: /* evt. */ Durable)
+                             val durable: /* evt. */ Durable)
     extends confluent.impl.Mixin[S]
     with Confluent {
 

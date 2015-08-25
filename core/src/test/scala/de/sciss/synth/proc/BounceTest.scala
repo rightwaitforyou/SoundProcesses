@@ -1,27 +1,39 @@
 package de.sciss.synth.proc
 
-import de.sciss.lucre.expr
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.store.BerkeleyDB
-import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.synth.{InMemory, Sys}
 import de.sciss.processor.Processor
 import de.sciss.span.Span
 import de.sciss.synth.proc.Implicits._
-import de.sciss.synth.{SynthGraph, proc, ugen}
+import de.sciss.synth.{SynthGraph, ugen}
 
 import scala.concurrent.ExecutionContext
 
 // XXX TODO: this should be a ScalaTest spec, opening the file after bouncing, and
 // verifying the contents (easy with a sine).
-object BounceTest extends App {
-  type S = InMemory
-  // type S = Durable
-  type I = S#I
+object BounceTest {
+  case class Config(realtime: Boolean = false, inMemory: Boolean = false)
 
-  // implicit val system = Durable(BerkeleyDB.tmp())
-  implicit val system = InMemory()
-
-  val realtime = args.headOption == Some("--realtime")
-
+  def main(args: Array[String]): Unit = {
+    val p = new scopt.OptionParser[Config]("BounceTest") {
+      opt[Unit]("realtime" ) action { (_, c) => c.copy(realtime = true) }
+      opt[Unit]("in-memory") action { (_, c) => c.copy(inMemory = true) }
+    }
+    p.parse(args, Config()).fold(sys.exit(1)) { c =>
+      SoundProcesses.init()
+      import c._
+      if (inMemory) {
+        implicit val system = InMemory()
+        new BounceTest(system, realtime = realtime)
+      } else {
+        implicit val system = Durable(BerkeleyDB.tmp())
+        new BounceTest(system, realtime = realtime)
+      }
+    }
+  }
+}
+class BounceTest[S <: Sys[S]](val system: S, realtime: Boolean)(implicit cursor: stm.Cursor[S]) {
   de.sciss.lucre.synth.showLog = true
   showTransportLog  = !realtime
 
@@ -36,17 +48,13 @@ object BounceTest extends App {
       |When using --realtime, the sound lasts 1s and the file has a duration of approx. 3s.
       |""".stripMargin)
 
-  import expr.Ops._
-
-  val groupH = system.step { implicit tx =>
+  val groupH = cursor.step { implicit tx =>
 //    val expr      = ExprImplicits[S]
 //    import expr._
     // import ExprImplicits._
 
     val proc      = Proc[S]
-    val peer      = proc // Proc.Elem(proc)
-    val obj       = proc // Obj(peer)
-    obj.name      = "sinosc"
+    proc.name     = "sinosc"
     proc.graph()  = SynthGraph {
       import ugen._
       val sig = SinOsc.ar(200)
@@ -54,13 +62,18 @@ object BounceTest extends App {
       Out.ar(0, sig)
     }
     val group     = Timeline[S]
-    group.add(Span(frame(if (realtime) 0.25 else 0.1), frame(if (realtime) 1.25 else 0.2)), obj)
+    group.add(Span(frame(if (realtime) 0.25 else 0.1), frame(if (realtime) 1.25 else 0.2)), proc)
     // import ProcGroup.serializer
     tx.newHandle(group)
   }
 
+  // type I = InMemory
+
   import WorkspaceHandle.Implicits._
-  val bounce              = Bounce[S, I]
+
+  implicit val bridge = system.inMemoryTx _
+
+  val bounce              = Bounce[S, system.I]
   val bCfg                = Bounce.Config[S]
   bCfg.group              = groupH :: Nil
   bCfg.span               = Span(frame(0.15), frame(if (realtime) 3.15 else 0.3)) // start in the middle of the proc span

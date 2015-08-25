@@ -65,19 +65,19 @@ class AttributesSpec extends ConfluentEventSpec {
     }
 
     system.step { implicit tx =>
-      val p = pH()
+      val p     = pH()
+      val group = pgH()
       assert(p.attr[IntObj      ]("int"    ).map(_.value) === Some(5678))
       assert(p.attr[DoubleObj   ]("double" ).map(_.value) === Some(123.4))
       assert(p.attr[LongObj     ]("long"   ).map(_.value) === Some(1234L))
       assert(p.attr[BooleanObj  ]("boolean").map(_.value) === Some(true))
       assert(p.attr[StringObj   ]("string" ).map(_.value) === Some("123"))
-      assert(p.attr[FadeSpec.Obj]("fade").map(_.value) === Some(fade))
-      assert(p.attr[DoubleVector]("d-vec").map(_.value) === Some(Vector(1.2, 3.4, 5.6)))
+      assert(p.attr[FadeSpec.Obj]("fade"   ).map(_.value) === Some(fade))
+      assert(p.attr[DoubleVector]("d-vec"  ).map(_.value) === Some(Vector(1.2, 3.4, 5.6)))
+      assert(p.attr[Timeline    ]("group"  ) === Some(group))
       assert(p.attr[Grapheme.Expr.Audio]("audio").map(_.value) ===
         Some(Grapheme.Value.Audio(file("foo") / "bar", spec, 1234L, 123.4)))
       assert(p.attr[ArtifactLocation]("loc").map(_.directory) === Some(file("foo")))
-      val group = pgH()
-      assert(p.attr[Timeline]("group") === Some(group))
     }
   }
 }

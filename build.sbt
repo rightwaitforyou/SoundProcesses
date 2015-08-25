@@ -28,6 +28,7 @@ lazy val topologyVersion            = "1.0.0"
 lazy val scalaTestVersion          = "2.2.5"
 lazy val loggingEnabled            = true
 lazy val bdb                       = "bdb"  // either "bdb" or "bdb6"
+lazy val scoptVersion              = "3.3.0"
 
 scalacOptions in ThisBuild ++= {
   // "-Xlint" -- produces problems with implicit objects and traits in package object
@@ -81,11 +82,12 @@ lazy val core = Project(id = s"$baseNameL-core", base = file("core"))
     ),
     buildInfoPackage := "de.sciss.synth.proc",
     libraryDependencies ++= Seq(
-      "de.sciss"      %% "lucre-confluent"  % lucreVersion,
-      "de.sciss"      %% "lucre-expr"       % lucreVersion,
-      "de.sciss"      %% "fileutil"         % fileUtilVersion,
-      "org.scalatest" %% "scalatest"        % scalaTestVersion  % "test",
-      "de.sciss"      %% s"lucre-$bdb"      % lucreVersion      % "test"
+      "de.sciss"          %% "lucre-confluent"  % lucreVersion,
+      "de.sciss"          %% "lucre-expr"       % lucreVersion,
+      "de.sciss"          %% "fileutil"         % fileUtilVersion,
+      "org.scalatest"     %% "scalatest"        % scalaTestVersion  % "test",
+      "de.sciss"          %% s"lucre-$bdb"      % lucreVersion      % "test",
+      "com.github.scopt"  %% "scopt"            % scoptVersion      % "test"
     )
   )
 
