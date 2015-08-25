@@ -17,7 +17,7 @@ import java.util
 
 import de.sciss.lucre.event.{Event, Dummy, EventLike, Targets}
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.stm.{Obj, Sys}
+import de.sciss.lucre.stm.{Copy, Elem, Obj, Sys}
 import de.sciss.lucre.expr
 import de.sciss.model.Change
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
@@ -35,8 +35,12 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
   protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
     new _Const[S](id, value)
 
-  protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]])(implicit tx: S#Tx): Var[S] =
-    new _Var[S](targets, vr)
+  protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]], connect: Boolean)
+                                  (implicit tx: S#Tx): Var[S] = {
+    val res = new _Var[S](targets, vr)
+    if (connect) res.connect()
+    res
+  }
 
   private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
     extends ConstImpl[S] with Repr[S]
@@ -319,6 +323,9 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
     def event(slot: Int): Event[S, Any] = throw new UnsupportedOperationException
 
     def tpe: Obj.Type = SynthGraphObj
+
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+      new Predefined(tx.newID(), cookie) // .connect()
 
     def write(out: DataOutput): Unit = {
       out.writeInt(tpe.typeID)

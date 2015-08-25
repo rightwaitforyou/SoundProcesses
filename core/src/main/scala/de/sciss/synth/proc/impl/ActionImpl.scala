@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.event.Targets
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{IDPeek, NoSys, Obj, Sys, TxnLike}
+import de.sciss.lucre.stm.{Copy, Elem, IDPeek, NoSys, Obj, Sys, TxnLike}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
@@ -216,6 +216,9 @@ object ActionImpl {
   private final class ConstBodyImpl[S <: Sys[S]](val id: S#ID, val actionID: String)
     extends ConstImpl[S] {
 
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+      new ConstBodyImpl(tx.newID(), actionID) // .connect()
+
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       val fun = mapPredef.getOrElse(actionID, sys.error(s"Predefined action '$actionID' not registered"))
@@ -236,6 +239,9 @@ object ActionImpl {
       ActionImpl.execute[S](universe, name, jar)
     }
 
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+      new ConstFunImpl(tx.newID(), name, jar) // .connect()
+
     protected def writeData(out: DataOutput): Unit = {
       out.writeByte(CONST_JAR)
       out.writeUTF(name)
@@ -254,7 +260,10 @@ object ActionImpl {
   private final class ConstEmptyImpl[S <: Sys[S]](val id: S#ID) extends ConstImpl[S] {
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = ()
 
-//    override def equals(that: Any): Boolean = that match {
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+      new ConstEmptyImpl(tx.newID()) // .connect()
+
+    //    override def equals(that: Any): Boolean = that match {
 //      case e: ConstEmptyImpl[_] => true
 //      case _ => super.equals(that)
 //    }
@@ -270,6 +279,12 @@ object ActionImpl {
     with evt.impl.SingleNode[S, Unit] {
 
     def tpe: Obj.Type = Action
+
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] = {
+      def newTgt  = Targets[S]
+      val newVr   = tx.newVar[Action[S]](newTgt.id, copy(peer()))
+      new VarImpl[S](newTgt, newVr) // .connect()
+    }
 
     def apply()(implicit tx: S#Tx): Action[S] = peer()
 

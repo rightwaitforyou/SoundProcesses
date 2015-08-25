@@ -14,8 +14,8 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.event.Publisher
-import de.sciss.lucre.stm.{Elem, Obj, Identifiable, Sys}
+import de.sciss.lucre.event.{Targets, Publisher}
+import de.sciss.lucre.stm.{Copy, Elem, Obj, Identifiable, Sys}
 import de.sciss.lucre.{event => evt, stm, data}
 import de.sciss.serial.{DataOutput, Serializer, DataInput}
 import de.sciss.synth.proc.impl.{ScanImpl => Impl}
@@ -46,6 +46,9 @@ object Scan extends Obj.Type {
       def id = peer.id
       override def toString = peer.toString
 
+      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+        new Grapheme(copy(peer))
+
       protected def writeData(out: DataOutput): Unit = {
         out.writeByte(0)
         peer.write(out)
@@ -59,6 +62,9 @@ object Scan extends Obj.Type {
 
       def id = peer.id
       override def toString = peer.toString
+
+      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+        new Scan(copy(peer))
 
       protected def writeData(out: DataOutput): Unit = {
         out.writeByte(1)

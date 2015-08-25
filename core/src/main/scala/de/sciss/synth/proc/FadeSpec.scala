@@ -17,7 +17,7 @@ package proc
 
 import de.sciss.lucre.event.{Pull, Targets}
 import de.sciss.lucre.expr.{DoubleObj, Expr => _Expr, LongObj, Type}
-import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.stm.{Elem, Sys, Copy}
 import de.sciss.lucre.{expr, stm}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.Curve.linear
@@ -67,8 +67,12 @@ object FadeSpec {
     protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
       new _Const[S](id, value)
 
-    protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]])(implicit tx: S#Tx): Var[S] =
-      new _Var[S](targets, vr)
+    protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]], connect: Boolean)
+                                    (implicit tx: S#Tx): Var[S] = {
+      val res = new _Var[S](targets, vr)
+      if (connect) res.connect()
+      res
+    }
 
     private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
       extends ConstImpl[S] with Repr[S]
@@ -113,6 +117,9 @@ object FadeSpec {
       extends lucre.expr.impl.NodeImpl[S, FadeSpec] with Obj[S] {
 
       def tpe: stm.Obj.Type = FadeSpec.Obj
+
+      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+        new Apply(Targets[S], copy(numFrames), copy(shape), copy(floor)).connect()
 
       def value(implicit tx: S#Tx): FadeSpec = FadeSpec(numFrames.value, shape.value, floor.value.toFloat)
 

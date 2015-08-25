@@ -22,7 +22,7 @@ import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.event.{Publisher, Targets}
 import de.sciss.lucre.expr.{Expr => _Expr, Type, DoubleObj, LongObj}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Obj, Sys}
+import de.sciss.lucre.stm.{Elem, Obj, Sys, Copy}
 import de.sciss.lucre.{event => evt, expr}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Serializer, Writable}
 import de.sciss.span.Span
@@ -194,8 +194,12 @@ object Grapheme extends Obj.Type {
     protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
       new _Const[S](id, value)
 
-    protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]])(implicit tx: S#Tx): Var[S] =
-      new _Var[S](targets, vr)
+    protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]], connect: Boolean)
+                                    (implicit tx: S#Tx): Var[S] = {
+      val res = new _Var[S](targets, vr)
+      if (connect) res.connect()
+      res
+    }
 
     private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
       extends ConstImpl[S] with Expr[S]
@@ -221,8 +225,12 @@ object Grapheme extends Obj.Type {
       protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
         new _Const[S](id, value)
 
-      protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]])(implicit tx: S#Tx): Var[S] =
-        new _Var[S](targets, vr)
+      protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]], connect: Boolean)
+                                      (implicit tx: S#Tx): Var[S] = {
+        val res = new _Var[S](targets, vr)
+        if (connect) res.connect()
+        res
+      }
 
       private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
         extends ConstImpl[S] with Repr[S]
@@ -275,8 +283,12 @@ object Grapheme extends Obj.Type {
       protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
         new _Const[S](id, value)
 
-      protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]])(implicit tx: S#Tx): Var[S] =
-        new _Var[S](targets, vr)
+      protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]], connect: Boolean)
+                                      (implicit tx: S#Tx): Var[S] = {
+        val res = new _Var[S](targets, vr)
+        if (connect) res.connect()
+        res
+      }
 
       private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
         extends ConstImpl[S] with Repr[S]
@@ -339,6 +351,9 @@ object Grapheme extends Obj.Type {
       extends expr.impl.NodeImpl[S, Value.Curve] with Curve[S] {
 
       def tpe: Obj.Type = Curve
+
+      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+        new ApplyCurve(Targets[S], values.map { case (xs, curve) => copy(xs) -> curve }).connect()
 
       def value(implicit tx: S#Tx): Value.Curve = {
         val v = values.map {
@@ -425,6 +440,9 @@ object Grapheme extends Obj.Type {
       extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
 
       def tpe: stm.Obj.Type = Audio
+
+      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+        new ApplyAudio(Targets[S], copy(artifact), spec, copy(offset), copy(gain)).connect()
 
       def value(implicit tx: S#Tx): Value.Audio = {
         val artVal    = artifact.value
