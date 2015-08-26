@@ -18,7 +18,7 @@ package impl
 import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.event.{impl => evti, Targets}
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{NoSys, Obj, Sys}
+import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.span.Span
@@ -86,6 +86,9 @@ object GraphemeImpl {
     override def toString: String = s"Grapheme$id"
 
     def modifiableOption: Option[Modifiable[S]] = Some(this)
+
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+      new Impl(Targets[S], numChannels, copy(pin)).connect()
 
     object changed extends Changed with evti.Root[S, Grapheme.Update[S]]
 

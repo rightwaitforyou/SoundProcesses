@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{NoSys, Obj, Sys}
+import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.lucre.event.{Targets, EventLike}
 import de.sciss.serial.{DataInput, Serializer}
@@ -68,11 +68,19 @@ object TimelineImpl {
   // ---- impl ----
 
   private abstract class Impl[S <: Sys[S]](protected val targets: evt.Targets[S])
-    extends BiGroupImpl.Impl[S, Obj[S]] with Timeline.Modifiable[S] {
+    extends BiGroupImpl.Impl[S, Obj[S]] with Timeline.Modifiable[S] { in =>
+
+    type A = Obj[S]
 
     override def modifiableOption: Option[Timeline.Modifiable[S]] = Some(this)
 
-    // def eventView(obj: Obj[S]): EventLike[S, Timeline.Update[S]] = obj.changed
+    def copy()(implicit tx: S#Tx, context: Copy[S]): Elem[S] =
+      new Impl(Targets[S]) { out =>
+        val tree = newTree()
+        context.provide(in, out)
+        copyTree(in.tree, out.tree)
+        // .connect()
+      }
 
     def tpe: Obj.Type = Timeline
 

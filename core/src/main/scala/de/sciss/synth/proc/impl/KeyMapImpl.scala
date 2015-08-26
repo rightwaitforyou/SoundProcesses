@@ -16,10 +16,8 @@ package proc
 package impl
 
 import de.sciss.lucre.data.SkipList
-import de.sciss.lucre.event.{EventLike, impl => evti}
-import de.sciss.lucre.stm.{Disposable, Obj, Sys}
-import de.sciss.lucre.{data, event => evt}
-import de.sciss.serial.{Writable, DataInput, DataOutput, Serializer}
+import de.sciss.lucre.stm.{Disposable, Sys}
+import de.sciss.serial.{DataInput, DataOutput, Serializer, Writable}
 
 object KeyMapImpl {
   trait ValueInfo[S <: Sys[S], Key, Value] {
@@ -40,7 +38,7 @@ object KeyMapImpl {
     def read(in: DataInput, access: S#Acc)(implicit tx: S#Tx): Entry[S, Key, Value] = {
       val key   = info.keySerializer.read(in, access)
       val value = info.valueSerializer.read(in, access)
-      new Entry(key, value)
+      new Entry[S, Key, Value](key, value)
     }
   }
 
@@ -98,7 +96,7 @@ trait KeyMapImpl[S <: Sys[S], Key, Value] {
     }
 
   final def add(key: Key, value: Value)(implicit tx: S#Tx): Unit = {
-    val n = new KeyMapImpl.Entry(key, value)
+    val n = new KeyMapImpl.Entry[S, Key, Value](key, value)
     val optRemoved: Option[(Key, Value)] = map.add(key -> n).map { oldNode =>
       // this -= oldNode
       key -> oldNode.value

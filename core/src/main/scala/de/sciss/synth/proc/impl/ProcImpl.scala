@@ -18,7 +18,7 @@ package impl
 import de.sciss.lucre.data.SkipList
 import de.sciss.lucre.event.{impl => evti, Targets}
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{NoSys, Obj, Sys}
+import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
 import de.sciss.lucre.synth.InMemory
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Serializer}
@@ -116,6 +116,26 @@ object ProcImpl {
     proc =>
 
     final def tpe: Obj.Type = Proc
+
+    def copy()(implicit tx: S#Tx, context: Copy[S]): Elem[S] =
+      new Impl[S] { out =>
+        protected val targets   = Targets[S]
+        val graph               = context(proc.graph)
+        val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
+        val scanOutMap          = SkipList.Map.empty[S, String, ScanEntry[S]]
+        context.provide(proc, out)
+
+        private[this] def copyMap(in : SkipList.Map[S, String, ScanEntry[S]],
+                                  out: SkipList.Map[S, String, ScanEntry[S]]): Unit =
+          in.iterator.foreach { case (key, eIn) =>
+            val eOut = new ScanEntry(key, context(eIn.value))
+              out.add(key -> eOut)
+          }
+
+        copyMap(proc.scanInMap , out.scanInMap)
+        copyMap(proc.scanOutMap, out.scanOutMap)
+        connect()
+      }
 
     import Proc._
 

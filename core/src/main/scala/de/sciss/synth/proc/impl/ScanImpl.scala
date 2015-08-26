@@ -18,7 +18,7 @@ package impl
 import de.sciss.lucre.event.{Targets, impl => evti}
 import de.sciss.lucre.expr.List
 import de.sciss.lucre.stm.impl.{ElemSerializer, ObjSerializer}
-import de.sciss.lucre.stm.{Elem, NoSys, Obj, Sys}
+import de.sciss.lucre.stm.{Copy, Elem, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
@@ -89,6 +89,9 @@ object ScanImpl {
     def tpe: Obj.Type = Scan
 
     override def toString: String = s"Scan$id"
+
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+      new Impl(Targets[S], copy(list)) // .connect()
 
     def iterator(implicit tx: S#Tx): Iterator[Link[S]] = list.iterator
 

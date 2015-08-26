@@ -17,7 +17,7 @@ package impl
 import de.sciss.lucre.event.Targets
 import de.sciss.lucre.expr.{BooleanObj, Expr, LongObj}
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{Obj, NoSys, Sys}
+import de.sciss.lucre.stm.{Elem, Copy, Obj, NoSys, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{Serializer, DataInput, DataOutput}
 
@@ -59,8 +59,8 @@ object EnsembleImpl {
 
   // ---- impl ----
 
-  private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], folderEx: Folder /* Elem.Obj */[S],
-                                        offsetEx: LongObj[S], playingEx: BooleanObj[S])
+  private final class Impl[S <: Sys[S]](val targets: evt.Targets[S], _folder: Folder[S],
+                                        _offset: LongObj[S], _playing: BooleanObj[S])
     extends Ensemble[S]
     with evt.impl.SingleNode[S, Ensemble.Update[S]] { self =>
 
@@ -68,14 +68,17 @@ object EnsembleImpl {
 
     override def toString: String = s"Ensemble$id"
 
-    def folder (implicit tx: S#Tx): Folder /* Elem.Obj */ [S] = folderEx
-    def offset (implicit tx: S#Tx): LongObj[S]     = offsetEx
-    def playing(implicit tx: S#Tx): BooleanObj[S]  = playingEx
+    def folder (implicit tx: S#Tx): Folder    [S] = _folder
+    def offset (implicit tx: S#Tx): LongObj   [S] = _offset
+    def playing(implicit tx: S#Tx): BooleanObj[S] = _playing
+
+    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
+      new Impl(Targets[S], copy(_folder), copy(_offset), copy(_playing)).connect()
 
     protected def writeData(out: DataOutput): Unit = {
-      folderEx .write(out)
-      offsetEx .write(out)
-      playingEx.write(out)
+      _folder .write(out)
+      _offset .write(out)
+      _playing.write(out)
     }
 
     protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
@@ -83,31 +86,31 @@ object EnsembleImpl {
     // ---- event ----
 
     def connect()(implicit tx: S#Tx): this.type = {
-      folderEx .changed ---> changed
-      offsetEx .changed ---> changed
-      playingEx.changed ---> changed
+      _folder .changed ---> changed
+      _offset .changed ---> changed
+      _playing.changed ---> changed
       this
     }
 
     private[this] def disconnect()(implicit tx: S#Tx): Unit = {
-      folderEx .changed -/-> changed
-      offsetEx .changed -/-> changed
-      playingEx.changed -/-> changed
+      _folder .changed -/-> changed
+      _offset .changed -/-> changed
+      _playing.changed -/-> changed
     }
 
     object changed extends Changed {
       def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Ensemble.Update[S]] = {
-        val folderEvt = folderEx /* .elem.peer */ .changed
+        val folderEvt = _folder /* .elem.peer */ .changed
         val l1 = if (pull.contains(folderEvt))
           pull(folderEvt).fold(List.empty[Ensemble.Change[S]])(Ensemble.Folder(_) :: Nil)
         else Nil
 
-        val offsetEvt = offsetEx.changed
+        val offsetEvt = _offset.changed
         val l2 = if (pull.contains(offsetEvt))
           pull(offsetEvt).fold(l1)(Ensemble.Offset[S](_) :: l1)
         else l1
 
-        val playingEvt = playingEx.changed
+        val playingEvt = _playing.changed
         val l3 = if (pull.contains(playingEvt))
           pull(playingEvt).fold(l2)(Ensemble.Playing[S](_) :: l2)
         else l2
