@@ -15,10 +15,10 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
+import de.sciss.lucre.event.Targets
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
+import de.sciss.lucre.stm.{Copy, Elem, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
-import de.sciss.lucre.event.{Targets, EventLike}
 import de.sciss.serial.{DataInput, Serializer}
 
 object TimelineImpl {

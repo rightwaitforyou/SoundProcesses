@@ -152,7 +152,6 @@ object AuralTimelineImpl {
             // (e.g., not deleting and re-creating the AuralObj)
             elemRemoved(timed.id, spanCh.before, timed.value)
             elemAdded  (timed.id, spanCh.now   , timed.value)
-// ELEM
 //          case Timeline.Element(_, _) =>  // we don't care
         }
       }
