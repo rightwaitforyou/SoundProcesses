@@ -28,14 +28,14 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 object ScanImpl {
   import Scan.Link
 
-  private final val SER_VERSION = 0x536F  // was "Sn"
+  private final val SER_VERSION = 0x5370  // was "Sn"
 
   sealed trait Update[S]
 
-  def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = {
+  def apply[S <: Sys[S]](proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = {
     val targets = evt.Targets[S]
     val list    = List.Modifiable[S, Link[S]]
-    new Impl(targets, list)
+    new Impl(targets, proc, key, list)
   }
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] =
@@ -54,10 +54,11 @@ object ScanImpl {
     val serVer = in.readShort()
     if (serVer != SER_VERSION) sys.error(s"Incompatible serialized version (found $serVer, required $SER_VERSION)")
 
-    val list = List.Modifiable.read[S, Link[S]](in, access)
-    new Impl(targets, list)
+    val proc  = Proc.read(in, access)
+    val key   = in.readUTF()
+    val list  = List.Modifiable.read[S, Link[S]](in, access)
+    new Impl(targets, proc, key, list)
   }
-
 
   implicit def linkSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Link[S]] = anyLinkSer.asInstanceOf[LinkSer[S]]
 
@@ -81,17 +82,32 @@ object ScanImpl {
     }
   }
 
+  private final val filterAll: Any => Boolean = _ => true
+
   private final class Impl[S <: Sys[S]](protected val targets : evt.Targets[S],
+                                        _proc: Proc[S], val key: String,
                                         protected val list    : List.Modifiable[S, Link[S]])
     extends Scan[S]
-    with evti.SingleNode[S, Scan.Update[S]] {
+    with evti.SingleNode[S, Scan.Update[S]] { in =>
 
     def tpe: Obj.Type = Scan
 
     override def toString: String = s"Scan$id"
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-      new Impl(Targets[S], copy(list)) // .connect()
+    def proc(implicit tx: S#Tx): Proc[S] = _proc
+
+    def copy()(implicit tx: S#Tx, context: Copy[S]): Elem[S] = {
+      val outList = List.Modifiable[S, Link[S]]
+      val out     = new Impl(Targets[S], context(_proc), key, outList)
+      context.provide(in, out)
+      val filter  = context.getHint(proc, Proc.hintFilterLinks).asInstanceOf[Option[Proc[S] => Boolean]]
+        .getOrElse(filterAll)
+      in.list.iterator.foreach {
+        case Scan.Link.Scan(peer) if !filter(peer.proc) =>
+        case link => out.add(context(link))
+      }
+      out // .connect()
+    }
 
     def iterator(implicit tx: S#Tx): Iterator[Link[S]] = list.iterator
 
@@ -126,6 +142,8 @@ object ScanImpl {
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
+      _proc.write(out)
+      out.writeUTF(key)
       list.write(out)
     }
 

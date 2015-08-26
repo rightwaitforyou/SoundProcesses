@@ -79,7 +79,7 @@ object ProcImpl {
       removed.foreach { tup =>
         b += (if (isInput) Proc.InputRemoved[S](tup._1, tup._2) else Proc.OutputRemoved[S](tup._1, tup._2))
       }
-      added.foreach {  tup =>
+      added.foreach { tup =>
         b += (if (isInput) Proc.InputAdded[S](tup._1, tup._2) else Proc.OutputAdded[S](tup._1, tup._2))
       }
 
@@ -92,7 +92,7 @@ object ProcImpl {
 
     def add(key: String)(implicit tx: S#Tx): Scan[S] =
       get(key).getOrElse {
-        val res = Scan[S]
+        val res = Scan[S](proc, key)
         add(key, res)
         res
       }

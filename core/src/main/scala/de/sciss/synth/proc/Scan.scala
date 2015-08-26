@@ -80,7 +80,7 @@ object Scan extends Obj.Type {
   sealed trait Link[S <: Sys[S]] extends Elem[S] with Identifiable[S#ID]
 
   /** Constructs a new unconnected scan. */
-  def apply[S <: Sys[S]](implicit tx: S#Tx): Scan[S] = Impl.apply
+  def apply[S <: Sys[S]](proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = Impl(proc, key)
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Scan[S] = Impl.read(in, access)
 
@@ -132,6 +132,10 @@ object Scan extends Obj.Type {
   */
 trait Scan[S <: Sys[S]] extends Obj[S] with Publisher[S, Scan.Update[S]] {
   import Scan._
+
+  def proc(implicit tx: S#Tx): Proc[S]
+
+  def key: String
 
   /** Returns an iterator over all currently connected nodes. */
   def iterator(implicit tx: S#Tx): Iterator[Link[S]]

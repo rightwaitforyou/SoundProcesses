@@ -74,6 +74,12 @@ object Proc extends Obj.Type {
   /** Audio input file (tape) grapheme. */
   final val graphAudio  = "sig"
 
+  /** Hint key for copying scan connections during `copy`. Value should be a
+    * predicate function `(Proc[S]) => Boolean`. If absent, all connections
+    * are copied.
+    */
+  final val hintFilterLinks = "links"
+
   override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
     Impl.readIdentifiedObj(in, access)
 }
