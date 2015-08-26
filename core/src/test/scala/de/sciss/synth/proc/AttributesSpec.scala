@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.ConfluentEventSpec
 import de.sciss.file._
-import de.sciss.lucre.artifact.ArtifactLocation
+import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.expr.{DoubleVector, BooleanObj, DoubleObj, IntObj, LongObj, StringObj}
 import de.sciss.synth.Curve
 import de.sciss.synth.io.AudioFileSpec
@@ -54,8 +54,8 @@ class AttributesSpec extends ConfluentEventSpec {
 
       attr.put("fade"   , FadeSpec.Obj.newConst(fade))
       attr.put("d-vec"  , DoubleVector.newConst(Vector(1.2, 3.4, 5.6)))
-      val loc = ArtifactLocation[S](file("foo"))
-      val art = loc.add(file("foo") / "bar")
+      val loc = ArtifactLocation.newConst[S](file("foo"))
+      val art = Artifact(loc, Artifact.Child("bar")) // loc.add(file("foo") / "bar")
       attr.put("audio"  , Grapheme.Expr.Audio(art, spec, offset = n, gain = d))
       attr.put("loc",     loc)
       val group = Timeline[S]

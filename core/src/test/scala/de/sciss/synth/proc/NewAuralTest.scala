@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.file._
-import de.sciss.lucre.artifact.ArtifactLocation
+import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.expr.{LongObj, BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
@@ -273,8 +273,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         Out.ar(0, sig)  // let it be heard
       }
       val f     = File.createTemp("disk", ".w64")
-      val loc   = ArtifactLocation[S](f.parent)
-      val art   = loc.add(f)
+      val loc   = ArtifactLocation.newConst[S](f.parent)
+      val art   = Artifact(loc, f) // loc.add(f)
       val artH  = tx.newHandle(art)
       pRec.attr.put("disk", art)
 
@@ -489,8 +489,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         val sig   = Pan2.ar(sig0)
         Out.ar(0, sig)
       }
-      val loc     = ArtifactLocation[S](f.parent)
-      val artif   = loc.add(f)
+      val loc     = ArtifactLocation.newConst[S](f.parent)
+      val artif   = Artifact(loc, f) // loc.add(f)
       val oAudio  = Grapheme.Expr.Audio(artif, spec, offset = 0L, gain = 2.0)
 
       _proc.attr.put("metal", oAudio)

@@ -1,7 +1,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.file._
-import de.sciss.lucre.artifact.ArtifactLocation
+import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.expr
 import de.sciss.lucre.synth.InMemory
 import de.sciss.synth.io.{AudioFile, AudioFileSpec}
@@ -53,8 +53,8 @@ object AsyncBounceTest {
       val tmpDir  = File.createTemp("artifacts", deleteOnExit = true, directory = true)
       val tmpF    = tmpDir / "buffer.aif"
       tmpF.deleteOnExit()
-      val loc     = ArtifactLocation[S](tmpDir)
-      val artif   = loc.add(tmpF)
+      val loc     = ArtifactLocation.newConst[S](tmpDir)
+      val artif   = Artifact(loc, tmpF) // .add(tmpF)
       val aSpec   = AudioFileSpec(numChannels = 1, numFrames = numFr, sampleRate = sr)
       val af      = AudioFile.openWrite(tmpF, aSpec)
       val aBuf    = Array(Array.tabulate(numFr) { i =>
