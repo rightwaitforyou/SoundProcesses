@@ -99,12 +99,13 @@ object ScanImpl {
     def copy()(implicit tx: S#Tx, context: Copy[S]): Elem[S] = {
       val outList = List.Modifiable[S, Link[S]]
       val out     = new Impl(Targets[S], context(_proc), key, outList)
-      context.provide(in, out)
-      val filter  = context.getHint(proc, Proc.hintFilterLinks).asInstanceOf[Option[Proc[S] => Boolean]]
-        .getOrElse(filterAll)
-      in.list.iterator.foreach {
-        case Scan.Link.Scan(peer) if !filter(peer.proc) =>
-        case link => out.add(context(link))
+      context.defer(in, out) {
+        val filter  = context.getHint(proc, Proc.hintFilterLinks).asInstanceOf[Option[Proc[S] => Boolean]]
+          .getOrElse(filterAll)
+        in.list.iterator.foreach {
+          case Scan.Link.Scan(peer) if !filter(peer.proc) =>
+          case link => out.add(context(link))
+        }
       }
       out // .connect()
     }

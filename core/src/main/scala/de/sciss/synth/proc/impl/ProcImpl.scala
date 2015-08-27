@@ -123,17 +123,17 @@ object ProcImpl {
         val graph               = context(proc.graph)
         val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
         val scanOutMap          = SkipList.Map.empty[S, String, ScanEntry[S]]
-        context.provide(proc, out)
-
-        private[this] def copyMap(in : SkipList.Map[S, String, ScanEntry[S]],
-                                  out: SkipList.Map[S, String, ScanEntry[S]]): Unit =
+        context.defer(proc, out) {
+          def copyMap(in : SkipList.Map[S, String, ScanEntry[S]],
+                                    out: SkipList.Map[S, String, ScanEntry[S]]): Unit =
           in.iterator.foreach { case (key, eIn) =>
             val eOut = new ScanEntry(key, context(eIn.value))
-              out.add(key -> eOut)
+            out.add(key -> eOut)
           }
 
-        copyMap(proc.scanInMap , out.scanInMap)
-        copyMap(proc.scanOutMap, out.scanOutMap)
+          copyMap(proc.scanInMap , out.scanInMap)
+          copyMap(proc.scanOutMap, out.scanOutMap)
+        }
         connect()
       }
 

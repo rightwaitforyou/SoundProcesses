@@ -77,8 +77,7 @@ object TimelineImpl {
     def copy()(implicit tx: S#Tx, context: Copy[S]): Elem[S] =
       new Impl(Targets[S]) { out =>
         val tree = newTree()
-        context.provide(in, out)
-        copyTree(in.tree, out.tree)
+        context.defer(in, out)(copyTree(in.tree, out.tree))
         // .connect()
       }
 
