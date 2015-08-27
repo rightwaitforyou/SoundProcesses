@@ -83,8 +83,9 @@ object AuralProcDataImpl {
           case Proc.OutputAdded  (key, scan)          => scanOutAdded(key, scan)
           case Proc.InputRemoved (key, scan)          => scanRemoved (key, scan)
           case Proc.OutputRemoved(key, scan)          => scanRemoved (key, scan)
-          case Proc.InputChange  (key, scan, sCh)     => scanInChange(key, scan, sCh)
-          case Proc.OutputChange (key, scan, sCh)     => // nada
+// ELEM
+// case Proc.InputChange  (key, scan, sCh)     => scanInChange(key, scan, sCh)
+// case Proc.OutputChange (key, scan, sCh)     => // nada
         }
       }
       val attr = proc.attr

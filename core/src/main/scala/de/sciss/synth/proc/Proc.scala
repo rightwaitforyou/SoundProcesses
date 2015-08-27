@@ -55,15 +55,15 @@ object Proc extends Obj.Type {
   final case class OutputAdded  [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
   final case class OutputRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
 
-  final case class InputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
-    extends Change[S] {
-    override def toString = s"InputChange($key, $scan, $changes)"
-  }
-
-  final case class OutputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
-    extends Change[S] {
-    override def toString = s"OutputChange($key, $scan, $changes)"
-  }
+//  final case class InputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
+//    extends Change[S] {
+//    override def toString = s"InputChange($key, $scan, $changes)"
+//  }
+//
+//  final case class OutputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
+//    extends Change[S] {
+//    override def toString = s"OutputChange($key, $scan, $changes)"
+//  }
 
   /** Source code of the graph function. */
   final val attrSource = "graph-source"

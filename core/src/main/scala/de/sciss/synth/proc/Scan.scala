@@ -92,17 +92,17 @@ object Scan extends Obj.Type {
 
   /** A scan event fires updates of this type. */
   final case class Update[S <: Sys[S]](scan: Scan[S], changes: Vec[Change[S]])
-  sealed trait Change      [S <: Sys[S]]
-  sealed trait LinkChange  [S <: Sys[S]] extends Change[S]      { def link  : Link[S] }
+  sealed trait Change      [S <: Sys[S]] { def link: Link[S] }
+//  sealed trait LinkChange  [S <: Sys[S]] extends Change[S]      { def link  : Link[S] }
 //  sealed trait SinkChange  [S <: Sys[S]] extends LinkChange[S]  { def sink  : Link[S] }
 //  sealed trait SourceChange[S <: Sys[S]] extends LinkChange[S]  { def source: Link[S] }
 
-  final case class Added[S <: Sys[S]](link: Link[S]) extends LinkChange[S] {
+  final case class Added[S <: Sys[S]](link: Link[S]) extends Change[S] {
     // override def toString = s"[$scan ---> $sink]"
 //    def link = sink
   }
 
-  final case class Removed[S <: Sys[S]](link: Link[S]) extends LinkChange[S] {
+  final case class Removed[S <: Sys[S]](link: Link[S]) extends Change[S] {
     // override def toString = s"[$scan -/-> $sink]"
 //    def link = sink
   }
