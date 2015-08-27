@@ -16,10 +16,10 @@ package impl
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.Artifact
-import de.sciss.lucre.expr.{DoubleVector, IntObj, BooleanObj, DoubleObj, Expr}
+import de.sciss.lucre.expr.{BooleanObj, DoubleObj, DoubleVector, IntObj}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Obj, Disposable}
-import de.sciss.lucre.synth.{Buffer, BusNodeSetter, AudioBus, Bus, NodeRef, Sys}
+import de.sciss.lucre.stm.{Disposable, Obj}
+import de.sciss.lucre.synth.{AudioBus, Buffer, Bus, BusNodeSetter, NodeRef, Sys}
 import de.sciss.model.Change
 import de.sciss.numbers
 import de.sciss.synth.Curve.parametric
@@ -44,22 +44,22 @@ object AuralProcDataImpl {
     extends ProcData[S] with UGB.Context[S] {
 
     import context.server
-    import context.scheduler.cursor
 
-    private val stateRef  = Ref.make[UGB.State[S]]()
+    private val stateRef      = Ref.make[UGB.State[S]]()
 
     // running main synths
-    private val nodeRef   = Ref(Option.empty[NodeRef.Group])
+    private val nodeRef       = Ref(Option.empty[NodeRef.Group])
 
+    // XXX TODO --- apparently this is never populated
     // running attribute inputs
-    private val attrMap   = TMap.empty[String, Disposable[S#Tx]]
+    private val attrMap       = TMap.empty[String, Disposable[S#Tx]]
 
     private val scanBuses     = TMap.empty[String, AudioBus]
     private val scanInViews   = TMap.empty[String, AuralScan.Owned[S]]
     private val scanOutViews  = TMap.empty[String, AuralScan.Owned[S]]
     private val procViews     = TSet.empty[AuralObj.Proc[S]]
 
-    private val procLoc   = TxnLocal[Proc[S]]() // cache-only purpose
+    private val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
 
     private var procObserver: Disposable[S#Tx] = _
     private var attrObserver: Disposable[S#Tx] = _
@@ -87,12 +87,16 @@ object AuralProcDataImpl {
           case Proc.OutputChange (key, scan, sCh)     => // nada
         }
       }
-      attrObserver = proc.attr.changed.react { implicit tx => upd => upd.changes.foreach {
+      val attr = proc.attr
+      attrObserver = attr.changed.react { implicit tx => upd => upd.changes.foreach {
         case Obj.AttrAdded  (key, value)          => attrAdded  (key, value)
         case Obj.AttrRemoved(key, value)          => attrRemoved(key, value)
-// ELEM
-//        case AttrChange (key, value, aCh)     => attrChange (key, value, aCh)
       }}
+
+      // XXX TODO -- should filter only relevant values
+      attr.iterator.foreach { case (key, value) =>
+        mkAttrObserver(key, value)
+      }
 
       tryBuild()
       this
@@ -176,6 +180,23 @@ object AuralProcDataImpl {
         n <- nodeRef.get(tx.peer)
         v <- state.acceptedInputs.get(UGB.AttributeKey(key))
       } attrNodeSet1(n, key, v, value)
+
+      // XXX TODO --- this is just a hack
+      // to restore the previous behaviour.
+      // Ideally we would register the observer
+      // in the clients so they can determine the
+      // kind of updates relevant. Here we just
+      // track
+
+      // XXX TODO -- should filter only relevant values
+      mkAttrObserver(key, value)
+    }
+
+    private def mkAttrObserver(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      // XXX TODO -- should have smarter observers that pull the changed
+      // values directly
+      val obs = value.changed.react { implicit tx => _ => attrChange(key) }
+      attrMap.put(key, obs)(tx.peer)
     }
 
     private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
@@ -184,27 +205,21 @@ object AuralProcDataImpl {
         n <- nodeRef.get(tx.peer)
         _ <- state.acceptedInputs.get(UGB.AttributeKey(key))
       } attrNodeUnset1(n, key)
+
+      attrMap.remove(key)(tx.peer)
     }
 
-    private def attrChange(key: String, value: Obj[S], changes: Vec[Obj.AttrUpdate[S]])(implicit tx: S#Tx): Unit = {
+    private def attrChange(key: String)(implicit tx: S#Tx): Unit = {
       logA(s"AttrChange in   ${procCached()} ($key)")
-// ELEM
-//      // currently, instead of processing the changes
-//      // for individual types, we'll just re-evaluate
-//      // the value and set it that way
-//      val isElem = changes.exists {
-//        case Obj.ElemChange(_) => true
-//        case _ => false
-//      }
-//      if (isElem) {
-//        for {
-//          n <- nodeRef.get(tx.peer)
-//          v <- state.acceptedInputs.get(UGB.AttributeKey(key))
-//        } {
-//          attrNodeUnset1(n, key)
-//          attrNodeSet1  (n, key, v, value)
-//        }
-//      }
+      for {
+        n <- nodeRef.get(tx.peer)
+        v <- state.acceptedInputs.get(UGB.AttributeKey(key))
+      } {
+        attrNodeUnset1(n, key)
+        procCached().attr.get(key).foreach { value =>
+          attrNodeSet1(n, key, v, value)
+        }
+      }
     }
 
     private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
@@ -293,6 +308,13 @@ object AuralProcDataImpl {
       procObserver.dispose()
       attrObserver.dispose()
       disposeNodeRefAndScans()
+      disposeAttrMap()
+    }
+
+    private def disposeAttrMap()(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
+      attrMap  .foreach(_._2.dispose())
+      attrMap  .clear()
     }
 
     private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
@@ -302,8 +324,6 @@ object AuralProcDataImpl {
       scanInViews.clear()
       scanOutViews.foreach(_._2.dispose())
       scanOutViews.clear()
-      attrMap  .foreach(_._2.dispose())
-      attrMap  .clear()
       scanBuses.clear()
       val rj = stateRef().rejectedInputs
       if (rj.nonEmpty) {
@@ -629,9 +649,8 @@ object AuralProcDataImpl {
 
         case a: Grapheme.Expr.Audio[S] =>
           val ctlName   = graph.Attribute.controlName(key)
-          val audioElem = a
-          // val spec      = audioElem.spec
-          val spec      = audioElem.value.spec
+          val audioVal  = a.value
+          val spec      = audioVal.spec
           if (spec.numFrames != 1)
             sys.error(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
           val numCh = spec.numChannels // numChL.toInt
@@ -640,7 +659,7 @@ object AuralProcDataImpl {
           val bus = Bus.control(server, numCh)
           val res = BusNodeSetter.mapper(ctlName, bus, b.node)
           b.addUser(res)
-          val w = AudioArtifactScalarWriter(bus, audioElem.value)
+          val w = AudioArtifactScalarWriter(bus, audioVal)
           b.addResource(w)
 
         case a: Scan[S] =>
@@ -691,12 +710,7 @@ object AuralProcDataImpl {
               (_buf, 0f)
             } {
               case a: Grapheme.Expr.Audio[S] =>
-                val audioElem = a
                 val audioVal  = a.value
-//                val spec      = audioElem.spec
-//                val path      = audioElem.artifact.value.getAbsolutePath
-//                val offset    = audioElem.offset  .value
-//                val _gain     = audioElem.gain    .value
                 val spec      = audioVal.spec
                 val path      = audioVal.artifact.getAbsolutePath
                 val offset    = audioVal.offset
@@ -737,9 +751,6 @@ object AuralProcDataImpl {
           } {
             case a: Grapheme.Expr.Audio[S] =>
               val audioVal  = a.value
-//              val spec      = audioElem.spec
-//              val path      = audioElem.artifact.value.getAbsolutePath
-//              val offset    = audioElem.offset  .value
               val spec      = audioVal.spec
               val path      = audioVal.artifact.getAbsolutePath
               val offset    = audioVal.offset

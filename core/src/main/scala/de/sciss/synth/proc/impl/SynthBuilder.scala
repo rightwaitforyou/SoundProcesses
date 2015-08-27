@@ -94,7 +94,7 @@ final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc[S]) {
 final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], val node: Node, key: String, nodeRef: NodeRef.Full)
   extends NodeDependencyBuilder[S] {
 
-  private var setMap = Vector.empty[ControlSet]
+  private var setMap          = Vector.empty[ControlSet]
 
   private var keyedUsers      = List.empty[DynamicUser]
   private var keyedResources  = List.empty[Resource   ]
