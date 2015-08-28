@@ -35,19 +35,10 @@ object TimelineImpl {
   implicit def modSerializer[S <: Sys[S]]: Serializer[S#Tx, S#Acc, Timeline.Modifiable[S]] =
     anyModSer.asInstanceOf[ModSer[S]]
 
-  // currently there is only modifiable instance
-  def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline[S] = modRead(in, access)
-
-  def modRead[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline.Modifiable[S] = {
-    val targets = evt.Targets.read[S](in, access)
-    read(in, access, targets)
-  }
-
-  private def read[S <: Sys[S]](in: DataInput, access: S#Acc, targets: evt.Targets[S])
-                               (implicit tx: S#Tx): Timeline.Modifiable[S] =
-    new Impl[S](targets) {
-      val tree = readTree(in,access)
-    }
+  //  def modRead[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline.Modifiable[S] = {
+  //    val targets = evt.Targets.read[S](in, access)
+  //    read(in, access, targets)
+  //  }
 
   private val anySer    = new Ser   [NoSys]
   private val anyModSer = new ModSer[NoSys]
@@ -62,7 +53,9 @@ object TimelineImpl {
 
   def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Timeline[S] = {
     val targets = Targets.read(in, access)
-    read(in, access, targets)
+    new Impl[S](targets) {
+      val tree = readTree(in,access)
+    }
   }
 
   // ---- impl ----
