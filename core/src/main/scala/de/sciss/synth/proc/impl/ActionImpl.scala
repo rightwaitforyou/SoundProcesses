@@ -216,8 +216,8 @@ object ActionImpl {
   private final class ConstBodyImpl[S <: Sys[S]](val id: S#ID, val actionID: String)
     extends ConstImpl[S] {
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-      new ConstBodyImpl(tx.newID(), actionID) // .connect()
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+      new ConstBodyImpl(txOut.newID(), actionID) // .connect()
 
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
@@ -239,8 +239,8 @@ object ActionImpl {
       ActionImpl.execute[S](universe, name, jar)
     }
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-      new ConstFunImpl(tx.newID(), name, jar) // .connect()
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+      new ConstFunImpl(txOut.newID(), name, jar) // .connect()
 
     protected def writeData(out: DataOutput): Unit = {
       out.writeByte(CONST_JAR)
@@ -260,8 +260,8 @@ object ActionImpl {
   private final class ConstEmptyImpl[S <: Sys[S]](val id: S#ID) extends ConstImpl[S] {
     def execute(universe: Action.Universe[S])(implicit tx: S#Tx): Unit = ()
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-      new ConstEmptyImpl(tx.newID()) // .connect()
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+      new ConstEmptyImpl(txOut.newID()) // .connect()
 
     //    override def equals(that: Any): Boolean = that match {
 //      case e: ConstEmptyImpl[_] => true
@@ -280,10 +280,10 @@ object ActionImpl {
 
     def tpe: Obj.Type = Action
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] = {
-      def newTgt  = Targets[S]
-      val newVr   = tx.newVar[Action[S]](newTgt.id, copy(peer()))
-      new VarImpl[S](newTgt, newVr) // .connect()
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] = {
+      def newTgt  = Targets[Out]
+      val newVr   = txOut.newVar[Action[Out]](newTgt.id, context(peer()))
+      new VarImpl[Out](newTgt, newVr) // .connect()
     }
 
     def apply()(implicit tx: S#Tx): Action[S] = peer()

@@ -118,8 +118,8 @@ object FadeSpec {
 
       def tpe: stm.Obj.Type = FadeSpec.Obj
 
-      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-        new Apply(Targets[S], copy(numFrames), copy(shape), copy(floor)).connect()
+      def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+        new Apply(Targets[Out], context(numFrames), context(shape), context(floor)).connect()
 
       def value(implicit tx: S#Tx): FadeSpec = FadeSpec(numFrames.value, shape.value, floor.value.toFloat)
 

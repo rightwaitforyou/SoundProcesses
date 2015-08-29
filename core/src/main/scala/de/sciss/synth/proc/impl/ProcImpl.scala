@@ -117,15 +117,15 @@ object ProcImpl {
 
     final def tpe: Obj.Type = Proc
 
-    def copy()(implicit tx: S#Tx, context: Copy[S]): Elem[S] =
-      new Impl[S] { out =>
-        protected val targets   = Targets[S]
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+      new Impl[Out] { out =>
+        protected val targets   = Targets[Out]
         val graph               = context(proc.graph)
-        val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
-        val scanOutMap          = SkipList.Map.empty[S, String, ScanEntry[S]]
+        val scanInMap           = SkipList.Map.empty[Out, String, ScanEntry[Out]]
+        val scanOutMap          = SkipList.Map.empty[Out, String, ScanEntry[Out]]
         context.defer(proc, out) {
-          def copyMap(in : SkipList.Map[S, String, ScanEntry[S]],
-                                    out: SkipList.Map[S, String, ScanEntry[S]]): Unit =
+          def copyMap(in : SkipList.Map[S  , String, ScanEntry[S  ]],
+                      out: SkipList.Map[Out, String, ScanEntry[Out]]): Unit =
           in.iterator.foreach { case (key, eIn) =>
             val eOut = new ScanEntry(key, context(eIn.value))
             out.add(key -> eOut)

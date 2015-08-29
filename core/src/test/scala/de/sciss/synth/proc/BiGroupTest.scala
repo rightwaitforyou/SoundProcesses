@@ -12,13 +12,11 @@ object BiGroupTest {
   def apply(): BiGroupTest[InMemory] = new BiGroupTest(InMemory())
 }
 class BiGroupTest[S <: Sys[S]](cursor: Cursor[S]) /* extends ExprImplicits[S] */ {
-  import expr.Ops._
-  // import ExprImplicits._
 
   def t[A](fun: S#Tx => A): A = cursor.step(fun)
 
   val bi = t { implicit tx =>
-    val res = BiGroup.Modifiable[S, LongObj[S]]
+    val res = BiGroup.Modifiable[S, LongObj]
     res.changed.react { _ => upd =>
       println(s"Observed: $upd")
     }

@@ -32,7 +32,7 @@ class GraphemeSerializationSpec extends ConfluentEventSpec {
       val g = gH()
       val time = 1234L: LE
       val mag  = Grapheme.Expr.Curve[S]((5678.9: DE) -> step)
-      g.add(time -> mag)
+      g.add(time, mag)
     }
 
     system.step { implicit tx =>

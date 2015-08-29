@@ -46,8 +46,8 @@ object Scan extends Obj.Type {
       def id = peer.id
       override def toString = peer.toString
 
-      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-        new Grapheme(copy(peer))
+      def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+        new Grapheme(context(peer))
 
       def changed: EventLike[S, Any] = Dummy[S, Any]
 
@@ -65,8 +65,8 @@ object Scan extends Obj.Type {
       def id = peer.id
       override def toString = peer.toString
 
-      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-        new Scan(copy(peer))
+      def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+        new Scan(context(peer))
 
       def changed: EventLike[S, Any] = Dummy[S, Any]
 

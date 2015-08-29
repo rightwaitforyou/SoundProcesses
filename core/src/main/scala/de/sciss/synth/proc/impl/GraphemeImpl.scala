@@ -17,6 +17,7 @@ package impl
 
 import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.event.{impl => evti, Targets}
+import de.sciss.lucre.expr.LongObj
 import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
@@ -70,7 +71,7 @@ object GraphemeImpl {
   def modifiable[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = {
     val targets = evt.Targets[S] // XXX TODO: partial?
     implicit val elemType = Expr
-    val pin = BiPin.Modifiable[S, Expr[S]]
+    val pin = BiPin.Modifiable[S, Expr]
     new Impl(targets, numChannels, pin).connect()
   }
 
@@ -87,23 +88,25 @@ object GraphemeImpl {
 
     def modifiableOption: Option[Modifiable[S]] = Some(this)
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-      new Impl(Targets[S], numChannels, copy(pin)).connect()
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] = {
+      type PinAux[~ <: Sys[~]] = BiPin.Modifiable[~, Grapheme.Expr[~]]
+      new Impl(Targets[Out], numChannels, context[PinAux](pin)).connect()
+    }
 
     object changed extends Changed with evti.Root[S, Grapheme.Update[S]]
 
     // ---- forwarding to pin ----
 
-    def add(elem: TimedElem[S])(implicit tx: S#Tx): Unit = {
-      val elemCh = elem.value.value.numChannels
+    def add(key: LongObj[S], value: Expr[S])(implicit tx: S#Tx): Unit = {
+      val elemCh = value.value.numChannels
       if (elemCh != numChannels)
         throw new IllegalArgumentException(
           s"Trying to add element with $elemCh channels to grapheme with $numChannels channels"
         )
 
-      pin.add(elem)
+      pin.add(key, value)
     }
-    def remove(elem: TimedElem[S])(implicit tx: S#Tx): Boolean  = pin.remove(elem)
+    def remove(key: LongObj[S], value: Expr[S])(implicit tx: S#Tx): Boolean  = pin.remove(key, value)
 
     def clear()(implicit tx: S#Tx): Unit = pin.clear()
 

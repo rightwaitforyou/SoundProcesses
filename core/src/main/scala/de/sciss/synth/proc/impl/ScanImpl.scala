@@ -34,7 +34,7 @@ object ScanImpl {
 
   def apply[S <: Sys[S]](proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = {
     val targets = evt.Targets[S]
-    val list    = List.Modifiable[S, Link[S]]
+    val list    = List.Modifiable[S, Link]
     new Impl(targets, proc, key, list)
   }
 
@@ -96,9 +96,9 @@ object ScanImpl {
 
     def proc(implicit tx: S#Tx): Proc[S] = _proc
 
-    def copy()(implicit tx: S#Tx, context: Copy[S]): Elem[S] = {
-      val outList = List.Modifiable[S, Link[S]]
-      val out     = new Impl(Targets[S], context(_proc), key, outList)
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] = {
+      val outList = List.Modifiable[Out, Link]
+      val out     = new Impl(Targets[Out], context(_proc), key, outList)
       context.defer(in, out) {
         val filter  = context.getHint(proc, Proc.hintFilterLinks).asInstanceOf[Option[Proc[S] => Boolean]]
           .getOrElse(filterAll)

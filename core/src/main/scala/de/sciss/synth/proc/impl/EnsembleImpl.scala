@@ -72,8 +72,8 @@ object EnsembleImpl {
     def offset (implicit tx: S#Tx): LongObj   [S] = _offset
     def playing(implicit tx: S#Tx): BooleanObj[S] = _playing
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-      new Impl(Targets[S], copy(_folder), copy(_offset), copy(_playing)).connect()
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+      new Impl(Targets[Out], context(_folder), context(_offset), context(_playing)).connect()
 
     protected def writeData(out: DataOutput): Unit = {
       _folder .write(out)

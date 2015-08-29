@@ -541,7 +541,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
       val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
       val gAudio  = Grapheme[S](spec.numChannels)
-      gAudio.add((0L: LongObj[S]) -> (vAudio: Grapheme.Expr[S])) // ... çoit trop complexe ...
+      gAudio.add(0L: LongObj[S], vAudio: Grapheme.Expr[S]) // ... çoit trop complexe ...
       sAudio.add(Scan.Link.Grapheme(gAudio))
 
       val _proc2 = proc {

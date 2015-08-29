@@ -352,8 +352,8 @@ object Grapheme extends Obj.Type {
 
       def tpe: Obj.Type = Curve
 
-      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-        new ApplyCurve(Targets[S], values.map { case (xs, curve) => copy(xs) -> curve }).connect()
+      def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+        new ApplyCurve(Targets[Out], values.map { case (xs, curve) => context(xs) -> curve }).connect()
 
       def value(implicit tx: S#Tx): Value.Curve = {
         val v = values.map {
@@ -441,8 +441,8 @@ object Grapheme extends Obj.Type {
 
       def tpe: stm.Obj.Type = Audio
 
-      def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-        new ApplyAudio(Targets[S], copy(artifact), spec, copy(offset), copy(gain)).connect()
+      def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+        new ApplyAudio(Targets[Out], context(artifact), spec, context(offset), context(gain)).connect()
 
       def value(implicit tx: S#Tx): Value.Audio = {
         val artVal    = artifact.value
@@ -530,8 +530,8 @@ object Grapheme extends Obj.Type {
   type TimedElem[S <: Sys[S]] = BiPin.Entry[S, Expr[S]]
 
   trait Modifiable[S <: Sys[S]] extends Grapheme[S] {
-    def add   (elem: TimedElem[S])(implicit tx: S#Tx): Unit
-    def remove(elem: TimedElem[S])(implicit tx: S#Tx): Boolean
+    def add   (key: LongObj[S], value: Expr[S])(implicit tx: S#Tx): Unit
+    def remove(key: LongObj[S], value: Expr[S])(implicit tx: S#Tx): Boolean
     def clear()(implicit tx: S#Tx): Unit
   }
 

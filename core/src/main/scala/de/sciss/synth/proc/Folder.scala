@@ -19,7 +19,7 @@ import de.sciss.serial.{Serializer, DataInput}
 import language.existentials
 
 object Folder {
-  def apply[S <: Sys[S]](implicit tx: S#Tx): Folder[S] = expr.List.Modifiable[S, Obj[S]]
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Folder[S] = expr.List.Modifiable[S, Obj]
 
   def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Folder[S] =
     expr.List.Modifiable.read[S, Obj[S]](in, access)

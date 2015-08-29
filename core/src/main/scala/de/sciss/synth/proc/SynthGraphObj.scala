@@ -324,8 +324,8 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
 
     def tpe: Obj.Type = SynthGraphObj
 
-    def copy()(implicit tx: S#Tx, copy: Copy[S]): Elem[S] =
-      new Predefined(tx.newID(), cookie) // .connect()
+    def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+      new Predefined(txOut.newID(), cookie) // .connect()
 
     def write(out: DataOutput): Unit = {
       out.writeInt(tpe.typeID)
