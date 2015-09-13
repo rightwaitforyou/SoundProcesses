@@ -16,6 +16,9 @@ package de.sciss.synth.proc
 import de.sciss.lucre.expr.{BooleanObj, Expr, StringObj}
 import de.sciss.lucre.stm.{Obj, Sys}
 
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.implicitConversions
+
 object Implicits {
 //  implicit class ExprAsVar[S <: Sys[S], A, Repr <: Expr[S, A]](val `this`: Repr) extends AnyVal { me =>
 //    import me.{`this` => ex}

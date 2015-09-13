@@ -38,7 +38,7 @@ package object proc {
   @elidable(CONFIG) private[proc] def log(what: => String): Unit =
     if (showLog) Console.out.println(logHeader.format(new Date()) + what)
 
-  // ---- types ----
-
-  type Folder[S <: Sys[S]] = expr.List.Modifiable[S, Obj[S]]
+//  // ---- types ----
+//
+//  type Folder[S <: Sys[S]] = expr.List.Modifiable[S, Obj[S]]
 }
