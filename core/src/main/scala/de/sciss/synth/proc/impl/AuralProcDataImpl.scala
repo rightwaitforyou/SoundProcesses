@@ -580,6 +580,9 @@ object AuralProcDataImpl {
           // a.spec.numChannels
           a.value.spec.numChannels
         case _: FadeSpec.Obj       [S] => 4
+//        case a: Scan[S] =>
+//          scanView(a).getOrElse(throw new MissingIn())
+//          requestScanInNumChannels(i)
         case _ => -1
       }
     }
@@ -664,8 +667,25 @@ object AuralProcDataImpl {
           b.addResource(w)
 
         case a: Scan[S] =>
-          scanView(a).fold {
+          scanView(a).fold[Unit] {
             Console.err.println(s"Warning: view for scan $a used as attribute key $key not found.")
+            // XXX TODO --- this is big ugly hack
+            // in order to allow the concurrent appearance
+            // of the source and sink procs.
+            context.waitForAux[AuralScan.Proxy[S]](a.id) {
+              case view: AuralScan[S] =>
+                nodeRef.get(tx.peer).foreach { n =>
+                  Console.err.println(s"...phew, view for scan $a used as attribute key $key appeared.")
+                  val b = new SynthUpdater(procCached(), node = n.node, key = key, nodeRef = n)
+                  // NOTE: because waitForAux is guaranteed to happen within
+                  // the same transaction, we can re-use `a` without handle!
+                  buildAttrValueInput(b, key = key, value = a, numChannels = numChannels)
+                  b.finish()
+                }
+
+              case _ =>
+            }
+
           } { view =>
             val bus = view.bus
             chanCheck(bus.numChannels)

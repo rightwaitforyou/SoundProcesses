@@ -42,6 +42,12 @@ trait AuralContext[S <: Sys[S]] {
 
   def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A]
 
+  /** A bit of a hack. Waits for the auxiliary object to appear
+    * within the _current_ transaction only. If the object
+    * appears the function is applied, otherwise nothing happens.
+    */
+  def waitForAux[A](id: S#ID)(fun: PartialFunction[A, Unit])(implicit tx: S#Tx): Unit
+
   def removeAux(id: S#ID)(implicit tx: S#Tx): Unit
 
   val scheduler: Scheduler[S]
