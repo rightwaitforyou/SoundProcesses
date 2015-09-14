@@ -14,10 +14,10 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.event.{Dummy, EventLike, Targets, Publisher}
-import de.sciss.lucre.stm.{Copy, Elem, Obj, Identifiable, Sys}
-import de.sciss.lucre.{event => evt, stm, data}
-import de.sciss.serial.{DataOutput, Serializer, DataInput}
+import de.sciss.lucre.event.{Dummy, EventLike, Publisher}
+import de.sciss.lucre.stm.{Copy, Elem, Obj, Sys}
+import de.sciss.lucre.stm
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.synth.proc.impl.{ScanImpl => Impl}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -43,8 +43,10 @@ object Scan extends Obj.Type {
 
       def tpe: Elem.Type = Link
 
-      def id = peer.id
-      override def toString = peer.toString
+      def peerID: S#ID = peer.id
+      // override def toString = peer.toString
+
+      override def productPrefix = "Scan.Link.Grapheme"
 
       def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
         new Grapheme(context(peer))
@@ -62,8 +64,10 @@ object Scan extends Obj.Type {
       extends Link[S] with stm.impl.ConstElemImpl[S] {
       def tpe: Elem.Type = Link
 
-      def id = peer.id
-      override def toString = peer.toString
+      def peerID: S#ID = peer.id
+
+      // override def toString = peer.toString
+      override def productPrefix = "Scan.Link.Scan"
 
       def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
         new Scan(context(peer))
@@ -81,7 +85,11 @@ object Scan extends Obj.Type {
   }
 
   /** This trait describes a source or sink link to/from a sink. */
-  sealed trait Link[S <: Sys[S]] extends Elem[S] with Identifiable[S#ID]
+  sealed trait Link[S <: Sys[S]] extends Elem[S] {
+    // with Identifiable[S#ID] --- NOT because we end up with aliased equals
+
+    def peerID: S#ID
+  }
 
   /** Constructs a new unconnected scan. */
   def apply[S <: Sys[S]](proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = Impl(proc, key)

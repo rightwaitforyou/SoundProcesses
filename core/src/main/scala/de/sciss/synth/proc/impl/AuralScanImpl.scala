@@ -68,20 +68,20 @@ object AuralScanImpl {
     // this event and call into the symmetric method.
     val obs = scan.changed.react { implicit tx => upd =>
       upd.changes.foreach {
-        case Scan.Added(peer) =>
+        case Scan.Added(link) =>
           if (isInput)
-            scanView(peer.id).foreach(view.addSource   )
+            scanView(link.peerID).foreach(view.addSource   )
           else
-            scanViewProxy(peer.id).foreach {
+            scanViewProxy(link.peerID).foreach {
               case sinkView: AuralScan[S] => view.addSink(sinkView)
               case proxy: AuralScan.Incomplete[S] => proxy.data.sinkAdded(proxy.key, view)
             }
 
-        case Scan.Removed(peer) =>
+        case Scan.Removed(link) =>
           if (isInput)
-            scanView(peer.id).foreach(view.removeSource)
+            scanView(link.peerID).foreach(view.removeSource)
           else
-            scanView(peer.id).foreach(view.removeSink)
+            scanView(link.peerID).foreach(view.removeSink)
       }
     }
 
