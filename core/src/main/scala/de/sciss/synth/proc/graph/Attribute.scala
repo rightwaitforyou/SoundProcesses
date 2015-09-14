@@ -51,14 +51,22 @@ object Attribute {
 
   /* private[proc] */ def controlName(key: String): String = s"$$at_$key"
 
-  def ir(key: String, default: Default = 0.0): Attribute = new Attribute(scalar , key, default)
-  def kr(key: String, default: Default = 0.0): Attribute = new Attribute(control, key, default)
-  def ar(key: String, default: Default = 0.0): Attribute = new Attribute(audio  , key, default)
+  def ir(key: String, default: Default = 0.0, fixed: Boolean = false): Attribute =
+    new Attribute(scalar , key, default, fixed = fixed)
+
+  def kr(key: String, default: Default = 0.0, fixed: Boolean = false): Attribute =
+    new Attribute(control, key, default, fixed = fixed)
+
+  def ar(key: String, default: Default = 0.0, fixed: Boolean = false): Attribute =
+    new Attribute(audio  , key, default, fixed = fixed)
 }
-final case class Attribute(rate: Rate, key: String, default: Attribute.Default) extends GE.Lazy {
+final case class Attribute(rate: Rate, key: String, default: Attribute.Default, fixed: Boolean)
+  extends GE.Lazy {
+
   def makeUGens: UGenInLike = {
     val b       = UGenGraphBuilder.get
-    val numCh   = b.requestInput(Input.Attribute(key, numChannels = -1)).numChannels
+    val inValue = b.requestInput(Input.Attribute(key, numChannels = if (fixed) default.numChannels else -1))
+    val numCh   = inValue.numChannels
     val ctlName = Attribute.controlName(key)
     val values  = default.tabulate(numCh)
     val nameOpt = Some(ctlName)
