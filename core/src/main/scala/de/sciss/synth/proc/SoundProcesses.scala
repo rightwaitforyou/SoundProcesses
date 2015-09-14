@@ -69,7 +69,7 @@ object SoundProcesses {
     CurveObj.init()
     Ensemble.init()
     FadeSpec.init()
-    // Folder  .init()
+    Folder  .init()
     Grapheme.init()
     Proc    .init()
     Scan    .init()
