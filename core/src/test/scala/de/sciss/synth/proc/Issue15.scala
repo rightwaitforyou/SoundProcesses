@@ -16,7 +16,7 @@ import de.sciss.span.Span
 class Issue15 extends ConfluentEventSpec {
   final val DEBUG = false
 
-  "AttrMap" should "dispatch events after repeated listener (un)registration" in { system =>
+  ignore /* "AttrMap" */ should "dispatch events after repeated listener (un)registration" in { system =>
     val obs = new Observation
 
     if (DEBUG) de.sciss.lucre.event.showLog = true
