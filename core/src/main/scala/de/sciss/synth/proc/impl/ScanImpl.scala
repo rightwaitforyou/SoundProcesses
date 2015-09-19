@@ -100,8 +100,8 @@ object ScanImpl {
       val outList = List.Modifiable[Out, Link]
       val out     = new Impl(Targets[Out], context(_proc), key, outList)
       context.defer(in, out) {
-        val filter  = context.getHint(proc, Proc.hintFilterLinks).asInstanceOf[Option[Proc[S] => Boolean]]
-          .getOrElse(filterAll)
+        val filterOpt = context.getHint[Proc[S] => Boolean](proc, Proc.hintFilterLinks)
+        val filter    = filterOpt.getOrElse(filterAll)
         in.list.iterator.foreach {
           case Scan.Link.Scan(peer) if !filter(peer.proc) =>
           case link => out.add(context(link))

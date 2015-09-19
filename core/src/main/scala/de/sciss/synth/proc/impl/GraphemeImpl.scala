@@ -16,10 +16,10 @@ package proc
 package impl
 
 import de.sciss.lucre.bitemp.BiPin
-import de.sciss.lucre.event.{impl => evti, Targets}
+import de.sciss.lucre.event.{Targets, impl => evti}
 import de.sciss.lucre.expr.LongObj
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
+import de.sciss.lucre.stm.{Copy, Elem, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 import de.sciss.span.Span
@@ -93,7 +93,53 @@ object GraphemeImpl {
       new Impl(Targets[Out], numChannels, context[PinAux](pin)).connect()
     }
 
-    object changed extends Changed with evti.Root[S, Grapheme.Update[S]]
+    object changed extends Changed {    // with evti.Root[S, Grapheme.Update[S]]
+      def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Grapheme.Update[S]] = {
+        pull(pin.changed).flatMap { upd =>
+          val segm: Vec[Segment] = upd.changes.foldLeft(Vector.empty: Vec[Segment]) {
+            case (res, ch) =>
+              val seq = ch match {
+                case BiPin.Added  (addTime, entry)    => segmentsAfterAdded(addTime, entry.value.value)
+                case BiPin.Removed(remTime, entry)    => Vector(segmentAfterRemoved(remTime))
+
+                // the BiPin.Collection update assumes the 'pin' character
+                // of the elements. that means that for example, an insertion
+                //
+                // |------I-------|
+                // floor          ceil
+                //
+                // will fire the dirty region
+                //
+                //        I-------|
+                //
+                // but the grapheme will change significantly more when curves are involved:
+                // - if `I` is `Audio`
+                //   - it may have been that ceil was a curve, and thus a segment was
+                //     stretching from floorTime to ceilTime, which is now replaced by
+                //     a constant from floorTime to I-time. Note that because multiple changes
+                //     might be collapsed, we should not assume that the segment was constructed
+                //     with the value now found at ceilTime. Instead, pessimistically, we will
+                //     always assume that the span floor--I must be fired.
+                //   - the span I--ceil is straight forward and does not need additional evaluations
+                // - if `I` is `Curve`
+                //   - the dirty region floor--I must be fired as above.
+                //   - additionally the span I--ceil must be resolved by looking at the holder at
+                //     ceilTime: if ceilTime is undefined, or if it is `Audio`, the span I--ceil is a
+                //     constant, otherwise if it is `Curve` we need to calculate the curve segment.
+
+                case BiPin.Moved(timeCh, elem) =>
+                  // val (timeCh, magCh) = elemCh.unzip
+                  val seqAdd = segmentsAfterAdded(timeCh.now, elem.value.value /* magCh.now */)
+                  if (timeCh.isSignificant) {
+                    segmentAfterRemoved(timeCh.before) +: seqAdd
+                  } else seqAdd
+              }
+              seq.foldLeft(res)(incorporate)
+          }
+          if (segm.nonEmpty) Some(Grapheme.Update(graph, segm)) else None
+        }
+      }
+    }
 
     // ---- forwarding to pin ----
 
@@ -106,6 +152,7 @@ object GraphemeImpl {
 
       pin.add(key, value)
     }
+
     def remove(key: LongObj[S], value: Expr[S])(implicit tx: S#Tx): Boolean  = pin.remove(key, value)
 
     def clear()(implicit tx: S#Tx): Unit = pin.clear()
@@ -126,7 +173,7 @@ object GraphemeImpl {
           case _ => tail
         }
 
-      loop(Long.MinValue, Nil)
+      loop(firstEvent.getOrElse(Long.MinValue), Nil)
     }
 
     def valueAt(time: Long)(implicit tx: S#Tx): Option[Value] =
@@ -171,7 +218,7 @@ object GraphemeImpl {
         case av: Value.Audio =>
           val span = pin.eventAfter(floorTime) match {
             case Some(ceilTime) => Span(floorTime, ceilTime)
-            case _ => Span.from(floorTime)
+            case _              => Span.from(floorTime)
           }
           Segment.Audio(span, av)
       }
@@ -233,52 +280,6 @@ object GraphemeImpl {
           assert(!inSpan.overlaps(addSpan))
           in.patch(i, Vec(add), 0)
         }
-      }
-    }
-
-    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Grapheme.Update[S]] = {
-      pull(pin.changed).flatMap { upd =>
-        val segm: Vec[Segment] = upd.changes.foldLeft(Vec.empty[Segment]) {
-          case (res, ch) =>
-            val seq = ch match {
-              case BiPin.Added  (addTime, entry)    => segmentsAfterAdded(addTime, entry.value.value)
-              case BiPin.Removed(remTime, entry)    => Vec(segmentAfterRemoved(remTime))
-
-              // the BiPin.Collection update assumes the 'pin' character
-              // of the elements. that means that for example, an insertion
-              //
-              // |------I-------|
-              // floor          ceil
-              //
-              // will fire the dirty region
-              //
-              //        I-------|
-              //
-              // but the grapheme will change significantly more when curves are involved:
-              // - if `I` is `Audio`
-              //   - it may have been that ceil was a curve, and thus a segment was
-              //     stretching from floorTime to ceilTime, which is now replaced by
-              //     a constant from floorTime to I-time. Note that because multiple changes
-              //     might be collapsed, we should not assume that the segment was constructed
-              //     with the value now found at ceilTime. Instead, pessimistically, we will
-              //     always assume that the span floor--I must be fired.
-              //   - the span I--ceil is straight forward and does not need additional evaluations
-              // - if `I` is `Curve`
-              //   - the dirty region floor--I must be fired as above.
-              //   - additionally the span I--ceil must be resolved by looking at the holder at
-              //     ceilTime: if ceilTime is undefined, or if it is `Audio`, the span I--ceil is a
-              //     constant, otherwise if it is `Curve` we need to calculate the curve segment.
-
-              case BiPin.Moved(timeCh, elem) =>
-                // val (timeCh, magCh) = elemCh.unzip
-                val seqAdd = segmentsAfterAdded(timeCh.now, elem.value.value /* magCh.now */)
-                if (timeCh.isSignificant) {
-                  segmentAfterRemoved(timeCh.before) +: seqAdd
-                } else seqAdd
-            }
-            seq.foldLeft(res)(incorporate)
-        }
-        if (segm.nonEmpty) Some(Grapheme.Update(graph, segm)) else None
       }
     }
 

@@ -90,8 +90,8 @@ object AuralProcDataImpl {
       }
       val attr = proc.attr
       attrObserver = attr.changed.react { implicit tx => upd => upd.changes.foreach {
-        case Obj.AttrAdded  (key, value)          => attrAdded  (key, value)
-        case Obj.AttrRemoved(key, value)          => attrRemoved(key, value)
+        case Obj.AttrAdded  (key, value) => attrAdded  (key, value)
+        case Obj.AttrRemoved(key, value) => attrRemoved(key, value)
       }}
 
       // XXX TODO -- should filter only relevant values

@@ -16,7 +16,7 @@ package proc
 package impl
 
 import de.sciss.lucre.data.SkipList
-import de.sciss.lucre.event.{impl => evti, Targets}
+import de.sciss.lucre.event.Targets
 import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
 import de.sciss.lucre.synth.InMemory
@@ -222,6 +222,7 @@ object ProcImpl {
     }
 
     final protected def disposeData()(implicit tx: S#Tx): Unit = {
+      disconnect()
       graph       .dispose()
       scanInMap   .dispose()
       scanOutMap  .dispose()
@@ -235,6 +236,7 @@ object ProcImpl {
     val graph               = SynthGraphObj.newVar(SynthGraphObj.empty)
     val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
     val scanOutMap          = SkipList.Map.empty[S, String, ScanEntry[S]]
+    connect()(tx0)
   }
 
   private final class Read[S <: Sys[S]](in: DataInput, access: S#Acc, protected val targets: evt.Targets[S])
