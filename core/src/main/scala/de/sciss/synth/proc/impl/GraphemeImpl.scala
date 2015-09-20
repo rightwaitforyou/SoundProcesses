@@ -173,7 +173,7 @@ object GraphemeImpl {
           case _ => tail
         }
 
-      loop(firstEvent.getOrElse(Long.MinValue), Nil)
+      loop(Long.MaxValue, Nil)  // N.B.: we are going backwards
     }
 
     def valueAt(time: Long)(implicit tx: S#Tx): Option[Value] =
