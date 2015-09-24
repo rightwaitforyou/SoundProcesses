@@ -290,7 +290,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         after(1.0) { implicit tx =>
           val spec  = AudioFile.readSpec(f)
           assert(spec.fileType == AudioFileType.Wave64 && spec.numChannels == 2)
-          val gr    = Grapheme.Expr.Audio(artH(), spec, 0L, 1.0)
+          val gr    = Grapheme.Expr.Audio[S](artH(), spec, 0L, 1.0)
           val pPlay = proc {
             val sig   = graph.DiskIn.ar("disk")
             Out.ar(0, sig)  // let it be heard
@@ -327,9 +327,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
       val playing = BooleanObj.newVar[S](false)
       val foldIn  = Folder[S]
-      val ensIn   = Ensemble(foldIn , 0L, true)     // inner ensemble already active
+      val ensIn   = Ensemble[S](foldIn , 0L, true)     // inner ensemble already active
       val foldOut = Folder[S]
-      val ensOut  = Ensemble(foldOut, 0L, playing)  // outer ensemble will be activated later
+      val ensOut  = Ensemble[S](foldOut, 0L, playing)  // outer ensemble will be activated later
 
       val gen = proc {
         val sig = WhiteNoise.ar(0.5)
@@ -491,7 +491,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       }
       val loc     = ArtifactLocation.newConst[S](f.parent)
       val artif   = Artifact(loc, f) // loc.add(f)
-      val oAudio  = Grapheme.Expr.Audio(artif, spec, offset = 0L, gain = 2.0)
+      val oAudio  = Grapheme.Expr.Audio[S](artif, spec, offset = 0L, gain = 2.0)
 
       _proc.attr.put("metal", oAudio)
 

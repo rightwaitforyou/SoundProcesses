@@ -1,7 +1,7 @@
 lazy val baseName  = "SoundProcesses"
 lazy val baseNameL = baseName.toLowerCase
 
-lazy val projectVersion = "3.2.0-SNAPSHOT"
+lazy val projectVersion = "3.2.0"
 
 lazy val commonSettings = Seq(
   version            := projectVersion,
@@ -14,11 +14,11 @@ lazy val commonSettings = Seq(
   resolvers          += "Oracle Repository" at "http://download.oracle.com/maven"  // required for sleepycat
 ) ++ publishSettings
 
-lazy val lucreVersion               = "3.2.0-SNAPSHOT"
+lazy val lucreVersion               = "3.2.0"
 lazy val scalaColliderVersion       = "1.17.4"
 lazy val scalaColliderSwingVersion  = "1.25.3"
 lazy val spanVersion                = "1.3.1"
-lazy val lucreSwingVersion          = "1.2.0-SNAPSHOT"
+lazy val lucreSwingVersion          = "1.2.0"
 lazy val audioWidgetsVersion        = "1.9.1"
 lazy val fileUtilVersion            = "1.1.1"
 lazy val topologyVersion            = "1.0.0"
