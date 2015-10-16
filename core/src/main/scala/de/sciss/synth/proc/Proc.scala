@@ -15,9 +15,7 @@ package de.sciss.synth
 package proc
 
 import de.sciss.lucre.event.Publisher
-import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm.{Obj, Sys}
-import de.sciss.lucre.{event => evt}
 import de.sciss.model
 import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc.impl.{ProcImpl => Impl}
@@ -48,31 +46,26 @@ object Proc extends Obj.Type {
   /** An associative change is either adding or removing an association */
   sealed trait ScanMapChange[S <: Sys[S]] extends Change[S] {
     def key: String
+
     def scan: Scan[S]
   }
-  final case class InputAdded   [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
-  final case class InputRemoved [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
-  final case class OutputAdded  [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
-  final case class OutputRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
 
-//  final case class InputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
-//    extends Change[S] {
-//    override def toString = s"InputChange($key, $scan, $changes)"
-//  }
-//
-//  final case class OutputChange[S <: Sys[S]](key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])
-//    extends Change[S] {
-//    override def toString = s"OutputChange($key, $scan, $changes)"
-//  }
+  final case class InputAdded[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+
+  final case class InputRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+
+  final case class OutputAdded[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+
+  final case class OutputRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
 
   /** Source code of the graph function. */
   final val attrSource = "graph-source"
 
-  final val scanMainIn  = "in"
+  final val scanMainIn = "in"
   final val scanMainOut = "out"
 
   /** Audio input file (tape) grapheme. */
-  final val graphAudio  = "sig"
+  final val graphAudio = "sig"
 
   /** Hint key for copying scan connections during `copy`. Value should be a
     * predicate function `(Proc[S]) => Boolean`. If absent, all connections
@@ -83,6 +76,7 @@ object Proc extends Obj.Type {
   override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
     Impl.readIdentifiedObj(in, access)
 }
+
 /** The `Proc` trait is the basic entity representing a sound process. */
 trait Proc[S <: Sys[S]] extends Obj[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */

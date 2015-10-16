@@ -15,12 +15,12 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Publisher
 import de.sciss.lucre.expr
-import de.sciss.lucre.expr.{LongObj, BooleanObj, Expr}
-import de.sciss.lucre.stm.{Obj, Sys, Disposable}
+import de.sciss.lucre.expr.{BooleanObj, LongObj}
+import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.model
-import de.sciss.serial.{DataInput, Serializer, Writable}
+import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc
-import impl.{EnsembleImpl => Impl}
+import de.sciss.synth.proc.impl.{EnsembleImpl => Impl}
 
 object Ensemble extends Obj.Type {
   final val typeID = 0x10007

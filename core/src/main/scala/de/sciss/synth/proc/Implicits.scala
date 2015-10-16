@@ -16,19 +16,9 @@ package de.sciss.synth.proc
 import de.sciss.lucre.expr.{BooleanObj, Expr, StringObj}
 import de.sciss.lucre.stm.{Obj, Sys}
 
-import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.implicitConversions
 
 object Implicits {
-//  implicit class ExprAsVar[S <: Sys[S], A, Repr <: Expr[S, A]](val `this`: Repr) extends AnyVal { me =>
-//    import me.{`this` => ex}
-//
-//    /** Resolves the expression as a variable. If the expression is not a variable,
-//      * throws an exception.
-//      */
-//    def asVar: Expr.Var[S, A] = Expr.Var.unapply(ex).getOrElse(sys.error(s"Not a variable: $ex"))
-//  }
-
   implicit class SecFrames(val `this`: Double) extends AnyVal { me =>
     import me.{`this` => d}
 

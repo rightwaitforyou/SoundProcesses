@@ -14,11 +14,10 @@
 package de.sciss.synth
 package proc
 
-import de.sciss.lucre.stm
-import de.sciss.lucre.synth.Sys
-import de.sciss.lucre.stm.{Obj, Disposable, Cursor}
 import de.sciss.lucre.event.Observable
-import impl.{TransportImpl => Impl}
+import de.sciss.lucre.stm.{Cursor, Disposable, Obj}
+import de.sciss.lucre.synth.Sys
+import de.sciss.synth.proc.impl.{TransportImpl => Impl}
 
 object Transport {
   /** Creates a `Transport` independent of a running aural system. If will create and destroy

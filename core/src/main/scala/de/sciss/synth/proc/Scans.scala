@@ -13,19 +13,21 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.data
 import de.sciss.lucre.stm.Sys
 
 object Scans {
   trait Modifiable[S <: Sys[S]] extends Scans[S] {
     /** Adds a new scan by the given key. If a span by that name already exists, the old scan is returned. */
     def add   (key: String)(implicit tx: S#Tx): Scan[S]
+
     def remove(key: String)(implicit tx: S#Tx): Boolean
   }
 }
 
 trait Scans[S <: Sys[S]] {
   def get(key: String)(implicit tx: S#Tx): Option[Scan[S]]
+
   def keys(implicit tx: S#Tx): Set[String]
+
   def iterator(implicit tx: S#Tx): Iterator[(String, Scan[S])]
 }
