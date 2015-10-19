@@ -47,68 +47,54 @@ object ProcImpl {
     new Read(in, access, targets)
   }
 
-  private type ScanEntry[S <: Sys[S]] = KeyMapImpl.Entry[S, String, Scan[S]]
+//  private type I = InMemory
 
-  private type I = InMemory
-
-  implicit def scanEntryInfo[S <: Sys[S]]: KeyMapImpl.ValueInfo[S, String, Scan[S]] =
-    anyScanEntryInfo.asInstanceOf[KeyMapImpl.ValueInfo[S, String, Scan[S]]]
-
-  private val anyScanEntryInfo = new KeyMapImpl.ValueInfo[NoSys, String, Scan[NoSys]] {
-    // def valueEvent(value: Scan[NoSys]) = value.changed
-
-    val keySerializer   = ImmutableSerializer.String
-    val valueSerializer = Scan.serializer[NoSys]
-  }
-
-  final class ScansImpl[S <: Sys[S]](proc: Impl[S], val slot: Int, isInput: Boolean)
-    extends Scans.Modifiable[S]
-    // with evti.EventImpl [S, Proc.Update[S], Proc[S]]
-    with impl.KeyMapImpl[S, String, Scan[S]] {
+  final class OutputsImpl[S <: Sys[S]](proc: Impl[S], val slot: Int, isInput: Boolean)
+    extends Outputs[S] {
 
     // ---- key-map-impl details ----
 
-    protected def map = if (isInput) proc.scanInMap else proc.scanOutMap
+    import proc.{outputsMap => map}
 
-    protected def fire(added: Option[(String, Scan[S])], removed: Option[(String, Scan[S])])
+    protected def fire(added: Option[Output[S]], removed: Option[Output[S]])
                       (implicit tx: S#Tx): Unit = {
-      val b = Vector.newBuilder[Proc.ScanMapChange[S]]
+      val b = Vector.newBuilder[Proc.OutputsChange[S]]
       b.sizeHint(2)
       // convention: first the removals, then the additions. thus, overwriting a key yields
       // successive removal and addition of the same key.
-      removed.foreach { tup =>
-        b += (if (isInput) Proc.InputRemoved[S](tup._1, tup._2) else Proc.OutputRemoved[S](tup._1, tup._2))
+      removed.foreach { output =>
+        b += Proc.OutputRemoved[S](output)
       }
-      added.foreach { tup =>
-        b += (if (isInput) Proc.InputAdded[S](tup._1, tup._2) else Proc.OutputAdded[S](tup._1, tup._2))
+      added.foreach { output =>
+        b += Proc.OutputAdded  [S](output)
       }
 
       proc.changed.fire(Proc.Update(proc, b.result()))
     }
 
-    // def node: Proc[S] with evt.Node[S] = proc
+    private def add(key: String, value: Output[S])(implicit tx: S#Tx): Unit = {
+      val optRemoved = map.add(key -> value)
+      fire(added = Some(value), removed = optRemoved)
+    }
 
-    // protected def isConnected(implicit tx: S#Tx): Boolean = proc.isConnected
+    def remove(key: String)(implicit tx: S#Tx): Boolean =
+      map.remove(key).exists { output =>
+        fire(added = None, removed = Some(output))
+        true
+      }
 
-    def add(key: String)(implicit tx: S#Tx): Scan[S] =
+    def add(key: String)(implicit tx: S#Tx): Output[S] =
       get(key).getOrElse {
-        val res = Scan[S](proc, key)
+        val res = Output[S](proc, key)
         add(key, res)
         res
       }
 
-//    def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[Proc.Update[S]] = {
-//      val changes = foldUpdate(pull)
-//      if (changes.isEmpty) None
-//      else Some(Proc.Update(proc,
-//        changes.map({
-//          case (key, u) =>
-//            if (isInput) Proc.InputChange (key, u.scan, u.changes)
-//            else         Proc.OutputChange(key, u.scan, u.changes)
-//        })(breakOut)))
-//    }
+    def get(key: String)(implicit tx: S#Tx): Option[Output[S]] = map.get(key)
 
-    protected def valueInfo = scanEntryInfo[S]
+    def keys(implicit tx: S#Tx): Set[String] = map.keysIterator.toSet
+
+    def iterator(implicit tx: S#Tx): Iterator[(String, Output[S])] = map.iterator
   }
 
   private sealed trait Impl[S <: Sys[S]]
@@ -121,26 +107,26 @@ object ProcImpl {
       new Impl[Out] { out =>
         protected val targets   = Targets[Out]
         val graph               = context(proc.graph)
-        val scanInMap           = SkipList.Map.empty[Out, String, ScanEntry[Out]]
-        val scanOutMap          = SkipList.Map.empty[Out, String, ScanEntry[Out]]
+        // val scanInMap           = SkipList.Map.empty[Out, String, ScanEntry[Out]]
+        val outputsMap          = SkipList.Map.empty[Out, String, Output[Out]]
         context.defer(proc, out) {
-          def copyMap(in : SkipList.Map[S  , String, ScanEntry[S  ]],
-                      out: SkipList.Map[Out, String, ScanEntry[Out]]): Unit =
+          def copyMap(in : SkipList.Map[S  , String, Output[S  ]],
+                      out: SkipList.Map[Out, String, Output[Out]]): Unit =
           in.iterator.foreach { case (key, eIn) =>
-            val eOut = new ScanEntry(key, context(eIn.value))
+            val eOut = context(eIn)
             out.add(key -> eOut)
           }
 
-          copyMap(proc.scanInMap , out.scanInMap)
-          copyMap(proc.scanOutMap, out.scanOutMap)
+          // copyMap(proc.scanInMap , out.scanInMap)
+          copyMap(proc.outputsMap, out.outputsMap)
         }
         connect()
       }
 
     import Proc._
 
-    def scanInMap : SkipList.Map[S, String, ScanEntry[S]]
-    def scanOutMap: SkipList.Map[S, String, ScanEntry[S]]
+    // def scanInMap : SkipList.Map[S, String, ScanEntry[S]]
+    def outputsMap: SkipList.Map[S, String, Output[S]]
 
     // ---- key maps ----
 
@@ -150,8 +136,8 @@ object ProcImpl {
 //      final def node: Proc[S] with evt.Node[S] = proc
 //    }
 
-    final val inputs  = new ScansImpl(this, 1, isInput = true )
-    final val outputs = new ScansImpl(this, 2, isInput = false)
+//    final val inputs  = new ScansImpl(this, 1, isInput = true )
+    final val outputs = new OutputsImpl(this, 2, isInput = false)
 
 //    object StateEvent
 //      extends evti.TriggerImpl[S, Proc.Update[S], Proc[S]]
@@ -217,15 +203,15 @@ object ProcImpl {
     final protected def writeData(out: DataOutput): Unit = {
       out.writeShort(SER_VERSION)
       graph       .write(out)
-      scanInMap   .write(out)
-      scanOutMap  .write(out)
+      // scanInMap   .write(out)
+      outputsMap  .write(out)
     }
 
     final protected def disposeData()(implicit tx: S#Tx): Unit = {
       disconnect()
       graph       .dispose()
-      scanInMap   .dispose()
-      scanOutMap  .dispose()
+      // scanInMap   .dispose()
+      outputsMap  .dispose()
     }
 
     override def toString: String = s"Proc$id"
@@ -234,8 +220,8 @@ object ProcImpl {
   private final class New[S <: Sys[S]](implicit tx0: S#Tx) extends Impl[S] {
     protected val targets   = evt.Targets[S](tx0)
     val graph               = SynthGraphObj.newVar(SynthGraphObj.empty)
-    val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
-    val scanOutMap          = SkipList.Map.empty[S, String, ScanEntry[S]]
+    // val scanInMap           = SkipList.Map.empty[S, String, ScanEntry[S]]
+    val outputsMap          = SkipList.Map.empty[S, String, Output[S]]
     connect()(tx0)
   }
 
@@ -249,7 +235,7 @@ object ProcImpl {
     }
 
     val graph         = SynthGraphObj.readVar(in, access)
-    val scanInMap     = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
-    val scanOutMap    = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
+    // val scanInMap     = SkipList.Map.read[S, String, ScanEntry[S]](in, access)
+    val outputsMap    = SkipList.Map.read[S, String, Output[S]](in, access)
   }
 }

@@ -111,41 +111,4 @@ trait KeyMapImpl[S <: Sys[S], Key, Value] {
       fire(added = None, removed = Some(key -> oldNode.value))
       true
     }
-
-  //  @inline private def +=(entry: Entry)(implicit tx: S#Tx): Unit = entry ---> this
-  //  @inline private def -=(entry: Entry)(implicit tx: S#Tx): Unit = entry -/-> this
-
-//  final def connect()(implicit tx: S#Tx): Unit =
-//    map.iterator.foreach {
-//      case (_, node) => this += node
-//    }
-//
-//  final def disconnect()(implicit tx: S#Tx): Unit =
-//    map.iterator.foreach {
-//      case (_, node) => this -= node
-//    }
-
-  //   final protected def foldUpdate( pull: evt.Pull[ S ])( implicit tx: S#Tx ) : Map[ Key, Vec[ ValueUpd ]] = {
-  //      pull.parents( this ).foldLeft( Map.empty[ Key, Vec[ ValueUpd ]]) { case (map, sel) =>
-  //         val entryEvt = sel.devirtualize[ (Key, ValueUpd), Entry ]( KeyMapImpl.entrySerializer )
-  //         pull(entryEvt) match {
-  //            case Some( (key, upd) ) => map + (key -> (map.getOrElse( key, Vec.empty ) :+ upd))
-  //            case None => map
-  //         }
-  //      }
-  //   }
-
-//  final protected def foldUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Map[Key, ValueUpd] = {
-//    pull.parents(this).foldLeft(Map.empty[Key, ValueUpd]) {
-//      case (map, sel) =>
-//        val entryEvt = sel.devirtualize[(Key, ValueUpd), Entry](KeyMapImpl.entrySerializer)
-//        pull(entryEvt) match {
-//          case Some((key, upd)) =>
-//            assert(!map.contains(key))
-//            map + (key -> upd)
-//          case None =>
-//            map
-//        }
-//    }
-//  }
 }

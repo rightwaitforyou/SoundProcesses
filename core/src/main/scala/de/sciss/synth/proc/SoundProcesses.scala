@@ -72,7 +72,7 @@ object SoundProcesses {
     Folder  .init()
     Grapheme.init()
     Proc    .init()
-    Scan    .init()
+    Output  .init()
     Timeline.init()
   }
 

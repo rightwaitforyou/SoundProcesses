@@ -44,24 +44,19 @@ object Proc extends Obj.Type {
   final case class GraphChange[S <: Sys[S]](change: model.Change[SynthGraph]) extends Change[S]
 
   /** An associative change is either adding or removing an association */
-  sealed trait ScanMapChange[S <: Sys[S]] extends Change[S] {
-    def key: String
-
-    def scan: Scan[S]
+  sealed trait OutputsChange[S <: Sys[S]] extends Change[S] {
+    def output: Output[S]
   }
 
-  final case class InputAdded[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
-
-  final case class InputRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
-
-  final case class OutputAdded[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
-
-  final case class OutputRemoved[S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+//  final case class InputAdded   [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+//  final case class InputRemoved [S <: Sys[S]](key: String, scan: Scan[S]) extends ScanMapChange[S]
+  final case class OutputAdded  [S <: Sys[S]](output: Output[S]) extends OutputsChange[S]
+  final case class OutputRemoved[S <: Sys[S]](output: Output[S]) extends OutputsChange[S]
 
   /** Source code of the graph function. */
   final val attrSource = "graph-source"
 
-  final val scanMainIn = "in"
+  final val scanMainIn  = "in"
   final val scanMainOut = "out"
 
   /** Audio input file (tape) grapheme. */
@@ -82,12 +77,6 @@ trait Proc[S <: Sys[S]] extends Obj[S] with Publisher[S, Proc.Update[S]] {
   /** The variable synth graph function of the process. */
   def graph: SynthGraphObj.Var[S]
 
-  //  /** The real-time inputs and outputs of the process. */
-  //  def scans: Scans.Modifiable[S]
-
-  /** The real-time inputs of the process. */
-  def inputs: Scans.Modifiable[S]
-
   /** The real-time outputs of the process. */
-  def outputs: Scans.Modifiable[S]
+  def outputs: Outputs[S]
 }

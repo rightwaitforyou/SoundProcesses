@@ -22,7 +22,6 @@ import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, Buffer, Bu
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
 import de.sciss.synth.proc.Grapheme.Segment
-import de.sciss.synth.proc.Scan.Link
 import de.sciss.synth.proc.Timeline.SampleRate
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 import de.sciss.synth.{ControlSet, proc}
@@ -235,45 +234,46 @@ object AuralProcImpl {
 
         // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
         //           we cannot use ControlSet any more, but need other mechanism
-        b.obj.inputs.get(key).foreach { scan =>
-          val src = scan.iterator
-          if (src.isEmpty) {
-            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
-            mkInBus()
-
-          } else {
-            src.foreach {
-              case Link.Grapheme(peer) =>
-                val segmOpt = peer.segment(time)
-                segmOpt.foreach {
-                  // again if not found... stick with default
-                  case const: Segment.Const =>
-                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
-                    b.setMap += (if (const.numChannels == 1) {
-                      ControlSet.Value (inCtlName, const.values.head .toFloat )
-                    } else {
-                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
-                    })
-
-                  case segm: Segment.Curve =>
-                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-                    // println(s"segment : ${segm.span}")
-                    val bm          = mkInBus()
-                    val w           = SegmentWriter(bm.bus, segm, time, SampleRate)
-                    b.dependencies  ::= w
-
-                  case audio: Segment.Audio =>
-                    ensureChannels(audio.numChannels)
-                    val bm          = mkInBus()
-                    val w           = AudioArtifactWriter(bm.bus, audio, time)
-                    b.dependencies  ::= w
-                }
-
-              case Link.Scan(peer) => mkInBus()
-            }
-          }
-        }
+// SCAN
+//        b.obj.inputs.get(key).foreach { scan =>
+//          val src = scan.iterator
+//          if (src.isEmpty) {
+//            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
+//            mkInBus()
+//
+//          } else {
+//            src.foreach {
+//              case Link.Grapheme(peer) =>
+//                val segmOpt = peer.segment(time)
+//                segmOpt.foreach {
+//                  // again if not found... stick with default
+//                  case const: Segment.Const =>
+//                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
+//                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
+//                    b.setMap += (if (const.numChannels == 1) {
+//                      ControlSet.Value (inCtlName, const.values.head .toFloat )
+//                    } else {
+//                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
+//                    })
+//
+//                  case segm: Segment.Curve =>
+//                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
+//                    // println(s"segment : ${segm.span}")
+//                    val bm          = mkInBus()
+//                    val w           = SegmentWriter(bm.bus, segm, time, SampleRate)
+//                    b.dependencies  ::= w
+//
+//                  case audio: Segment.Audio =>
+//                    ensureChannels(audio.numChannels)
+//                    val bm          = mkInBus()
+//                    val w           = AudioArtifactWriter(bm.bus, audio, time)
+//                    b.dependencies  ::= w
+//                }
+//
+//              case Link.Scan(peer) => mkInBus()
+//            }
+//          }
+//        }
 
       case _ => throw new IllegalStateException(s"Unsupported input scan request $value")
     }

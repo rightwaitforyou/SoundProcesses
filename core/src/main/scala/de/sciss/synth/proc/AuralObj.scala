@@ -59,9 +59,10 @@ object AuralObj {
       */
     def nodeOption(implicit tx: S#Tx): Option[NodeRef]
 
-    def getScanIn (key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
-
-    def getScanOut(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
+// SCAN
+//    def getScanIn (key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
+//
+//    def getScanOut(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
 
     //    /** Queries the number of channel associated with a scanned input.
     //      * Throws a control throwable when no value can be determined, making
@@ -114,10 +115,11 @@ object AuralObj {
     def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGenGraphBuilder.Value)
                       (implicit tx: S#Tx): Unit
 
-    // called from scan-view if source is not materialized yet.
-    // XXX TODO --- the method name is confusing. The `key` refers to
-    // to an _input_ scan for which a _source_ is now available.
-    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit
+// SCAN
+//    // called from scan-view if source is not materialized yet.
+//    // XXX TODO --- the method name is confusing. The `key` refers to
+//    // to an _input_ scan for which a _source_ is now available.
+//    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit
 
     implicit def context: AuralContext[S]
   }
