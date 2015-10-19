@@ -56,7 +56,7 @@ object AuralProcDataImpl {
     private val scanBuses     = TMap.empty[String, AudioBus]
 // SCAN
 //    private val scanInViews   = TMap.empty[String, AuralScan.Owned[S]]
-//    private val scanOutViews  = TMap.empty[String, AuralScan.Owned[S]]
+    private val scanOutViews  = TMap.empty[String, AuralOutput.Owned[S]]
     private val procViews     = TSet.empty[AuralObj.Proc[S]]
 
     private val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
@@ -278,12 +278,11 @@ object AuralProcDataImpl {
     private def testOutScan(scan: Output[S])(implicit tx: S#Tx): Unit = {
       val key = scan.key
       state.scanOuts.get(key).foreach { numCh =>
-// SCAN
-//        scanOutViews.get(key)(tx.peer).fold[Unit] {
-//          mkAuralScan(scan, numCh, isInput = false)
-//        } { view =>
-//          checkScanNumChannels(view, numCh)
-//        }
+        scanOutViews.get(key)(tx.peer).fold[Unit] {
+          mkAuralOutput(scan, numCh)
+        } { view =>
+          checkScanNumChannels(view, numCh)
+        }
       }
     }
 
@@ -498,6 +497,23 @@ object AuralProcDataImpl {
       bus
     }
 
+    /* Creates a new aural output */
+    private def mkAuralOutput(output: Output[S], numChannels: Int)(implicit tx: S#Tx): AuralScan[S] = {
+      val key   = output.key
+      val bus   = mkBus(key, numChannels)
+      val views = scanOutViews
+      val view  = AuralOutput(data = this, output = output, bus = bus)
+      views.put(key, view)(tx.peer)
+      // note: the view will iterate over the
+      //       sources and sinks itself upon initialization,
+      //       and establish the playing links if found
+      //
+      //      nodeOption.foreach { n =>
+      //        view.play(n)
+      //      }
+      view
+    }
+
 // SCAN
 //    /* Creates a new aural scan */
 //    private def mkAuralScan(scan: Output[S], numChannels: Int, isInput: Boolean)
@@ -517,11 +533,10 @@ object AuralProcDataImpl {
 //      view
 //    }
 
-// SCAN
-//    private def checkScanNumChannels(view: AuralScan[S], numChannels: Int): Unit = {
-//      val numCh1 = view.bus.numChannels
-//      if (numCh1 != numChannels) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numChannels)")
-//    }
+    private def checkScanNumChannels(view: AuralScan[S], numChannels: Int): Unit = {
+      val numCh1 = view.bus.numChannels
+      if (numCh1 != numChannels) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numChannels)")
+    }
 
     //    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit = {
     //      if (state.missingIns.contains(sinkKey)) tryBuild()
