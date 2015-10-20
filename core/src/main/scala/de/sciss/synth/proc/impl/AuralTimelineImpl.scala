@@ -463,7 +463,7 @@ object AuralTimelineImpl {
       prepareSpanRef() = prepareSpan
       val tl          = obj()
       // search for new regions starting within the look-ahead period
-      val it          = tl.rangeSearch(start = Span(frame, stopFrame), stop = Span.All)
+      val it          = tl.rangeSearch(start = Span(startFrame, stopFrame), stop = Span.All)
       val pt          = playTimeRef()
       val tr0         = pt.shiftTo(sched.time)
       prepare2(tr0, it)
