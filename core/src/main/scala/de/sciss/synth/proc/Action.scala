@@ -16,7 +16,6 @@ package de.sciss.synth.proc
 import de.sciss.lucre.stm.{Obj, Sys, TxnLike}
 import de.sciss.lucre.{event => evt, stm}
 import de.sciss.serial.{DataInput, Serializer}
-import de.sciss.synth.proc
 import de.sciss.synth.proc.impl.{ActionImpl => Impl}
 
 import scala.collection.immutable.{IndexedSeq => Vec}

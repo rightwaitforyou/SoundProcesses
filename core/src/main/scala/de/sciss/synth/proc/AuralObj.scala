@@ -259,6 +259,6 @@ trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Dispos
   def state(implicit tx: S#Tx): AuralObj.State
 
   def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  def play   (timeRef: TimeRef)(implicit tx: S#Tx): Unit
+  def play   (timeRef: TimeRef = TimeRef.Undefined)(implicit tx: S#Tx): Unit
   def stop   (/* time: Long*/ )(implicit tx: S#Tx): Unit
 }
