@@ -20,15 +20,15 @@ import de.sciss.lucre.data.SkipOctree
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.geom.{LongPoint2D, LongSpace}
-import de.sciss.lucre.stm.{Obj, Disposable, IdentifierMap}
-import de.sciss.lucre.synth.Sys
 import de.sciss.lucre.stm
+import de.sciss.lucre.stm.{Disposable, IdentifierMap, Obj}
+import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.AuralObj.{TargetPlaying, TargetPrepared, TargetStop, TargetState, Playing, Preparing, Prepared, Stopped}
+import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, Stopped}
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{Ref, TSet}
+import scala.concurrent.stm.{Ref, TMap, TSet}
 
 object AuralTimelineImpl {
   private type Leaf[S <: Sys[S]] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], AuralObj[S])])
@@ -84,19 +84,20 @@ object AuralTimelineImpl {
 
     private[this] def sched = context.scheduler
 
-    private[this] val currentStateRef = Ref[AuralObj.State](Stopped)
-    private[this] val activeViews     = TSet.empty[AuralObj[S]]
-    private[this] var tlObserver: Disposable[S#Tx] = _
-    private[this] val schedEvtToken   = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
-    private[this] val schedGridToken  = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
-    private[this] val playTimeRef     = Ref(new PlayTime(0L, TimeRef(Span.from(0L), 0L)))
-    private[this] val prepareSpanRef  = Ref(Span(0L, 0L))
+    private[this] val currentStateRef   = Ref[AuralObj.State](Stopped)
+    private[this] val playingViews      = TSet.empty[AuralObj[S]]
+    private[this] val preparingViews    = TMap.empty[AuralObj[S], Disposable[S#Tx]]
+    private[this] var tlObserver        = null: Disposable[S#Tx]
+    private[this] val schedEvtToken     = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
+    private[this] val schedGridToken    = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
+    private[this] val playTimeRef       = Ref(new PlayTime(0L, TimeRef(Span.from(0L), 0L)))
+    private[this] val prepareSpanRef    = Ref(Span(0L, 0L))
 
 //    private[this] val targetStateRef  = Ref[TargetState](TargetStop)
 
     def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
 
-    def views(implicit tx: S#Tx): Set[AuralObj[S]] = activeViews.single.toSet
+    def views(implicit tx: S#Tx): Set[AuralObj[S]] = playingViews.single.toSet
 
     object contents extends ObservableImpl[S, AuralObj.Timeline.Update[S]] {
       def viewAdded(timed: S#ID, view: AuralObj[S])(implicit tx: S#Tx): Unit =
@@ -138,7 +139,6 @@ object AuralTimelineImpl {
     def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemAdded  (id, span.value, obj)
     def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemRemoved(id, span.value, obj)
 
-    // XXX TODO --- check this out
     private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"timeline - elemAdded($span, $obj)")
 
@@ -206,38 +206,31 @@ object AuralTimelineImpl {
       }
     }
 
-    // XXX TODO --- check this out
-    private[this] def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-      ???
-      
-      logA(s"timeline - elemRemoved($span, $obj)")
-      implicit val itx: I#Tx = iSys(tx)
-
-      val view = viewMap.get(tid).getOrElse {
-        Console.err.println(s"Warning: timeline - elemRemoved - no view for $obj found")
-        return
+    private[this] def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit =
+      viewMap.get(tid).foreach { view =>
+        // finding the object in the view-map implies that it
+        // is currently preparing or playing
+        logA(s"timeline - elemRemoved($span, $obj)")
+        elemRemoved1(tid, span, obj, view)
       }
+
+    private[this] def elemRemoved1(tid: S#ID, span: SpanLike, obj: Obj[S], view: AuralObj[S])
+                                  (implicit tx: S#Tx): Unit = {
+      implicit val ptx  = tx.peer
+      implicit val itx  = iSys(tx)
 
       // remove view for the element from tree and map
       viewMap.remove(tid)
-      tree.transformAt(spanToPoint(span)) { opt =>
-        opt.flatMap { case (span1, views) =>
-          val i = views.indexWhere(_._2 == view)
-          val views1 = if (i >= 0) {
-            views.patch(i, Nil, 1)
-          } else {
-            Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
-            views
-          }
-          if (views1.isEmpty) None else Some(span1 -> views1)
-        }
-      }
+      stopAndDisposeView(span, view)
 
-      if (state != Playing) return
+      val st = state
+      if (st != Playing) {
+        if (st == Preparing && preparingViews.isEmpty) state = Prepared // go back to that
+        return
+      }
 
       // TODO - a bit of DRY re elemAdded
       // calculate current frame
-      implicit val ptx  = tx.peer
       val pt            = playTimeRef()
       val tr0           = pt.shiftTo(sched.time)
       val currentFrame  = tr0.frame
@@ -246,10 +239,10 @@ object AuralTimelineImpl {
       // the current frame, play that new element
       val elemPlays     = span.contains(currentFrame)
 
-      if (elemPlays) {
-        logA(s"...stopView")
-        stopView(span, view)
-      }
+//      if (elemPlays) {
+//        logA("...stopView")
+//        stopAndDisposeView(span, view)
+//      }
 
       // re-validate the next scheduling position
       val oldSched    = schedEvtToken()
@@ -278,8 +271,6 @@ object AuralTimelineImpl {
       // contents.viewRemoved(view)
     }
 
-    private[this] val childrenPreparing = TSet.empty[Disposable[S#Tx]]
-
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       if (state != Stopped) return
       implicit val ptx = tx.peer
@@ -304,7 +295,7 @@ object AuralTimelineImpl {
 
       val it          = tl.intersect(prepareSpan)
       prepare2(timeRef, it)
-      if (childrenPreparing.isEmpty) state = Prepared
+      if (preparingViews.isEmpty) state = Prepared
     }
 
     // consumes the iterator
@@ -330,22 +321,21 @@ object AuralTimelineImpl {
       view.prepare(childTime)
       val isPrepared = view.state == Prepared
       if (!isPrepared) {
-        lazy val childObs: Disposable[S#Tx] = view.react { implicit tx => {
-          case Prepared => viewPrepared(view, childObs)
+        val childObs = view.react { implicit tx => {
+          case Prepared => viewPrepared(view)
           case _ =>
         }}
-        childrenPreparing.add(childObs)
+        preparingViews.put(view, childObs)
       }
       isPrepared
     }
 
     // called by prepare1 for each child view when it becomes ready
-    private[this] def viewPrepared(view: AuralObj[S], obs: Disposable[S#Tx])(implicit tx: S#Tx): Unit = {
+    private[this] def viewPrepared(view: AuralObj[S])(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
-      obs.dispose()
-      val ok = childrenPreparing.remove(obs)
-      if (ok) {
-        val isReady = state == Preparing && childrenPreparing.isEmpty
+      preparingViews.remove(view).foreach { obs =>
+        obs.dispose()
+        val isReady = state == Preparing && preparingViews.isEmpty
         if (isReady) state = Prepared
 //          targetState match {
 //          case TargetPrepared => state = Prepared
@@ -390,25 +380,38 @@ object AuralTimelineImpl {
     // note: `timeRef` should already have been updated
     private[this] def playView(timed: S#ID, view: AuralObj[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       view.play(timeRef)
-      activeViews.add(view)(tx.peer)
+      playingViews.add(view)(tx.peer)
       contents.viewAdded(timed, view)
     }
 
-    private[this] def stopViews(it: Iterator[Leaf[S]])(implicit tx: S#Tx): Unit = {
+    private[this] def stopAndDisposeViews(it: Iterator[Leaf[S]])(implicit tx: S#Tx): Unit = {
       logA("timeline - stopViews")
       implicit val itx: I#Tx = iSys(tx)
-      if (it.hasNext) it.foreach { case (span, views) =>
-        views.foreach { case (_, view) => stopView(span, view) }
+      // Nnote: `toList` makes sure the iterator is not
+      // invalidated when `stopAndDisposeView` removes element from `tree`!
+      if (it.hasNext) it.toList.foreach { case (span, views) =>
+        views.foreach { case (_, view) => stopAndDisposeView(span, view) }
       }
     }
 
-    private[this] def stopView(span: SpanLike, view: AuralObj[S])(implicit tx: S#Tx): Unit = {
+    private[this] def stopAndDisposeView(span: SpanLike, view: AuralObj[S])(implicit tx: S#Tx): Unit = {
+      implicit val ptx = tx.peer
       implicit val itx = iSys(tx)
       view.stop()
-      activeViews.remove(view)(tx.peer)
-      tree.transformAt(spanToPoint(span)) {
-        case Some((_, seq)) => Some(span, seq.filterNot(_._2 == view))
-        case None           => throw new IllegalStateException(s"View $view not in live tree at $span")
+      view.dispose()
+      playingViews  .remove(view)
+      preparingViews.remove(view).foreach(_.dispose())
+      tree.transformAt(spanToPoint(span)) { opt =>
+        opt.flatMap { case (span1, views) =>
+          val i = views.indexWhere(_._2 == view)
+          val views1 = if (i >= 0) {
+            views.patch(i, Nil, 1)
+          } else {
+            Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
+            views
+          }
+          if (views1.isEmpty) None else Some(span1 -> views1)
+        }
       }
       contents.viewRemoved(view)
     }
@@ -432,7 +435,7 @@ object AuralTimelineImpl {
       val (toStart, toStop) = eventsAt(frame)
       val tr = playTimeRef().timeRef.updateFrame(frame)
       playViews(toStart, tr)
-      stopViews(toStop)
+      stopAndDisposeViews(toStop)
       scheduleNextEvent(frame)
     }
 
@@ -481,15 +484,15 @@ object AuralTimelineImpl {
       implicit val ptx = tx.peer
       implicit val itx = iSys(tx)
 
-      activeViews.foreach { view =>
+      playingViews.foreach { view =>
         view.stop()
         contents.viewRemoved(view)
       }
       sched.cancel(schedEvtToken ().token)
       sched.cancel(schedGridToken().token)
-      activeViews       .clear()
+      playingViews       .clear()
       tree              .clear()
-      childrenPreparing .clear()
+      preparingViews .clear()
     }
 
     // ---- bi-group functionality TODO - DRY ----
