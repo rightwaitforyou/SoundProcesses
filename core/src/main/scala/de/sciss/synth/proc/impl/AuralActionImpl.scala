@@ -35,6 +35,8 @@ object AuralActionImpl extends AuralObj.Factory {
   private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Action[S]])(implicit context: AuralContext[S])
     extends AuralObj.Action[S] with ObservableImpl[S, AuralObj.State] {
 
+    override def toString = s"AuralAction@${hashCode().toHexString}"
+
     def typeID = Action.typeID
 
     private val stateRef = Ref[AuralObj.State](AuralObj.Stopped)

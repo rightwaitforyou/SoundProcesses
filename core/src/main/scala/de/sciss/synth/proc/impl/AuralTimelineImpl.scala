@@ -115,6 +115,7 @@ object AuralTimelineImpl {
     private[this] def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
       if (value != old) {
+        logA(s"timeline - state = $value")
         // println(s"------TIMELINE STATE $old > $value")
         fire(value)
       }
@@ -140,10 +141,10 @@ object AuralTimelineImpl {
     def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemRemoved(id, span.value, obj)
 
     private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-      logA(s"timeline - elemAdded($span, $obj)")
-
       val st = state
       if (st == Stopped || !span.overlaps(prepareSpanRef.get(tx.peer))) return
+
+      logA(s"timeline - elemAdded($span, $obj)")
 
       implicit val ptx  = tx.peer
       implicit val itx  = iSys(tx)
@@ -177,7 +178,6 @@ object AuralTimelineImpl {
 
       if (elemPlays) {
         val tr1 = tr0.intersect(span)
-        logA(s"...playView: $tr1")
         playView(tid, view, tr1)
       }
 
@@ -318,6 +318,7 @@ object AuralTimelineImpl {
 
     private[this] def prepareView(view: AuralObj[S], childTime: TimeRef)(implicit tx: S#Tx): Boolean = {
       implicit val ptx = tx.peer
+      logA(s"timeline - prepare $view - $childTime")
       view.prepare(childTime)
       val isPrepared = view.state == Prepared
       if (!isPrepared) {
@@ -369,7 +370,7 @@ object AuralTimelineImpl {
     }
 
     private[this] def playViews(it: Iterator[Leaf[S]], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      logA("timeline - playViews")
+      // logA("timeline - playViews")
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
         val tr = timeRef.intersect(span)
@@ -379,15 +380,16 @@ object AuralTimelineImpl {
 
     // note: `timeRef` should already have been updated
     private[this] def playView(timed: S#ID, view: AuralObj[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+      logA(s"timeline - playView: $timed - $timeRef")
       view.play(timeRef)
       playingViews.add(view)(tx.peer)
       contents.viewAdded(timed, view)
     }
 
     private[this] def stopAndDisposeViews(it: Iterator[Leaf[S]])(implicit tx: S#Tx): Unit = {
-      logA("timeline - stopViews")
+      // logA("timeline - stopViews")
       implicit val itx: I#Tx = iSys(tx)
-      // Nnote: `toList` makes sure the iterator is not
+      // Note: `toList` makes sure the iterator is not
       // invalidated when `stopAndDisposeView` removes element from `tree`!
       if (it.hasNext) it.toList.foreach { case (span, views) =>
         views.foreach { case (_, view) => stopAndDisposeView(span, view) }
@@ -395,6 +397,8 @@ object AuralTimelineImpl {
     }
 
     private[this] def stopAndDisposeView(span: SpanLike, view: AuralObj[S])(implicit tx: S#Tx): Unit = {
+      logA(s"timeline - stopAndDispose - $span - $view")
+
       implicit val ptx = tx.peer
       implicit val itx = iSys(tx)
       view.stop()
