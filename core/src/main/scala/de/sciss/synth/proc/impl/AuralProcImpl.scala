@@ -21,10 +21,8 @@ import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.ProcData
-import de.sciss.synth.proc.Grapheme.Segment
 import de.sciss.synth.proc.Timeline.SampleRate
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
-import de.sciss.synth.{ControlSet, proc}
 
 import scala.concurrent.Future
 import scala.concurrent.stm.Ref
@@ -125,9 +123,9 @@ object AuralProcImpl {
 
     def data: ProcData[S] = _data
 
-    final def prepare()(implicit tx: S#Tx): Unit = {
+    final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       targetStateRef.set(TargetPrepared)(tx.peer)
-
+      // XXX TODO
     }
 
     final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
@@ -209,7 +207,8 @@ object AuralProcImpl {
         // val numCh = scanIn.numChannels
 
         @inline def ensureChannels(n: Int): Unit =
-          require(n == numCh, s"Scan input changed number of channels (expected $numCh but found $n)")
+          if (n != numCh)
+            throw new IllegalStateException(s"Scan input changed number of channels (expected $numCh but found $n)")
 
         val inCtlName = graph.ScanIn.controlName(key)
         // var inBus     = Option.empty[AudioBusNodeSetter]

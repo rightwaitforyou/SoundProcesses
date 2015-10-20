@@ -15,11 +15,11 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.stm.{Obj, Disposable}
+import de.sciss.lucre.stm
+import de.sciss.lucre.stm.{Disposable, Obj}
 import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
-import de.sciss.lucre.{stm, event => evt}
 import de.sciss.span.SpanLike
-import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralProcImpl, AuralTimelineImpl, AuralObjImpl => Impl}
+import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
 
 import scala.language.higherKinds
 
@@ -234,7 +234,7 @@ trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Dispos
 
   def state(implicit tx: S#Tx): AuralObj.State
 
-  def prepare()                                    (implicit tx: S#Tx): Unit
-  def play   (timeRef: TimeRef = TimeRef.Undefined)(implicit tx: S#Tx): Unit
-  def stop   (/* time: Long*/                     )(implicit tx: S#Tx): Unit
+  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
+  def play   (timeRef: TimeRef)(implicit tx: S#Tx): Unit
+  def stop   (/* time: Long*/ )(implicit tx: S#Tx): Unit
 }

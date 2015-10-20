@@ -100,7 +100,7 @@ object AuralEnsembleImpl {
       state = AuralObj.Playing
     }
 
-    def prepare()(implicit tx: S#Tx): Unit = {
+    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       if (state != AuralObj.Stopped) return
       Console.err.println("TODO: AuralEnsemble.prepare") // XXX TODO
     }

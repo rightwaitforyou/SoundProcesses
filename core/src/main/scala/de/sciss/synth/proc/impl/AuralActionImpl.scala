@@ -39,7 +39,7 @@ object AuralActionImpl extends AuralObj.Factory {
 
     private val stateRef = Ref[AuralObj.State](AuralObj.Stopped)
 
-    def prepare()(implicit tx: S#Tx): Unit = {
+    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       // nothing to do. XXX TODO - set state and fire
     }
 

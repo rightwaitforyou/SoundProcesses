@@ -288,7 +288,7 @@ object AuralTimelineImpl {
       // contents.viewRemoved(view)
     }
 
-    def prepare()(implicit tx: S#Tx): Unit = {
+    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       if (state != AuralObj.Stopped) return
       Console.err.println("TODO: AuralTimeline.prepare") // XXX TODO
     }
@@ -384,16 +384,19 @@ object AuralTimelineImpl {
 
     // ---- bi-group functionality TODO - DRY ----
 
-    private def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf[S]] =
+    @inline
+    private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf[S]] =
       BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
     // this can be easily implemented with two rectangular range searches
     // return: (things-that-start, things-that-stop)
-    private def eventsAt(frame: Long)(implicit tx: S#Tx): (Iterator[Leaf[S]], Iterator[Leaf[S]]) =
+    @inline
+    private[this] def eventsAt(frame: Long)(implicit tx: S#Tx): (Iterator[Leaf[S]], Iterator[Leaf[S]]) =
       BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
 
     // Long.MaxValue indicates _no event_; frame is exclusive!
-    private def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
+    @inline
+    private[this] def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
       BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
   }
 }
