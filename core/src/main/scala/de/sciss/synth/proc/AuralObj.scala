@@ -40,11 +40,35 @@ object AuralObj {
 
   def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = Impl(obj)
 
+  /* The current state a view is in. */
   sealed trait State
   case object Stopped   extends State
   case object Preparing extends State
   case object Prepared  extends State
   case object Playing   extends State
+
+  /* The target state indicates the eventual state the process should have,
+     independent of the current state which might not yet be ready.
+   */
+  sealed trait TargetState {
+    def completed: AuralObj.State
+  }
+  case object TargetStop extends TargetState {
+    def completed = AuralObj.Stopped
+  }
+  case object TargetPrepared extends TargetState {
+    def completed = AuralObj.Prepared
+  }
+  final case class TargetPlaying(wallClock: Long, timeRef: TimeRef) extends TargetState {
+    def completed = AuralObj.Playing
+
+    def shiftTo(newWallClock: Long): TimeRef = {
+      val delta = newWallClock - wallClock
+      timeRef.shift(delta)
+    }
+
+    override def toString = s"TargetPlaying(wallClock = $wallClock, timeRef = $timeRef)"
+  }
 
   // -------------- sub-types --------------
 

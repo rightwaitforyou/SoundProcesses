@@ -99,6 +99,7 @@ object TimeRef {
   */
 sealed trait TimeRef {
   def span : SpanLike
+
   def frame: Long
   /** `true` for `TimeRef.Apply`, `false` for `TimeRef.Undefined`. */
   def isDefined: Boolean

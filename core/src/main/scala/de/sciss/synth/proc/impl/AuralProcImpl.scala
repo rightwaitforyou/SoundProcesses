@@ -20,7 +20,7 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
 import de.sciss.span.Span
-import de.sciss.synth.proc.AuralObj.ProcData
+import de.sciss.synth.proc.AuralObj.{Preparing, Playing, Stopped, Prepared, TargetPlaying, TargetPrepared, TargetStop, TargetState, ProcData}
 import de.sciss.synth.proc.Timeline.SampleRate
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 
@@ -43,29 +43,6 @@ object AuralProcImpl {
   }
 
   // ---------------------------------------------------------------------
-
-  /* The target state indicates the eventual state the process should have,
-     independent of the current state which might not yet be ready.
-   */
-  private sealed trait TargetState {
-    def toAuralState: AuralObj.State
-  }
-  private case object TargetStop extends TargetState {
-    def toAuralState = AuralObj.Stopped
-  }
-  private case object TargetPrepared extends TargetState {
-    def toAuralState = AuralObj.Prepared
-  }
-  private final class TargetPlaying(val wallClock: Long, val timeRef: TimeRef) extends TargetState {
-    def toAuralState = AuralObj.Playing
-
-    def shiftTo(newWallClock: Long): TimeRef = {
-      val delta = newWallClock - wallClock
-      timeRef.shift(delta)
-    }
-
-    override def toString = s"TargetPlaying(wallClock = $wallClock, timeRef = $timeRef)"
-  }
 
   class Impl[S <: Sys[S]](implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
@@ -111,7 +88,7 @@ object AuralProcImpl {
     }
 
     final def state      (implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
-    final def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer).toAuralState
+    final def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer).completed
 
     private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
@@ -129,13 +106,13 @@ object AuralProcImpl {
     }
 
     final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val ts = new TargetPlaying(context.scheduler.time, timeRef)
+      val ts = TargetPlaying(context.scheduler.time, timeRef)
       targetStateRef.set(ts)(tx.peer)
       _data.state match {
         case s: UGB.Complete[S] =>
           state match {
-            case AuralObj.Stopped   => prepareAndLaunch(s, timeRef)
-            case AuralObj.Prepared  => launch          (s, timeRef)
+            case Stopped   => prepareAndLaunch(s, timeRef)
+            case Prepared  => launch          (s, timeRef)
             case _ =>
           }
 
@@ -145,7 +122,7 @@ object AuralProcImpl {
 
     // same as `play` but reusing previous `timeRef`
     final def playAfterRebuild()(implicit tx: S#Tx): Unit = {
-      if (state != AuralObj.Stopped) return
+      if (state != Stopped) return
 
       (_data.state, targetStateRef.get(tx.peer)) match {
         case (s: UGB.Complete[S], tp: TargetPlaying) =>
@@ -162,7 +139,7 @@ object AuralProcImpl {
     // same as `stop` but not touching target state
     final def stopForRebuild()(implicit tx: S#Tx): Unit = {
       freePlayingRef()
-      state = AuralObj.Stopped
+      state = Stopped
     }
 
     // def prepare()(implicit tx: S#Tx): Unit = ...
@@ -342,7 +319,7 @@ object AuralProcImpl {
         case tp: TargetPlaying =>
           launch(ugen, tp.shiftTo(context.scheduler.time)) // XXX TODO - yes or no, shift time?
         case _ =>
-          state = AuralObj.Prepared
+          state = Prepared
       }
     }
 
@@ -399,14 +376,14 @@ object AuralProcImpl {
       val old = playingRef.swap(new PlayingNode(node))(tx.peer)
       old.dispose()
       _data.addInstanceNode(node)
-      state = AuralObj.Playing
+      state = Playing
     }
 
     private def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
       val res = new PlayingPrepare(resources)
       val old = playingRef.swap(res)(tx.peer)
       old.dispose()
-      state = AuralObj.Preparing
+      state = Preparing
       res
     }
 
