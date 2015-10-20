@@ -30,7 +30,7 @@ object NodeImpl {
 
   var poolSize: Option[Int] = None
 
-  private lazy val pool: ScheduledExecutorService = {
+  lazy val pool: ScheduledExecutorService = {
     // system wide scheduler
     val res = poolSize match {
       case Some(sz) => Executors.newScheduledThreadPool(sz)
