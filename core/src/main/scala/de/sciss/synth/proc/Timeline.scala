@@ -50,6 +50,7 @@ object Timeline extends Obj.Type {
   // val Element   = BiGroup.ElementMutated
 
   type Timed[S <: Sys[S]] = BiGroup.Entry[S, Obj[S]]
+  type Leaf [S <: Sys[S]] = BiGroup.Leaf[S, Obj[S]]
 
   override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
     Impl.readIdentifiedObj(in, access)
