@@ -467,6 +467,10 @@ object AuralTimelineImpl {
       val pt          = playTimeRef()
       val tr0         = pt.shiftTo(sched.time)
       prepare2(tr0, it)
+//      println(s"tree.size = ${tree.size(iSys(tx))}")
+      // XXX TODO -- a refinement could look for eventAfter,
+      // however then we need additional fiddling around in
+      // `elemAdded` and `elemRemoved`...
       scheduleNextGrid(frame)
     }
 
@@ -494,8 +498,8 @@ object AuralTimelineImpl {
       }
       sched.cancel(schedEvtToken ().token)
       sched.cancel(schedGridToken().token)
-      playingViews       .clear()
-      tree              .clear()
+      playingViews   .clear()
+      tree           .clear()
       preparingViews .clear()
     }
 

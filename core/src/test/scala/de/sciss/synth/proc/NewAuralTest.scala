@@ -199,7 +199,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     println(
       """
         |Expected behaviour:
-        |XXX TODO
+        |Actions are scheduled on a timeline,
+        |printing "bang" messages once at 1.0s,
+        |twice at 2.2s, once at 3.3s.
         |
         |""".stripMargin)
 
@@ -209,7 +211,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val body = new Action.Body {
         def apply[T <: stm.Sys[T]](universe: Universe[T])(implicit tx: T#Tx): Unit = {
           val secs = seconds(t.position(tx.asInstanceOf[S#Tx]))
-          println(f"bang at $secs%1.2f sec.")
+          println(f"bang at $secs%1.3f sec.")
         }
       }
       Action.registerPredef("test.action", body)
@@ -220,6 +222,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       def time(sec: Double) = Span(frame(sec), frame(sec + 0.1))
 
       tl.add(time(1.0), action)
+      tl.add(time(2.2), action)
       tl.add(time(2.2), action)
       tl.add(time(3.3), action)
 
