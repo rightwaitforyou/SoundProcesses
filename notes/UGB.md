@@ -19,11 +19,15 @@ we should not flatten the `Key` to `AttributeKey`.
 
 After each `tryBuild` we look at the
 
-- newly rejected inputs -- watch attribute keys and rebuild if they change, appear or disappear
-- newly accepted inputs -- watch attribute keys and re-check if they change, appear or disappear.
-  if change is incompatible, rebuild. if change is compatible and synth is running, run node updates
+- newly rejected inputs -- watch attribute keys and `tryBuild` if they change, appear or disappear
+- newly accepted inputs -- watch attribute keys and re-check   if they change, appear or disappear.
+  If change is incompatible, rebuild from zero. If change is compatible and synth is running, 
+  run node updates
 - newly accepted outputs -- intersect with declared outputs -- for those in the intersection,
   'publish' number of output channels
+  
+Note that rejected-inputs can only shrink (except for initial build) and accepted-inputs can
+only grow.
 
 What happens with an initial mismatch in the number-of-channels. E.g. input request specifies
 `i` channels and actual attribute has `j != i` channels? That currently results in a generic

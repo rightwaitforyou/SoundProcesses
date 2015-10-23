@@ -292,7 +292,7 @@ object AuralProcImpl {
       logA(s"begin prepare $p (${hashCode.toHexString})")
 
       val b = new AsyncProcBuilder(p)
-      ugen.acceptedInputs.foreach { case (key, value) =>
+      ugen.acceptedInputs.foreach { case (key, (_, value)) =>
         if (value.async) buildAsyncInput(b, key, value)
       }
       val res   = b.resources
@@ -355,7 +355,7 @@ object AuralProcImpl {
         case _ => // Double.PositiveInfinity
       }
 
-      ugen.acceptedInputs.foreach { case (key, value) =>
+      ugen.acceptedInputs.foreach { case (key, (_, value)) =>
         if (!value.async) buildSyncInput(builder, key, value)
       }
 

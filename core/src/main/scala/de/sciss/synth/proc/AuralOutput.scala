@@ -23,10 +23,10 @@ sealed trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] {
 }
 
 object AuralOutput {
-  sealed trait Proxy[S <: Sys[S]]
-  final class Incomplete[S <: Sys[S]](val data: AuralObj.ProcData[S], val key: String) extends Proxy[S] {
-    override def toString = s"Proxy($data, $key)"
-  }
+//  sealed trait Proxy[S <: Sys[S]]
+//  final class Incomplete[S <: Sys[S]](val data: AuralObj.ProcData[S], val key: String) extends Proxy[S] {
+//    override def toString = s"Proxy($data, $key)"
+//  }
 
   /** Creates a new aural scan view and registers it with the context under `scan.id`. */
   def apply[S <: Sys[S]](data: AuralObj.ProcData[S], output: Output[S], bus: AudioBus)
@@ -34,13 +34,12 @@ object AuralOutput {
     ??? // SCAN Impl(data = data, key = key, scan = scan, bus = bus, isInput = isInput)
 
   trait Owned[S <: Sys[S]] extends AuralOutput[S] {
-
     def stop()(implicit tx: S#Tx): Unit
     def play(n: NodeRef)(implicit tx: S#Tx): Unit
   }
 }
 
-trait AuralOutput[S <: Sys[S]] extends AuralScan[S] with AuralOutput.Proxy[S] {
+trait AuralOutput[S <: Sys[S]] extends AuralScan[S] /* with AuralOutput.Proxy[S] */ {
   // def numChannels(implicit tx: S#Tx): Int
   // def numChannels_=(value: Int)(implicit tx: S#Tx): Unit
 

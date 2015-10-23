@@ -30,7 +30,7 @@ object AuralOutputImpl {
     val key   = output.key
     val view  = new Impl[S](data = data, key = key, bus = bus, idH = tx.newHandle(id))
     logA(s"AuralOutput(${data.procCached()}, $key, bus = $bus)")
-    context.putAux[AuralOutput.Proxy[S]](id, view)
+    context.putAux[AuralOutput /* .Proxy */[S]](id, view)
 
 // SCAN
 //    def scanView(peer: S#ID)(implicit tx: S#Tx): Option[AuralOutput[S]] =

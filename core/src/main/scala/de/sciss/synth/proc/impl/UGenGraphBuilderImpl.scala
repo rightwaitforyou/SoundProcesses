@@ -56,8 +56,8 @@ object UGenGraphBuilderImpl {
       val controlValues : Vec[Float],
       val controlNames  : Vec[(String, Int)],
       val sourceMap     : Map[AnyRef, Any],
-      val outputs      : Map[String, Int],
-      val acceptedInputs: Map[UGenGraphBuilder.Key, Input#Value],
+      val outputs       : Map[String, Int],
+      val acceptedInputs: Map[UGenGraphBuilder.Key, (Input, Input#Value)],
       val rejectedInputs: Set[UGenGraphBuilder.Key]
    )
     extends Incomplete[S] {
@@ -67,8 +67,8 @@ object UGenGraphBuilderImpl {
   }
 
   private final class CompleteImpl[S <: Sys[S]](val result: UGenGraph,
-      val outputs      : Map[String, Int],
-      val acceptedInputs: Map[UGenGraphBuilder.Key, Input#Value]
+      val outputs       : Map[String, Int],
+      val acceptedInputs: Map[UGenGraphBuilder.Key, (Input, Input#Value)]
    )
     extends Complete[S] {
   }
@@ -102,7 +102,7 @@ object UGenGraphBuilderImpl {
       // we pass in `this` and not `in`, because that way the context
       // can find accepted inputs that have been added during the current build cycle!
       val res = context.requestInput[req.Value](req, this /* in */)(tx)
-      acceptedInputs += req.key -> res
+      acceptedInputs += req.key -> (req, res)
       logAural(s"acceptedInputs += ${req.key} -> $res")
       res
     }
@@ -162,8 +162,8 @@ object UGenGraphBuilderImpl {
                 outputs            = savedScanOuts
                 acceptedInputs      = savedAcceptedInputs
                 missingElems      :+= elem
-                rejectedInputs     += rejected.key
-                logAural(s"rejectedInputs += ${rejected.key}")
+                rejectedInputs     += rejected // .key
+                logAural(s"rejectedInputs += ${rejected /* .key */}")
             }
           }
         }

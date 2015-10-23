@@ -31,7 +31,7 @@ object UGenGraphBuilder {
     * This can be a case class because it is used only within the same transaction,
     * and thereby the `timed` argument does not become stale.
     */
-  final case class MissingIn(input: Input) extends ControlThrowable
+  final case class MissingIn(input: Key /* Input */) extends ControlThrowable
 
   /** '''Note''': The resulting object is mutable, therefore must not be shared across threads and also must be
     * created and consumed within the same transaction. That is to say, to be transactionally safe, it may only
@@ -49,7 +49,7 @@ object UGenGraphBuilder {
   }
 
   sealed trait State[S <: Sys[S]] {
-    def acceptedInputs: Map[Key, Input#Value]
+    def acceptedInputs: Map[Key, (Input, Input#Value)]
     def rejectedInputs: Set[Key]
 
     /** Current set of used outputs (scan keys to number of channels).
@@ -82,7 +82,7 @@ object UGenGraphBuilder {
   /** A scalar value found in the attribute map. */
   final case class AttributeKey(name: String) extends Key
 //  /** A entry in a proc's scan map. */
-//  final case class ScanKey  (name: String) extends Key
+//  final case class InputKey    (name: String) extends Key
   //  /** A buffer source found in the attribute map. */
   //  final case class BufferKey(name: String) extends Key
 
