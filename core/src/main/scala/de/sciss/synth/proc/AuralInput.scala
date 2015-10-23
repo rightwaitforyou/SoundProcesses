@@ -13,12 +13,13 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.synth.{NodeRef, DynamicUser, Sys}
+import de.sciss.lucre.synth.{Node, Txn, NodeRef, DynamicUser, Sys}
 import impl.{AuralInputImpl => Impl}
 
 object AuralInput {
-  def attr[S <: Sys[S]](nodeRef: NodeRef, key: String, source: AuralOutput[S])(implicit tx: S#Tx): AuralInput[S] =
-    Impl.attr(nodeRef, key, source)
+  def attr[S <: Sys[S]](data: AuralObj.ProcData[S], key: String, node: Node,
+                        source: AuralOutput[S])(implicit tx: S#Tx): AuralInput[S] =
+    Impl.attr(data, key, node, source)
 }
 trait AuralInput[S <: Sys[S]] extends /* Disposable[S#Tx] with */ DynamicUser {
   //   def addSource   (view: AuralOutput[S])(implicit tx: S#Tx): Unit
@@ -26,5 +27,5 @@ trait AuralInput[S <: Sys[S]] extends /* Disposable[S#Tx] with */ DynamicUser {
 
   // def sourceUpdated(view: AuralOutput[S])(implicit tx: S#Tx): Unit
 
-  def nodeRef: NodeRef
+  def nodeRef(implicit tx: Txn): Option[NodeRef]
 }

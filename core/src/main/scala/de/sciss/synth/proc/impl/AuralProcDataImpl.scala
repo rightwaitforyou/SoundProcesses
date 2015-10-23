@@ -802,7 +802,7 @@ object AuralProcDataImpl {
             val bus = view.bus
             chanCheck(bus.numChannels)
             // val res = BusNodeSetter.mapper(ctlName, bus, b.node)
-            val res = AuralInput.attr(nodeRef = b.node, key = key, source = view)
+            val res = AuralInput.attr(data = this, key = key, node = b.node, source = view)
             b.addUser(res)
             // XXX TODO:
             // - adapt number-of-channels if they don't match (using auxiliary synth)

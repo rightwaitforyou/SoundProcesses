@@ -185,15 +185,15 @@ object AuralOutputImpl {
       sinkPlaying(sink)
     }
 
-    private def tryLink(sourceNode: NodeRef, sink: AuralInput[S])(implicit tx: Txn): Unit = {
-      val sinkNode = sink.nodeRef
-      implicit val itx = tx.peer
-      if (!links.contains(sink)) {
-        val link = LinkNode[S](this, sourceNode, sink, sinkNode)
-        logA(s"AuralOutput link; $data, link")
-        links.put(sink, link)
+    private def tryLink(sourceNode: NodeRef, sink: AuralInput[S])(implicit tx: Txn): Unit =
+      sink.nodeRef.foreach { sinkNode =>
+        implicit val itx = tx.peer
+        if (!links.contains(sink)) {
+          val link = LinkNode[S](this, sourceNode, sink, sinkNode)
+          logA(s"AuralOutput link; $data, link")
+          links.put(sink, link)
+        }
       }
-    }
 
 // SCAN
 //    def removeSource(source: AuralOutput[S])(implicit tx: S#Tx): Unit = {

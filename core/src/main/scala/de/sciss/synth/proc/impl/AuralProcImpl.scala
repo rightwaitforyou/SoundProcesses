@@ -369,17 +369,22 @@ object AuralProcImpl {
         // res
       }
 
-      val node = builder.finish()
-      logA(s"launched $p -> $node (${hashCode.toHexString})")
-      setPlayingNode(node)
-    }
-
-    private def setPlayingNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
+      val node = builder.finish1() // .finish()
       val old = playingRef.swap(new PlayingNode(node))(tx.peer)
       old.dispose()
       _data.addInstanceNode(node)
+      builder.finish2()
+      logA(s"launched $p -> $node (${hashCode.toHexString})")
       state = Playing
+      // setPlayingNode(node)
     }
+
+//    private def setPlayingNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
+//      val old = playingRef.swap(new PlayingNode(node))(tx.peer)
+//      old.dispose()
+//      _data.addInstanceNode(node)
+//      state = Playing
+//    }
 
     private def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
       val res = new PlayingPrepare(resources)

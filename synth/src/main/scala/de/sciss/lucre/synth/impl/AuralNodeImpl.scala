@@ -48,8 +48,10 @@ object AuralNodeImpl {
 
     private val attrMap   = TMap[String, List[Disposable[Txn]]](attrMap0.toSeq: _*)
 
-    override def toString = s"AuralProc($synth, outs = ${outputBuses.mkString("(", ", ", ")")}, " +
-      s"ins = ${inputBuses.mkString("(", ", ", ")")}"
+    override def toString = {
+      val insS = s"ins = ${inputBuses.mkString("(", ", ", ")")}"
+      s"AuralProc($synth, outs = ${outputBuses.mkString("(", ", ", ")")}, $insS"
+    }
 
     def server = synth.server
 

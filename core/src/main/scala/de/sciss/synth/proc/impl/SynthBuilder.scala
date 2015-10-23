@@ -44,7 +44,13 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
 
   private var attrMap = Map.empty[String, (List[DynamicUser], List[Resource])]
 
-  def finish()(implicit tx: Txn): AuralNode = {
+  /** finishes building the `AuralNode`. Does not yet add the
+    * users which is done through `finish2`, the reason being
+    * that the caller may want to store the `AuralNode` as its
+    * node-ref in the meantime, so users may find it.
+    * Not pretty...
+    */
+  def finish1()(implicit tx: Txn): AuralNode = {
     // XXX TODO
     val server  = synth.server
     val group   = server.defaultGroup
@@ -58,9 +64,15 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
     synth.play(target = group, addAction = addToHead, args = setMap.result(),
       dependencies = dependencies)
 
+//    users                  .foreach(_.add())
+//    attrMap.foreach(_._2._1.foreach(_.add()))
+    node
+  }
+
+  /** Second stage of finishing is to add all users. */
+  def finish2()(implicit tx: Txn): Unit = {
     users                  .foreach(_.add())
     attrMap.foreach(_._2._1.foreach(_.add()))
-    node
   }
 
   // copies the node-dependency-builder stuff to a map entry
