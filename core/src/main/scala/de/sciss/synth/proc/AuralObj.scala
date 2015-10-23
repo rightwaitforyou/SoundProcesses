@@ -16,7 +16,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Disposable, Obj}
+import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
 import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
 import de.sciss.span.SpanLike
 import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
@@ -81,7 +81,7 @@ object AuralObj {
       * at least one instance view is playing, whereas a `None` value indicates that
       * there is no actively playing instance view at the moment.
       */
-    def nodeOption(implicit tx: S#Tx): Option[NodeRef]
+    def nodeOption(implicit tx: TxnLike): Option[NodeRef]
 
 // SCAN
 //    def getScanIn (key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]

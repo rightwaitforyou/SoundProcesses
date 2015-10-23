@@ -129,6 +129,6 @@ object AuralNodeImpl {
     }
 
     def removeAttrResources(key: String)(implicit tx: Txn): Unit =
-      attrMap.remove(key)(tx.peer).foreach(_.foreach(_.dispose()))
+      attrMap.remove(key)(tx.peer).getOrElse(Nil).foreach(_.dispose())
   }
 }

@@ -18,7 +18,7 @@ import de.sciss.file._
 import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.expr.{BooleanObj, DoubleObj, DoubleVector, IntObj}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Disposable, Obj}
+import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
 import de.sciss.lucre.synth.{AudioBus, Buffer, Bus, BusNodeSetter, NodeRef, Sys}
 import de.sciss.numbers
 import de.sciss.synth.ControlSet
@@ -102,7 +102,7 @@ object AuralProcDataImpl {
       this
     }
 
-    final def nodeOption(implicit tx: S#Tx): Option[NodeRef] = nodeRef.get(tx.peer)
+    final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = nodeRef.get(tx.peer)
 
 // SCAN
 //    final def getScanIn(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] =
@@ -545,7 +545,7 @@ object AuralProcDataImpl {
 //    }
 
     /* Creates a new aural output */
-    private def mkAuralOutput(output: Output[S], numChannels: Int)(implicit tx: S#Tx): AuralScan[S] = {
+    private def mkAuralOutput(output: Output[S], numChannels: Int)(implicit tx: S#Tx): AuralOutput[S] = {
       // val key   = output.key
       val bus   = Bus.audio(server, numChannels = numChannels) // mkBus(key, numChannels)
       // val views = scanOutViews
@@ -801,7 +801,8 @@ object AuralProcDataImpl {
           } { view =>
             val bus = view.bus
             chanCheck(bus.numChannels)
-            val res = BusNodeSetter.mapper(ctlName, bus, b.node)
+            // val res = BusNodeSetter.mapper(ctlName, bus, b.node)
+            val res = AuralInput.attr(nodeRef = b.node, key = key, source = view)
             b.addUser(res)
             // XXX TODO:
             // - adapt number-of-channels if they don't match (using auxiliary synth)

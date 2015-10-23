@@ -14,13 +14,11 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
+import de.sciss.lucre.synth.{Txn, DynamicUser, NodeRef, AudioBus, Sys}
 import impl.{AuralOutputImpl => Impl}
 
-sealed trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] {
-  def key : String
-  def bus : AudioBus
-}
+//sealed trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] {
+//}
 
 object AuralOutput {
 //  sealed trait Proxy[S <: Sys[S]]
@@ -39,25 +37,18 @@ object AuralOutput {
   }
 }
 
-trait AuralOutput[S <: Sys[S]] extends AuralScan[S] /* with AuralOutput.Proxy[S] */ {
+trait AuralOutput[S <: Sys[S]] extends Disposable[S#Tx] /* AuralScan[S] */ /* with AuralOutput.Proxy[S] */ {
   // def numChannels(implicit tx: S#Tx): Int
   // def numChannels_=(value: Int)(implicit tx: S#Tx): Unit
 
   def data: AuralObj.ProcData[S]
 
-  def addSink      (view: AuralInput [S])(implicit tx: S#Tx): Unit
-  def removeSink   (view: AuralInput [S])(implicit tx: S#Tx): Unit
+  def key : String
+  def bus : AudioBus
 
-  def sinkStopped  (view: AuralInput [S])(implicit tx: S#Tx): Unit
-  def sinkPlaying  (view: AuralInput [S])(implicit tx: S#Tx): Unit
-}
+  def addSink      (view: AuralInput[S])(implicit tx: Txn): Unit
+  def removeSink   (view: AuralInput[S])(implicit tx: Txn): Unit
 
-object AuralInput {
-
-}
-trait AuralInput[S <: Sys[S]] extends AuralScan[S] {
-   def addSource   (view: AuralOutput[S])(implicit tx: S#Tx): Unit
-   def removeSource(view: AuralOutput[S])(implicit tx: S#Tx): Unit
-
-  // def sourceUpdated(view: AuralOutput[S])(implicit tx: S#Tx): Unit
+//  def sinkStopped  (view: AuralInput [S])(implicit tx: S#Tx): Unit
+//  def sinkPlaying  (view: AuralInput [S])(implicit tx: S#Tx): Unit
 }
