@@ -169,7 +169,8 @@ object AuralProcDataImpl {
           val numCh1 = view.bus.numChannels
           // checkScanNumChannels(view, numCh)
           if (numCh1 != numCh) {
-            ???
+            disposeAuralOutput(view)
+            mkAuralOutput(output, numCh)
           }
         }
       }
@@ -177,7 +178,15 @@ object AuralProcDataImpl {
 
     private def outputRemoved(output: Output[S])(implicit tx: S#Tx): Unit = {
       logA(s"outputRemoved from ${procCached()} (${output.key})")
+      context.getAux[AuralOutput[S]](output.id).foreach(disposeAuralOutput(_))
+      val key = output.key
+      state.outputs.get(key).foreach { numCh =>
+      }
     }
+
+    @inline
+    private def disposeAuralOutput(view: AuralOutput[S])(implicit tx: S#Tx): Unit =
+      view.dispose()  // this will call `context.removeAux`
 
 // SCAN
 //    private def scanInChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
@@ -537,11 +546,13 @@ object AuralProcDataImpl {
 
     /* Creates a new aural output */
     private def mkAuralOutput(output: Output[S], numChannels: Int)(implicit tx: S#Tx): AuralScan[S] = {
-      val key   = output.key
+      // val key   = output.key
       val bus   = Bus.audio(server, numChannels = numChannels) // mkBus(key, numChannels)
       // val views = scanOutViews
       val view  = AuralOutput(data = this, output = output, bus = bus)
-      context.putAux[AuralOutput[S]](output.id, view)
+      // this is done by the `AuralOutput` constructor:
+      // context.putAux[AuralOutput[S]](output.id, view)
+
       // views.put(key, view)(tx.peer)
       // note: the view will iterate over the
       //       sources and sinks itself upon initialization,
