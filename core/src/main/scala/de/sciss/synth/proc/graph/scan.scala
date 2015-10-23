@@ -30,7 +30,7 @@ object ScanIn {
 
     final def makeUGens: UGenInLike = {
       val b = UGenGraphBuilder.get
-      val numCh   = b.requestInput(Input.Scan(key, fixed)).numChannels
+      val numCh   = ??? : Int // b.requestInput(Input.Scan(key, fixed)).numChannels
       val ctlName = controlName(key)
       mkUGen(ctlName, numCh)
     }
@@ -85,7 +85,7 @@ final case class ScanOut(key: String, in: GE)
     val sigArg      = _args.tail
     val numChannels = sigArg.size
     val b = UGenGraphBuilder.get
-    b.addScanOut(key, numChannels)
+    b.addOutput(key, numChannels)
     val sigArgAr = sigArg.map { ui =>
       if (ui.rate == audio) ui else UGen.SingleOut("K2A", audio, Vector(ui))
     }

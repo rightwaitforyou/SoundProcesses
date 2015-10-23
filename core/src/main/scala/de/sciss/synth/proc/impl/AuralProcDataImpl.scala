@@ -24,7 +24,7 @@ import de.sciss.model.Change
 import de.sciss.numbers
 import de.sciss.synth.Curve.parametric
 import de.sciss.synth.io.AudioFileType
-import de.sciss.synth.proc.AuralObj.ProcData
+import de.sciss.synth.proc.AuralObj.{Playing, ProcData}
 import de.sciss.synth.proc.Implicits._
 import de.sciss.synth.proc.UGenGraphBuilder.{Complete, Incomplete, MissingIn}
 import de.sciss.synth.proc.graph.impl.ActionResponder
@@ -49,7 +49,6 @@ object AuralProcDataImpl {
     // running main synths
     private val nodeRef       = Ref(Option.empty[NodeRef.Group])
 
-    // XXX TODO --- apparently this is never populated
     // running attribute inputs
     private val attrMap       = TMap.empty[String, Disposable[S#Tx]]
 
@@ -61,8 +60,7 @@ object AuralProcDataImpl {
 
     private val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
 
-    private var procObserver: Disposable[S#Tx] = _
-    private var attrObserver: Disposable[S#Tx] = _
+    private var observers     = List.empty[Disposable[S#Tx]]
 
     private var _obj: stm.Source[S#Tx, Proc[S]] = _
 
@@ -76,7 +74,7 @@ object AuralProcDataImpl {
       val ugenInit = UGB.init(proc)
       stateRef.set(ugenInit)(tx.peer)
 
-      procObserver = proc.changed.react { implicit tx => upd =>
+      observers ::= proc.changed.react { implicit tx => upd =>
         upd.changes.foreach {
           case Proc.GraphChange(Change(_, newGraph))  => newSynthGraph(newGraph)
 // SCAN
@@ -91,15 +89,15 @@ object AuralProcDataImpl {
         }
       }
       val attr = proc.attr
-      attrObserver = attr.changed.react { implicit tx => upd => upd.changes.foreach {
+      observers ::= attr.changed.react { implicit tx => upd => upd.changes.foreach {
         case Obj.AttrAdded  (key, value) => attrAdded  (key, value)
         case Obj.AttrRemoved(key, value) => attrRemoved(key, value)
       }}
 
-      // XXX TODO -- should filter only relevant values
-      attr.iterator.foreach { case (key, value) =>
-        mkAttrObserver(key, value)
-      }
+//      // XXX TODO -- should filter only relevant values
+//      attr.iterator.foreach { case (key, value) =>
+//        mkAttrObserver(key, value)
+//      }
 
       tryBuild()
       this
@@ -147,6 +145,7 @@ object AuralProcDataImpl {
         if (view.state == AuralObj.Playing) view.stopForRebuild()
       }
       disposeNodeRefAndScans()
+      disposeAttrMap()
 
       // then try to rebuild the stuff
       val ugenInit = UGB.init(procCached())
@@ -184,25 +183,24 @@ object AuralProcDataImpl {
 
     private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrAdded   to   ${procCached()} ($key)")
-      for {
-        n <- nodeRef.get(tx.peer)
-        v <- state.acceptedInputs.get(UGB.AttributeKey(key))
-      } attrNodeSet1(n, key, v, value)
+      val st    = state
+      val aKey  = UGB.AttributeKey(key)
+      if (!st.rejectedInputs.contains(aKey) && !st.acceptedInputs.contains(aKey)) return
 
-      // XXX TODO --- this is just a hack
-      // to restore the previous behaviour.
-      // Ideally we would register the observer
-      // in the clients so they can determine the
-      // kind of updates relevant. Here we just
-      // track
-
-      // XXX TODO -- should filter only relevant values
       mkAttrObserver(key, value)
+
+      if (st.isComplete) {
+        for {
+          n <- nodeRef.get(tx.peer)
+          v <- st.acceptedInputs.get(aKey)
+        } attrNodeSet1(n, key, v, value)
+      }
     }
 
+    private def addUsedAttr(attr: Obj.AttrMap[S], key: String)(implicit tx: S#Tx): Unit =
+      attr.get(key).foreach { value => mkAttrObserver(key, value) }
+
     private def mkAttrObserver(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      // XXX TODO -- should have smarter observers that pull the changed
-      // values directly
       val obs = value.changed.react { implicit tx => _ => attrChange(key) }
       attrMap.put(key, obs)(tx.peer)
     }
@@ -242,6 +240,10 @@ object AuralProcDataImpl {
 
     // ----
 
+    private def addUsedOutput(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
+      ???
+    }
+
 // SCAN
 //    // if a scan was added or a source was added to an existing scan,
 //    // check if the scan is used as currently missing input. if so,
@@ -277,7 +279,7 @@ object AuralProcDataImpl {
 
     private def testOutScan(scan: Output[S])(implicit tx: S#Tx): Unit = {
       val key = scan.key
-      state.scanOuts.get(key).foreach { numCh =>
+      state.outputs.get(key).foreach { numCh =>
         scanOutViews.get(key)(tx.peer).fold[Unit] {
           mkAuralOutput(scan, numCh)
         } { view =>
@@ -308,8 +310,7 @@ object AuralProcDataImpl {
 // SCAN
 //        scanInViews .foreach(_._2.stop   ())
 //        scanOutViews.foreach(_._2.stop   ())
-        attrMap     .foreach(_._2.dispose())
-        attrMap     .clear()
+        disposeAttrMap()
       }
     }
 
@@ -318,8 +319,7 @@ object AuralProcDataImpl {
 
     /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
-      procObserver.dispose()
-      attrObserver.dispose()
+      observers.foreach(_.dispose())
       disposeNodeRefAndScans()
       disposeAttrMap()
     }
@@ -383,35 +383,33 @@ object AuralProcDataImpl {
     private def buildAdvanced(before: UGB.State[S], now: UGB.State[S])(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
 
+      lazy val attr = procCached().attr
+
+      // handle newly rejected inputs
       if (now.rejectedInputs.isEmpty) {
         logA(s"buildAdvanced ${procCached()}; complete? ${now.isComplete}")
       } else {
         logA(s"buildAdvanced ${procCached()}; rejectedInputs = ${now.rejectedInputs.mkString(",")}")
-
-        // store proxies so future sinks can detect this incomplete proc
-// SCAN
-//         val scans = procCached().inputs
-        now.rejectedInputs.foreach {
-          case UGB.ScanKey(key) =>
-// SCAN
-//            scans.get(key).foreach { scan =>
-//              addIncompleteScanIn(key, scan)
-//            }
-
-          case _ =>
+        val newRejected = now.rejectedInputs diff before.rejectedInputs
+        if (newRejected.nonEmpty) {
+          newRejected.foreach {
+            case UGB.AttributeKey(key) => addUsedAttr(attr, key)
+            case _ =>
+          }
         }
       }
 
       // handle newly visible outputs
-      if (before.scanOuts ne now.scanOuts) {
+      if (before.outputs ne now.outputs) {
         // detect which new scan outputs have been determined in the last iteration
         // (newOuts is a map from `name: String` to `numChannels Int`)
-        val newOuts = now.scanOuts.filterNot {
-          case (key, _) => before.scanOuts.contains(key)
+        val newOuts = now.outputs.filterNot {
+          case (key, _) => before.outputs.contains(key)
         }
         logA(s"...newOuts = ${newOuts.mkString(",")}")
 
         newOuts.foreach { case (key, numCh) =>
+          addUsedOutput(key, numCh)
 // SCAN
 //          activateAuralScanOut(key, numCh)
         }
@@ -425,22 +423,22 @@ object AuralProcDataImpl {
         logA(s"...newIns  = ${newIns.mkString(",")}")
 
         newIns.foreach {
-          case (UGB.ScanKey(key), UGB.Input.Scan.Value(numCh)) =>
+          case (UGB.AttributeKey(key), _) =>
+            addUsedAttr(attr, key)
 // SCAN
+//          case (UGB.ScanKey(key), UGB.Input.Scan.Value(numCh)) =>
 //            activateAuralScanIn(key, numCh)
           case _ =>
         }
       }
 
-      now match {
-        case c: Complete[S] =>
-          procViews.foreach { view =>
-            if (view.targetState == AuralObj.Playing) {
-              // ugen graph became ready and view wishes to play.
-              view.playAfterRebuild()
-            }
+      if (now.isComplete) {
+        procViews.foreach { view =>
+          if (view.targetState == Playing) {
+            // ugen graph became ready and view wishes to play.
+            view.playAfterRebuild()
           }
-        case _ =>
+        }
       }
     }
 
@@ -555,8 +553,9 @@ object AuralProcDataImpl {
         val res = if (found >= 0) found else if (reqNum >= 0) reqNum else 1
         UGB.Input.Attribute.Value(res)
 
-      case i: UGB.Input.Scan =>
-        UGB.Input.Scan.Value(requestScanInNumChannels(i))
+// SCAN
+//      case i: UGB.Input.Scan =>
+//        UGB.Input.Scan.Value(requestScanInNumChannels(i))
 
       case i: UGB.Input.Stream =>
         val numCh0  = requestAttrNumChannels(i.name)
@@ -628,15 +627,16 @@ object AuralProcDataImpl {
       }
     }
 
-    private def requestScanInNumChannels(req: UGenGraphBuilder.Input.Scan)(implicit tx: S#Tx): Int = {
-      val procObj = procCached()    /** Sub-classes may override this if invoking the super-method. */
-
-      val proc    = procObj
 // SCAN
-      val numCh0  = ??? : Int // proc.inputs.get(req.name).fold(-1)(scanInNumChannels)
-      val numCh   = if (numCh0 == -1) req.fixed else numCh0
-      if (numCh == -1) throw MissingIn(req) else numCh
-    }
+//    private def requestScanInNumChannels(req: UGenGraphBuilder.Input.Scan)(implicit tx: S#Tx): Int = {
+//      val procObj = procCached()    /** Sub-classes may override this if invoking the super-method. */
+//
+//      val proc    = procObj
+//// SCAN
+//      val numCh0  = ??? : Int // proc.inputs.get(req.name).fold(-1)(scanInNumChannels)
+//      val numCh   = if (numCh0 == -1) req.fixed else numCh0
+//      if (numCh == -1) throw MissingIn(req) else numCh
+//    }
 
 // SCAN
 //    private def scanInNumChannels(scan: Scan[S])(implicit tx: S#Tx): Int = {

@@ -55,7 +55,7 @@ object UGenGraphBuilder {
     /** Current set of used outputs (scan keys to number of channels).
       * This is guaranteed to only grow during incremental building, never shrink.
       */
-    def scanOuts: Map[String, Int]
+    def outputs: Map[String, Int]
 
     def isComplete: Boolean
   }
@@ -81,8 +81,8 @@ object UGenGraphBuilder {
   trait Key
   /** A scalar value found in the attribute map. */
   final case class AttributeKey(name: String) extends Key
-  /** A entry in a proc's scan map. */
-  final case class ScanKey  (name: String) extends Key
+//  /** A entry in a proc's scan map. */
+//  final case class ScanKey  (name: String) extends Key
   //  /** A buffer source found in the attribute map. */
   //  final case class BufferKey(name: String) extends Key
 
@@ -98,21 +98,21 @@ object UGenGraphBuilder {
   type Unit = Unit.type
 
   object Input {
-    object Scan {
-      final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
-        def async = false
-        override def productPrefix = "Input.Scan.Value"
-        override def toString = s"$productPrefix(numChannels = $numChannels)"
-      }
-    }
-    final case class Scan(name: String, fixed: Int) extends Input {
-      type Key    = ScanKey
-      type Value  = Scan.Value
-
-      def key = ScanKey(name)
-
-      override def productPrefix = "Input.Scan"
-    }
+//    object Scan {
+//      final case class Value(numChannels: Int) extends UGenGraphBuilder.Value {
+//        def async = false
+//        override def productPrefix = "Input.Scan.Value"
+//        override def toString = s"$productPrefix(numChannels = $numChannels)"
+//      }
+//    }
+//    final case class Scan(name: String, fixed: Int) extends Input {
+//      type Key    = ScanKey
+//      type Value  = Scan.Value
+//
+//      def key = ScanKey(name)
+//
+//      override def productPrefix = "Input.Scan"
+//    }
 
     object Stream {
       def EmptySpec = Spec(0.0, 0)
@@ -260,5 +260,5 @@ trait UGenGraphBuilder extends UGenGraph.Builder {
   /** This method should only be invoked by the `graph.scan.Elem` instances. It declares a scan output along
     * with the number of channels written to it.
     */
-  def addScanOut(key: String, numChannels: Int): scala.Unit
+  def addOutput(key: String, numChannels: Int): scala.Unit
 }

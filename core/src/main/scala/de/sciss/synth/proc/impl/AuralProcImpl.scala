@@ -165,94 +165,96 @@ object AuralProcImpl {
         _data.buildAttrInput(b, key, value)
         b.storeKey(key)
 
-      case UGB.ScanKey(key) =>
-        buildScanInput(b, key, value)
+// SCAN
+//      case UGB.ScanKey(key) =>
+//        buildScanInput(b, key, value)
 
       case _ =>
         throw new IllegalStateException(s"Unsupported input request $keyW")
     }
 
-      /** Sub-classes may override this if falling back to the super-method. */
-    protected def buildScanInput(b: SynthBuilder[S], key: String, value: UGB.Value)
-                                (implicit tx: S#Tx): Unit = value match {
-      case UGB.Input.Scan.Value(numCh) =>
-        // ---- scans ----
-        // XXX TODO : this should all disappear
-        // and the missing bits should be added
-        // to AuralScan
-
-        // val numCh = scanIn.numChannels
-
-        @inline def ensureChannels(n: Int): Unit =
-          if (n != numCh)
-            throw new IllegalStateException(s"Scan input changed number of channels (expected $numCh but found $n)")
-
-        val inCtlName = graph.ScanIn.controlName(key)
-        // var inBus     = Option.empty[AudioBusNodeSetter]
-
-        def mkInBus(): AudioBusNodeSetter = {
-          val bus    = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
-          // val b      = Bus.audio(server, numCh)
-          logA(s"addInputBus($key, $b) (${hashCode.toHexString})")
-          val res    =
-          // if (scanIn.fixed)
-          //   BusNodeSetter.reader(inCtlName, b, synth)
-          // else
-            BusNodeSetter.mapper(inCtlName, bus, b.synth)
-          b.users ::= res
-          b.inputBuses += key -> bus
-          res
-        }
-
-        // note: if not found, stick with default
-
-        val time = b.timeRef.offsetOrZero
-
-        // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
-        //           we cannot use ControlSet any more, but need other mechanism
 // SCAN
-//        b.obj.inputs.get(key).foreach { scan =>
-//          val src = scan.iterator
-//          if (src.isEmpty) {
-//            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
-//            mkInBus()
+//    /** Sub-classes may override this if falling back to the super-method. */
+//    protected def buildScanInput(b: SynthBuilder[S], key: String, value: UGB.Value)
+//                                (implicit tx: S#Tx): Unit = value match {
+//      case UGB.Input.Scan.Value(numCh) =>
+//        // ---- scans ----
+//        // XXX TODO : this should all disappear
+//        // and the missing bits should be added
+//        // to AuralScan
 //
-//          } else {
-//            src.foreach {
-//              case Link.Grapheme(peer) =>
-//                val segmOpt = peer.segment(time)
-//                segmOpt.foreach {
-//                  // again if not found... stick with default
-//                  case const: Segment.Const =>
-//                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-//                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
-//                    b.setMap += (if (const.numChannels == 1) {
-//                      ControlSet.Value (inCtlName, const.values.head .toFloat )
-//                    } else {
-//                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
-//                    })
+//        // val numCh = scanIn.numChannels
 //
-//                  case segm: Segment.Curve =>
-//                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-//                    // println(s"segment : ${segm.span}")
-//                    val bm          = mkInBus()
-//                    val w           = SegmentWriter(bm.bus, segm, time, SampleRate)
-//                    b.dependencies  ::= w
+//        @inline def ensureChannels(n: Int): Unit =
+//          if (n != numCh)
+//            throw new IllegalStateException(s"Scan input changed number of channels (expected $numCh but found $n)")
 //
-//                  case audio: Segment.Audio =>
-//                    ensureChannels(audio.numChannels)
-//                    val bm          = mkInBus()
-//                    val w           = AudioArtifactWriter(bm.bus, audio, time)
-//                    b.dependencies  ::= w
-//                }
+//        val inCtlName = graph.ScanIn.controlName(key)
+//        // var inBus     = Option.empty[AudioBusNodeSetter]
 //
-//              case Link.Scan(peer) => mkInBus()
-//            }
-//          }
+//        def mkInBus(): AudioBusNodeSetter = {
+//          val bus    = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
+//          // val b      = Bus.audio(server, numCh)
+//          logA(s"addInputBus($key, $b) (${hashCode.toHexString})")
+//          val res    =
+//          // if (scanIn.fixed)
+//          //   BusNodeSetter.reader(inCtlName, b, synth)
+//          // else
+//            BusNodeSetter.mapper(inCtlName, bus, b.synth)
+//          b.users ::= res
+//          b.inputBuses += key -> bus
+//          res
 //        }
-
-      case _ => throw new IllegalStateException(s"Unsupported input scan request $value")
-    }
+//
+//        // note: if not found, stick with default
+//
+//        val time = b.timeRef.offsetOrZero
+//
+//        // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
+//        //           we cannot use ControlSet any more, but need other mechanism
+//// SCAN
+////        b.obj.inputs.get(key).foreach { scan =>
+////          val src = scan.iterator
+////          if (src.isEmpty) {
+////            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
+////            mkInBus()
+////
+////          } else {
+////            src.foreach {
+////              case Link.Grapheme(peer) =>
+////                val segmOpt = peer.segment(time)
+////                segmOpt.foreach {
+////                  // again if not found... stick with default
+////                  case const: Segment.Const =>
+////                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
+////                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
+////                    b.setMap += (if (const.numChannels == 1) {
+////                      ControlSet.Value (inCtlName, const.values.head .toFloat )
+////                    } else {
+////                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
+////                    })
+////
+////                  case segm: Segment.Curve =>
+////                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
+////                    // println(s"segment : ${segm.span}")
+////                    val bm          = mkInBus()
+////                    val w           = SegmentWriter(bm.bus, segm, time, SampleRate)
+////                    b.dependencies  ::= w
+////
+////                  case audio: Segment.Audio =>
+////                    ensureChannels(audio.numChannels)
+////                    val bm          = mkInBus()
+////                    val w           = AudioArtifactWriter(bm.bus, audio, time)
+////                    b.dependencies  ::= w
+////                }
+////
+////              case Link.Scan(peer) => mkInBus()
+////            }
+////          }
+////        }
+//
+//      case _ => throw new IllegalStateException(s"Unsupported input scan request $value")
+//    }
 
     /** Sub-classes may override this if invoking the super-method. */
     protected def buildAsyncAttrInput(b: AsyncProcBuilder[S], key: String, value: UGB.Value)
@@ -358,7 +360,7 @@ object AuralProcImpl {
       }
 
       // ---- handle output buses, and establish missing links to sinks ----
-      ugen.scanOuts.foreach { case (key, numCh) =>
+      ugen.outputs.foreach { case (key, numCh) =>
         val bus    = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
         logA(s"addOutputBus($key, $bus) (${hashCode.toHexString})")
         val res    = BusNodeSetter.writer(graph.ScanOut.controlName(key), bus, synth)

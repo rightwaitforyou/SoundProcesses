@@ -41,7 +41,7 @@ object UGenGraphBuilderImpl {
     val in  = new IncompleteImpl[S](
       remaining = g.sources, controlProxies = g.controlProxies,
       ugens = Vec.empty, controlValues = Vec.empty, controlNames = Vec.empty,
-      sourceMap = Map.empty, scanOuts = Map.empty, acceptedInputs = Map.empty,
+      sourceMap = Map.empty, outputs = Map.empty, acceptedInputs = Map.empty,
       rejectedInputs = Set.empty
     )
     in
@@ -56,7 +56,7 @@ object UGenGraphBuilderImpl {
       val controlValues : Vec[Float],
       val controlNames  : Vec[(String, Int)],
       val sourceMap     : Map[AnyRef, Any],
-      val scanOuts      : Map[String, Int],
+      val outputs      : Map[String, Int],
       val acceptedInputs: Map[UGenGraphBuilder.Key, Input#Value],
       val rejectedInputs: Set[UGenGraphBuilder.Key]
    )
@@ -67,7 +67,7 @@ object UGenGraphBuilderImpl {
   }
 
   private final class CompleteImpl[S <: Sys[S]](val result: UGenGraph,
-      val scanOuts      : Map[String, Int],
+      val outputs      : Map[String, Int],
       val acceptedInputs: Map[UGenGraphBuilder.Key, Input#Value]
    )
     extends Complete[S] {
@@ -82,7 +82,7 @@ object UGenGraphBuilderImpl {
     private var remaining       = in.remaining
     private var controlProxies  = in.controlProxies
 
-    var scanOuts                = in.scanOuts
+    var outputs                = in.outputs
     var acceptedInputs          = in.acceptedInputs
     var rejectedInputs          = Set.empty[UGenGraphBuilder.Key]
 
@@ -107,9 +107,9 @@ object UGenGraphBuilderImpl {
       res
     }
 
-    def addScanOut(key: String, numChannels: Int): Unit =
-      scanOuts.get(key).fold {
-        scanOuts += key -> numChannels
+    def addOutput(key: String, numChannels: Int): Unit =
+      outputs.get(key).fold {
+        outputs += key -> numChannels
       } { prevChans =>
         if (numChannels != prevChans) {
           val s1 = s"Cannot write multiple times to the same scan ($key)"
@@ -148,7 +148,7 @@ object UGenGraphBuilderImpl {
             val savedControlNames   = controlNames
             val savedControlValues  = controlValues
             val savedUGens          = ugens
-            val savedScanOuts       = scanOuts
+            val savedScanOuts       = outputs
             val savedAcceptedInputs = acceptedInputs
             try {
               elem.force(builder)
@@ -159,7 +159,7 @@ object UGenGraphBuilderImpl {
                 controlNames        = savedControlNames
                 controlValues       = savedControlValues
                 ugens               = savedUGens
-                scanOuts            = savedScanOuts
+                outputs            = savedScanOuts
                 acceptedInputs      = savedAcceptedInputs
                 missingElems      :+= elem
                 rejectedInputs     += rejected.key
@@ -177,7 +177,7 @@ object UGenGraphBuilderImpl {
 
       val newState = if (missingElems.isEmpty) {
         val result = build(controlProxies)
-        new CompleteImpl[S](result, scanOuts = scanOuts, acceptedInputs = acceptedInputs)
+        new CompleteImpl[S](result, outputs = outputs, acceptedInputs = acceptedInputs)
 
       } else {
         // NOTE: we have to return a new object even if no elem succeeded,
@@ -187,7 +187,7 @@ object UGenGraphBuilderImpl {
           new IncompleteImpl[S](
             remaining = missingElems, controlProxies = controlProxies,
             ugens = ugens, controlValues = controlValues, controlNames = controlNames,
-            sourceMap = sourceMap, scanOuts = scanOuts, acceptedInputs = acceptedInputs,
+            sourceMap = sourceMap, outputs = outputs, acceptedInputs = acceptedInputs,
             rejectedInputs = rejectedInputs
           )
         // } else in
