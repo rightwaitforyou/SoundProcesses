@@ -14,10 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.{Obj, Disposable, IdentifierMap}
+import de.sciss.lucre.stm.{Disposable, IdentifierMap, Obj}
 import de.sciss.lucre.synth.{Server, Sys}
 
-import scala.concurrent.stm.{TxnLocal, Ref}
+import scala.concurrent.stm.Ref
+import scala.language.higherKinds
 
 object AuralContextImpl {
   def apply[S <: Sys[S]](server: Server, sched: Scheduler[S])
@@ -38,9 +39,9 @@ object AuralContextImpl {
                                         auxMap: IdentifierMap[S#ID, S#Tx, Any],
                                         val scheduler: Scheduler[S],
                                         val server: Server)(implicit val workspaceHandle: WorkspaceHandle[S])
-    extends AuralContext[S] {
+    extends AuralContext[S] /* with ObservableImpl[S, AuralContext.Update[S]] */ {
 
-    private val waiting = TxnLocal(Map.empty[S#ID, List[PartialFunction[Any, Unit]]])
+    // private val waiting = TxnLocal(Map.empty[S#ID, List[PartialFunction[Any, Unit]]])
 
     def acquire[A <: Disposable[S#Tx]](obj: Obj[S])(init: => A)(implicit tx: S#Tx): A = {
       val id = obj.id
@@ -66,28 +67,28 @@ object AuralContextImpl {
       }
     }
 
-    def waitForAux[A](id: S#ID)(fun: PartialFunction[A, Unit])(implicit tx: S#Tx): Unit = {
-      waiting.transform { m0 =>
-        val list = m0.getOrElse(id, Nil) :+ fun.asInstanceOf[PartialFunction[Any, Unit]]
-        m0 + (id -> list)
-      } (tx.peer)
-    }
+//    def waitForAux[A](id: S#ID)(fun: PartialFunction[A, Unit])(implicit tx: S#Tx): Unit = {
+//      waiting.transform { m0 =>
+//        val list = m0.getOrElse(id, Nil) :+ fun.asInstanceOf[PartialFunction[Any, Unit]]
+//        m0 + (id -> list)
+//      } (tx.peer)
+//    }
 
     def putAux[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit = {
       auxMap.put(id, value)
       implicit val itx = tx.peer
-      if (waiting.isInitialized) waiting.getAndTransform { m0 =>
-        m0.get(id).fold(m0) { funs =>
-          val (apply, keep) = funs.partition(_.isDefinedAt(value))
-          apply.foreach { fun =>
-            fun(value)
-          }
-          if (keep.nonEmpty) m0 + (id -> keep) else m0 - id
-        }
-      }
+//      if (waiting.isInitialized) waiting.getAndTransform { m0 =>
+//        m0.get(id).fold(m0) { funs =>
+//          val (apply, keep) = funs.partition(_.isDefinedAt(value))
+//          apply.foreach { fun =>
+//            fun(value)
+//          }
+//          if (keep.nonEmpty) m0 + (id -> keep) else m0 - id
+//        }
+//      }
     }
 
-    def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A] = auxMap.get(id).asInstanceOf[Option[A]]
+    def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A] = auxMap.get   (id).asInstanceOf[Option[A]]
     def removeAux(id: S#ID)(implicit tx: S#Tx): Unit      = auxMap.remove(id)
   }
 }

@@ -14,9 +14,11 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Obj, Disposable}
+import de.sciss.lucre.stm.{Disposable, Obj}
 import de.sciss.lucre.synth.{Server, Sys}
-import impl.{AuralContextImpl => Impl}
+import de.sciss.synth.proc.impl.{AuralContextImpl => Impl}
+
+import scala.language.higherKinds
 
 object AuralContext {
   def apply[S <: Sys[S]](server: Server, scheduler: Scheduler[S])
@@ -28,8 +30,12 @@ object AuralContext {
     val sched = Scheduler[S]
     apply(server, sched)
   }
+
+//  sealed trait Update[S <: Sys[S]]
+//  final case class AuxAdded  [S <: Sys[S], A](id: S#ID, value: A) extends Update[S]
+//  final case class AuxRemoved[S <: Sys[S], A](id: S#ID, value: A) extends Update[S]
 }
-trait AuralContext[S <: Sys[S]] {
+trait AuralContext[S <: Sys[S]] /* extends Observable[S#Tx, AuralContext.Update[S]] */ {
   def server: Server
 
   def acquire[A <: Disposable[S#Tx]](obj: Obj[S])(init: => A)(implicit tx: S#Tx): A
@@ -42,11 +48,11 @@ trait AuralContext[S <: Sys[S]] {
 
   def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A]
 
-  /** A bit of a hack. Waits for the auxiliary object to appear
-    * within the _current_ transaction only. If the object
-    * appears the function is applied, otherwise nothing happens.
-    */
-  def waitForAux[A](id: S#ID)(fun: PartialFunction[A, Unit])(implicit tx: S#Tx): Unit
+//  /** A bit of a hack. Waits for the auxiliary object to appear
+//    * within the _current_ transaction only. If the object
+//    * appears the function is applied, otherwise nothing happens.
+//    */
+//  def waitForAux[A](id: S#ID)(fun: PartialFunction[A, Unit])(implicit tx: S#Tx): Unit
 
   def removeAux(id: S#ID)(implicit tx: S#Tx): Unit
 

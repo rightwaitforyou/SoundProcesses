@@ -18,9 +18,9 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.StringObj
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AudioBus, AudioBusNodeSetter, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
+import de.sciss.lucre.synth.{AudioBus, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
 import de.sciss.span.Span
-import de.sciss.synth.proc.AuralObj.{Preparing, Playing, Stopped, Prepared, TargetPlaying, TargetPrepared, TargetStop, TargetState, ProcData}
+import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, ProcData, Stopped, TargetPlaying, TargetPrepared, TargetState, TargetStop}
 import de.sciss.synth.proc.Timeline.SampleRate
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 

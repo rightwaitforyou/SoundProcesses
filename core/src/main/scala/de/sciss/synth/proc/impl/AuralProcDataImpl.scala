@@ -178,7 +178,7 @@ object AuralProcDataImpl {
 
     private def outputRemoved(output: Output[S])(implicit tx: S#Tx): Unit = {
       logA(s"outputRemoved from ${procCached()} (${output.key})")
-      context.getAux[AuralOutput[S]](output.id).foreach(disposeAuralOutput(_))
+      context.getAux[AuralOutput[S]](output.id).foreach(disposeAuralOutput)
       val key = output.key
       state.outputs.get(key).foreach { numCh =>
       }
