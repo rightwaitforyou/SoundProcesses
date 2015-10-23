@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.bitemp.BiPin
-import de.sciss.lucre.expr.{LongObj, BooleanObj, DoubleObj, IntObj, SpanLikeObj}
+import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.stm.store.BerkeleyDB
@@ -14,6 +14,7 @@ import de.sciss.synth.Curve.{exponential, linear}
 import de.sciss.synth.io.{AudioFile, AudioFileType}
 import de.sciss.synth.proc.Action.Universe
 import de.sciss.synth.proc.WorkspaceHandle.Implicits._
+import de.sciss.synth.proc.Implicits._
 
 import scala.concurrent.stm.Txn
 import scala.language.implicitConversions
@@ -155,19 +156,22 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //  def addScanIn(proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = {
 //    proc.inputs.add(key)
 //  }
-//
-//  def addScanOut(proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = {
-//    proc.outputs.add(key)
-//  }
 
-// SCAN
-//  implicit class ScanOps(val `this`: Scan[S]) /* extends AnyVal */ {
-//    def ~> (that: Scan[S])(implicit tx: S#Tx): Unit =
-//      `this`.add(Scan.Link.Scan(that))
-//
-//    def ~/> (that: Scan[S])(implicit tx: S#Tx): Unit =
-//      `this`.remove(Scan.Link.Scan(that))
-//  }
+  def addOutput(proc: Proc[S], key: String)(implicit tx: S#Tx): Output[S] = {
+    proc.outputs.add(key)
+  }
+
+  implicit class OutputOps(val `this`: Output[S]) /* extends AnyVal */ {
+    def ~> (that: (Proc[S], String))(implicit tx: S#Tx): Unit = {
+      val (sink, key) = that
+      sink.attr.put(key, `this`)
+    }
+
+    def ~/> (that: (Proc[S], String))(implicit tx: S#Tx): Unit = {
+      val (sink, key) = that
+      sink.attr.remove(key)
+    }
+  }
 
   implicit def timeRange(in: (Double, Double)): Span = {
     val start = (in._1 * Timeline.SampleRate).toLong
@@ -392,158 +396,159 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 13
 
   def test13()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test13----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |A generator and filter are separated
-//        |by a nested ensemble. Both should be
-//        |heard together.
-//        |
-//        |""".stripMargin)
-//
-//    cursor.step { implicit tx =>
-////      val imp     = ExprImplicits[S]
-////      import imp._
-//
-//      val playing = BooleanObj.newVar[S](false)
-//      val foldIn  = Folder[S]
-//      val ensIn   = Ensemble[S](foldIn , 0L, true)     // inner ensemble already active
-//      val foldOut = Folder[S]
-//      val ensOut  = Ensemble[S](foldOut, 0L, playing)  // outer ensemble will be activated later
-//
-//      val gen = proc {
-//        val sig = WhiteNoise.ar(0.5)
-//        DC.kr(1).poll(0, label = "gen")
-//        graph.ScanOut(sig)
-//      }
-//      val source = addScanOut(gen, "out")
-//
-//      val filter = proc {
-//        val in  = graph.ScanInFix("in", 1)
-//        val sig = Resonz.ar(in, 444, 0.1) * 10
-//        DC.kr(1).poll(0, label = "filter")
-//        Out.ar(0, Pan2.ar(sig))
-//      }
-//      val sink = addScanIn(filter, "in")
-//
-//      source ~> sink
-//
-//      // - `gen` will be the contents of `ensIn`
-//      // - `filter` and `foldIn` will be the contents of `ensOut`
-//      foldIn .addLast(gen)
-//      // foldOut.addLast(gen)
-//      foldOut.addLast(ensIn) // Obj(Ensemble.Elem(ensIn)))
-//      foldOut.addLast(filter)
-//
-//      val t = Transport[S]
-//      t.addObject(ensOut) // Obj(Ensemble.Elem(ensOut)))
-//      t.play()
-//
-//      val playingH = tx.newHandle(playing)
-//
-//      after(2.0) { implicit tx =>
-//        println("--enable outer ensemble--")
-//        val p = playingH()
-//        p() = true
-//        stopAndQuit()
-//      }
-//    }
+    println("----test13----")
+    println(
+      """
+        |Expected behaviour:
+        |A generator and filter are separated
+        |by a nested ensemble. Both should be
+        |heard together.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+//      val imp     = ExprImplicits[S]
+//      import imp._
+
+      val playing = BooleanObj.newVar[S](false)
+      val foldIn  = Folder[S]
+      val ensIn   = Ensemble[S](foldIn , 0L, true)     // inner ensemble already active
+      val foldOut = Folder[S]
+      val ensOut  = Ensemble[S](foldOut, 0L, playing)  // outer ensemble will be activated later
+
+      val gen = proc {
+        val sig = WhiteNoise.ar(0.5)
+        DC.kr(1).poll(0, label = "gen")
+        graph.ScanOut(sig)
+      }
+      gen.name   = "gen"
+      val source = addOutput(gen, "out")
+
+      val filter = proc {
+        val in  = graph.ScanInFix("in", 1)
+        val sig = Resonz.ar(in, 444, 0.1) * 10
+        DC.kr(1).poll(0, label = "filter")
+        Out.ar(0, Pan2.ar(sig))
+      }
+      filter.name = "filter"
+      val sink = (filter, "in")
+
+      source ~> sink
+
+      // - `gen` will be the contents of `ensIn`
+      // - `filter` and `foldIn` will be the contents of `ensOut`
+      foldIn .addLast(gen)
+      // foldOut.addLast(gen)
+      foldOut.addLast(ensIn) // Obj(Ensemble.Elem(ensIn)))
+      foldOut.addLast(filter)
+
+      val t = Transport[S]
+      t.addObject(ensOut) // Obj(Ensemble.Elem(ensOut)))
+      t.play()
+
+      val playingH = tx.newHandle(playing)
+
+      after(2.0) { implicit tx =>
+        println("--enable outer ensemble--")
+        val p = playingH()
+        p() = true
+        stopAndQuit()
+      }
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 12
 
   def test12()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test12----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |A pulse sequence is heard continuously,
-//        |After         4 seconds,   a noise is added.
-//        |After another 2 seconds,   a dust  is added.
-//        |After another 2 seconds, the noise is removed.
-//        |After another 2 seconds, the dust  is removed.
-//        |
-//        |""".stripMargin)
-//
-//    cursor.step { implicit tx =>
-//      val _proc = proc {
-//        val in  = graph.ScanInFix("in", 1)
-//        val gen = Pulse.ar(LFNoise1.ar(1).linexp(0, 1, 400, 1000.0)) * 0.1
-//        val sig = gen + in
-//        Out.ar(0, Pan2.ar(sig))
-//      }
-//      addScanIn(_proc, "in")
-//      val t = Transport[S]
-//      t.addObject(_proc)
-//      t.play()
-//      val procH = tx.newHandle(_proc)
-//
-//      after(2.0) { implicit tx =>
-//        println("--create inputs--")
-//        val in1 = proc {
-//          val sig = PinkNoise.ar(0.2)
-//          graph.ScanOut("out", sig)
-//        }
-//        addScanOut(in1, "out")
-//        val in1H = tx.newHandle(in1)
-//        t.addObject(in1)
-//
-//        val in2 = proc {
-//          val sig = Dust.ar(50) * 0.7
-//          graph.ScanOut("out", sig)
-//        }
-//        addScanOut(in2, "out")
-//        val in2H = tx.newHandle(in2)
-//        t.addObject(in2)
-//
-//        after(2.0) { implicit tx =>
-//          for {
-//            scanOut <- in1H ().outputs.get("out")
-//            scanIn  <- procH().inputs .get("in" )
-//          } {
-//            println("--connect noise--")
-//            scanOut ~> scanIn
-//          }
-//
-//          after(2.0) { implicit tx =>
-//            for {
-//              scanOut <- in2H ().outputs.get("out")
-//              scanIn  <- procH().inputs .get("in" )
-//            } {
-//              println("--connect dust--")
-//              scanOut ~> scanIn
-//            }
-//
-//            after(2.0) { implicit tx =>
-//              for {
-//                scanOut <- in1H ().outputs.get("out")
-//                scanIn  <- procH().inputs .get("in" )
-//              } {
-//                println("--disconnect noise--")
-//                scanOut ~/> scanIn
-//              }
-//
-//              after(2.0) { implicit tx =>
-//                for {
-//                  scanOut <- in2H ().outputs.get("out")
-//                  scanIn  <- procH().inputs.get("in" )
-//                } {
-//                  println("--disconnect dust--")
-//                  scanOut ~/> scanIn
-//                }
-//
-//                stopAndQuit()
-//              }
-//            }
-//          }
-//        }
-//      }
-//    }
+    println("----test12----")
+    println(
+      """
+        |Expected behaviour:
+        |A pulse sequence is heard continuously,
+        |After         4 seconds,   a noise is added.
+        |After another 2 seconds,   a dust  is added.
+        |After another 2 seconds, the noise is removed.
+        |After another 2 seconds, the dust  is removed.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val _proc = proc {
+        val in  = graph.ScanInFix("in", 1)
+        val gen = Pulse.ar(LFNoise1.ar(1).linexp(0, 1, 400, 1000.0)) * 0.1
+        val sig = gen + in
+        Out.ar(0, Pan2.ar(sig))
+      }
+      _proc.name = "out"
+      // addScanIn(_proc, "in")
+      val t = Transport[S]
+      t.addObject(_proc)
+      t.play()
+      val procH = tx.newHandle(_proc)
+
+      after(2.0) { implicit tx =>
+        println("--create inputs--")
+        val in1 = proc {
+          val sig = PinkNoise.ar(0.2)
+          graph.ScanOut("out", sig)
+        }
+        in1.name = "noise"
+        addOutput(in1, "out")
+        val in1H = tx.newHandle(in1)
+        t.addObject(in1)
+
+        val in2 = proc {
+          val sig = Dust.ar(50) * 0.7
+          graph.ScanOut("out", sig)
+        }
+        in2.name = "dust"
+        addOutput(in2, "out")
+        val in2H = tx.newHandle(in2)
+        t.addObject(in2)
+
+        after(2.0) { implicit tx =>
+          for {
+            scanOut <- in1H ().outputs.get("out")
+            // scanIn  <- procH().inputs .get("in" )
+          } {
+            println("--connect noise--")
+            scanOut ~> (procH(), "in")
+          }
+
+          after(2.0) { implicit tx =>
+            for {
+              scanOut <- in2H ().outputs.get("out")
+              // scanIn  <- procH().inputs .get("in" )
+            } {
+              println("--connect dust--")
+              scanOut ~> (procH(), "in") // scanIn
+            }
+
+            after(2.0) { implicit tx =>
+              for {
+                scanOut <- in1H ().outputs.get("out")
+                // scanIn  <- procH().inputs .get("in" )
+              } {
+                println("--disconnect noise--")
+                scanOut ~/> (procH(), "in") // scanIn
+              }
+
+              after(2.0) { implicit tx =>
+                for {
+                  scanOut <- in2H ().outputs.get("out")
+                  // scanIn  <- procH().inputs.get("in" )
+                } {
+                  println("--disconnect dust--")
+                  scanOut ~/> (procH(), "in") // scanIn
+                }
+
+                stopAndQuit()
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 11
@@ -640,7 +645,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //        Out.ar(0, sig)
 //      }
 //
-//      addScanOut(_proc1, "out") ~> addScanIn(_proc2, "in")
+//      addOutput(_proc1, "out") ~> addScanIn(_proc2, "in")
 //
 //      val _tl = timeline()
 //      _tl += (1.0 -> 8.0, _proc1)
@@ -786,7 +791,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //      // the problem occurs (occurred! now it's fixed) when we add the scan _before_ creating
 //      // adding _proc2. like here:
 //      println("--add scan--")
-//      addScanOut(_proc2, "out") ~> addScanIn(_proc1, "in")
+//      addOutput(_proc2, "out") ~> addScanIn(_proc1, "in")
 //      println("--add proc2--")
 //      tlObj += (2.0 ->  4.0, _proc2)
 //      println("--alright--")
@@ -833,7 +838,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //        graph.ScanOut("out", PinkNoise.ar(Seq(0.5, 0.5)))
 //      }
 //
-//      val scanOut = addScanOut(_view2.obj(), "out")
+//      val scanOut = addOutput(_view2.obj(), "out")
 //      val scanBar = addScanIn (_view1.obj(), "bar")
 //
 //      scanOut ~> scanBar
@@ -1045,7 +1050,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //      //      println(s"---1, num-children is ${test.size}")
 //      // reversed steps
 //      val scanIn  = addScanIn (proc2, "in" )
-//      val scanOut = addScanOut(proc1, "out")
+//      val scanOut = addOutput(proc1, "out")
 //      scanOut ~> scanIn
 //    }
 //
@@ -1108,7 +1113,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //      view1.play()
 //      val proc1   = view1.obj()
 //      val proc2   = view2.obj()
-//      val scanOut = addScanOut(proc1, "out")
+//      val scanOut = addOutput(proc1, "out")
 //      val scanIn  = addScanIn (proc2, "in" )
 //      scanOut ~> scanIn
 ////      println("--issue play2--")
@@ -1166,7 +1171,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 //      view2.play()
 //      val proc1   = view1.obj()
 //      val proc2   = view2.obj()
-//      val scanOut = addScanOut(proc1, "out")
+//      val scanOut = addOutput(proc1, "out")
 //      val scanIn  = addScanIn (proc2, "in" )
 //      scanOut ~> scanIn
 //    }

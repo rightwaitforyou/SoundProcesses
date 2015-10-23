@@ -40,4 +40,18 @@ We should still distinguish `ScanIn` and `Attribute` in the sense that the forme
 attribute to be present, whereas the latter will use its default value when the attribute is
 missing.
 
+# Linking to outputs
 
+If an input value is an `Output`, we have to find the corresponding `AuralOutput`. Querying
+an existing object is simple, we could use `context.acquire(output.proc)`, but there is
+currently no reactive element. Since we have used `putAux` and `getAux` before, using
+`output.id`, this would be the logical solution. Instead of adding a global observable
+instance, it might make sense to add observers specific to an `id`. Also keep in mind that
+eventually we will support `Timeline` instances as attribute values, and then we cannot
+rely on some `.proc` handle.
+
+What do we do if an output is not declared but used in terms of `ScanOut`? We should
+nevertheless create a dummy bus, so we can gracefully handle the transition once
+an `Output` appears.
+
+A request for detection will come from `buildAttrValueInput`.

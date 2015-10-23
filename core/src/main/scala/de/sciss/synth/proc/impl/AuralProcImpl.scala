@@ -361,7 +361,7 @@ object AuralProcImpl {
 
       // ---- handle output buses, and establish missing links to sinks ----
       ugen.outputs.foreach { case (key, numCh) =>
-        val bus    = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
+        val bus    = _data.getOutputBus(key) getOrElse sys.error(s"Scan bus $key not provided")
         logA(s"addOutputBus($key, $bus) (${hashCode.toHexString})")
         val res    = BusNodeSetter.writer(graph.ScanOut.controlName(key), bus, synth)
         builder.users ::= res

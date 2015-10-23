@@ -117,7 +117,7 @@ object AuralObj {
 
     // def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
 
-    def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
+    def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
 
     //    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus]
     //    def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]

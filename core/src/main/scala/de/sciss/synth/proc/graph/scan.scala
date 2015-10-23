@@ -21,7 +21,8 @@ import collection.immutable.{IndexedSeq => Vec}
 import de.sciss.synth.ugen.UGenInGroup
 
 object ScanIn {
-  /* private[proc] */ def controlName (key: String): String = s"$$i_$key"
+  /* private[proc] */ def controlName (key: String): String =
+    Attribute.controlName(key) // s"$$i_$key"
 
   sealed trait Like extends GE.Lazy with AudioRated {
     protected def key: String
@@ -30,7 +31,7 @@ object ScanIn {
 
     final def makeUGens: UGenInLike = {
       val b = UGenGraphBuilder.get
-      val numCh   = ??? : Int // b.requestInput(Input.Scan(key, fixed)).numChannels
+      val numCh   = b.requestInput(Input.Attribute(key, fixed)).numChannels
       val ctlName = controlName(key)
       mkUGen(ctlName, numCh)
     }

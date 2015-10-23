@@ -42,9 +42,12 @@ object OutputImpl {
   }
 
   def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Output[S] = {
+    val cookie  = in.readByte()
+    if (cookie != 3) sys.error(s"Unexpected cookie, expected 3 found $cookie")
     val id      = tx.readID(in, access)
     val serVer  = in.readShort()
-    if (serVer != SER_VERSION) sys.error(s"Incompatible serialized version (found $serVer, required $SER_VERSION)")
+    if (serVer != SER_VERSION)
+      sys.error(s"Incompatible serialized version (found ${serVer.toInt.toHexString}, required ${SER_VERSION.toHexString})")
 
     val proc  = Proc.read(in, access)
     val key   = in.readUTF()
@@ -66,7 +69,6 @@ object OutputImpl {
     }
 
     protected def writeData(out: DataOutput): Unit = {
-
       out.writeShort(SER_VERSION)
       proc.write(out)
       out.writeUTF(key)

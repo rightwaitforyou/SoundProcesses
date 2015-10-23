@@ -26,7 +26,7 @@ import de.sciss.synth.Curve.parametric
 import de.sciss.synth.io.AudioFileType
 import de.sciss.synth.proc.AuralObj.{Playing, ProcData}
 import de.sciss.synth.proc.Implicits._
-import de.sciss.synth.proc.UGenGraphBuilder.{Complete, Incomplete, MissingIn}
+import de.sciss.synth.proc.UGenGraphBuilder.{AttributeKey, Complete, Incomplete, MissingIn}
 import de.sciss.synth.proc.graph.impl.ActionResponder
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 
@@ -647,7 +647,7 @@ object AuralProcDataImpl {
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
     }
 
-    final def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = {
+    final def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = {
       procCached().outputs.get(key).flatMap { output =>
         context.getAux[AuralOutput[S]](output.id).map(_.bus)
       }
@@ -664,9 +664,10 @@ object AuralProcDataImpl {
       }
     }
 
-// SCAN
-//    private def scanView(scan: Scan[S])(implicit tx: S#Tx): Option[AuralScan[S]] =
-//      context.getAux[AuralScan.Proxy[S]](scan.id) match {
+    @inline
+    private def getAuralOutput(output: Output[S])(implicit tx: S#Tx): Option[AuralOutput[S]] =
+      context.getAux[AuralOutput[S]](output.id)
+//      match {
 //        case Some(view: AuralScan[S]) => Some(view)
 //        case _                        => None
 //      }
@@ -717,7 +718,11 @@ object AuralProcDataImpl {
 //    }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
-    /** Sub-classes may override this if invoking the super-method. */
+
+    /** Sub-classes may override this if invoking the super-method.
+      * If the value is incompatible with the assigned `value`, a `MissingIn` should be thrown.
+      * See `buildAttrInput` for a warning regarding throwing that exception.
+      */
     protected def buildAttrValueInput(b: NodeDependencyBuilder[S], key: String, value: Obj[S], numChannels: Int)
                                      (implicit tx: S#Tx): Unit = {
       val ctlName = graph.Attribute.controlName(key)
@@ -727,7 +732,8 @@ object AuralProcDataImpl {
 
       def chanCheck(expected: Int): Unit =
         if (numChannels != expected)
-          sys.error(s"Mismatch: Attribute $key has $numChannels channels, expected $expected")
+          throw MissingIn(AttributeKey(key))
+          // sys.error(s"Mismatch: Attribute $key has $numChannels channels, expected $expected")
 
       value match {
         case a: IntObj[S] =>
@@ -757,8 +763,11 @@ object AuralProcDataImpl {
           val ctlName   = graph.Attribute.controlName(key)
           val audioVal  = a.value
           val spec      = audioVal.spec
-          if (spec.numFrames != 1)
+          if (spec.numFrames != 1) {
             sys.error(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
+            // Console.err.println(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
+            // throw MissingIn(AttributeKey(key))
+          }
           val numCh = spec.numChannels // numChL.toInt
           if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
           chanCheck(numCh)
@@ -768,11 +777,10 @@ object AuralProcDataImpl {
           val w = AudioArtifactScalarWriter(bus, audioVal)
           b.addResource(w)
 
-
-// SCAN
-//        case a: Scan[S] =>
-//          scanView(a).fold[Unit] {
-//            Console.err.println(s"Warning: view for scan $a used as attribute key $key not found.")
+        case a: Output[S] =>
+          getAuralOutput(a).fold[Unit] {
+            Console.err.println(s"Warning: view for scan $a used as attribute key $key not found.")
+            throw new MissingIn(AttributeKey(key))
 //            // XXX TODO --- this is big ugly hack
 //            // in order to allow the concurrent appearance
 //            // of the source and sink procs.
@@ -789,23 +797,27 @@ object AuralProcDataImpl {
 //
 //              case _ =>
 //            }
-//
-//          } { view =>
-//            val bus = view.bus
-//            chanCheck(bus.numChannels)
-//            val res = BusNodeSetter.mapper(ctlName, bus, b.node)
-//            b.addUser(res)
-//            // XXX TODO:
-//            // - adapt number-of-channels if they don't match (using auxiliary synth)
-//          }
+
+          } { view =>
+            val bus = view.bus
+            chanCheck(bus.numChannels)
+            val res = BusNodeSetter.mapper(ctlName, bus, b.node)
+            b.addUser(res)
+            // XXX TODO:
+            // - adapt number-of-channels if they don't match (using auxiliary synth)
+          }
 
         case _ =>
           sys.error(s"Cannot use attribute $value as a scalar value")
       }
     }
 
-    /** Sub-classes may override this if invoking the super-method. If the value
-      * is incompatible with the assigned `value`, a `MissingIn` should be thrown.
+    /** Sub-classes may override this if invoking the super-method.
+      * If the value is incompatible with the assigned `value` and rebuilding the
+      * synth-graph would alleviate that problem, a `MissingIn` should be thrown.
+      * If the problem does not change in terms of the re-evaluation of the
+      * synth-graph, a different generic exception must be thrown to avoid
+      * an infinite loop.
       */
     def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGB.Value)
                       (implicit tx: S#Tx): Unit = {
