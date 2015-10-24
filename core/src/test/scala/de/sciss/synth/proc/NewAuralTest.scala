@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.bitemp.BiPin
-import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
+import de.sciss.lucre.expr.{LongObj, BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.stm.store.BerkeleyDB
@@ -152,10 +152,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       quit()
     }
 
-// SCAN
-//  def addScanIn(proc: Proc[S], key: String)(implicit tx: S#Tx): Scan[S] = {
-//    proc.inputs.add(key)
-//  }
+  def addScanIn(proc: Proc[S], key: String)(implicit tx: S#Tx): (Proc[S], String) /* Scan[S] */ = {
+    (proc, key) // proc.inputs.add(key)
+  }
 
   def addOutput(proc: Proc[S], key: String)(implicit tx: S#Tx): Output[S] = {
     proc.outputs.add(key)
@@ -574,7 +573,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
       val _proc = proc {
         val buf   = graph.Buffer("metal")
-        val speed = LFPulse.ar(BufDur.kr(buf).reciprocal).linlin(0, 1, -4, 4)
+        val speed = LFPulse.ar(0.25).linlin(0, 1, -4, 4)
         val sig0  = PlayBuf.ar(numChannels = spec.numChannels, buf = buf, speed = speed, loop = 1)
         val sig   = Pan2.ar(sig0)
         Out.ar(0, sig)
@@ -602,94 +601,93 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 10
 
   def test10()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test10----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |A tape proc is fed through a global spatialization proc.
-//        |It is heard after 1s, beginning with the text "So I took a turn...".
-//        |The sound is panned rapidly between left and right stereo channel.
-//        |After 1s the sound is muted (on the tape), after another 1s un-muted,
-//        |then the same happens, but the mute is engaged with the global proc.
-//        |
-//        |""".stripMargin)
-//
-////    val imp     = ExprImplicits[S]
-////    import imp._
-//
-//    val (tr, proc1H, proc2H) = cursor.step { implicit tx =>
-//      val p     = Proc[S]
-//      val g     = SynthGraphObj.tape[S]
-//      p.graph() = g
-//      val _proc1 = p // Obj(Proc.Elem(p))
-//
-//      val sAudio = addScanIn(_proc1, "sig")
-//      import de.sciss.file._
-//      val f       = userHome / "Music" / "tapes" / "machinaecoelestis.aif"
-//      val spec    = AudioFile.readSpec(f)
-//      println(spec)
-//      val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
-//      val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
-//      val gAudio  = Grapheme[S](spec.numChannels)
-//      gAudio.add(0L: LongObj[S], vAudio: Grapheme.Expr[S]) // ... çoit trop complexe ...
-//      sAudio.add(Scan.Link.Grapheme(gAudio))
-//
-//      val _proc2 = proc {
-//        val in  = graph.ScanIn("in")
-//        val m   = graph.Attribute.kr("mute", 0.0)
-//        val sig0 = in * (1 - m)
-//        val pos  = LFTri.ar(4)
-//        val sig  = Balance2.ar(sig0 \ 0, sig0 \ 1, pos)
-//        Out.ar(0, sig)
-//      }
-//
-//      addOutput(_proc1, "out") ~> addScanIn(_proc2, "in")
-//
-//      val _tl = timeline()
-//      _tl += (1.0 -> 8.0, _proc1)
-//      // _tl += (1.0 -> 6.0, _proc2)
-//      _tl += (Span.all, _proc2)
-//      val _tr = Transport(as)
-//      _tr.addObject(_tl)
-//
-//      (_tr, tx.newHandle(_proc1), tx.newHandle(_proc2))
-//    }
-//
-//    cursor.step { implicit tx =>
-//      println("--issue play--")
-//      tr.play()
-//
-//      after(2.0) { implicit tx =>
-//        println("--mute tape--")
-//        val p1 = proc1H()
-//        p1.attr.put(ObjKeys.attrMute, true: BooleanObj[S])
-//
-//        after(1.0) { implicit tx =>
-//          println("--unmute tape--")
-//          val p1 = proc1H()
-//          p1.attr.put(ObjKeys.attrMute, false: BooleanObj[S])
-//
-//          after(1.0) { implicit tx =>
-//            println("--mute main--")
-//            val p2 = proc2H()
-//            p2.attr.put(ObjKeys.attrMute, true: BooleanObj[S])
-//
-//            after(1.0) { implicit tx =>
-//              println("--unmute main--")
-//              val p2 = proc2H()
-//              p2.attr.put(ObjKeys.attrMute, false: BooleanObj[S])
-//
-//              after(2.0) { implicit tx =>
-//                tr.stop()
-//                stopAndQuit(1.0)
-//              }
-//            }
-//          }
-//        }
-//      }
-//    }
+    println("----test10----")
+    println(
+      """
+        |Expected behaviour:
+        |A tape proc is fed through a global spatialization proc.
+        |It is heard after 1s, beginning with the text "So I took a turn...".
+        |The sound is panned rapidly between left and right stereo channel.
+        |After 1s the sound is muted (on the tape), after another 1s un-muted,
+        |then the same happens, but the mute is engaged with the global proc.
+        |
+        |""".stripMargin)
+
+//    val imp     = ExprImplicits[S]
+//    import imp._
+
+    val (tr, proc1H, proc2H) = cursor.step { implicit tx =>
+      val p     = Proc[S]
+      val g     = SynthGraphObj.tape[S]
+      p.graph() = g
+      val _proc1 = p // Obj(Proc.Elem(p))
+
+      // val sAudio = addScanIn(_proc1, "sig")
+      import de.sciss.file._
+      val f       = userHome / "Music" / "tapes" / "machinaecoelestis.aif"
+      val spec    = AudioFile.readSpec(f)
+      println(spec)
+      val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
+      val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
+      val gAudio  = Grapheme[S](spec.numChannels)
+      gAudio.add(0L: LongObj[S], vAudio: Grapheme.Expr[S]) // ... çoit trop complexe ...
+      // sAudio.add(Scan.Link.Grapheme(gAudio))
+      _proc1.attr.put("sig", gAudio)
+
+      val _proc2 = proc {
+        val in  = graph.ScanIn("in")
+        val m   = graph.Attribute.kr("mute", 0.0)
+        val sig0 = in * (1 - m)
+        val pos  = LFTri.ar(4)
+        val sig  = Balance2.ar(sig0 \ 0, sig0 \ 1, pos)
+        Out.ar(0, sig)
+      }
+
+      addOutput(_proc1, "out") ~> addScanIn(_proc2, "in")
+
+      val _tl = timeline()
+      _tl += (1.0 -> 8.0, _proc1)
+      // _tl += (1.0 -> 6.0, _proc2)
+      _tl += (Span.all, _proc2)
+      val _tr = Transport(as)
+      _tr.addObject(_tl)
+
+      (_tr, tx.newHandle(_proc1), tx.newHandle(_proc2))
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      tr.play()
+
+      after(2.0) { implicit tx =>
+        println("--mute tape--")
+        val p1 = proc1H()
+        p1.attr.put(ObjKeys.attrMute, true: BooleanObj[S])
+
+        after(1.0) { implicit tx =>
+          println("--unmute tape--")
+          val p1 = proc1H()
+          p1.attr.put(ObjKeys.attrMute, false: BooleanObj[S])
+
+          after(1.0) { implicit tx =>
+            println("--mute main--")
+            val p2 = proc2H()
+            p2.attr.put(ObjKeys.attrMute, true: BooleanObj[S])
+
+            after(1.0) { implicit tx =>
+              println("--unmute main--")
+              val p2 = proc2H()
+              p2.attr.put(ObjKeys.attrMute, false: BooleanObj[S])
+
+              after(2.0) { implicit tx =>
+                tr.stop()
+                stopAndQuit(1.0)
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 9
