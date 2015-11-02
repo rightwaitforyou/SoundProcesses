@@ -328,7 +328,7 @@ object AuralProcImpl {
     // ---- synchronous preparation ----
     private def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p = _data.procCached()
-      logA(s"begin launch $p (${hashCode.toHexString})")
+      logA(s"begin launch  $p (${hashCode.toHexString})")
 
       val ug            = ugen.result
       implicit val itx  = tx.peer

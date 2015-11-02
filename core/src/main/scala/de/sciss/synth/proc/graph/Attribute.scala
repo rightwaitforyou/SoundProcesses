@@ -65,7 +65,10 @@ final case class Attribute(rate: Rate, key: String, default: Attribute.Default, 
 
   def makeUGens: UGenInLike = {
     val b       = UGenGraphBuilder.get
-    val inValue = b.requestInput(Input.Attribute(key, numChannels = if (fixed) default.numChannels else -1))
+    val inValue = b.requestInput(Input.Attribute(
+      name                = key,
+      requiredNumChannels = if (fixed) default.numChannels else -1,
+      defaultNumChannels  = default.numChannels))
     val numCh   = inValue.numChannels
     val ctlName = Attribute.controlName(key)
     val values  = default.tabulate(numCh)

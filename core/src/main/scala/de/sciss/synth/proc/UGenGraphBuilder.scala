@@ -172,10 +172,11 @@ object UGenGraphBuilder {
     }
     /** Specifies access to a scalar attribute.
       *
-      * @param name         name (key) of the attribute
-      * @param numChannels  the required number of channels or `-1` if no specific requirement
+      * @param name                 name (key) of the attribute
+      * @param requiredNumChannels  the required number of channels or `-1` if no specific requirement
+      * @param defaultNumChannels   the default  number of channels or `-1` if no default provided
       */
-    final case class Attribute(name: String, numChannels: Int) extends Input {
+    final case class Attribute(name: String, requiredNumChannels: Int, defaultNumChannels: Int) extends Input {
       type Key    = AttributeKey
       type Value  = Attribute.Value
 

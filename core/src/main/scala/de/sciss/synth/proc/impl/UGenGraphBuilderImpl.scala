@@ -141,7 +141,7 @@ object UGenGraphBuilderImpl {
       var missingElems  = Vector.empty[Lazy]
       // var someSucceeded = false
       while (remaining.nonEmpty) {  // XXX TODO: this can go through many exceptions. perhaps should short circuit?
-      val g = SynthGraph {
+        val g = SynthGraph {
           remaining.foreach { elem =>
             // save rollback information -- not very elegant; should figure out how scala-stm nesting works
             val savedSourceMap      = sourceMap
@@ -163,7 +163,7 @@ object UGenGraphBuilderImpl {
                 acceptedInputs      = savedAcceptedInputs
                 missingElems      :+= elem
                 rejectedInputs     += rejected // .key
-                logAural(s"rejectedInputs += ${rejected /* .key */}")
+                // logAural(s"rejectedInputs += ${rejected /* .key */}")
             }
           }
         }

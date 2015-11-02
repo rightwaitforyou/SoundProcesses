@@ -1129,55 +1129,53 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 2
 
   def test2()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test2----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |A filtered pink noise with resonance frequency 666 Hz is heard.
-//        |
-//        |""".stripMargin)
-//
-//    val (view1, view2) = cursor.step { implicit tx =>
-//      val _view1 = procV {
-//        val amp   = graph.Attribute.ir("amp")
-//        val noise = PinkNoise.ar(Seq(amp, amp))
-//        graph.ScanOut("out", noise)
-//      }
-//      import Implicits._
-//      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
-//      val proc1 = _view1.obj()
-//      proc1.name = "pink"
-//      putDouble(proc1, "amp", 0.5)
-//
-//      val _view2 = procV {
-//        val freq  = graph.Attribute.ir("freq", 440.0)
-//        val in    = graph.ScanIn("in")
-//        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
-//      }
-//      val proc2 = _view2.obj()
-//      proc2.name = "filter"
-//      putDouble(proc2, "freq", 666)
-//
-//      (_view1, _view2)
-//    }
-//
-//    cursor.step { implicit tx =>
-//      println("--issue play--")
-//      view1.play()
-//      view2.play()
-//      val proc1   = view1.obj()
-//      val proc2   = view2.obj()
-//      val scanOut = addOutput(proc1, "out")
-//      val scanIn  = addScanIn (proc2, "in" )
-//      scanOut ~> scanIn
-//    }
-//
-//    Thread.sleep(100)
-//    context.server.peer.dumpTree(controls = true)
-//
-//    stopAndQuit()
+    println("----test2----")
+    println(
+      """
+        |Expected behaviour:
+        |A filtered pink noise with resonance frequency 666 Hz is heard.
+        |
+        |""".stripMargin)
+
+    val (view1, view2) = cursor.step { implicit tx =>
+      val _view1 = procV {
+        val amp   = graph.Attribute.ir("amp")
+        val noise = PinkNoise.ar(Seq(amp, amp))
+        graph.ScanOut("out", noise)
+      }
+      import Implicits._
+      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
+      val proc1 = _view1.obj()
+      proc1.name = "pink"
+      putDouble(proc1, "amp", 0.5)
+
+      val _view2 = procV {
+        val freq  = graph.Attribute.ir("freq", 440.0)
+        val in    = graph.ScanIn("in")
+        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
+      }
+      val proc2 = _view2.obj()
+      proc2.name = "filter"
+      putDouble(proc2, "freq", 666)
+
+      (_view1, _view2)
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      view1.play()
+      view2.play()
+      val proc1   = view1.obj()
+      val proc2   = view2.obj()
+      val scanOut = addOutput(proc1, "out")
+      val scanIn  = addScanIn(proc2, "in" )
+      scanOut ~> scanIn
+    }
+
+    Thread.sleep(100)
+    context.server.peer.dumpTree(controls = true)
+
+    stopAndQuit()
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 1

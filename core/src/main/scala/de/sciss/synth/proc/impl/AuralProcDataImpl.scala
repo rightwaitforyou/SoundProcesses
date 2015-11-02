@@ -50,11 +50,7 @@ object AuralProcDataImpl {
 
     // running attribute inputs
     private val attrMap       = TMap.empty[String, Disposable[S#Tx]]
-
-    // private val scanBuses     = TMap.empty[String, AudioBus]
-// SCAN
-//    private val scanInViews   = TMap.empty[String, AuralScan.Owned[S]]
-    // private val scanOutViews  = TMap.empty[String, AuralOutput.Owned[S]]
+    private val outputBuses   = TMap.empty[String, AudioBus]
     private val procViews     = TSet.empty[AuralObj.Proc[S]]
 
     private val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
@@ -75,16 +71,9 @@ object AuralProcDataImpl {
 
       observers ::= proc.changed.react { implicit tx => upd =>
         upd.changes.foreach {
-          case Proc.GraphChange(_)  => newSynthGraph()
-// SCAN
-//          case Proc.InputAdded   (key, scan)          => scanInAdded (key, scan)
-          case Proc.OutputAdded  (scan)          => outputAdded(scan)
-// SCAN
-//          case Proc.InputRemoved (key, scan)          => scanRemoved (key, scan)
-          case Proc.OutputRemoved(scan)          => outputRemoved(scan)
-// ELEM
-// case Proc.InputChange  (key, scan, sCh)     => scanInChange(key, scan, sCh)
-// case Proc.OutputChange (key, scan, sCh)     => // nada
+          case Proc.GraphChange(_)        => newSynthGraph()
+          case Proc.OutputAdded  (output) => outputAdded(output)
+          case Proc.OutputRemoved(output) => outputRemoved(output)
         }
       }
       val attr = proc.attr
@@ -98,29 +87,15 @@ object AuralProcDataImpl {
 //        mkAttrObserver(key, value)
 //      }
 
+//      proc.outputs.iterator.foreach { case (key, output) =>
+//        outputAdded(output)
+//      }
+
       tryBuild()
       this
     }
 
     final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = nodeRef.get(tx.peer)
-
-// SCAN
-//    final def getScanIn(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] =
-//      getScan(key, scanInViews)
-//
-//    final def getScanOut(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] =
-//      getScan(key, scanOutViews)
-
-// SCAN
-//    private[this] def getScan(key: String, views: TMap[String, AuralScan.Owned[S]])
-//                             (implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]] = {
-//      implicit val itx = tx.peer
-//      views.get(key).fold[Option[Either[AudioBus, AuralScan[S]]]] {
-//        scanBuses.get(key).map(Left(_))
-//      } { v =>
-//        Some(Right(v))
-//      }
-//    }
 
     private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"playScans ${procCached()}")
@@ -153,27 +128,26 @@ object AuralProcDataImpl {
 
     // ---- scan events ----
 
-// SCAN
-//    private def scanInAdded(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
-//      logA(s"scanInAdded  to   ${procCached()} ($key)")
-//      testInScan (key, scan)
-//    }
-
     private def outputAdded(output: Output[S])(implicit tx: S#Tx): Unit = {
       logA(s"outputAdded  to   ${procCached()} (${output.key})")
+      implicit val itx = tx.peer
       val key = output.key
-      state.outputs.get(key).foreach { numCh =>
-        context.getAux[AuralOutput[S]](output.id).fold[Unit] {
-          mkAuralOutput(output, numCh)
-        } { view =>
-          val numCh1 = view.bus.numChannels
-          // checkScanNumChannels(view, numCh)
-          if (numCh1 != numCh) {
-            disposeAuralOutput(view)
-            mkAuralOutput(output, numCh)
-          }
-        }
+      outputBuses.get(key).foreach { bus =>
+        mkAuralOutput(output, bus)
       }
+//      state.outputs.get(key).foreach { numCh =>
+//        context.getAux[AuralOutput[S]](output.id).fold[Unit] {
+//          mkAuralOutput(output, numCh)
+//        } { view =>
+//          assert(false, s"Found an AuralOutput for ${output.id} although it was just added")
+////          val numCh1 = view.bus.numChannels
+////          // checkScanNumChannels(view, numCh)
+////          if (numCh1 != numCh) {
+////            disposeAuralOutput(view)
+////            mkAuralOutput(output, numCh)
+////          }
+//        }
+//      }
     }
 
     private def outputRemoved(output: Output[S])(implicit tx: S#Tx): Unit = {
@@ -187,15 +161,6 @@ object AuralProcDataImpl {
     @inline
     private def disposeAuralOutput(view: AuralOutput[S])(implicit tx: S#Tx): Unit =
       view.dispose()  // this will call `context.removeAux`
-
-// SCAN
-//    private def scanInChange(key: String, scan: Scan[S], changes: Vec[Scan.Change[S]])(implicit tx: S#Tx): Unit = {
-//      logA(s"scanInChange in   ${procCached()} ($key)")
-//      changes.foreach {
-//        case Scan.Added(_) => testInScan(key, scan)
-//        case _ =>
-//      }
-//    }
 
     // ---- attr events ----
 
@@ -297,44 +262,14 @@ object AuralProcDataImpl {
 
     // creates an `AuralOutput` and registers it with the aural context.
     private def addUsedOutput(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
+      implicit val itx = tx.peer
       val outputs = procCached().outputs
+      val bus     = Bus.audio(server, numChannels = numChannels) // mkBus(key, numChannels)
+      outputBuses.put(key, bus).foreach(_ => throw new IllegalStateException(s"Output bus for $key already defined"))
       outputs.get(key).foreach { output =>
-        mkAuralOutput(output, numChannels)
+        mkAuralOutput(output, bus)
       }
     }
-
-// SCAN
-//    // if a scan was added or a source was added to an existing scan,
-//    // check if the scan is used as currently missing input. if so,
-//    // try to build the ugen graph again.
-//    private def testInScan(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit = {
-//      if (state.rejectedInputs.contains(UGB.ScanKey(key))) {
-//        val numCh = scanInNumChannels(scan)
-//        // println(s"testInScan($key) -> numCh = $numCh")
-//        if (numCh >= 0) {
-//          // the scan is ready to be used and was missing before
-//          tryBuild()
-//        } else {
-//          addIncompleteScanIn(key, scan)
-//        }
-//      }
-//    }
-
-// SCAN
-//    // incomplete scan ins are scan ins which do exist and are used by
-//    // the ugen graph, but their source is not yet available. in order
-//    // for them to be detected when a sink is added, the sink must
-//    // be able to find a reference to them via the context's auxiliary
-//    // map. we thus store the special proxy sub-type `Incomplete` in
-//    // there; when the sink finds it, it will invoke `sinkAdded`,
-//    // in turn causing the data object to try to rebuild the ugen graph.
-//    private def addIncompleteScanIn(key: String, scan: Scan[S])(implicit tx: S#Tx): Unit =
-//      context.putAux[AuralScan.Proxy[S]](scan.id, new AuralScan.Incomplete(this, key))
-
-// SCAN
-//    // called from scan-view if source is not materialized yet
-//    final def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit =
-//      if (state.rejectedInputs.contains(UGenGraphBuilder.ScanKey(key))) tryBuild()
 
     final def addInstanceNode(n: NodeRef.Full)(implicit tx: S#Tx): Unit = {
       logA(s"addInstanceNode ${procCached()} : $n")
@@ -390,7 +325,7 @@ object AuralProcDataImpl {
 //      scanInViews.clear()
 //      scanOutViews.foreach(_._2.dispose())
 //      scanOutViews.clear()
-      // scanBuses.clear()
+      outputBuses.clear()
       val rj = stateRef().rejectedInputs
       if (rj.nonEmpty) {
 // SCAN
@@ -491,125 +426,28 @@ object AuralProcDataImpl {
       }
     }
 
-// SCAN
-//    /* Ensures that an aural-scan for a given key exists. If it exists,
-//     * checks that the number of channels is correct. Otherwise, checks
-//     * if a scan for the key exists. If yes, instantiates the aural-scan,
-//     * if no, creates an audio-bus for later use.
-//     */
-//    private[this] def activateAuralScanIn(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
-//      activateAuralScan(key = key, numChannels = numChannels, isInput = true )
-//
-//    private[this] def activateAuralScanOut(key: String, numChannels: Int)(implicit tx: S#Tx): Unit =
-//      activateAuralScan(key = key, numChannels = numChannels, isInput = false)
-
-// SCAN
-//    /* Ensures that an aural-scan for a given key exists. If it exists,
-//     * checks that the number of channels is correct. Otherwise, checks
-//     * if a scan for the key exists. If yes, instantiates the aural-scan,
-//     * if no, creates an audio-bus for later use.
-//     */
-//    private[this] def activateAuralScan(key: String, numChannels: Int, isInput: Boolean)
-//                                       (implicit tx: S#Tx): Unit = {
-//      val views = if (isInput) scanInViews else scanOutViews
-//      views.get(key)(tx.peer).fold {
-//        val proc  = procCached()
-//// SCAN
-//require (!isInput)
-//        val scans = /* SCAN if (isInput) proc.inputs else */ proc.outputs
-//        scans.get(key).fold[Unit] {
-//          mkBus(key, numChannels)
-//        } { scan =>
-//          mkAuralScan(scan = scan, numChannels = numChannels, isInput = isInput)
-//        }
-//      } { view =>
-//        checkScanNumChannels(view, numChannels = numChannels)
-//      }
-//    }
-
-//    /* Creates a bus for the given scan, unless it already exists.
-//     * Existing buses are checked for consistency with the given
-//     * number-of-channels (throws an exception upon discrepancy).
-//     */
-//    private def mkBus(key: String, numChannels: Int)(implicit tx: S#Tx): AudioBus = {
-//      implicit val itx = tx.peer
-//      val bus = scanBuses.get(key).getOrElse {
-//        val res = Bus.audio(context.server, numChannels = numChannels)
-//        scanBuses.put(key, res)
-//        res
-//      }
-//      if (bus.numChannels != numChannels)
-//        sys.error(s"Scan bus channels changed from ${bus.numChannels} to $numChannels")
-//
-//      bus
-//    }
-
     /* Creates a new aural output */
-    private def mkAuralOutput(output: Output[S], numChannels: Int)(implicit tx: S#Tx): AuralOutput[S] = {
+    private def mkAuralOutput(output: Output[S], bus: AudioBus)(implicit tx: S#Tx): AuralOutput[S] = {
       // val key   = output.key
-      val bus   = Bus.audio(server, numChannels = numChannels) // mkBus(key, numChannels)
       // val views = scanOutViews
       val view  = AuralOutput(data = this, output = output, bus = bus)
       // this is done by the `AuralOutput` constructor:
       // context.putAux[AuralOutput[S]](output.id, view)
-
-      // views.put(key, view)(tx.peer)
-      // note: the view will iterate over the
-      //       sources and sinks itself upon initialization,
-      //       and establish the playing links if found
-      //
-      //      nodeOption.foreach { n =>
-      //        view.play(n)
-      //      }
       view
     }
-
-// SCAN
-//    /* Creates a new aural scan */
-//    private def mkAuralScan(scan: Output[S], numChannels: Int, isInput: Boolean)
-//                           (implicit tx: S#Tx): AuralScan[S] = {
-//      val key   = scan.key
-//      val bus   = mkBus(key, numChannels)
-//      val views = if (isInput) scanInViews else scanOutViews
-//      val view  = ... : AuralScan.Owned[S] // SCAN AuralScan(data = this, key = key, scan = scan, bus = bus, isInput = isInput)
-//      views.put(key, view)(tx.peer)
-//      // note: the view will iterate over the
-//      //       sources and sinks itself upon initialization,
-//      //       and establish the playing links if found
-//      //
-//      //      nodeOption.foreach { n =>
-//      //        view.play(n)
-//      //      }
-//      view
-//    }
-
-//    private def checkScanNumChannels(view: AuralScan[S], numChannels: Int): Unit = {
-//      val numCh1 = view.bus.numChannels
-//      if (numCh1 != numChannels) sys.error(s"Trying to access scan with competing numChannels ($numCh1, $numChannels)")
-//    }
-
-    //    def scanInBusChanged(sinkKey: String, bus: AudioBus)(implicit tx: S#Tx): Unit = {
-    //      if (state.missingIns.contains(sinkKey)) tryBuild()
-    //    }
-
-    // def getScanBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = scanViews.get(key)(tx.peer).map(_.bus)
 
     /** Sub-classes may override this if invoking the super-method. */
     def requestInput[Res](in: UGB.Input { type Value = Res }, st: Incomplete[S])
                          (implicit tx: S#Tx): Res = in match {
       case i: UGB.Input.Attribute =>
-        val found  = requestAttrNumChannels(i.name)
-        val reqNum = i.numChannels
-        if (found >= 0 && reqNum >= 0 && found != reqNum) {
+        val found = requestAttrNumChannels(i.name)
+        import i.{requiredNumChannels => reqNum, defaultNumChannels => defNum}
+        if ((found < 0 && i.defaultNumChannels < 0) || (found >= 0 && reqNum >= 0 && found != reqNum)) {
           // throw new IllegalStateException(s"Attribute ${i.name} requires $reqNum channels (found $found)")
           throw MissingIn(i.key)
         }
-        val res = if (found >= 0) found else if (reqNum >= 0) reqNum else 1
+        val res = if (found >= 0) found else if (reqNum >= 0) reqNum else defNum
         UGB.Input.Attribute.Value(res)
-
-// SCAN
-//      case i: UGB.Input.Scan =>
-//        UGB.Input.Scan.Value(requestScanInNumChannels(i))
 
       case i: UGB.Input.Stream =>
         val numCh0  = requestAttrNumChannels(i.name)
@@ -648,10 +486,10 @@ object AuralProcDataImpl {
     }
 
     final def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus] = {
-      procCached().outputs.get(key).flatMap { output =>
-        context.getAux[AuralOutput[S]](output.id).map(_.bus)
-      }
-      // scanBuses.get(key)(tx.peer)
+//      procCached().outputs.get(key).flatMap { output =>
+//        context.getAux[AuralOutput[S]](output.id).map(_.bus)
+//      }
+      outputBuses.get(key)(tx.peer)
     }
 
     final def procCached()(implicit tx: S#Tx): Proc[S] = {
@@ -673,8 +511,9 @@ object AuralProcDataImpl {
 //      }
 
     private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
-      val procObj = procCached()
-      procObj.attr.get(key).fold(-1) {
+      val procObj   = procCached()
+      val valueOpt  = procObj.attr.get(key)
+      valueOpt.fold(-1) {
         case a: DoubleVector[S] => a.value.size // XXX TODO: would be better to write a.peer.size.value
         case a: Grapheme.Expr.Audio [S] =>
           // a.spec.numChannels
@@ -683,39 +522,11 @@ object AuralProcDataImpl {
 //        case a: Scan[S] =>
 //          scanView(a).getOrElse(throw new MissingIn())
 //          requestScanInNumChannels(i)
+        case a: Output[S] =>
+          getAuralOutput(a).fold(-1)(_.bus.numChannels)
         case _ => -1
       }
     }
-
-// SCAN
-//    private def requestScanInNumChannels(req: UGenGraphBuilder.Input.Scan)(implicit tx: S#Tx): Int = {
-//      val procObj = procCached()    /** Sub-classes may override this if invoking the super-method. */
-//
-//      val proc    = procObj
-//// SCAN
-//      val numCh0  = ... : Int // proc.inputs.get(req.name).fold(-1)(scanInNumChannels)
-//      val numCh   = if (numCh0 == -1) req.fixed else numCh0
-//      if (numCh == -1) throw MissingIn(req) else numCh
-//    }
-
-// SCAN
-//    private def scanInNumChannels(scan: Scan[S])(implicit tx: S#Tx): Int = {
-//      val chans = scan.iterator.toList.map {
-//        case Link.Grapheme(peer) =>
-//          // val chansOpt = peer.valueAt(time).map(_.numChannels)
-//          // chansOpt.getOrElse(numChannels)
-//          peer.numChannels
-//
-//        case Link.Scan(peer) =>
-//          val sourceOpt = scanView(peer)
-//          sourceOpt.fold(-1) { sourceView =>
-//            // val sourceObj = sourceObjH()
-//            // getOutputBus(sourceObj, sourceKey)
-//            sourceView.bus.numChannels // data.state.scanOuts.get(sourceView.key)
-//          }
-//      }
-//      if (chans.isEmpty) -1 else chans.max
-//    }
 
     //////////////////////////////////////////////////////////////////////////////////////////////
 

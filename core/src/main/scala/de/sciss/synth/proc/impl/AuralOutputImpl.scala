@@ -31,65 +31,6 @@ object AuralOutputImpl {
     val view  = new Impl[S](data = data, key = key, bus = bus, idH = tx.newHandle(id))
     logA(s"AuralOutput(${data.procCached()}, $key, bus = $bus)")
     context.putAux[AuralOutput /* .Proxy */[S]](id, view)
-
-// SCAN
-//    def scanView(peer: S#ID)(implicit tx: S#Tx): Option[AuralOutput[S]] =
-//      context.getAux[AuralOutput.Proxy[S]](peer) match {
-//        case Some(view: AuralOutput[S]) => Some(view)
-//        case _                        => None
-//      }
-//
-//    def scanViewProxy(peer: S#ID)(implicit tx: S#Tx): Option[AuralOutput.Proxy[S]] =
-//      context.getAux[AuralOutput.Proxy[S]](peer)
-
-// SCAN
-//    scan.iterator.foreach {
-//// SCAN
-////      case Link.Grapheme(peer) => // XXX TODO: currently not supported
-//      case Link.Scan(peer) =>
-//        if (isInput)
-//          scanView(peer.id).foreach { sourceView =>
-//            sourceView.addSink  (view      )
-//            view      .addSource(sourceView)
-//          }
-//
-//        else
-//          scanViewProxy(peer.id).foreach {
-//            case sinkView: AuralOutput[S] =>
-//              view    .addSink  (sinkView)
-//              sinkView.addSource(view    )
-//            case proxy: AuralOutput.Incomplete[S] =>
-//              proxy.data.sinkAdded(proxy.key, view)
-//          }
-//    }
-
-
-// SCAN
-//    // the observer registers source and sink additions and removals.
-//    // if a view is found for the remote scan, simply invoke the
-//    // the corresponding add/remove method on our view. do not call
-//    // into the remote view, because it will from its own side observe
-//    // this event and call into the symmetric method.
-//    val obs = scan.changed.react { implicit tx => upd =>
-//      upd.changes.foreach {
-//        case Output.Added(link) =>
-//          if (isInput)
-//            scanView(link.peerID).foreach(view.addSource   )
-//          else
-//            scanViewProxy(link.peerID).foreach {
-//              case sinkView: AuralOutput[S] => view.addSink(sinkView)
-//              case proxy: AuralOutput.Incomplete[S] => proxy.data.sinkAdded(proxy.key, view)
-//            }
-//
-//        case Output.Removed(link) =>
-//          if (isInput)
-//            scanView(link.peerID).foreach(view.removeSource)
-//          else
-//            scanView(link.peerID).foreach(view.removeSink)
-//      }
-//    }
-//
-//    view.obs = obs  // will be disposed with the view
     view
   }
 
