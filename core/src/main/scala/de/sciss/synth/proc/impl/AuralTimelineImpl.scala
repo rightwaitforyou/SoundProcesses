@@ -72,6 +72,7 @@ object AuralTimelineImpl {
 
   private final class Scheduled(val token: Int, val frame: Long) {
     override def toString = s"[token = $token, frame = $frame / ${TimeRef.framesToSecs(frame)}]"
+    def isEmpty: Boolean = token == -1
   }
 
   private final class Impl[S <: Sys[S], I <: stm.Sys[I]](val obj: stm.Source[S#Tx, Timeline[S]],
@@ -201,7 +202,6 @@ object AuralTimelineImpl {
 
       if (reschedule) {
         logA("...reschedule")
-        sched.cancel(oldSched.token)
         scheduleNextEvent(currentFrame)
       }
     }
@@ -264,7 +264,6 @@ object AuralTimelineImpl {
 
       if (reschedule) {
         logA("...reschedule")
-        sched.cancel(oldSched.token)
         scheduleNextEvent(currentFrame)
       }
 
@@ -275,11 +274,12 @@ object AuralTimelineImpl {
       if (state != Stopped) return
       implicit val ptx = tx.peer
         // targetState   = TargetPrepared
-      playTimeRef() = new PlayTime(sched.time, timeRef.force)
-      prepare1(timeRef)
+      val tForce    = timeRef.force
+      playTimeRef() = new PlayTime(sched.time, tForce)
+      prepare1(tForce)
     }
 
-    private[this] def prepare1(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    private[this] def prepare1(timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       implicit val itx = iSys(tx)
       state           = Preparing
@@ -299,7 +299,7 @@ object AuralTimelineImpl {
     }
 
     // consumes the iterator
-    private[this] def prepare2(timeRef: TimeRef, it: Iterator[Timeline.Leaf[S]])(implicit tx: S#Tx): Unit = {
+    private[this] def prepare2(timeRef: TimeRef.Apply, it: Iterator[Timeline.Leaf[S]])(implicit tx: S#Tx): Unit = {
       implicit val ptx = tx.peer
       if (it.nonEmpty) it.foreach { case (span, elems) =>
         val childTime = timeRef.intersect(span)
@@ -358,18 +358,19 @@ object AuralTimelineImpl {
       implicit val ptx = tx.peer
       implicit val itx: I#Tx = iSys(tx)
 
-      playTimeRef() = new PlayTime(sched.time, timeRef.force)
+      val tForce    = timeRef.force
+      playTimeRef() = new PlayTime(sched.time, tForce)
       val frame     = timeRef.offsetOrZero
-      if (st == Stopped || prepareSpanRef().start != frame) prepare1(timeRef)
+      if (st == Stopped || prepareSpanRef().start != frame) prepare1(tForce)
 
       val toStart   = intersect(frame)
-      playViews(toStart, timeRef)
+      playViews(toStart, tForce)
       scheduleNextEvent(frame)
       scheduleNextGrid (frame)
       state         = Playing
     }
 
-    private[this] def playViews(it: Iterator[Leaf[S]], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    private[this] def playViews(it: Iterator[Leaf[S]], timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit = {
       // logA("timeline - playViews")
       implicit val itx: I#Tx = iSys(tx)
       if (it.hasNext) it.foreach { case (span, views) =>
@@ -430,7 +431,8 @@ object AuralTimelineImpl {
           eventReached(frame = targetFrame)
         }
       }
-      schedEvtToken() = new Scheduled(token, targetFrame)
+      val oldSched = schedEvtToken.swap(new Scheduled(token, targetFrame))
+      if (oldSched.token != -1) sched.cancel(oldSched.token)
     }
 
     private[this] def eventReached(frame: Long)(implicit tx: S#Tx): Unit = {
@@ -466,12 +468,17 @@ object AuralTimelineImpl {
       val it          = tl.rangeSearch(start = Span(startFrame, stopFrame), stop = Span.All)
       val pt          = playTimeRef()
       val tr0         = pt.shiftTo(sched.time)
+      val reschedule  = it.nonEmpty
       prepare2(tr0, it)
 //      println(s"tree.size = ${tree.size(iSys(tx))}")
       // XXX TODO -- a refinement could look for eventAfter,
       // however then we need additional fiddling around in
       // `elemAdded` and `elemRemoved`...
       scheduleNextGrid(frame)
+      if (reschedule) {
+        logA("...reschedule")
+        scheduleNextEvent(frame)
+      }
     }
 
     def stop()(implicit tx: S#Tx): Unit = {

@@ -934,23 +934,27 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |""".stripMargin)
 
     val tl = cursor.step { implicit tx =>
-      def mkProc() = procV {
+      def mkProc() = proc {
         val freq = graph.Attribute.ir("freq", 441.0)
         val pan  = graph.Attribute.ir("pan")
-        val sig  = Pan2.ar(SinOsc.ar(freq) * 0.2, pan)
+        val sin  = SinOsc.ar(freq) * 0.2
+        val sig  = Pan2.ar(sin, pan)
+//          freq.poll(2, s"$name-freq")
+//          pan .poll(2, s"$name-pan ")
+//          sin .poll(2, s"$name-sig ")
         Out.ar(0, sig)
       }
 
       val _view1 = mkProc()
-      putDouble(_view1.obj(), "pan", -1)
+      putDouble(_view1, "pan", -1)
       val _view2 = mkProc()
-      putDouble(_view2.obj(), "freq", 666)
-      putDouble(_view2.obj(), "pan", 1)
+      putDouble(_view2, "freq", 666)
+      putDouble(_view2, "pan", 1)
 
       val _tl   = timelineV()
       val tlObj = _tl.obj()
-      tlObj += (1.0 -> 3.0, _view1.obj())
-      tlObj += (2.0 -> 4.0, _view2.obj())
+      tlObj += (1.0 -> 3.0, _view1)
+      tlObj += (2.0 -> 4.0, _view2)
       val it = tlObj.debugList
       println("--debug print--")
       println(it)
@@ -1007,123 +1011,119 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 4
 
   def test4()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test4----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |A filtered pink noise with resonance frequency 666 Hz is heard
-//        |after issuing 'play1'. A second later, the frequency changes to 999 Hz.
-//        |
-//        |""".stripMargin)
-//
-//    val (view1, view2) = cursor.step { implicit tx =>
-//      val _view1 = procV {
-//        val amp   = graph.Attribute.ir("amp")
-//        val noise = PinkNoise.ar(Seq(amp, amp))
-//        graph.ScanOut("out", noise)
-//      }
-//      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
-//      val proc1 = _view1.obj()
-//      putDouble(proc1, "amp", 0.5)
-//
-//      val _view2 = procV {
-//        val freq  = graph.Attribute.kr("freq", 440.0)
-//        val in    = graph.ScanIn("in")
-//        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
-//      }
-//      val proc2 = _view2.obj()
-//      putDouble(proc2, "freq", 666)
-//
-//      (_view1, _view2)
-//    }
-//
-//    cursor.step { implicit tx =>
-//      println("--issue play2--")
-//      view2.play()
-//      val proc1   = view1.obj()
-//      val proc2   = view2.obj()
-//      //      val test = de.sciss.lucre.event.Peek.targets(proc2)
-//      //      println(s"---1, num-children is ${test.size}")
-//      // reversed steps
-//      val scanIn  = addScanIn (proc2, "in" )
-//      val scanOut = addOutput(proc1, "out")
-//      scanOut ~> scanIn
-//    }
-//
-//    after(2.0) { implicit tx =>
-//      println("--issue play1--")
-//      view1.play()
-//      //      val proc2 = view2.obj()
-//      //      val test = de.sciss.lucre.event.Peek.targets(proc2)
-//      //      println(s"---2, num-children is ${test.size}")
-//
-//      after(1.0) { implicit tx =>
-//        val proc2b = view2.obj()
-//        println("--adjust attribute--")
-//        // val test1 = de.sciss.lucre.event.Peek.targets(proc2b)
-//        // println(s"---3, num-children is ${test1.size}")
-//        putDouble(proc2b, "freq", 999)
-//
-//        stopAndQuit()
-//      }
-//    }
+    println("----test4----")
+    println(
+      """
+        |Expected behaviour:
+        |A filtered pink noise with resonance frequency 666 Hz is heard
+        |after issuing 'play1'. A second later, the frequency changes to 999 Hz.
+        |
+        |""".stripMargin)
+
+    val (view1, view2) = cursor.step { implicit tx =>
+      val _view1 = procV {
+        val amp   = graph.Attribute.ir("amp")
+        val noise = PinkNoise.ar(Seq(amp, amp))
+        graph.ScanOut("out", noise)
+      }
+      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
+      val proc1 = _view1.obj()
+      putDouble(proc1, "amp", 0.5)
+
+      val _view2 = procV {
+        val freq  = graph.Attribute.kr("freq", 440.0)
+        val in    = graph.ScanIn("in")
+        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
+      }
+      val proc2 = _view2.obj()
+      putDouble(proc2, "freq", 666)
+
+      (_view1, _view2)
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play2--")
+      view2.play()
+      val proc1   = view1.obj()
+      val proc2   = view2.obj()
+      //      val test = de.sciss.lucre.event.Peek.targets(proc2)
+      //      println(s"---1, num-children is ${test.size}")
+      // reversed steps
+      val scanIn  = addScanIn (proc2, "in" )
+      val scanOut = addOutput(proc1, "out")
+      scanOut ~> scanIn
+    }
+
+    after(2.0) { implicit tx =>
+      println("--issue play1--")
+      view1.play()
+      //      val proc2 = view2.obj()
+      //      val test = de.sciss.lucre.event.Peek.targets(proc2)
+      //      println(s"---2, num-children is ${test.size}")
+
+      after(1.0) { implicit tx =>
+        val proc2b = view2.obj()
+        println("--adjust attribute--")
+        // val test1 = de.sciss.lucre.event.Peek.targets(proc2b)
+        // println(s"---3, num-children is ${test1.size}")
+        putDouble(proc2b, "freq", 999)
+
+        stopAndQuit()
+      }
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 3
 
   def test3()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test3----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |A filtered pink noise with resonance frequency 666 Hz is heard
-//        |after issuing 'play2'.
-//        |
-//        |""".stripMargin)
-//
-//    val (view1, view2) = cursor.step { implicit tx =>
-//      val _view1 = procV {
-//        val amp   = graph.Attribute.ir("amp")
-//        val noise = PinkNoise.ar(Seq(amp, amp))
-//        graph.ScanOut("out", noise)
-//      }
-//      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
-//      val proc1 = _view1.obj()
-//      putDouble(proc1, "amp", 0.5)
-//
-//      val _view2 = procV {
-//        val freq  = graph.Attribute.ir("freq", 440.0)
-//        val in    = graph.ScanIn("in")
-//        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
-//      }
-//      val proc2 = _view2.obj()
-//      putDouble(proc2, "freq", 666)
-//
-//      (_view1, _view2)
-//    }
-//
-//    cursor.step { implicit tx =>
-//      println("--issue play1--")
-//      view1.play()
-//      val proc1   = view1.obj()
-//      val proc2   = view2.obj()
-//      val scanOut = addOutput(proc1, "out")
-//      val scanIn  = addScanIn (proc2, "in" )
-//      scanOut ~> scanIn
-////      println("--issue play2--")
-////      view2.play()
-//    }
-//
-//    after(2.0) { implicit tx =>
+    println("----test3----")
+    println(
+      """
+        |Expected behaviour:
+        |A filtered pink noise with resonance frequency 666 Hz is heard
+        |after issuing 'play2'.
+        |
+        |""".stripMargin)
+
+    val (view1, view2) = cursor.step { implicit tx =>
+      val _view1 = procV {
+        val amp   = graph.Attribute.ir("amp")
+        val noise = PinkNoise.ar(Seq(amp, amp))
+        graph.ScanOut("out", noise)
+      }
+      _view1.react { implicit tx => upd => println(s"Observed: $upd") }
+      val proc1 = _view1.obj()
+      putDouble(proc1, "amp", 0.5)
+
+      val _view2 = procV {
+        val freq  = graph.Attribute.ir("freq", 440.0)
+        val in    = graph.ScanIn("in")
+        Out.ar(0, Resonz.ar(in, freq, 0.1) * 10)
+      }
+      val proc2 = _view2.obj()
+      putDouble(proc2, "freq", 666)
+
+      (_view1, _view2)
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play1--")
+      view1.play()
+      val proc1   = view1.obj()
+      val proc2   = view2.obj()
+      val scanOut = addOutput(proc1, "out")
+      val scanIn  = addScanIn (proc2, "in" )
+      scanOut ~> scanIn
 //      println("--issue play2--")
 //      view2.play()
-//
-//      stopAndQuit()
-//    }
+    }
+
+    after(2.0) { implicit tx =>
+      println("--issue play2--")
+      view2.play()
+
+      stopAndQuit()
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 2
