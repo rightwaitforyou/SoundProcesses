@@ -746,118 +746,116 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 8
 
   def test8()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test8----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |Two procs are connected to each other and placed
-//        |on a timeline. The filter exists from the beginning,
-//        |but the generator only joins after 2s. Sound
-//        |should only be heard after 2s, The filter
-//        |synth is started immediately with zero input as observable
-//        |from the poll output (because the input's number of channels
-//        |is known). At 4s the generator is removed
-//        |again. The filter keeps playing but with zero
-//        |input.
-//        |
-//        |There is currently a glitch when n_mapan is undone,
-//        |resulting in a short burst of buffer repetition at 4s
-//        |before the filter input becomes actually zero.
-//        |
-//        |""".stripMargin)
-//
-//    val tl = cursor.step { implicit tx =>
-//      val _proc1 = proc {
-//        val sig = graph.ScanIn("in")
-//        (sig \ 0).poll(1, "ping-1")
-//        Out.ar(0, sig)
-//      }
-//
-//      val _proc2 = proc {
-//        val sig = PinkNoise.ar(Seq(0.5, 0.5))
-//        (sig \ 0).poll(1, "ping-2")
-//        graph.ScanOut("out", sig)
-//      }
-//
-//      println("--mk timeline--")
-//
-//      val _tl = timelineV()
-//      val tlObj = _tl.obj()
-//      tlObj += (0.0 -> 10.0, _proc1)
-//      // the problem occurs (occurred! now it's fixed) when we add the scan _before_ creating
-//      // adding _proc2. like here:
-//      println("--add scan--")
-//      addOutput(_proc2, "out") ~> addScanIn(_proc1, "in")
-//      println("--add proc2--")
-//      tlObj += (2.0 ->  4.0, _proc2)
-//      println("--alright--")
-//      _tl
-//    }
-//
-//    cursor.step { implicit tx =>
-//      println("--issue play--")
-//      tl.play()
-//
-//      after(6.0) { implicit tx =>
-//        tl.stop()
-//        stopAndQuit(2.0)
-//      }
-//    }
+    println("----test8----")
+    println(
+      """
+        |Expected behaviour:
+        |Two procs are connected to each other and placed
+        |on a timeline. The filter exists from the beginning,
+        |but the generator only joins after 2s. Sound
+        |should only be heard after 2s, The filter
+        |synth is started immediately with zero input as observable
+        |from the poll output (because the input's number of channels
+        |is known). At 4s the generator is removed
+        |again. The filter keeps playing but with zero
+        |input.
+        |
+        |There is currently a glitch when n_mapan is undone,
+        |resulting in a short burst of buffer repetition at 4s
+        |before the filter input becomes actually zero.
+        |
+        |""".stripMargin)
+
+    val tl = cursor.step { implicit tx =>
+      val _proc1 = proc {
+        val sig = graph.ScanIn("in")
+        (sig \ 0).poll(1, "ping-1")
+        Out.ar(0, sig)
+      }
+      _proc1.name = "reader"
+
+      val _proc2 = proc {
+        val sig = PinkNoise.ar(Seq(0.5, 0.5))
+        (sig \ 0).poll(1, "ping-2")
+        graph.ScanOut("out", sig)
+      }
+      _proc2.name = "noise"
+
+      println("--mk timeline--")
+
+      val _tl = timelineV()
+      val tlObj = _tl.obj()
+      tlObj += (0.0 -> 10.0, _proc1)
+      // the problem occurs (occurred! now it's fixed) when we add the scan _before_ creating
+      // adding _proc2. like here:
+      println("--add scan--")
+      addOutput(_proc2, "out") ~> addScanIn(_proc1, "in")
+      println("--add proc2--")
+      tlObj += (2.0 ->  4.0, _proc2)
+      println("--alright--")
+      _tl
+    }
+
+    cursor.step { implicit tx =>
+      println("--issue play--")
+      tl.play()
+
+      after(6.0) { implicit tx =>
+        tl.stop()
+        stopAndQuit(2.0)
+      }
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 7
 
   def test7()(implicit context: AuralContext[S]): Unit = {
-    ???
-// SCAN
-//    println("----test7----")
-//    println(
-//      """
-//        |Expected behaviour:
-//        |Two procs, a generator and filter, are connected,
-//        |however the filter's scan input refers to an non-existing
-//        |key, thus nothing is heard. After 2s, the filter's
-//        |graph function is exchanged for one that refers to the
-//        |correct scan key, making a pink noise filtered at 555 Hz
-//        |be heard.
-//        |
-//        |""".stripMargin)
-//
-//    cursor.step { implicit tx =>
-//      val _view1 = procV {
-//        val in   = graph.ScanIn("foo")
-//        val sig  = Resonz.ar(in, 777, 0.1) * 10
-//        Out.ar(0, sig)
-//      }
-//
-//      val _view2 = procV {
-//        graph.ScanOut("out", PinkNoise.ar(Seq(0.5, 0.5)))
-//      }
-//
-//      val scanOut = addOutput(_view2.obj(), "out")
-//      val scanBar = addScanIn (_view1.obj(), "bar")
-//
-//      scanOut ~> scanBar
-//
-//      println("--issue play--")
-//      _view1.play()
-//      _view2.play()
-//
-//      after(2.0) { implicit tx =>
-//        println("--issue graph change--")
-//        val pObj = _view1.obj()
-//        val newGraph = SynthGraph {
-//          val in   = graph.ScanIn("bar")
-//          val sig  = Resonz.ar(in, 555, 0.1) * 10
-//          Out.ar(0, sig)
-//        }
-//        pObj.graph() = SynthGraphObj.newConst[S](newGraph)
-//
-//        stopAndQuit()
-//      }
-//    }
+    println("----test7----")
+    println(
+      """
+        |Expected behaviour:
+        |Two procs, a generator and filter, are connected,
+        |however the filter's scan input refers to an non-existing
+        |key, thus nothing is heard. After 2s, the filter's
+        |graph function is exchanged for one that refers to the
+        |correct scan key, making a pink noise filtered at 555 Hz
+        |be heard.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val _view1 = procV {
+        val in   = graph.ScanIn("foo")
+        val sig  = Resonz.ar(in, 777, 0.1) * 10
+        Out.ar(0, sig)
+      }
+
+      val _view2 = procV {
+        graph.ScanOut("out", PinkNoise.ar(Seq(0.5, 0.5)))
+      }
+
+      val scanOut = addOutput(_view2.obj(), "out")
+      val scanBar = addScanIn (_view1.obj(), "bar")
+
+      scanOut ~> scanBar
+
+      println("--issue play--")
+      _view1.play()
+      _view2.play()
+
+      after(2.0) { implicit tx =>
+        println("--issue graph change--")
+        val pObj = _view1.obj()
+        val newGraph = SynthGraph {
+          val in   = graph.ScanIn("bar")
+          val sig  = Resonz.ar(in, 555, 0.1) * 10
+          Out.ar(0, sig)
+        }
+        pObj.graph() = SynthGraphObj.newConst[S](newGraph)
+
+        stopAndQuit()
+      }
+    }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////// 6
