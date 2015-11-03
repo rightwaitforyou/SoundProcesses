@@ -299,7 +299,8 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
     SynthGraph {
       import de.sciss.synth._
       import proc.Implicits._
-      val sig   = graph.ScanIn(Proc.graphAudio)
+      // val sig   = graph.ScanIn(Proc.graphAudio)
+      val sig   = graph.DiskIn.ar(Proc.graphAudio)
       val gain  = graph.Attribute.kr(ObjKeys.attrGain, 1.0)
       val mute  = graph.Attribute.kr(ObjKeys.attrMute, 0.0)
       val env   = graph.FadeInOut.ar

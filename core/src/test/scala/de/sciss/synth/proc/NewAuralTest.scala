@@ -600,7 +600,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 10
 
-  def test10()(implicit context: AuralContext[S]): Unit = { // XXX TODO
+  def test10()(implicit context: AuralContext[S]): Unit = {
     println("----test10----")
     println(
       """
@@ -612,9 +612,6 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |then the same happens, but the mute is engaged with the global proc.
         |
         |""".stripMargin)
-
-//    val imp     = ExprImplicits[S]
-//    import imp._
 
     val (tr, proc1H, proc2H) = cursor.step { implicit tx =>
       val p     = Proc[S]
@@ -629,9 +626,11 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       println(spec)
       val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
       val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
-      val gAudio  = Grapheme[S](spec.numChannels)
-      gAudio.add(0L: LongObj[S], vAudio: Grapheme.Expr[S]) // ... çoit trop complexe ...
+//      val gAudio  = Grapheme[S](spec.numChannels)
+//      gAudio.add(0L: LongObj[S], vAudio: Grapheme.Expr[S]) // ... çoit trop complexe ...
+      val gAudio = Grapheme.Expr.Audio.newConst[S](vAudio)
       // sAudio.add(Scan.Link.Grapheme(gAudio))
+      _proc1.name = "tape"
       _proc1.attr.put("sig", gAudio)
 
       val _proc2 = proc {
@@ -642,6 +641,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         val sig  = Balance2.ar(sig0 \ 0, sig0 \ 1, pos)
         Out.ar(0, sig)
       }
+      _proc2.name = "spat"
 
       addOutput(_proc1, "out") ~> addScanIn(_proc2, "in")
 
