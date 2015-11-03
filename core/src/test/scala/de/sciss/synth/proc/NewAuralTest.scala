@@ -238,7 +238,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 16
 
-  def test16()(implicit context: AuralContext[S]): Unit = {
+  def test16()(implicit context: AuralContext[S]): Unit = { // XXX TODO
     println("----test16----")
     println(
       """
@@ -458,7 +458,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 12
 
-  def test12()(implicit context: AuralContext[S]): Unit = {
+  def test12()(implicit context: AuralContext[S]): Unit = { // XXX TODO
     println("----test12----")
     println(
       """
@@ -600,7 +600,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 10
 
-  def test10()(implicit context: AuralContext[S]): Unit = {
+  def test10()(implicit context: AuralContext[S]): Unit = { // XXX TODO
     println("----test10----")
     println(
       """
