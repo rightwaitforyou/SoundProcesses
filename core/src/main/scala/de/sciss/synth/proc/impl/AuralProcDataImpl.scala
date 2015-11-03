@@ -82,15 +82,6 @@ object AuralProcDataImpl {
         case Obj.AttrRemoved(key, value) => attrRemoved(key, value)
       }}
 
-//      // XXX TODO -- should filter only relevant values
-//      attr.iterator.foreach { case (key, value) =>
-//        mkAttrObserver(key, value)
-//      }
-
-//      proc.outputs.iterator.foreach { case (key, output) =>
-//        outputAdded(output)
-//      }
-
       tryBuild()
       this
     }
@@ -177,11 +168,11 @@ object AuralProcDataImpl {
       logA(s"AttrAdded   to   ${procCached()} ($key)")
       if (!isAttrUsed(key)) return
 
-      mkAttrObserver(key, value)
+      mkAttrObserver1(key, value)
       attrUpdate(key, Some(value))
     }
 
-    private def attrChanged(key: String)(implicit tx: S#Tx): Unit = {
+    protected final def attrChanged(key: String)(implicit tx: S#Tx): Unit = {
       logA(s"AttrChange in   ${procCached()} ($key)")
       attrUpdate(key, procCached().attr.get(key))
     }
@@ -234,13 +225,27 @@ object AuralProcDataImpl {
     // attribute values that are used in the form of accepted or rejected inputs will be observed.
     // (if the attribute is not present, it will be handled by `attrAdded`)
     private def addUsedAttr(attr: Obj.AttrMap[S], key: String)(implicit tx: S#Tx): Unit =
-      attr.get(key).foreach { value => mkAttrObserver(key, value) }
+      attr.get(key).foreach { value => mkAttrObserver1(key, value) }
 
-    // an observed attribute value will trigger `attrChange`
-    private def mkAttrObserver(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      val obs = value.changed.react { implicit tx => _ => attrChanged(key) }
+    // calls `mkAttrObserver` and stores observer
+    private def mkAttrObserver1(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      val obs = mkAttrObserver(key = key, value = value)
       attrMap.put(key, obs)(tx.peer)
     }
+
+    /** Sub-classes may override this if invoking the super-method for unhandled values.
+      * An observed attribute value will trigger `attrChange`
+      */
+    protected def mkAttrObserver(key: String, value: Obj[S])(implicit tx: S#Tx): Disposable[S#Tx] =
+      value match {
+        case output: Output[S] =>
+          context.observeAux[AuralOutput[S]](output.id) { implicit tx => {
+            case AuralContext.AuxAdded(_, _) => attrChanged(key)
+            case _ =>
+          }}
+        case _ =>
+          value.changed.react { implicit tx => _ => attrChanged (key) }
+      }
 
     private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
       n.removeAttrResources(key)
@@ -592,22 +597,6 @@ object AuralProcDataImpl {
           getAuralOutput(a).fold[Unit] {
             Console.err.println(s"Warning: view for scan $a used as attribute key $key not found.")
             throw new MissingIn(AttributeKey(key))
-//            // XXX TODO --- this is big ugly hack
-//            // in order to allow the concurrent appearance
-//            // of the source and sink procs.
-//            context.waitForAux[AuralScan.Proxy[S]](a.id) {
-//              case view: AuralScan[S] =>
-//                nodeRef.get(tx.peer).foreach { n =>
-//                  Console.err.println(s"...phew, view for scan $a used as attribute key $key appeared.")
-//                  val b = new SynthUpdater(procCached(), node = n.node, key = key, nodeRef = n)
-//                  // NOTE: because waitForAux is guaranteed to happen within
-//                  // the same transaction, we can re-use `a` without handle!
-//                  buildAttrValueInput(b, key = key, value = a, numChannels = numChannels)
-//                  b.finish()
-//                }
-//
-//              case _ =>
-//            }
 
           } { view =>
             val bus = view.bus

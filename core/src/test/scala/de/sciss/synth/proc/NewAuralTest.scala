@@ -753,16 +753,11 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |Two procs are connected to each other and placed
         |on a timeline. The filter exists from the beginning,
         |but the generator only joins after 2s. Sound
-        |should only be heard after 2s, The filter
-        |synth is started immediately with zero input as observable
-        |from the poll output (because the input's number of channels
-        |is known). At 4s the generator is removed
+        |should only be heard after 2s. The filter
+        |synth is thus incomplete and not aurally
+        |started before 2s. At 4s the generator is removed
         |again. The filter keeps playing but with zero
         |input.
-        |
-        |There is currently a glitch when n_mapan is undone,
-        |resulting in a short burst of buffer repetition at 4s
-        |before the filter input becomes actually zero.
         |
         |""".stripMargin)
 

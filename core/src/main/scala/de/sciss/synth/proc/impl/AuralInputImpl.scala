@@ -49,7 +49,9 @@ object AuralInputImpl {
       // clear the control, so we end up with a noise loop from
       // whatever was in the last buffer. To avoid that, we
       // remove the `mapan` explicitly here.
-      node.mapan(ControlABusMap.Multi(mapper.controlName, -1, source.bus.numChannels))
+      if (node.isOnline) {
+        node.mapan(ControlABusMap.Multi(mapper.controlName, -1, source.bus.numChannels))
+      }
       source.removeSink(this)
     }
 
