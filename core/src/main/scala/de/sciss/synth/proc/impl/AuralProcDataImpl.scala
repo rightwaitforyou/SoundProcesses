@@ -165,8 +165,9 @@ object AuralProcDataImpl {
     }
 
     private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      logA(s"AttrAdded   to   ${procCached()} ($key)")
-      if (!isAttrUsed(key)) return
+      val used = isAttrUsed(key)
+      logA(s"AttrAdded   to   ${procCached()} ($key) - used? $used")
+      if (!used) return
 
       mkAttrObserver1(key, value)
       attrUpdate(key, Some(value))

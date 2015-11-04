@@ -634,8 +634,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       _proc1.attr.put("sig", gAudio)
 
       val _proc2 = proc {
-        val in  = graph.ScanIn("in")
-        val m   = graph.Attribute.kr("mute", 0.0)
+        val in   = graph.ScanIn("in")
+        val m    = graph.Attribute.kr("mute", 0.0)
         val sig0 = in * (1 - m)
         val pos  = LFTri.ar(4)
         val sig  = Balance2.ar(sig0 \ 0, sig0 \ 1, pos)
