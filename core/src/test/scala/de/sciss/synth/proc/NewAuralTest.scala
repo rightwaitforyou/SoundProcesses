@@ -3,7 +3,7 @@ package de.sciss.synth.proc
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
 import de.sciss.lucre.bitemp.BiPin
-import de.sciss.lucre.expr.{LongObj, BooleanObj, DoubleObj, IntObj, SpanLikeObj}
+import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.stm.store.BerkeleyDB
@@ -163,12 +163,31 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   implicit class OutputOps(val `this`: Output[S]) /* extends AnyVal */ {
     def ~> (that: (Proc[S], String))(implicit tx: S#Tx): Unit = {
       val (sink, key) = that
-      sink.attr.put(key, `this`)
+      val attr = sink.attr
+      attr.get(key).fold[Unit] {
+        attr.put(key, `this`)
+      } {
+        case f: Folder[S] => f.addLast(`this`)
+        case prev =>
+          val f = Folder[S]
+          f.addLast(prev)
+          f.addLast(`this`)
+          attr.put(key, f)
+      }
     }
 
     def ~/> (that: (Proc[S], String))(implicit tx: S#Tx): Unit = {
       val (sink, key) = that
-      sink.attr.remove(key)
+      val attr = sink.attr
+      attr.get(key).getOrElse(sys.error(s"Attribute $key was not assigned")) match {
+        case `sink` => attr.remove(key)
+        case f: Folder[S] =>
+          val idx = f.indexOf(sink)
+          if (idx < 0) sys.error(s"Attribute $key has a folder but does not contain $sink")
+          f.removeAt(idx)
+
+        case other => sys.error(s"Cannot remove output from $other")
+      }
     }
   }
 
