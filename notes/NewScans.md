@@ -63,3 +63,69 @@ In a first step, we could define an interface for attribute input support (the f
     
     type Builder = ???
     
+We have to different approaches:
+ 
+ - setting a control directly on a node,
+ - and playing to a bus.
+ 
+Let's examine. Say there is `Folder` to which first an `IntObj` then an `Output` is added.
+Say we change the presumed API to have these methods:
+
+    def setControl(source: AuralAttribute, values: Vec[Float]): Unit
+    ...
+    
+No.
+
+    def realize(): AuralAttribute.Value
+    
+    sealed trait Value
+    case class Scalar(values: Vec[Float]) extends Value
+    case class Stream(???)                extends Value
+
+We have to anticipate what we'll need for `AuralTimelineAttribute`. Do we want to dynamically
+switch between node-setters and bus-mappers? Or do we want to require bus-mappers for a complex
+object like that? I.e. assuming a `Nuages` session where virtually every parameter is on a
+timeline but acting mostly compatible with a `BiPin`, do we really want the overhead to run
+an extra synth per parameter? I think that _no_.
+
+The receiving end must make sense of the value because the sending side might not
+even know if there are other senders so that `setControl` won't work but needs addition/mixing.
+
+Let's say to avoid complexity, as soon as we need to mix inputs, we'll use an auxiliary synth,
+no client-side scalar addition or the like. Because that gets messy if elements are removed.
+
+    scalar ---+
+              |
+    scalar ---+--- folder ---+
+                             |
+                   scalar ---+--- folder --- node-ref
+
+Obviously we do only ever need a single bus.
+
+                           +----------- TOPOLOGY-VERTEX ----------+
+                           |                                      |
+    scalar -> Control -> Out.ar ---+--- audio-bus -> mapa -> AudioControl
+                                   |                              |
+    scalar -> Control -> Out.ar ---+                              |
+                            |      |                              |
+    scalar -> Control -> Out.ar ---+                              |
+                           ||                                     |
+                           ++---------- TOPOLOGY-VERTEX ----------+
+
+This is anyway a rare case. Usually if we have a mixing, that would be from multiple `Output` instances.
+
+We could simplify again by saying that there is only ever a transition from node-setter to bus-mapper
+but never back again (until of course disposal and rebuild). What makes it difficult is that the request
+to "upgrade" to bus may need propagate in two directions (think of the first folder in the first diagram).
+ 
+    (a) node-setter
+    
+    scalar ------- folder ------- folder --- node-ref
+
+    (b) add another input - must switch to common bus
+        and topology vertices
+    
+    scalar ---+
+              |
+    scalar ---+--- folder ------- folder --- node-ref
+
