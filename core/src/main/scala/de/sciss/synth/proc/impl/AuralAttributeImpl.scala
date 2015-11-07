@@ -1,15 +1,28 @@
+/*
+ *  AuralAttributeImpl.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2015 Hanns Holger Rutz. All rights reserved.
+ *
+ *	This software is published under the GNU General Public License v2+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.expr.{BooleanObj, DoubleObj, Expr, IntObj}
-import de.sciss.lucre.{expr, stm}
 import de.sciss.lucre.stm.{Disposable, Obj}
 import de.sciss.lucre.synth.Sys
-import de.sciss.synth.proc.AuralContext.AuxAdded
-import de.sciss.synth.{Curve, ControlSet}
+import de.sciss.lucre.{expr, stm}
+import de.sciss.synth.Curve
 import de.sciss.synth.proc.AuralAttribute.Factory
-import de.sciss.synth.proc.UGenGraphBuilder.{AttributeKey, MissingIn}
+import de.sciss.synth.proc.AuralContext.AuxAdded
 
+import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.Ref
 
 object AuralAttributeImpl {
@@ -23,11 +36,10 @@ object AuralAttributeImpl {
 
   def factories: Iterable[Factory] = map.values
 
-  def apply[S <: Sys[S]](key: String, value: Obj[S])
-                        (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = {
+  def apply[S <: Sys[S]](value: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = {
     val tid     = value.tpe.typeID
     val factory = map.getOrElse(tid, throw new IllegalArgumentException(s"No AuralAttribute available for $value"))
-    factory(key, value.asInstanceOf[factory.Repr[S]])
+    factory(value.asInstanceOf[factory.Repr[S]])
   }
 
   private[this] var map = Map[Int, Factory](
@@ -42,10 +54,10 @@ object AuralAttributeImpl {
 //    Timeline            .typeID -> ...
   )
 
-  private[this] final class PlayRef[S <: Sys[S]](val builder: NodeOwner[S], val numChannels: Int)
+  private[this] final class PlayRef[S <: Sys[S]](val builder: AuralAttributeTarget[S], val numChannels: Int)
 
   private[this] final class PlayTime[S <: Sys[S]](val wallClock: Long,
-                                                  val timeRef: TimeRef.Apply, val builder: NodeOwner[S],
+                                                  val timeRef: TimeRef.Apply, val builder: AuralAttributeTarget[S],
                                                   val numChannels: Int) {
     def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
   }
@@ -53,18 +65,17 @@ object AuralAttributeImpl {
   private[this] trait ExprImpl[S <: Sys[S], A] extends AuralAttribute[S] {
     // ---- abstract ----
 
-    protected def key: String
-
     protected def exprH: stm.Source[S#Tx, Expr[S, A]]
 
-    protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet
+    // protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet
+    protected def floatValues(in: A): Vec[Float]
 
     // ---- impl ----
 
     private[this] val obsRef  = Ref.make[Disposable[S#Tx]]
     private[this] val playRef = Ref.make[PlayRef[S]]
 
-    def play(timeRef: TimeRef, b: NodeOwner[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef, b: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
       val p = new PlayRef(b, numChannels)
       require(playRef.swap(p)(tx.peer) == null)
       update(p, exprH().value)
@@ -72,10 +83,12 @@ object AuralAttributeImpl {
 
     private[this] def update(p: PlayRef[S], value: A)(implicit tx: S#Tx): Unit = {
       // val ctlVal  = floatValue(value)
-      val ctlName = graph.Attribute.controlName(key)
-      import p.{builder, numChannels}
-      val ctl: ControlSet = controlSet(ctlName, value, numChannels)
-      builder.setControl(ctl)
+      // val ctlName = graph.Attribute.controlName(key)
+      import p.builder
+      // val ctl: ControlSet = controlSet(ctlName, value, numChannels)
+      // builder.setControl(ctl)
+      val ctlVal = floatValues(value)
+      builder.add(this, ctlVal)
     }
 
     def accept()(implicit tx: S#Tx): Unit = {
@@ -99,10 +112,15 @@ object AuralAttributeImpl {
 
     final def preferredNumChannels(implicit tx: S#Tx): Int = 1
 
-    final protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet = {
-      val f = floatValue(value)
-      if (numChannels == 1) ctlName -> f else ctlName -> Vector.fill(numChannels)(f)
-    }
+
+
+//    final protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet = {
+//      val f = floatValue(value)
+//      if (numChannels == 1) ctlName -> f else ctlName -> Vector.fill(numChannels)(f)
+//    }
+    // protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet
+
+    final protected def floatValues(in: A): Vec[Float] = Vector(floatValue(in))
   }
   
   // ------------------- IntObj ------------------- 
@@ -112,12 +130,11 @@ object AuralAttributeImpl {
 
     def typeID = IntObj.typeID
 
-    def apply[S <: Sys[S]](key: String, value: IntObj[S])
+    def apply[S <: Sys[S]](value: IntObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new IntAttribute(key, tx.newHandle(value))
+      new IntAttribute(tx.newHandle(value))
   }
-  private[this] final class IntAttribute[S <: Sys[S]](protected val key: String,
-                                                      protected val exprH: stm.Source[S#Tx, IntObj[S]])
+  private[this] final class IntAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, IntObj[S]])
     extends NumberImpl[S, Int] {
 
     protected def floatValue(value: Int): Float = value.toFloat
@@ -130,12 +147,11 @@ object AuralAttributeImpl {
 
     def typeID = DoubleObj.typeID
 
-    def apply[S <: Sys[S]](key: String, value: DoubleObj[S])
+    def apply[S <: Sys[S]](value: DoubleObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new DoubleAttribute(key, tx.newHandle(value))
+      new DoubleAttribute(tx.newHandle(value))
   }
-  private[this] final class DoubleAttribute[S <: Sys[S]](protected val key: String,
-                                                         protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
+  private[this] final class DoubleAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
     extends NumberImpl[S, Double] {
 
     protected def floatValue(value: Double): Float = value.toFloat
@@ -148,12 +164,11 @@ object AuralAttributeImpl {
 
     def typeID = BooleanObj.typeID
 
-    def apply[S <: Sys[S]](key: String, value: BooleanObj[S])
+    def apply[S <: Sys[S]](value: BooleanObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new BooleanAttribute(key, tx.newHandle(value))
+      new BooleanAttribute(tx.newHandle(value))
   }
-  private[this] final class BooleanAttribute[S <: Sys[S]](protected val key: String,
-                                                          protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
+  private[this] final class BooleanAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
     extends NumberImpl[S, Boolean] {
 
     protected def floatValue(value: Boolean): Float = if (value) 1f else 0f
@@ -166,27 +181,21 @@ object AuralAttributeImpl {
 
     def typeID = FadeSpec.Obj.typeID
 
-    def apply[S <: Sys[S]](key: String, value: FadeSpec.Obj[S])
+    def apply[S <: Sys[S]](value: FadeSpec.Obj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new FadeSpecAttribute(key, tx.newHandle(value))
+      new FadeSpecAttribute(tx.newHandle(value))
   }
-  private[this] final class FadeSpecAttribute[S <: Sys[S]](protected val key: String,
-                                                          protected val exprH: stm.Source[S#Tx, FadeSpec.Obj[S]])
+  private[this] final class FadeSpecAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, FadeSpec.Obj[S]])
     extends ExprImpl[S, FadeSpec] {
 
     def preferredNumChannels(implicit tx: S#Tx): Int = 4
 
-    protected def controlSet(ctlName: String, spec: FadeSpec, numChannels: Int)(implicit tx: S#Tx): ControlSet = {
-      if (numChannels != 4) throw MissingIn(AttributeKey(key))
-
-      val values = Vector(
-        (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
-          case Curve.parametric(c)  => c
-          case _                    => 0f
-        }, spec.floor
-      )
-      ctlName -> values
-    }
+    protected def floatValues(spec: FadeSpec): Vec[Float] = Vector(
+      (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+        case Curve.parametric(c)  => c
+        case _                    => 0f
+      }, spec.floor
+    )
   }
 
   // ------------------- Output ------------------- 
@@ -196,11 +205,11 @@ object AuralAttributeImpl {
 
     def typeID = Output.typeID
 
-    def apply[S <: Sys[S]](key: String, value: Output[S])
+    def apply[S <: Sys[S]](value: Output[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new OutputAttribute(key, tx.newHandle(value.id))
+      new OutputAttribute(tx.newHandle(value.id))
   }
-  private[this] final class OutputAttribute[S <: Sys[S]](key: String, idH: stm.Source[S#Tx, S#ID])
+  private[this] final class OutputAttribute[S <: Sys[S]](idH: stm.Source[S#Tx, S#ID])
                                                         (implicit context: AuralContext[S])
     extends AuralAttribute[S] {
 
@@ -225,7 +234,7 @@ object AuralAttributeImpl {
       ???
     }
 
-    def play(timeRef: TimeRef, builder: NodeOwner[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
 
       ???
     }
@@ -247,17 +256,17 @@ object AuralAttributeImpl {
 
     def typeID = Folder.typeID
 
-    def apply[S <: Sys[S]](key: String, value: Folder[S])
+    def apply[S <: Sys[S]](value: Folder[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = {
 
       val elemViews = value.iterator.map { elem =>
-        AuralAttribute(key, elem)
+        AuralAttribute(elem)
       } .toVector
 
-      new FolderAttribute(key, tx.newHandle(value), Ref(elemViews))
+      new FolderAttribute(tx.newHandle(value), Ref(elemViews))
     }
   }
-  private[this] final class FolderAttribute[S <: Sys[S]](key: String, folderH: stm.Source[S#Tx, Folder[S]],
+  private[this] final class FolderAttribute[S <: Sys[S]](folderH: stm.Source[S#Tx, Folder[S]],
                                                          elemViewsRef: Ref[Vector[AuralAttribute[S]]])
                                                         (implicit context: AuralContext[S])
     extends AuralAttribute[S] {
@@ -283,7 +292,7 @@ object AuralAttributeImpl {
       views.foreach(_.accept())
       val obs = folderH().changed.react { implicit tx => upd => upd.changes.foreach {
         case expr.List.Added  (idx, child) =>
-          val view = AuralAttribute(key, child)
+          val view = AuralAttribute(child)
           elemViewsRef.transform(_.patch(idx, view :: Nil, 0))(tx.peer)
           val p = playRef.get(tx.peer)
           if (p != null) {
@@ -302,7 +311,7 @@ object AuralAttributeImpl {
       require(obsRef.swap(obs)(tx.peer) == null)
     }
 
-    def play(timeRef: TimeRef, builder: NodeOwner[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
       val tForce  = timeRef.force
       val p       = new PlayTime(sched.time, tForce, builder, numChannels)
       require(playRef.swap(p)(tx.peer) == null)

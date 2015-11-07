@@ -129,3 +129,17 @@ to "upgrade" to bus may need propagate in two directions (think of the first fol
               |
     scalar ---+--- folder ------- folder --- node-ref
 
+Why don't we abstract:
+
+    trait AttributeTarget {
+      def add(source: AnyRef, nodeRef: NodeRef, bus: lucre.synth.AudioBus)
+      def add(source: AnyRef, scalar: Vec[Float])
+      der remove(source: AnyRef)
+    }
+    
+including the expanding and wrapping of the number of channels `bus.numChannels` / `scalar.size`. And there
+is only one real target, and the intermediate folders or timeline instances simply forward.
+
+Considering `Output` that might be written to different folders at the same time, we need to isolate
+its own bus. That produces a problem above with `source: AnyRef`. Actually it doesn't. Because we have
+the independent `AuralOutput` as singleton with multiple `AuralAttribute` relating to it.
