@@ -609,8 +609,14 @@ object AuralProcDataImpl {
             // - adapt number-of-channels if they don't match (using auxiliary synth)
           }
 
+        // XXX TODO:
+        // case a: Folder[S] =>
+
+        // XXX TODO:
+        // case a: Timeline[S] =>
+
         case _ =>
-          sys.error(s"Cannot use attribute $value as a scalar value")
+          sys.error(s"Cannot use $value as an attribute value")
       }
     }
 

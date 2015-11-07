@@ -21,6 +21,10 @@ object AuralInput {
                         source: AuralOutput[S])(implicit tx: S#Tx): AuralInput[S] =
     Impl.attr(data, key, node, source)
 }
+
+/** The aural representation of _a proc as an input_. Perhaps it should
+  * be renamed to `AuralInputProc`.
+  */
 trait AuralInput[S <: Sys[S]] extends /* Disposable[S#Tx] with */ DynamicUser {
   //   def addSource   (view: AuralOutput[S])(implicit tx: S#Tx): Unit
   //   def removeSource(view: AuralOutput[S])(implicit tx: S#Tx): Unit

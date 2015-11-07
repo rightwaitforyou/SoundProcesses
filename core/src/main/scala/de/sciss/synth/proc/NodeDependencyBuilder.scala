@@ -13,8 +13,8 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.Obj
-import de.sciss.lucre.synth.{Node, DynamicUser, Resource, Sys}
+import de.sciss.lucre.stm.{Sys, Obj}
+import de.sciss.lucre.synth.{Node, DynamicUser, Resource}
 import de.sciss.synth.ControlSet
 
 trait NodeDependencyBuilder[S <: Sys[S]] {

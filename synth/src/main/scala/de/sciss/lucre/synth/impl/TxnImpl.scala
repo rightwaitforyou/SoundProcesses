@@ -14,10 +14,7 @@
 package de.sciss.lucre.synth
 package impl
 
-import de.sciss.osc
-import concurrent.stm.InTxn
-import de.sciss.synth.message
-import scala.concurrent.stm.{Txn => ScalaTxn}
+import scala.concurrent.stm.{InTxn, Txn => ScalaTxn}
 
 object TxnImpl {
   var timeoutFun: () => Unit = () => ()
@@ -104,8 +101,8 @@ sealed trait TxnImpl extends Txn { tx =>
 
       } else {
         // we don't need the assertion, since we are going to call payload.apply which would
-        // through an out of bounds exception if the assertion wouldn't hold
-        //            assert( idxNew >= idxOld && idxNew < idxOld + szOld )
+        // throw an out of bounds exception if the assertion wouldn't hold
+        //            assert (idxNew >= idxOld && idxNew < idxOld + szOld)
         val payIdx = resourceStampNew - txnStartStamp
         val payNew = payOld.updated(payIdx, payOld(payIdx).append(m))
         payNew: Txn.Bundles

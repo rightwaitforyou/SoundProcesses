@@ -35,3 +35,31 @@ has its value collection sequenced).
 Eventually it would make sense to decentralise the attribute value views,
 like through an `AuralAttributeValue`. Alternatively we can reuse `AuralView`
 and supply the mix-bus through the `AuralContext`?
+
+-------------------------------------
+
+Request-Input
+
+- Attribute     -- (lots)
+- Stream        -- Grapheme.Expr.Audio
+- Buffer        -- Grapheme.Expr.Audio
+- Action        -- Action
+- DiskOut       -- Artifact
+
+In a first step, we could define an interface for attribute input support (the first one):
+
+    object AuralAttribute {
+      sealed trait Update[S <: Sys[S]]
+      case class NumChannelsChanged[S <: Sys[S]](ai: AttributeInput[S], ch: Change[Int]) extends Update
+    }
+    // somehow similar to AuralObj
+    trait AuralAttribute[S <: Sys[S]] extends Publisher[S, AttributeInput.Update[S]] with Disposable[S#Tx] {
+      def numChannels: Int
+      def accept()(implicit tx: S#Tx): Unit
+      def prepare(builder: Builder, timeRef: TimeRef)(implicit tx: S#Tx): Unit
+      def play   (builder: Builder, timeRef: TimeRef)(implicit tx: S#Tx): Unit
+      def stop   ()(implicit tx: S#Tx): Unit
+    }
+    
+    type Builder = ???
+    
