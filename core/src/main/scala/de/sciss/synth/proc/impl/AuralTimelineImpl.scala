@@ -83,7 +83,7 @@ object AuralTimelineImpl {
 
     def typeID: Int = Timeline.typeID
 
-    private[this] def sched = context.scheduler
+    import context.{scheduler => sched}
 
     private[this] val currentStateRef   = Ref[AuralObj.State](Stopped)
     private[this] val playingViews      = TSet.empty[AuralObj[S]]

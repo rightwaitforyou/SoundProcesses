@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Sys, Obj}
-import de.sciss.lucre.synth.{Node, DynamicUser, Resource}
+import de.sciss.lucre.synth.{NodeRef, Node, DynamicUser, Resource}
 import de.sciss.synth.ControlSet
 
 trait NodeDependencyBuilder[S <: Sys[S]] {
@@ -40,4 +40,11 @@ trait NodeDependencyBuilder[S <: Sys[S]] {
     * regular `dependencies ::= _` mechanism should be used.
     */
   def addResource(resource: Resource   ): Unit
+}
+
+trait NodeOwner[S <: Sys[S]] extends NodeRef {
+  // def addControl(pair: ControlSet)(implicit tx: S#Tx): Unit
+
+  // def nodeRef: NodeRef
+  def setControl(pair: ControlSet): Unit
 }

@@ -107,7 +107,7 @@ object AuralProcDataImpl {
 
       // stop and dispose all
       procViews.foreach { view =>
-        if (view.state == AuralObj.Playing) view.stopForRebuild()
+        if (view.state == Playing) view.stopForRebuild()
       }
       disposeBuild()
 

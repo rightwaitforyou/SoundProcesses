@@ -50,8 +50,7 @@ trait AuralContext[S <: Sys[S]] /* extends Observable[S#Tx, AuralContext.Update[
 
   def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A]
 
-  /** Waits for the auxiliary object to appear
-    * within the _current_ transaction only. If the object
+  /** Waits for the auxiliary object to appear. If the object
     * appears the function is applied, otherwise nothing happens.
     */
   def observeAux[A](id: S#ID)(fun: S#Tx => AuxUpdate[S, A] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
