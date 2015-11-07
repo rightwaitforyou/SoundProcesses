@@ -48,7 +48,7 @@ object AuralAttributeImpl {
     BooleanObj          .typeID -> BooleanAttribute,
     FadeSpec.Obj        .typeID -> FadeSpecAttribute,
 //    DoubleVector        .typeID -> DoubleVectorAttribute,
-    Grapheme.Expr.Audio .typeID -> AudioGraphemeAttribute,
+//    Grapheme.Expr.Audio .typeID -> AudioGraphemeAttribute,
     Output              .typeID -> OutputAttribute,
     Folder              .typeID -> FolderAttribute
 //    Timeline            .typeID -> ...
@@ -356,36 +356,36 @@ object AuralAttributeImpl {
       views.foreach(_.dispose())
     }
   }
-  
+
   // ------------------- AudioGrapheme ------------------- 
 
-  private[this] object AudioGraphemeAttribute extends Factory {
-    type Repr[S <: stm.Sys[S]] = Grapheme.Expr.Audio[S]
-
-    def typeID = Grapheme.Expr.Audio.typeID
-
-    def apply[S <: Sys[S]](value: Grapheme.Expr.Audio[S])
-                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new AudioGraphemeAttribute(tx.newHandle(value))
-  }
-  private[this] final class AudioGraphemeAttribute[S <: Sys[S]](audioH: stm.Source[S#Tx, Grapheme.Expr.Audio[S]])
-                                                               (implicit context: AuralContext[S])
-    extends AuralAttribute[S] {
-
-    def preferredNumChannels(implicit tx: S#Tx): Int = audioH().value.numChannels
-
-    def accept()(implicit tx: S#Tx): Unit = {
-      ???
-    }
-
-    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
-      ???
-    }
-
-    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ???
-
-    def dispose()(implicit tx: S#Tx): Unit = {
-      ???
-    }
-  }
+//  private[this] object AudioGraphemeAttribute extends Factory {
+//    type Repr[S <: stm.Sys[S]] = Grapheme.Expr.Audio[S]
+//
+//    def typeID = Grapheme.Expr.Audio.typeID
+//
+//    def apply[S <: Sys[S]](value: Grapheme.Expr.Audio[S])
+//                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
+//      new AudioGraphemeAttribute(tx.newHandle(value))
+//  }
+//  private[this] final class AudioGraphemeAttribute[S <: Sys[S]](audioH: stm.Source[S#Tx, Grapheme.Expr.Audio[S]])
+//                                                               (implicit context: AuralContext[S])
+//    extends AuralAttribute[S] {
+//
+//    def preferredNumChannels(implicit tx: S#Tx): Int = audioH().value.numChannels
+//
+//    def accept()(implicit tx: S#Tx): Unit = {
+//      ...
+//    }
+//
+//    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+//      ...
+//    }
+//
+//    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ...
+//
+//    def dispose()(implicit tx: S#Tx): Unit = {
+//      ...
+//    }
+//  }
 }
