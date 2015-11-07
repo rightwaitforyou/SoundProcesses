@@ -14,6 +14,7 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.Txn
@@ -102,7 +103,7 @@ object AuralOutputImpl {
   // an error in `dispose()` when trying to remove the entry from the ID map!
   private final class Impl[S <: Sys[S]](val data: ProcData[S], val key: String, val bus: AudioBus,
                                         idH: stm.Source[S#Tx, S#ID])
-    extends AuralOutput.Owned[S]  {
+    extends AuralOutput.Owned[S] with ObservableImpl[S, AuralOutput.Update] {
 
     override def toString: String = s"AuralOutput($data, $key, $bus)"
 
@@ -154,6 +155,7 @@ object AuralOutputImpl {
       implicit val itx = tx.peer
       logA(s"AuralOutput play; ${data.procCached()}, $key")
       stop1()
+      fire(AuralOutput.Play(n))
       sinks.foreach { sink =>
         tryLink(n, sink)
       }
@@ -166,6 +168,7 @@ object AuralOutputImpl {
     def stop()(implicit tx: S#Tx): Unit = {
       logA(s"AuralOutput stop; ${data.procCached()}, $key")
       stop1()
+      fire(AuralOutput.Stop)
     }
 
     private def stop1()(implicit tx: S#Tx): Unit = {

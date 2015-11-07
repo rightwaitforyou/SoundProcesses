@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.expr.{BooleanObj, DoubleObj, Expr, IntObj}
 import de.sciss.lucre.stm.{Disposable, Obj}
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{expr, stm}
 import de.sciss.synth.Curve
 import de.sciss.synth.proc.AuralAttribute.Factory
@@ -47,8 +47,8 @@ object AuralAttributeImpl {
     DoubleObj           .typeID -> DoubleAttribute,
     BooleanObj          .typeID -> BooleanAttribute,
     FadeSpec.Obj        .typeID -> FadeSpecAttribute,
-//    DoubleVector        .typeID -> ...,
-//    Grapheme.Expr.Audio .typeID -> ...,
+//    DoubleVector        .typeID -> DoubleVectorAttribute,
+    Grapheme.Expr.Audio .typeID -> AudioGraphemeAttribute,
     Output              .typeID -> OutputAttribute,
     Folder              .typeID -> FolderAttribute
 //    Timeline            .typeID -> ...
@@ -82,18 +82,15 @@ object AuralAttributeImpl {
     }
 
     private[this] def update(p: PlayRef[S], value: A)(implicit tx: S#Tx): Unit = {
-      // val ctlVal  = floatValue(value)
-      // val ctlName = graph.Attribute.controlName(key)
       import p.builder
-      // val ctl: ControlSet = controlSet(ctlName, value, numChannels)
-      // builder.setControl(ctl)
       val ctlVal = floatValues(value)
       builder.add(this, ctlVal)
     }
 
     def accept()(implicit tx: S#Tx): Unit = {
       val obs = exprH().changed.react { implicit tx => change =>
-        update(playRef.get(tx.peer), change.now)
+        val p = playRef.get(tx.peer)
+        if (p != null) update(p, change.now)
       }
       require(obsRef.swap(obs)(tx.peer) == null)
     }
@@ -103,7 +100,8 @@ object AuralAttributeImpl {
     def dispose()(implicit tx: S#Tx): Unit = {
       val obs = obsRef.swap(null)(tx.peer)
       if (obs != null) obs.dispose()
-      playRef.set(null)(tx.peer)
+      val p = playRef.swap(null)(tx.peer)
+      if (p != null) p.builder.remove(this)
     }
   }
 
@@ -215,6 +213,8 @@ object AuralAttributeImpl {
 
     private[this] val auralRef  = Ref.make[AuralOutput[S]]
     private[this] val obsRef    = Ref.make[Disposable[S#Tx]]
+    private[this] val playRef   = Ref.make[PlayRef[S]]
+    private[this] val aObsRef   = Ref.make[Disposable[S#Tx]]
 
     def preferredNumChannels(implicit tx: S#Tx): Int = {
       val a = auralRef.get(tx.peer)
@@ -231,12 +231,32 @@ object AuralAttributeImpl {
     }
 
     private[this] def auralSeen(auralOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
-      ???
+      auralRef.set(auralOutput)(tx.peer)
+      val aObs = auralOutput.react { implicit tx => {
+        case AuralOutput.Play(n) =>
+          val p = playRef.get(tx.peer)
+          if (p != null) update(p, auralOutput)
+        case AuralOutput.Stop => // XXX TODO: ignore?
+      }}
+      val aObsOld = aObsRef.swap(aObs)(tx.peer)
+      if (aObsOld != null) aObsOld.dispose()
+      val p = playRef.get(tx.peer)
+      if (p != null) update(p, auralOutput)
     }
 
     def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+      val p = new PlayRef(builder, numChannels)
+      require(playRef.swap(p)(tx.peer) == null)
+      val a = auralRef.get(tx.peer)
+      if (a != null) update(p, a)
+    }
 
-      ???
+    private[this] def update(p: PlayRef[S], audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit =
+      audioOutput.data.nodeOption.foreach(update(p, _, audioOutput.bus))
+
+    private[this] def update(p: PlayRef[S], nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit = {
+      import p.builder
+      builder.add(this, nodeRef, bus)
     }
 
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
@@ -244,8 +264,12 @@ object AuralAttributeImpl {
     def dispose()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
       auralRef.set(null)
+      val aObs = aObsRef.swap(null)(tx.peer)
+      if (aObs != null) aObs.dispose()
       val obs = obsRef.swap(null)
       if (obs != null) obs.dispose()
+      val p = playRef.swap(null)(tx.peer)
+      if (p != null) p.builder.remove(this)
     }
   }
 
@@ -330,6 +354,38 @@ object AuralAttributeImpl {
       playRef.set(null)(tx.peer)
       val views = elemViewsRef.get(tx.peer)
       views.foreach(_.dispose())
+    }
+  }
+  
+  // ------------------- AudioGrapheme ------------------- 
+
+  private[this] object AudioGraphemeAttribute extends Factory {
+    type Repr[S <: stm.Sys[S]] = Grapheme.Expr.Audio[S]
+
+    def typeID = Grapheme.Expr.Audio.typeID
+
+    def apply[S <: Sys[S]](value: Grapheme.Expr.Audio[S])
+                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
+      new AudioGraphemeAttribute(tx.newHandle(value))
+  }
+  private[this] final class AudioGraphemeAttribute[S <: Sys[S]](audioH: stm.Source[S#Tx, Grapheme.Expr.Audio[S]])
+                                                               (implicit context: AuralContext[S])
+    extends AuralAttribute[S] {
+
+    def preferredNumChannels(implicit tx: S#Tx): Int = audioH().value.numChannels
+
+    def accept()(implicit tx: S#Tx): Unit = {
+      ???
+    }
+
+    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+      ???
+    }
+
+    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ???
+
+    def dispose()(implicit tx: S#Tx): Unit = {
+      ???
     }
   }
 }

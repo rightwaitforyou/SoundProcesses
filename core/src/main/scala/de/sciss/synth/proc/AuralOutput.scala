@@ -13,9 +13,10 @@
 
 package de.sciss.synth.proc
 
+import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Txn, DynamicUser, NodeRef, AudioBus, Sys}
-import impl.{AuralOutputImpl => Impl}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys, Txn}
+import de.sciss.synth.proc.impl.{AuralOutputImpl => Impl}
 
 //sealed trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] {
 //}
@@ -35,9 +36,13 @@ object AuralOutput {
     def stop()(implicit tx: S#Tx): Unit
     def play(n: NodeRef)(implicit tx: S#Tx): Unit
   }
+
+  sealed trait Update
+  case class  Play(n: NodeRef) extends Update
+  case object Stop             extends Update
 }
 
-trait AuralOutput[S <: Sys[S]] extends Disposable[S#Tx] /* AuralScan[S] */ /* with AuralOutput.Proxy[S] */ {
+trait AuralOutput[S <: Sys[S]] extends Disposable[S#Tx] with Observable[S#Tx, AuralOutput.Update] {
   // def numChannels(implicit tx: S#Tx): Int
   // def numChannels_=(value: Int)(implicit tx: S#Tx): Unit
 

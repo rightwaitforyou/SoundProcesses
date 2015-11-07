@@ -34,7 +34,7 @@ object AuralInputImpl {
 
     // private[this] val mapper = Ref.make[BusNodeSetter]()
 
-    def add   ()(implicit tx: Txn): Unit = {
+    def add()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       mapper.add()
       source.addSink(this)

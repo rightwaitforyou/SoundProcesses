@@ -33,7 +33,7 @@ trait NodeDependencyBuilder[S <: Sys[S]] {
     * effective. If this is not desired, the
     * regular `users ::= _` mechanism should be used.
     */
-  def addUser    (user    : DynamicUser): Unit
+  def addUser(user: DynamicUser): Unit
 
   /** Adds a _keyed_ resource. This is a resource that is
     * associated with an attribute key. Only if
@@ -41,7 +41,7 @@ trait NodeDependencyBuilder[S <: Sys[S]] {
     * effective. If this is not desired, the
     * regular `dependencies ::= _` mechanism should be used.
     */
-  def addResource(resource: Resource   ): Unit
+  def addResource(resource: Resource): Unit
 }
 
 trait AuralAttributeTarget[S <: Sys[S]] /* extends NodeRef */ {
@@ -50,9 +50,9 @@ trait AuralAttributeTarget[S <: Sys[S]] /* extends NodeRef */ {
   // def nodeRef: NodeRef
   // def setControl(pair: ControlSet): Unit
 
-  def add(source: AnyRef, nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit
+  def add(source: AuralAttribute[S], nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit
   
-  def add(source: AnyRef, scalar: Vec[Float])(implicit tx: S#Tx): Unit
+  def add(source: AuralAttribute[S], scalar: Vec[Float])(implicit tx: S#Tx): Unit
   
-  def remove(source: AnyRef)(implicit tx: S#Tx): Unit
+  def remove(source: AuralAttribute[S])(implicit tx: S#Tx): Unit
 }
