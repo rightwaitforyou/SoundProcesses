@@ -37,8 +37,6 @@ object AuralAttribute {
 trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
   def preferredNumChannels(implicit tx: S#Tx): Int
 
-  def accept()(implicit tx: S#Tx): Unit
-
   def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
   def play   (timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit
 

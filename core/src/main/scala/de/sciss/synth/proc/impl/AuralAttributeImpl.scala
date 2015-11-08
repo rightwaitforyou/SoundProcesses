@@ -72,7 +72,7 @@ object AuralAttributeImpl {
 
     // ---- impl ----
 
-    private[this] val obsRef  = Ref.make[Disposable[S#Tx]]
+    private[this] var obs: Disposable[S#Tx] = _
     private[this] val playRef = Ref.make[PlayRef[S]]
 
     def play(timeRef: TimeRef, b: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
@@ -87,19 +87,18 @@ object AuralAttributeImpl {
       builder.add(this, ctlVal)
     }
 
-    def accept()(implicit tx: S#Tx): Unit = {
-      val obs = exprH().changed.react { implicit tx => change =>
+    def init()(implicit tx: S#Tx): this.type = {
+      obs = exprH().changed.react { implicit tx => change =>
         val p = playRef.get(tx.peer)
         if (p != null) update(p, change.now)
       }
-      require(obsRef.swap(obs)(tx.peer) == null)
+      this
     }
 
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
 
     def dispose()(implicit tx: S#Tx): Unit = {
-      val obs = obsRef.swap(null)(tx.peer)
-      if (obs != null) obs.dispose()
+      obs.dispose()
       val p = playRef.swap(null)(tx.peer)
       if (p != null) p.builder.remove(this)
     }
@@ -109,14 +108,6 @@ object AuralAttributeImpl {
     protected def floatValue(in: A): Float
 
     final def preferredNumChannels(implicit tx: S#Tx): Int = 1
-
-
-
-//    final protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet = {
-//      val f = floatValue(value)
-//      if (numChannels == 1) ctlName -> f else ctlName -> Vector.fill(numChannels)(f)
-//    }
-    // protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet
 
     final protected def floatValues(in: A): Vec[Float] = Vector(floatValue(in))
   }
@@ -130,7 +121,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: IntObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new IntAttribute(tx.newHandle(value))
+      new IntAttribute(tx.newHandle(value)).init()
   }
   private[this] final class IntAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, IntObj[S]])
     extends NumberImpl[S, Int] {
@@ -147,7 +138,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: DoubleObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new DoubleAttribute(tx.newHandle(value))
+      new DoubleAttribute(tx.newHandle(value)).init()
   }
   private[this] final class DoubleAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
     extends NumberImpl[S, Double] {
@@ -164,7 +155,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: BooleanObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new BooleanAttribute(tx.newHandle(value))
+      new BooleanAttribute(tx.newHandle(value)).init()
   }
   private[this] final class BooleanAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
     extends NumberImpl[S, Boolean] {
@@ -181,7 +172,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: FadeSpec.Obj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new FadeSpecAttribute(tx.newHandle(value))
+      new FadeSpecAttribute(tx.newHandle(value)).init()
   }
   private[this] final class FadeSpecAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, FadeSpec.Obj[S]])
     extends ExprImpl[S, FadeSpec] {
@@ -205,14 +196,13 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: Output[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new OutputAttribute(tx.newHandle(value.id))
+      new OutputAttribute().init(value)
   }
-  private[this] final class OutputAttribute[S <: Sys[S]](idH: stm.Source[S#Tx, S#ID])
-                                                        (implicit context: AuralContext[S])
+  private[this] final class OutputAttribute[S <: Sys[S]]()(implicit context: AuralContext[S])
     extends AuralAttribute[S] {
 
     private[this] val auralRef  = Ref.make[AuralOutput[S]]
-    private[this] val obsRef    = Ref.make[Disposable[S#Tx]]
+    private[this] var obs: Disposable[S#Tx] = _
     private[this] val playRef   = Ref.make[PlayRef[S]]
     private[this] val aObsRef   = Ref.make[Disposable[S#Tx]]
 
@@ -221,13 +211,13 @@ object AuralAttributeImpl {
       if (a == null) -1 else a.bus.numChannels
     }
 
-    def accept()(implicit tx: S#Tx): Unit = {
-      val id  = idH()
-      val obs = context.observeAux[AuralOutput[S]](id) { implicit tx => {
+    def init(output: Output[S])(implicit tx: S#Tx): this.type = {
+      val id  = output.id // idH()
+      obs = context.observeAux[AuralOutput[S]](id) { implicit tx => {
         case AuxAdded(_, auralOutput) => auralSeen(auralOutput)
       }}
       context.getAux[AuralOutput[S]](id).foreach(auralSeen)
-      require(obsRef.swap(obs)(tx.peer) == null)
+      this
     }
 
     private[this] def auralSeen(auralOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
@@ -266,8 +256,7 @@ object AuralAttributeImpl {
       auralRef.set(null)
       val aObs = aObsRef.swap(null)(tx.peer)
       if (aObs != null) aObs.dispose()
-      val obs = obsRef.swap(null)
-      if (obs != null) obs.dispose()
+      obs.dispose()
       val p = playRef.swap(null)(tx.peer)
       if (p != null) p.builder.remove(this)
     }
@@ -287,18 +276,17 @@ object AuralAttributeImpl {
         AuralAttribute(elem)
       } .toVector
 
-      new FolderAttribute(tx.newHandle(value), Ref(elemViews))
+      new FolderAttribute(Ref(elemViews)).init(value)
     }
   }
-  private[this] final class FolderAttribute[S <: Sys[S]](folderH: stm.Source[S#Tx, Folder[S]],
-                                                         elemViewsRef: Ref[Vector[AuralAttribute[S]]])
+  private[this] final class FolderAttribute[S <: Sys[S]](elemViewsRef: Ref[Vector[AuralAttribute[S]]])
                                                         (implicit context: AuralContext[S])
     extends AuralAttribute[S] {
 
     import context.{scheduler => sched}
 
     private[this] val playRef = Ref.make[PlayTime[S]]
-    private[this] val obsRef  = Ref.make[Disposable[S#Tx]]
+    private[this] var obs: Disposable[S#Tx] = _
 
     def preferredNumChannels(implicit tx: S#Tx): Int = {
       def loop(views: Vector[AuralAttribute[S]], res: Int): Int = views match {
@@ -311,10 +299,10 @@ object AuralAttributeImpl {
       loop(elemViewsRef.get(tx.peer), -1)
     }
 
-    def accept()(implicit tx: S#Tx): Unit = {
-      val views = elemViewsRef.get(tx.peer)
-      views.foreach(_.accept())
-      val obs = folderH().changed.react { implicit tx => upd => upd.changes.foreach {
+    def init(folder: Folder[S])(implicit tx: S#Tx): this.type = {
+      // val views = elemViewsRef.get(tx.peer)
+      // views.foreach(_.init())
+      obs = folder.changed.react { implicit tx => upd => upd.changes.foreach {
         case expr.List.Added  (idx, child) =>
           val view = AuralAttribute(child)
           elemViewsRef.transform(_.patch(idx, view :: Nil, 0))(tx.peer)
@@ -332,7 +320,7 @@ object AuralAttributeImpl {
             in.patch(idx, Nil, 1)
           } (tx.peer)
       }}
-      require(obsRef.swap(obs)(tx.peer) == null)
+      this
     }
 
     def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
@@ -349,8 +337,7 @@ object AuralAttributeImpl {
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {
-      val obs = obsRef.swap(null)(tx.peer)
-      if (obs != null) obs.dispose()
+      obs.dispose()
       playRef.set(null)(tx.peer)
       val views = elemViewsRef.get(tx.peer)
       views.foreach(_.dispose())
@@ -366,15 +353,15 @@ object AuralAttributeImpl {
 //
 //    def apply[S <: Sys[S]](value: Grapheme.Expr.Audio[S])
 //                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-//      new AudioGraphemeAttribute(tx.newHandle(value))
+//      new AudioGraphemeAttribute().init(value)
 //  }
-//  private[this] final class AudioGraphemeAttribute[S <: Sys[S]](audioH: stm.Source[S#Tx, Grapheme.Expr.Audio[S]])
+//  private[this] final class AudioGraphemeAttribute[S <: Sys[S]]()
 //                                                               (implicit context: AuralContext[S])
 //    extends AuralAttribute[S] {
 //
 //    def preferredNumChannels(implicit tx: S#Tx): Int = audioH().value.numChannels
 //
-//    def accept()(implicit tx: S#Tx): Unit = {
+//    def init(audio: Grapheme.Expr.Audio[S])(implicit tx: S#Tx): this.type = {
 //      ...
 //    }
 //
