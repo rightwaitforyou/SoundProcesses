@@ -47,8 +47,7 @@ object AuralProcDataImpl {
     private[this] val nodeRef       = Ref(Option.empty[NodeRef.Group])
 
     // running attribute inputs
-    private[this] val attrMap       = TMap.empty[String, Disposable[S#Tx]]
-    private[this] val attrMap2      = TMap.empty[String, AuralAttribute[S]]
+    private[this] val attrMap       = TMap.empty[String, AuralAttribute[S]]
     private[this] val outputBuses   = TMap.empty[String, AudioBus]
     private[this] val procViews     = TSet.empty[AuralObj.Proc[S]]
 
@@ -159,8 +158,7 @@ object AuralProcDataImpl {
       logA(s"AttrRemoved from ${procCached()} ($key)")
       if (!isAttrUsed(key)) return
 
-      attrMap.remove(key)(tx.peer)
-      attrUpdate(key, None)
+      attrMap.remove(key)(tx.peer).foreach(_.dispose())
     }
 
     private def attrUpdate(key: String, valueOption: Option[Obj[S]])(implicit tx: S#Tx): Unit = {
@@ -199,31 +197,6 @@ object AuralProcDataImpl {
           }
       }
     }
-
-//    // attribute values that are used in the form of accepted or rejected inputs will be observed.
-//    // (if the attribute is not present, it will be handled by `attrAdded`)
-//    private def addUsedAttr(attr: Obj.AttrMap[S], key: String)(implicit tx: S#Tx): Unit =
-//      attr.get(key).foreach { value => mkAttrObserver1(key, value) }
-//
-//    // calls `mkAttrObserver` and stores observer
-//    private def mkAttrObserver1(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
-//      val obs = mkAttrObserver(key = key, value = value)
-//      attrMap.put(key, obs)(tx.peer)
-//    }
-//
-//    /** Sub-classes may override this if invoking the super-method for unhandled values.
-//      * An observed attribute value will trigger `attrChange`
-//      */
-//    protected def mkAttrObserver(key: String, value: Obj[S])(implicit tx: S#Tx): Disposable[S#Tx] =
-//      value match {
-//        case output: Output[S] =>
-//          context.observeAux[AuralOutput[S]](output.id) { implicit tx => {
-//            case AuralContext.AuxAdded(_, _) => attrChanged(key)
-//            case _ =>
-//          }}
-//        case _ =>
-//          value.changed.react { implicit tx => _ => attrChanged (key) }
-//      }
 
     private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
       n.removeAttrResources(key)
@@ -293,9 +266,8 @@ object AuralProcDataImpl {
 
     private def disposeAttrMap()(implicit tx: S#Tx): Unit = {
       implicit val itx = tx.peer
-      attrMap  .foreach(_._2.dispose())
-      attrMap  .clear()
-      ??? // handle attrMap2
+      attrMap .foreach(_._2.dispose())
+      attrMap .clear()
     }
 
     private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
@@ -397,7 +369,7 @@ object AuralProcDataImpl {
         val valueOpt  = procObj.attr.get(i.name)
         val found     = valueOpt.fold(-1) { value =>
           implicit val itx = tx.peer
-          val view = attrMap2.getOrElseUpdate(i.name, AuralAttribute(value))
+          val view = attrMap.getOrElseUpdate(i.name, AuralAttribute(value))
           view.preferredNumChannels
         }
 
