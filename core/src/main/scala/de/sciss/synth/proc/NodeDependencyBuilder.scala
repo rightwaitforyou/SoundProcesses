@@ -45,16 +45,3 @@ trait NodeDependencyBuilder[S <: Sys[S]] {
     */
   def addResource(resource: Resource): Unit
 }
-
-trait AuralAttributeTarget[S <: Sys[S]] /* extends NodeRef */ {
-  // def addControl(pair: ControlSet)(implicit tx: S#Tx): Unit
-
-  // def nodeRef: NodeRef
-  // def setControl(pair: ControlSet): Unit
-
-  def add(source: AuralAttribute[S], nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit
-  
-  def add(source: AuralAttribute[S], scalar: Vec[Float])(implicit tx: S#Tx): Unit
-  
-  def remove(source: AuralAttribute[S])(implicit tx: S#Tx): Unit
-}

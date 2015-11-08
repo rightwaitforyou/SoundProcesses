@@ -14,10 +14,12 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Obj, Disposable, Sys}
-import de.sciss.lucre.synth.{Sys => SSys}
+import de.sciss.lucre.synth.{Sys => SSys, NodeRef, AudioBus}
+import de.sciss.synth.ControlSet
 import impl.{AuralAttributeImpl => Impl}
 
-import scala.language.higherKinds
+import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.language.{implicitConversions, higherKinds}
 
 object AuralAttribute {
   trait Factory {
@@ -33,12 +35,43 @@ object AuralAttribute {
   def factories: Iterable[Factory] = Impl.factories
 
   def apply[S <: SSys[S]](value: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = Impl(value)
+
+  // ---- Target ----
+
+  object Target {
+    def apply[S <: Sys[S]](): Target[S] = ??? // new impl.AuralAttributeTargetImpl[S]
+  }
+  trait Target[S <: Sys[S]] {
+    def put(source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
+
+    def remove(source: AuralAttribute[S])(implicit tx: S#Tx): Unit
+  }
+
+  // ---- Value ----
+
+  object Value {
+    implicit def fromFloat (x : Float     ): ScalarValue  = new ScalarValue (x )
+    implicit def fromFloats(xs: Vec[Float]): ScalarVector = new ScalarVector(xs)
+  }
+  sealed trait Value
+  sealed trait Scalar extends Value {
+    def toControl(key: String): ControlSet
+  }
+
+  final case class ScalarValue (x : Float     ) extends Scalar {
+    def toControl(key: String): ControlSet = ControlSet.Value(key, x)
+  }
+  final case class ScalarVector(xs: Vec[Float]) extends Scalar {
+    def toControl(key: String): ControlSet = ControlSet.Vector(key, xs)
+  }
+
+  final case class Stream(source: NodeRef, bus: AudioBus) extends Value
 }
 trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
   def preferredNumChannels(implicit tx: S#Tx): Int
 
   def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  def play   (timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit
+  def play   (timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit
 
   // def stop   ()(implicit tx: S#Tx): Unit
 }

@@ -22,7 +22,6 @@ import de.sciss.synth.Curve
 import de.sciss.synth.proc.AuralAttribute.Factory
 import de.sciss.synth.proc.AuralContext.AuxAdded
 
-import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.Ref
 
 object AuralAttributeImpl {
@@ -54,10 +53,10 @@ object AuralAttributeImpl {
 //    Timeline            .typeID -> ...
   )
 
-  private[this] final class PlayRef[S <: Sys[S]](val builder: AuralAttributeTarget[S], val numChannels: Int)
+  private[this] final class PlayRef[S <: Sys[S]](val target: AuralAttribute.Target[S], val numChannels: Int)
 
   private[this] final class PlayTime[S <: Sys[S]](val wallClock: Long,
-                                                  val timeRef: TimeRef.Apply, val builder: AuralAttributeTarget[S],
+                                                  val timeRef: TimeRef.Apply, val target: AuralAttribute.Target[S],
                                                   val numChannels: Int) {
     def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
   }
@@ -68,23 +67,23 @@ object AuralAttributeImpl {
     protected def exprH: stm.Source[S#Tx, Expr[S, A]]
 
     // protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet
-    protected def floatValues(in: A): Vec[Float]
+    protected def mkValue(in: A): AuralAttribute.Value
 
     // ---- impl ----
 
     private[this] var obs: Disposable[S#Tx] = _
     private[this] val playRef = Ref(Option.empty[PlayRef[S]])
 
-    def play(timeRef: TimeRef, b: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
-      val p = new PlayRef(b, numChannels)
+    def play(timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+      val p = new PlayRef(target, numChannels)
       require(playRef.swap(Some(p))(tx.peer).isEmpty)
       update(p, exprH().value)
     }
 
     private[this] def update(p: PlayRef[S], value: A)(implicit tx: S#Tx): Unit = {
-      import p.builder
-      val ctlVal = floatValues(value)
-      builder.add(this, ctlVal)
+      import p.target
+      val ctlVal = mkValue(value)
+      target.put(this, ctlVal)
     }
 
     def init()(implicit tx: S#Tx): this.type = {
@@ -98,16 +97,12 @@ object AuralAttributeImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       obs.dispose()
-      playRef.swap(None)(tx.peer).foreach(_.builder.remove(this))
+      playRef.swap(None)(tx.peer).foreach(_.target.remove(this))
     }
   }
 
   private[this] trait NumberImpl[S <: Sys[S], A] extends ExprImpl[S, A] {
-    protected def floatValue(in: A): Float
-
     final def preferredNumChannels(implicit tx: S#Tx): Int = 1
-
-    final protected def floatValues(in: A): Vec[Float] = Vector(floatValue(in))
   }
   
   // ------------------- IntObj ------------------- 
@@ -124,7 +119,7 @@ object AuralAttributeImpl {
   private[this] final class IntAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, IntObj[S]])
     extends NumberImpl[S, Int] {
 
-    protected def floatValue(value: Int): Float = value.toFloat
+    protected def mkValue(value: Int): AuralAttribute.Value = value.toFloat
   }
 
   // ------------------- DoubleObj ------------------- 
@@ -141,7 +136,7 @@ object AuralAttributeImpl {
   private[this] final class DoubleAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
     extends NumberImpl[S, Double] {
 
-    protected def floatValue(value: Double): Float = value.toFloat
+    protected def mkValue(value: Double): AuralAttribute.Value = value.toFloat
   }
 
   // ------------------- BooleanObj ------------------- 
@@ -158,7 +153,7 @@ object AuralAttributeImpl {
   private[this] final class BooleanAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
     extends NumberImpl[S, Boolean] {
 
-    protected def floatValue(value: Boolean): Float = if (value) 1f else 0f
+    protected def mkValue(value: Boolean): AuralAttribute.Value = if (value) 1f else 0f
   }
 
   // ------------------- FadeSpec.Obj ------------------- 
@@ -177,7 +172,7 @@ object AuralAttributeImpl {
 
     def preferredNumChannels(implicit tx: S#Tx): Int = 4
 
-    protected def floatValues(spec: FadeSpec): Vec[Float] = Vector(
+    protected def mkValue(spec: FadeSpec): AuralAttribute.Value = Vector[Float](
       (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
         case Curve.parametric(c)  => c
         case _                    => 0f
@@ -227,8 +222,8 @@ object AuralAttributeImpl {
       playRef.get(tx.peer).foreach(update(_, auralOutput))
     }
 
-    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
-      val p = new PlayRef(builder, numChannels)
+    def play(timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+      val p = new PlayRef(target, numChannels)
       require(playRef.swap(Some(p))(tx.peer).isEmpty)
       auralRef.get(tx.peer).foreach(update(p, _))
     }
@@ -237,8 +232,8 @@ object AuralAttributeImpl {
       audioOutput.data.nodeOption.foreach(update(p, _, audioOutput.bus))
 
     private[this] def update(p: PlayRef[S], nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit = {
-      import p.builder
-      builder.add(this, nodeRef, bus)
+      import p.target
+      target.put(this, AuralAttribute.Stream(nodeRef, bus))
     }
 
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
@@ -248,7 +243,7 @@ object AuralAttributeImpl {
       auralRef.set(None)
       aObsRef.swap(None)(tx.peer).foreach(_.dispose())
       obs.dispose()
-      playRef.swap(None)(tx.peer).foreach(_.builder.remove(this))
+      playRef.swap(None)(tx.peer).foreach(_.target.remove(this))
     }
   }
 
@@ -297,9 +292,9 @@ object AuralAttributeImpl {
           val view = AuralAttribute(child)
           elemViewsRef.transform(_.patch(idx, view :: Nil, 0))(tx.peer)
           playRef.get(tx.peer).foreach { p =>
-            import p.{builder, numChannels}
+            import p.{target, numChannels}
             val tForce = p.shiftTo(sched.time)
-            view.play(tForce, builder, numChannels)
+            view.play(tForce, target, numChannels)
           }
 
         case expr.List.Removed(idx, child) =>
@@ -312,12 +307,12 @@ object AuralAttributeImpl {
       this
     }
 
-    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
       val tForce  = timeRef.force
-      val p       = new PlayTime(sched.time, tForce, builder, numChannels)
+      val p       = new PlayTime(sched.time, tForce, target, numChannels)
       require(playRef.swap(Some(p))(tx.peer).isEmpty)
       val views = elemViewsRef.get(tx.peer)
-      views.foreach(_.play(tForce, builder ,numChannels))
+      views.foreach(_.play(tForce, target ,numChannels))
     }
 
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
