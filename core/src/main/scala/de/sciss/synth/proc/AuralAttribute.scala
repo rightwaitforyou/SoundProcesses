@@ -50,22 +50,27 @@ object AuralAttribute {
   // ---- Value ----
 
   object Value {
-    implicit def fromFloat (x : Float     ): ScalarValue  = new ScalarValue (x )
-    implicit def fromFloats(xs: Vec[Float]): ScalarVector = new ScalarVector(xs)
+    implicit def fromFloat (value : Float     ): ScalarValue  = new ScalarValue (value )
+    implicit def fromFloats(values: Vec[Float]): ScalarVector = new ScalarVector(values)
   }
-  sealed trait Value
+  sealed trait Value { def isScalar: Boolean }
   sealed trait Scalar extends Value {
     def toControl(key: String): ControlSet
+    def values: Vec[Float]
+    final def isScalar = true
   }
 
-  final case class ScalarValue (x : Float     ) extends Scalar {
-    def toControl(key: String): ControlSet = ControlSet.Value(key, x)
+  final case class ScalarValue(value: Float) extends Scalar {
+    def toControl(key: String): ControlSet = ControlSet.Value(key, value)
+    def values: Vec[Float] = Vector(value)
   }
-  final case class ScalarVector(xs: Vec[Float]) extends Scalar {
-    def toControl(key: String): ControlSet = ControlSet.Vector(key, xs)
+  final case class ScalarVector(values: Vec[Float]) extends Scalar {
+    def toControl(key: String): ControlSet = ControlSet.Vector(key, values)
   }
 
-  final case class Stream(source: NodeRef, bus: AudioBus) extends Value
+  final case class Stream(source: NodeRef, bus: AudioBus) extends Value {
+    def isScalar = false
+  }
 }
 trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
   def preferredNumChannels(implicit tx: S#Tx): Int

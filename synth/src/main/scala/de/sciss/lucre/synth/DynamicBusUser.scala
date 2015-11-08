@@ -19,8 +19,15 @@ import concurrent.stm.{Ref => ScalaRef}
 import de.sciss.synth.{ControlBus => SControlBus, AudioBus => SAudioBus}
 
 trait DynamicUser extends Disposable[Txn] {
+  /** Adds the user and thereby issues actions on the server. */
   def add    ()(implicit tx: Txn): Unit
+
+  /** Removes the user. It is safe to call this method repeatedly,
+    * and also if the user has never been added.
+    */
   def remove ()(implicit tx: Txn): Unit
+
+  /** The user implements `dispose` by simply calling `remove`. */
   def dispose()(implicit tx: Txn): Unit = remove()
 }
 
