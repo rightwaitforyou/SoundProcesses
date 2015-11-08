@@ -20,6 +20,8 @@ import de.sciss.synth.ControlSet
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 trait NodeDependencyBuilder[S <: Sys[S]] {
+  def timeRef: TimeRef
+
   def obj: Obj[S]
 
   def node: Node

@@ -145,14 +145,16 @@ object AuralProcDataImpl {
       logA(s"AttrAdded   to   ${procCached()} ($key) - used? $used")
       if (!used) return
 
+      implicit val itx = tx.peer
       // mkAttrObserver1(key, value)
-      attrUpdate(key, Some(value))
+      val view = attrMap.getOrElseUpdate(key, AuralAttribute(value))
+      ??? // attrUpdate(key, Some(value))
     }
 
-    protected final def attrChanged(key: String)(implicit tx: S#Tx): Unit = {
-      logA(s"AttrChange in   ${procCached()} ($key)")
-      attrUpdate(key, procCached().attr.get(key))
-    }
+//    protected final def attrChanged(key: String)(implicit tx: S#Tx): Unit = {
+//      logA(s"AttrChange in   ${procCached()} ($key)")
+//      attrUpdate(key, procCached().attr.get(key))
+//    }
 
     private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
@@ -166,19 +168,19 @@ object AuralProcDataImpl {
       val aKey        = UGB.AttributeKey(key)
       val acceptedOpt = st.acceptedInputs.get(aKey)
       st match {
-        case st0: Complete[S] =>
-          // try to adjust the runtime value.
-          // if it is incompatible, `attrNodeSet1` will
-          // dispose and restart the build.
-          for {
-            n       <- nodeRef.get(tx.peer)
-            (_, v)  <- acceptedOpt // st.acceptedInputs.get(aKey)
-          } {
-            attrNodeUnset1(n, key)
-            valueOption.foreach { value =>
-              attrNodeSet1(n, key, assigned = v, value = value)
-            }
-          }
+//        case st0: Complete[S] =>
+//          // try to adjust the runtime value.
+//          // if it is incompatible, `attrNodeSet1` will
+//          // dispose and restart the build.
+//          for {
+//            n       <- nodeRef.get(tx.peer)
+//            (_, v)  <- acceptedOpt // st.acceptedInputs.get(aKey)
+//          } {
+//            attrNodeUnset1(n, key)
+//            valueOption.foreach { value =>
+//              attrNodeSet1(n, key, assigned = v, value = value)
+//            }
+//          }
 
         case st0: Incomplete[S] =>
           acceptedOpt.fold[Unit] {  // rejected
@@ -195,24 +197,26 @@ object AuralProcDataImpl {
               case MissingIn(_) => newSynthGraph()
             }
           }
+
+        case _ =>
       }
     }
 
-    private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
-      n.removeAttrResources(key)
+//    private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
+//      n.removeAttrResources(key)
 
-    // called on a running node when an attribute value changes. tries to adjust the
-    // running node. if the new value is incompatible, i.e. `buildAttrInput` throws a
-    // `MissingIn`, we kill the node and try to rebuild.
-    private def attrNodeSet1(n: NodeRef.Full, key: String, assigned: UGB.Value, value: Obj[S])
-                            (implicit tx: S#Tx): Unit =
-      try {
-        val b = new SynthUpdater(procCached(), n.node, key, n)
-        buildAttrInput(b, key, assigned)
-        b.finish()
-      } catch {
-        case MissingIn(_) => newSynthGraph()
-      }
+//    // called on a running node when an attribute value changes. tries to adjust the
+//    // running node. if the new value is incompatible, i.e. `buildAttrInput` throws a
+//    // `MissingIn`, we kill the node and try to rebuild.
+//    private def attrNodeSet1(n: NodeRef.Full, key: String, assigned: UGB.Value, value: Obj[S])
+//                            (implicit tx: S#Tx): Unit =
+//      try {
+//        val b = new SynthUpdater(procCached(), n.node, key, n)
+//        buildAttrInput(b, key, assigned)
+//        b.finish()
+//      } catch {
+//        case MissingIn(_) => newSynthGraph()
+//      }
 
     // ----
 
@@ -460,10 +464,9 @@ object AuralProcDataImpl {
                       (implicit tx: S#Tx): Unit = {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
-          ???
-//          b.obj.attr.get(key).foreach { a =>
-//            buildAttrValueInput(b, key, a, numChannels = numChannels)
-//          }
+          attrMap.get(key)(tx.peer).foreach { a =>
+            a.play(timeRef = b.timeRef, builder = ???, numChannels = numChannels)
+          }
 
         case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
           val infoSeq = if (specs.isEmpty) UGB.Input.Stream.EmptySpec :: Nil else specs
