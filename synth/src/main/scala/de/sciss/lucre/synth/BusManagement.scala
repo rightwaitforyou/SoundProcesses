@@ -449,7 +449,9 @@ object Bus {
       val oldHolder = bus()
       oldHolder.free()
       if (readers.isEmpty) {
-        if (!writers.isEmpty) {
+        if (writers.isEmpty) {
+          bus.set(null)
+        } else {
           // they can all go to write only
           val bh = createWriteOnlyBus(server, numChannels)
           bus.set(bh)
@@ -469,7 +471,9 @@ object Bus {
       val oldHolder = bus.get
       oldHolder.free()
       if (writers.isEmpty) {
-        if (!readers.isEmpty) {
+        if (readers.isEmpty) {
+          bus.set(null)
+        } else {
           // they can all go to write only
           val bh = createReadOnlyBus(server, numChannels)
           bus.set(bh)

@@ -66,7 +66,6 @@ object AuralAttributeImpl {
 
     protected def exprH: stm.Source[S#Tx, Expr[S, A]]
 
-    // protected def controlSet(ctlName: String, value: A, numChannels: Int)(implicit tx: S#Tx): ControlSet
     protected def mkValue(in: A): AuralAttribute.Value
 
     // ---- impl ----
