@@ -82,7 +82,7 @@ object UGenGraphBuilderImpl {
     private var remaining       = in.remaining
     private var controlProxies  = in.controlProxies
 
-    var outputs                = in.outputs
+    var outputs                 = in.outputs
     var acceptedInputs          = in.acceptedInputs
     var rejectedInputs          = Set.empty[UGenGraphBuilder.Key]
 

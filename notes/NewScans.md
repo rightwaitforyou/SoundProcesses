@@ -143,3 +143,13 @@ is only one real target, and the intermediate folders or timeline instances simp
 Considering `Output` that might be written to different folders at the same time, we need to isolate
 its own bus. That produces a problem above with `source: AnyRef`. Actually it doesn't. Because we have
 the independent `AuralOutput` as singleton with multiple `AuralAttribute` relating to it.
+
+------------------------
+
+    requestInput
+        -> reject
+            
+            
+        -> accept
+            
+        

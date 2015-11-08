@@ -45,7 +45,8 @@ object UGenGraphBuilder {
   case class ScanIn(numChannels: Int, fixed: Boolean)
 
   trait Context[S <: Sys[S]] {
-    def requestInput[Res](req: UGenGraphBuilder.Input { type Value = Res }, state: Incomplete[S])(implicit tx: S#Tx): Res
+    def requestInput[Res](req: UGenGraphBuilder.Input { type Value = Res }, state: Incomplete[S])
+                         (implicit tx: S#Tx): Res
   }
 
   sealed trait State[S <: Sys[S]] {

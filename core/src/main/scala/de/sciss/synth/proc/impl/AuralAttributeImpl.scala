@@ -379,6 +379,22 @@ object AuralAttributeImpl {
 //    }
 //
 //    def play(timeRef: TimeRef, builder: AuralAttributeTarget[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+//      val ctlName   = graph.Attribute.controlName(key)
+//        val audioVal  = a.value
+//        val spec      = audioVal.spec
+//        if (spec.numFrames != 1) {
+//          sys.error(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
+//          // Console.err.println(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
+//          // throw MissingIn(AttributeKey(key))
+//        }
+//        val numCh = spec.numChannels // numChL.toInt
+//        if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
+//        chanCheck(numCh)
+//        val bus = Bus.control(server, numCh)
+//        val res = BusNodeSetter.mapper(ctlName, bus, b.node)
+//        b.addUser(res)
+//        val w = AudioArtifactScalarWriter(bus, audioVal)
+//        b.addResource(w)
 //      ...
 //    }
 //

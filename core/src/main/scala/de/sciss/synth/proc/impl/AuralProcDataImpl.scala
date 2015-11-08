@@ -43,21 +43,22 @@ object AuralProcDataImpl {
 
     import context.server
 
-    private val stateRef      = Ref.make[UGB.State[S]]()
+    private[this] val stateRef      = Ref.make[UGB.State[S]]()
 
     // running main synths
-    private val nodeRef       = Ref(Option.empty[NodeRef.Group])
+    private[this] val nodeRef       = Ref(Option.empty[NodeRef.Group])
 
     // running attribute inputs
-    private val attrMap       = TMap.empty[String, Disposable[S#Tx]]
-    private val outputBuses   = TMap.empty[String, AudioBus]
-    private val procViews     = TSet.empty[AuralObj.Proc[S]]
+    private[this] val attrMap       = TMap.empty[String, Disposable[S#Tx]]
+    private[this] val attrMap2      = TMap.empty[String, AuralAttribute[S]]
+    private[this] val outputBuses   = TMap.empty[String, AudioBus]
+    private[this] val procViews     = TSet.empty[AuralObj.Proc[S]]
 
-    private val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
+    private[this] val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
 
-    private var observers     = List.empty[Disposable[S#Tx]]
+    private[this] var observers     = List.empty[Disposable[S#Tx]]
 
-    private var _obj: stm.Source[S#Tx, Proc[S]] = _
+    private[this] var _obj: stm.Source[S#Tx, Proc[S]] = _
 
     final def obj = _obj
 
@@ -446,7 +447,15 @@ object AuralProcDataImpl {
     def requestInput[Res](in: UGB.Input { type Value = Res }, st: Incomplete[S])
                          (implicit tx: S#Tx): Res = in match {
       case i: UGB.Input.Attribute =>
-        val found = requestAttrNumChannels(i.name)
+        val procObj   = procCached()
+        val valueOpt  = procObj.attr.get(i.name)
+        val found     = valueOpt.fold(-1) { value =>
+          implicit val itx = tx.peer
+          val view = attrMap2.getOrElseUpdate(i.name, AuralAttribute(value))
+          view.preferredNumChannels
+        }
+
+        // val found = requestAttrNumChannels(i.name)
         import i.{requiredNumChannels => reqNum, defaultNumChannels => defNum}
         if ((found < 0 && i.defaultNumChannels < 0) || (found >= 0 && reqNum >= 0 && found != reqNum)) {
           // throw new IllegalStateException(s"Attribute ${i.name} requires $reqNum channels (found $found)")
