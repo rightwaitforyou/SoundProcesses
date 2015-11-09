@@ -53,11 +53,12 @@ object AuralAttributeImpl {
 //    Timeline            .typeID -> ...
   )
 
-  private[this] final class PlayRef[S <: Sys[S]](val target: AuralAttribute.Target[S], val numChannels: Int)
+  // private[this] final class PlayRef[S <: Sys[S]](val target: AuralAttribute.Target[S])
+
+  private[this] type PlayRef[S <: Sys[S]] = AuralAttribute.Target[S]
 
   private[this] final class PlayTime[S <: Sys[S]](val wallClock: Long,
-                                                  val timeRef: TimeRef.Apply, val target: AuralAttribute.Target[S],
-                                                  val numChannels: Int) {
+                                                  val timeRef: TimeRef.Apply, val target: AuralAttribute.Target[S]) {
     def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
   }
 
@@ -73,14 +74,15 @@ object AuralAttributeImpl {
     private[this] var obs: Disposable[S#Tx] = _
     private[this] val playRef = Ref(Option.empty[PlayRef[S]])
 
-    def play(timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
-      val p = new PlayRef(target, numChannels)
+    def play(timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Unit = {
+      val p = target // new PlayRef(target)
       require(playRef.swap(Some(p))(tx.peer).isEmpty)
       update(p, exprH().value)
     }
 
     private[this] def update(p: PlayRef[S], value: A)(implicit tx: S#Tx): Unit = {
-      import p.target
+      // import p.target
+      val target = p
       val ctlVal = mkValue(value)
       target.put(this, ctlVal)
     }
@@ -96,7 +98,7 @@ object AuralAttributeImpl {
 
     def dispose()(implicit tx: S#Tx): Unit = {
       obs.dispose()
-      playRef.swap(None)(tx.peer).foreach(_.target.remove(this))
+      playRef.swap(None)(tx.peer).foreach(_ /*.target */.remove(this))
     }
   }
 
@@ -221,8 +223,8 @@ object AuralAttributeImpl {
       playRef.get(tx.peer).foreach(update(_, auralOutput))
     }
 
-    def play(timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
-      val p = new PlayRef(target, numChannels)
+    def play(timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Unit = {
+      val p = target // new PlayRef(target)
       require(playRef.swap(Some(p))(tx.peer).isEmpty)
       auralRef.get(tx.peer).foreach(update(p, _))
     }
@@ -231,7 +233,8 @@ object AuralAttributeImpl {
       audioOutput.data.nodeOption.foreach(update(p, _, audioOutput.bus))
 
     private[this] def update(p: PlayRef[S], nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit = {
-      import p.target
+      // import p.target
+      val target = p
       target.put(this, AuralAttribute.Stream(nodeRef, bus))
     }
 
@@ -242,7 +245,7 @@ object AuralAttributeImpl {
       auralRef.set(None)
       aObsRef.swap(None)(tx.peer).foreach(_.dispose())
       obs.dispose()
-      playRef.swap(None)(tx.peer).foreach(_.target.remove(this))
+      playRef.swap(None)(tx.peer).foreach(_ /* .target */.remove(this))
     }
   }
 
@@ -291,9 +294,9 @@ object AuralAttributeImpl {
           val view = AuralAttribute(child)
           elemViewsRef.transform(_.patch(idx, view :: Nil, 0))(tx.peer)
           playRef.get(tx.peer).foreach { p =>
-            import p.{target, numChannels}
+            import p.target
             val tForce = p.shiftTo(sched.time)
-            view.play(tForce, target, numChannels)
+            view.play(tForce, target)
           }
 
         case expr.List.Removed(idx, child) =>
@@ -306,12 +309,12 @@ object AuralAttributeImpl {
       this
     }
 
-    def play(timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Unit = {
       val tForce  = timeRef.force
-      val p       = new PlayTime(sched.time, tForce, target, numChannels)
+      val p       = new PlayTime(sched.time, tForce, target)
       require(playRef.swap(Some(p))(tx.peer).isEmpty)
       val views = elemViewsRef.get(tx.peer)
-      views.foreach(_.play(tForce, target ,numChannels))
+      views.foreach(_.play(tForce, target))
     }
 
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {

@@ -465,7 +465,8 @@ object AuralProcDataImpl {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
           attrMap.get(key)(tx.peer).foreach { a =>
-            a.play(timeRef = timeRef, target = ???, numChannels = numChannels)
+            val target = AuralAttribute.Target[S](nr, key, Bus.audio(server, numChannels))
+            a.play(timeRef = timeRef, target = target)
           }
 
         case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming

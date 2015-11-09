@@ -100,7 +100,7 @@ object BufferPrepare {
       buf
     }
 
-    def install(b: SynthBuilder[S])(implicit tx: S#Tx): Unit = {
+    def install(b: SynthBuilder)(implicit tx: S#Tx): Unit = {
       val ctlName = graph.Buffer.controlName(key)
       b.setMap += ctlName -> buf.id
       b.dependencies ::= buf

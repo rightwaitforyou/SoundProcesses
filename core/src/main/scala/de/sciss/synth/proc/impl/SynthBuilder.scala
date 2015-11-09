@@ -13,10 +13,9 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{Server, NodeRef, Node, AuralNode, Txn, AudioBus, Resource, DynamicUser, Synth, Sys}
-import de.sciss.synth.{addToHead, ControlSet}
-import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
+import de.sciss.lucre.synth.{AudioBus, AuralNode, DynamicUser, Node, NodeRef, Resource, Server, Synth, Sys, Txn}
+import de.sciss.synth.proc.{Proc, TimeRef}
+import de.sciss.synth.{ControlSet, addToHead}
 
 /** An object used in the last phase of playing a process. It has
   * an instantiated synth and allows the addition of controls, buses, users
@@ -24,10 +23,10 @@ import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
   *
   * @see  [[AuralProcImpl]]
   */
-final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val timeRef: TimeRef)
-  extends NodeDependencyBuilder[S] {
+final class SynthBuilder(synth: Synth)
+  extends NodeRef.Full {
 
-  override def toString = s"SynthBuilder($obj, $synth, $timeRef)"
+  override def toString = s"SynthBuilder($synth)"
 
   val setMap        = Vector.newBuilder[ControlSet]
 
@@ -45,6 +44,8 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
 
   private var attrMap = Map.empty[String, (List[DynamicUser], List[Resource])]
 
+  private[this] var finished = false
+
   /** finishes building the `AuralNode`. Does not yet add the
     * users which is done through `finish2`, the reason being
     * that the caller may want to store the `AuralNode` as its
@@ -52,6 +53,9 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
     * Not pretty...
     */
   def finish1()(implicit tx: Txn): AuralNode = {
+    require (!finished)
+    finished = true
+
     // XXX TODO
     val server  = synth.server
     val group   = server.defaultGroup
@@ -117,41 +121,3 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
 final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc[S]) {
   var resources = List.empty[AsyncResource[S]]
 }
-
-//final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], node0: Node, key: String, nodeRef: NodeRef.Full,
-//                                      val timeRef: TimeRef)
-//  extends NodeDependencyBuilder[S] {
-//
-////  private var setMap          = Vector.empty[ControlSet]
-////
-////  private var keyedUsers      = List.empty[DynamicUser]
-////  private var keyedResources  = List.empty[Resource   ]
-////
-////  def addControl(pair: ControlSet): Unit = setMap :+= pair
-////
-////  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
-////  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
-//
-//  def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ...
-//  def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ...
-//
-//  def addResource   (resource: Resource)(implicit tx: Txn): Unit = ...
-//  def removeResource(resource: Resource)(implicit tx: Txn): Unit = ...
-//
-//  def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ...
-//
-//  def dispose()(implicit tx: Txn): Unit = ...
-//
-//  def node(implicit tx: Txn): Node = node0
-//
-//  def server: Server = node0.server
-//
-//  def finish()(implicit tx: Txn): Unit = {
-//    ...
-////    if (setMap.nonEmpty) node.set(setMap: _*)
-////    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-////      ... // nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
-////      keyedUsers.foreach(_.add())
-////    }
-//  }
-//}

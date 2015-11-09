@@ -41,7 +41,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
       this
     }
 
-    def add   ()(implicit tx: Txn): Unit = users.foreach(_.add   ())
+    def add()(implicit tx: Txn): Unit = users.foreach(_.add())
 
     def remove()(implicit tx: Txn): Unit = {
       if (resources.nonEmpty) resources.foreach(target.removeResource)

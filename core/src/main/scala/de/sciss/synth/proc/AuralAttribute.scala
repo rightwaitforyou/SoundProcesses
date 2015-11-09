@@ -39,7 +39,8 @@ object AuralAttribute {
   // ---- Target ----
 
   object Target {
-    def apply[S <: Sys[S]](): Target[S] = ??? // new impl.AuralAttributeTargetImpl[S]
+    def apply[S <: SSys[S]](nodeRef: NodeRef.Full, key: String, targetBus: AudioBus): Target[S] =
+      new impl.AuralAttributeTargetImpl[S](nodeRef, key, targetBus)
   }
   trait Target[S <: Sys[S]] {
     def put   (source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
@@ -88,7 +89,7 @@ trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
   def preferredNumChannels(implicit tx: S#Tx): Int
 
   def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  def play   (timeRef: TimeRef, target: AuralAttribute.Target[S], numChannels: Int)(implicit tx: S#Tx): Unit
+  def play   (timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Unit
 
   // def stop   ()(implicit tx: S#Tx): Unit
 }

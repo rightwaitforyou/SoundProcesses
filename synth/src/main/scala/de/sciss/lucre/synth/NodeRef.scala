@@ -13,6 +13,7 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.impl.{NodeRefImpl => Impl}
 import de.sciss.synth.ControlSet
@@ -21,6 +22,11 @@ import de.sciss.topology.Topology
 object NodeRef {
   // def apply(n: Node): NodeRef = Impl(n)
   def Group(name: String, in0: Full)(implicit tx: Txn): Group = Impl.Group(name, in0)
+
+  object Var {
+    def apply(init: NodeRef.Full): Var = Impl.Var(init)
+  }
+  trait Var extends NodeRef.Full with stm.Source[Txn, NodeRef.Full] with stm.Sink[Txn, NodeRef.Full]
 
   trait Full extends NodeRef with Disposable[Txn] {
 //    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit

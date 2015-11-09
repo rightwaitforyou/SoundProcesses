@@ -336,13 +336,14 @@ object AuralProcImpl {
       val nameHint      = p.attr.$[StringObj](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
-      val builder       = new SynthBuilder(p, synth, timeRef)
+      val builder       = new SynthBuilder(synth)
 
       // "consume" prepared state
       playingRef.swap(PlayingNone) match {
-        case prep: PlayingPrepare => prep.resources.foreach { resource =>
-          resource.install(builder)
-        }
+        case prep: PlayingPrepare =>
+          prep.resources.foreach { resource =>
+            resource.install(builder)
+          }
         case _ =>
       }
 
@@ -355,8 +356,9 @@ object AuralProcImpl {
         case _ => // Double.PositiveInfinity
       }
 
+      val nodeRefVar = NodeRef.Var(builder)
       ugen.acceptedInputs.foreach { case (key, (_, value)) =>
-        if (!value.async) buildSyncInput(builder, timeRef, key, value)
+        if (!value.async) buildSyncInput(nodeRefVar, timeRef, key, value)
       }
 
       // ---- handle output buses, and establish missing links to sinks ----
