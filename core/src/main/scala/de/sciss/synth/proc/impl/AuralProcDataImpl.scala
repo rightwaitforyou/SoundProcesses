@@ -460,12 +460,12 @@ object AuralProcDataImpl {
       * synth-graph, a different generic exception must be thrown to avoid
       * an infinite loop.
       */
-    def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGB.Value)
+    def buildAttrInput(nr: NodeRef.Full, timeRef: TimeRef, key: String, value: UGB.Value)
                       (implicit tx: S#Tx): Unit = {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
           attrMap.get(key)(tx.peer).foreach { a =>
-            a.play(timeRef = b.timeRef, target = ???, numChannels = numChannels)
+            a.play(timeRef = timeRef, target = ???, numChannels = numChannels)
           }
 
         case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
@@ -483,7 +483,7 @@ object AuralProcDataImpl {
               val bestSzLo  = bestSzHi >> 1
               if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
             }
-            val (rb, gain) = b.obj.attr.get(key).fold[(Buffer, Float)] {
+            val (rb, gain) = procCached().attr.get(key).fold[(Buffer, Float)] {
               // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
               // So instead of aborting when the attribute is not set, fall back to zero
               val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
@@ -511,22 +511,22 @@ object AuralProcDataImpl {
                   )
                 } else {
                   val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
-                  val trig = new StreamBuffer(key = key, idx = idx, synth = b.node, buf = __buf, path = path,
+                  val trig = new StreamBuffer(key = key, idx = idx, synth = nr.node, buf = __buf, path = path,
                     fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
                     resetFrame = offset)
-                  b.addUser(trig)
+                  nr.addUser(trig)
                   __buf
                 }
                 (_buf, _gain.toFloat)
 
               case a => sys.error(s"Cannot use attribute $a as an audio stream")
             }
-            b.addControl(ctlName -> Seq[Float](rb.id, gain): ControlSet)
-            b.addResource(rb)
+            nr.addControl(ctlName -> Seq[Float](rb.id, gain): ControlSet)
+            nr.addResource(rb)
           }
 
         case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
-          val rb = b.obj.attr.get(key).fold[Buffer] {
+          val rb = procCached().attr.get(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for buffer content")
           } {
             case a: Grapheme.Expr.Audio[S] =>
@@ -547,15 +547,15 @@ object AuralProcDataImpl {
             case a => sys.error(s"Cannot use attribute $a as a buffer content")
           }
           val ctlName    = graph.Buffer.controlName(key)
-          b.addControl(ctlName -> rb.id)
-          b.addResource(rb)
+          nr.addControl(ctlName -> rb.id)
+          nr.addResource(rb)
 
         case UGB.Input.Action.Value =>   // ----------------------- action
-          val resp = new ActionResponder(objH = tx.newHandle(b.obj), key = key, synth = b.node)
-          b.addUser(resp)
+          val resp = new ActionResponder(objH = obj /* tx.newHandle(nr.obj) */, key = key, synth = nr.node)
+          nr.addUser(resp)
 
         case UGB.Input.DiskOut.Value(numCh) =>
-          val rb = b.obj.attr.get(key).fold[Buffer] {
+          val rb = procCached().attr.get(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for disk-out artifact")
           } {
             case a: Artifact[S] =>
@@ -569,8 +569,8 @@ object AuralProcDataImpl {
             case a => sys.error(s"Cannot use attribute $a as an artifact")
           }
           val ctlName    = graph.DiskOut.controlName(key)
-          b.addControl(ctlName -> rb.id)
-          b.addResource(rb)
+          nr.addControl(ctlName -> rb.id)
+          nr.addResource(rb)
 
         case _ =>
           throw new IllegalStateException(s"Unsupported input attribute request $value")

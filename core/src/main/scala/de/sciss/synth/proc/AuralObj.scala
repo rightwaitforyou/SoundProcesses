@@ -136,7 +136,7 @@ object AuralObj {
     //      */
     //    def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet
 
-    def buildAttrInput(b: NodeDependencyBuilder[S], key: String, value: UGenGraphBuilder.Value)
+    def buildAttrInput(nr: NodeRef.Full, timeRef: TimeRef, key: String, value: UGenGraphBuilder.Value)
                       (implicit tx: S#Tx): Unit
 
 // SCAN

@@ -42,9 +42,8 @@ object AuralAttribute {
     def apply[S <: Sys[S]](): Target[S] = ??? // new impl.AuralAttributeTargetImpl[S]
   }
   trait Target[S <: Sys[S]] {
-    def put(source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
-
-    def remove(source: AuralAttribute[S])(implicit tx: S#Tx): Unit
+    def put   (source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
+    def remove(source: AuralAttribute[S]              )(implicit tx: S#Tx): Unit
   }
 
   // ---- Value ----

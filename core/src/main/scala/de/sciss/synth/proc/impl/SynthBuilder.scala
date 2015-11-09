@@ -118,40 +118,40 @@ final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc[S]) {
   var resources = List.empty[AsyncResource[S]]
 }
 
-final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], node0: Node, key: String, nodeRef: NodeRef.Full,
-                                      val timeRef: TimeRef)
-  extends NodeDependencyBuilder[S] {
-
-//  private var setMap          = Vector.empty[ControlSet]
+//final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], node0: Node, key: String, nodeRef: NodeRef.Full,
+//                                      val timeRef: TimeRef)
+//  extends NodeDependencyBuilder[S] {
 //
-//  private var keyedUsers      = List.empty[DynamicUser]
-//  private var keyedResources  = List.empty[Resource   ]
+////  private var setMap          = Vector.empty[ControlSet]
+////
+////  private var keyedUsers      = List.empty[DynamicUser]
+////  private var keyedResources  = List.empty[Resource   ]
+////
+////  def addControl(pair: ControlSet): Unit = setMap :+= pair
+////
+////  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
+////  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
 //
-//  def addControl(pair: ControlSet): Unit = setMap :+= pair
+//  def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ...
+//  def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ...
 //
-//  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
-//  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
-
-  def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
-  def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
-
-  def addResource   (resource: Resource)(implicit tx: Txn): Unit = ???
-  def removeResource(resource: Resource)(implicit tx: Txn): Unit = ???
-
-  def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ???
-
-  def dispose()(implicit tx: Txn): Unit = ???
-
-  def node(implicit tx: Txn): Node = node0
-
-  def server: Server = node0.server
-
-  def finish()(implicit tx: Txn): Unit = {
-    ???
-//    if (setMap.nonEmpty) node.set(setMap: _*)
-//    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-//      ??? // nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
-//      keyedUsers.foreach(_.add())
-//    }
-  }
-}
+//  def addResource   (resource: Resource)(implicit tx: Txn): Unit = ...
+//  def removeResource(resource: Resource)(implicit tx: Txn): Unit = ...
+//
+//  def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ...
+//
+//  def dispose()(implicit tx: Txn): Unit = ...
+//
+//  def node(implicit tx: Txn): Node = node0
+//
+//  def server: Server = node0.server
+//
+//  def finish()(implicit tx: Txn): Unit = {
+//    ...
+////    if (setMap.nonEmpty) node.set(setMap: _*)
+////    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
+////      ... // nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
+////      keyedUsers.foreach(_.add())
+////    }
+//  }
+//}

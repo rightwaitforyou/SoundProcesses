@@ -18,7 +18,7 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.StringObj
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AudioBus, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
+import de.sciss.lucre.synth.{NodeRef, AudioBus, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, ProcData, Stopped, TargetPlaying, TargetPrepared, TargetState, TargetStop}
 import de.sciss.synth.proc.Timeline.SampleRate
@@ -159,10 +159,10 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if falling back to the super-method. */
-    protected def buildSyncInput(b: SynthBuilder[S], keyW: UGB.Key, value: UGB.Value)
+    protected def buildSyncInput(nr: NodeRef.Full, timeRef: TimeRef, keyW: UGB.Key, value: UGB.Value)
                                 (implicit tx: S#Tx): Unit = keyW match {
       case UGB.AttributeKey(key) =>
-        _data.buildAttrInput(b, key, value)
+        _data.buildAttrInput(nr, timeRef, key, value)
 //        b.storeKey(key)
 
 // SCAN
@@ -356,7 +356,7 @@ object AuralProcImpl {
       }
 
       ugen.acceptedInputs.foreach { case (key, (_, value)) =>
-        if (!value.async) buildSyncInput(builder, key, value)
+        if (!value.async) buildSyncInput(builder, timeRef, key, value)
       }
 
       // ---- handle output buses, and establish missing links to sinks ----
