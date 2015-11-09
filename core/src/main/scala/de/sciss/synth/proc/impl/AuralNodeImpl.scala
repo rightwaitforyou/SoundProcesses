@@ -16,15 +16,14 @@ package de.sciss.synth.proc.impl
 import de.sciss.lucre.stm.TxnLike
 import de.sciss.lucre.synth.{DynamicUser, Group, Node, Resource, Synth, Txn}
 import de.sciss.synth.proc.{TimeRef, AuralNode}
-import de.sciss.synth.{ControlSet, addBefore}
+import de.sciss.synth.{addToHead, ControlSet, addBefore}
 
 import scala.concurrent.stm.Ref
 
 object AuralNodeImpl {
-  def apply(timeRef: TimeRef, wallClock: Long, synth: Synth, users: List[DynamicUser], resources: List[Resource])
-           (implicit tx: Txn): AuralNode = {
+  def apply(timeRef: TimeRef, wallClock: Long, synth: Synth)(implicit tx: Txn): AuralNode.Builder = {
     // XXX TODO -- probably we can throw `users` and `resources` together as disposables
-    val res = new Impl(timeRef, wallClock, synth, users = Ref(users), resources = Ref(resources))
+    val res = new Impl(timeRef, wallClock, synth)
     synth.server.addVertex(res)
     res
   }
@@ -40,13 +39,18 @@ object AuralNodeImpl {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl(val timeRef: TimeRef, wallClock: Long, synth: Synth,
-                           users: Ref[List[DynamicUser]], resources: Ref[List[Resource]])
-    extends AuralNode {
+  private final class Impl(val timeRef: TimeRef, wallClock: Long, synth: Synth)
+    extends AuralNode.Builder {
 
     import TxnLike.peer
 
-    private[this] val groupsRef = Ref[Option[AllGroups]](None)
+    private[this] val users     = Ref(List.empty[DynamicUser])
+    private[this] val resources = Ref(List.empty[Resource   ])
+
+    private[this] val groupsRef = Ref(Option.empty[AllGroups])
+
+    // we only add to `setMap` before `play`, thus does not need to be transactional
+    private[this] var setMap    = List.empty[ControlSet]
 
     override def toString = s"AuralProc($synth)"
 
@@ -55,6 +59,13 @@ object AuralNodeImpl {
     def groupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).map(_.main)
 
     def node(implicit tx: Txn): Node = groupOption.getOrElse(synth)
+
+    def play()(implicit tx: Txn): Unit = {
+      // `play` calls `requireOffline`, so we are safe against accidental repeated calls
+      val target = server.defaultGroup
+      synth.play(target = target, addAction = addToHead, args = setMap.reverse, dependencies = resources().reverse)
+      users().reverse.foreach(_.add())
+    }
 
     def shiftTo(newWallClock: Long): TimeRef = {
       val delta = newWallClock - wallClock
@@ -82,7 +93,8 @@ object AuralNodeImpl {
         Some(res)
       }
 
-    @inline private[this] def preGroupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).flatMap(_.pre)
+    @inline private[this] def preGroupOption(implicit tx: Txn): Option[Group] =
+      groupsRef.get(tx.peer).flatMap(_.pre)
 
     def preGroup()(implicit tx: Txn): Group =
       preGroupOption.getOrElse {
@@ -111,20 +123,28 @@ object AuralNodeImpl {
 
     def dispose()(implicit tx: Txn): Unit = {
       node.free()
-      users    .swap(Nil).foreach(_.dispose())
-      resources.swap(Nil).foreach(_.dispose())
+      users    .swap(Nil).reverse.foreach(_.dispose())
+      resources.swap(Nil).reverse.foreach(_.dispose())
       server.removeVertex(this)
     }
 
-    def addControl(pair: ControlSet)(implicit tx: Txn): Unit = node.set(pair)
-
-    def addUser(user: DynamicUser)(implicit tx: Txn): Unit = {
-      users.transform(_ :+ user)
-      user.add()
+    def addControl(pair: ControlSet)(implicit tx: Txn): Unit = {
+      if (synth.isOnline) node.set(pair)
+      else setMap ::= pair
     }
 
-    def removeUser    (user: DynamicUser )(implicit tx: Txn): Unit = users    .transform(_.filterNot(_ == user))
-    def addResource   (resource: Resource)(implicit tx: Txn): Unit = resources.transform(_ :+ resource)
-    def removeResource(resource: Resource)(implicit tx: Txn): Unit = resources.transform(_.filterNot(_ == resource))
+    def addUser(user: DynamicUser)(implicit tx: Txn): Unit = {
+      users.transform(user :: _)
+      if (synth.isOnline) user.add()
+    }
+
+    def removeUser(user: DynamicUser )(implicit tx: Txn): Unit =
+      users.transform(_.filterNot(_ == user))
+
+    def addResource(resource: Resource)(implicit tx: Txn): Unit =
+      resources.transform(resource :: _)
+
+    def removeResource(resource: Resource)(implicit tx: Txn): Unit =
+      resources.transform(_.filterNot(_ == resource))
   }
 }

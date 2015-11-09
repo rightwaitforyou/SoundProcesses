@@ -17,9 +17,12 @@ import de.sciss.lucre.synth.{DynamicUser, Group, NodeRef, Resource, Server, Synt
 import impl.{AuralNodeImpl => Impl}
 
 object AuralNode {
-  def apply(timeRef: TimeRef, wallClock: Long, synth: Synth, users: List[DynamicUser], resources: List[Resource])
-           (implicit tx: Txn): AuralNode =
-    Impl(timeRef, wallClock, synth, users = users, resources = resources)
+  def apply(timeRef: TimeRef, wallClock: Long, synth: Synth)(implicit tx: Txn): Builder =
+    Impl(timeRef, wallClock, synth)
+
+  trait Builder extends AuralNode {
+    def play()(implicit tx: Txn): Unit
+  }
 }
 
 trait AuralNode extends NodeRef.Full {

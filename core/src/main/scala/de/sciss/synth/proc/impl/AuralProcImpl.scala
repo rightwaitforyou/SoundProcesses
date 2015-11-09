@@ -336,7 +336,7 @@ object AuralProcImpl {
       val nameHint      = p.attr.$[StringObj](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
-      val builder       = new SynthBuilder(synth)
+      val builder       = AuralNode(timeRef, sched.time, synth)
 
       // "consume" prepared state
       playingRef.swap(PlayingNone) match {
@@ -356,9 +356,9 @@ object AuralProcImpl {
         case _ => // Double.PositiveInfinity
       }
 
-      val nodeRefVar = NodeRef.Var(builder)
+      // val nodeRefVar = NodeRef.Var(builder)
       ugen.acceptedInputs.foreach { case (key, (_, value)) =>
-        if (!value.async) buildSyncInput(nodeRefVar, timeRef, key, value)
+        if (!value.async) buildSyncInput(builder /* nodeRefVar */, timeRef, key, value)
       }
 
       // ---- handle output buses, and establish missing links to sinks ----
@@ -371,13 +371,14 @@ object AuralProcImpl {
         // res
       }
 
-      val node      = builder.finish1(timeRef, sched.time) // .finish()
-      nodeRefVar()  = node
-      val old       = playingRef.swap(new PlayingNode(node))(tx.peer)
+//      val node      = builder.finish1()
+//      nodeRefVar()  = node
+      val old       = playingRef.swap(new PlayingNode(builder))(tx.peer)
       old.dispose()
-      _data.addInstanceNode(node)
-      builder.finish2()
-      logA(s"launched $p -> $node (${hashCode.toHexString})")
+      builder.play()
+      _data.addInstanceNode(builder)
+      // builder.finish2()
+      logA(s"launched $p -> $builder (${hashCode.toHexString})")
       state = Playing
       // setPlayingNode(node)
     }

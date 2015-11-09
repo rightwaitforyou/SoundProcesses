@@ -23,7 +23,8 @@ final case class GroupImpl(server: Server, peer: SGroup)(override protected val 
 
   def play(target: Node, addAction: AddAction)(implicit tx: Txn): Unit = {
     requireOffline()
-    require(target.server == server && target.isOnline, s"Target $target must be running and using the same server")
+    require(target.isOnline        , s"Target $target must be running")
+    require(target.server == server, s"Target $target must be using the same server")
 
     tx.addMessage(this, peer.newMsg(target.peer, addAction), dependencies = target :: Nil)
     setOnline(value = true)
