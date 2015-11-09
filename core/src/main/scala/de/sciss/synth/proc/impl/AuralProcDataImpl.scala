@@ -39,6 +39,8 @@ object AuralProcDataImpl {
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGB.Context[S] {
 
+    import TxnLike.peer
+
     import context.{scheduler => sched, server}
 
     private[this] val stateRef      = Ref.make[UGB.State[S]]()
@@ -57,15 +59,15 @@ object AuralProcDataImpl {
 
     private[this] var _obj: stm.Source[S#Tx, Proc[S]] = _
 
-    final def obj = _obj
+    final def obj: stm.Source[S#Tx, Proc[S]] = _obj
 
     override def toString = s"AuralObj.ProcData@${hashCode().toHexString}"
 
     /** Sub-classes may override this if invoking the super-method. */
     def init(proc: Proc[S])(implicit tx: S#Tx): this.type = {
-      _obj = tx.newHandle(proc)
-      val ugenInit = UGB.init(proc)
-      stateRef.set(ugenInit)(tx.peer)
+      _obj          = tx.newHandle(proc)
+      val ugenInit  = UGB.init(proc)
+      stateRef()    = ugenInit
 
       observers ::= proc.changed.react { implicit tx => upd =>
         upd.changes.foreach {
@@ -84,7 +86,7 @@ object AuralProcDataImpl {
       this
     }
 
-    final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = nodeRef.get(tx.peer)
+    final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = nodeRef()
 
     private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"playScans ${procCached()}")
@@ -92,7 +94,6 @@ object AuralProcDataImpl {
 
     private def newSynthGraph()(implicit tx: S#Tx): Unit = {
       logA(s"newSynthGraph ${procCached()}")
-      implicit val itx = tx.peer
 
       // stop and dispose all
       procViews.foreach { view =>
@@ -110,7 +111,6 @@ object AuralProcDataImpl {
 
     private def outputAdded(output: Output[S])(implicit tx: S#Tx): Unit = {
       logA(s"outputAdded  to   ${procCached()} (${output.key})")
-      implicit val itx = tx.peer
       val key = output.key
       outputBuses.get(key).foreach { bus =>
         mkAuralOutput(output, bus)
@@ -140,8 +140,8 @@ object AuralProcDataImpl {
       logA(s"AttrAdded   to   ${procCached()} ($key) - used? $used")
       if (!used) return
 
-      implicit val itx = tx.peer
       // mkAttrObserver1(key, value)
+      val view    = attrMap.getOrElseUpdate(key, AuralAttribute(value))
       st match {
         case st0: Complete[S] =>
           acceptedOpt match {
@@ -149,7 +149,6 @@ object AuralProcDataImpl {
               nodeRef().foreach { group =>
                 group.instanceNodes.foreach { nr =>
                   val target  = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
-                  val view    = attrMap.getOrElseUpdate(key, AuralAttribute(value))
                   val trNew   = nr.shiftTo(sched.time)
                   view.play(timeRef = trNew, target = target)
                 }
@@ -180,14 +179,13 @@ object AuralProcDataImpl {
 
     private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
-      attrMap.remove(key)(tx.peer).foreach(_.dispose())
+      attrMap.remove(key).foreach(_.dispose())
     }
 
     // ----
 
     // creates an `AuralOutput` and registers it with the aural context.
     private def addUsedOutput(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
-      implicit val itx = tx.peer
       val outputs = procCached().outputs
       val bus     = Bus.audio(server, numChannels = numChannels) // mkBus(key, numChannels)
       outputBuses.put(key, bus).foreach(_ => throw new IllegalStateException(s"Output bus for $key already defined"))
@@ -198,7 +196,6 @@ object AuralProcDataImpl {
 
     final def addInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
       logA(s"addInstanceNode ${procCached()} : $n")
-      implicit val itx = tx.peer
       nodeRef().fold {
         val groupImpl = NodeGroupRef(name = s"Group-NodeRef ${procCached()}", in0 = n)
         nodeRef() = Some(groupImpl)
@@ -212,15 +209,14 @@ object AuralProcDataImpl {
 
     final def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
       logA(s"removeInstanceNode ${procCached()} : $n")
-      implicit val itx = tx.peer
       val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
       if (groupImpl.removeInstanceNode(n)) {
         disposeAttrMap()
       }
     }
 
-    final def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.add   (view)(tx.peer)
-    final def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.remove(view)(tx.peer)
+    final def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.add   (view)
+    final def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit = procViews.remove(view)
 
     /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
@@ -234,18 +230,16 @@ object AuralProcDataImpl {
     }
 
     private def disposeAttrMap()(implicit tx: S#Tx): Unit = {
-      implicit val itx = tx.peer
       attrMap .foreach(_._2.dispose())
       attrMap .clear()
     }
 
     private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
-      implicit val itx = tx.peer
       nodeRef  .swap(None).foreach(_.dispose())
       outputBuses.clear()
     }
 
-    final def state(implicit tx: S#Tx): UGB.State[S] = stateRef.get(tx.peer)
+    final def state(implicit tx: S#Tx): UGB.State[S] = stateRef()
 
     /* If the ugen graph is incomplete, tries to (incrementally)
      * build it. Calls `buildAdvanced` with the old and new
@@ -255,8 +249,8 @@ object AuralProcDataImpl {
       state match {
         case s0: Incomplete[S] =>
           logA(s"try build ${procCached()} - ${procCached().name}")
-          val s1 = s0.retry(this)
-          stateRef.set(s1)(tx.peer)
+          val s1      = s0.retry(this)
+          stateRef()  = s1
           buildAdvanced(before = s0, now = s1)
 
         case s0: Complete[S] => // nada
@@ -273,7 +267,6 @@ object AuralProcDataImpl {
      * it calls `play` on the proc-views whose target-state is to play.
      */
     private def buildAdvanced(before: UGB.State[S], now: UGB.State[S])(implicit tx: S#Tx): Unit = {
-      implicit val itx = tx.peer
 
       // handle newly rejected inputs
       if (now.rejectedInputs.isEmpty) {
@@ -323,7 +316,6 @@ object AuralProcDataImpl {
         val procObj   = procCached()
         val valueOpt  = procObj.attr.get(i.name)
         val found     = valueOpt.fold(-1) { value =>
-          implicit val itx = tx.peer
           val view = attrMap.getOrElseUpdate(i.name, AuralAttribute(value))
           view.preferredNumChannels
         }
@@ -374,10 +366,9 @@ object AuralProcDataImpl {
     }
 
     final def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus] =
-      outputBuses.get(key)(tx.peer)
+      outputBuses.get(key)
 
     final def procCached()(implicit tx: S#Tx): Proc[S] = {
-      implicit val itx = tx.peer
       if (procLoc.isInitialized) procLoc.get
       else {
         val proc = obj()
@@ -415,7 +406,7 @@ object AuralProcDataImpl {
                       (implicit tx: S#Tx): Unit = {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
-          attrMap.get(key)(tx.peer).foreach { a =>
+          attrMap.get(key).foreach { a =>
             val target = AuralAttribute.Target(nr, key, Bus.audio(server, numChannels))
             a.play(timeRef = timeRef, target = target)
           }

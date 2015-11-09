@@ -71,13 +71,15 @@ object UGenGraphBuilderImpl {
       val acceptedInputs: Map[UGenGraphBuilder.Key, (Input, Input#Value)]
    )
     extends Complete[S] {
+
+    override def toString = s"UGenGraphBuilder.Complete@${hashCode.toHexString}"
   }
 
   private final class Impl[S <: Sys[S]](context: Context[S], in: IncompleteImpl[S], val tx: S#Tx)
     extends BasicUGenGraphBuilder with UGenGraphBuilder with Incomplete[S] {
     builder =>
 
-    override def toString = s"proc.UGenGraph.Builder@${hashCode.toHexString}"
+    override def toString = s"UGenGraphBuilder.Incomplete@${hashCode.toHexString}"
 
     private var remaining       = in.remaining
     private var controlProxies  = in.controlProxies
