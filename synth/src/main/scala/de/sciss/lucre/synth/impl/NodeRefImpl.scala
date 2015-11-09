@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth
-import de.sciss.synth.addBefore
+import de.sciss.synth.{ControlSet, addBefore}
 
 import scala.concurrent.stm.Ref
 
@@ -80,11 +80,26 @@ object NodeRefImpl {
       }
     }
 
-    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit =
-      instancesRef.get(tx.peer).foreach(_.addAttrResources(key, values))
+//    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit =
+//      instancesRef.get(tx.peer).foreach(_.addAttrResources(key, values))
+//
+//    def removeAttrResources(key: String)(implicit tx: Txn): Unit =
+//      instancesRef.get(tx.peer).foreach(_.removeAttrResources(key))
 
-    def removeAttrResources(key: String)(implicit tx: Txn): Unit =
-      instancesRef.get(tx.peer).foreach(_.removeAttrResources(key))
+    def addUser(user: DynamicUser)(implicit tx: Txn): Unit =
+      instancesRef.get(tx.peer).foreach(_.addUser(user))
+
+    def removeUser(user: DynamicUser)(implicit tx: Txn): Unit =
+      instancesRef.get(tx.peer).foreach(_.removeUser(user))
+
+    def addResource(resource: Resource)(implicit tx: Txn): Unit =
+      instancesRef.get(tx.peer).foreach(_.addResource(resource))
+
+//    def removeResource(resource: Resource)(implicit tx: Txn): Unit =
+//      instancesRef.get(tx.peer).foreach(_.removeResource(resource))
+
+    def addControl(pair: ControlSet)(implicit tx: Txn): Unit =
+      instancesRef.get(tx.peer).foreach(_.addControl(pair))
 
     def dispose()(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer

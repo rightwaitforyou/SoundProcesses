@@ -15,6 +15,7 @@ package de.sciss.lucre.synth
 
 import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.impl.{NodeRefImpl => Impl}
+import de.sciss.synth.ControlSet
 import de.sciss.topology.Topology
 
 object NodeRef {
@@ -22,10 +23,18 @@ object NodeRef {
   def Group(name: String, in0: Full)(implicit tx: Txn): Group = Impl.Group(name, in0)
 
   trait Full extends NodeRef with Disposable[Txn] {
-    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit
+//    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit
+//
+//    /** Removes and frees resources associated with the attribute specified by `key` */
+//    def removeAttrResources(key: String)(implicit tx: Txn): Unit
 
-    /** Removes and frees resources associated with the attribute specified by `key` */
-    def removeAttrResources(key: String)(implicit tx: Txn): Unit
+    def addUser       (user: DynamicUser )(implicit tx: Txn): Unit
+    def removeUser    (user: DynamicUser )(implicit tx: Txn): Unit
+
+    def addResource   (resource: Resource)(implicit tx: Txn): Unit
+    // def removeResource(resource: Resource)(implicit tx: Txn): Unit
+
+    def addControl(pair: ControlSet)(implicit tx: Txn): Unit
   }
 
   trait Group extends Full with Disposable[Txn] {

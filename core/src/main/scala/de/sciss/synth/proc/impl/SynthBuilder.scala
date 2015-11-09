@@ -13,7 +13,8 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.synth.{NodeRef, Node, AuralNode, Txn, AudioBus, Resource, DynamicUser, Synth, Sys}
+import de.sciss.lucre.stm.Disposable
+import de.sciss.lucre.synth.{Server, NodeRef, Node, AuralNode, Txn, AudioBus, Resource, DynamicUser, Synth, Sys}
 import de.sciss.synth.{addToHead, ControlSet}
 import de.sciss.synth.proc.{NodeDependencyBuilder, TimeRef, Proc}
 
@@ -85,7 +86,7 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
 
   // ---- node-dependency-builder ----
 
-  def node = synth
+  // def node = synth
 
   def addControl(pair: ControlSet): Unit = setMap += pair
 
@@ -94,6 +95,18 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
 
   def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
   def addResource(resource: Resource   ): Unit = keyedResources ::= resource
+
+  def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
+  def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
+
+  def addResource(resource: Resource)(implicit tx: Txn): Unit = ???
+  def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ???
+
+  def dispose()(implicit tx: Txn): Unit = ???
+
+  def node(implicit tx: Txn): Node = synth
+
+  def server: Server = synth.server
 }
 
 /** An object used in the preparatory phase of playing a process. It allows
@@ -103,7 +116,7 @@ final class AsyncProcBuilder[S <: Sys[S]](val obj: Proc[S]) {
   var resources = List.empty[AsyncResource[S]]
 }
 
-final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], val node: Node, key: String, nodeRef: NodeRef.Full,
+final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], node0: Node, key: String, nodeRef: NodeRef.Full,
                                       val timeRef: TimeRef)
   extends NodeDependencyBuilder[S] {
 
@@ -117,10 +130,23 @@ final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], val node: Node, key: Str
   def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
   def addResource(resource: Resource   ): Unit = keyedResources ::= resource
 
+
+  def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
+  def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
+
+  def addResource(resource: Resource)(implicit tx: Txn): Unit = ???
+  def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ???
+
+  def dispose()(implicit tx: Txn): Unit = ???
+
+  def node(implicit tx: Txn): Node = node0
+
+  def server: Server = node0.server
+
   def finish()(implicit tx: Txn): Unit = {
     if (setMap.nonEmpty) node.set(setMap: _*)
     if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-      nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
+      ??? // nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
       keyedUsers.foreach(_.add())
     }
   }

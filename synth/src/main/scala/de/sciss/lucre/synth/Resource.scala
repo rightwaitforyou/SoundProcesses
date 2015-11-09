@@ -32,7 +32,7 @@ object Resource {
   //    def resource(implicit tx: Txn): Resource
   //  }
 
-  def User() = ()
+  // def User() = ()
 
   /** Forwards the resource API to a peer resource */
   trait Proxy extends Resource {

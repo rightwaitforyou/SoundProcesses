@@ -58,17 +58,24 @@ object AuralAttribute {
     * that needs to be set on the target node.
     */
   sealed trait Scalar extends Value {
-    def toControl(key: String): ControlSet
+    def toControl(key: String, numChannels: Int): ControlSet
     def values: Vec[Float]
     final def isScalar = true
   }
 
   final case class ScalarValue(value: Float) extends Scalar {
-    def toControl(key: String): ControlSet = ControlSet.Value(key, value)
+    def toControl(key: String, numChannels: Int): ControlSet =
+      if (numChannels == 1) ControlSet.Value (key, value)
+      else                  ControlSet.Vector(key, Vector.fill(numChannels)(value))
+
     def values: Vec[Float] = Vector(value)
   }
   final case class ScalarVector(values: Vec[Float]) extends Scalar {
-    def toControl(key: String): ControlSet = ControlSet.Vector(key, values)
+    def toControl(key: String, numChannels: Int): ControlSet = {
+      val sz = values.size
+      val xs = if (numChannels == sz) values else Vector.tabulate(numChannels)(i => values(i % sz))
+      ControlSet.Vector(key, xs)
+    }
   }
 
   /** Value for which a `Synth` is required that writes its signal to a bus,

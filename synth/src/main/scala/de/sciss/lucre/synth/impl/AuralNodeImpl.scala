@@ -15,7 +15,7 @@ package de.sciss.lucre.synth
 package impl
 
 import de.sciss.lucre.stm.Disposable
-import de.sciss.synth.addBefore
+import de.sciss.synth.{ControlSet, addBefore}
 
 import scala.concurrent.stm.{Ref, TMap}
 
@@ -121,6 +121,14 @@ object AuralNodeImpl {
       attrMap.clear()
       server.removeVertex(this)
     }
+
+    def addControl(pair: ControlSet)(implicit tx: Txn): Unit = node.set(pair)
+
+    def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
+    def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
+
+    def addResource   (resource: Resource)(implicit tx: Txn): Unit = ???
+    // def removeResource(resource: Resource)(implicit tx: Txn): Unit = ...
 
     def getInputBus (key: String): Option[AudioBus] = inputBuses .get(key)
     def getOutputBus(key: String): Option[AudioBus] = outputBuses.get(key)

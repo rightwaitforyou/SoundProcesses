@@ -19,29 +19,29 @@ import de.sciss.synth.ControlSet
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
-trait NodeDependencyBuilder[S <: Sys[S]] {
+trait NodeDependencyBuilder[S <: Sys[S]] extends NodeRef.Full {
   def timeRef: TimeRef
 
   def obj: Obj[S]
 
-  def node: Node
-
-  /** Adds an `n_set` pair to the builder. */
-  def addControl(pair: ControlSet): Unit
-
-  /** Adds a _keyed_ user. This is a user that is
-    * associated with an attribute key. Only if
-    * the attribute is used, will the user become
-    * effective. If this is not desired, the
-    * regular `users ::= _` mechanism should be used.
-    */
-  def addUser(user: DynamicUser): Unit
-
-  /** Adds a _keyed_ resource. This is a resource that is
-    * associated with an attribute key. Only if
-    * the attribute is used, will the resource become
-    * effective. If this is not desired, the
-    * regular `dependencies ::= _` mechanism should be used.
-    */
-  def addResource(resource: Resource): Unit
+//  def node: Node
+//
+//  /** Adds an `n_set` pair to the builder. */
+//  def addControl(pair: ControlSet): Unit
+//
+//  /** Adds a _keyed_ user. This is a user that is
+//    * associated with an attribute key. Only if
+//    * the attribute is used, will the user become
+//    * effective. If this is not desired, the
+//    * regular `users ::= _` mechanism should be used.
+//    */
+//  def addUser(user: DynamicUser): Unit
+//
+//  /** Adds a _keyed_ resource. This is a resource that is
+//    * associated with an attribute key. Only if
+//    * the attribute is used, will the resource become
+//    * effective. If this is not desired, the
+//    * regular `dependencies ::= _` mechanism should be used.
+//    */
+//  def addResource(resource: Resource): Unit
 }
