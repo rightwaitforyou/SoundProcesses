@@ -248,8 +248,10 @@ object AuralAttributeImpl {
       // p
     }
 
-    private[this] def update(p: PlayRef, audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit =
-      audioOutput.data.nodeOption.foreach(update1(p, _, audioOutput.bus))
+    private[this] def update(p: PlayRef, audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
+      val nodeRefOpt = audioOutput.data.nodeOption
+      nodeRefOpt.foreach(update1(p, _, audioOutput.bus))
+    }
 
     private[this] def update1(p: PlayRef, nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit = {
       import p.target

@@ -51,8 +51,8 @@ trait AuralOutput[S <: Sys[S]] extends Disposable[S#Tx] with Observable[S#Tx, Au
   def key : String
   def bus : AudioBus
 
-  def addSink      (view: AuralInput[S])(implicit tx: Txn): Unit
-  def removeSink   (view: AuralInput[S])(implicit tx: Txn): Unit
+//  def addSink      (view: AuralInput[S])(implicit tx: Txn): Unit
+//  def removeSink   (view: AuralInput[S])(implicit tx: Txn): Unit
 
 //  def sinkStopped  (view: AuralInput [S])(implicit tx: S#Tx): Unit
 //  def sinkPlaying  (view: AuralInput [S])(implicit tx: S#Tx): Unit

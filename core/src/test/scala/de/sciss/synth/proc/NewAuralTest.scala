@@ -1063,7 +1063,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       //      val test = de.sciss.lucre.event.Peek.targets(proc2)
       //      println(s"---1, num-children is ${test.size}")
       // reversed steps
-      val scanIn  = addScanIn (proc2, "in" )
+      val scanIn  = addScanIn(proc2, "in" )
       val scanOut = addOutput(proc1, "out")
       scanOut ~> scanIn
     }
