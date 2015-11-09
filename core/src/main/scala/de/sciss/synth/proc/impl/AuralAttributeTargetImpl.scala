@@ -27,35 +27,36 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef, key: String, target
 
   import targetBus.{numChannels, server}
 
-  private[this] def ctlName = graph.Attribute.controlName(key)
+  private def ctlName = graph.Attribute.controlName(key)
 
-  private[this] val map       = TMap.empty[AuralAttribute[S], Connected]
-  private[this] val stateRef  = Ref[State](Empty)
+  private val map       = TMap.empty[AuralAttribute[S], Connected]
+  private val stateRef  = Ref[State](Empty)
 
-  private[this] final class Connected(val value: AuralAttribute.Value,
+  private final class Connected(val value: AuralAttribute.Value,
                                       val users: List[DynamicUser]) extends Disposable[Txn] {
     def dispose()(implicit tx: Txn): Unit = users.foreach(_.dispose())
   }
 
-  private[this] sealed trait State {
+  private sealed trait State {
     def put   (source: AuralAttribute[S], value: AuralAttribute.Value)(implicit tx: S#Tx): State
-    def remove(value: AuralAttribute.Value)(implicit tx: S#Tx): State
+    def remove(source: AuralAttribute[S])(implicit tx: S#Tx): State
   }
 
-  private[this] final class AddRemoveEdge(edge: NodeRef.Edge) extends DynamicUser {
+  private final class AddRemoveEdge(edge: NodeRef.Edge) extends DynamicUser {
     def add   ()(implicit tx: Txn): Unit = server.addEdge   (edge)
     def remove()(implicit tx: Txn): Unit = server.removeEdge(edge)
   }
 
-  private[this] def putSingleScalar(source: AuralAttribute[S], value: AuralAttribute.Scalar)
+  private def putSingleScalar(source: AuralAttribute[S], value: AuralAttribute.Scalar)
                                    (implicit tx: S#Tx): State = {
     implicit val itx = tx.peer
     target.node.set(value.toControl(ctlName))
-    map.put(source, new Connected(value, Nil)).foreach(_.dispose())
-    new SingleScalar(source)
+    val cc = new Connected(value, Nil)
+    map.put(source, cc).foreach(_.dispose())
+    new Single(source, cc)
   }
 
-  private[this] def putSingleStream(source: AuralAttribute[S], value: AuralAttribute.Stream)
+  private def putSingleStream(source: AuralAttribute[S], value: AuralAttribute.Stream)
                                    (implicit tx: S#Tx): State = {
     implicit val itx = tx.peer
     val edge      = NodeRef.Edge(value.source, target)
@@ -63,65 +64,63 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef, key: String, target
     val busUser   = BusNodeSetter.mapper(ctlName, value.bus, target.node)
     addUser(edgeUser)
     addUser(busUser)
-    map.put(source, new Connected(value, edgeUser :: busUser :: Nil)).foreach(_.dispose())
-    new SingleStream(source)
+    val cc        = new Connected(value, edgeUser :: busUser :: Nil)
+    map.put(source, cc).foreach(_.dispose())
+    new Single(source, cc)
   }
 
   // ----
 
-  private[this] object Empty extends State {
+  private object Empty extends State {
     def put(source: AuralAttribute[S], value: AuralAttribute.Value)(implicit tx: S#Tx): State =
       value match {
         case sc: AuralAttribute.Scalar => putSingleScalar(source, sc)
         case sc: AuralAttribute.Stream => putSingleStream(source, sc)
       }
 
-    def remove(value: AuralAttribute.Value)(implicit tx: S#Tx): State = this
+    def remove(source: AuralAttribute[S])(implicit tx: S#Tx): State =
+      throw new NoSuchElementException(source.toString)
   }
 
   // ----
 
-  private[this] final class SingleScalar(aa: AuralAttribute[S]) extends State {
+  private final class Single(aa: AuralAttribute[S], cc: Connected) extends State {
     def put(source: AuralAttribute[S], value: AuralAttribute.Value)(implicit tx: S#Tx): State =
-      if (source == aa)
-        Empty.put(source,value)
-      else
-        value match {
-          case sc: AuralAttribute.Scalar => ???
-          case sc: AuralAttribute.Stream =>
-            implicit val itx = tx.peer
-            map.transform { case (key1, oldConn) =>
-              mkVertex(oldConn.value)
-            }
-            val newConn = mkVertex(sc)
-            ??? // map.put(source)
-
-            ???
-        }
-
-    def remove(value: AuralAttribute.Value)(implicit tx: S#Tx): State = Empty
-  }
-
-  private[this] def addUser(user: DynamicUser)(implicit tx: S#Tx): Unit = ???
-
-  // ----
-
-  private[this] final class SingleStream(aa: AuralAttribute[S]) extends State {
-    def put(source: AuralAttribute[S], value: AuralAttribute.Value)(implicit tx: S#Tx): State =
-      if (source == aa)
+      if (source == aa) {
         Empty.put(source, value)
-      else
-        value match {
-          case sc: AuralAttribute.Scalar => ???
-          case sc: AuralAttribute.Stream => ???
-        }
+      } else {
+        implicit val itx = tx.peer
+        cc.dispose()
+        val c1 = mkVertex(cc.value)
+        val c2 = mkVertex(   value)
+        map.put(aa    , c1)
+        map.put(source, c2)
+        Multiple
+      }
 
-    def remove(value: AuralAttribute.Value)(implicit tx: S#Tx): State = ??? // Empty
+    def remove(source: AuralAttribute[S])(implicit tx: S#Tx): State = {
+      implicit val itx = tx.peer
+      map.remove(source).fold(throw new NoSuchElementException(source.toString))(_.dispose())
+      Empty
+    }
   }
 
   // ----
 
-  private[this] def mkVertex(value: AuralAttribute.Value)(implicit tx: S#Tx): Connected = {
+  private object Multiple extends State {
+    def put(source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State = {
+      implicit val itx = tx.peer
+      val con = mkVertex(value)
+      map.put(source, con).foreach(_.dispose())
+      this
+    }
+
+    def remove(source: AuralAttribute[S])(implicit tx: S#Tx): State = ???
+  }
+  
+  // ----
+
+  private def mkVertex(value: AuralAttribute.Value)(implicit tx: S#Tx): Connected = {
     val users: List[DynamicUser] = value match {
       case sc: AuralAttribute.Scalar =>
         val g = SynthGraph {
@@ -148,79 +147,12 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef, key: String, target
     new Connected(value, users)
   }
 
-  private[this] def addDependency(r: Resource)(implicit tx: S#Tx): Unit = ???
+  private def addUser(user: DynamicUser)(implicit tx: S#Tx): Unit = ???
+  private def addDependency(r: Resource)(implicit tx: S#Tx): Unit = ???
 
-  def put(source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit = {
-    if (map.isEmpty(tx.peer)) putFirst(source, value)
-  }
+  def put(source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit =
+    stateRef.transform(_.put(source, value))(tx.peer)
 
-  private[this] def putFirst(source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit =
-    value match {
-      case sc: AuralAttribute.Scalar =>
-        target.node.set(sc.toControl(ctlName))
-      case AuralAttribute.Stream(sourceNode, sourceBus) =>
-        ???
-    }
-
-  private[this] def put1(source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit = {
-    implicit val itx = tx.peer
-
-    // cases
-    // - map was empty | map size was one and value replaces previous value
-    //   - value is scalar -> stay scalar
-    //   - value is stream -> establish stream
-    // - map size was one and value is new
-    //   -
-
-    val oldSize   = map.size
-//    val oldValOpt = map.put(source, value)
-    val isScalar  = value.isScalar
-
-//    (oldSize, value, oldValOpt) match {
-//      case (0, sc: AuralAttribute.Scalar, _) =>
-//      case (0, sc: AuralAttribute.Stream, _) =>
-//      case (1, sc: AuralAttribute.Scalar, Some(osc: AuralAttribute.Scalar)) =>
-//
-//    }
-
-    if (oldSize == 0) {
-      value match {
-        case sc: AuralAttribute.Scalar =>
-          target.node.set(sc.toControl(ctlName))
-        case AuralAttribute.Stream(sourceNode, sourceBus) =>
-          ???
-      }
-
-    } else {
-      targetBus.busOption match {
-        case Some(bus) =>
-        //  targetBus.addWriter()
-
-        case None =>
-      }
-    }
-
-
-    ???
-  }
-
-  private[this] def lift(in: AuralAttribute.Scalar, numChannels: Int)(implicit tx: S#Tx): AuralAttribute.Stream = {
-    val g = SynthGraph {
-      import synth._
-      import ugen._
-      val values0 = in.values
-      val len0    = values0.length
-      val value   = "value".kr(Vector.tabulate[Float](numChannels)(i => values0(i % len0)))
-      Out.ar("bus".kr, value)
-    }
-    val syn = Synth.play(g, nameHint = Some("attr"))(target = ???, args = ???, addAction = ???, dependencies = ???)
-    addDependency(syn)
-    BusNodeSetter.mapper(controlName = ???, bus = targetBus, node = target.node)
-    ???
-  }
-
-  def remove(source: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
-
-    ???
-  }
+  def remove(source: AuralAttribute[S])(implicit tx: S#Tx): Unit =
+    stateRef.transform(_.remove(source))(tx.peer)
 }
