@@ -152,18 +152,6 @@ object AuralProcDataImpl {
 
             case _ =>
           }
-        //          // try to adjust the runtime value.
-        //          // if it is incompatible, `attrNodeSet1` will
-        //          // dispose and restart the build.
-        //          for {
-        //            n       <- nodeRef.get(tx.peer)
-        //            (_, v)  <- acceptedOpt // st.acceptedInputs.get(aKey)
-        //          } {
-        //            attrNodeUnset1(n, key)
-        //            valueOption.foreach { value =>
-        //              attrNodeSet1(n, key, assigned = v, value = value)
-        //            }
-        //          }
 
         case st0: Incomplete[S] =>
           acceptedOpt.fold[Unit] {  // rejected

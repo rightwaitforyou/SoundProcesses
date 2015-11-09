@@ -44,8 +44,8 @@ object NodeRef {
   }
 
   trait Group extends Full with Disposable[Txn] {
-    def addInstanceNode   (n: Full)(implicit tx: Txn): Unit
-    def removeInstanceNode(n: Full)(implicit tx: Txn): Boolean
+    def addInstanceNode   (n: AuralNode)(implicit tx: Txn): Unit
+    def removeInstanceNode(n: AuralNode)(implicit tx: Txn): Boolean
   }
 
   final case class Edge(source: NodeRef, sink: NodeRef)

@@ -87,8 +87,8 @@ object AuralAttributeImpl {
       target.put(this, ctlVal)
     }
 
-    def init()(implicit tx: S#Tx): this.type = {
-      obs = exprH().changed.react { implicit tx => change =>
+    def init(expr: Expr[S, A])(implicit tx: S#Tx): this.type = {
+      obs = expr.changed.react { implicit tx => change =>
         playRef.get(tx.peer).foreach(update(_, change.now))
       }
       this
@@ -115,7 +115,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: IntObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new IntAttribute(tx.newHandle(value)).init()
+      new IntAttribute(tx.newHandle(value)).init(value)
   }
   private[this] final class IntAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, IntObj[S]])
     extends NumberImpl[S, Int] {
@@ -132,7 +132,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: DoubleObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new DoubleAttribute(tx.newHandle(value)).init()
+      new DoubleAttribute(tx.newHandle(value)).init(value)
   }
   private[this] final class DoubleAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
     extends NumberImpl[S, Double] {
@@ -149,7 +149,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: BooleanObj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new BooleanAttribute(tx.newHandle(value)).init()
+      new BooleanAttribute(tx.newHandle(value)).init(value)
   }
   private[this] final class BooleanAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
     extends NumberImpl[S, Boolean] {
@@ -166,7 +166,7 @@ object AuralAttributeImpl {
 
     def apply[S <: Sys[S]](value: FadeSpec.Obj[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new FadeSpecAttribute(tx.newHandle(value)).init()
+      new FadeSpecAttribute(tx.newHandle(value)).init(value)
   }
   private[this] final class FadeSpecAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, FadeSpec.Obj[S]])
     extends ExprImpl[S, FadeSpec] {

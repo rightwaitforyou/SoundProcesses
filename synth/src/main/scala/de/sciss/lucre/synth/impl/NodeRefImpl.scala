@@ -22,8 +22,6 @@ import de.sciss.synth.{ControlSet, addBefore}
 import scala.concurrent.stm.Ref
 
 object NodeRefImpl {
-  // def apply(n: Node): NodeRef = new Wrap(n)
-
   def Group(name: String, in0: Full)(implicit tx: Txn): NodeRef.Group = {
     val res = new GroupImpl(name, in0)
     in0.server.addVertex(res)
@@ -51,13 +49,6 @@ object NodeRefImpl {
     def addControl(pair: ControlSet)(implicit tx: Txn): Unit = ref().addControl(pair)
   }
   
-  //  private final case class Wrap(n: Node) extends NodeRef {
-  //    def node(implicit tx: Txn): Node = n
-  //    def server: Server = n.server
-  //
-  //    override def toString = s"NodeRef($n)"
-  //  }
-
   // dynamically flips between single proc and multiple procs
   // (wrapping them in one common group)
   private final class GroupImpl(name: String, in0: Full) extends NodeRef.Group {
@@ -70,7 +61,7 @@ object NodeRefImpl {
 
     def node(implicit tx: Txn): Node = nodeRef.get(tx.peer).node
 
-    def addInstanceNode(n: Full)(implicit tx: Txn): Unit = {
+    def addInstanceNode(n: AuralNode)(implicit tx: Txn): Unit = {
       implicit val itx = tx.peer
       val old = instancesRef.getAndTransform(n :: _)
       old match {
@@ -84,7 +75,7 @@ object NodeRefImpl {
       }
     }
 
-    def removeInstanceNode(n: Full)(implicit tx: Txn): Boolean = {
+    def removeInstanceNode(n: AuralNode)(implicit tx: Txn): Boolean = {
       implicit val itx = tx.peer
       val after = instancesRef.transformAndGet(_.filterNot(_ == n))
       after match {
@@ -101,12 +92,6 @@ object NodeRefImpl {
         case _ => false
       }
     }
-
-//    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit =
-//      instancesRef.get(tx.peer).foreach(_.addAttrResources(key, values))
-//
-//    def removeAttrResources(key: String)(implicit tx: Txn): Unit =
-//      instancesRef.get(tx.peer).foreach(_.removeAttrResources(key))
 
     def addUser(user: DynamicUser)(implicit tx: Txn): Unit =
       instancesRef.get(tx.peer).foreach(_.addUser(user))
