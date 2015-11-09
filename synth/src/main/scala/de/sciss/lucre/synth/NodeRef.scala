@@ -20,8 +20,7 @@ import de.sciss.synth.ControlSet
 import de.sciss.topology.Topology
 
 object NodeRef {
-  // def apply(n: Node): NodeRef = Impl(n)
-  def Group(name: String, in0: Full)(implicit tx: Txn): Group = Impl.Group(name, in0)
+  def Group(name: String, in0: AuralNode)(implicit tx: Txn): Group = Impl.Group(name, in0)
 
   object Var {
     def apply(init: NodeRef.Full): Var = Impl.Var(init)
