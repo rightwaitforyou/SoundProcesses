@@ -148,11 +148,9 @@ object AuralProcDataImpl {
             case Some((_, UGB.Input.Attribute.Value(numChannels))) =>
               nodeRef().foreach { group =>
                 group.instanceNodes.foreach { nr =>
-                  val target    = AuralAttribute.Target[S](nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
+                  val target    = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
                   val view      = attrMap.getOrElseUpdate(key, AuralAttribute(value))
-                  val viewPlay  = view.play(timeRef = ???, target = target)
-                  nr.addResource(??? /* viewPlay */)
-                  ???
+                  view.play(timeRef = ???, target = target)
                 }
               }
 
@@ -417,9 +415,8 @@ object AuralProcDataImpl {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
           attrMap.get(key)(tx.peer).foreach { a =>
-            val target    = AuralAttribute.Target[S](nr, key, Bus.audio(server, numChannels))
-            val viewPlay  = a.play(timeRef = timeRef, target = target)
-            ???
+            val target = AuralAttribute.Target(nr, key, Bus.audio(server, numChannels))
+            a.play(timeRef = timeRef, target = target)
           }
 
         case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming

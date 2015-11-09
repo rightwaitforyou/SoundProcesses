@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Obj, Disposable, Sys}
-import de.sciss.lucre.synth.{Sys => SSys, AuralNode, NodeRef, AudioBus}
+import de.sciss.lucre.synth.{Sys => SSys, Txn, AuralNode, NodeRef, AudioBus}
 import de.sciss.synth.ControlSet
 import impl.{AuralAttributeImpl => Impl}
 
@@ -39,15 +39,17 @@ object AuralAttribute {
   // ---- Target ----
 
   object Target {
-    def apply[S <: SSys[S]](nodeRef: NodeRef.Full, key: String, targetBus: AudioBus)(implicit tx: S#Tx): Target[S] = {
-      val res = new impl.AuralAttributeTargetImpl[S](nodeRef, key, targetBus)
+    def apply(nodeRef: NodeRef.Full, key: String, targetBus: AudioBus)(implicit tx: Txn): Target = {
+      val res = new impl.AuralAttributeTargetImpl(nodeRef, key, targetBus)
       nodeRef.addUser(res)
       res
     }
   }
-  trait Target[S <: Sys[S]] {
-    def put   (instance: Instance[S], value: Value)(implicit tx: S#Tx): Unit
-    def remove(instance: Instance[S]              )(implicit tx: S#Tx): Unit
+  trait Target {
+    def put   (instance: Instance, value: Value)(implicit tx: Txn): Unit
+
+    def add   (instance: Instance)(implicit tx: Txn): Unit
+    def remove(instance: Instance)(implicit tx: Txn): Unit
   }
 
   // ---- Value ----
@@ -88,16 +90,17 @@ object AuralAttribute {
     def isScalar = false
   }
 
-  trait Instance[S <: Sys[S]] extends Disposable[S#Tx]
+  // trait Instance[S <: Sys[S]] extends Disposable[S#Tx]
+  trait Instance extends Disposable[Txn]
 }
 trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
-  import AuralAttribute.{Target, Instance}
+  import AuralAttribute.Target
 
   def preferredNumChannels(implicit tx: S#Tx): Int
 
   // def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
 
-  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Instance[S]
+  def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit // Instance[S]
 
   // def stop   ()(implicit tx: S#Tx): Unit
 }
