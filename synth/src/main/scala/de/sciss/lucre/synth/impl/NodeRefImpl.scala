@@ -95,8 +95,8 @@ object NodeRefImpl {
     def addResource(resource: Resource)(implicit tx: Txn): Unit =
       instancesRef.get(tx.peer).foreach(_.addResource(resource))
 
-//    def removeResource(resource: Resource)(implicit tx: Txn): Unit =
-//      instancesRef.get(tx.peer).foreach(_.removeResource(resource))
+    def removeResource(resource: Resource)(implicit tx: Txn): Unit =
+      instancesRef.get(tx.peer).foreach(_.removeResource(resource))
 
     def addControl(pair: ControlSet)(implicit tx: Txn): Unit =
       instancesRef.get(tx.peer).foreach(_.addControl(pair))

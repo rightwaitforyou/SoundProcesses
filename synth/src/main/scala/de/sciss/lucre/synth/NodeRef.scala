@@ -32,7 +32,7 @@ object NodeRef {
     def removeUser    (user: DynamicUser )(implicit tx: Txn): Unit
 
     def addResource   (resource: Resource)(implicit tx: Txn): Unit
-    // def removeResource(resource: Resource)(implicit tx: Txn): Unit
+    def removeResource(resource: Resource)(implicit tx: Txn): Unit
 
     def addControl(pair: ControlSet)(implicit tx: Txn): Unit
   }

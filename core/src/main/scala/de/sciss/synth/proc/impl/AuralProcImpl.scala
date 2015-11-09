@@ -163,7 +163,7 @@ object AuralProcImpl {
                                 (implicit tx: S#Tx): Unit = keyW match {
       case UGB.AttributeKey(key) =>
         _data.buildAttrInput(b, key, value)
-        b.storeKey(key)
+//        b.storeKey(key)
 
 // SCAN
 //      case UGB.ScanKey(key) =>

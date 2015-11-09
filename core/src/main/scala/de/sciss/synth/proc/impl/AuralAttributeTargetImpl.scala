@@ -14,7 +14,6 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm.Disposable
 import de.sciss.lucre.synth.{Node, Txn, DynamicUser, BusNodeSetter, Resource, Synth, AudioBus, NodeRef, Sys}
 import de.sciss.synth
 import de.sciss.synth.SynthGraph
@@ -33,19 +32,23 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
   private val stateRef  = Ref[State](Empty)
 
   private final class Connected(val value: AuralAttribute.Value,
-                                val users: List[DynamicUser])
+                                val users: List[DynamicUser], val resources: List[Resource])
     extends DynamicUser {
 
     def attach()(implicit tx: Txn): this.type = {
-      target.addUser(this)
+      if (users    .nonEmpty) target.addUser(this)
+      if (resources.nonEmpty) resources.foreach(target.addResource)
       this
     }
 
     def add   ()(implicit tx: Txn): Unit = users.foreach(_.add   ())
 
     def remove()(implicit tx: Txn): Unit = {
-      target.removeUser(this)
-      users.foreach(_.remove())
+      if (resources.nonEmpty) resources.foreach(target.removeResource)
+      if (users.nonEmpty) {
+        target.removeUser(this)
+        users.foreach(_.remove())
+      }
     }
 
     override def toString = s"Connected($value, $users)"
@@ -79,7 +82,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
     val ctlSet = value.toControl(ctlName, numChannels = numChannels)
     // target.node.set(ctlSet)
     target.addControl(ctlSet)
-    val cc = new Connected(value, Nil)
+    val cc = new Connected(value, Nil, Nil)
     map.put(source, cc).foreach(_.dispose())
     cc.attach()
     new Single(source, cc)
@@ -91,7 +94,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
     val edge      = NodeRef.Edge(value.source, target)
     val edgeUser  = new AddRemoveEdge(edge)
     val busUser   = BusNodeSetter.mapper(ctlName, value.bus, target.node)
-    val cc        = new Connected(value, edgeUser :: busUser :: Nil)
+    val cc        = new Connected(value, edgeUser :: busUser :: Nil, Nil)
     map.put(source, cc).foreach(_.dispose())
     cc.attach()
     new Single(source, cc)
@@ -166,7 +169,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
   // ----
 
   private def mkVertex(value: AuralAttribute.Value)(implicit tx: S#Tx): Connected = {
-    val users: List[DynamicUser] = value match {
+    val cc: Connected = value match {
       case sc: AuralAttribute.Scalar =>
         val g = SynthGraph {
           import synth._
@@ -180,14 +183,15 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
           args = List("value" -> Vector.tabulate[Float](numChannels)(i => values0(i % len0))))
         // XXX TODO - `.play` should not be called here?
         val vertexUser= new AddVertexFreeNode(syn)
-        target.addResource(syn)
+        // target.addResource(syn)
         val edge      = NodeRef.Edge(syn, target)
         val edgeUser  = new AddRemoveEdge(edge)
         val busUser   = BusNodeSetter.writer("bus", targetBus, syn)
 //        addUser(vertexUser)
 //        addUser(edgeUser  )
 //        addUser(busUser   )
-        vertexUser :: edgeUser :: busUser :: Nil
+        val users = vertexUser :: edgeUser :: busUser :: Nil
+        new Connected(value, users = users, resources = syn :: Nil)
 
       case sc: AuralAttribute.Stream =>
         // - basically the same synth (mapped control in, bus out)
@@ -195,7 +199,6 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
         // - add both vertices, add both edges
         ???
     }
-    val cc = new Connected(value, users)
     cc.attach()
   }
 

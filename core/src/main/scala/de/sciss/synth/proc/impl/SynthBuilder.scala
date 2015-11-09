@@ -76,30 +76,32 @@ final class SynthBuilder[S <: Sys[S]](val obj: Proc[S], val synth: Synth, val ti
     attrMap.foreach(_._2._1.foreach(_.add()))
   }
 
-  // copies the node-dependency-builder stuff to a map entry
-  def storeKey(key: String): Unit =
-    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-      attrMap += key -> (keyedUsers -> keyedResources)
-      keyedUsers      = Nil
-      keyedResources  = Nil
-    }
+//  // copies the node-dependency-builder stuff to a map entry
+//  def storeKey(key: String): Unit =
+//    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
+//      attrMap += key -> (keyedUsers -> keyedResources)
+//      keyedUsers      = Nil
+//      keyedResources  = Nil
+//    }
 
   // ---- node-dependency-builder ----
 
   // def node = synth
 
-  def addControl(pair: ControlSet): Unit = setMap += pair
+//  def addControl(pair: ControlSet): Unit = setMap += pair
 
-  private var keyedUsers      = List.empty[DynamicUser]
-  private var keyedResources  = List.empty[Resource   ]
-
-  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
-  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
+//  private var keyedUsers      = List.empty[DynamicUser]
+//  private var keyedResources  = List.empty[Resource   ]
+//
+//  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
+//  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
 
   def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
   def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
 
-  def addResource(resource: Resource)(implicit tx: Txn): Unit = ???
+  def addResource   (resource: Resource)(implicit tx: Txn): Unit = ???
+  def removeResource(resource: Resource)(implicit tx: Txn): Unit = ???
+
   def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ???
 
   def dispose()(implicit tx: Txn): Unit = ???
@@ -120,21 +122,22 @@ final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], node0: Node, key: String
                                       val timeRef: TimeRef)
   extends NodeDependencyBuilder[S] {
 
-  private var setMap          = Vector.empty[ControlSet]
-
-  private var keyedUsers      = List.empty[DynamicUser]
-  private var keyedResources  = List.empty[Resource   ]
-
-  def addControl(pair: ControlSet): Unit = setMap :+= pair
-
-  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
-  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
-
+//  private var setMap          = Vector.empty[ControlSet]
+//
+//  private var keyedUsers      = List.empty[DynamicUser]
+//  private var keyedResources  = List.empty[Resource   ]
+//
+//  def addControl(pair: ControlSet): Unit = setMap :+= pair
+//
+//  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
+//  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
 
   def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
   def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
 
-  def addResource(resource: Resource)(implicit tx: Txn): Unit = ???
+  def addResource   (resource: Resource)(implicit tx: Txn): Unit = ???
+  def removeResource(resource: Resource)(implicit tx: Txn): Unit = ???
+
   def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ???
 
   def dispose()(implicit tx: Txn): Unit = ???
@@ -144,10 +147,11 @@ final class SynthUpdater[S <: Sys[S]](val obj: Proc[S], node0: Node, key: String
   def server: Server = node0.server
 
   def finish()(implicit tx: Txn): Unit = {
-    if (setMap.nonEmpty) node.set(setMap: _*)
-    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-      ??? // nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
-      keyedUsers.foreach(_.add())
-    }
+    ???
+//    if (setMap.nonEmpty) node.set(setMap: _*)
+//    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
+//      ??? // nodeRef.addAttrResources(key, keyedUsers ::: keyedResources)
+//      keyedUsers.foreach(_.add())
+//    }
   }
 }
