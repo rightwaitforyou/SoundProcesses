@@ -19,7 +19,7 @@ import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.expr.DoubleVector
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj, TxnLike}
-import de.sciss.lucre.synth.{AudioBus, Buffer, Bus, NodeRef, Sys}
+import de.sciss.lucre.synth.{AuralNode, AudioBus, Buffer, Bus, NodeRef, Sys}
 import de.sciss.numbers
 import de.sciss.synth.ControlSet
 import de.sciss.synth.io.AudioFileType
@@ -131,56 +131,39 @@ object AuralProcDataImpl {
 
     // ---- attr events ----
 
-    private def isAttrUsed(key: String)(implicit tx: S#Tx): Boolean = {
+    private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       val st          = state
       val aKey        = UGB.AttributeKey(key)
       val rejected    = st.rejectedInputs.contains(aKey)
-      val accepted    = st.acceptedInputs.contains(aKey)
-      val used        = rejected || accepted
-      used
-    }
-
-    private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      val used = isAttrUsed(key)
+      val acceptedOpt = st.acceptedInputs.get(aKey)
+      val used        = rejected || acceptedOpt.isDefined
       logA(s"AttrAdded   to   ${procCached()} ($key) - used? $used")
       if (!used) return
 
       implicit val itx = tx.peer
       // mkAttrObserver1(key, value)
-      val view = attrMap.getOrElseUpdate(key, AuralAttribute(value))
-      ??? // attrUpdate(key, Some(value))
-    }
-
-//    protected final def attrChanged(key: String)(implicit tx: S#Tx): Unit = {
-//      logA(s"AttrChange in   ${procCached()} ($key)")
-//      attrUpdate(key, procCached().attr.get(key))
-//    }
-
-    private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
-      logA(s"AttrRemoved from ${procCached()} ($key)")
-      if (!isAttrUsed(key)) return
-
-      attrMap.remove(key)(tx.peer).foreach(_.dispose())
-    }
-
-    private def attrUpdate(key: String, valueOption: Option[Obj[S]])(implicit tx: S#Tx): Unit = {
-      val st          = state
-      val aKey        = UGB.AttributeKey(key)
-      val acceptedOpt = st.acceptedInputs.get(aKey)
       st match {
-//        case st0: Complete[S] =>
-//          // try to adjust the runtime value.
-//          // if it is incompatible, `attrNodeSet1` will
-//          // dispose and restart the build.
-//          for {
-//            n       <- nodeRef.get(tx.peer)
-//            (_, v)  <- acceptedOpt // st.acceptedInputs.get(aKey)
-//          } {
-//            attrNodeUnset1(n, key)
-//            valueOption.foreach { value =>
-//              attrNodeSet1(n, key, assigned = v, value = value)
-//            }
-//          }
+        case st0: Complete[S] =>
+          acceptedOpt match {
+            case Some((_, UGB.Input.Attribute.Value(numChannels))) =>
+              val target  = AuralAttribute.Target[S](nodeRef = ???, key, Bus.audio(server, numChannels = numChannels))
+              val view    = attrMap.getOrElseUpdate(key, AuralAttribute(value))
+              view.play(timeRef = ???, target = target)
+
+            case _ =>
+          }
+        //          // try to adjust the runtime value.
+        //          // if it is incompatible, `attrNodeSet1` will
+        //          // dispose and restart the build.
+        //          for {
+        //            n       <- nodeRef.get(tx.peer)
+        //            (_, v)  <- acceptedOpt // st.acceptedInputs.get(aKey)
+        //          } {
+        //            attrNodeUnset1(n, key)
+        //            valueOption.foreach { value =>
+        //              attrNodeSet1(n, key, assigned = v, value = value)
+        //            }
+        //          }
 
         case st0: Incomplete[S] =>
           acceptedOpt.fold[Unit] {  // rejected
@@ -202,21 +185,10 @@ object AuralProcDataImpl {
       }
     }
 
-//    private def attrNodeUnset1(n: NodeRef.Full, key: String)(implicit tx: S#Tx): Unit =
-//      n.removeAttrResources(key)
-
-//    // called on a running node when an attribute value changes. tries to adjust the
-//    // running node. if the new value is incompatible, i.e. `buildAttrInput` throws a
-//    // `MissingIn`, we kill the node and try to rebuild.
-//    private def attrNodeSet1(n: NodeRef.Full, key: String, assigned: UGB.Value, value: Obj[S])
-//                            (implicit tx: S#Tx): Unit =
-//      try {
-//        val b = new SynthUpdater(procCached(), n.node, key, n)
-//        buildAttrInput(b, key, assigned)
-//        b.finish()
-//      } catch {
-//        case MissingIn(_) => newSynthGraph()
-//      }
+    private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AttrRemoved from ${procCached()} ($key)")
+      attrMap.remove(key)(tx.peer).foreach(_.dispose())
+    }
 
     // ----
 
@@ -231,7 +203,7 @@ object AuralProcDataImpl {
       }
     }
 
-    final def addInstanceNode(n: NodeRef.Full)(implicit tx: S#Tx): Unit = {
+    final def addInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
       logA(s"addInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       nodeRef().fold {
@@ -245,7 +217,7 @@ object AuralProcDataImpl {
       }
     }
 
-    final def removeInstanceNode(n: NodeRef.Full)(implicit tx: S#Tx): Unit = {
+    final def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
       logA(s"removeInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
@@ -316,20 +288,6 @@ object AuralProcDataImpl {
       } else {
         logA(s"buildAdvanced ${procCached()}; rejectedInputs = ${now.rejectedInputs.mkString(",")}")
       }
-
-//      // handle newly visible inputs
-//      if (before.acceptedInputs ne now.acceptedInputs) {
-//        // detect which new inputs have been accepted in the last iteration
-//        val newIns = now.acceptedInputs.filterNot {
-//          case (key, _) => before.acceptedInputs.contains(key)
-//        }
-//        logA(s"...newIns  = ${newIns.mkString(",")}")
-//
-//        newIns.foreach {
-//          case (UGB.AttributeKey(key), _) => addUsedAttr(attr, key)
-//          case _ =>
-//        }
-//      }
 
       // handle newly visible outputs
       if (before.outputs ne now.outputs) {

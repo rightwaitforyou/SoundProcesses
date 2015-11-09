@@ -57,7 +57,7 @@ final class SynthBuilder(synth: Synth)
     val server  = synth.server
     val group   = server.defaultGroup
 
-    val node = AuralNode(synth, resources = users ::: dependencies)
+    val node = AuralNode(synth, users = users, resources = dependencies)
 
     // wrap as AuralProc and save it in the identifier map for later lookup
     synth.play(target = group, addAction = addToHead, args = setMap.result(),

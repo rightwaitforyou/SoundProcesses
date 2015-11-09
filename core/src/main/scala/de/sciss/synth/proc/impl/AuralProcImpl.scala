@@ -371,8 +371,9 @@ object AuralProcImpl {
         // res
       }
 
-      val node = builder.finish1() // .finish()
-      val old = playingRef.swap(new PlayingNode(node))(tx.peer)
+      val node      = builder.finish1() // .finish()
+      nodeRefVar()  = node
+      val old       = playingRef.swap(new PlayingNode(node))(tx.peer)
       old.dispose()
       _data.addInstanceNode(node)
       builder.finish2()

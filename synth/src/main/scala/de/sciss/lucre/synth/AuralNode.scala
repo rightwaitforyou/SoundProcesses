@@ -13,12 +13,11 @@
 
 package de.sciss.lucre.synth
 
-import de.sciss.lucre.stm.Disposable
-import impl.{AuralNodeImpl => Impl}
+import de.sciss.lucre.synth.impl.{AuralNodeImpl => Impl}
 
 object AuralNode {
-  def apply(synth: Synth, resources: List[Disposable[Txn]])(implicit tx: Txn): AuralNode =
-    Impl(synth, resources = resources)
+  def apply(synth: Synth, users: List[DynamicUser], resources: List[Resource])(implicit tx: Txn): AuralNode =
+    Impl(synth, users = users, resources = resources)
 }
 
 trait AuralNode extends NodeRef.Full {

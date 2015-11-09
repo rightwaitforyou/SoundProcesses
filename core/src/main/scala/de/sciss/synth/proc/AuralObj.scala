@@ -17,7 +17,7 @@ import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
-import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
+import de.sciss.lucre.synth.{AuralNode, AudioBus, NodeRef, Sys}
 import de.sciss.span.SpanLike
 import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
 
@@ -125,8 +125,8 @@ object AuralObj {
     def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
     def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
 
-    def addInstanceNode   (n: NodeRef.Full)(implicit tx: S#Tx): Unit
-    def removeInstanceNode(n: NodeRef.Full)(implicit tx: S#Tx): Unit
+    def addInstanceNode   (n: AuralNode)(implicit tx: S#Tx): Unit
+    def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit
 
     //    /** Converts an attribute key and a value, given as an `Elem`, to a
     //      * control-set entry for a synth. Currently throws an exception if
