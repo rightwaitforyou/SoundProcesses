@@ -54,6 +54,9 @@ object AuralAttribute {
     implicit def fromFloats(values: Vec[Float]): ScalarVector = new ScalarVector(values)
   }
   sealed trait Value { def isScalar: Boolean }
+  /** Value for which a no synth is needed, but only a scalar value
+    * that needs to be set on the target node.
+    */
   sealed trait Scalar extends Value {
     def toControl(key: String): ControlSet
     def values: Vec[Float]
@@ -68,6 +71,9 @@ object AuralAttribute {
     def toControl(key: String): ControlSet = ControlSet.Vector(key, values)
   }
 
+  /** Value for which a `Synth` is required that writes its signal to a bus,
+    * and the bus is then somehow mapped to the target node's control.
+    */
   final case class Stream(source: NodeRef, bus: AudioBus) extends Value {
     def isScalar = false
   }
