@@ -13,8 +13,8 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.synth.{AuralNode, DynamicUser, Node, NodeRef, Resource, Server, Synth, Sys, Txn}
-import de.sciss.synth.proc.Proc
+import de.sciss.lucre.synth.{DynamicUser, Node, NodeRef, Resource, Server, Synth, Sys, Txn}
+import de.sciss.synth.proc.{TimeRef, AuralNode, Proc}
 import de.sciss.synth.{ControlSet, addToHead}
 
 /** An object used in the last phase of playing a process. It has
@@ -47,9 +47,9 @@ final class SynthBuilder(synth: Synth)
     * node-ref in the meantime, so users may find it.
     * Not pretty...
     */
-  def finish1()(implicit tx: Txn): AuralNode = {
+  def finish1(timeRef: TimeRef, wallClock: Long)(implicit tx: Txn): AuralNode = {
     require (!finished1)
-    finished1      = true
+    finished1     = true
     users         = users.reverse
     dependencies  = dependencies.reverse
 
@@ -57,7 +57,7 @@ final class SynthBuilder(synth: Synth)
     val server  = synth.server
     val group   = server.defaultGroup
 
-    val node = AuralNode(synth, users = users, resources = dependencies)
+    val node = AuralNode(timeRef, wallClock, synth, users = users, resources = dependencies)
 
     // wrap as AuralProc and save it in the identifier map for later lookup
     synth.play(target = group, addAction = addToHead, args = setMap.result(),

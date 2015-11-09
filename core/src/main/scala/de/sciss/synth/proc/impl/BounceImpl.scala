@@ -155,7 +155,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
         val now = scheduler.time
         if (!isCompleted) {
           if (now < span.stop ) {
-            val time = math.min(span.stop, now + (Timeline.SampleRate * 0.1).toLong)
+            val time = math.min(span.stop, now + (TimeRef.SampleRate * 0.1).toLong)
             scheduler.schedule(time)(scheduleProgress)
           }
           tx.afterCommit {
@@ -244,7 +244,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       }
       aural = __aural
 
-      val srRatio = server.sampleRate / Timeline.SampleRate
+      val srRatio = server.sampleRate / TimeRef.SampleRate
 
       prepare(transport)(state => state == AuralObj.Playing | state == AuralObj.Stopped)
 
@@ -321,7 +321,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       // ---- run scsynth ----
 
-      val dur = span.length / Timeline.SampleRate
+      val dur = span.length / TimeRef.SampleRate
 
       logTransport("---- BOUNCE: scsynth ----")
 
@@ -342,7 +342,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       // Timeline, we at least provide some bounce support for objects
       // that require asynchronous preparation. To do that, we gather
       // all views with state `Preparing` and wait for them to go into
-      // either `Playing` or `Stopped`. We go deeply into timelines as
+      // either `Playing` or `Stopped`. We go deeply into timeline objects as
       // well. Finally, we bundle all these futures together and wait
       // for their completion. Then we should be fine advancing the
       // logical clock.

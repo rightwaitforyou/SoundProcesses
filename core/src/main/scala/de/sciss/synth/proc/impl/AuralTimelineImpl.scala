@@ -33,8 +33,8 @@ import scala.concurrent.stm.{Ref, TMap, TSet}
 object AuralTimelineImpl {
   private type Leaf[S <: Sys[S]] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], AuralObj[S])])
 
-  private final val LOOK_AHEAD  = (1.0 * Timeline.SampleRate).toLong  // one second. XXX TODO -- make configurable
-  private final val STEP_GRID   = (0.5 * Timeline.SampleRate).toLong  // XXX TODO -- make configurable
+  private final val LOOK_AHEAD  = (1.0 * TimeRef.SampleRate).toLong  // one second. XXX TODO -- make configurable
+  private final val STEP_GRID   = (0.5 * TimeRef.SampleRate).toLong  // XXX TODO -- make configurable
 
   def apply[S <: Sys[S]](tlObj: Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
     val system  = tx.system

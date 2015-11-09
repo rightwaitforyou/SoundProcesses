@@ -19,7 +19,7 @@ import de.sciss.serial.{DataInput, Serializer}
 import de.sciss.synth.proc.impl.{TimelineImpl => Impl}
 
 object Timeline extends Obj.Type {
-  final val SampleRate = 14112000.0 // lcm(88.2k, 96k); note: value is copied in AuralContextImpl
+  // final val SampleRate = 14112000.0 // lcm(88.2k, 96k); note: value is copied in AuralContextImpl
 
   final val typeID = 0x10006
 

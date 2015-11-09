@@ -72,7 +72,7 @@ object AudioArtifactWriter {
       // the synth plays at the head
       val offsetTL  = frameTL - segm.span.start
       val srFile    = spec.sampleRate
-      val srRatio   = srFile / Timeline.SampleRate
+      val srRatio   = srFile / TimeRef.SampleRate
       val offsetFile = offsetTL * srRatio
       val target    = server.defaultGroup
       val startFile = math.max(0L, math.min(fileFrames, audioVal.offset + (offsetFile + 0.5).toLong))

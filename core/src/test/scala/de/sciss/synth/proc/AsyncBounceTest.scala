@@ -25,7 +25,7 @@ object AsyncBounceTest {
     de.sciss.lucre.synth.showLog = true
     showTransportLog  = true
 
-    def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
+    def frame(secs: Double): Long = (secs * TimeRef.SampleRate).toLong
 
     println(
       """Expected outcome:

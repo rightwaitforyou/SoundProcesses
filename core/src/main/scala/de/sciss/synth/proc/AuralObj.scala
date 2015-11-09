@@ -17,7 +17,7 @@ import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
-import de.sciss.lucre.synth.{AuralNode, AudioBus, NodeRef, Sys}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
 import de.sciss.span.SpanLike
 import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
 

@@ -11,18 +11,20 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
-package impl
+package de.sciss.synth.proc.impl
 
 import de.sciss.lucre.stm.TxnLike
+import de.sciss.lucre.synth.{DynamicUser, Group, Node, Resource, Synth, Txn}
+import de.sciss.synth.proc.{TimeRef, AuralNode}
 import de.sciss.synth.{ControlSet, addBefore}
 
 import scala.concurrent.stm.Ref
 
 object AuralNodeImpl {
-  def apply(synth: Synth, users: List[DynamicUser], resources: List[Resource])(implicit tx: Txn): AuralNode = {
+  def apply(timeRef: TimeRef, wallClock: Long, synth: Synth, users: List[DynamicUser], resources: List[Resource])
+           (implicit tx: Txn): AuralNode = {
     // XXX TODO -- probably we can throw `users` and `resources` together as disposables
-    val res = new Impl(synth, users = Ref(users), resources = Ref(resources))
+    val res = new Impl(timeRef, wallClock, synth, users = Ref(users), resources = Ref(resources))
     synth.server.addVertex(res)
     res
   }
@@ -38,7 +40,8 @@ object AuralNodeImpl {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl(synth: Synth, users: Ref[List[DynamicUser]], resources: Ref[List[Resource]])
+  private final class Impl(val timeRef: TimeRef, wallClock: Long, synth: Synth,
+                           users: Ref[List[DynamicUser]], resources: Ref[List[Resource]])
     extends AuralNode {
 
     import TxnLike.peer
@@ -52,6 +55,11 @@ object AuralNodeImpl {
     def groupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).map(_.main)
 
     def node(implicit tx: Txn): Node = groupOption.getOrElse(synth)
+
+    def shiftTo(newWallClock: Long): TimeRef = {
+      val delta = newWallClock - wallClock
+      timeRef.shift(delta)
+    }
 
     def group()(implicit tx: Txn): Group =
       groupOption.getOrElse {

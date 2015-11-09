@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Obj, Disposable, Sys}
-import de.sciss.lucre.synth.{Sys => SSys, Txn, AuralNode, NodeRef, AudioBus}
+import de.sciss.lucre.synth.{Sys => SSys, Txn, NodeRef, AudioBus}
 import de.sciss.synth.ControlSet
 import impl.{AuralAttributeImpl => Impl}
 

@@ -19,11 +19,13 @@ object TimeRef {
   /** `Undefined` with general type */
   def undefined: TimeRef = Undefined
 
+  final val SampleRate = 14112000.0 // lcm(88.2k, 96k); note: value is copied in AuralContextImpl
+
   /** Utility method that generates a string representation of
     * the time in seconds of a given frame index.
     */
   def framesToSecs(n: Long): String = if (n == Long.MinValue) "-inf" else if (n == Long.MaxValue) "inf" else {
-    val s = n / Timeline.SampleRate
+    val s = n / SampleRate
     f"$s%1.3f"
   }
 

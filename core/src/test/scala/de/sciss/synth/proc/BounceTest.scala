@@ -37,7 +37,7 @@ class BounceTest[S <: Sys[S]](val system: S, realtime: Boolean)(implicit cursor:
   de.sciss.lucre.synth.showLog = true
   showTransportLog  = !realtime
 
-  def frame(secs: Double): Long = (secs * Timeline.SampleRate).toLong
+  def frame(secs: Double): Long = (secs * TimeRef.SampleRate).toLong
 
   println(
     """Expected outcome:

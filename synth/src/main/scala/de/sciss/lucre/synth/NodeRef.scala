@@ -20,8 +20,6 @@ import de.sciss.synth.ControlSet
 import de.sciss.topology.Topology
 
 object NodeRef {
-  def Group(name: String, in0: AuralNode)(implicit tx: Txn): Group = Impl.Group(name, in0)
-
   object Var {
     def apply(init: NodeRef.Full): Var = Impl.Var(init)
   }
@@ -40,12 +38,6 @@ object NodeRef {
     def removeResource(resource: Resource)(implicit tx: Txn): Unit
 
     def addControl(pair: ControlSet)(implicit tx: Txn): Unit
-  }
-
-  trait Group extends Full with Disposable[Txn] {
-    def addInstanceNode   (n: AuralNode)(implicit tx: Txn): Unit
-    def removeInstanceNode(n: AuralNode)(implicit tx: Txn): Boolean
-    def instanceNodes(implicit tx: Txn): Iterator[AuralNode]
   }
 
   final case class Edge(source: NodeRef, sink: NodeRef)

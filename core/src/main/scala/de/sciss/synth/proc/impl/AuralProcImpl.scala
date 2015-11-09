@@ -18,10 +18,10 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.StringObj
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{NodeRef, AudioBus, AuralNode, Buffer, BusNodeSetter, Synth, Sys}
+import de.sciss.lucre.synth.{NodeRef, AudioBus, Buffer, BusNodeSetter, Synth, Sys}
 import de.sciss.span.Span
 import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, ProcData, Stopped, TargetPlaying, TargetPrepared, TargetState, TargetStop}
-import de.sciss.synth.proc.Timeline.SampleRate
+import de.sciss.synth.proc.TimeRef.SampleRate
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 
 import scala.concurrent.Future
@@ -47,8 +47,8 @@ object AuralProcImpl {
   class Impl[S <: Sys[S]](implicit context: AuralContext[S])
     extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
 
-    import context.scheduler.cursor
-    import context.server
+    import context.{scheduler => sched, server}
+    import sched.cursor
 
     /* The ongoing build aural node build process, as stored in `playingRef`. */
     private sealed trait PlayingRef extends Disposable[S#Tx]
@@ -106,7 +106,7 @@ object AuralProcImpl {
     }
 
     final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val ts = TargetPlaying(context.scheduler.time, timeRef)
+      val ts = TargetPlaying(sched.time, timeRef)
       targetStateRef.set(ts)(tx.peer)
       _data.state match {
         case s: UGB.Complete[S] =>
@@ -126,7 +126,7 @@ object AuralProcImpl {
 
       (_data.state, targetStateRef.get(tx.peer)) match {
         case (s: UGB.Complete[S], tp: TargetPlaying) =>
-          prepareAndLaunch(s, tp.shiftTo(context.scheduler.time))
+          prepareAndLaunch(s, tp.shiftTo(sched.time))
         case _ =>
       }
     }
@@ -319,7 +319,7 @@ object AuralProcImpl {
     private def prepared(ugen: UGB.Complete[S])(implicit tx: S#Tx): Unit = {
       targetStateRef.get(tx.peer) match {
         case tp: TargetPlaying =>
-          launch(ugen, tp.shiftTo(context.scheduler.time)) // XXX TODO - yes or no, shift time?
+          launch(ugen, tp.shiftTo(sched.time)) // XXX TODO - yes or no, shift time?
         case _ =>
           state = Prepared
       }
@@ -371,7 +371,7 @@ object AuralProcImpl {
         // res
       }
 
-      val node      = builder.finish1() // .finish()
+      val node      = builder.finish1(timeRef, sched.time) // .finish()
       nodeRefVar()  = node
       val old       = playingRef.swap(new PlayingNode(node))(tx.peer)
       old.dispose()

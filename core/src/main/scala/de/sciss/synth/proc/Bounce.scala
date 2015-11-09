@@ -83,7 +83,7 @@ object Bounce {
     def group_=(value: GroupH[S]): Unit = _group = value
 
     /** The default span is from zero to one second. */
-    var span  : Span                    = Span(0L, Timeline.SampleRate.toLong)
+    var span  : Span                    = Span(0L, TimeRef.SampleRate.toLong)
     /** The default server configuration is ScalaCollider's
       * default, a block-size of one, no input and one output channel.
       */

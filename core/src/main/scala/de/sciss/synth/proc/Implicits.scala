@@ -25,7 +25,7 @@ object Implicits {
     /** Interprets the number as a duration in seconds, and converts it to sample frames,
       * based on the standard `Timeline` sample-rate.
       */
-    def secframes: Long = (d * Timeline.SampleRate + 0.5).toLong
+    def secframes: Long = (d * TimeRef.SampleRate + 0.5).toLong
   }
 
 // SCAN

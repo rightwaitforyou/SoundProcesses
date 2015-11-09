@@ -8,7 +8,7 @@ object SchedulerTest extends App {
   implicit val cursor = InMemory()
   showTransportLog = true
 
-  def frames(secs: Double) = (Timeline.SampleRate * secs).toLong
+  def frames(secs: Double) = (TimeRef.SampleRate * secs).toLong
 
   /*
       Expected output:

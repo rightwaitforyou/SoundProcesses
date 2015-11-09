@@ -11,17 +11,23 @@
  *  contact@sciss.de
  */
 
-package de.sciss.lucre.synth
+package de.sciss.synth.proc
 
-import de.sciss.lucre.synth.impl.{AuralNodeImpl => Impl}
+import de.sciss.lucre.synth.{DynamicUser, Group, NodeRef, Resource, Server, Synth, Txn}
+import impl.{AuralNodeImpl => Impl}
 
 object AuralNode {
-  def apply(synth: Synth, users: List[DynamicUser], resources: List[Resource])(implicit tx: Txn): AuralNode =
-    Impl(synth, users = users, resources = resources)
+  def apply(timeRef: TimeRef, wallClock: Long, synth: Synth, users: List[DynamicUser], resources: List[Resource])
+           (implicit tx: Txn): AuralNode =
+    Impl(timeRef, wallClock, synth, users = users, resources = resources)
 }
 
 trait AuralNode extends NodeRef.Full {
   def server: Server
+
+  def timeRef: TimeRef
+
+  def shiftTo(newWallClock: Long): TimeRef
 
   /** Retrieves the main group of the Proc, or returns None if a group has not yet been assigned. */
   def groupOption(implicit tx: Txn): Option[Group]

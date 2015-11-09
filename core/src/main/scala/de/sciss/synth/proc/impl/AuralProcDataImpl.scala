@@ -19,7 +19,7 @@ import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.expr.DoubleVector
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj, TxnLike}
-import de.sciss.lucre.synth.{AuralNode, AudioBus, Buffer, Bus, NodeRef, Sys}
+import de.sciss.lucre.synth.{AudioBus, Buffer, Bus, NodeRef, Sys}
 import de.sciss.numbers
 import de.sciss.synth.ControlSet
 import de.sciss.synth.io.AudioFileType
@@ -39,12 +39,12 @@ object AuralProcDataImpl {
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
     extends ProcData[S] with UGB.Context[S] {
 
-    import context.server
+    import context.{scheduler => sched, server}
 
     private[this] val stateRef      = Ref.make[UGB.State[S]]()
 
     // running main synths
-    private[this] val nodeRef       = Ref(Option.empty[NodeRef.Group])
+    private[this] val nodeRef       = Ref(Option.empty[NodeGroupRef])
 
     // running attribute inputs
     private[this] val attrMap       = TMap.empty[String, AuralAttribute[S]]
@@ -148,9 +148,10 @@ object AuralProcDataImpl {
             case Some((_, UGB.Input.Attribute.Value(numChannels))) =>
               nodeRef().foreach { group =>
                 group.instanceNodes.foreach { nr =>
-                  val target    = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
-                  val view      = attrMap.getOrElseUpdate(key, AuralAttribute(value))
-                  view.play(timeRef = ???, target = target)
+                  val target  = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
+                  val view    = attrMap.getOrElseUpdate(key, AuralAttribute(value))
+                  val trNew   = nr.shiftTo(sched.time)
+                  view.play(timeRef = trNew, target = target)
                 }
               }
 
@@ -199,7 +200,7 @@ object AuralProcDataImpl {
       logA(s"addInstanceNode ${procCached()} : $n")
       implicit val itx = tx.peer
       nodeRef().fold {
-        val groupImpl = NodeRef.Group(name = s"Group-NodeRef ${procCached()}", in0 = n)
+        val groupImpl = NodeGroupRef(name = s"Group-NodeRef ${procCached()}", in0 = n)
         nodeRef() = Some(groupImpl)
         playScans(groupImpl)
 

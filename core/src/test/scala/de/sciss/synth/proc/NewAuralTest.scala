@@ -137,8 +137,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     tl // Obj(Timeline.Elem(tl))
   }
 
-  def frame  (secs  : Double): Long   = (secs  * Timeline.SampleRate).toLong
-  def seconds(frames: Long  ): Double = frames / Timeline.SampleRate
+  def frame  (secs  : Double): Long   = (secs  * TimeRef.SampleRate).toLong
+  def seconds(frames: Long  ): Double = frames / TimeRef.SampleRate
 
   def putDouble(proc: Proc[S], key: String, value: Double)(implicit tx: S#Tx): Unit = {
     // val imp = ExprImplicits[S]
@@ -192,8 +192,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   }
 
   implicit def timeRange(in: (Double, Double)): Span = {
-    val start = (in._1 * Timeline.SampleRate).toLong
-    val stop  = (in._2 * Timeline.SampleRate).toLong
+    val start = (in._1 * TimeRef.SampleRate).toLong
+    val stop  = (in._2 * TimeRef.SampleRate).toLong
     Span(start, stop)
   }
 

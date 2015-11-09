@@ -37,7 +37,7 @@ object TransportViewImpl {
                          model: TimelineModel, hasMillis: Boolean, hasLoop: Boolean)
                         (implicit tx: S#Tx, cursor: Cursor[S]): TransportView[S] = {
     val view    = new Impl(transport, model)
-    val srk     = 1000 / Timeline.SampleRate // transport.sampleRate
+    val srk     = 1000 / TimeRef.SampleRate // transport.sampleRate
 
     view.observer = transport.react { implicit tx => {
       case Transport.Play(_, time) => view.startedPlaying(time)
@@ -72,7 +72,7 @@ object TransportViewImpl {
 
     private var timerFrame  = 0L
     private var timerSys    = 0L
-    private val srm         = 0.001 * Timeline.SampleRate // transport.sampleRate
+    private val srm         = 0.001 * TimeRef.SampleRate // transport.sampleRate
 
     private var transportStrip: Component with GUITransport.ButtonStrip = _
 
@@ -223,7 +223,7 @@ object TransportViewImpl {
         def actionPerformed(e: ActionEvent): Unit = modOpt.foreach { mod =>
           val isPlaying = atomic { implicit tx => transport.isPlaying }
           if (!isPlaying) {
-            mod.position = mod.position + (Timeline.SampleRate * 0.25 * cueDirection).toLong
+            mod.position = mod.position + (TimeRef.SampleRate * 0.25 * cueDirection).toLong
           }
         }
       })

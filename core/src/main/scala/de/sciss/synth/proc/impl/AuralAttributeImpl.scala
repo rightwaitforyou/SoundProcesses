@@ -182,7 +182,7 @@ object AuralAttributeImpl {
     def preferredNumChannels(implicit tx: S#Tx): Int = 4
 
     protected def mkValue(spec: FadeSpec): AuralAttribute.Value = Vector[Float](
-      (spec.numFrames / Timeline.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+      (spec.numFrames / TimeRef.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
         case Curve.parametric(c)  => c
         case _                    => 0f
       }, spec.floor
