@@ -21,6 +21,7 @@ import scala.concurrent.stm.Ref
 
 object AuralNodeImpl {
   def apply(synth: Synth, users: List[DynamicUser], resources: List[Resource])(implicit tx: Txn): AuralNode = {
+    // XXX TODO -- probably we can throw `users` and `resources` together as disposables
     val res = new Impl(synth, users = Ref(users), resources = Ref(resources))
     synth.server.addVertex(res)
     res
@@ -109,7 +110,11 @@ object AuralNodeImpl {
 
     def addControl(pair: ControlSet)(implicit tx: Txn): Unit = node.set(pair)
 
-    def addUser       (user: DynamicUser )(implicit tx: Txn): Unit = users    .transform(_ :+ user)
+    def addUser(user: DynamicUser)(implicit tx: Txn): Unit = {
+      users.transform(_ :+ user)
+      user.add()
+    }
+
     def removeUser    (user: DynamicUser )(implicit tx: Txn): Unit = users    .transform(_.filterNot(_ == user))
     def addResource   (resource: Resource)(implicit tx: Txn): Unit = resources.transform(_ :+ resource)
     def removeResource(resource: Resource)(implicit tx: Txn): Unit = resources.transform(_.filterNot(_ == resource))

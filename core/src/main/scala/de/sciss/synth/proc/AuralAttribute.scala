@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.stm.{Obj, Disposable, Sys}
-import de.sciss.lucre.synth.{Sys => SSys, NodeRef, AudioBus}
+import de.sciss.lucre.synth.{Sys => SSys, AuralNode, NodeRef, AudioBus}
 import de.sciss.synth.ControlSet
 import impl.{AuralAttributeImpl => Impl}
 
@@ -39,10 +39,13 @@ object AuralAttribute {
   // ---- Target ----
 
   object Target {
-    def apply[S <: SSys[S]](nodeRef: NodeRef.Full, key: String, targetBus: AudioBus): Target[S] =
-      new impl.AuralAttributeTargetImpl[S](nodeRef, key, targetBus)
+    def apply[S <: SSys[S]](nodeRef: NodeRef.Full, key: String, targetBus: AudioBus)(implicit tx: S#Tx): Target[S] = {
+      val res = new impl.AuralAttributeTargetImpl[S](nodeRef, key, targetBus)
+      nodeRef.addUser(res)
+      res
+    }
   }
-  trait Target[S <: Sys[S]] extends Disposable[S#Tx] {
+  trait Target[S <: Sys[S]] {
     def put   (instance: Instance[S], value: Value)(implicit tx: S#Tx): Unit
     def remove(instance: Instance[S]              )(implicit tx: S#Tx): Unit
   }

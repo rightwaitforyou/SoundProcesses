@@ -22,7 +22,7 @@ import de.sciss.synth.proc.AuralAttribute.{Scalar, Stream, Instance, Value}
 import scala.concurrent.stm.{Ref, TMap}
 
 class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, targetBus: AudioBus)
-  extends AuralAttribute.Target[S] {
+  extends AuralAttribute.Target[S] with DynamicUser {
 
   import targetBus.{numChannels, server}
 
@@ -202,7 +202,14 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
     cc.attach()
   }
 
-  def dispose()(implicit tx: S#Tx): Unit = ???
+  // def dispose()(implicit tx: S#Tx): Unit = ...
+
+  // this is a no-op, we just use removal
+  def add()(implicit tx: Txn): Unit = ()
+
+  def remove()(implicit tx: Txn): Unit = {
+    ???
+  }
 
   def put(instance: Instance[S], value: Value)(implicit tx: S#Tx): Unit =
     stateRef.transform(_.put(instance, value))(tx.peer)

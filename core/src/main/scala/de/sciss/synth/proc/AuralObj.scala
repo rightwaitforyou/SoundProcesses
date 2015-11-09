@@ -83,30 +83,6 @@ object AuralObj {
       */
     def nodeOption(implicit tx: TxnLike): Option[NodeRef]
 
-// SCAN
-//    def getScanIn (key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
-//
-//    def getScanOut(key: String)(implicit tx: S#Tx): Option[Either[AudioBus, AuralScan[S]]]
-
-    //    /** Queries the number of channel associated with a scanned input.
-    //      * Throws a control throwable when no value can be determined, making
-    //      * the ugen graph builder mark the querying graph element as incomplete
-    //      * (missing information).
-    //      *
-    //      * @param key          the scan key
-    //      * @param numChannels  a given number of channels if `>= 0`, or `-1` to accept whatever the scan in provides
-    //      *
-    //      * @return             the number of channels for the scan input at the given time
-    //      */
-    //    def scanInNumChannels(key: String, numChannels: Int)(implicit tx: S#Tx): Int
-
-    //    /** Queries the number of channels associated with an attribute input.
-    //      * @param key          the attribute key
-    //      *
-    //      * @return             the number of channels for the attribute input
-    //      */
-    //    def attrNumChannels(key: String)(implicit tx: S#Tx): Int
-
     def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
 
     /* The proc object may be needed multiple times during a transaction.
@@ -115,12 +91,7 @@ object AuralObj {
      */
     def procCached()(implicit tx: S#Tx): _Proc[S]
 
-    // def scanInBusChanged(key: String, bus: AudioBus)(implicit tx: S#Tx): Unit
-
     def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
-
-    //    def getScanInBus (key: String)(implicit tx: S#Tx): Option[AudioBus]
-    //    def getScanOutBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
 
     def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
     def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
@@ -128,22 +99,8 @@ object AuralObj {
     def addInstanceNode   (n: AuralNode)(implicit tx: S#Tx): Unit
     def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit
 
-    //    /** Converts an attribute key and a value, given as an `Elem`, to a
-    //      * control-set entry for a synth. Currently throws an exception if
-    //      * the attribute value cannot be cast into a scalar control value.
-    //      *
-    //      * A scalar audio grapheme is not supported right now.
-    //      */
-    //    def attrControlSet(key: String, value: Elem[S])(implicit tx: S#Tx): ControlSet
-
     def buildAttrInput(nr: NodeRef.Full, timeRef: TimeRef, key: String, value: UGenGraphBuilder.Value)
                       (implicit tx: S#Tx): Unit
-
-// SCAN
-//    // called from scan-view if source is not materialized yet.
-//    // XXX TODO --- the method name is confusing. The `key` refers to
-//    // to an _input_ scan for which a _source_ is now available.
-//    def sinkAdded(key: String, view: AuralScan[S])(implicit tx: S#Tx): Unit
 
     implicit def context: AuralContext[S]
   }
@@ -242,8 +199,6 @@ object AuralObj {
   }
   trait Action[S <: Sys[S]] extends AuralObj[S] {
     override def obj: stm.Source[S#Tx, _Action[S]]
-
-    // def views(implicit tx: S#Tx): Set[AuralObj[S]]
   }
 }
 trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Disposable[S#Tx] {
@@ -251,10 +206,6 @@ trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Dispos
 
   /** The view must store a handle to its underlying model. */
   def obj: stm.Source[S#Tx, Obj[S]]
-
-  // def latencyEstimate(implicit tx: S#Tx): Long
-
-  // def isPrepared(implicit tx: S#Tx): Boolean
 
   def state(implicit tx: S#Tx): AuralObj.State
 
