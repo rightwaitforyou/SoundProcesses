@@ -51,6 +51,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef, key: String, target
                                    (implicit tx: S#Tx): State = {
     implicit val itx = tx.peer
     target.node.set(value.toControl(ctlName))
+    ??? // toControl: must match `numChannels`!
     val cc = new Connected(value, Nil)
     map.put(source, cc).foreach(_.dispose())
     new Single(source, cc)
@@ -133,6 +134,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef, key: String, target
         val len0      = values0.length
         val syn       = Synth.play(g, nameHint = Some("attr"))(target = server,
           args = List("value" -> Vector.tabulate[Float](numChannels)(i => values0(i % len0))))
+        ??? // `.play` should not be called here; `syn` should be a user (with vertex), so it's freed at the end
         addDependency(syn)
         val edge      = NodeRef.Edge(syn, target)
         val edgeUser  = new AddRemoveEdge(edge)
@@ -142,6 +144,9 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef, key: String, target
         edgeUser :: busUser :: Nil
 
       case sc: AuralAttribute.Stream =>
+        // - basically the same synth (mapped control in, bus out)
+        // - .reader/.mapper source-bus; .write targetBus
+        // - add both vertices, add both edges
         ???
     }
     new Connected(value, users)
