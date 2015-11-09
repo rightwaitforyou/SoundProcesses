@@ -16,7 +16,7 @@ package impl
 
 import java.io.File
 
-import de.sciss.lucre.synth.{Sys, Buffer, Txn}
+import de.sciss.lucre.synth.{NodeRef, Sys, Buffer, Txn}
 import de.sciss.osc
 import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.synth.io.AudioFileSpec
@@ -100,7 +100,7 @@ object BufferPrepare {
       buf
     }
 
-    def install(b: SynthBuilder)(implicit tx: S#Tx): Unit = {
+    def install(b: NodeRef.Full)(implicit tx: S#Tx): Unit = {
       val ctlName = graph.Buffer.controlName(key)
       b.addControl(ctlName -> buf.id)
       b.addResource(buf)
