@@ -17,11 +17,8 @@ import de.sciss.lucre.stm.Disposable
 import impl.{AuralNodeImpl => Impl}
 
 object AuralNode {
-  def apply(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
-            resources: List[Disposable[Txn]], attrMap: Map[String, List[Disposable[Txn]]])
-           (implicit tx: Txn): AuralNode =
-    Impl(synth, inputBuses = inputBuses, outputBuses = outputBuses,
-      resources = resources, attrMap = attrMap)
+  def apply(synth: Synth, resources: List[Disposable[Txn]])(implicit tx: Txn): AuralNode =
+    Impl(synth, resources = resources)
 }
 
 trait AuralNode extends NodeRef.Full {
@@ -38,6 +35,6 @@ trait AuralNode extends NodeRef.Full {
 
   def preGroup()(implicit tx: Txn): Group
 
-  def getInputBus (key: String): Option[AudioBus]
-  def getOutputBus(key: String): Option[AudioBus]
+  // def getInputBus (key: String): Option[AudioBus]
+  // def getOutputBus(key: String): Option[AudioBus]
 }

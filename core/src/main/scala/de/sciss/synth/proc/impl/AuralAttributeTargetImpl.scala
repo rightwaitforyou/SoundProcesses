@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.synth.{Node, Txn, DynamicUser, BusNodeSetter, Resource, Synth, AudioBus, NodeRef, Sys}
+import de.sciss.lucre.synth.{AudioBus, BusNodeSetter, DynamicUser, NodeRef, Resource, Synth, Sys, Txn}
 import de.sciss.synth
 import de.sciss.synth.SynthGraph
 import de.sciss.synth.proc.AuralAttribute.Value
@@ -66,14 +66,14 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
     override def toString = s"AddRemoveEdge($edge)"
   }
 
-  private final class AddVertexFreeNode(node: Node) extends DynamicUser {
-    def add   ()(implicit tx: Txn): Unit = server.addVertex(node)
+  private final class AddRemoveVertex(vertex: NodeRef) extends DynamicUser {
+    def add   ()(implicit tx: Txn): Unit = server.addVertex(vertex)
     def remove()(implicit tx: Txn): Unit = {
-      server.removeVertex(node)
-      node.free()
+      server.removeVertex(vertex)
+      // node.free()
     }
 
-    override def toString = s"AddVertexFreeNode($node)"
+    override def toString = s"AddRemoveVertex($vertex)"
   }
 
   private def putSingleScalar(source: AuralAttribute[S], value: AuralAttribute.Scalar)
@@ -182,7 +182,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
         val syn       = Synth.play(g, nameHint = Some("attr"))(target = server,
           args = List("value" -> Vector.tabulate[Float](numChannels)(i => values0(i % len0))))
         // XXX TODO - `.play` should not be called here?
-        val vertexUser= new AddVertexFreeNode(syn)
+        val vertexUser= new AddRemoveVertex(syn)
         // target.addResource(syn)
         val edge      = NodeRef.Edge(syn, target)
         val edgeUser  = new AddRemoveEdge(edge)

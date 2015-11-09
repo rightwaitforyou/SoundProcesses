@@ -348,11 +348,11 @@ object AuralProcImpl {
       }
 
       // XXX TODO - it would be nicer if these were added optionally
-      if (timeRef.frame        != 0) builder.setMap += graph.Time    .key -> (timeRef.frame        / SampleRate)
-      if (timeRef.offsetOrZero != 0) builder.setMap += graph.Offset  .key -> (timeRef.offsetOrZero / SampleRate)
+      if (timeRef.frame        != 0) builder.addControl(graph.Time    .key -> (timeRef.frame        / SampleRate))
+      if (timeRef.offsetOrZero != 0) builder.addControl(graph.Offset  .key -> (timeRef.offsetOrZero / SampleRate))
       timeRef.span match {
         case Span(start, stop) =>
-          builder.setMap += graph.Duration.key -> ((stop - start) / SampleRate)
+          builder.addControl(graph.Duration.key -> ((stop - start) / SampleRate))
         case _ => // Double.PositiveInfinity
       }
 
@@ -366,8 +366,8 @@ object AuralProcImpl {
         val bus    = _data.getOutputBus(key) getOrElse sys.error(s"Scan bus $key not provided")
         logA(s"addOutputBus($key, $bus) (${hashCode.toHexString})")
         val res    = BusNodeSetter.writer(graph.ScanOut.controlName(key), bus, synth)
-        builder.users ::= res
-        builder.outputBuses += key -> bus
+        builder.addUser(res)
+        // builder.outputBuses += key -> bus
         // res
       }
 

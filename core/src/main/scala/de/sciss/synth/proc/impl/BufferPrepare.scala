@@ -102,8 +102,8 @@ object BufferPrepare {
 
     def install(b: SynthBuilder)(implicit tx: S#Tx): Unit = {
       val ctlName = graph.Buffer.controlName(key)
-      b.setMap += ctlName -> buf.id
-      b.dependencies ::= buf
+      b.addControl(ctlName -> buf.id)
+      b.addResource(buf)
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {

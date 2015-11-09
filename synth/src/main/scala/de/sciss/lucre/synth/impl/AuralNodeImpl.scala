@@ -17,14 +17,11 @@ package impl
 import de.sciss.lucre.stm.Disposable
 import de.sciss.synth.{ControlSet, addBefore}
 
-import scala.concurrent.stm.{Ref, TMap}
+import scala.concurrent.stm.Ref
 
 object AuralNodeImpl {
-  def apply(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
-            resources: List[Disposable[Txn]], attrMap: Map[String, List[Disposable[Txn]]])
-           (implicit tx: Txn): AuralNode = {
-    val res = new Impl(synth, inputBuses = inputBuses, outputBuses = outputBuses,
-      resources = resources, attrMap0 = attrMap)
+  def apply(synth: Synth, resources: List[Disposable[Txn]])(implicit tx: Txn): AuralNode = {
+    val res = new Impl(synth, resources = resources)
     synth.server.addVertex(res)
     res
   }
@@ -40,18 +37,12 @@ object AuralNodeImpl {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl(synth: Synth, inputBuses: Map[String, AudioBus], outputBuses: Map[String, AudioBus],
-                           resources: List[Disposable[Txn]], attrMap0: Map[String, List[Disposable[Txn]]])
+  private final class Impl(synth: Synth, resources: List[Disposable[Txn]])
     extends AuralNode {
 
-    private val groupsRef = Ref[Option[AllGroups]](None)
+    private[this] val groupsRef = Ref[Option[AllGroups]](None)
 
-    private val attrMap   = TMap[String, List[Disposable[Txn]]](attrMap0.toSeq: _*)
-
-    override def toString = {
-      val insS = s"ins = ${inputBuses.mkString("(", ", ", ")")}"
-      s"AuralProc($synth, outs = ${outputBuses.mkString("(", ", ", ")")}, $insS"
-    }
+    override def toString = s"AuralProc($synth)"
 
     def server = synth.server
 
@@ -82,7 +73,7 @@ object AuralNodeImpl {
       }
     }
 
-    @inline private def preGroupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).flatMap(_.pre)
+    @inline private[this] def preGroupOption(implicit tx: Txn): Option[Group] = groupsRef.get(tx.peer).flatMap(_.pre)
 
     def preGroup()(implicit tx: Txn): Group = {
       implicit val itx = tx.peer
@@ -102,7 +93,7 @@ object AuralNodeImpl {
       groupsRef().flatMap(_.core) getOrElse synth // runningRef().map( _.anchorNode )
     }
 
-    private def moveAllTo(all: AllGroups, newGroup: Group)(implicit tx: Txn): Unit = {
+    private[this] def moveAllTo(all: AllGroups, newGroup: Group)(implicit tx: Txn): Unit = {
       val core = anchorNode
       core.moveToTail(newGroup)
       all.pre .foreach(_.moveBefore(core))
@@ -117,28 +108,15 @@ object AuralNodeImpl {
       implicit val itx = tx.peer
       node.free()
       resources.foreach(_.dispose())
-      attrMap  .foreach(_._2.foreach(_.dispose()))
-      attrMap.clear()
       server.removeVertex(this)
     }
 
     def addControl(pair: ControlSet)(implicit tx: Txn): Unit = node.set(pair)
 
-    def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
-    def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
+    def addUser       (user: DynamicUser )(implicit tx: Txn): Unit = ???
+    def removeUser    (user: DynamicUser )(implicit tx: Txn): Unit = ???
 
     def addResource   (resource: Resource)(implicit tx: Txn): Unit = ???
     def removeResource(resource: Resource)(implicit tx: Txn): Unit = ???
-
-    def getInputBus (key: String): Option[AudioBus] = inputBuses .get(key)
-    def getOutputBus(key: String): Option[AudioBus] = outputBuses.get(key)
-
-    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit = {
-      val all = attrMap.get(key)(tx.peer).fold(values)(_ ::: values)
-      attrMap.put(key, all)(tx.peer)
-    }
-
-    def removeAttrResources(key: String)(implicit tx: Txn): Unit =
-      attrMap.remove(key)(tx.peer).getOrElse(Nil).foreach(_.dispose())
   }
 }

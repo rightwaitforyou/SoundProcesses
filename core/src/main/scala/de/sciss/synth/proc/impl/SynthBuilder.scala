@@ -13,8 +13,8 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.synth.{AudioBus, AuralNode, DynamicUser, Node, NodeRef, Resource, Server, Synth, Sys, Txn}
-import de.sciss.synth.proc.{Proc, TimeRef}
+import de.sciss.lucre.synth.{AuralNode, DynamicUser, Node, NodeRef, Resource, Server, Synth, Sys, Txn}
+import de.sciss.synth.proc.Proc
 import de.sciss.synth.{ControlSet, addToHead}
 
 /** An object used in the last phase of playing a process. It has
@@ -28,23 +28,18 @@ final class SynthBuilder(synth: Synth)
 
   override def toString = s"SynthBuilder($synth)"
 
-  val setMap        = Vector.newBuilder[ControlSet]
+  private[this] val setMap = Vector.newBuilder[ControlSet]
 
   /** Users are elements which must be added after the
     * aural proc synth is started, and removed when it stops.
     */
-  var users         = List.empty[DynamicUser]
+  private[this] var users         = List.empty[DynamicUser]
   /** resources are dependencies in terms of synth bundle spawning,
     * and will be disposed by the aural proc.
     */
-  var dependencies  = List.empty[Resource]
+  private[this] var dependencies  = List.empty[Resource]
 
-  var outputBuses   = Map.empty[String, AudioBus]
-  var inputBuses    = Map.empty[String, AudioBus]
-
-  private var attrMap = Map.empty[String, (List[DynamicUser], List[Resource])]
-
-  private[this] var finished = false
+  private[this] var finished1 = false
 
   /** finishes building the `AuralNode`. Does not yet add the
     * users which is done through `finish2`, the reason being
@@ -53,17 +48,16 @@ final class SynthBuilder(synth: Synth)
     * Not pretty...
     */
   def finish1()(implicit tx: Txn): AuralNode = {
-    require (!finished)
-    finished = true
+    require (!finished1)
+    finished1      = true
+    users         = users.reverse
+    dependencies  = dependencies.reverse
 
     // XXX TODO
     val server  = synth.server
     val group   = server.defaultGroup
 
-    val attrMap1 = attrMap.map { case (key, value) => (key, value._1 ::: value._2) }
-
-    val node = AuralNode(synth, inputBuses = inputBuses, outputBuses = outputBuses,
-      resources = users ::: dependencies, attrMap = attrMap1)
+    val node = AuralNode(synth, resources = users ::: dependencies)
 
     // wrap as AuralProc and save it in the identifier map for later lookup
     synth.play(target = group, addAction = addToHead, args = setMap.result(),
@@ -74,41 +68,30 @@ final class SynthBuilder(synth: Synth)
     node
   }
 
+  private[this] var finished2 = false
+
   /** Second stage of finishing is to add all users. */
   def finish2()(implicit tx: Txn): Unit = {
-    users                  .foreach(_.add())
-    attrMap.foreach(_._2._1.foreach(_.add()))
+    require (!finished2)
+    finished2      = true
+    users.foreach(_.add())
   }
 
-//  // copies the node-dependency-builder stuff to a map entry
-//  def storeKey(key: String): Unit =
-//    if (keyedUsers.nonEmpty || keyedResources.nonEmpty) {
-//      attrMap += key -> (keyedUsers -> keyedResources)
-//      keyedUsers      = Nil
-//      keyedResources  = Nil
-//    }
-
-  // ---- node-dependency-builder ----
-
-  // def node = synth
-
-//  def addControl(pair: ControlSet): Unit = setMap += pair
-
-//  private var keyedUsers      = List.empty[DynamicUser]
-//  private var keyedResources  = List.empty[Resource   ]
-//
 //  def addUser    (user    : DynamicUser): Unit = keyedUsers     ::= user
 //  def addResource(resource: Resource   ): Unit = keyedResources ::= resource
 
-  def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = ???
-  def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = ???
+  def addUser   (user: DynamicUser)(implicit tx: Txn): Unit = users ::= user
+  def removeUser(user: DynamicUser)(implicit tx: Txn): Unit = users   = users.filterNot(_ == user)
 
-  def addResource   (resource: Resource)(implicit tx: Txn): Unit = ???
-  def removeResource(resource: Resource)(implicit tx: Txn): Unit = ???
+  def addResource   (resource: Resource)(implicit tx: Txn): Unit = dependencies ::= resource
+  def removeResource(resource: Resource)(implicit tx: Txn): Unit = dependencies.filterNot(_ == resource)
 
-  def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = ???
+  def addControl (pair: ControlSet  )(implicit tx: Txn): Unit = setMap += pair
 
-  def dispose()(implicit tx: Txn): Unit = ???
+  def dispose()(implicit tx: Txn): Unit = {
+    users       .foreach(_.dispose())
+    dependencies.foreach(_.dispose())
+  }
 
   def node(implicit tx: Txn): Node = synth
 
