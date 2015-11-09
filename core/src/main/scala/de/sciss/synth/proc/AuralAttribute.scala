@@ -42,9 +42,9 @@ object AuralAttribute {
     def apply[S <: SSys[S]](nodeRef: NodeRef.Full, key: String, targetBus: AudioBus): Target[S] =
       new impl.AuralAttributeTargetImpl[S](nodeRef, key, targetBus)
   }
-  trait Target[S <: Sys[S]] {
-    def put   (source: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
-    def remove(source: AuralAttribute[S]              )(implicit tx: S#Tx): Unit
+  trait Target[S <: Sys[S]] extends Disposable[S#Tx] {
+    def put   (instance: Instance[S], value: Value)(implicit tx: S#Tx): Unit
+    def remove(instance: Instance[S]              )(implicit tx: S#Tx): Unit
   }
 
   // ---- Value ----
@@ -84,12 +84,17 @@ object AuralAttribute {
   final case class Stream(source: NodeRef, bus: AudioBus) extends Value {
     def isScalar = false
   }
+
+  trait Instance[S <: Sys[S]] extends Disposable[S#Tx]
 }
 trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
+  import AuralAttribute.{Target, Instance}
+
   def preferredNumChannels(implicit tx: S#Tx): Int
 
   // def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  def play(timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Disposable[S#Tx]
+
+  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Instance[S]
 
   // def stop   ()(implicit tx: S#Tx): Unit
 }

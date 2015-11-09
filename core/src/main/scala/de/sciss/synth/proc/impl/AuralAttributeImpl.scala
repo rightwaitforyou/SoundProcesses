@@ -19,7 +19,7 @@ import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
 import de.sciss.lucre.synth.{NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{expr, stm}
 import de.sciss.synth.Curve
-import de.sciss.synth.proc.AuralAttribute.Factory
+import de.sciss.synth.proc.AuralAttribute.{Instance, Target, Factory}
 import de.sciss.synth.proc.AuralContext.AuxAdded
 
 import scala.concurrent.stm.Ref
@@ -55,9 +55,9 @@ object AuralAttributeImpl {
 //    Timeline            .typeID -> ...
   )
 
-  // private[this] final class PlayRef[S <: Sys[S]](val target: AuralAttribute.Target[S])
+  // private[this] final class PlayRef[S <: Sys[S]](val target: Target[S])
 
-  // private[this] type PlayRef[S <: Sys[S]] = AuralAttribute.Target[S]
+  // private[this] type PlayRef[S <: Sys[S]] = Target[S]
 
   private[this] trait ExprImpl[S <: Sys[S], A] extends AuralAttribute[S] { attr =>
     // ---- abstract ----
@@ -68,19 +68,19 @@ object AuralAttributeImpl {
 
     // ---- impl ----
 
-    private[this] final class PlayRef(val target: AuralAttribute.Target[S])
-      extends Disposable[S#Tx] {
+    private[this] final class PlayRef(val target: Target[S])
+      extends Instance[S] {
 
       def dispose()(implicit tx: S#Tx): Unit = {
         playRef.transform(_.filterNot(_ == this))
-        target.remove(attr)
+        target.remove(this)
       }
     }
 
     private[this] var obs: Disposable[S#Tx] = _
     private[this] val playRef = Ref(List.empty[PlayRef])
 
-    def play(timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Disposable[S#Tx] = {
+    def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Instance[S] = {
       val p = new PlayRef(target)
       playRef.transform(p :: _)
       // require(playRef.swap(Some(p))(tx.peer).isEmpty)
@@ -91,7 +91,7 @@ object AuralAttributeImpl {
     private[this] def update(p: PlayRef, value: A)(implicit tx: S#Tx): Unit = {
       import p.target
       val ctlVal = mkValue(value)
-      target.put(this, ctlVal)
+      target.put(p, ctlVal)
     }
 
     def init(expr: Expr[S, A])(implicit tx: S#Tx): this.type = {
@@ -202,12 +202,12 @@ object AuralAttributeImpl {
   private[this] final class OutputAttribute[S <: Sys[S]]()(implicit context: AuralContext[S])
     extends AuralAttribute[S] { attr =>
 
-    private[this] final class PlayRef(val target: AuralAttribute.Target[S])
-      extends Disposable[S#Tx] {
+    private[this] final class PlayRef(val target: Target[S])
+      extends Instance[S] {
 
       def dispose()(implicit tx: S#Tx): Unit = {
         playRef.transform(_.filterNot(_ == this))
-        target.remove(attr)
+        target.remove(this)
       }
     }
 
@@ -239,7 +239,7 @@ object AuralAttributeImpl {
       playRef().foreach(update(_, auralOutput))
     }
 
-    def play(timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Disposable[S#Tx] = {
+    def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Instance[S] = {
       val p = new PlayRef(target)
       playRef.transform(p :: _)
       auralRef().foreach(update(p, _))
@@ -251,7 +251,7 @@ object AuralAttributeImpl {
 
     private[this] def update1(p: PlayRef, nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit = {
       import p.target
-      target.put(this, AuralAttribute.Stream(nodeRef, bus))
+      target.put(p, AuralAttribute.Stream(nodeRef, bus))
     }
 
 //    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
@@ -288,15 +288,15 @@ object AuralAttributeImpl {
     import context.{scheduler => sched}
 
     private[this] final class PlayTime(val wallClock: Long,
-                                       val timeRef: TimeRef.Apply, val target: AuralAttribute.Target[S],
+                                       val timeRef: TimeRef.Apply, val target: Target[S],
                                        childViews: Ref[Vector[Disposable[S#Tx]]])
-      extends Disposable[S#Tx] {
+      extends Instance[S] {
 
       def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
 
       def dispose()(implicit tx: S#Tx): Unit = {
         playRef.transform(_.filterNot(_ == this))
-        target.remove(attr)
+        target.remove(this)
         childViews.swap(Vector.empty).foreach(_.dispose())
       }
 
@@ -341,7 +341,7 @@ object AuralAttributeImpl {
       this
     }
 
-    def play(timeRef: TimeRef, target: AuralAttribute.Target[S])(implicit tx: S#Tx): Disposable[S#Tx] = {
+    def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Instance[S] = {
       val tForce  = timeRef.force
       // require(playRef.swap(Some(p)).isEmpty)
       val childAttrs  = childAttrRef()
