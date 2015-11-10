@@ -111,7 +111,7 @@ object AuralOutputImpl {
 //    private val sinks   = TSet.empty[AuralInput[S]]
 //    private val links   = TMap.empty[AuralInput[S], LinkNode] // key = sink
 
-    private[AuralOutputImpl] var obs: Disposable[S#Tx] = _
+//    private[AuralOutputImpl] var obs: Disposable[S#Tx] = _
 
 // SCAN
 //    def addSource(source: AuralOutput[S])(implicit tx: S#Tx): Unit = {
@@ -197,7 +197,7 @@ object AuralOutputImpl {
       logA(s"AuralOutput dispose; ${data.procCached()}, $key")
       implicit val itx = tx.peer
       data.context.removeAux(idH())
-      obs.dispose()
+      // obs.dispose()
 // SCAN
 //      val sources0  = sources.swap(Set.empty)(tx.peer)
 //      val sinks0    = sinks  .swap(Set.empty)(tx.peer)

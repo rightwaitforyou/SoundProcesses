@@ -764,7 +764,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 8
 
-  def test8()(implicit context: AuralContext[S]): Unit = {
+  def test8()(implicit context: AuralContext[S]): Unit = {  // XXX TODO
     println("----test8----")
     println(
       """
@@ -1006,12 +1006,17 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
             Out.ar(1, sig)
           }
 
-          tlObj += (6.0 -> 7.5, _view4.obj())
+          val span1 = SpanLikeObj.newConst(6.0 -> 7.5): SpanLikeObj[S]
+          tlObj.modifiableOption.get.add(span1, _view4.obj())
+          // tlObj += (6.0 -> 7.5, _view4.obj())
+          val span1H = tx.newHandle(span1)
 
           after(1.0) { implicit tx =>
             val tlObj = tl.obj()
             println("--kill your idol at 6.5s--")
-            tlObj -= (6.0 -> 7.5, _view4.obj())
+            val span1 = span1H()
+            // tlObj -= (6.0 -> 7.5, _view4.obj())
+            tlObj.modifiableOption.get.remove(span1, _view4.obj())
 
             stopAndQuit(3.0)
           }
