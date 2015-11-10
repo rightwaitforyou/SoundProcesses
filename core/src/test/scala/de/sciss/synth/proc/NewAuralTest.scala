@@ -510,7 +510,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         t.addObject(in1)
 
         val in2 = proc {
-          val sig = Dust.ar(50) * 0.75
+          val sig = Dust.ar(400) * 0.75
           graph.ScanOut("out", sig)
         }
         in2.name = "dust"

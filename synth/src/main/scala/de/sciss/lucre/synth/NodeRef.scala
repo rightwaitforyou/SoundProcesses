@@ -13,25 +13,28 @@
 
 package de.sciss.lucre.synth
 
-import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.impl.{NodeRefImpl => Impl}
 import de.sciss.synth.ControlSet
 import de.sciss.topology.Topology
 
 object NodeRef {
-  object Var {
-    def apply(init: NodeRef.Full): Var = Impl.Var(init)
-  }
-  trait Var extends NodeRef.Full with stm.Source[Txn, NodeRef.Full] with stm.Sink[Txn, NodeRef.Full]
+//  object Var {
+//    def apply(init: NodeRef.Full): Var = Impl.Var(init)
+//  }
+//  trait Var extends NodeRef.Full with stm.Source[Txn, NodeRef.Full] with stm.Sink[Txn, NodeRef.Full]
 
   trait Full extends NodeRef with Disposable[Txn] {
-//    def addAttrResources(key: String, values: List[Disposable[Txn]])(implicit tx: Txn): Unit
-//
-//    /** Removes and frees resources associated with the attribute specified by `key` */
-//    def removeAttrResources(key: String)(implicit tx: Txn): Unit
 
+    /** Adds a user to the node-ref. If it is already playing,
+      * it successively calls `user.add()`.
+      */
     def addUser       (user: DynamicUser )(implicit tx: Txn): Unit
+
+    /** Removes a user from the node-ref. __Note:__ If the node-ref
+      * is already playing, it currently does not call `user.remove()`,
+      * but this must be done by the caller.
+      * XXX TODO -- perhaps we should change that?
+      */
     def removeUser    (user: DynamicUser )(implicit tx: Txn): Unit
 
     def addResource   (resource: Resource)(implicit tx: Txn): Unit

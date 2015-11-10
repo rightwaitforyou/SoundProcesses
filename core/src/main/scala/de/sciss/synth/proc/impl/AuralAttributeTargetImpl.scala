@@ -156,9 +156,10 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
       map.size match {
         case 1 =>
           val (aa, cc) = map.head
-          new Single(aa, cc)
-//        case 2 =>
-//          ...
+          target.removeUser(tgtBusUser)
+          tgtBusUser.dispose()  // XXX TODO --- not sure this should be done by `removeUser` automatically
+          cc.dispose()
+          Empty.put(aa, cc.value)
         case x =>
           assert(x > 2)
           this
