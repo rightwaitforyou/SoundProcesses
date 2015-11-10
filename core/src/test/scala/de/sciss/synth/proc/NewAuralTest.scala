@@ -366,9 +366,6 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |""".stripMargin)
 
     cursor.step { implicit tx =>
-//      val imp     = ExprImplicits[S]
-//      import imp._
-
       val pRec = proc {
         val freq  = LFNoise0.ar(Seq(5, 5)).linlin(-1, 1, 70, 90).roundTo(1).midicps
         val sig   = SinOsc.ar(freq) * 0.2
@@ -425,9 +422,6 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |""".stripMargin)
 
     cursor.step { implicit tx =>
-//      val imp     = ExprImplicits[S]
-//      import imp._
-
       val playing = BooleanObj.newVar[S](false)
       val foldIn  = Folder[S]
       val ensIn   = Ensemble[S](foldIn , 0L, true)     // inner ensemble already active
@@ -493,7 +487,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     cursor.step { implicit tx =>
       val _proc = proc {
         val in  = graph.ScanInFix("in", 1)
-        val gen = Pulse.ar(LFNoise1.ar(1).linexp(0, 1, 400, 1000.0)) * 0.1
+        val gen = Pulse.ar(LFNoise1.ar(1).linexp(0, 1, 400, 1000.0)) * 0.06
         val sig = gen + in
         Out.ar(0, Pan2.ar(sig))
       }
@@ -507,7 +501,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       after(2.0) { implicit tx =>
         println("--create inputs--")
         val in1 = proc {
-          val sig = PinkNoise.ar(0.2)
+          val sig = PinkNoise.ar(0.3)
           graph.ScanOut("out", sig)
         }
         in1.name = "noise"
@@ -619,7 +613,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 10
 
-  def test10()(implicit context: AuralContext[S]): Unit = {
+  def test10()(implicit context: AuralContext[S]): Unit = {   // XXX TODO
     println("----test10----")
     println(
       """
