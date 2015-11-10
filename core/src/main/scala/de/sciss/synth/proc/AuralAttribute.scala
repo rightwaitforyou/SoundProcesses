@@ -22,19 +22,30 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.{implicitConversions, higherKinds}
 
 object AuralAttribute {
+  def apply[S <: SSys[S]](key: String, value: Obj[S], observer: Observer[S])
+                         (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
+    Impl(key, value, observer)
+
+  // ---- Observer ----
+
+  trait Observer[S <: Sys[S]] {
+    def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit
+  }
+
+  // ---- Factory ----
+
   trait Factory {
     def typeID: Int
 
     type Repr[~ <: Sys[~]] <: Obj[~]
 
-    def apply[S <: SSys[S]](value: Repr[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S]
+    def apply[S <: SSys[S]](key: String, value: Repr[S], observer: Observer[S])
+                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S]
   }
 
   def addFactory(f: Factory): Unit = Impl.addFactory(f)
 
   def factories: Iterable[Factory] = Impl.factories
-
-  def apply[S <: SSys[S]](value: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = Impl(value)
 
   // ---- Target ----
 
@@ -95,6 +106,8 @@ object AuralAttribute {
 }
 trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
   import AuralAttribute.Target
+
+  def key: String
 
   def preferredNumChannels(implicit tx: S#Tx): Int
 

@@ -37,7 +37,7 @@ object AuralProcDataImpl {
     context.acquire[AuralObj.ProcData[S]](proc)(new Impl[S].init(proc))
 
   class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
-    extends ProcData[S] with UGB.Context[S] {
+    extends ProcData[S] with UGB.Context[S] with AuralAttribute.Observer[S] {
 
     import TxnLike.peer
 
@@ -156,8 +156,7 @@ object AuralProcDataImpl {
       logA(s"AttrAdded   to   ${procCached()} ($key) - used? $used")
       if (!used) return
 
-      // mkAttrObserver1(key, value)
-      val view    = attrMap.getOrElseUpdate(key, AuralAttribute(value))
+      val view = mkAuralAttribute(key, value)
       st match {
         case st0: Complete[S] =>
           acceptedOpt match {
@@ -332,6 +331,15 @@ object AuralProcDataImpl {
       view
     }
 
+    private def mkAuralAttribute(key: String, value: Obj[S])(implicit tx: S#Tx): AuralAttribute[S] =
+      attrMap.getOrElseUpdate(key, AuralAttribute(key, value, this))
+
+    // AuralAttribute.Observer
+    def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
+      val aKey = UGB.AttributeKey(attr.key)
+      if (state.rejectedInputs.contains(aKey)) tryBuild()
+    }
+
     /** Sub-classes may override this if invoking the super-method. */
     def requestInput[Res](in: UGB.Input { type Value = Res }, st: Incomplete[S])
                          (implicit tx: S#Tx): Res = in match {
@@ -339,7 +347,7 @@ object AuralProcDataImpl {
         val procObj   = procCached()
         val valueOpt  = procObj.attr.get(i.name)
         val found     = valueOpt.fold(-1) { value =>
-          val view = attrMap.getOrElseUpdate(i.name, AuralAttribute(value))
+          val view = mkAuralAttribute(i.name, value)
           view.preferredNumChannels
         }
 

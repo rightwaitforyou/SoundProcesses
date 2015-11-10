@@ -19,7 +19,7 @@ import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
 import de.sciss.lucre.synth.{Txn, NodeRef, AudioBus, Sys}
 import de.sciss.lucre.{expr, stm}
 import de.sciss.synth.Curve
-import de.sciss.synth.proc.AuralAttribute.{Instance, Target, Factory}
+import de.sciss.synth.proc.AuralAttribute.{Observer, Instance, Target, Factory}
 import de.sciss.synth.proc.AuralContext.AuxAdded
 
 import scala.concurrent.stm.Ref
@@ -37,10 +37,11 @@ object AuralAttributeImpl {
 
   def factories: Iterable[Factory] = map.values
 
-  def apply[S <: Sys[S]](value: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = {
+  def apply[S <: Sys[S]](key: String, value: Obj[S], observer: Observer[S])
+                        (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = {
     val tid     = value.tpe.typeID
     val factory = map.getOrElse(tid, throw new IllegalArgumentException(s"No AuralAttribute available for $value"))
-    factory(value.asInstanceOf[factory.Repr[S]])
+    factory(key, value.asInstanceOf[factory.Repr[S]], observer)
   }
 
   private[this] var map = Map[Int, Factory](
@@ -121,11 +122,12 @@ object AuralAttributeImpl {
 
     def typeID = IntObj.typeID
 
-    def apply[S <: Sys[S]](value: IntObj[S])
+    def apply[S <: Sys[S]](key: String, value: IntObj[S], observer: Observer[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new IntAttribute(tx.newHandle(value)).init(value)
+      new IntAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class IntAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, IntObj[S]])
+  private[this] final class IntAttribute[S <: Sys[S]](val key: String,
+                                                      protected val exprH: stm.Source[S#Tx, IntObj[S]])
     extends NumberImpl[S, Int] {
 
     protected def mkValue(value: Int): AuralAttribute.Value = value.toFloat
@@ -138,11 +140,12 @@ object AuralAttributeImpl {
 
     def typeID = DoubleObj.typeID
 
-    def apply[S <: Sys[S]](value: DoubleObj[S])
+    def apply[S <: Sys[S]](key: String, value: DoubleObj[S], observer: Observer[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new DoubleAttribute(tx.newHandle(value)).init(value)
+      new DoubleAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class DoubleAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
+  private[this] final class DoubleAttribute[S <: Sys[S]](val key: String,
+                                                         protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
     extends NumberImpl[S, Double] {
 
     protected def mkValue(value: Double): AuralAttribute.Value = value.toFloat
@@ -155,11 +158,12 @@ object AuralAttributeImpl {
 
     def typeID = BooleanObj.typeID
 
-    def apply[S <: Sys[S]](value: BooleanObj[S])
+    def apply[S <: Sys[S]](key: String, value: BooleanObj[S], observer: Observer[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new BooleanAttribute(tx.newHandle(value)).init(value)
+      new BooleanAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class BooleanAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
+  private[this] final class BooleanAttribute[S <: Sys[S]](val key: String,
+                                                          protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
     extends NumberImpl[S, Boolean] {
 
     protected def mkValue(value: Boolean): AuralAttribute.Value = if (value) 1f else 0f
@@ -172,11 +176,12 @@ object AuralAttributeImpl {
 
     def typeID = FadeSpec.Obj.typeID
 
-    def apply[S <: Sys[S]](value: FadeSpec.Obj[S])
+    def apply[S <: Sys[S]](key: String, value: FadeSpec.Obj[S], observer: Observer[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new FadeSpecAttribute(tx.newHandle(value)).init(value)
+      new FadeSpecAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class FadeSpecAttribute[S <: Sys[S]](protected val exprH: stm.Source[S#Tx, FadeSpec.Obj[S]])
+  private[this] final class FadeSpecAttribute[S <: Sys[S]](val key: String,
+                                                           protected val exprH: stm.Source[S#Tx, FadeSpec.Obj[S]])
     extends ExprImpl[S, FadeSpec] {
 
     def preferredNumChannels(implicit tx: S#Tx): Int = 4
@@ -196,11 +201,12 @@ object AuralAttributeImpl {
 
     def typeID = Output.typeID
 
-    def apply[S <: Sys[S]](value: Output[S])
+    def apply[S <: Sys[S]](key: String, value: Output[S], observer: Observer[S])
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new OutputAttribute().init(value)
+      new OutputAttribute(key, observer).init(value)
   }
-  private[this] final class OutputAttribute[S <: Sys[S]]()(implicit context: AuralContext[S])
+  private[this] final class OutputAttribute[S <: Sys[S]](val key: String, observer: Observer[S])
+                                                        (implicit context: AuralContext[S])
     extends AuralAttribute[S] { attr =>
 
     private[this] final class PlayRef(val target: Target)
@@ -223,7 +229,10 @@ object AuralAttributeImpl {
     def init(output: Output[S])(implicit tx: S#Tx): this.type = {
       val id  = output.id // idH()
       obs = context.observeAux[AuralOutput[S]](id) { implicit tx => {
-        case AuxAdded(_, auralOutput) => auralSeen(auralOutput)
+        case AuxAdded(_, auralOutput) =>
+        auralSeen(auralOutput)
+        playRef().foreach(update(_, auralOutput))
+        observer.attrNumChannelsChanged(this)
       }}
       context.getAux[AuralOutput[S]](id).foreach(auralSeen)
       this
@@ -275,21 +284,18 @@ object AuralAttributeImpl {
 
     def typeID = Folder.typeID
 
-    def apply[S <: Sys[S]](value: Folder[S])
-                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = {
-
-      val elemViews = value.iterator.map { elem =>
-        AuralAttribute(elem)
-      } .toVector
-
-      new FolderAttribute(Ref(elemViews)).init(value)
-    }
+    def apply[S <: Sys[S]](key: String, value: Folder[S], observer: Observer[S])
+                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
+      new FolderAttribute(key, observer).init(value)
   }
-  private[this] final class FolderAttribute[S <: Sys[S]](childAttrRef: Ref[Vector[AuralAttribute[S]]])
+  private[this] final class FolderAttribute[S <: Sys[S]](val key: String,
+                                                         observer: Observer[S])
                                                         (implicit context: AuralContext[S])
-    extends AuralAttribute[S] { attr =>
+    extends AuralAttribute[S] with Observer[S] { attr =>
 
     import context.{scheduler => sched}
+
+    private[this] val childAttrRef = Ref.make[Vector[AuralAttribute[S]]]
 
     private[this] final class PlayTime(val wallClock: Long,
                                        val timeRef: TimeRef.Apply, val target: Target)
@@ -324,11 +330,21 @@ object AuralAttributeImpl {
       loop(childAttrRef(), -1)
     }
 
+    // simply forward, for now we don't go into the details of checking
+    // `preferredNumChannels`
+    def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
+      observer.attrNumChannelsChanged(attr)
+
     def init(folder: Folder[S])(implicit tx: S#Tx): this.type = {
+      val elemViews = folder.iterator.map { elem =>
+        AuralAttribute(key, elem, attr)
+      } .toVector
+      childAttrRef() = elemViews
+
       // views.foreach(_.init())
       obs = folder.changed.react { implicit tx => upd => upd.changes.foreach {
         case expr.List.Added  (idx, child) =>
-          val childAttr = AuralAttribute(child)
+          val childAttr = AuralAttribute(key, child, attr)
           childAttrRef.transform(_.patch(idx, childAttr :: Nil, 0))
           playRef().foreach { p =>
             // p.addChild(childAttr)
