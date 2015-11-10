@@ -125,11 +125,13 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
         Empty.put(instance, value)
       } else {
         con1.dispose()
-        val c1 = mkVertex(con1.value, isFirst = true )
-        val c2 = mkVertex(     value, isFirst = false)
+        val tgtBusUser = BusNodeSetter.mapper(ctlName, targetBus, target.node)
+        target.addUser(tgtBusUser)
+        val c1 = mkVertex(con1.value)
+        val c2 = mkVertex(     value)
         map.put(instance1, c1)
         map.put(instance , c2)
-        Multiple
+        new Multiple(tgtBusUser)
       }
 
     def remove(instance: Instance)(implicit tx: Txn): State = {
@@ -142,9 +144,9 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
 
   // ----
 
-  private object Multiple extends State {
+  private final class Multiple(tgtBusUser: DynamicUser) extends State {
     def put(instance: Instance, value: Value)(implicit tx: Txn): State = {
-      val con = mkVertex(value, isFirst = false)
+      val con = mkVertex(value)
       map.put(instance, con).foreach(_.dispose())
       this
     }
@@ -155,8 +157,10 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
         case 1 =>
           val (aa, cc) = map.head
           new Single(aa, cc)
+//        case 2 =>
+//          ...
         case x =>
-          assert(x > 1)
+          assert(x > 2)
           this
       }
     }
@@ -166,17 +170,13 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
   
   // ----
 
-  private def mkVertex(value: Value, isFirst: Boolean)(implicit tx: Txn): Connected = {
+  private def mkVertex(value: Value)(implicit tx: Txn): Connected = {
     def make(syn: Synth, users0: List[DynamicUser]): Connected = {
       val vertexUser  = new AddRemoveVertex(syn)
       val outEdge     = NodeRef.Edge(syn, target)
       val outEdgeUser = new AddRemoveEdge(outEdge)
       val outBusUser  = BusNodeSetter.writer("out", targetBus, syn)
-      val users1      = vertexUser :: outEdgeUser :: outBusUser :: users0
-      val users = if (isFirst) {
-        val tgtBusUser = BusNodeSetter.mapper(ctlName, targetBus, target.node)
-        tgtBusUser :: users1
-      } else users1
+      val users       = vertexUser :: outEdgeUser :: outBusUser :: users0
 
       val cc = new Connected(value, users = users, resources = syn :: Nil)
       cc.attach()

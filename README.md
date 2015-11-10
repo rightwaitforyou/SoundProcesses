@@ -40,3 +40,11 @@ For compiling the tests, the following additional resolver may be needed:
 ## usage
 
 Project is still experimental, and documentation is still missing. There is a graphical front-end [Mellite](https://github.com/Sciss/Mellite) (also experimental)...
+
+## notes
+
+- in the Lucre-3 based version 3 (experimental) branch, currently constant `Expr` object do carry 
+  an `id` and thus are **not identical to each other** when created repeatedly even with the same 
+  peer constant. This was done in order to satisfy `Obj` property, e.g. for any `IntObj` including 
+  its constants. A future version may go back to 'cheap' constants which must be explicitly lifted 
+  if one wants to access `attr` on them.
