@@ -84,7 +84,7 @@ object AuralContextImpl {
       def dispose()(implicit tx: S#Tx): Unit = {
         val id    = idH()
         val list0 = auxObservers.getOrElse(id, Nil)
-        val list1 = list0.filterNot(_ == fun)
+        val list1 = list0.filterNot(_ == this)
         if (list1.isEmpty) auxObservers.remove(id) else auxObservers.put(id, list1)
       }
     }

@@ -79,7 +79,7 @@ object AuralAttributeImpl {
     }
 
     private[this] var obs: Disposable[S#Tx] = _
-    private[this] val playRef = Ref(List.empty[PlayRef])
+    private /* [this] */ val playRef = Ref[List[PlayRef]](Nil)  // private[this] crashes Scala 2.10 !
 
     def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit /* Instance */ = {
       val p = new PlayRef(target)
