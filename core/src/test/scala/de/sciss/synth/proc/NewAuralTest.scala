@@ -471,7 +471,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 12
 
-  def test12()(implicit context: AuralContext[S]): Unit = { // XXX TODO
+  def test12()(implicit context: AuralContext[S]): Unit = {
     println("----test12----")
     println(
       """

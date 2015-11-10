@@ -17,7 +17,7 @@ package impl
 import de.sciss.lucre.stm.TxnLike
 import de.sciss.lucre.synth.{AudioBus, BusNodeSetter, DynamicUser, NodeRef, Resource, Synth, Txn}
 import de.sciss.synth
-import de.sciss.synth.SynthGraph
+import de.sciss.synth.{ControlSet, SynthGraph}
 import de.sciss.synth.proc.AuralAttribute.{Instance, Scalar, Stream, Value}
 
 import scala.concurrent.stm.{Ref, TMap, TSet}
@@ -136,6 +136,17 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
 
     def remove(instance: Instance)(implicit tx: Txn): State = {
       map.remove(instance).fold(throw new NoSuchElementException(instance.toString))(_.dispose())
+      if (!con1.value.isScalar) {
+        // We had a `mapan` for which the bus input is now gone.
+        // Right now, `ButNodeSetter.mapper` does _not_ undo the
+        // mapping if you remove it. XXX TODO -- I don't know if it should...
+        // Therefore, to avoid glitches from stale bus contents,
+        // we must explicitly set the control to some value (i.e. zero)
+        val ctlSet: ControlSet =
+          if (numChannels == 1) ctlName -> 0f
+          else                  ctlName -> Vector.fill(numChannels)(0f)
+        target.addControl(ctlSet)
+      }
       Empty
     }
 
