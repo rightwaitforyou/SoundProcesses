@@ -52,6 +52,7 @@ object AuralProcDataImpl {
     private[this] val attrMap       = TMap.empty[String, AuralAttribute[S]]
     private[this] val outputBuses   = TMap.empty[String, AudioBus]
     private[this] val procViews     = TSet.empty[AuralObj.Proc[S]]
+    private[this] val auralOutputs  = TMap.empty[String, AuralOutput.Owned[S]]
 
     private[this] val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
 
@@ -88,8 +89,18 @@ object AuralProcDataImpl {
 
     final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = nodeRef()
 
-    private def playScans(n: NodeRef)(implicit tx: S#Tx): Unit = {
-      logA(s"playScans ${procCached()}")
+    private def playOutputs(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      logA(s"playOutputs ${procCached()}")
+      auralOutputs.foreach { case (_, view) =>
+        view.play(n)
+      }
+    }
+
+    private def stopOutputs()(implicit tx: S#Tx): Unit = {
+      // logA(s"stopOutputs ${procCached()}")
+      auralOutputs.foreach { case (_, view) =>
+        view.stop()
+      }
     }
 
     private def newSynthGraph()(implicit tx: S#Tx): Unit = {
@@ -113,21 +124,26 @@ object AuralProcDataImpl {
       logA(s"outputAdded  to   ${procCached()} (${output.key})")
       val key = output.key
       outputBuses.get(key).foreach { bus =>
-        mkAuralOutput(output, bus)
+        val view = mkAuralOutput(output, bus)
+        nodeOption.foreach(view.play)
       }
     }
 
     private def outputRemoved(output: Output[S])(implicit tx: S#Tx): Unit = {
       logA(s"outputRemoved from ${procCached()} (${output.key})")
       context.getAux[AuralOutput[S]](output.id).foreach(disposeAuralOutput)
-      val key = output.key
-      state.outputs.get(key).foreach { numCh =>
-      }
+//      val key = output.key
+//      state.outputs.get(key).foreach { numCh =>
+//        ... // XXX TODO - what was I thinking to do here?
+//      }
     }
 
     @inline
-    private def disposeAuralOutput(view: AuralOutput[S])(implicit tx: S#Tx): Unit =
-      view.dispose()  // this will call `context.removeAux`
+    private def disposeAuralOutput(view: AuralOutput[S])(implicit tx: S#Tx): Unit = {
+      view.dispose() // this will call `context.removeAux`
+      val exists = auralOutputs.remove(view.key)
+      if (exists.isEmpty) throw new IllegalStateException(s"AuralOutput ${view.key} was not in map")
+    }
 
     // ---- attr events ----
 
@@ -199,7 +215,7 @@ object AuralProcDataImpl {
       nodeRef().fold {
         val groupImpl = NodeGroupRef(name = s"Group-NodeRef ${procCached()}", in0 = n)
         nodeRef() = Some(groupImpl)
-        playScans(groupImpl)
+        playOutputs(groupImpl)
 
       } { groupImpl =>
         groupImpl.addInstanceNode(n)
@@ -211,7 +227,9 @@ object AuralProcDataImpl {
       logA(s"removeInstanceNode ${procCached()} : $n")
       val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
       if (groupImpl.removeInstanceNode(n)) {
-        disposeAttrMap()
+        nodeRef() = None
+        stopOutputs()
+        // disposeAttrMap()
       }
     }
 
@@ -225,7 +243,7 @@ object AuralProcDataImpl {
     }
 
     private def disposeBuild()(implicit tx: S#Tx): Unit = {
-      disposeNodeRefAndScans()
+      disposeNodeRefAndOutputs()
       disposeAttrMap()
     }
 
@@ -234,8 +252,11 @@ object AuralProcDataImpl {
       attrMap .clear()
     }
 
-    private def disposeNodeRefAndScans()(implicit tx: S#Tx): Unit = {
-      nodeRef  .swap(None).foreach(_.dispose())
+    private def disposeNodeRefAndOutputs()(implicit tx: S#Tx): Unit = {
+      nodeRef.swap(None).foreach(_.dispose())
+      // stopOutputs()
+      auralOutputs.foreach { case (_, view) => view.dispose() }
+      auralOutputs.clear()
       outputBuses.clear()
     }
 
@@ -300,12 +321,14 @@ object AuralProcDataImpl {
     }
 
     /* Creates a new aural output */
-    private def mkAuralOutput(output: Output[S], bus: AudioBus)(implicit tx: S#Tx): AuralOutput[S] = {
+    private def mkAuralOutput(output: Output[S], bus: AudioBus)(implicit tx: S#Tx): AuralOutput.Owned[S] = {
       // val key   = output.key
       // val views = scanOutViews
       val view  = AuralOutput(data = this, output = output, bus = bus)
       // this is done by the `AuralOutput` constructor:
       // context.putAux[AuralOutput[S]](output.id, view)
+      val old = auralOutputs.put(output.key, view)
+      if (old.isDefined) throw new IllegalStateException(s"AuralOutput already exists for ${output.key}")
       view
     }
 
