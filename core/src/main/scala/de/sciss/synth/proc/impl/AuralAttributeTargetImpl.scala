@@ -125,10 +125,10 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
         Empty.put(instance, value)
       } else {
         con1.dispose()
-        val c1 = mkVertex(con1.value)
-        val c2 = mkVertex(     value)
-        map.put(instance1     , c1)
-        map.put(instance, c2)
+        val c1 = mkVertex(con1.value, isFirst = true )
+        val c2 = mkVertex(     value, isFirst = false)
+        map.put(instance1, c1)
+        map.put(instance , c2)
         Multiple
       }
 
@@ -144,7 +144,7 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
 
   private object Multiple extends State {
     def put(instance: Instance, value: Value)(implicit tx: Txn): State = {
-      val con = mkVertex(value)
+      val con = mkVertex(value, isFirst = false)
       map.put(instance, con).foreach(_.dispose())
       this
     }
@@ -152,11 +152,12 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
     def remove(instance: Instance)(implicit tx: Txn): State = {
       map.remove(instance).fold(throw new NoSuchElementException(instance.toString))(_.dispose())
       map.size match {
-        case 0 => Empty
         case 1 =>
           val (aa, cc) = map.head
           new Single(aa, cc)
-        case _ => this
+        case x =>
+          assert(x > 1)
+          this
       }
     }
 
@@ -165,38 +166,56 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
   
   // ----
 
-  private def mkVertex(value: Value)(implicit tx: Txn): Connected = {
-    val cc: Connected = value match {
+  private def mkVertex(value: Value, isFirst: Boolean)(implicit tx: Txn): Connected = {
+    def make(syn: Synth, users0: List[DynamicUser]): Connected = {
+      val vertexUser  = new AddRemoveVertex(syn)
+      val outEdge     = NodeRef.Edge(syn, target)
+      val outEdgeUser = new AddRemoveEdge(outEdge)
+      val outBusUser  = BusNodeSetter.writer("out", targetBus, syn)
+      val users1      = vertexUser :: outEdgeUser :: outBusUser :: users0
+      val users = if (isFirst) {
+        val tgtBusUser = BusNodeSetter.mapper(ctlName, targetBus, target.node)
+        tgtBusUser :: users1
+      } else users1
+
+      val cc = new Connected(value, users = users, resources = syn :: Nil)
+      cc.attach()
+    }
+
+    value match {
       case sc: Scalar =>
         val g = SynthGraph {
           import synth._
           import ugen._
-          val value = "value".kr(Vector.fill(numChannels)(0f))
-          Out.ar("bus".kr, value)
+          val in = "in".kr(Vector.fill(numChannels)(0f))
+          Out.ar("out".kr, in)
         }
-        val values0   = sc.values
-        val len0      = values0.length
-        val syn       = Synth.play(g, nameHint = Some("attr"))(target = server,
-          args = List("value" -> Vector.tabulate[Float](numChannels)(i => values0(i % len0))))
-        // XXX TODO - `.play` should not be called here?
-        val vertexUser= new AddRemoveVertex(syn)
-        // target.addResource(syn)
-        val edge      = NodeRef.Edge(syn, target)
-        val edgeUser  = new AddRemoveEdge(edge)
-        val busUser   = BusNodeSetter.writer("bus", targetBus, syn)
-//        addUser(vertexUser)
-//        addUser(edgeUser  )
-//        addUser(busUser   )
-        val users = vertexUser :: edgeUser :: busUser :: Nil
-        new Connected(value, users = users, resources = syn :: Nil)
+        val values0     = sc.values
+        val inChannels  = values0.length
+        val syn         = Synth.play(g, nameHint = Some("attr-set"))(target = server,
+          args = List("in" -> Vector.tabulate[Float](numChannels)(i => values0(i % inChannels))))
+        make(syn, Nil)
 
       case sc: Stream =>
         // - basically the same synth (mapped control in, bus out)
         // - .reader/.mapper source-bus; .write targetBus
         // - add both vertices, add both edges
-        ???
+        val inChannels  = sc.bus.numChannels
+        val g = SynthGraph {
+          import synth._
+          import ugen._
+          val in  = "in".ar(Vector.fill(inChannels)(0f)) // In.ar("in".kr, inChannels)
+          val ext = Vector.tabulate(numChannels)(in \ _)
+          Out.ar("out".kr, ext)
+        }
+        val syn         = Synth.play(g, nameHint = Some("attr-map"))(
+          target = server, dependencies = sc.source.node :: Nil)
+        val inEdge      = NodeRef.Edge(sc.source, syn)
+        val inEdgeUser  = new AddRemoveEdge(inEdge)
+        val inBusUser   = BusNodeSetter.mapper("in" , sc.bus   , syn)
+        val users0      = inEdgeUser :: inBusUser :: Nil
+        make(syn, users0)
     }
-    cc.attach()
   }
 
   // def dispose()(implicit tx: Txn): Unit = ...

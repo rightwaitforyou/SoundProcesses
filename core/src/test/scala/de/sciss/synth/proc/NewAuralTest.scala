@@ -182,8 +182,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       attr.get(key).getOrElse(sys.error(s"Attribute $key was not assigned")) match {
         case `sink` => attr.remove(key)
         case f: Folder[S] =>
-          val idx = f.indexOf(sink)
-          if (idx < 0) sys.error(s"Attribute $key has a folder but does not contain $sink")
+          val idx = f.indexOf(`this`)
+          if (idx < 0) sys.error(s"Attribute $key has a folder but does not contain ${`this`}")
           f.removeAt(idx)
 
         case other => sys.error(s"Cannot remove output from $other")
@@ -487,7 +487,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     cursor.step { implicit tx =>
       val _proc = proc {
         val in  = graph.ScanInFix("in", 1)
-        val gen = Pulse.ar(LFNoise1.ar(1).linexp(0, 1, 400, 1000.0)) * 0.06
+        val gen = Pulse.ar(LFNoise1.ar(1).linexp(0, 1, 400, 1000.0)) * 0.05
         val sig = gen + in
         Out.ar(0, Pan2.ar(sig))
       }
@@ -501,7 +501,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       after(2.0) { implicit tx =>
         println("--create inputs--")
         val in1 = proc {
-          val sig = PinkNoise.ar(0.3)
+          val sig = PinkNoise.ar(0.2)
           graph.ScanOut("out", sig)
         }
         in1.name = "noise"
@@ -510,7 +510,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         t.addObject(in1)
 
         val in2 = proc {
-          val sig = Dust.ar(50) * 0.7
+          val sig = Dust.ar(50) * 0.75
           graph.ScanOut("out", sig)
         }
         in2.name = "dust"
