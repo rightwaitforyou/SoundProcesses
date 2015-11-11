@@ -15,12 +15,11 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.expr.{BooleanObj, DoubleObj, Expr, IntObj}
-import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
-import de.sciss.lucre.synth.{Txn, NodeRef, AudioBus, Sys}
-import de.sciss.lucre.{expr, stm}
+import de.sciss.lucre.stm
+import de.sciss.lucre.stm.{Disposable, Obj, TxnLike}
+import de.sciss.lucre.synth.{Sys, Txn}
 import de.sciss.synth.Curve
-import de.sciss.synth.proc.AuralAttribute.{Observer, Instance, Target, Factory}
-import de.sciss.synth.proc.AuralContext.AuxAdded
+import de.sciss.synth.proc.AuralAttribute.{Factory, Instance, Observer, Target}
 
 import scala.concurrent.stm.Ref
 
@@ -51,9 +50,9 @@ object AuralAttributeImpl {
     FadeSpec.Obj        .typeID -> FadeSpecAttribute,
 //    DoubleVector        .typeID -> DoubleVectorAttribute,
 //    Grapheme.Expr.Audio .typeID -> AudioGraphemeAttribute,
-    Output              .typeID -> OutputAttribute,
-    Folder              .typeID -> FolderAttribute
-//    Timeline            .typeID -> ...
+    Output              .typeID -> AuralOutputAttribute,
+    Folder              .typeID -> AuralFolderAttribute,
+    Timeline            .typeID -> AuralTimelineAttribute
   )
 
   // private[this] final class PlayRef[S <: Sys[S]](val target: Target)
@@ -194,199 +193,6 @@ object AuralAttributeImpl {
     )
   }
 
-  // ------------------- Output ------------------- 
-
-  private[this] object OutputAttribute extends Factory {
-    type Repr[S <: stm.Sys[S]] = Output[S]
-
-    def typeID = Output.typeID
-
-    def apply[S <: Sys[S]](key: String, value: Output[S], observer: Observer[S])
-                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new OutputAttribute(key, observer).init(value)
-  }
-  private[this] final class OutputAttribute[S <: Sys[S]](val key: String, observer: Observer[S])
-                                                        (implicit context: AuralContext[S])
-    extends AuralAttribute[S] { attr =>
-
-    private[this] final class PlayRef(val target: Target)
-      extends Instance {
-
-      def dispose()(implicit tx: Txn): Unit = {
-        playRef.transform(_.filterNot(_ == this))
-        target.remove(this)
-      }
-    }
-
-    private[this] val auralRef  = Ref(Option.empty[AuralOutput[S]])
-    private[this] var obs: Disposable[S#Tx] = _
-    private[this] val playRef   = Ref(List.empty[PlayRef])
-    private[this] val aObsRef   = Ref(Option.empty[Disposable[S#Tx]])
-
-    def preferredNumChannels(implicit tx: S#Tx): Int =
-      auralRef().fold(-1)(_.bus.numChannels)
-
-    def init(output: Output[S])(implicit tx: S#Tx): this.type = {
-      val id  = output.id // idH()
-      obs = context.observeAux[AuralOutput[S]](id) { implicit tx => {
-        case AuxAdded(_, auralOutput) =>
-        auralSeen(auralOutput)
-        playRef().foreach(update(_, auralOutput))
-        observer.attrNumChannelsChanged(this)
-      }}
-      context.getAux[AuralOutput[S]](id).foreach(auralSeen)
-      this
-    }
-
-    private[this] def auralSeen(auralOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
-      auralRef() = Some(auralOutput)
-      val aObs = auralOutput.react { implicit tx => {
-        case AuralOutput.Play(n) =>
-          playRef().foreach(update(_, auralOutput))
-        case AuralOutput.Stop => // XXX TODO: ignore?
-      }}
-      aObsRef.swap(Some(aObs)).foreach(_.dispose())
-      playRef().foreach(update(_, auralOutput))
-    }
-
-    def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit /* Instance */ = {
-      val p = new PlayRef(target)
-      playRef.transform(p :: _)
-      target.add(p)
-      auralRef().foreach(update(p, _))
-      // p
-    }
-
-    private[this] def update(p: PlayRef, audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
-      val nodeRefOpt = audioOutput.data.nodeOption
-      nodeRefOpt.foreach(update1(p, _, audioOutput.bus))
-    }
-
-    private[this] def update1(p: PlayRef, nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit = {
-      import p.target
-      target.put(p, AuralAttribute.Stream(nodeRef, bus))
-    }
-
-//    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
-
-    def dispose()(implicit tx: S#Tx): Unit = {
-      auralRef.set(None)
-      aObsRef.swap(None).foreach(_.dispose())
-      obs.dispose()
-      playRef().foreach(_.dispose())
-    }
-  }
-
-  // ------------------- Folder ------------------- 
-
-  private[this] object FolderAttribute extends Factory {
-    type Repr[S <: stm.Sys[S]] = Folder[S]
-
-    def typeID = Folder.typeID
-
-    def apply[S <: Sys[S]](key: String, value: Folder[S], observer: Observer[S])
-                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-      new FolderAttribute(key, observer).init(value)
-  }
-  private[this] final class FolderAttribute[S <: Sys[S]](val key: String,
-                                                         observer: Observer[S])
-                                                        (implicit context: AuralContext[S])
-    extends AuralAttribute[S] with Observer[S] { attr =>
-
-    import context.{scheduler => sched}
-
-    private[this] val childAttrRef = Ref.make[Vector[AuralAttribute[S]]]
-
-    private[this] final class PlayTime(val wallClock: Long,
-                                       val timeRef: TimeRef.Apply, val target: Target)
-      extends Instance {
-
-      def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
-
-      def dispose()(implicit tx: Txn): Unit = {
-        playRef.transform(_.filterNot(_ == this))
-        target.remove(this)
-        // childViews.swap(Vector.empty).foreach(_.dispose())
-      }
-
-//      def addChild(child: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
-//        val tForce    = shiftTo(sched.time)
-//        val childView = child.play(tForce, target)
-//        // childViews.transform(_ :+ childView)
-//      }
-    }
-
-    private[this] val playRef = Ref(List.empty[PlayTime])
-    private[this] var obs: Disposable[S#Tx] = _
-
-    def preferredNumChannels(implicit tx: S#Tx): Int = {
-      def loop(views: Vector[AuralAttribute[S]], res: Int): Int = views match {
-        case head +: tail =>
-          val ch = head.preferredNumChannels
-          if (ch == -1) ch else loop(tail, math.max(res, ch))
-        case _ => res
-      }
-
-      loop(childAttrRef(), -1)
-    }
-
-    // simply forward, for now we don't go into the details of checking
-    // `preferredNumChannels`
-    def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
-      observer.attrNumChannelsChanged(attr)
-
-    def init(folder: Folder[S])(implicit tx: S#Tx): this.type = {
-      val elemViews = folder.iterator.map { elem =>
-        AuralAttribute(key, elem, attr)
-      } .toVector
-      childAttrRef() = elemViews
-
-      // views.foreach(_.init())
-      obs = folder.changed.react { implicit tx => upd => upd.changes.foreach {
-        case expr.List.Added  (idx, child) =>
-          val childAttr = AuralAttribute(key, child, attr)
-          childAttrRef.transform(_.patch(idx, childAttr :: Nil, 0))
-          playRef().foreach { p =>
-            // p.addChild(childAttr)
-            val tForce    = p.shiftTo(sched.time)
-            childAttr.play(tForce, p.target)
-          }
-
-        case expr.List.Removed(idx, child) =>
-          childAttrRef.transform { in =>
-            val childAttr = in(idx)
-            childAttr.dispose()
-            in.patch(idx, Nil, 1)
-          }
-      }}
-      this
-    }
-
-    def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit /* Instance */ = {
-      val tForce  = timeRef.force
-      // require(playRef.swap(Some(p)).isEmpty)
-      val childAttrs  = childAttrRef()
-     childAttrs.foreach { childAttr =>
-        childAttr.play(tForce, target)
-      }
-      val p = new PlayTime(sched.time, tForce, target /* , Ref(childViews) */)
-      playRef.transform(p :: _)
-      target.add(p)
-      // p
-    }
-
-//    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-//      val views = elemViewsRef()
-//      views.foreach(_.prepare(timeRef))
-//    }
-
-    def dispose()(implicit tx: S#Tx): Unit = {
-      obs.dispose()
-      playRef.swap(Nil).foreach(_.dispose())
-      val views = childAttrRef()
-      views.foreach(_.dispose())
-    }
-  }
 
   // ------------------- AudioGrapheme ------------------- 
 
