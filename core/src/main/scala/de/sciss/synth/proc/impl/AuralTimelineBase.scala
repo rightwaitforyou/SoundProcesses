@@ -90,10 +90,18 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Elem <: Disposabl
 
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
 
-  protected def makeView   (obj: Obj[S])(implicit tx: S#Tx): Elem
+  // ---- abstract ----
+
+  protected def makeView   (obj: Obj[S]                 )(implicit tx: S#Tx): Elem
   protected def prepareView(view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
   protected def playView   (view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  protected def stopView   (view: Elem)(implicit tx: S#Tx): Unit
+  protected def stopView   (view: Elem                  )(implicit tx: S#Tx): Unit
+
+  protected def viewAdded  (timed: S#ID, view: Elem     )(implicit tx: S#Tx): Unit
+  protected def viewRemoved(             view: Elem     )(implicit tx: S#Tx): Unit
+
+
+  // ---- impl ----
 
   import AuralTimelineBase.{Scheduled, PlayTime, LOOK_AHEAD, STEP_GRID, spanToPoint}
 
@@ -398,7 +406,7 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Elem <: Disposabl
     logA(s"timeline - playView: $timed - $timeRef")
     playView(view, timeRef) // view.play(timeRef)
     playingViews.add(view)(tx.peer)
-    ??? // contents.viewAdded(timed, view)
+    viewAdded(timed, view)   // contents.viewAdded(timed, view)
   }
 
   private[this] def stopAndDisposeViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
@@ -433,7 +441,7 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Elem <: Disposabl
         if (views1.isEmpty) None else Some(span1 -> views1)
       }
     }
-    ??? // contents.viewRemoved(view)
+    viewRemoved(view)   // contents.viewRemoved(view)
   }
 
   private[this] def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
@@ -516,7 +524,7 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Elem <: Disposabl
 
     playingViews.foreach { view =>
       stopView(view) // view.stop()
-      ??? // contents.viewRemoved(view)
+      viewRemoved(View) // contents.viewRemoved(view)
     }
     sched.cancel(schedEvtToken ().token)
     sched.cancel(schedGridToken().token)
