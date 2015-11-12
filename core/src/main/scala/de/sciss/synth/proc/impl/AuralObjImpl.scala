@@ -59,7 +59,7 @@ object AuralObjImpl {
 
       def isPrepared(implicit tx: S#Tx): Boolean = true
 
-      def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
+      def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = ()
       def stop(/* time: Long */)(implicit tx: S#Tx): Unit = ()
 
       // def latencyEstimate(implicit tx: S#Tx): Long = 0L
@@ -68,7 +68,7 @@ object AuralObjImpl {
 
       def dispose()(implicit tx: S#Tx): Unit = ()
 
-      def state(implicit tx: S#Tx): AuralObj.State = AuralObj.Stopped
+      def state(implicit tx: S#Tx): AuralView.State = AuralView.Stopped
     }
   }
 }

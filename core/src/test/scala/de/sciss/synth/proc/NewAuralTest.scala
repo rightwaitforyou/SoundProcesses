@@ -978,7 +978,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
       after(1.0) { implicit tx =>
         println("--issue play from 3.5s--")
-        tl.play(TimeRef(Span.from(0L), frame(3.5)))
+        tl.play(TimeRef(Span.from(0L), frame(3.5)), ())
 
         after(2.0) { implicit tx =>
           println("--insert at 5.5s--")

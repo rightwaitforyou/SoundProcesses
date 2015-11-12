@@ -16,7 +16,7 @@ package de.sciss.synth.proc
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
+import de.sciss.lucre.stm.{Obj, TxnLike}
 import de.sciss.lucre.synth.{NodeRef, Sys}
 import de.sciss.span.SpanLike
 import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
@@ -40,27 +40,27 @@ object AuralObj {
 
   def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = Impl(obj)
 
-  /* The current state a view is in. */
-  sealed trait State
-  case object Stopped   extends State
-  case object Preparing extends State
-  case object Prepared  extends State
-  case object Playing   extends State
+//  /* The current state a view is in. */
+//  sealed trait State
+//  case object Stopped   extends State
+//  case object Preparing extends State
+//  case object Prepared  extends State
+//  case object Playing   extends State
 
   /* The target state indicates the eventual state the process should have,
      independent of the current state which might not yet be ready.
    */
   sealed trait TargetState {
-    def completed: AuralObj.State
+    def completed: AuralView.State
   }
   case object TargetStop extends TargetState {
-    def completed = AuralObj.Stopped
+    def completed = AuralView.Stopped
   }
   case object TargetPrepared extends TargetState {
-    def completed = AuralObj.Prepared
+    def completed = AuralView.Prepared
   }
   final case class TargetPlaying(wallClock: Long, timeRef: TimeRef) extends TargetState {
-    def completed = AuralObj.Playing
+    def completed = AuralView.Playing
 
     def shiftTo(newWallClock: Long): TimeRef = {
       val delta = newWallClock - wallClock
@@ -91,7 +91,7 @@ object AuralObj {
       */
     def nodeOption(implicit tx: TxnLike): Option[NodeRef]
 
-    def targetState(implicit tx: S#Tx): AuralObj.State
+    def targetState(implicit tx: S#Tx): AuralView.State
 
     implicit def context: AuralContext[S]
   }
@@ -173,15 +173,6 @@ object AuralObj {
     override def obj: stm.Source[S#Tx, _Action[S]]
   }
 }
-trait AuralObj[S <: Sys[S]] extends Observable[S#Tx, AuralObj.State] with Disposable[S#Tx] {
-  def typeID: Int
-
-  /** The view must store a handle to its underlying model. */
-  def obj: stm.Source[S#Tx, Obj[S]]
-
-  def state(implicit tx: S#Tx): AuralObj.State
-
-  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  def play   (timeRef: TimeRef = TimeRef.Undefined)(implicit tx: S#Tx): Unit
-  def stop   (/* time: Long*/ )(implicit tx: S#Tx): Unit
+trait AuralObj[S <: Sys[S]] extends AuralView[S, Unit] {
+  def play()(implicit tx: S#Tx): Unit = play(TimeRef.Undefined, ())
 }

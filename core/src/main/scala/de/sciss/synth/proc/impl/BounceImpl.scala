@@ -23,6 +23,7 @@ import de.sciss.lucre.synth.{Buffer, Server, Synth, Sys, Txn}
 import de.sciss.processor.Processor
 import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.synth.io.{AudioFile, AudioFileType, SampleFormat}
+import de.sciss.synth.proc.AuralView.{Playing, Prepared, Stopped, Preparing}
 import de.sciss.synth.{Server => SServer, addAfter, SynthGraph, addToTail}
 import de.sciss.{osc, synth}
 
@@ -149,7 +150,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
         config.beforePrepare.apply(tx, server)
       }
 
-      prepare(transport)(state => state == AuralObj.Prepared || state == AuralObj.Stopped)
+      prepare(transport)(state => state == Prepared || state == Stopped)
 
       lazy val scheduleProgress: (S#Tx) => Unit = { implicit tx: S#Tx =>
         val now = scheduler.time
@@ -246,7 +247,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
 
       val srRatio = server.sampleRate / TimeRef.SampleRate
 
-      prepare(transport)(state => state == AuralObj.Playing | state == AuralObj.Stopped)
+      prepare(transport)(state => state == Playing | state == Stopped)
 
       if (config.beforePlay != Bounce.Config.NoOp) cursor.step { implicit tx =>
         config.beforePlay.apply(tx, server)
@@ -336,7 +337,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       // scheduler.dispose()
     }
 
-    private def prepare(transport: Transport[S])(isReady: AuralObj.State => Boolean): Unit = {
+    private def prepare(transport: Transport[S])(isReady: AuralView.State => Boolean): Unit = {
       // Tricky business: While handling prepared state is not yet
       // fully solved, especially with collection objects such as
       // Timeline, we at least provide some bounce support for objects
@@ -357,7 +358,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           //            if (obj.state != AuralObj.Preparing) println(s"- - - - $obj: ${obj.state}")
           //          }
           val set1 = views.collect {
-            case obj if obj.state == AuralObj.Preparing =>
+            case obj if obj.state == Preparing =>
               val p = Promise[Unit]()
               obj.react { implicit tx => state => if (isReady(state)) {
                 tx.afterCommit(p.tryComplete(Success(())))

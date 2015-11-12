@@ -24,7 +24,7 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, IdentifierMap, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, Stopped}
+import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -79,13 +79,13 @@ object AuralTimelineImpl {
                                                          tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]],
                                                          viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
                                                         (implicit context: AuralContext[S], iSys: S#Tx => I#Tx)
-    extends AuralObj.Timeline.Manual[S] with ObservableImpl[S, AuralObj.State] { impl =>
+    extends AuralObj.Timeline.Manual[S] with ObservableImpl[S, AuralView.State] { impl =>
 
     def typeID: Int = Timeline.typeID
 
     import context.{scheduler => sched}
 
-    private[this] val currentStateRef   = Ref[AuralObj.State](Stopped)
+    private[this] val currentStateRef   = Ref[AuralView.State](Stopped)
     private[this] val playingViews      = TSet.empty[AuralObj[S]]
     private[this] val preparingViews    = TMap.empty[AuralObj[S], Disposable[S#Tx]]
     private[this] var tlObserver        = null: Disposable[S#Tx]
@@ -96,7 +96,7 @@ object AuralTimelineImpl {
 
 //    private[this] val targetStateRef  = Ref[TargetState](TargetStop)
 
-    def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
+    def state(implicit tx: S#Tx): AuralView.State = currentStateRef.get(tx.peer)
 
     def views(implicit tx: S#Tx): Set[AuralObj[S]] = playingViews.single.toSet
 
@@ -113,7 +113,7 @@ object AuralTimelineImpl {
 
     def getView(timed: Timeline.Timed[S])(implicit tx: S#Tx): Option[AuralObj[S]] = viewMap.get(timed.id)
 
-    private[this] def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
+    private[this] def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
       if (value != old) {
         logA(s"timeline - state = $value")
@@ -350,7 +350,7 @@ object AuralTimelineImpl {
       }
     }
 
-    def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
       val st = state
       if (st == Playing) return
       // targetState = TargetPlaying(sched.time, timeRef)
@@ -382,7 +382,7 @@ object AuralTimelineImpl {
     // note: `timeRef` should already have been updated
     private[this] def playView(timed: S#ID, view: AuralObj[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       logA(s"timeline - playView: $timed - $timeRef")
-      view.play(timeRef)
+      view.play(timeRef, ())
       playingViews.add(view)(tx.peer)
       contents.viewAdded(timed, view)
     }

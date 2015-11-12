@@ -31,13 +31,13 @@ object AuralEnsembleImpl {
   }
   
   private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Ensemble[S]], transport: Transport[S])
-    extends AuralObj.Ensemble[S] with ObservableImpl[S, AuralObj.State] {
+    extends AuralObj.Ensemble[S] with ObservableImpl[S, AuralView.State] {
     
     def typeID = Ensemble.typeID
 
     private var observer: Disposable[S#Tx] = _
 
-    private val currentStateRef = Ref[AuralObj.State](AuralObj.Stopped)
+    private val currentStateRef = Ref[AuralView.State](AuralView.Stopped)
 
     def init(ens: Ensemble[S])(implicit tx: S#Tx): this.type = {
       observer = ens.changed.react { implicit tx => upd =>
@@ -54,7 +54,7 @@ object AuralEnsembleImpl {
           case Ensemble.Playing(Change(_, newPlaying)) =>
             logTransport(s"AuralEnsemble - new playing.value = $newPlaying")
             if (newPlaying) {
-              if (state == AuralObj.Playing) startTransport(ens)
+              if (state == AuralView.Playing) startTransport(ens)
             } else {
               transport.stop()
             }
@@ -68,12 +68,12 @@ object AuralEnsembleImpl {
 
     def stop()(implicit tx: S#Tx): Unit = {
       transport.stop()
-      state = AuralObj.Stopped
+      state = AuralView.Stopped
     }
 
-    def state(implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
+    def state(implicit tx: S#Tx): AuralView.State = currentStateRef.get(tx.peer)
 
-    private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
+    private def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
       if (value != old) {
         // println(s"------ENSEMBLE STATE $old > $value")
@@ -89,19 +89,19 @@ object AuralEnsembleImpl {
       transport.play()                  // XXX TODO -- should we be able to pass the timeRef?
     }
 
-    def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      if (state == AuralObj.Playing) return
+    def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
+      if (state == AuralView.Playing) return
 
       val ens = ensemble
       val p   = ens.playing.value
       logTransport(s"AuralEnsemble.play() - playing.value = $p")
 
       if (p) startTransport(ens)
-      state = AuralObj.Playing
+      state = AuralView.Playing
     }
 
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      if (state != AuralObj.Stopped) return
+      if (state != AuralView.Stopped) return
       Console.err.println("TODO: AuralEnsemble.prepare") // XXX TODO
     }
 

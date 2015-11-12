@@ -33,21 +33,21 @@ object AuralActionImpl extends AuralObj.Factory {
   }
 
   private final class Impl[S <: Sys[S]](val obj: stm.Source[S#Tx, Action[S]])(implicit context: AuralContext[S])
-    extends AuralObj.Action[S] with ObservableImpl[S, AuralObj.State] {
+    extends AuralObj.Action[S] with ObservableImpl[S, AuralView.State] {
 
     override def toString = s"AuralAction@${hashCode().toHexString}"
 
     def typeID = Action.typeID
 
-    private val stateRef = Ref[AuralObj.State](AuralObj.Stopped)
+    private val stateRef = Ref[AuralView.State](AuralView.Stopped)
 
     def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       // nothing to do. XXX TODO - set state and fire
     }
 
-    def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val oldState = stateRef.swap(AuralObj.Playing)(tx.peer) // XXX TODO fire update
-      if (oldState != AuralObj.Playing) {
+    def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
+      val oldState = stateRef.swap(AuralView.Playing)(tx.peer) // XXX TODO fire update
+      if (oldState != AuralView.Playing) {
         val actionObj = obj()
         if (!actionObj.muted) {
           val action    = actionObj
@@ -58,9 +58,9 @@ object AuralActionImpl extends AuralObj.Factory {
     }
 
     def stop()(implicit tx: S#Tx): Unit =
-      stateRef.set(AuralObj.Stopped)(tx.peer)
+      stateRef.set(AuralView.Stopped)(tx.peer)
 
-    def state(implicit tx: S#Tx): AuralObj.State = stateRef.get(tx.peer)
+    def state(implicit tx: S#Tx): AuralView.State = stateRef.get(tx.peer)
 
     def dispose()(implicit tx: S#Tx) = ()
   }

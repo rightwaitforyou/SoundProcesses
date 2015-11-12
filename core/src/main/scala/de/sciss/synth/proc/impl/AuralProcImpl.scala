@@ -25,7 +25,8 @@ import de.sciss.numbers
 import de.sciss.span.Span
 import de.sciss.synth.ControlSet
 import de.sciss.synth.io.AudioFileType
-import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, Stopped, TargetPlaying, TargetPrepared, TargetState, TargetStop}
+import de.sciss.synth.proc.AuralObj.{TargetPlaying, TargetPrepared, TargetState, TargetStop}
+import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
 import de.sciss.synth.proc.Implicits._
 import de.sciss.synth.proc.TimeRef.SampleRate
 import de.sciss.synth.proc.UGenGraphBuilder.{Complete, Incomplete, MissingIn}
@@ -33,11 +34,10 @@ import de.sciss.synth.proc.graph.impl.ActionResponder
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 
 import scala.concurrent.Future
-import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
+import scala.concurrent.stm.{Ref, TMap, TxnLocal}
 
 object AuralProcImpl {
   def apply[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
-    // context.acquire[AuralObj.ProcData[S]](proc)(new Impl[S].init(proc))
     val res   = new Impl[S]
     res.init(proc)
   }
@@ -46,7 +46,7 @@ object AuralProcImpl {
     extends AuralObj.Proc[S]
     with UGB.Context[S]
     with AuralAttribute.Observer[S]
-    with ObservableImpl[S, AuralObj.State] {
+    with ObservableImpl[S, AuralView.State] {
 
     import TxnLike.peer
     import context.{scheduler => sched, server}
@@ -55,12 +55,11 @@ object AuralProcImpl {
     private[this] val buildStateRef = Ref.make[UGB.State[S]]()
 
     // running main synths
-    private[this] val nodeRef       = Ref(Option.empty[NodeGroupRef])
+    private[this] val nodeRef       = Ref(Option.empty[AuralNode])
 
     // running attribute inputs
     private[this] val attrMap       = TMap.empty[String, AuralAttribute[S]]
     private[this] val outputBuses   = TMap.empty[String, AudioBus]
-    // private[this] val procViews     = TSet.empty[AuralObj.Proc[S]]
     private[this] val auralOutputs  = TMap.empty[String, AuralOutput.Owned[S]]
 
     private[this] val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
@@ -90,16 +89,16 @@ object AuralProcImpl {
     }
 
     // XXX TODO - perhaps `currentStateRef` and `playingRef` could be one thing?
-    private[this] val currentStateRef     = Ref[AuralObj.State](AuralObj.Stopped)
-    private[this] val targetStateRef      = Ref[TargetState   ](TargetStop      )
-    private[this] val playingRef          = Ref[PlayingRef    ](PlayingNone     )
+    private[this] val currentStateRef     = Ref[AuralView.State](Stopped    )
+    private[this] val targetStateRef      = Ref[TargetState    ](TargetStop )
+    private[this] val playingRef          = Ref[PlayingRef     ](PlayingNone)
 
     final def typeID: Int = Proc.typeID
 
-    final def state      (implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
-    final def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer).completed
+    final def state      (implicit tx: S#Tx): AuralView.State = currentStateRef.get(tx.peer)
+    final def targetState(implicit tx: S#Tx): AuralView.State = targetStateRef .get(tx.peer).completed
 
-    private[this] def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
+    private[this] def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
       if (value != old) {
         fire(value)
@@ -148,10 +147,6 @@ object AuralProcImpl {
     private[this] def newSynthGraph()(implicit tx: S#Tx): Unit = {
       logA(s"newSynthGraph ${procCached()}")
 
-      // stop and dispose all
-//      procViews.foreach { view =>
-//        if (view.state == Playing) view.stopForRebuild()
-//      }
       if (state == Playing) stopForRebuild()
 
       disposeBuild()
@@ -205,12 +200,10 @@ object AuralProcImpl {
         case st0: Complete[S] =>
           acceptedOpt match {
             case Some((_, UGB.Input.Attribute.Value(numChannels))) =>
-              nodeRef().foreach { group =>
-                group.instanceNodes.foreach { nr =>
-                  val target  = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
-                  val trNew   = nr.shiftTo(sched.time)
-                  view.play(timeRef = trNew, target = target)
-                }
+              nodeRef().foreach { nr =>
+                val target  = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
+                val trNew   = nr.shiftTo(sched.time)
+                view.play(timeRef = trNew, target = target)
               }
 
             case _ =>
@@ -253,34 +246,21 @@ object AuralProcImpl {
       }
     }
 
-    private[this] def addInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
-      logA(s"addInstanceNode ${procCached()} : $n")
-      nodeRef().fold {
-        val groupImpl = NodeGroupRef(name = s"Group-NodeRef ${procCached()}", in0 = n)
-        nodeRef() = Some(groupImpl)
-        playOutputs(groupImpl)
-
-      } { groupImpl =>
-        groupImpl.addInstanceNode(n)
-        nodeRef() = None
-      }
+    private[this] def setInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
+      logA(s"setInstanceNode ${procCached()} : $n")
+      if (nodeRef.swap(Some(n)).isDefined) throw new IllegalStateException(s"Already playing: $this")
+      playOutputs(n)
     }
 
     private[this] def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
       logA(s"removeInstanceNode ${procCached()} : $n")
-      val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
-      if (groupImpl.removeInstanceNode(n)) {
-        nodeRef() = None
-        stopOutputs()
-        // disposeAttrMap()
-      }
+      if (nodeRef.swap(None).isEmpty) throw new IllegalStateException(s"Was not playing: $this")
+      stopOutputs()
     }
 
     /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
       freePlayingRef()
-      // _data.removeInstanceView(this)
-      // context.release(procCached())
       observers.foreach(_.dispose())
       disposeBuild()
     }
@@ -353,21 +333,11 @@ object AuralProcImpl {
         }
       }
 
-      if (now.isComplete) {
-//        procViews.foreach { view =>
-//          if (view.targetState == Playing) {
-//            // ugen graph became ready and view wishes to play.
-//            view.playAfterRebuild()
-//          }
-//        }
-        if (targetState == Playing) playAfterRebuild()
-      }
+      if (now.isComplete && targetState == Playing) playAfterRebuild()
     }
 
     /* Creates a new aural output */
     private[this] def mkAuralOutput(output: Output[S], bus: AudioBus)(implicit tx: S#Tx): AuralOutput.Owned[S] = {
-      // val key   = output.key
-      // val views = scanOutViews
       val view  = AuralOutput(view = this, output = output, bus = bus)
       // this is done by the `AuralOutput` constructor:
       // context.putAux[AuralOutput[S]](output.id, view)
@@ -601,7 +571,7 @@ object AuralProcImpl {
       // XXX TODO
     }
 
-    final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    final def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
       val ts = TargetPlaying(sched.time, timeRef)
       targetStateRef.set(ts)(tx.peer)
       /* _data. */ state match {
@@ -769,7 +739,7 @@ object AuralProcImpl {
       val old       = playingRef.swap(new PlayingNode(builder))(tx.peer)
       old.dispose()
       builder.play()
-      addInstanceNode(builder)
+      setInstanceNode(builder)
       logA(s"launched $p -> $builder (${hashCode.toHexString})")
       state = Playing
     }
