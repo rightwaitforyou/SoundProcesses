@@ -524,7 +524,7 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Elem <: Disposabl
 
     playingViews.foreach { view =>
       stopView(view) // view.stop()
-      viewRemoved(View) // contents.viewRemoved(view)
+      viewRemoved(view) // contents.viewRemoved(view)
     }
     sched.cancel(schedEvtToken ().token)
     sched.cancel(schedGridToken().token)
