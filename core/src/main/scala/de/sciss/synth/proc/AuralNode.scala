@@ -13,21 +13,20 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.synth.{DynamicUser, Group, NodeRef, Resource, Server, Synth, Txn}
-import impl.{AuralNodeImpl => Impl}
+import de.sciss.lucre.stm.Sys
+import de.sciss.lucre.synth.{Group, NodeRef, Synth, Sys => SSys, Txn}
+import de.sciss.synth.proc.impl.{AuralNodeImpl => Impl}
 
 object AuralNode {
-  def apply(timeRef: TimeRef, wallClock: Long, synth: Synth)(implicit tx: Txn): Builder =
-    Impl(timeRef, wallClock, synth)
+  def apply[S <: SSys[S]](timeRef: TimeRef, wallClock: Long, synth: Synth)(implicit tx: Txn): Builder[S] =
+    Impl[S](timeRef, wallClock, synth)
 
-  trait Builder extends AuralNode {
-    def play()(implicit tx: Txn): Unit
+  trait Builder[S <: Sys[S]] extends AuralNode[S] {
+    def play()(implicit tx: S#Tx): Unit
   }
 }
 
-trait AuralNode extends NodeRef.Full {
-  def server: Server
-
+trait AuralNode[S <: Sys[S]] extends NodeRef.Full[S] {
   def timeRef: TimeRef
 
   def shiftTo(newWallClock: Long): TimeRef
@@ -37,11 +36,11 @@ trait AuralNode extends NodeRef.Full {
 
   /** Retrieves the main group of the Proc. If this group has not been assigned yet,
     * this method will create a new group. */
-  def group()(implicit tx: Txn): Group
+  def group()(implicit tx: S#Tx): Group
 
-  def group_=(value: Group)(implicit tx: Txn): Unit
+  def group_=(value: Group)(implicit tx: S#Tx): Unit
 
-  def preGroup()(implicit tx: Txn): Group
+  def preGroup()(implicit tx: S#Tx): Group
 
   // def getInputBus (key: String): Option[AudioBus]
   // def getOutputBus(key: String): Option[AudioBus]

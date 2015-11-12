@@ -55,7 +55,7 @@ object AuralProcImpl {
     private[this] val buildStateRef = Ref.make[UGB.State[S]]()
 
     // running main synths
-    private[this] val nodeRef       = Ref(Option.empty[AuralNode])
+    private[this] val nodeRef       = Ref(Option.empty[AuralNode[S]])
 
     // running attribute inputs
     private[this] val attrMap       = TMap.empty[String, AuralAttribute[S]]
@@ -78,7 +78,7 @@ object AuralProcImpl {
     private[this] object PlayingNone extends PlayingRef {
       def dispose()(implicit tx: S#Tx) = ()
     }
-    private[this] final class PlayingNode(val node: AuralNode) extends PlayingRef {
+    private[this] final class PlayingNode(val node: AuralNode[S]) extends PlayingRef {
       def dispose()(implicit tx: S#Tx): Unit = {
         removeInstanceNode(node)
         node.dispose()
@@ -246,13 +246,13 @@ object AuralProcImpl {
       }
     }
 
-    private[this] def setInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
+    private[this] def setInstanceNode(n: AuralNode[S])(implicit tx: S#Tx): Unit = {
       logA(s"setInstanceNode ${procCached()} : $n")
       if (nodeRef.swap(Some(n)).isDefined) throw new IllegalStateException(s"Already playing: $this")
       playOutputs(n)
     }
 
-    private[this] def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
+    private[this] def removeInstanceNode(n: AuralNode[S])(implicit tx: S#Tx): Unit = {
       logA(s"removeInstanceNode ${procCached()} : $n")
       if (nodeRef.swap(None).isEmpty) throw new IllegalStateException(s"Was not playing: $this")
       stopOutputs()
@@ -448,7 +448,7 @@ object AuralProcImpl {
       * synth-graph, a different generic exception must be thrown to avoid
       * an infinite loop.
       */
-    def buildAttrInput(nr: NodeRef.Full, timeRef: TimeRef, key: String, value: UGB.Value)
+    def buildAttrInput(nr: NodeRef.Full[S], timeRef: TimeRef, key: String, value: UGB.Value)
                       (implicit tx: S#Tx): Unit = {
       value match {
         case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
@@ -616,7 +616,7 @@ object AuralProcImpl {
     }
 
     /** Sub-classes may override this if falling back to the super-method. */
-    protected def buildSyncInput(nr: NodeRef.Full, timeRef: TimeRef, keyW: UGB.Key, value: UGB.Value)
+    protected def buildSyncInput(nr: NodeRef.Full[S], timeRef: TimeRef, keyW: UGB.Key, value: UGB.Value)
                                 (implicit tx: S#Tx): Unit = keyW match {
       case UGB.AttributeKey(key) =>
         buildAttrInput(nr, timeRef, key, value)
@@ -703,7 +703,7 @@ object AuralProcImpl {
       val nameHint      = p.attr.$[StringObj](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
-      val builder       = AuralNode(timeRef, sched.time, synth)
+      val builder       = AuralNode[S](timeRef, sched.time, synth)
 
       // "consume" prepared state
       playingRef.swap(PlayingNone) match {

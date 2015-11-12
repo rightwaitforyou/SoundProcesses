@@ -22,7 +22,7 @@ import de.sciss.synth.{ControlSet, SynthGraph}
 
 import scala.concurrent.stm.{Ref, TMap, TSet}
 
-class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, targetBus: AudioBus)
+class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String, targetBus: AudioBus)
   extends AuralAttribute.Target[S] with DynamicUser {
 
   import TxnLike.peer
@@ -38,7 +38,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, t
                                 val users: List[DynamicUser], val resources: List[Resource])
     extends DynamicUser {
 
-    def attach()(implicit tx: Txn): this.type = {
+    def attach()(implicit tx: S#Tx): this.type = {
       if (users    .nonEmpty) target.addUser(this)
       if (resources.nonEmpty) resources.foreach(target.addResource)
       this

@@ -100,7 +100,7 @@ object BufferPrepare {
       buf
     }
 
-    def install(b: NodeRef.Full)(implicit tx: S#Tx): Unit = {
+    def install(b: NodeRef.Full[S])(implicit tx: S#Tx): Unit = {
       val ctlName = graph.Buffer.controlName(key)
       b.addControl(ctlName -> buf.id)
       b.addResource(buf)

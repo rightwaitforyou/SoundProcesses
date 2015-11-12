@@ -13,6 +13,7 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Disposable
 import de.sciss.synth.ControlSet
 import de.sciss.topology.Topology
@@ -23,7 +24,7 @@ object NodeRef {
 //  }
 //  trait Var extends NodeRef.Full with stm.Source[Txn, NodeRef.Full] with stm.Sink[Txn, NodeRef.Full]
 
-  trait Full extends NodeRef with Disposable[Txn] {
+  trait Full[S <: stm.Sys[S]] extends NodeRef with Disposable[S#Tx] {
 
     /** Adds a user to the node-ref. If it is already playing,
       * it successively calls `user.add()`.
@@ -40,7 +41,9 @@ object NodeRef {
     def addResource   (resource: Resource)(implicit tx: Txn): Unit
     def removeResource(resource: Resource)(implicit tx: Txn): Unit
 
-    def addControl(pair: ControlSet)(implicit tx: Txn): Unit
+    def addControl(pair: ControlSet)(implicit tx: S#Tx): Unit
+
+    // def addDisposable(d: Disposable[S#Tx])(implicit tx: S#Tx): Unit
   }
 
   final case class Edge(source: NodeRef, sink: NodeRef)

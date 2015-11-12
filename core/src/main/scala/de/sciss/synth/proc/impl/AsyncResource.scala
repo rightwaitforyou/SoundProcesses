@@ -18,5 +18,5 @@ import de.sciss.lucre.synth.{NodeRef, Sys}
 import de.sciss.processor.Processor
 
 trait AsyncResource[S <: Sys[S]] extends Processor[Any] with Disposable[S#Tx] {
-  def install(b: NodeRef.Full)(implicit tx: S#Tx): Unit
+  def install(b: NodeRef.Full[S])(implicit tx: S#Tx): Unit
 }
