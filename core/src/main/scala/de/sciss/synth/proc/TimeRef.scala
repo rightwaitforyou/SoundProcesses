@@ -100,8 +100,10 @@ object TimeRef {
   * a time frame corresponding to the current position.
   */
 sealed trait TimeRef {
+  /** The overall played span. */
   def span : SpanLike
 
+  /** The current position. */
   def frame: Long
   /** `true` for `TimeRef.Apply`, `false` for `TimeRef.Undefined`. */
   def isDefined: Boolean
