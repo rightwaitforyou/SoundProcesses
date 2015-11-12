@@ -88,7 +88,7 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, observer: Observe
   }
 
   private[this] def update(p: PlayRef, audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
-    val nodeRefOpt = audioOutput.data.nodeOption
+    val nodeRefOpt = audioOutput.view.nodeOption
     nodeRefOpt.foreach(update1(p, _, audioOutput.bus))
   }
 

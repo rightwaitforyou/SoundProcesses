@@ -15,22 +15,14 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys, Txn}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
 import de.sciss.synth.proc.impl.{AuralOutputImpl => Impl}
 
-//sealed trait AuralScan[S <: Sys[S]] extends Disposable[S#Tx] {
-//}
-
 object AuralOutput {
-//  sealed trait Proxy[S <: Sys[S]]
-//  final class Incomplete[S <: Sys[S]](val data: AuralObj.ProcData[S], val key: String) extends Proxy[S] {
-//    override def toString = s"Proxy($data, $key)"
-//  }
-
   /** Creates a new aural scan view and registers it with the context under `scan.id`. */
-  def apply[S <: Sys[S]](data: AuralObj.ProcData[S], output: Output[S], bus: AudioBus)
+  def apply[S <: Sys[S]](view: AuralObj.Proc[S], output: Output[S], bus: AudioBus)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralOutput.Owned[S] =
-    Impl(data = data, output = output, bus = bus)
+    Impl(view = view, output = output, bus = bus)
 
   trait Owned[S <: Sys[S]] extends AuralOutput[S] {
     def stop()(implicit tx: S#Tx): Unit
@@ -43,17 +35,8 @@ object AuralOutput {
 }
 
 trait AuralOutput[S <: Sys[S]] extends Disposable[S#Tx] with Observable[S#Tx, AuralOutput.Update] {
-  // def numChannels(implicit tx: S#Tx): Int
-  // def numChannels_=(value: Int)(implicit tx: S#Tx): Unit
-
-  def data: AuralObj.ProcData[S]
+  def view: AuralObj.Proc[S]
 
   def key : String
   def bus : AudioBus
-
-//  def addSink      (view: AuralInput[S])(implicit tx: Txn): Unit
-//  def removeSink   (view: AuralInput[S])(implicit tx: Txn): Unit
-
-//  def sinkStopped  (view: AuralInput [S])(implicit tx: S#Tx): Unit
-//  def sinkPlaying  (view: AuralInput [S])(implicit tx: S#Tx): Unit
 }

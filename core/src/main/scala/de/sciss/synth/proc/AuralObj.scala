@@ -17,7 +17,7 @@ import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
-import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
+import de.sciss.lucre.synth.{NodeRef, Sys}
 import de.sciss.span.SpanLike
 import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
 
@@ -74,37 +74,6 @@ object AuralObj {
 
   // ---- proc ----
 
-  trait ProcData[S <: Sys[S]] extends Disposable[S#Tx] {
-    def obj: stm.Source[S#Tx, _Proc[S]]
-
-    /** The node reference associated with the process. A `Some` value indicates that
-      * at least one instance view is playing, whereas a `None` value indicates that
-      * there is no actively playing instance view at the moment.
-      */
-    def nodeOption(implicit tx: TxnLike): Option[NodeRef]
-
-    def state(implicit tx: S#Tx): UGenGraphBuilder.State[S]
-
-    /* The proc object may be needed multiple times during a transaction.
-     * The data instance is thus asked to provide a transaction-local
-     * cache for resolving the proc from its `stm.Source`.
-     */
-    def procCached()(implicit tx: S#Tx): _Proc[S]
-
-    def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus]
-
-    def addInstanceView   (view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
-    def removeInstanceView(view: AuralObj.Proc[S])(implicit tx: S#Tx): Unit
-
-    def addInstanceNode   (n: AuralNode)(implicit tx: S#Tx): Unit
-    def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit
-
-    def buildAttrInput(nr: NodeRef.Full, timeRef: TimeRef, key: String, value: UGenGraphBuilder.Value)
-                      (implicit tx: S#Tx): Unit
-
-    implicit def context: AuralContext[S]
-  }
-
   object Proc extends AuralObj.Factory {
     type Repr[S <: Sys[S]] = _Proc[S]
 
@@ -114,14 +83,17 @@ object AuralObj {
       AuralProcImpl(obj)
   }
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
-    def data: ProcData[S]
-
     override def obj: stm.Source[S#Tx, _Proc[S]]
+
+    /** The node reference associated with the process. A `Some` value indicates that
+      * at least one instance view is playing, whereas a `None` value indicates that
+      * there is no actively playing instance view at the moment.
+      */
+    def nodeOption(implicit tx: TxnLike): Option[NodeRef]
 
     def targetState(implicit tx: S#Tx): AuralObj.State
 
-    private[proc] def stopForRebuild  ()(implicit tx: S#Tx): Unit
-    private[proc] def playAfterRebuild()(implicit tx: S#Tx): Unit
+    implicit def context: AuralContext[S]
   }
 
   // ---- timeline ----

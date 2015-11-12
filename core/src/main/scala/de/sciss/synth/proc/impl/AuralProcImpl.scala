@@ -14,91 +14,587 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.file._
+import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.event.impl.ObservableImpl
-import de.sciss.lucre.expr.StringObj
+import de.sciss.lucre.expr.{DoubleVector, StringObj}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{NodeRef, AudioBus, Buffer, BusNodeSetter, Synth, Sys}
+import de.sciss.lucre.stm.{Disposable, Obj, TxnLike}
+import de.sciss.lucre.synth.{AudioBus, Buffer, Bus, BusNodeSetter, NodeRef, Synth, Sys}
+import de.sciss.numbers
 import de.sciss.span.Span
-import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, ProcData, Stopped, TargetPlaying, TargetPrepared, TargetState, TargetStop}
+import de.sciss.synth.ControlSet
+import de.sciss.synth.io.AudioFileType
+import de.sciss.synth.proc.AuralObj.{Playing, Prepared, Preparing, Stopped, TargetPlaying, TargetPrepared, TargetState, TargetStop}
+import de.sciss.synth.proc.Implicits._
 import de.sciss.synth.proc.TimeRef.SampleRate
+import de.sciss.synth.proc.UGenGraphBuilder.{Complete, Incomplete, MissingIn}
+import de.sciss.synth.proc.graph.impl.ActionResponder
 import de.sciss.synth.proc.{UGenGraphBuilder => UGB, logAural => logA}
 
 import scala.concurrent.Future
-import scala.concurrent.stm.Ref
+import scala.concurrent.stm.{Ref, TMap, TSet, TxnLocal}
 
 object AuralProcImpl {
   def apply[S <: Sys[S]](proc: Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] = {
-    val data  = AuralProcDataImpl(proc)
+    // context.acquire[AuralObj.ProcData[S]](proc)(new Impl[S].init(proc))
     val res   = new Impl[S]
-    res.init(data)
+    res.init(proc)
   }
 
-  private final class OutputBuilder(val bus: AudioBus) {
-    var sinks = List.empty[(String, AuralNode)]
-  }
+  class Impl[S <: Sys[S]](implicit val context: AuralContext[S])
+    extends AuralObj.Proc[S]
+    with UGB.Context[S]
+    with AuralAttribute.Observer[S]
+    with ObservableImpl[S, AuralObj.State] {
 
-  private final class AuralProcBuilder(val ugen: UGB /*, val name: String */) {
-    var outputs = Map.empty[String, OutputBuilder]
-  }
-
-  // ---------------------------------------------------------------------
-
-  class Impl[S <: Sys[S]](implicit context: AuralContext[S])
-    extends AuralObj.Proc[S] with ObservableImpl[S, AuralObj.State] {
-
+    import TxnLike.peer
     import context.{scheduler => sched, server}
     import sched.cursor
 
-    /* The ongoing build aural node build process, as stored in `playingRef`. */
-    private sealed trait PlayingRef extends Disposable[S#Tx]
+    private[this] val buildStateRef = Ref.make[UGB.State[S]]()
 
-    private object PlayingNone extends PlayingRef {
-      def dispose()(implicit tx: S#Tx) = ()
-    }
-    private final class PlayingNode(val node: AuralNode) extends PlayingRef {
-      def dispose()(implicit tx: S#Tx): Unit = {
-        _data.removeInstanceNode(node)
-        node.dispose()
-      }
-    }
-    private final class PlayingPrepare(val resources: List[AsyncResource[S]]) extends PlayingRef {
-      def dispose()(implicit tx: S#Tx): Unit = resources.foreach(_.dispose())
-    }
+    // running main synths
+    private[this] val nodeRef       = Ref(Option.empty[NodeGroupRef])
 
-    private var _data: ProcData[S]  = _
-    // XXX TODO - perhaps `currentStateRef` and `playingRef` could be one thing?
-    private val currentStateRef     = Ref[AuralObj.State](AuralObj.Stopped)
-    private val targetStateRef      = Ref[TargetState   ](TargetStop      )
-    private val playingRef          = Ref[PlayingRef    ](PlayingNone     )
+    // running attribute inputs
+    private[this] val attrMap       = TMap.empty[String, AuralAttribute[S]]
+    private[this] val outputBuses   = TMap.empty[String, AudioBus]
+    // private[this] val procViews     = TSet.empty[AuralObj.Proc[S]]
+    private[this] val auralOutputs  = TMap.empty[String, AuralOutput.Owned[S]]
 
-    final def obj: stm.Source[S#Tx, Proc[S]] = _data.obj
+    private[this] val procLoc       = TxnLocal[Proc[S]]() // cache-only purpose
 
-    final def typeID: Int = Proc.typeID
+    private[this] var observers     = List.empty[Disposable[S#Tx]]
 
-    // def latencyEstimate(implicit tx: S#Tx): Long = ...
+    private[this] var _obj: stm.Source[S#Tx, Proc[S]] = _
+
+    final def obj: stm.Source[S#Tx, Proc[S]] = _obj
 
     override def toString = s"AuralObj.Proc@${hashCode().toHexString}"
 
-    /** Sub-classes may override this if invoking the super-method. */
-    def init(data: ProcData[S])(implicit tx: S#Tx): this.type = {
-      this._data = data
-      data.addInstanceView(this)
-      this
+    /* The ongoing build aural node build process, as stored in `playingRef`. */
+    private[this] sealed trait PlayingRef extends Disposable[S#Tx]
+
+    private[this] object PlayingNone extends PlayingRef {
+      def dispose()(implicit tx: S#Tx) = ()
     }
+    private[this] final class PlayingNode(val node: AuralNode) extends PlayingRef {
+      def dispose()(implicit tx: S#Tx): Unit = {
+        removeInstanceNode(node)
+        node.dispose()
+      }
+    }
+    private[this] final class PlayingPrepare(val resources: List[AsyncResource[S]]) extends PlayingRef {
+      def dispose()(implicit tx: S#Tx): Unit = resources.foreach(_.dispose())
+    }
+
+    // XXX TODO - perhaps `currentStateRef` and `playingRef` could be one thing?
+    private[this] val currentStateRef     = Ref[AuralObj.State](AuralObj.Stopped)
+    private[this] val targetStateRef      = Ref[TargetState   ](TargetStop      )
+    private[this] val playingRef          = Ref[PlayingRef    ](PlayingNone     )
+
+    final def typeID: Int = Proc.typeID
 
     final def state      (implicit tx: S#Tx): AuralObj.State = currentStateRef.get(tx.peer)
     final def targetState(implicit tx: S#Tx): AuralObj.State = targetStateRef .get(tx.peer).completed
 
-    private def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
+    private[this] def state_=(value: AuralObj.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)(tx.peer)
       if (value != old) {
-        // println(s"------PROC STATE $old > $value")
         fire(value)
       }
     }
 
-    def data: ProcData[S] = _data
+    /** Sub-classes may override this if invoking the super-method. */
+    def init(proc: Proc[S])(implicit tx: S#Tx): this.type = {
+      _obj            = tx.newHandle(proc)
+      val ugenInit    = UGB.init(proc)
+      buildStateRef() = ugenInit
+
+      observers ::= proc.changed.react { implicit tx => upd =>
+        upd.changes.foreach {
+          case Proc.GraphChange(_)        => newSynthGraph()
+          case Proc.OutputAdded  (output) => outputAdded(output)
+          case Proc.OutputRemoved(output) => outputRemoved(output)
+        }
+      }
+      val attr = proc.attr
+      observers ::= attr.changed.react { implicit tx => upd => upd.changes.foreach {
+        case Obj.AttrAdded  (key, value) => attrAdded  (key, value)
+        case Obj.AttrRemoved(key, value) => attrRemoved(key, value)
+      }}
+
+      tryBuild()
+      this
+    }
+
+    final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = nodeRef()
+
+    private[this] def playOutputs(n: NodeRef)(implicit tx: S#Tx): Unit = {
+      logA(s"playOutputs ${procCached()}")
+      auralOutputs.foreach { case (_, view) =>
+        view.play(n)
+      }
+    }
+
+    private[this] def stopOutputs()(implicit tx: S#Tx): Unit = {
+      // logA(s"stopOutputs ${procCached()}")
+      auralOutputs.foreach { case (_, view) =>
+        view.stop()
+      }
+    }
+
+    private[this] def newSynthGraph()(implicit tx: S#Tx): Unit = {
+      logA(s"newSynthGraph ${procCached()}")
+
+      // stop and dispose all
+//      procViews.foreach { view =>
+//        if (view.state == Playing) view.stopForRebuild()
+//      }
+      if (state == Playing) stopForRebuild()
+
+      disposeBuild()
+
+      // then try to rebuild the stuff
+      val ugenInit    = UGB.init(procCached())
+      buildStateRef() = ugenInit
+      tryBuild() // this will re-start the temporarily stopped views if possible
+    }
+
+    // ---- scan events ----
+
+    private[this] def outputAdded(output: Output[S])(implicit tx: S#Tx): Unit = {
+      logA(s"outputAdded  to   ${procCached()} (${output.key})")
+      val key = output.key
+      outputBuses.get(key).foreach { bus =>
+        val view = mkAuralOutput(output, bus)
+        nodeOption.foreach(view.play)
+      }
+    }
+
+    private[this] def outputRemoved(output: Output[S])(implicit tx: S#Tx): Unit = {
+      logA(s"outputRemoved from ${procCached()} (${output.key})")
+      context.getAux[AuralOutput[S]](output.id).foreach(disposeAuralOutput)
+//      val key = output.key
+//      state.outputs.get(key).foreach { numCh =>
+//        ... // XXX TODO - what was I thinking to do here?
+//      }
+    }
+
+    @inline
+    private[this] def disposeAuralOutput(view: AuralOutput[S])(implicit tx: S#Tx): Unit = {
+      view.dispose() // this will call `context.removeAux`
+      val exists = auralOutputs.remove(view.key)
+      if (exists.isEmpty) throw new IllegalStateException(s"AuralOutput ${view.key} was not in map")
+    }
+
+    // ---- attr events ----
+
+    private[this] def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      val st          = buildState
+      val aKey        = UGB.AttributeKey(key)
+      val rejected    = st.rejectedInputs.contains(aKey)
+      val acceptedOpt = st.acceptedInputs.get(aKey)
+      val used        = rejected || acceptedOpt.isDefined
+      logA(s"AttrAdded   to   ${procCached()} ($key) - used? $used")
+      if (!used) return
+
+      val view = mkAuralAttribute(key, value)
+      st match {
+        case st0: Complete[S] =>
+          acceptedOpt match {
+            case Some((_, UGB.Input.Attribute.Value(numChannels))) =>
+              nodeRef().foreach { group =>
+                group.instanceNodes.foreach { nr =>
+                  val target  = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
+                  val trNew   = nr.shiftTo(sched.time)
+                  view.play(timeRef = trNew, target = target)
+                }
+              }
+
+            case _ =>
+          }
+
+        case st0: Incomplete[S] =>
+          acceptedOpt.fold[Unit] {  // rejected
+            // give it another incremental try
+            tryBuild()
+          } { case (input, valueBefore) =>
+            // if the request value changes or the
+            // new request is rejected, we have to
+            // rebuild the whole thing
+            try {
+              val valueNow = requestInput[input.Value](input, st0)
+              if (valueNow != valueBefore) newSynthGraph()
+            } catch {
+              case MissingIn(_) => newSynthGraph()
+            }
+          }
+
+        case _ =>
+      }
+    }
+
+    private[this] def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+      logA(s"AttrRemoved from ${procCached()} ($key)")
+      attrMap.remove(key).foreach(_.dispose())
+    }
+
+    // ----
+
+    // creates an `AuralOutput` and registers it with the aural context.
+    private[this] def addUsedOutput(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
+      val outputs = procCached().outputs
+      val bus     = Bus.audio(server, numChannels = numChannels) // mkBus(key, numChannels)
+      outputBuses.put(key, bus).foreach(_ => throw new IllegalStateException(s"Output bus for $key already defined"))
+      outputs.get(key).foreach { output =>
+        mkAuralOutput(output, bus)
+      }
+    }
+
+    private[this] def addInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
+      logA(s"addInstanceNode ${procCached()} : $n")
+      nodeRef().fold {
+        val groupImpl = NodeGroupRef(name = s"Group-NodeRef ${procCached()}", in0 = n)
+        nodeRef() = Some(groupImpl)
+        playOutputs(groupImpl)
+
+      } { groupImpl =>
+        groupImpl.addInstanceNode(n)
+        nodeRef() = None
+      }
+    }
+
+    private[this] def removeInstanceNode(n: AuralNode)(implicit tx: S#Tx): Unit = {
+      logA(s"removeInstanceNode ${procCached()} : $n")
+      val groupImpl = nodeRef().getOrElse(sys.error(s"Removing unregistered AuralProc node instance $n"))
+      if (groupImpl.removeInstanceNode(n)) {
+        nodeRef() = None
+        stopOutputs()
+        // disposeAttrMap()
+      }
+    }
+
+    /** Sub-classes may override this if invoking the super-method. */
+    def dispose()(implicit tx: S#Tx): Unit = {
+      freePlayingRef()
+      // _data.removeInstanceView(this)
+      // context.release(procCached())
+      observers.foreach(_.dispose())
+      disposeBuild()
+    }
+
+    private[this] def disposeBuild()(implicit tx: S#Tx): Unit = {
+      disposeNodeRefAndOutputs()
+      disposeAttrMap()
+    }
+
+    private[this] def disposeAttrMap()(implicit tx: S#Tx): Unit = {
+      attrMap .foreach(_._2.dispose())
+      attrMap .clear()
+    }
+
+    private[this] def disposeNodeRefAndOutputs()(implicit tx: S#Tx): Unit = {
+      nodeRef.swap(None).foreach(_.dispose())
+      // stopOutputs()
+      auralOutputs.foreach { case (_, view) => view.dispose() }
+      auralOutputs.clear()
+      outputBuses .clear()
+    }
+
+    private[this] def buildState(implicit tx: S#Tx): UGB.State[S] = buildStateRef()
+
+    /* If the ugen graph is incomplete, tries to (incrementally)
+     * build it. Calls `buildAdvanced` with the old and new
+     * state then.
+     */
+    final def tryBuild()(implicit tx: S#Tx): Unit = {
+      buildState match {
+        case s0: Incomplete[S] =>
+          logA(s"try build ${procCached()} - ${procCached().name}")
+          val s1          = s0.retry(this)
+          buildStateRef() = s1
+          buildAdvanced(before = s0, now = s1)
+
+        case s0: Complete[S] => // nada
+      }
+    }
+
+    /* Called after invoking `retry` on the ugen graph builder.
+     * The methods looks for new scan-ins and scan-outs used by
+     * the ugen graph, and creates aural-scans for them, or
+     * at least the bus-proxies if no matching entries exist
+     * in the proc's `scans` dictionary.
+     *
+     * If the now-state indicates that the ugen-graph is complete,
+     * it calls `play` on the proc-views whose target-state is to play.
+     */
+    private[this] def buildAdvanced(before: UGB.State[S], now: UGB.State[S])(implicit tx: S#Tx): Unit = {
+
+      // handle newly rejected inputs
+      if (now.rejectedInputs.isEmpty) {
+        logA(s"buildAdvanced ${procCached()}; complete? ${now.isComplete}")
+      } else {
+        logA(s"buildAdvanced ${procCached()}; rejectedInputs = ${now.rejectedInputs.mkString(",")}")
+      }
+
+      // handle newly visible outputs
+      if (before.outputs ne now.outputs) {
+        // detect which new outputs have been determined in the last iteration
+        // (newOuts is a map from `name: String` to `numChannels Int`)
+        val newOuts = now.outputs.filterNot {
+          case (key, _) => before.outputs.contains(key)
+        }
+        logA(s"...newOuts = ${newOuts.mkString(",")}")
+
+        newOuts.foreach { case (key, numCh) =>
+          addUsedOutput(key, numCh)
+        }
+      }
+
+      if (now.isComplete) {
+//        procViews.foreach { view =>
+//          if (view.targetState == Playing) {
+//            // ugen graph became ready and view wishes to play.
+//            view.playAfterRebuild()
+//          }
+//        }
+        if (targetState == Playing) playAfterRebuild()
+      }
+    }
+
+    /* Creates a new aural output */
+    private[this] def mkAuralOutput(output: Output[S], bus: AudioBus)(implicit tx: S#Tx): AuralOutput.Owned[S] = {
+      // val key   = output.key
+      // val views = scanOutViews
+      val view  = AuralOutput(view = this, output = output, bus = bus)
+      // this is done by the `AuralOutput` constructor:
+      // context.putAux[AuralOutput[S]](output.id, view)
+      val old = auralOutputs.put(output.key, view)
+      if (old.isDefined) throw new IllegalStateException(s"AuralOutput already exists for ${output.key}")
+      view
+    }
+
+    private[this] def mkAuralAttribute(key: String, value: Obj[S])(implicit tx: S#Tx): AuralAttribute[S] =
+      attrMap.getOrElseUpdate(key, AuralAttribute(key, value, this))
+
+    // AuralAttribute.Observer
+    final def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
+      val aKey = UGB.AttributeKey(attr.key)
+      if (buildState.rejectedInputs.contains(aKey)) tryBuild()
+    }
+
+    /** Sub-classes may override this if invoking the super-method. */
+    def requestInput[Res](in: UGB.Input { type Value = Res }, st: Incomplete[S])
+                         (implicit tx: S#Tx): Res = in match {
+      case i: UGB.Input.Attribute =>
+        val procObj   = procCached()
+        val valueOpt  = procObj.attr.get(i.name)
+        val found     = valueOpt.fold(-1) { value =>
+          val view = mkAuralAttribute(i.name, value)
+          view.preferredNumChannels
+        }
+
+        // val found = requestAttrNumChannels(i.name)
+        import i.{defaultNumChannels => defNum, requiredNumChannels => reqNum}
+        if ((found < 0 && i.defaultNumChannels < 0) || (found >= 0 && reqNum >= 0 && found != reqNum)) {
+          // throw new IllegalStateException(s"Attribute ${i.name} requires $reqNum channels (found $found)")
+          throw MissingIn(i.key)
+        }
+        val res = if (found >= 0) found else if (reqNum >= 0) reqNum else defNum
+        UGB.Input.Attribute.Value(res)
+
+      case i: UGB.Input.Stream =>
+        val numCh0  = requestAttrNumChannels(i.name)
+        val numCh   = if (numCh0 < 0) 1 else numCh0     // simply default to 1
+        val newSpecs0 = st.acceptedInputs.get(i.key) match {
+          case Some((_, v: UGB.Input.Stream.Value))   => v.specs
+          case _                                      => Nil
+        }
+        val newSpecs = if (i.spec.isEmpty) newSpecs0 else {
+          i.spec :: newSpecs0
+        }
+        UGB.Input.Stream.Value(numChannels = numCh, specs = newSpecs)
+
+      case i: UGB.Input.Buffer =>
+        val procObj = procCached()
+        val (numFr, numCh) = procObj.attr.get(i.name).fold((-1L, -1)) {
+          case a: DoubleVector[S] =>
+            val v = a.value   // XXX TODO: would be better to write a.peer.size.value
+            (v.size.toLong, 1)
+          case a: Grapheme.Expr.Audio[S] =>
+            // val spec = a.spec
+            val spec = a.value.spec
+            (spec.numFrames, spec.numChannels)
+
+          case _ => (-1L, -1)
+        }
+        if (numCh < 0) throw MissingIn(i.key)
+        // larger files are asynchronously prepared, smaller ones read on the fly
+        val async = (numCh * numFr) > UGB.Input.Buffer.AsyncThreshold   // XXX TODO - that threshold should be configurable
+        UGB.Input.Buffer.Value(numFrames = numFr, numChannels = numCh, async = async)
+
+      case i: UGB.Input.Action  => UGB.Input.Action .Value
+      case i: UGB.Input.DiskOut => UGB.Input.DiskOut.Value(i.numChannels)
+
+      case _ => throw new IllegalStateException(s"Unsupported input request $in")
+    }
+
+    private[this] def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus] =
+      outputBuses.get(key)
+
+    final protected def procCached()(implicit tx: S#Tx): Proc[S] = {
+      if (procLoc.isInitialized) procLoc.get
+      else {
+        val proc = obj()
+        procLoc.set(proc)
+        proc
+      }
+    }
+
+    @inline
+    private[this] def getAuralOutput(output: Output[S])(implicit tx: S#Tx): Option[AuralOutput[S]] =
+      context.getAux[AuralOutput[S]](output.id)
+
+    private[this] def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
+      val procObj   = procCached()
+      val valueOpt  = procObj.attr.get(key)
+      valueOpt.fold(-1) {
+        case a: DoubleVector[S] => a.value.size // XXX TODO: would be better to write a.peer.size.value
+        case a: Grapheme.Expr.Audio [S] =>
+          a.value.spec.numChannels
+        case _: FadeSpec.Obj[S] => 4
+        case a: Output[S] =>
+          getAuralOutput(a).fold(-1)(_.bus.numChannels)
+        case _ => -1
+      }
+    }
+
+    /** Sub-classes may override this if invoking the super-method.
+      * If the value is incompatible with the assigned `value` and rebuilding the
+      * synth-graph would alleviate that problem, a `MissingIn` should be thrown.
+      * If the problem does not change in terms of the re-evaluation of the
+      * synth-graph, a different generic exception must be thrown to avoid
+      * an infinite loop.
+      */
+    def buildAttrInput(nr: NodeRef.Full, timeRef: TimeRef, key: String, value: UGB.Value)
+                      (implicit tx: S#Tx): Unit = {
+      value match {
+        case UGB.Input.Attribute.Value(numChannels) =>  // --------------------- scalar
+          attrMap.get(key).foreach { a =>
+            val target = AuralAttribute.Target(nr, key, Bus.audio(server, numChannels))
+            a.play(timeRef = timeRef, target = target)
+          }
+
+        case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
+          val infoSeq = if (specs.isEmpty) UGB.Input.Stream.EmptySpec :: Nil else specs
+
+          infoSeq.zipWithIndex.foreach { case (info, idx) =>
+            val ctlName     = graph.impl.Stream.controlName(key, idx)
+            val bufSize     = if (info.isEmpty) server.config.blockSize else {
+              val maxSpeed  = if (info.maxSpeed <= 0.0) 1.0 else info.maxSpeed
+              val bufDur    = 1.5 * maxSpeed
+              val minSz     = (2 * server.config.blockSize * math.max(1.0, maxSpeed)).toInt
+              val bestSz    = math.max(minSz, (bufDur * server.sampleRate).toInt)
+              import numbers.Implicits._
+              val bestSzHi  = bestSz.nextPowerOfTwo
+              val bestSzLo  = bestSzHi >> 1
+              if (bestSzHi.toDouble/bestSz < bestSz.toDouble/bestSzLo) bestSzHi else bestSzLo
+            }
+            val (rb, gain) = procCached().attr.get(key).fold[(Buffer, Float)] {
+              // DiskIn and VDiskIn are fine with an empty non-streaming buffer, as far as I can tell...
+              // So instead of aborting when the attribute is not set, fall back to zero
+              val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
+              (_buf, 0f)
+            } {
+              case a: Grapheme.Expr.Audio[S] =>
+                val audioVal  = a.value
+                val spec      = audioVal.spec
+                val path      = audioVal.artifact.getAbsolutePath
+                val offset    = audioVal.offset
+                val _gain     = audioVal.gain
+                val _buf      = if (info.isNative) {
+                  // XXX DIRTY HACK
+                  val offset1 = if (key.contains("!rnd")) {
+                    offset + (math.random * (spec.numFrames - offset)).toLong
+                  } else {
+                    offset
+                  }
+                  // println(s"OFFSET = $offset1")
+                  Buffer.diskIn(server)(
+                    path          = path,
+                    startFrame    = offset1,
+                    numFrames     = bufSize,
+                    numChannels   = spec.numChannels
+                  )
+                } else {
+                  val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
+                  val trig = new StreamBuffer(key = key, idx = idx, synth = nr.node, buf = __buf, path = path,
+                    fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
+                    resetFrame = offset)
+                  nr.addUser(trig)
+                  __buf
+                }
+                (_buf, _gain.toFloat)
+
+              case a => sys.error(s"Cannot use attribute $a as an audio stream")
+            }
+            nr.addControl(ctlName -> Seq[Float](rb.id, gain): ControlSet)
+            nr.addResource(rb)
+          }
+
+        case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
+          val rb = procCached().attr.get(key).fold[Buffer] {
+            sys.error(s"Missing attribute $key for buffer content")
+          } {
+            case a: Grapheme.Expr.Audio[S] =>
+              val audioVal  = a.value
+              val spec      = audioVal.spec
+              val path      = audioVal.artifact.getAbsolutePath
+              val offset    = audioVal.offset
+              // XXX TODO - for now, gain is ignored.
+              // one might add an auxiliary control proxy e.g. Buffer(...).gain
+              // val _gain     = audioElem.gain    .value
+              if (spec.numFrames > 0x3FFFFFFF)
+                sys.error(s"File too large for in-memory buffer: $path (${spec.numFrames} frames)")
+              val bufSize   = spec.numFrames.toInt
+              val _buf      = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
+              _buf.read(path = path, fileStartFrame = offset)
+              _buf
+
+            case a => sys.error(s"Cannot use attribute $a as a buffer content")
+          }
+          val ctlName    = graph.Buffer.controlName(key)
+          nr.addControl(ctlName -> rb.id)
+          nr.addResource(rb)
+
+        case UGB.Input.Action.Value =>   // ----------------------- action
+          val resp = new ActionResponder(objH = obj /* tx.newHandle(nr.obj) */, key = key, synth = nr.node)
+          nr.addUser(resp)
+
+        case UGB.Input.DiskOut.Value(numCh) =>
+          val rb = procCached().attr.get(key).fold[Buffer] {
+            sys.error(s"Missing attribute $key for disk-out artifact")
+          } {
+            case a: Artifact[S] =>
+              val artifact  = a
+              val f         = artifact.value.absolute
+              val ext       = f.ext.toLowerCase
+              val tpe       = AudioFileType.writable.find(_.extensions.contains(ext)).getOrElse(AudioFileType.AIFF)
+              val _buf      = Buffer.diskOut(server)(path = f.path, fileType = tpe, numChannels = numCh)
+              _buf
+
+            case a => sys.error(s"Cannot use attribute $a as an artifact")
+          }
+          val ctlName    = graph.DiskOut.controlName(key)
+          nr.addControl(ctlName -> rb.id)
+          nr.addResource(rb)
+
+        case _ =>
+          throw new IllegalStateException(s"Unsupported input attribute request $value")
+      }
+    }
 
     final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       targetStateRef.set(TargetPrepared)(tx.peer)
@@ -108,7 +604,7 @@ object AuralProcImpl {
     final def play(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val ts = TargetPlaying(sched.time, timeRef)
       targetStateRef.set(ts)(tx.peer)
-      _data.state match {
+      /* _data. */ state match {
         case s: UGB.Complete[S] =>
           state match {
             case Stopped   => prepareAndLaunch(s, timeRef)
@@ -121,10 +617,10 @@ object AuralProcImpl {
     }
 
     // same as `play` but reusing previous `timeRef`
-    final def playAfterRebuild()(implicit tx: S#Tx): Unit = {
+    private[this] def playAfterRebuild()(implicit tx: S#Tx): Unit = {
       if (state != Stopped) return
 
-      (_data.state, targetStateRef.get(tx.peer)) match {
+      (buildState, targetStateRef.get(tx.peer)) match {
         case (s: UGB.Complete[S], tp: TargetPlaying) =>
           prepareAndLaunch(s, tp.shiftTo(sched.time))
         case _ =>
@@ -137,18 +633,9 @@ object AuralProcImpl {
     }
 
     // same as `stop` but not touching target state
-    final def stopForRebuild()(implicit tx: S#Tx): Unit = {
+    private[this] def stopForRebuild()(implicit tx: S#Tx): Unit = {
       freePlayingRef()
       state = Stopped
-    }
-
-    // def prepare()(implicit tx: S#Tx): Unit = ...
-
-    /** Sub-classes may override this if invoking the super-method. */
-    def dispose()(implicit tx: S#Tx): Unit = {
-      freePlayingRef()
-      _data.removeInstanceView(this)
-      context.release(_data.procCached())
     }
 
     /** Sub-classes may override this if falling back to the super-method. */
@@ -162,99 +649,11 @@ object AuralProcImpl {
     protected def buildSyncInput(nr: NodeRef.Full, timeRef: TimeRef, keyW: UGB.Key, value: UGB.Value)
                                 (implicit tx: S#Tx): Unit = keyW match {
       case UGB.AttributeKey(key) =>
-        _data.buildAttrInput(nr, timeRef, key, value)
-//        b.storeKey(key)
-
-// SCAN
-//      case UGB.ScanKey(key) =>
-//        buildScanInput(b, key, value)
+        buildAttrInput(nr, timeRef, key, value)
 
       case _ =>
         throw new IllegalStateException(s"Unsupported input request $keyW")
     }
-
-// SCAN
-//    /** Sub-classes may override this if falling back to the super-method. */
-//    protected def buildScanInput(b: SynthBuilder[S], key: String, value: UGB.Value)
-//                                (implicit tx: S#Tx): Unit = value match {
-//      case UGB.Input.Scan.Value(numCh) =>
-//        // ---- scans ----
-//        // XXX TODO : this should all disappear
-//        // and the missing bits should be added
-//        // to AuralScan
-//
-//        // val numCh = scanIn.numChannels
-//
-//        @inline def ensureChannels(n: Int): Unit =
-//          if (n != numCh)
-//            throw new IllegalStateException(s"Scan input changed number of channels (expected $numCh but found $n)")
-//
-//        val inCtlName = graph.ScanIn.controlName(key)
-//        // var inBus     = Option.empty[AudioBusNodeSetter]
-//
-//        def mkInBus(): AudioBusNodeSetter = {
-//          val bus    = _data.getScanBus(key) getOrElse sys.error(s"Scan bus $key not provided")
-//          // val b      = Bus.audio(server, numCh)
-//          logA(s"addInputBus($key, $b) (${hashCode.toHexString})")
-//          val res    =
-//          // if (scanIn.fixed)
-//          //   BusNodeSetter.reader(inCtlName, b, synth)
-//          // else
-//            BusNodeSetter.mapper(inCtlName, bus, b.synth)
-//          b.users ::= res
-//          b.inputBuses += key -> bus
-//          res
-//        }
-//
-//        // note: if not found, stick with default
-//
-//        val time = b.timeRef.offsetOrZero
-//
-//        // XXX TODO: combination fixed + grapheme source doesn't work -- as soon as there's a bus mapper
-//        //           we cannot use ControlSet any more, but need other mechanism
-//// SCAN
-////        b.obj.inputs.get(key).foreach { scan =>
-////          val src = scan.iterator
-////          if (src.isEmpty) {
-////            // if (scanIn.fixed) lazyInBus  // make sure a fixed channels scan in exists as a bus
-////            mkInBus()
-////
-////          } else {
-////            src.foreach {
-////              case Link.Grapheme(peer) =>
-////                val segmOpt = peer.segment(time)
-////                segmOpt.foreach {
-////                  // again if not found... stick with default
-////                  case const: Segment.Const =>
-////                    ensureChannels(const.numChannels) // ... or could just adjust to the fact that they changed
-////                    //                        setMap :+= ((key -> const.numChannels) : ControlSet)
-////                    b.setMap += (if (const.numChannels == 1) {
-////                      ControlSet.Value (inCtlName, const.values.head .toFloat )
-////                    } else {
-////                      ControlSet.Vector(inCtlName, const.values.map(_.toFloat))
-////                    })
-////
-////                  case segm: Segment.Curve =>
-////                    ensureChannels(segm.numChannels) // ... or could just adjust to the fact that they changed
-////                    // println(s"segment : ${segm.span}")
-////                    val bm          = mkInBus()
-////                    val w           = SegmentWriter(bm.bus, segm, time, SampleRate)
-////                    b.dependencies  ::= w
-////
-////                  case audio: Segment.Audio =>
-////                    ensureChannels(audio.numChannels)
-////                    val bm          = mkInBus()
-////                    val w           = AudioArtifactWriter(bm.bus, audio, time)
-////                    b.dependencies  ::= w
-////                }
-////
-////              case Link.Scan(peer) => mkInBus()
-////            }
-////          }
-////        }
-//
-//      case _ => throw new IllegalStateException(s"Unsupported input scan request $value")
-//    }
 
     /** Sub-classes may override this if invoking the super-method. */
     protected def buildAsyncAttrInput(b: AsyncProcBuilder[S], key: String, value: UGB.Value)
@@ -286,9 +685,9 @@ object AuralProcImpl {
     }
 
     // ---- asynchronous preparation ----
-    private def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)
-                       (implicit tx: S#Tx): Unit = {
-      val p = _data.procCached()
+    private[this] def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)
+                                      (implicit tx: S#Tx): Unit = {
+      val p = procCached()
       logA(s"begin prepare $p (${hashCode.toHexString})")
 
       val b = new AsyncProcBuilder(p)
@@ -316,7 +715,7 @@ object AuralProcImpl {
       }
     }
 
-    private def prepared(ugen: UGB.Complete[S])(implicit tx: S#Tx): Unit = {
+    private[this] def prepared(ugen: UGB.Complete[S])(implicit tx: S#Tx): Unit = {
       targetStateRef.get(tx.peer) match {
         case tp: TargetPlaying =>
           launch(ugen, tp.shiftTo(sched.time)) // XXX TODO - yes or no, shift time?
@@ -326,13 +725,11 @@ object AuralProcImpl {
     }
 
     // ---- synchronous preparation ----
-    private def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      val p = _data.procCached()
+    private[this] def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+      val p = procCached()
       logA(s"begin launch  $p (${hashCode.toHexString})")
 
       val ug            = ugen.result
-      implicit val itx  = tx.peer
-
       val nameHint      = p.attr.$[StringObj](ObjKeys.attrName).map(_.value)
       val synth         = Synth.expanded(server, ug, nameHint = nameHint)
 
@@ -363,34 +760,21 @@ object AuralProcImpl {
 
       // ---- handle output buses, and establish missing links to sinks ----
       ugen.outputs.foreach { case (key, numCh) =>
-        val bus    = _data.getOutputBus(key) getOrElse sys.error(s"Scan bus $key not provided")
+        val bus    = getOutputBus(key) getOrElse sys.error(s"Scan bus $key not provided")
         logA(s"addOutputBus($key, $bus) (${hashCode.toHexString})")
         val res    = BusNodeSetter.writer(graph.ScanOut.controlName(key), bus, synth)
         builder.addUser(res)
-        // builder.outputBuses += key -> bus
-        // res
       }
 
-//      val node      = builder.finish1()
-//      nodeRefVar()  = node
       val old       = playingRef.swap(new PlayingNode(builder))(tx.peer)
       old.dispose()
       builder.play()
-      _data.addInstanceNode(builder)
-      // builder.finish2()
+      addInstanceNode(builder)
       logA(s"launched $p -> $builder (${hashCode.toHexString})")
       state = Playing
-      // setPlayingNode(node)
     }
 
-//    private def setPlayingNode(node: AuralNode)(implicit tx: S#Tx): Unit = {
-//      val old = playingRef.swap(new PlayingNode(node))(tx.peer)
-//      old.dispose()
-//      _data.addInstanceNode(node)
-//      state = Playing
-//    }
-
-    private def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
+    private[this] def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
       val res = new PlayingPrepare(resources)
       val old = playingRef.swap(res)(tx.peer)
       old.dispose()
@@ -398,7 +782,7 @@ object AuralProcImpl {
       res
     }
 
-    private def freePlayingRef()(implicit tx: S#Tx): Unit = {
+    private[this] def freePlayingRef()(implicit tx: S#Tx): Unit = {
       val old = playingRef.swap(PlayingNone)(tx.peer)
       old.dispose()
     }
