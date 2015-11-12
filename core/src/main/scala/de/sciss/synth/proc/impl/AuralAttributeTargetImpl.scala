@@ -22,8 +22,8 @@ import de.sciss.synth.{ControlSet, SynthGraph}
 
 import scala.concurrent.stm.{Ref, TMap, TSet}
 
-class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String, targetBus: AudioBus)
-  extends AuralAttribute.Target[S] with DynamicUser {
+final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String, targetBus: AudioBus)
+  extends AuralAttribute.Target[S] /* with DynamicUser */ {
 
   import TxnLike.peer
   import targetBus.{numChannels, server}
@@ -32,7 +32,7 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String
 
   private val map       = TMap.empty[AuralAttribute[S], Connected]
   private val stateRef  = Ref[State](Empty)
-  private val attrs     = TSet.empty[AuralAttribute[S]]
+//  private val attrs     = TSet.empty[AuralAttribute[S]]
 
   private final class Connected(val value: Value,
                                 val users: List[DynamicUser], val resources: List[Resource])
@@ -231,19 +231,19 @@ class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String
 
   // def dispose()(implicit tx: S#Tx): Unit = ...
 
-  // this is a no-op, we just use removal
-  def add   ()(implicit tx: Txn): Unit = ()
-  def remove()(implicit tx: Txn): Unit = ??? // attrs.foreach(_.dispose())
+//  // this is a no-op, we just use removal
+//  def add   ()(implicit tx: Txn): Unit = ()
+//  def remove()(implicit tx: Txn): Unit = attrs.foreach(_.dispose())
 
   def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit =
     stateRef.transform(_.put(attr, value))(tx.peer)
 
   def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
     stateRef.transform(_.remove(attr))(tx.peer)
-    attrs.remove(attr)
+    // attrs.remove(attr)
     // if (!attrs.remove(attr)) throw new IllegalStateException(s"AuralAttribute[S] $attr was not added")
   }
 
-  def add(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
-    if (!attrs.add(attr)) throw new IllegalStateException(s"AuralAttribute[S] $attr was already added")
+  //  def add(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
+  //    if (!attrs.add(attr)) throw new IllegalStateException(s"AuralAttribute[S] $attr was already added")
 }

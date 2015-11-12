@@ -129,7 +129,7 @@ final class AuralTimelineAttribute[S <: Sys[S]](val key: String, val obj: stm.So
     }
     val p = new PlayTime(sched.time, tForce, target /* , Ref(childViews) */)
     require(playRef.swap(Some(p)).isEmpty)
-    target.add(this)
+//    target.add(this)
     state = Playing
     // p
   }

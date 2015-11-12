@@ -79,7 +79,7 @@ object AuralAttributeImpl {
 
     final def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
       require(playRef.swap(Some(target))(tx.peer).isEmpty)
-      target.add(this)
+      // target.add(this)
       state = Playing
       update(target, obj().value)
     }

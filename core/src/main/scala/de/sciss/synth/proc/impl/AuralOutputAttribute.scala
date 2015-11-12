@@ -82,7 +82,7 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
 
   def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
     require (playRef.swap(Some(target)).isEmpty)
-    target.add(this)
+    // target.add(this)
     auralRef().foreach(update(target, _))
     state = Playing
     // p
