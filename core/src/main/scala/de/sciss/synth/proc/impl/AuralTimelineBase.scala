@@ -30,6 +30,8 @@ import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TMap, TSet}
 
 object AuralTimelineBase {
+  type Leaf[S <: Sys[S], Elem] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
+
   private final val LOOK_AHEAD  = (1.0 * TimeRef.SampleRate).toLong  // one second. XXX TODO -- make configurable
   private final val STEP_GRID   = (0.5 * TimeRef.SampleRate).toLong  // XXX TODO -- make configurable
 
@@ -39,14 +41,9 @@ object AuralTimelineBase {
   }
 
   @inline
-  private def spanToPoint(span: SpanLike): LongPoint2D = BiGroupImpl.spanToPoint(span)
-
+  def spanToPoint(span: SpanLike): LongPoint2D = BiGroupImpl.spanToPoint(span)
 }
-abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[S, Target]](
-    val obj: stm.Source[S#Tx, Timeline[S]],
-    tree: SkipOctree[I, LongSpace.TwoDim, (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])],
-    viewMap: IdentifierMap[S#ID, S#Tx, Elem])
-   (implicit context: AuralContext[S], iSys: S#Tx => I#Tx)
+trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[S, Target]]
   extends /* AuralObj.Timeline.Manual[S] with */ ObservableImpl[S, AuralView.State] { impl =>
 
   import TxnLike.peer
@@ -57,10 +54,21 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: A
 
   // ---- abstract ----
 
+  def obj: stm.Source[S#Tx, Timeline[S]]
+
+  protected def tree: SkipOctree[I, LongSpace.TwoDim, (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])]
+
+  protected def viewMap: IdentifierMap[S#ID, S#Tx, Elem]
+
+  implicit protected val context: AuralContext[S]
+
+  protected def iSys: S#Tx => I#Tx
+
   protected def makeView   (obj: Obj[S]                 )(implicit tx: S#Tx): Elem
-//  protected def prepareView(view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  protected def playView   (view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  protected def stopView   (view: Elem                  )(implicit tx: S#Tx): Unit
+
+  //  protected def prepareView(view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
+  //  protected def playView   (view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
+  //  protected def stopView   (view: Elem                  )(implicit tx: S#Tx): Unit
 
   protected def viewAdded  (timed: S#ID, view: Elem     )(implicit tx: S#Tx): Unit
   protected def viewRemoved(             view: Elem     )(implicit tx: S#Tx): Unit
@@ -396,7 +404,7 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: A
   private[this] def stopAndDisposeView(span: SpanLike, view: Elem)(implicit tx: S#Tx): Unit = {
     logA(s"timeline - stopAndDispose - $span - $view")
 
-    stopView(view)
+    view.stop() // stopView(view)
     // view.stop()
     view.dispose()
     playingViews  .remove(view)
@@ -498,7 +506,7 @@ abstract class AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: A
     // implicit val itx = iSys(tx)
 
     playingViews.foreach { view =>
-      stopView   (view) // view.stop()
+      view.stop() // stopView   (view) // view.stop()
       viewRemoved(view) // contents.viewRemoved(view)
     }
     sched.cancel(schedEvtToken ().token)
