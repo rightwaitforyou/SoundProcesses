@@ -62,6 +62,8 @@ object UGenGraphBuilderImpl {
    )
     extends Incomplete[S] {
 
+    override def toString = s"UGenGraphBuilder.Incomplete@${hashCode.toHexString}"
+
     def retry(context: Context[S])(implicit tx: S#Tx): State[S] =
       new Impl[S](context, this, tx).tryBuild()
   }
@@ -79,7 +81,7 @@ object UGenGraphBuilderImpl {
     extends BasicUGenGraphBuilder with UGenGraphBuilder with Incomplete[S] {
     builder =>
 
-    override def toString = s"UGenGraphBuilder.Incomplete@${hashCode.toHexString}"
+    override def toString = s"UGenGraphBuilder.Incomplete@${hashCode.toHexString} (active)"
 
     private var remaining       = in.remaining
     private var controlProxies  = in.controlProxies

@@ -54,9 +54,6 @@ object AuralProcImpl {
 
     private[this] val buildStateRef = Ref.make[UGB.State[S]]()
 
-    // running main synths
-    private[this] val nodeRef       = Ref(Option.empty[AuralNode[S]])
-
     // running attribute inputs
     private[this] val attrMap       = TMap.empty[String, AuralAttribute[S]]
     private[this] val outputBuses   = TMap.empty[String, AudioBus]
@@ -73,19 +70,30 @@ object AuralProcImpl {
     override def toString = s"AuralObj.Proc@${hashCode().toHexString}"
 
     /* The ongoing build aural node build process, as stored in `playingRef`. */
-    private[this] sealed trait PlayingRef extends Disposable[S#Tx]
+    private[this] sealed trait PlayingRef extends Disposable[S#Tx] {
+      def nodeOption: Option[AuralNode[S]]
+    }
 
     private[this] object PlayingNone extends PlayingRef {
       def dispose()(implicit tx: S#Tx) = ()
+      def nodeOption = None
     }
     private[this] final class PlayingNode(val node: AuralNode[S]) extends PlayingRef {
       def dispose()(implicit tx: S#Tx): Unit = {
-        removeInstanceNode(node)
+        auralOutputs.foreach { case (_, view) =>
+          view.stop()
+        }
+        attrMap.foreach { case (_, view) =>
+          view.stop()
+        }
         node.dispose()
       }
+
+      def nodeOption = Some(node)
     }
     private[this] final class PlayingPrepare(val resources: List[AsyncResource[S]]) extends PlayingRef {
       def dispose()(implicit tx: S#Tx): Unit = resources.foreach(_.dispose())
+      def nodeOption = None
     }
 
     // XXX TODO - perhaps `currentStateRef` and `playingRef` could be one thing?
@@ -95,11 +103,11 @@ object AuralProcImpl {
 
     final def typeID: Int = Proc.typeID
 
-    final def state      (implicit tx: S#Tx): AuralView.State = currentStateRef.get(tx.peer)
-    final def targetState(implicit tx: S#Tx): AuralView.State = targetStateRef .get(tx.peer).completed
+    final def state      (implicit tx: S#Tx): AuralView.State = currentStateRef()
+    final def targetState(implicit tx: S#Tx): AuralView.State = targetStateRef ().completed
 
     private[this] def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
-      val old = currentStateRef.swap(value)(tx.peer)
+      val old = currentStateRef.swap(value)
       if (value != old) {
         fire(value)
       }
@@ -128,19 +136,13 @@ object AuralProcImpl {
       this
     }
 
-    final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = nodeRef()
+    final def nodeOption(implicit tx: TxnLike): Option[NodeRef] = playingRef().nodeOption
 
+    @inline
     private[this] def playOutputs(n: NodeRef)(implicit tx: S#Tx): Unit = {
       logA(s"playOutputs ${procCached()}")
       auralOutputs.foreach { case (_, view) =>
         view.play(n)
-      }
-    }
-
-    private[this] def stopOutputs()(implicit tx: S#Tx): Unit = {
-      // logA(s"stopOutputs ${procCached()}")
-      auralOutputs.foreach { case (_, view) =>
-        view.stop()
       }
     }
 
@@ -200,10 +202,13 @@ object AuralProcImpl {
         case st0: Complete[S] =>
           acceptedOpt match {
             case Some((_, UGB.Input.Attribute.Value(numChannels))) =>
-              nodeRef().foreach { nr =>
-                val target  = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
-                val trNew   = nr.shiftTo(sched.time)
-                view.play(timeRef = trNew, target = target)
+              playingRef() match {
+                case p: PlayingNode =>
+                  val nr      = p.node
+                  val target  = AuralAttribute.Target(nodeRef = nr, key, Bus.audio(server, numChannels = numChannels))
+                  val trNew   = nr.shiftTo(sched.time)
+                  view.play(timeRef = trNew, target = target)
+                case _ =>
               }
 
             case _ =>
@@ -246,18 +251,6 @@ object AuralProcImpl {
       }
     }
 
-    private[this] def setInstanceNode(n: AuralNode[S])(implicit tx: S#Tx): Unit = {
-      logA(s"setInstanceNode ${procCached()} : $n")
-      if (nodeRef.swap(Some(n)).isDefined) throw new IllegalStateException(s"Already playing: $this")
-      playOutputs(n)
-    }
-
-    private[this] def removeInstanceNode(n: AuralNode[S])(implicit tx: S#Tx): Unit = {
-      logA(s"removeInstanceNode ${procCached()} : $n")
-      if (nodeRef.swap(None).isEmpty) throw new IllegalStateException(s"Was not playing: $this")
-      stopOutputs()
-    }
-
     /** Sub-classes may override this if invoking the super-method. */
     def dispose()(implicit tx: S#Tx): Unit = {
       freePlayingRef()
@@ -265,22 +258,14 @@ object AuralProcImpl {
       disposeBuild()
     }
 
+    // does _not_ dispose playingRef
     private[this] def disposeBuild()(implicit tx: S#Tx): Unit = {
-      disposeNodeRefAndOutputs()
-      disposeAttrMap()
-    }
-
-    private[this] def disposeAttrMap()(implicit tx: S#Tx): Unit = {
-      attrMap .foreach(_._2.dispose())
-      attrMap .clear()
-    }
-
-    private[this] def disposeNodeRefAndOutputs()(implicit tx: S#Tx): Unit = {
-      nodeRef.swap(None).foreach(_.dispose())
-      // stopOutputs()
       auralOutputs.foreach { case (_, view) => view.dispose() }
       auralOutputs.clear()
       outputBuses .clear()
+
+      attrMap .foreach(_._2.dispose())
+      attrMap .clear()
     }
 
     private[this] def buildState(implicit tx: S#Tx): UGB.State[S] = buildStateRef()
@@ -567,14 +552,14 @@ object AuralProcImpl {
     }
 
     final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-      targetStateRef.set(TargetPrepared)(tx.peer)
+      targetStateRef() = TargetPrepared
       // XXX TODO
     }
 
     final def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
       val ts = TargetPlaying(sched.time, timeRef)
-      targetStateRef.set(ts)(tx.peer)
-      /* _data. */ state match {
+      targetStateRef() = ts
+      buildState match {
         case s: UGB.Complete[S] =>
           state match {
             case Stopped   => prepareAndLaunch(s, timeRef)
@@ -590,7 +575,7 @@ object AuralProcImpl {
     private[this] def playAfterRebuild()(implicit tx: S#Tx): Unit = {
       if (state != Stopped) return
 
-      (buildState, targetStateRef.get(tx.peer)) match {
+      (buildState, targetStateRef()) match {
         case (s: UGB.Complete[S], tp: TargetPlaying) =>
           prepareAndLaunch(s, tp.shiftTo(sched.time))
         case _ =>
@@ -598,7 +583,7 @@ object AuralProcImpl {
     }
 
     final def stop(/* time: Long */)(implicit tx: S#Tx): Unit = {
-      targetStateRef.set(TargetStop)(tx.peer)
+      targetStateRef() = TargetStop
       stopForRebuild()
     }
 
@@ -676,7 +661,7 @@ object AuralProcImpl {
           val reduced = Future.reduce(res)((_, _) => ())
           reduced.foreach { _ =>
             cursor.step { implicit tx =>
-              if (playingRef.get(tx.peer) == prep) {
+              if (playingRef() == prep) {
                 prepared(ugen)
               }
             }
@@ -686,7 +671,7 @@ object AuralProcImpl {
     }
 
     private[this] def prepared(ugen: UGB.Complete[S])(implicit tx: S#Tx): Unit = {
-      targetStateRef.get(tx.peer) match {
+      targetStateRef() match {
         case tp: TargetPlaying =>
           launch(ugen, tp.shiftTo(sched.time)) // XXX TODO - yes or no, shift time?
         case _ =>
@@ -723,9 +708,8 @@ object AuralProcImpl {
         case _ => // Double.PositiveInfinity
       }
 
-      // val nodeRefVar = NodeRef.Var(builder)
       ugen.acceptedInputs.foreach { case (key, (_, value)) =>
-        if (!value.async) buildSyncInput(builder /* nodeRefVar */, timeRef, key, value)
+        if (!value.async) buildSyncInput(builder, timeRef, key, value)
       }
 
       // ---- handle output buses, and establish missing links to sinks ----
@@ -736,24 +720,25 @@ object AuralProcImpl {
         builder.addUser(res)
       }
 
-      val old       = playingRef.swap(new PlayingNode(builder))(tx.peer)
+      val old       = playingRef.swap(new PlayingNode(builder))
       old.dispose()
       builder.play()
-      setInstanceNode(builder)
+      playOutputs(builder)
+
       logA(s"launched $p -> $builder (${hashCode.toHexString})")
       state = Playing
     }
 
     private[this] def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
       val res = new PlayingPrepare(resources)
-      val old = playingRef.swap(res)(tx.peer)
+      val old = playingRef.swap(res)
       old.dispose()
       state = Preparing
       res
     }
 
     private[this] def freePlayingRef()(implicit tx: S#Tx): Unit = {
-      val old = playingRef.swap(PlayingNone)(tx.peer)
+      val old = playingRef.swap(PlayingNone)
       old.dispose()
     }
   }
