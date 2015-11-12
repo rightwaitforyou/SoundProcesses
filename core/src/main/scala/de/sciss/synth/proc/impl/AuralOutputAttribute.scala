@@ -14,12 +14,12 @@
 package de.sciss.synth.proc.impl
 
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{TxnLike, Disposable}
-import de.sciss.lucre.synth.{AudioBus, NodeRef, Txn, Sys}
-import de.sciss.synth.proc.AuralAttribute.{Target, Observer, Factory}
+import de.sciss.lucre.stm.{Disposable, TxnLike}
+import de.sciss.lucre.synth.Sys
+import de.sciss.synth.proc.AuralAttribute.{Factory, Observer, Target}
 import de.sciss.synth.proc.AuralContext.AuxAdded
-import de.sciss.synth.proc.AuralView.{Stopped, Playing, Preparing, Prepared}
-import de.sciss.synth.proc.{TimeRef, AuralOutput, AuralAttribute, AuralContext, Output}
+import de.sciss.synth.proc.AuralView.{Playing, Prepared, Stopped}
+import de.sciss.synth.proc.{AuralAttribute, AuralContext, AuralOutput, Output, TimeRef}
 
 import scala.concurrent.stm.Ref
 
@@ -74,23 +74,22 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     playRef().foreach(update(_, auralOutput))
   }
 
-  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-    state = Preparing
-    ???
-    state = Prepared
-  }
+  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = state = Prepared
 
   def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
     require (playRef.swap(Some(target)).isEmpty)
     // target.add(this)
     auralRef().foreach(update(target, _))
     state = Playing
-    // p
   }
 
   def stop()(implicit tx: S#Tx): Unit = {
-    ???
+    stopNoFire()
     state = Stopped
+  }
+
+  private[this] def stopNoFire()(implicit tx: S#Tx): Unit = {
+    playRef.swap(None).foreach(_.remove(this))
   }
 
   private[this] def update(target: Target[S], audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
@@ -100,13 +99,11 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     }
   }
 
-  //    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
-
   def dispose()(implicit tx: S#Tx): Unit = {
+    stopNoFire()
     auralRef.set(None)
     aObsRef.swap(None).foreach(_.dispose())
     obs.dispose()
-    playRef.swap(None).foreach(_.remove(this))
   }
 }
   

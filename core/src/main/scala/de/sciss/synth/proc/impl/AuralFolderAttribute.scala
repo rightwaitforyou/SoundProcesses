@@ -14,13 +14,15 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.event.impl.ObservableImpl
+import de.sciss.lucre.stm.{Disposable, TxnLike}
+import de.sciss.lucre.synth.Sys
 import de.sciss.lucre.{expr, stm}
-import de.sciss.lucre.stm.{TxnLike, Disposable}
-import de.sciss.lucre.synth.{Txn, Sys}
-import de.sciss.synth.proc.AuralAttribute.{Target, Observer, Factory}
-import de.sciss.synth.proc.AuralView.{Prepared, Preparing, Stopped, Playing}
+import de.sciss.synth.proc.AuralAttribute.{Factory, Observer, Target}
+import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
 
 import scala.annotation.tailrec
+import scala.collection.breakOut
 import scala.concurrent.stm.Ref
 
 object AuralFolderAttribute extends Factory {
@@ -35,36 +37,45 @@ object AuralFolderAttribute extends Factory {
 final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, Folder[S]],
                                               observer: Observer[S])
                                              (implicit context: AuralContext[S])
-  extends AuralAttributeImpl[S] with AuralAttribute.Observer[S] { attr =>
+  extends AuralAttribute[S] with ObservableImpl[S, AuralView.State] with AuralAttribute.Observer[S] { attr =>
 
   import TxnLike.peer
-
   import context.{scheduler => sched}
 
   def typeID = Folder.typeID
 
-  private[this] val childAttrRef = Ref.make[Vector[AuralAttribute[S]]]
+  private[this] sealed trait InternalState extends Disposable[S#Tx] {
+    def external: AuralView.State
+  }
 
-  private[this] final class PlayTime(val wallClock: Long,
-                                     val timeRef: TimeRef.Apply, val target: Target[S]) {
+  private[this] object IStopped extends InternalState {
+    def dispose()(implicit tx: S#Tx): Unit = ()
+    def external = Stopped
+  }
+
+  private[this] case class IPreparing(map: Map[AuralAttribute[S], Disposable[S#Tx]], timeRef: TimeRef)
+    extends InternalState {
+
+    def dispose()(implicit tx: S#Tx): Unit = map.foreach(_._2.dispose())
+
+    def external = if (map.isEmpty) Prepared else Preparing
+  }
+
+  private[this] case class IPlaying(wallClock: Long,timeRef: TimeRef.Apply, target: Target[S])
+    extends InternalState {
 
     def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
 
-//    def dispose()(implicit tx: Txn): Unit = {
-//      playRef.transform(_.filterNot(_ == this))
-//      target.remove(this)
-//      // childViews.swap(Vector.empty).foreach(_.dispose())
-//    }
+    def dispose()(implicit tx: S#Tx): Unit = ()
 
-    //      def addChild(child: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
-    //        val tForce    = shiftTo(sched.time)
-    //        val childView = child.play(tForce, target)
-    //        // childViews.transform(_ :+ childView)
-    //      }
+    def external = Playing
   }
 
-  private[this] val playRef = Ref(Option.empty[PlayTime])
+  private[this] val childAttrRef    = Ref.make[Vector[AuralAttribute[S]]]
+
+  private[this] val internalRef = Ref[InternalState](IStopped)
   private[this] var obs: Disposable[S#Tx] = _
+  private[this] val prefChansRef = Ref(-2)    // -2 = cache invalid
 
   def preferredNumChannels(implicit tx: S#Tx): Int = {
     @tailrec
@@ -76,75 +87,157 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
       case _ => res
     }
 
-    loop(childAttrRef(), -1)
+    val cache = prefChansRef()
+    if (cache > -2) cache else {
+      val res = loop(childAttrRef(), -1)
+      prefChansRef() = res
+      res
+    }
   }
 
   // simply forward, for now we don't go into the details of checking
   // `preferredNumChannels`
   def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
-    observer.attrNumChannelsChanged(attr)
+    invalidateNumChans()
+
+  private[this] def invalidateNumChans()(implicit tx: S#Tx): Unit = {
+    prefChansRef() = -2
+    observer.attrNumChannelsChanged(this)
+  }
 
   def init(folder: Folder[S])(implicit tx: S#Tx): this.type = {
-    val elemViews = folder.iterator.map { elem =>
+    val childViews = folder.iterator.map { elem =>
       AuralAttribute(key, elem, attr)
     } .toVector
-    childAttrRef() = elemViews
+    childAttrRef() = childViews
 
     // views.foreach(_.init())
     obs = folder.changed.react { implicit tx => upd => upd.changes.foreach {
       case expr.List.Added  (idx, child) =>
-        val childAttr = AuralAttribute(key, child, attr)
-        childAttrRef.transform(_.patch(idx, childAttr :: Nil, 0))
-        playRef().foreach { p =>
-          // p.addChild(childAttr)
-          val tForce    = p.shiftTo(sched.time)
-          childAttr.play(tForce, p.target)
+        val childView = AuralAttribute[S](key, child, attr)
+        childAttrRef.transform(_.patch(idx, childView :: Nil, 0))
+        internalRef() match {
+          case play: IPlaying   =>
+            val tForce = play.shiftTo(sched.time)
+            childView.play(tForce, play.target)
+
+          case prep: IPreparing =>
+            val prepOpt = prepareChild(childView, prep.timeRef)
+            prepOpt.foreach { case (_, childObs) =>
+              val map1  = prep.map + (childView -> childObs)
+              val prep1 = prep.copy(map = map1)
+              internalRef() = prep1
+              val st0 = prep.external
+              if (st0 == Prepared) fire(Preparing)
+            }
+
+          case _ => // Karl-Friedrich von der Stoppenweide
         }
 
       case expr.List.Removed(idx, child) =>
-        childAttrRef.transform { in =>
-          val childAttr = in(idx)
-          childAttr.dispose()
-          in.patch(idx, Nil, 1)
-        }
+        val c0          = childAttrRef()
+        val childView   = c0(idx)
+        val childChans  = childView.preferredNumChannels
+        childView.dispose()
+        val c1          = c0.patch(idx, Nil, 1)
+        childAttrRef()  = c1
+        childPreparedOrRemoved(childView) // might change state to `Prepared`
+        if (childChans == -1 && c1.nonEmpty) invalidateNumChans()
     }}
     this
   }
 
+  def state(implicit tx: S#Tx): AuralView.State = internalRef().external
+
   def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-    state = Preparing
-    ???
-    state = Prepared
+    if (state != Stopped) return
+    val tForce    = timeRef.force
+    val newState  = prepareNoFire(tForce)
+    fire(newState.external)
   }
 
-  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
-    val tForce  = timeRef.force
-    // require(playRef.swap(Some(p)).isEmpty)
-    val childAttrs  = childAttrRef()
-    childAttrs.foreach { childAttr =>
-      childAttr.play(tForce, target)
+  private[this] def prepareNoFire(timeRef: TimeRef.Apply)(implicit tx: S#Tx): InternalState = {
+    // prepareTimeRef() = timeRef
+
+    // this can happen if `play` is called with a
+    // different `timeRef` from what was previously prepared
+    clearPlayState()
+
+    val childViews = childAttrRef()
+    val prepObs: Map[AuralAttribute[S], Disposable[S#Tx]] = childViews.flatMap { childView =>
+      prepareChild(childView, childTime = timeRef)
+    } (breakOut)
+
+    val st = IPreparing(prepObs, timeRef)
+    internalRef() = st
+    st
+  }
+
+  private[this] def prepareChild(childView: AuralAttribute[S], childTime: TimeRef)
+                                (implicit tx: S#Tx): Option[(AuralAttribute[S], Disposable[S#Tx])] = {
+    childView.prepare(childTime)
+    val isPrepared = childView.state == Prepared
+    if (isPrepared) None else {
+      val childObs = childView.react { implicit tx => {
+        case Prepared => childPreparedOrRemoved(childView)
+        case _        =>
+      }}
+      Some(childView -> childObs) // preparingViews.put(childView, childObs)
     }
-    val p = new PlayTime(sched.time, tForce, target /* , Ref(childViews) */)
-    require(playRef.swap(Some(p)).isEmpty)
-    // target.add(this)
-    state = Playing
-    // p
+    // isPrepared
   }
 
-  def stop()(implicit tx: S#Tx): Unit = {
-    ???
-    state = Stopped
+  // called by `prepareChild` for each child view when it becomes ready
+  private[this] def childPreparedOrRemoved(view: AuralAttribute[S])(implicit tx: S#Tx): Unit =
+    internalRef() match {
+      case prep: IPreparing =>
+        prep.map.get(view).foreach { obs =>
+          obs.dispose()
+          val map1      = prep.map - view
+          val prep1     = prep.copy(map = map1)
+          internalRef() = prep1
+          val st = prep1.external
+          if (st == Prepared) fire(Prepared)
+        }
+      case _ =>
+    }
+
+  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit = {
+    val st0 = state
+    if (st0 == Playing) return
+
+    val tForce  = timeRef.force
+    val st1     = IPlaying(sched.time, tForce, target)
+    // if (st == Stopped || prepareTimeRef() != tForce) prepareNoFire(tForce)
+    internalRef.swap(st1).dispose()
+
+    val childViews = childAttrRef()
+    childViews.foreach { childView =>
+      childView.play(tForce, target)
+    }
+
+    fire(Playing)
   }
 
-  //    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-  //      val views = elemViewsRef()
-  //      views.foreach(_.prepare(timeRef))
-  //    }
+  def stop()(implicit tx: S#Tx): Unit = if (state != Stopped) {
+    stopNoFire()
+    fire(Stopped)
+  }
+
+  private[this] def stopNoFire()(implicit tx: S#Tx): Unit = {
+    clearPlayState()  // first this, so no more child observers
+    val childViews = childAttrRef()
+    childViews.foreach(_.stop())
+  }
+
+  @inline
+  private[this] def clearPlayState()(implicit tx: S#Tx): Unit =
+    internalRef.swap(IStopped).dispose()
 
   def dispose()(implicit tx: S#Tx): Unit = {
+    clearPlayState()
     obs.dispose()
-    playRef.swap(None).foreach(_.target.remove(this))
-    val views = childAttrRef()
-    views.foreach(_.dispose())
+    val childViews = childAttrRef()
+    childViews.foreach(_.dispose())
   }
 }

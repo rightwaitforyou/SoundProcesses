@@ -41,7 +41,4 @@ trait AuralNode[S <: Sys[S]] extends NodeRef.Full[S] {
   def group_=(value: Group)(implicit tx: S#Tx): Unit
 
   def preGroup()(implicit tx: S#Tx): Group
-
-  // def getInputBus (key: String): Option[AudioBus]
-  // def getOutputBus(key: String): Option[AudioBus]
 }
