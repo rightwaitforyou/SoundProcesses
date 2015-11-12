@@ -17,7 +17,8 @@ package impl
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{TxnLike, Disposable}
 import de.sciss.lucre.synth.{Sys, Txn}
-import de.sciss.synth.proc.AuralAttribute.{Factory, Instance, Observer, Target}
+import de.sciss.synth.proc.AuralAttribute.{Factory, Observer, Target}
+import de.sciss.synth.proc.AuralView.{Stopped, Prepared, Preparing, Playing}
 
 import scala.annotation.tailrec
 import scala.concurrent.stm.Ref
@@ -29,32 +30,33 @@ object AuralTimelineAttribute extends Factory {
 
   def apply[S <: Sys[S]](key: String, value: Timeline[S], observer: Observer[S])
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-    new AuralTimelineAttribute(key, observer).init(value)
+    new AuralTimelineAttribute(key, tx.newHandle(value), observer).init(value)
 }
-final class AuralTimelineAttribute[S <: Sys[S]](val key: String,
-                                              observer: Observer[S])
-                                             (implicit context: AuralContext[S])
-  extends AuralAttribute[S] with Observer[S] { attr =>
+final class AuralTimelineAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, Timeline[S]],
+                                                observer: Observer[S])
+                                               (implicit context: AuralContext[S])
+  extends AuralAttributeImpl[S] with Observer[S] { attr =>
 
   import TxnLike.peer
   import context.{scheduler => sched}
 
+  def typeID = Timeline.typeID
+
   private[this] val childAttrRef = Ref.make[Vector[AuralAttribute[S]]]
 
   private[this] final class PlayTime(val wallClock: Long,
-                                     val timeRef: TimeRef.Apply, val target: Target)
-    extends Instance {
+                                     val timeRef: TimeRef.Apply, val target: Target[S]) {
 
     def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
 
-    def dispose()(implicit tx: Txn): Unit = {
-      playRef.transform(_.filterNot(_ == this))
-      target.remove(this)
-      // childViews.swap(Vector.empty).foreach(_.dispose())
-    }
+//    def dispose()(implicit tx: Txn): Unit = {
+//      playRef.transform(_.filterNot(_ == this))
+//      target.remove(this)
+//      // childViews.swap(Vector.empty).foreach(_.dispose())
+//    }
   }
 
-  private[this] val playRef = Ref(List.empty[PlayTime])
+  private[this] val playRef = Ref(Option.empty[PlayTime])
   private[this] var obs: Disposable[S#Tx] = _
 
   def preferredNumChannels(implicit tx: S#Tx): Int = {
@@ -112,7 +114,13 @@ final class AuralTimelineAttribute[S <: Sys[S]](val key: String,
     this
   }
 
-  def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit /* Instance */ = {
+  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    state = Preparing
+    ???
+    state = Prepared
+  }
+
+  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
     val tForce  = timeRef.force
     // require(playRef.swap(Some(p)).isEmpty)
     val childAttrs  = childAttrRef()
@@ -120,9 +128,15 @@ final class AuralTimelineAttribute[S <: Sys[S]](val key: String,
       childAttr.play(tForce, target)
     }
     val p = new PlayTime(sched.time, tForce, target /* , Ref(childViews) */)
-    playRef.transform(p :: _)
-    target.add(p)
+    require(playRef.swap(Some(p)).isEmpty)
+    target.add(this)
+    state = Playing
     // p
+  }
+
+  def stop()(implicit tx: S#Tx): Unit = {
+    ???
+    state = Stopped
   }
 
   //    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
@@ -132,7 +146,7 @@ final class AuralTimelineAttribute[S <: Sys[S]](val key: String,
 
   def dispose()(implicit tx: S#Tx): Unit = {
     obs.dispose()
-    playRef.swap(Nil).foreach(_.dispose())
+    playRef.swap(None).foreach(_.target.remove(this))
     val views = childAttrRef()
     views.foreach(_.dispose())
   }

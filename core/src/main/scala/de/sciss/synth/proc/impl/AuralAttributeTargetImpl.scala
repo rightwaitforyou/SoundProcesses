@@ -15,25 +15,24 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.stm.TxnLike
-import de.sciss.lucre.synth.{AudioBus, BusNodeSetter, DynamicUser, NodeRef, Resource, Synth, Txn}
+import de.sciss.lucre.synth.{AudioBus, BusNodeSetter, DynamicUser, NodeRef, Resource, Synth, Sys, Txn}
 import de.sciss.synth
+import de.sciss.synth.proc.AuralAttribute.{Scalar, Stream, Value}
 import de.sciss.synth.{ControlSet, SynthGraph}
-import de.sciss.synth.proc.AuralAttribute.{Instance, Scalar, Stream, Value}
 
 import scala.concurrent.stm.{Ref, TMap, TSet}
 
-class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: AudioBus)
-  extends AuralAttribute.Target with DynamicUser {
+class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full, key: String, targetBus: AudioBus)
+  extends AuralAttribute.Target[S] with DynamicUser {
 
   import TxnLike.peer
-
   import targetBus.{numChannels, server}
 
   private def ctlName   = graph.Attribute.controlName(key)
 
-  private val map       = TMap.empty[Instance, Connected]
+  private val map       = TMap.empty[AuralAttribute[S], Connected]
   private val stateRef  = Ref[State](Empty)
-  private val instances = TSet.empty[Instance]
+  private val attrs     = TSet.empty[AuralAttribute[S]]
 
   private final class Connected(val value: Value,
                                 val users: List[DynamicUser], val resources: List[Resource])
@@ -59,8 +58,8 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
   }
 
   private sealed trait State {
-    def put   (instance: Instance, value: Value)(implicit tx: Txn): State
-    def remove(instance: Instance)(implicit tx: Txn): State
+    def put   (attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State
+    def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State
   }
 
   private final class AddRemoveEdge(edge: NodeRef.Edge) extends DynamicUser {
@@ -80,62 +79,62 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
     override def toString = s"AddRemoveVertex($vertex)"
   }
 
-  private def putSingleScalar(instance: Instance, value: Scalar)
-                                   (implicit tx: Txn): State = {
+  private def putSingleScalar(attr: AuralAttribute[S], value: Scalar)
+                             (implicit tx: S#Tx): State = {
     val ctlSet = value.toControl(ctlName, numChannels = numChannels)
     // target.node.set(ctlSet)
     target.addControl(ctlSet)
     val cc = new Connected(value, Nil, Nil)
-    map.put(instance, cc).foreach(_.dispose())
+    map.put(attr, cc).foreach(_.dispose())
     cc.attach()
-    new Single(instance, cc)
+    new Single(attr, cc)
   }
 
-  private def putSingleStream(instance: Instance, value: Stream)
-                             (implicit tx: Txn): State = {
+  private def putSingleStream(attr: AuralAttribute[S], value: Stream)
+                             (implicit tx: S#Tx): State = {
     val edge      = NodeRef.Edge(value.source, target)
     val edgeUser  = new AddRemoveEdge(edge)
     val busUser   = BusNodeSetter.mapper(ctlName, value.bus, target.node)
     val cc        = new Connected(value, edgeUser :: busUser :: Nil, Nil)
-    map.put(instance, cc).foreach(_.dispose())
+    map.put(attr, cc).foreach(_.dispose())
     cc.attach()
-    new Single(instance, cc)
+    new Single(attr, cc)
   }
 
   // ----
 
   private object Empty extends State {
-    def put(instance: Instance, value: Value)(implicit tx: Txn): State =
+    def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State =
       value match {
-        case sc: Scalar => putSingleScalar(instance, sc)
-        case sc: Stream => putSingleStream(instance, sc)
+        case sc: Scalar => putSingleScalar(attr, sc)
+        case sc: Stream => putSingleStream(attr, sc)
       }
 
-    def remove(instance: Instance)(implicit tx: Txn): State =
-      throw new NoSuchElementException(instance.toString)
+    def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State =
+      throw new NoSuchElementException(attr.toString)
 
     override def toString = "Empty"
   }
 
   // ----
 
-  private final class Single(instance1: Instance, con1: Connected) extends State {
-    def put(instance: Instance, value: Value)(implicit tx: Txn): State =
-      if (instance == instance1) {
-        Empty.put(instance, value)
+  private final class Single(attr1: AuralAttribute[S], con1: Connected) extends State {
+    def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State =
+      if (attr == attr1) {
+        Empty.put(attr, value)
       } else {
         con1.dispose()
         val tgtBusUser = BusNodeSetter.mapper(ctlName, targetBus, target.node)
         target.addUser(tgtBusUser)
         val c1 = mkVertex(con1.value)
         val c2 = mkVertex(     value)
-        map.put(instance1, c1)
-        map.put(instance , c2)
+        map.put(attr1, c1)
+        map.put(attr , c2)
         new Multiple(tgtBusUser)
       }
 
-    def remove(instance: Instance)(implicit tx: Txn): State = {
-      map.remove(instance).fold(throw new NoSuchElementException(instance.toString))(_.dispose())
+    def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State = {
+      map.remove(attr).fold(throw new NoSuchElementException(attr.toString))(_.dispose())
       if (!con1.value.isScalar) {
         // We had a `mapan` for which the bus input is now gone.
         // Right now, `ButNodeSetter.mapper` does _not_ undo the
@@ -150,20 +149,20 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
       Empty
     }
 
-    override def toString = s"Single($instance1, $con1)"
+    override def toString = s"Single($attr1, $con1)"
   }
 
   // ----
 
   private final class Multiple(tgtBusUser: DynamicUser) extends State {
-    def put(instance: Instance, value: Value)(implicit tx: Txn): State = {
+    def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State = {
       val con = mkVertex(value)
-      map.put(instance, con).foreach(_.dispose())
+      map.put(attr, con).foreach(_.dispose())
       this
     }
 
-    def remove(instance: Instance)(implicit tx: Txn): State = {
-      map.remove(instance).fold(throw new NoSuchElementException(instance.toString))(_.dispose())
+    def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State = {
+      map.remove(attr).fold(throw new NoSuchElementException(attr.toString))(_.dispose())
       map.size match {
         case 1 =>
           val (aa, cc) = map.head
@@ -182,7 +181,7 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
   
   // ----
 
-  private def mkVertex(value: Value)(implicit tx: Txn): Connected = {
+  private def mkVertex(value: Value)(implicit tx: S#Tx): Connected = {
     def make(syn: Synth, users0: List[DynamicUser]): Connected = {
       val vertexUser  = new AddRemoveVertex(syn)
       val outEdge     = NodeRef.Edge(syn, target)
@@ -230,24 +229,21 @@ class AuralAttributeTargetImpl(target: NodeRef.Full, key: String, targetBus: Aud
     }
   }
 
-  // def dispose()(implicit tx: Txn): Unit = ...
+  // def dispose()(implicit tx: S#Tx): Unit = ...
 
   // this is a no-op, we just use removal
-  def add()(implicit tx: Txn): Unit = ()
+  def add   ()(implicit tx: Txn): Unit = ()
+  def remove()(implicit tx: Txn): Unit = ??? // attrs.foreach(_.dispose())
 
-  def remove()(implicit tx: Txn): Unit = {
-    instances.foreach(_.dispose())
+  def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit =
+    stateRef.transform(_.put(attr, value))(tx.peer)
+
+  def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
+    stateRef.transform(_.remove(attr))(tx.peer)
+    attrs.remove(attr)
+    // if (!attrs.remove(attr)) throw new IllegalStateException(s"AuralAttribute[S] $attr was not added")
   }
 
-  def put(instance: Instance, value: Value)(implicit tx: Txn): Unit =
-    stateRef.transform(_.put(instance, value))(tx.peer)
-
-  def remove(instance: Instance)(implicit tx: Txn): Unit = {
-    stateRef.transform(_.remove(instance))(tx.peer)
-    instances.remove(instance)
-    // if (!instances.remove(instance)) throw new IllegalStateException(s"Instance $instance was not added")
-  }
-
-  def add(instance: Instance)(implicit tx: Txn): Unit =
-    if (!instances.add(instance)) throw new IllegalStateException(s"Instance $instance was already added")
+  def add(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
+    if (!attrs.add(attr)) throw new IllegalStateException(s"AuralAttribute[S] $attr was already added")
 }

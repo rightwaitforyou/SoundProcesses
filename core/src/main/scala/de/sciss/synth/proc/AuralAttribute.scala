@@ -13,13 +13,13 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.stm.{Obj, Disposable, Sys}
-import de.sciss.lucre.synth.{Sys => SSys, Txn, NodeRef, AudioBus}
+import de.sciss.lucre.stm.{Obj, Sys}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys => SSys, Txn}
 import de.sciss.synth.ControlSet
-import impl.{AuralAttributeImpl => Impl}
+import de.sciss.synth.proc.impl.{AuralAttributeImpl => Impl}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.language.{implicitConversions, higherKinds}
+import scala.language.{higherKinds, implicitConversions}
 
 object AuralAttribute {
   def apply[S <: SSys[S]](key: String, value: Obj[S], observer: Observer[S])
@@ -50,17 +50,17 @@ object AuralAttribute {
   // ---- Target ----
 
   object Target {
-    def apply(nodeRef: NodeRef.Full, key: String, targetBus: AudioBus)(implicit tx: Txn): Target = {
-      val res = new impl.AuralAttributeTargetImpl(nodeRef, key, targetBus)
+    def apply[S <: SSys[S]](nodeRef: NodeRef.Full, key: String, targetBus: AudioBus)(implicit tx: S#Tx): Target[S] = {
+      val res = new impl.AuralAttributeTargetImpl[S](nodeRef, key, targetBus)
       nodeRef.addUser(res)
       res
     }
   }
-  trait Target {
-    def put   (instance: Instance, value: Value)(implicit tx: Txn): Unit
+  trait Target[S <: Sys[S]] {
+    def put   (attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
 
-    def add   (instance: Instance)(implicit tx: Txn): Unit
-    def remove(instance: Instance)(implicit tx: Txn): Unit
+    def add   (attr: AuralAttribute[S])(implicit tx: S#Tx): Unit
+    def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit
   }
 
   // ---- Value ----
@@ -101,19 +101,11 @@ object AuralAttribute {
     def isScalar = false
   }
 
-  // trait Instance[S <: Sys[S]] extends Disposable[S#Tx]
-  trait Instance extends Disposable[Txn]
+//  // trait Instance[S <: Sys[S]] extends Disposable[S#Tx]
+//  trait Instance extends Disposable[Txn]
 }
-trait AuralAttribute[S <: Sys[S]] extends Disposable[S#Tx] {
-  import AuralAttribute.Target
-
+trait AuralAttribute[S <: Sys[S]] extends AuralView[S, AuralAttribute.Target[S]] {
   def key: String
 
   def preferredNumChannels(implicit tx: S#Tx): Int
-
-  // def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit
-
-  def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit // Instance[S]
-
-  // def stop   ()(implicit tx: S#Tx): Unit
 }

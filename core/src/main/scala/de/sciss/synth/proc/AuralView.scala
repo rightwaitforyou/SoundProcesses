@@ -1,3 +1,16 @@
+/*
+ *  AuralView.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2015 Hanns Holger Rutz. All rights reserved.
+ *
+ *	This software is published under the GNU General Public License v2+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
@@ -12,6 +25,9 @@ object AuralView {
   case object Prepared  extends State
   case object Playing   extends State
 }
+/** A trait that provides a shared structure for `AuralObj` and `AuralAttribute`,
+  * the only difference being the `Target` context type needed for issuing a play.
+  */
 trait AuralView[S <: Sys[S], Target] extends Observable[S#Tx, AuralView.State] with Disposable[S#Tx] {
   def typeID: Int
 

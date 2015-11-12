@@ -14,12 +14,14 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.{BooleanObj, DoubleObj, Expr, IntObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj, TxnLike}
-import de.sciss.lucre.synth.{Sys, Txn}
+import de.sciss.lucre.synth.Sys
 import de.sciss.synth.Curve
-import de.sciss.synth.proc.AuralAttribute.{Factory, Instance, Observer, Target}
+import de.sciss.synth.proc.AuralAttribute.{Factory, Observer, Target}
+import de.sciss.synth.proc.AuralView.{Playing, Prepared, State, Stopped}
 
 import scala.concurrent.stm.Ref
 
@@ -59,40 +61,38 @@ object AuralAttributeImpl {
 
   // private[this] type PlayRef[S <: Sys[S]] = Target
 
-  private[this] trait ExprImpl[S <: Sys[S], A] extends AuralAttribute[S] { attr =>
+  private[this] trait ExprImpl[S <: Sys[S], A]
+    extends AuralAttributeImpl[S] { attr =>
+
     // ---- abstract ----
 
-    protected def exprH: stm.Source[S#Tx, Expr[S, A]]
+    /* override */ def obj: stm.Source[S#Tx, Expr[S, A]]
 
     protected def mkValue(in: A): AuralAttribute.Value
 
     // ---- impl ----
 
-    private[this] final class PlayRef(val target: Target)
-      extends Instance {
-
-      def dispose()(implicit tx: Txn): Unit = {
-        playRef.transform(_.filterNot(_ == this))
-        target.remove(this)
-      }
-    }
-
     private[this] var obs: Disposable[S#Tx] = _
-    private /* [this] */ val playRef = Ref[List[PlayRef]](Nil)  // private[this] crashes Scala 2.10 !
+    private /* [this] */ val playRef = Ref[Option[Target[S]]](None)  // private[this] crashes Scala 2.10 !
 
-    def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit /* Instance */ = {
-      val p = new PlayRef(target)
-      playRef.transform(p :: _)
-      // require(playRef.swap(Some(p))(tx.peer).isEmpty)
-      target.add(p)
-      update(p, exprH().value)
-      // p
+    final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = state = Prepared
+
+    final def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
+      require(playRef.swap(Some(target))(tx.peer).isEmpty)
+      target.add(this)
+      state = Playing
+      update(target, obj().value)
     }
 
-    private[this] def update(p: PlayRef, value: A)(implicit tx: S#Tx): Unit = {
-      import p.target
+    final def stop()(implicit tx: S#Tx): Unit = {
+      stopNoFire()
+      state = Stopped
+    }
+
+    private[this] def update(target: Target[S], value: A)(implicit tx: S#Tx): Unit = {
+      // import p.target
       val ctlVal = mkValue(value)
-      target.put(p, ctlVal)
+      target.put(this, ctlVal)
     }
 
     def init(expr: Expr[S, A])(implicit tx: S#Tx): this.type = {
@@ -104,9 +104,12 @@ object AuralAttributeImpl {
 
 //    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
 
+    private[this] def stopNoFire()(implicit tx: S#Tx): Unit =
+      playRef.swap(None).foreach(_.remove(this))
+
     def dispose()(implicit tx: S#Tx): Unit = {
       obs.dispose()
-      playRef().foreach(_.dispose())
+      stopNoFire()
     }
   }
 
@@ -126,8 +129,10 @@ object AuralAttributeImpl {
       new IntAttribute(key, tx.newHandle(value)).init(value)
   }
   private[this] final class IntAttribute[S <: Sys[S]](val key: String,
-                                                      protected val exprH: stm.Source[S#Tx, IntObj[S]])
+                                                      val obj: stm.Source[S#Tx, IntObj[S]])
     extends NumberImpl[S, Int] {
+
+    def typeID = IntObj.typeID
 
     protected def mkValue(value: Int): AuralAttribute.Value = value.toFloat
   }
@@ -144,8 +149,10 @@ object AuralAttributeImpl {
       new DoubleAttribute(key, tx.newHandle(value)).init(value)
   }
   private[this] final class DoubleAttribute[S <: Sys[S]](val key: String,
-                                                         protected val exprH: stm.Source[S#Tx, DoubleObj[S]])
+                                                         val obj: stm.Source[S#Tx, DoubleObj[S]])
     extends NumberImpl[S, Double] {
+
+    def typeID = DoubleObj.typeID
 
     protected def mkValue(value: Double): AuralAttribute.Value = value.toFloat
   }
@@ -162,8 +169,10 @@ object AuralAttributeImpl {
       new BooleanAttribute(key, tx.newHandle(value)).init(value)
   }
   private[this] final class BooleanAttribute[S <: Sys[S]](val key: String,
-                                                          protected val exprH: stm.Source[S#Tx, BooleanObj[S]])
+                                                          val obj: stm.Source[S#Tx, BooleanObj[S]])
     extends NumberImpl[S, Boolean] {
+
+    def typeID = BooleanObj.typeID
 
     protected def mkValue(value: Boolean): AuralAttribute.Value = if (value) 1f else 0f
   }
@@ -180,8 +189,10 @@ object AuralAttributeImpl {
       new FadeSpecAttribute(key, tx.newHandle(value)).init(value)
   }
   private[this] final class FadeSpecAttribute[S <: Sys[S]](val key: String,
-                                                           protected val exprH: stm.Source[S#Tx, FadeSpec.Obj[S]])
+                                                           val obj: stm.Source[S#Tx, FadeSpec.Obj[S]])
     extends ExprImpl[S, FadeSpec] {
+
+    def typeID = FadeSpec.Obj.typeID
 
     def preferredNumChannels(implicit tx: S#Tx): Int = 4
 
@@ -241,4 +252,15 @@ object AuralAttributeImpl {
 //      ...
 //    }
 //  }
+}
+trait AuralAttributeImpl[S <: Sys[S]] extends AuralAttribute[S] with ObservableImpl[S, AuralView.State] {
+  import TxnLike.peer
+
+  private[this] final val stateRef = Ref[State](Stopped)
+
+  final def state(implicit tx: S#Tx): State = stateRef()
+  final protected def state_=(value: State)(implicit tx: S#Tx): Unit = {
+    val prev = stateRef.swap(value)
+    if (value != prev) fire(value)
+  }
 }

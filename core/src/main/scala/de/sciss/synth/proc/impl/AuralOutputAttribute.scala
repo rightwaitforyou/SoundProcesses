@@ -16,8 +16,9 @@ package de.sciss.synth.proc.impl
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{TxnLike, Disposable}
 import de.sciss.lucre.synth.{AudioBus, NodeRef, Txn, Sys}
-import de.sciss.synth.proc.AuralAttribute.{Instance, Target, Observer, Factory}
+import de.sciss.synth.proc.AuralAttribute.{Target, Observer, Factory}
 import de.sciss.synth.proc.AuralContext.AuxAdded
+import de.sciss.synth.proc.AuralView.{Stopped, Playing, Preparing, Prepared}
 import de.sciss.synth.proc.{TimeRef, AuralOutput, AuralAttribute, AuralContext, Output}
 
 import scala.concurrent.stm.Ref
@@ -31,26 +32,20 @@ object AuralOutputAttribute extends Factory {
 
   def apply[S <: Sys[S]](key: String, value: Output[S], observer: Observer[S])
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-    new AuralOutputAttribute(key, observer).init(value)
+    new AuralOutputAttribute(key, tx.newHandle(value), observer).init(value)
 }
-final class AuralOutputAttribute[S <: Sys[S]](val key: String, observer: Observer[S])
-                                                      (implicit context: AuralContext[S])
-  extends AuralAttribute[S] { attr =>
+final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, Output[S]],
+                                              observer: Observer[S])
+                                             (implicit context: AuralContext[S])
+  extends AuralAttributeImpl[S] { attr =>
 
   import TxnLike.peer
 
-  private[this] final class PlayRef(val target: Target)
-    extends Instance {
-
-    def dispose()(implicit tx: Txn): Unit = {
-      playRef.transform(_.filterNot(_ == this))
-      target.remove(this)
-    }
-  }
+  def typeID = Output.typeID
 
   private[this] val auralRef  = Ref(Option.empty[AuralOutput[S]])
   private[this] var obs: Disposable[S#Tx] = _
-  private[this] val playRef   = Ref(List.empty[PlayRef])
+  private[this] val playRef   = Ref(Option.empty[Target[S]])
   private[this] val aObsRef   = Ref(Option.empty[Disposable[S#Tx]])
 
   def preferredNumChannels(implicit tx: S#Tx): Int =
@@ -79,22 +74,30 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, observer: Observe
     playRef().foreach(update(_, auralOutput))
   }
 
-  def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit /* Instance */ = {
-    val p = new PlayRef(target)
-    playRef.transform(p :: _)
-    target.add(p)
-    auralRef().foreach(update(p, _))
+  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    state = Preparing
+    ???
+    state = Prepared
+  }
+
+  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
+    require (playRef.swap(Some(target)).isEmpty)
+    target.add(this)
+    auralRef().foreach(update(target, _))
+    state = Playing
     // p
   }
 
-  private[this] def update(p: PlayRef, audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
-    val nodeRefOpt = audioOutput.view.nodeOption
-    nodeRefOpt.foreach(update1(p, _, audioOutput.bus))
+  def stop()(implicit tx: S#Tx): Unit = {
+    ???
+    state = Stopped
   }
 
-  private[this] def update1(p: PlayRef, nodeRef: NodeRef, bus: AudioBus)(implicit tx: S#Tx): Unit = {
-    import p.target
-    target.put(p, AuralAttribute.Stream(nodeRef, bus))
+  private[this] def update(target: Target[S], audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
+    val nodeRefOpt = audioOutput.view.nodeOption
+    nodeRefOpt.foreach { nodeRef =>
+      target.put(this, AuralAttribute.Stream(nodeRef, audioOutput.bus))
+    }
   }
 
   //    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
@@ -103,7 +106,7 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, observer: Observe
     auralRef.set(None)
     aObsRef.swap(None).foreach(_.dispose())
     obs.dispose()
-    playRef().foreach(_.dispose())
+    playRef.swap(None).foreach(_.remove(this))
   }
 }
   
