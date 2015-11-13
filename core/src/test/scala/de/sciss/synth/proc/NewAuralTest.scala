@@ -256,7 +256,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   ////////////////////////////////////////////////////////////////////////////////////// 16
 
-  def test16()(implicit context: AuralContext[S]): Unit = { // XXX TODO
+  def test16()(implicit context: AuralContext[S]): Unit = {
     println("----test16----")
     println(
       """
@@ -296,8 +296,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
       val t = Transport[S]
       t.addObject(p1)
-      t.addObject(p2) // XXX TODO --- if this is accidentally removed there is a clean-up problem
-//      t.addObject(pin)
+      t.addObject(p2)
       t.play()
 
       stopAndQuit(8.0)

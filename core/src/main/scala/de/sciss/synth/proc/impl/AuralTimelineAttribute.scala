@@ -23,6 +23,7 @@ import de.sciss.lucre.synth.Sys
 import de.sciss.synth.proc.AuralAttribute.{Factory, Observer}
 
 import scala.annotation.tailrec
+import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.Ref
 
 object AuralTimelineAttribute extends Factory {
@@ -69,7 +70,11 @@ final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
 
   type Elem = AuralAttribute[S]
 
-  private[this] val prefChansRef = Ref(-2)    // -2 = cache invalid
+  // we sample the first encountered objects for which temporary views
+  // have to built in order to get the number-of-channels. these
+  // temporary views are here and must be disposed with the parent view.
+  private[this] val prefChansElemRef  = Ref[Vec[Elem]](Vector.empty)
+  private[this] val prefChansNumRef   = Ref(-2)   // -2 = cache invalid. across contents of `prefChansElemRef`
 
   protected def makeView(obj: Obj[S])(implicit tx: S#Tx): Elem = AuralAttribute(key, obj, attr)
 
@@ -77,18 +82,28 @@ final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
   protected def viewRemoved(             view: Elem)(implicit tx: S#Tx): Unit = ()
 
   def preferredNumChannels(implicit tx: S#Tx): Int = {
-    val cache = prefChansRef()
-    if (cache > -2) return cache
-
-    println("WARNING: AuralTimelineAttribute.preferredNumChannels - not yet implemented")
-    return 1
+    val cache = prefChansNumRef()
+    if (cache > -2) {
+      // println(s"preferredNumChannels - cached: $cache")
+      return cache
+    }
 
     val timeline  = obj()
-    val time0     = timeline.eventAfter(0L).getOrElse(-1L)
-    if (time0 < 0L) return -1
+    val time0     = timeline.firstEvent.getOrElse(-1L)
+    if (time0 < 0L) {
+      // println(s"preferredNumChannels - empty: -1")
+      return -1
+    }
 
-    val elemViews = timeline.intersect(time0)
-    if (elemViews.isEmpty) return -1
+    val entries = timeline.intersect(time0)
+    if (entries.isEmpty) {
+      // println(s"preferredNumChannels - empty: -1")
+      return -1
+    }
+
+    val elems = entries.flatMap(_._2.map(_.value)).toVector
+    val views = elems.map(makeView)
+    prefChansElemRef.swap(views).foreach(_.dispose())
 
     @tailrec
     def loop(views: Vector[Elem], res: Int): Int = views match {
@@ -99,18 +114,21 @@ final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
       case _ => res
     }
 
-    val res = loop(???, -1)
-    prefChansRef() = res
+    val res = loop(views, -1)
+    prefChansNumRef() = res
+    // println(s"preferredNumChannels - ${views.size} elems yield new: $res")
     res
   }
 
-  // simply forward, for now we don't go into the details of checking
-  // `preferredNumChannels`
+  // if cache is affected, simply forward, so that cache is rebuilt.
   def attrNumChannelsChanged(attr: Elem)(implicit tx: S#Tx): Unit =
-    invalidateNumChans()
+    if (prefChansElemRef().contains(attr)) {  // then invalidate, otherwise ignore (what can we do?)
+      prefChansNumRef() = -2
+      observer.attrNumChannelsChanged(this)
+    }
 
-  private[this] def invalidateNumChans()(implicit tx: S#Tx): Unit = {
-    prefChansRef() = -2
-    observer.attrNumChannelsChanged(this)
+  override def dispose()(implicit tx: S#Tx): Unit = {
+    super.dispose()
+    prefChansElemRef.swap(Vector.empty).foreach(_.dispose())
   }
 }

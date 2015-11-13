@@ -25,6 +25,8 @@ import scala.concurrent.stm.{Ref, TMap}
 final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String, targetBus: AudioBus)
   extends AuralAttribute.Target[S] /* with DynamicUser */ {
 
+  override def toString = s"AuralAttribute.Target($target, $key, $targetBus)"
+
   import TxnLike.peer
   import targetBus.{numChannels, server}
 
@@ -111,7 +113,7 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
       }
 
     def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State =
-      throw new NoSuchElementException(attr.toString)
+      this // throw new NoSuchElementException(attr.toString)
 
     override def toString = "Empty"
   }
@@ -134,19 +136,26 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
       }
 
     def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State = {
-      map.remove(attr).fold(throw new NoSuchElementException(attr.toString))(_.dispose())
-      if (!con1.value.isScalar) {
-        // We had a `mapan` for which the bus input is now gone.
-        // Right now, `ButNodeSetter.mapper` does _not_ undo the
-        // mapping if you remove it. XXX TODO -- I don't know if it should...
-        // Therefore, to avoid glitches from stale bus contents,
-        // we must explicitly set the control to some value (i.e. zero)
-        val ctlSet: ControlSet =
-          if (numChannels == 1) ctlName -> 0f
-          else                  ctlName -> Vector.fill(numChannels)(0f)
-        target.addControl(ctlSet)
+      // note: now that there is no general `add` method without
+      // passing values, it is totally valid that an attribute
+      // calls `remove` even if it hadn't called any `put` method
+      // and thus there is no entry in the `map`.
+      val opt = map.remove(attr) /* .fold(throw new NoSuchElementException(attr.toString)) (_.dispose()) */
+      opt.fold[State](this) { value =>
+        value.dispose()
+        if (!con1.value.isScalar) {
+          // We had a `mapan` for which the bus input is now gone.
+          // Right now, `ButNodeSetter.mapper` does _not_ undo the
+          // mapping if you remove it. XXX TODO -- I don't know if it should...
+          // Therefore, to avoid glitches from stale bus contents,
+          // we must explicitly set the control to some value (i.e. zero)
+          val ctlSet: ControlSet =
+            if (numChannels == 1) ctlName -> 0f
+            else                  ctlName -> Vector.fill(numChannels)(0f)
+          target.addControl(ctlSet)
+        }
+        Empty
       }
-      Empty
     }
 
     override def toString = s"Single($attr1, $con1)"
@@ -162,17 +171,20 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
     }
 
     def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State = {
-      map.remove(attr).fold(throw new NoSuchElementException(attr.toString))(_.dispose())
-      map.size match {
-        case 1 =>
-          val (aa, cc) = map.head
-          target.removeUser(tgtBusUser)
-          tgtBusUser.dispose()  // XXX TODO --- not sure this should be done by `removeUser` automatically
-          cc.dispose()
-          Empty.put(aa, cc.value)
-        case x =>
-          assert(x > 2)
-          this
+      val opt = map.remove(attr) // .fold(throw new NoSuchElementException(attr.toString))(_.dispose())
+      opt.fold[State](this) { value =>
+        value.dispose()
+        map.size match {
+          case 1 =>
+            val (aa, cc) = map.head
+            target.removeUser(tgtBusUser)
+            tgtBusUser.dispose()  // XXX TODO --- not sure this should be done by `removeUser` automatically
+            cc.dispose()
+            Empty.put(aa, cc.value)
+          case x =>
+            assert(x > 2)
+            this
+        }
       }
     }
 

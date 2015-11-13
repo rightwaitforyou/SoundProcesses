@@ -39,6 +39,8 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
                                              (implicit context: AuralContext[S])
   extends AuralAttributeImpl[S] { attr =>
 
+  override def toString = s"AuralOutputAttribute($key)@${hashCode.toHexString}"
+
   import TxnLike.peer
 
   def typeID = Output.typeID

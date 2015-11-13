@@ -27,7 +27,7 @@ import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.concurrent.stm.{Ref, TMap, TSet}
+import scala.concurrent.stm.{Ref, TSet}
 
 object AuralTimelineBase {
   type Leaf[S <: Sys[S], Elem] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
@@ -77,25 +77,31 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   import AuralTimelineBase.{LOOK_AHEAD, STEP_GRID, Scheduled, spanToPoint}
 
-  private[this] sealed trait InternalState extends Disposable[S#Tx] {
+  protected sealed trait InternalState extends Disposable[S#Tx] {
     def external: AuralView.State
   }
 
-  private[this] object IStopped extends InternalState {
+  protected object IStopped extends InternalState {
     def dispose()(implicit tx: S#Tx): Unit = ()
     def external = Stopped
   }
 
-  private[this] case class IPreparing(map: Map[Elem, Disposable[S#Tx]], timeRef: TimeRef)
+  protected final class IPreparing(val map: Map[Elem, Disposable[S#Tx]], val timeRef: TimeRef)
     extends InternalState {
+
+    def copy(map: Map[Elem, Disposable[S#Tx]]): IPreparing = new IPreparing(map, timeRef)
+
+    override def toString = s"IPreparing($map, $timeRef)"
 
     def dispose()(implicit tx: S#Tx): Unit = map.foreach(_._2.dispose())
 
     def external = if (map.isEmpty) Prepared else Preparing
   }
 
-  private[this] case class IPlaying(wallClock: Long,timeRef: TimeRef.Apply, target: Target)
+  protected final class IPlaying(val wallClock: Long, val timeRef: TimeRef.Apply, val target: Target)
     extends InternalState {
+
+    override def toString = s"IPlaying($wallClock, $timeRef, $target)"
 
     def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
 
@@ -104,7 +110,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     def external = Playing
   }
 
-  def typeID: Int = Timeline.typeID
+  final def typeID: Int = Timeline.typeID
 
   import context.{scheduler => sched}
 
@@ -112,14 +118,15 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private[this] val prepareSpanRef    = Ref(Span(0L, 0L))
 
   private[this] val playingViews      = TSet.empty[Elem]
-  private[this] val preparingViews    = TMap.empty[Elem, Disposable[S#Tx]]
   private[this] var tlObserver        = null: Disposable[S#Tx]
   private[this] val schedEvtToken     = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
   private[this] val schedGridToken    = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
 
-  def state(implicit tx: S#Tx): AuralView.State = internalRef().external
+  final def state(implicit tx: S#Tx): AuralView.State = internalRef().external
 
-  def views(implicit tx: S#Tx): Set[Elem] = playingViews.single.toSet
+  final protected def internalState(implicit tx: S#Tx): InternalState = internalRef()
+
+  final def views(implicit tx: S#Tx): Set[Elem] = playingViews.single.toSet
 
 //  object contents extends ObservableImpl[S, AuralObj.Timeline.Update[S]] {
 //    def viewAdded(timed: S#ID, view: Elem)(implicit tx: S#Tx): Unit =
@@ -129,7 +136,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 //      fire(AuralObj.Timeline.ViewRemoved(impl, view))
 //  }
 
-  def getView(timed: Timeline.Timed[S])(implicit tx: S#Tx): Option[Elem] = viewMap.get(timed.id)
+  final def getView(timed: Timeline.Timed[S])(implicit tx: S#Tx): Option[Elem] = viewMap.get(timed.id)
 
 //  private[this] def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
 //    val old = currentStateRef.swap(value)
@@ -156,11 +163,14 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     this
   }
 
-  def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemAdded  (id, span.value, obj)
-  def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemRemoved(id, span.value, obj)
+  final def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit =
+    elemAdded  (id, span.value, obj)
+
+  final def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit =
+    elemRemoved(id, span.value, obj)
 
   private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-    val st = internalRef()
+    val st = internalState
     if (st.external == Stopped || !span.overlaps(prepareSpanRef())) return
 
     logA(s"timeline - elemAdded($span, $obj)")
@@ -241,7 +251,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     // remove view for the element from tree and map
     viewMap.remove(tid)
     stopAndDisposeView(span, childView)
-    internalRef() match {
+    internalState match {
       case _: IPreparing =>
         childPreparedOrRemoved(childView) // might change state to `Prepared`
 
@@ -302,7 +312,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val it            = tl.intersect(prepareSpan)
     val prepObs: Map[Elem, Disposable[S#Tx]] = prepareFromIterator(timeRef, it)
 
-    val st            = IPreparing(prepObs, timeRef)
+    val st            = new IPreparing(prepObs, timeRef)
     internalRef()     = st
     prepareSpanRef()  = prepareSpan
     st
@@ -344,7 +354,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   // called by `prepareChild` for each child view when it becomes ready
   private[this] def childPreparedOrRemoved(childView: Elem)(implicit tx: S#Tx): Unit =
-    internalRef() match {
+    internalState match {
       case prep: IPreparing =>
         prep.map.get(childView).foreach { obs =>
           obs.dispose()
@@ -366,7 +376,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
     if (st == Stopped || prepareSpanRef() != Span(frame, frame + LOOK_AHEAD + STEP_GRID)) prepareNoFire(tForce)
 
-    val st1 = IPlaying(sched.time, tForce, target)
+    val st1 = new IPlaying(sched.time, tForce, target)
     internalRef.swap(st1).dispose()
 
     val toStart   = intersect(frame)
@@ -405,11 +415,14 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private[this] def stopAndDisposeView(span: SpanLike, view: Elem)(implicit tx: S#Tx): Unit = {
     logA(s"timeline - stopAndDispose - $span - $view")
 
-    view.stop() // stopView(view)
-    // view.stop()
+    // note: this doesn't have to check for `IPreparing`, as it is called only
+    // via `eventReached`, thus during playing. correct?
+
+    view.stop()
     view.dispose()
+
     playingViews  .remove(view)
-    preparingViews.remove(view).foreach(_.dispose())
+    // preparingViews.remove(view).foreach(_.dispose())
     tree.transformAt(spanToPoint(span)) { opt =>
       opt.flatMap { case (span1, views) =>
         val i = views.indexWhere(_._2 == view)
@@ -440,12 +453,29 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   private[this] def eventReached(frame: Long)(implicit tx: S#Tx): Unit = {
     logA(s"timeline - eventReached($frame)")
-    internalRef() match {
+    internalState match {
       case play: IPlaying =>
         val (toStart, toStop) = eventsAt(frame)
         val tr = play.timeRef.updateFrame(frame)
-        playViews(toStart, tr, play.target)
+
+        // this is a pretty tricky decision...
+        // do we first free the stopped views and then launch the started ones?
+        // or vice versa?
+        //
+        // we stick now to stop-then-start because it seems advantageous
+        // for aural-attr-target as we don't build up unnecessary temporary
+        // attr-set/attr-map synths. however, I'm not sure this doesn't
+        // cause a problem where the stop action schedules on immediate
+        // bundle and the start action requires a sync'ed bundle? or is
+        // this currently prevented automatically? we might have to
+        // reverse this decision.
+
+//        playViews(toStart, tr, play.target)
+//        stopAndDisposeViews(toStop)
+
         stopAndDisposeViews(toStop)
+        playViews(toStart, tr, play.target)
+
         scheduleNextEvent(frame)
 
       case _ =>
@@ -464,7 +494,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   private[this] def gridReached(frame: Long)(implicit tx: S#Tx): Unit = {
     logA(s"timeline - gridReached($frame)")
-    internalRef() match {
+    internalState match {
       case play: IPlaying =>
         val startFrame  = frame       + LOOK_AHEAD
         val stopFrame   = startFrame  + STEP_GRID
@@ -514,9 +544,9 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     sched.cancel(schedGridToken().token)
     playingViews   .clear()
     tree           .clear()(iSys(tx))
-    preparingViews .clear()
+    // preparingViews .clear()
 
-    internalRef() = IStopped
+    internalRef.swap(IStopped).dispose()
   }
 
   // ---- bi-group functionality TODO - DRY ----
