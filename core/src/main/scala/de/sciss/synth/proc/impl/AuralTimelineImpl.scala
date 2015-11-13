@@ -27,11 +27,10 @@ object AuralTimelineImpl {
 
   import AuralTimelineBase.spanToPoint
 
-  def apply[S <: Sys[S]](tlObj: Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
+  def apply[S <: Sys[S]](timeline: Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] = {
     val system  = tx.system
-    val res     = prepare[S, system.I](tlObj, system)
-    res.init(tlObj)
-    res
+    val res     = prepare[S, system.I](timeline, system)
+    res.init(timeline)
   }
 
   /** An empty view that does not listen for events on the timeline. */

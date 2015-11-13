@@ -14,54 +14,84 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.bitemp.BiGroup
+import de.sciss.lucre.data.SkipOctree
+import de.sciss.lucre.geom.LongSpace
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{TxnLike, Disposable}
-import de.sciss.lucre.synth.{Sys, Txn}
-import de.sciss.synth.proc.AuralAttribute.{Factory, Observer, Target}
-import de.sciss.synth.proc.AuralView.{Stopped, Prepared, Preparing, Playing}
+import de.sciss.lucre.stm.{TxnLike, IdentifierMap, Obj}
+import de.sciss.lucre.synth.Sys
+import de.sciss.synth.proc.AuralAttribute.{Factory, Observer}
 
 import scala.annotation.tailrec
 import scala.concurrent.stm.Ref
 
 object AuralTimelineAttribute extends Factory {
+  import AuralTimelineBase.spanToPoint
+
   type Repr[S <: stm.Sys[S]] = Timeline[S]
 
-  def typeID = Timeline.typeID
-
-  def apply[S <: Sys[S]](key: String, value: Timeline[S], observer: Observer[S])
-                        (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-    new AuralTimelineAttribute(key, tx.newHandle(value), observer).init(value)
-}
-final class AuralTimelineAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, Timeline[S]],
-                                                observer: Observer[S])
-                                               (implicit context: AuralContext[S])
-  extends AuralAttributeImpl[S] with Observer[S] { attr =>
-
-  import TxnLike.peer
-  import context.{scheduler => sched}
+  private type Leaf[S <: Sys[S]] = AuralTimelineBase.Leaf[S, AuralAttribute[S]]
 
   def typeID = Timeline.typeID
 
-  private[this] val childAttrRef = Ref.make[Vector[AuralAttribute[S]]]
-
-  private[this] final class PlayTime(val wallClock: Long,
-                                     val timeRef: TimeRef.Apply, val target: Target[S]) {
-
-    def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
-
-//    def dispose()(implicit tx: Txn): Unit = {
-//      playRef.transform(_.filterNot(_ == this))
-//      target.remove(this)
-//      // childViews.swap(Vector.empty).foreach(_.dispose())
-//    }
+  def apply[S <: Sys[S]](key: String, timeline: Timeline[S], observer: Observer[S])
+                        (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] = {
+    val system  = tx.system
+    val res     = prepare[S, system.I](key, timeline, observer, system)
+    res.init(timeline)
   }
 
-  private[this] val playRef = Ref(Option.empty[PlayTime])
-  private[this] var obs: Disposable[S#Tx] = _
+  private def prepare[S <: Sys[S], I1 <: stm.Sys[I1]](key: String, value: Timeline[S],
+                                                      observer: Observer[S], system: S { type I = I1 })
+                   (implicit tx: S#Tx, context: AuralContext[S]): AuralTimelineAttribute[S, I1] = {
+    implicit val iSys     = system.inMemoryTx _
+    implicit val itx      = iSys(tx)
+    implicit val pointView = (l: Leaf[S], tx: I1#Tx) => spanToPoint(l._1)
+    implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
+    val tree = SkipOctree.empty[I1, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
+
+    val viewMap = tx.newInMemoryIDMap[AuralAttribute[S]]
+    new AuralTimelineAttribute(key, tx.newHandle(value), observer, tree, viewMap)
+  }
+}
+final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String,
+         val obj: stm.Source[S#Tx, Timeline[S]],
+         observer: Observer[S],
+         protected val tree: SkipOctree[I, LongSpace.TwoDim, AuralTimelineAttribute.Leaf[S]],
+         protected val viewMap: IdentifierMap[S#ID, S#Tx, AuralAttribute[S]])
+        (implicit protected val context: AuralContext[S], protected val iSys: S#Tx => I#Tx)
+  extends AuralTimelineBase[S, I, AuralAttribute.Target[S], AuralAttribute[S]]
+  with AuralAttribute[S]
+  with Observer[S] {
+  attr =>
+
+  import TxnLike.peer
+
+  type Elem = AuralAttribute[S]
+
+  private[this] val prefChansRef = Ref(-2)    // -2 = cache invalid
+
+  protected def makeView(obj: Obj[S])(implicit tx: S#Tx): Elem = AuralAttribute(key, obj, attr)
+
+  protected def viewAdded  (timed: S#ID, view: Elem)(implicit tx: S#Tx): Unit = ()
+  protected def viewRemoved(             view: Elem)(implicit tx: S#Tx): Unit = ()
 
   def preferredNumChannels(implicit tx: S#Tx): Int = {
+    val cache = prefChansRef()
+    if (cache > -2) return cache
+
+    println("WARNING: AuralTimelineAttribute.preferredNumChannels - not yet implemented")
+    return 1
+
+    val timeline  = obj()
+    val time0     = timeline.eventAfter(0L).getOrElse(-1L)
+    if (time0 < 0L) return -1
+
+    val elemViews = timeline.intersect(time0)
+    if (elemViews.isEmpty) return -1
+
     @tailrec
-    def loop(views: Vector[AuralAttribute[S]], res: Int): Int = views match {
+    def loop(views: Vector[Elem], res: Int): Int = views match {
       case head +: tail =>
         val ch = head.preferredNumChannels
         // if there is any child with `-1` (undefined), we have to return
@@ -69,85 +99,18 @@ final class AuralTimelineAttribute[S <: Sys[S]](val key: String, val obj: stm.So
       case _ => res
     }
 
-    loop(childAttrRef(), -1)
+    val res = loop(???, -1)
+    prefChansRef() = res
+    res
   }
 
   // simply forward, for now we don't go into the details of checking
   // `preferredNumChannels`
-  def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
-    observer.attrNumChannelsChanged(attr)
+  def attrNumChannelsChanged(attr: Elem)(implicit tx: S#Tx): Unit =
+    invalidateNumChans()
 
-  def init(timeline: Timeline[S])(implicit tx: S#Tx): this.type = {
-    val time0 = timeline.eventAfter(0L).getOrElse(-1L)
-
-    if (time0 >= 0L) {
-      val elemViews = timeline.intersect(time0).flatMap { case (_, elems) =>
-        elems.map { elem =>
-          AuralAttribute(key, elem, attr)
-        }
-      } .toVector
-      childAttrRef() = elemViews
-    }
-
-    // views.foreach(_.init())
-    obs = timeline.changed.react { implicit tx => upd => upd.changes.foreach {
-      case Timeline.Added(span, entry) =>
-        ???
-//        val childAttr = AuralAttribute(key, child, attr)
-//        childAttrRef.transform(_.patch(idx, childAttr :: Nil, 0))
-//        playRef().foreach { p =>
-//          // p.addChild(childAttr)
-//          val tForce    = p.shiftTo(sched.time)
-//          childAttr.play(tForce, p.target)
-//        }
-
-      case Timeline.Removed(span, entry) =>
-        ???
-//        childAttrRef.transform { in =>
-//          val childAttr = in(idx)
-//          childAttr.dispose()
-//          in.patch(idx, Nil, 1)
-//        }
-      case Timeline.Moved(change, entry) =>
-        ???
-    }}
-    this
-  }
-
-  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-    state = Preparing
-    ???
-    state = Prepared
-  }
-
-  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
-    val tForce  = timeRef.force
-    // require(playRef.swap(Some(p)).isEmpty)
-    val childAttrs  = childAttrRef()
-    childAttrs.foreach { childAttr =>
-      childAttr.play(tForce, target)
-    }
-    val p = new PlayTime(sched.time, tForce, target /* , Ref(childViews) */)
-    require(playRef.swap(Some(p)).isEmpty)
-//    target.add(this)
-    state = Playing
-    // p
-  }
-
-  def stop()(implicit tx: S#Tx): Unit = {
-    ???
-    state = Stopped
-  }
-
-  //    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-  //      val views = elemViewsRef()
-  //      views.foreach(_.prepare(timeRef))
-  //    }
-
-  def dispose()(implicit tx: S#Tx): Unit = {
-    obs.dispose()
-    playRef.swap(None).foreach(_.target.remove(this))
-    val views = childAttrRef()
-    views.foreach(_.dispose())
+  private[this] def invalidateNumChans()(implicit tx: S#Tx): Unit = {
+    prefChansRef() = -2
+    observer.attrNumChannelsChanged(this)
   }
 }

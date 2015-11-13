@@ -140,7 +140,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 //    }
 //  }
 
-  def init(tl: Timeline[S])(implicit tx: S#Tx): Unit = {
+  def init(tl: Timeline[S])(implicit tx: S#Tx): this.type = {
     tlObserver = tl.changed.react { implicit tx => upd =>
       upd.changes.foreach {
         case Timeline.Added  (span, timed)    => elemAdded  (timed.id, span, timed.value)
@@ -153,6 +153,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
           elemAdded  (timed.id, spanCh.now   , timed.value)
       }
     }
+    this
   }
 
   def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit = elemAdded  (id, span.value, obj)

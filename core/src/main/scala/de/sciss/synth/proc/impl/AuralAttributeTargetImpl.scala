@@ -20,7 +20,7 @@ import de.sciss.synth
 import de.sciss.synth.proc.AuralAttribute.{Scalar, Stream, Value}
 import de.sciss.synth.{ControlSet, SynthGraph}
 
-import scala.concurrent.stm.{Ref, TMap, TSet}
+import scala.concurrent.stm.{Ref, TMap}
 
 final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String, targetBus: AudioBus)
   extends AuralAttribute.Target[S] /* with DynamicUser */ {

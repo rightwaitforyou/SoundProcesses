@@ -2,7 +2,6 @@ package de.sciss.synth.proc
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
-import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
@@ -13,8 +12,8 @@ import de.sciss.synth
 import de.sciss.synth.Curve.{exponential, linear}
 import de.sciss.synth.io.{AudioFile, AudioFileType}
 import de.sciss.synth.proc.Action.Universe
-import de.sciss.synth.proc.WorkspaceHandle.Implicits._
 import de.sciss.synth.proc.Implicits._
+import de.sciss.synth.proc.WorkspaceHandle.Implicits._
 
 import scala.concurrent.stm.Txn
 import scala.language.implicitConversions
@@ -152,11 +151,11 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       quit()
     }
 
-  def addScanIn(proc: Proc[S], key: String)(implicit tx: S#Tx): (Proc[S], String) /* Scan[S] */ = {
+  def addScanIn(proc: Proc[S], key: String = "in")(implicit tx: S#Tx): (Proc[S], String) /* Scan[S] */ = {
     (proc, key) // proc.inputs.add(key)
   }
 
-  def addOutput(proc: Proc[S], key: String)(implicit tx: S#Tx): Output[S] = {
+  def addOutput(proc: Proc[S], key: String = "out")(implicit tx: S#Tx): Output[S] = {
     proc.outputs.add(key)
   }
 
@@ -262,7 +261,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     println(
       """
         |Expected behaviour:
-        |An attribute should accept a BiPin
+        |An attribute should accept a timeline
         |with time-varying elements as input.
         |
         |""".stripMargin)
@@ -274,22 +273,34 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         Out.ar(0, Pan2.ar(sin * 0.1))
       }
 
-      val pin = BiPin.Modifiable[S, Obj]
+      val p2 = proc {
+        val freq = LFTri.ar(2).linexp(-1, 1, 441.0, 882.0)
+        graph.ScanOut(freq)
+      }
+      val out = addOutput(p2)
+
       val f1  = DoubleObj.newConst[S](441.0)
-      val f2  = ??? : Obj[S] // XXX TODO -- scan here
+      val f2  = out
       val f3  = DoubleObj.newConst[S](661.5)
-      pin.add(frame(0.0), f1)
-      pin.add(frame(2.0), f2)
-      pin.add(frame(8.0), f3)
+//      val pin = BiPin.Modifiable[S, Obj]
+//      pin.add(frame(0.0), f1)
+//      pin.add(frame(2.0), f2)
+//      pin.add(frame(8.0), f3)
+      val pin = Timeline[S]
+      pin.add(SpanLikeObj.newConst(0.0 -> 2.0), f1)
+      pin.add(SpanLikeObj.newConst(2.0 -> 6.0), f2)
+      pin.add(SpanLikeObj.newConst(Span.from(frame(6.0))), f3)
 
       val attr = p1.attr
       attr.put("key", pin)
 
       val t = Transport[S]
       t.addObject(p1)
+      t.addObject(p2) // XXX TODO --- if this is accidentally removed there is a clean-up problem
+//      t.addObject(pin)
       t.play()
 
-      stopAndQuit(10.0)
+      stopAndQuit(8.0)
     }
   }
 
