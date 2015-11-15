@@ -18,10 +18,9 @@ package impl
 import de.sciss.lucre.data.SkipList
 import de.sciss.lucre.event.Targets
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{Elem, Copy, NoSys, Obj, Sys}
-import de.sciss.lucre.synth.InMemory
+import de.sciss.lucre.stm.{Copy, Elem, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
-import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Serializer}
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.language.higherKinds
@@ -54,7 +53,7 @@ object ProcImpl {
 
     // ---- key-map-impl details ----
 
-    import proc.{outputsMap => map}
+    import proc.outputsMap
 
     protected def fire(added: Option[Output[S]], removed: Option[Output[S]])
                       (implicit tx: S#Tx): Unit = {
@@ -73,12 +72,12 @@ object ProcImpl {
     }
 
     private def add(key: String, value: Output[S])(implicit tx: S#Tx): Unit = {
-      val optRemoved = map.add(key -> value)
+      val optRemoved = outputsMap.add(key -> value)
       fire(added = Some(value), removed = optRemoved)
     }
 
     def remove(key: String)(implicit tx: S#Tx): Boolean =
-      map.remove(key).exists { output =>
+      outputsMap.remove(key).exists { output =>
         fire(added = None, removed = Some(output))
         true
       }
@@ -90,11 +89,11 @@ object ProcImpl {
         res
       }
 
-    def get(key: String)(implicit tx: S#Tx): Option[Output[S]] = map.get(key)
+    def get(key: String)(implicit tx: S#Tx): Option[Output[S]] = outputsMap.get(key)
 
-    def keys(implicit tx: S#Tx): Set[String] = map.keysIterator.toSet
+    def keys(implicit tx: S#Tx): Set[String] = outputsMap.keysIterator.toSet
 
-    def iterator(implicit tx: S#Tx): Iterator[(String, Output[S])] = map.iterator
+    def iterator(implicit tx: S#Tx): Iterator[(String, Output[S])] = outputsMap.iterator
   }
 
   private sealed trait Impl[S <: Sys[S]]

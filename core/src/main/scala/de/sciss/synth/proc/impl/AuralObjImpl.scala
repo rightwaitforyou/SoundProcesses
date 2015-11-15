@@ -33,7 +33,10 @@ object AuralObjImpl {
 
   def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
     val tid = obj.tpe.typeID
-    map.get(tid).fold(Generic(obj))(f => f(obj.asInstanceOf[f.Repr[S]]))
+    val opt: Option[Factory] = map.get(tid)
+    opt.fold[AuralObj[S]](Generic(obj)) { f =>
+      f[S](obj.asInstanceOf[f.Repr[S]])   // XXX IntelliJ highlighting bug
+    }
   }
 
   private var map = scala.Predef.Map[Int, Factory](
