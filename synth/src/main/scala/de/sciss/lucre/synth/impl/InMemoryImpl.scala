@@ -14,12 +14,10 @@
 package de.sciss.lucre.synth
 package impl
 
-import de.sciss.lucre.event.Observer
-import de.sciss.lucre.stm.IdentifierMap
+import de.sciss.lucre.event.impl.ReactionMapImpl
+import de.sciss.lucre.stm
 
-import concurrent.stm.InTxn
-import de.sciss.lucre.{stm, event => evt}
-import evt.impl.ReactionMapImpl
+import scala.concurrent.stm.InTxn
 
 object InMemoryImpl {
   def apply(): InMemory = new System

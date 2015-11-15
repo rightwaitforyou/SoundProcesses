@@ -16,9 +16,6 @@ package de.sciss.synth
 import java.text.SimpleDateFormat
 import java.util.{Date, Locale}
 
-import de.sciss.lucre.expr
-import de.sciss.lucre.stm.{Obj, Sys}
-
 import scala.annotation.elidable
 import scala.annotation.elidable.CONFIG
 import scala.language.{existentials, higherKinds}

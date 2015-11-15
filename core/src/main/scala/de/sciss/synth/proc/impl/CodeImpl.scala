@@ -16,13 +16,10 @@ package impl
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, File}
 
-import de.sciss.lucre.expr.Expr
-import de.sciss.lucre.{event => evt}
 import de.sciss.processor.ProcessorLike
 import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth
-import de.sciss.synth.proc
 
 import scala.collection.immutable.{IndexedSeq => Vec, Seq => ISeq}
 import scala.concurrent.duration.Duration
@@ -35,7 +32,7 @@ object CodeImpl {
   def unpackJar(bytes: Array[Byte]): Map[String, Array[Byte]] = {
     import java.util.jar._
 
-import scala.annotation.tailrec
+    import scala.annotation.tailrec
 
     val in = new JarInputStream(new ByteArrayInputStream(bytes))
     val b  = Map.newBuilder[String, Array[Byte]]

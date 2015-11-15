@@ -22,16 +22,15 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.synth.{Buffer, Server, Synth, Sys, Txn}
 import de.sciss.processor.Processor
 import de.sciss.processor.impl.ProcessorImpl
-import de.sciss.synth.io.{AudioFile, AudioFileType, SampleFormat}
-import de.sciss.synth.proc.AuralView.{Playing, Prepared, Stopped, Preparing}
-import de.sciss.synth.{Server => SServer, addAfter, SynthGraph, addToTail}
+import de.sciss.synth.io.{AudioFileType, SampleFormat}
+import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
+import de.sciss.synth.{Server => SServer, SynthGraph, addToTail}
 import de.sciss.{osc, synth}
 
 import scala.annotation.tailrec
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future, Promise, blocking}
 import scala.util.Success
-import scala.util.control.NonFatal
 
 object BounceImpl {
   var DEBUG = false
@@ -79,7 +78,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
       val sCfg = if (needsOSCFile || needsDummyOut || needsOutFile) {
         val b = Server.ConfigBuilder(config.server)
         if (needsOSCFile) {
-          val f = File.createTempFile("bounce", ".osc")
+          val f = java.io.File.createTempFile("bounce", ".osc")
           b.nrtCommandPath = f.getCanonicalPath
         }
         if (needsDummyOut) {
@@ -88,7 +87,7 @@ final class BounceImpl[S <: Sys[S], I <: stm.Sys[I]](implicit cursor: stm.Cursor
           b.outputBusChannels = 1
         }
         if (needsDummyOut || needsOutFile) {
-          outFile = File.createTempFile("bounce", s".${b.nrtHeaderFormat.extension}")
+          outFile = java.io.File.createTempFile("bounce", s".${b.nrtHeaderFormat.extension}")
           b.nrtOutputPath = outFile.getCanonicalPath
         }
         b.build

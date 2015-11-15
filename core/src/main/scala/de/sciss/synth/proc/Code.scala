@@ -177,6 +177,8 @@ object Code {
   trait Obj[S <: Sys[S]] extends expr.Expr[S, Code]
 }
 sealed trait Code extends Writable { me =>
+  type Self = Code { type In = me.In; type Out = me.Out }
+
   /** The interfacing input type */
   type In
   /** The interfacing output type */
@@ -188,7 +190,7 @@ sealed trait Code extends Writable { me =>
   /** Source code. */
   def source: String
 
-  def updateSource(newText: String): Code { type In = me.In; type Out = me.Out }
+  def updateSource(newText: String): Self
 
   /** Human readable name. */
   def contextName: String

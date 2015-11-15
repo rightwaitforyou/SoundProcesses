@@ -298,7 +298,6 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
   private lazy val tapeSynthGraph: SynthGraph =
     SynthGraph {
       import de.sciss.synth._
-      import proc.Implicits._
       // val sig   = graph.ScanIn(Proc.graphAudio)
       val sig   = graph.DiskIn.ar(Proc.graphAudio)
       val gain  = graph.Attribute.kr(ObjKeys.attrGain, 1.0)

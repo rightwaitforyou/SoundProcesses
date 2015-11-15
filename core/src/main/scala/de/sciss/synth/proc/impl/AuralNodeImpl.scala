@@ -13,10 +13,10 @@
 
 package de.sciss.synth.proc.impl
 
-import de.sciss.lucre.stm.{Disposable, TxnLike}
-import de.sciss.lucre.synth.{Sys, DynamicUser, Group, Node, Resource, Synth, Txn}
-import de.sciss.synth.proc.{TimeRef, AuralNode}
-import de.sciss.synth.{addToHead, ControlSet, addBefore}
+import de.sciss.lucre.stm.TxnLike
+import de.sciss.lucre.synth.{DynamicUser, Group, Node, Resource, Synth, Sys, Txn}
+import de.sciss.synth.proc.{AuralNode, TimeRef}
+import de.sciss.synth.{ControlSet, addBefore, addToHead}
 
 import scala.concurrent.stm.Ref
 

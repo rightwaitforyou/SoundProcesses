@@ -15,11 +15,11 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.event.Targets
-import de.sciss.lucre.expr.{BooleanObj, Expr, LongObj}
+import de.sciss.lucre.expr.{BooleanObj, LongObj}
 import de.sciss.lucre.stm.impl.ObjSerializer
-import de.sciss.lucre.stm.{Elem, Copy, Obj, NoSys, Sys}
+import de.sciss.lucre.stm.{Copy, Elem, NoSys, Obj, Sys}
 import de.sciss.lucre.{event => evt}
-import de.sciss.serial.{Serializer, DataInput, DataOutput}
+import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 object EnsembleImpl {
   def apply[S <: Sys[S]](folder: Folder /* Elem.Obj */[S], offset: LongObj[S], playing: BooleanObj[S])

@@ -48,9 +48,9 @@ object Implicits {
 //      case l @ Scan.Link.Scan(_) => l
 //    } .toSet
 
-  implicit class ProcPairOps[S <: Sys[S]](val `this`: (Proc[S], Proc[S])) extends AnyVal { me =>
-    import me.{`this` => pair}
-
+//  implicit class ProcPairOps[S <: Sys[S]](val `this`: (Proc[S], Proc[S])) extends AnyVal { me =>
+//    import me.{`this` => pair}
+//
 // SCAN
 //    private def getLayerIn(implicit tx: S#Tx): Scan[S] = {
 //      val inObj = pair._1
@@ -127,7 +127,7 @@ object Implicits {
 //        }
 //      }
 //    }
-  }
+//  }
 
   implicit class FolderOps[S <: Sys[S]](val `this`: Folder[S]) extends AnyVal { me =>
     import me.{`this` => folder}
