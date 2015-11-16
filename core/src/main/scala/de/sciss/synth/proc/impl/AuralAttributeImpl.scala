@@ -15,7 +15,7 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
-import de.sciss.lucre.expr.{BooleanObj, DoubleObj, Expr, IntObj}
+import de.sciss.lucre.expr.{DoubleVector, BooleanObj, DoubleObj, Expr, IntObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj, TxnLike}
 import de.sciss.lucre.synth.Sys
@@ -23,6 +23,7 @@ import de.sciss.synth.Curve
 import de.sciss.synth.proc.AuralAttribute.{Factory, Observer, Target}
 import de.sciss.synth.proc.AuralView.{Playing, Prepared, State, Stopped}
 
+import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.Ref
 
 object AuralAttributeImpl {
@@ -50,7 +51,7 @@ object AuralAttributeImpl {
     DoubleObj           .typeID -> DoubleAttribute,
     BooleanObj          .typeID -> BooleanAttribute,
     FadeSpec.Obj        .typeID -> FadeSpecAttribute,
-//    DoubleVector        .typeID -> DoubleVectorAttribute,
+    DoubleVector        .typeID -> DoubleVectorAttribute,
 //    Grapheme.Expr.Audio .typeID -> AudioGraphemeAttribute,
     Output              .typeID -> AuralOutputAttribute,
     Folder              .typeID -> AuralFolderAttribute,
@@ -204,6 +205,27 @@ object AuralAttributeImpl {
     )
   }
 
+  // ------------------- DoubleVector ------------------- 
+
+  private[this] object DoubleVectorAttribute extends Factory {
+    type Repr[S <: stm.Sys[S]] = DoubleVector[S]
+
+    def typeID = DoubleVector.typeID
+
+    def apply[S <: Sys[S]](key: String, value: DoubleVector[S], observer: Observer[S])
+                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
+      new DoubleVectorAttribute(key, tx.newHandle(value)).init(value)
+  }
+  private[this] final class DoubleVectorAttribute[S <: Sys[S]](val key: String,
+                                                               val obj: stm.Source[S#Tx, DoubleVector[S]])
+    extends ExprImpl[S, Vec[Double]] {
+
+    def typeID = DoubleVector.typeID
+
+    def preferredNumChannels(implicit tx: S#Tx): Int = obj().value.size
+
+    protected def mkValue(vec: Vec[Double]): AuralAttribute.Value = vec.map(_.toFloat)
+  }
 
   // ------------------- AudioGrapheme ------------------- 
 
