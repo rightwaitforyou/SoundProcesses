@@ -18,7 +18,7 @@ import java.io.{ByteArrayOutputStream, DataOutputStream}
 
 import de.sciss.osc
 import de.sciss.osc.Timetag
-import de.sciss.synth.{AllocatorExhausted, Client => SClient, ControlABusMap, ControlSet, Escape, Server => SServer, UGenGraph, addToHead, message}
+import de.sciss.synth.{AllocatorExhausted, Client => SClient, ControlABusMap, ControlSet, Server => SServer, UGenGraph, addToHead, message}
 import de.sciss.topology.Topology
 
 import scala.annotation.tailrec
@@ -32,11 +32,13 @@ object ServerImpl {
   def offline(peer: SServer): Server.Offline  = new OfflineImpl(peer)
 
   /** If `true`, checks against bundle size overflow (64K) and prints the bundle before crashing. */
-  var VERIFY_BUNDLE_SIZE = true
+  var VERIFY_BUNDLE_SIZE  = true
   /** If `true`, applies a few optimizations to messages within a bundle, in order to reduce its size */
-  var USE_COMPRESSION = true
+  var USE_COMPRESSION     = true
+  /** If `true`, check that wire-buffers are not exceeded before sending synth def */
+  var VERIFY_WIRE_BUFFERS = true
   /** If `true` debug sending out stuff */
-  var DEBUG = false
+  var DEBUG               = false
 
   private final val MaxOnlinePacketSize   = 0x8000 // 0x10000 // 64K
   private final val MaxOfflinePacketSize  = 0x2000 // 8192
@@ -458,7 +460,7 @@ object ServerImpl {
 
       val bos   = new ByteArrayOutputStream
       val dos   = new DataOutputStream(bos)
-      Escape.write(graph, dos)
+      graph.write(dos, version = 1) // Escape.write(graph, dos)
       dos.flush()
       dos.close()
       val bytes = bos.toByteArray
@@ -467,6 +469,15 @@ object ServerImpl {
 
       ugenGraphMap.get(equ).fold[SynthDef] {
         log(s"synth graph ${equ.hashCode()} is new")
+        if (VERIFY_WIRE_BUFFERS) {
+          val wires     = UGenGraph.calcWireBuffers(graph)
+          val maxWires  = server.peer.config.wireBuffers
+          if (wires > maxWires) {
+            val nameS = nameHint.fold("")(n => s" for '$n'")
+            throw new IndexOutOfBoundsException(s"UGen graph$nameS exceeds number of wire buffers ($wires > $maxWires")
+          }
+        }
+
         val name  = mkSynthDefName(nameHint)
         val peer  = de.sciss.synth.SynthDef(name, graph)
         val rd    = impl.SynthDefImpl(server, peer)
