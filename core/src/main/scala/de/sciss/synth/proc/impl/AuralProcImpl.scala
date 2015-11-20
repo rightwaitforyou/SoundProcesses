@@ -680,7 +680,7 @@ object AuralProcImpl {
     }
 
     // ---- synchronous preparation ----
-    private[this] def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    protected def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p = procCached()
       logA(s"begin launch  $p (${hashCode.toHexString})")
 
