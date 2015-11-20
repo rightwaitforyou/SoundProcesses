@@ -16,8 +16,8 @@ package de.sciss.synth.proc
 import de.sciss.lucre.event.Observable
 import de.sciss.lucre.expr.Expr
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Obj, TxnLike}
-import de.sciss.lucre.synth.{NodeRef, Sys}
+import de.sciss.lucre.stm.{Obj, TxnLike, Sys}
+import de.sciss.lucre.synth.{NodeRef, Sys => SSys}
 import de.sciss.span.SpanLike
 import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
 
@@ -31,14 +31,14 @@ object AuralObj {
 
     type Repr[~ <: Sys[~]] <: Obj[~]
 
-    def apply[S <: Sys[S]](obj: Repr[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S]
+    def apply[S <: SSys[S]](obj: Repr[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S]
   }
 
   def addFactory(f: Factory): Unit = Impl.addFactory(f)
 
   def factories: Iterable[Factory] = Impl.factories
 
-  def apply[S <: Sys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = Impl(obj)
+  def apply[S <: SSys[S]](obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = Impl(obj)
 
 //  /* The current state a view is in. */
 //  sealed trait State
@@ -79,7 +79,7 @@ object AuralObj {
 
     def typeID = _Proc.typeID
 
-    def apply[S <: Sys[S]](obj: _Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] =
+    def apply[S <: SSys[S]](obj: _Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] =
       AuralProcImpl(obj)
   }
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
@@ -103,11 +103,11 @@ object AuralObj {
 
     def typeID = _Timeline.typeID
 
-    def apply[S <: Sys[S]](obj: _Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] =
+    def apply[S <: SSys[S]](obj: _Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Timeline[S] =
       AuralTimelineImpl(obj)
 
     /** Creates an empty view that can be manually populated by calling `addObject`. */
-    def empty[S <: Sys[S]](obj: _Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): Manual[S] =
+    def empty[S <: SSys[S]](obj: _Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): Manual[S] =
       AuralTimelineImpl.empty(obj)
 
     sealed trait Update[S <: Sys[S]] {
@@ -150,7 +150,7 @@ object AuralObj {
 
     def typeID = _Ensemble.typeID
 
-    def apply[S <: Sys[S]](obj: _Ensemble[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] =
+    def apply[S <: SSys[S]](obj: _Ensemble[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] =
       AuralEnsembleImpl(obj)
   }
   trait Ensemble[S <: Sys[S]] extends AuralObj[S] {
@@ -166,7 +166,7 @@ object AuralObj {
 
     def typeID = _Action.typeID
 
-    def apply[S <: Sys[S]](obj: _Action[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Action[S] =
+    def apply[S <: SSys[S]](obj: _Action[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Action[S] =
       AuralActionImpl(obj)
   }
   trait Action[S <: Sys[S]] extends AuralObj[S] {
