@@ -19,12 +19,12 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Obj, TxnLike, Sys}
 import de.sciss.lucre.synth.{NodeRef, Sys => SSys}
 import de.sciss.span.SpanLike
-import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
+import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralFolderImpl, AuralActionImpl, AuralEnsembleImpl, AuralProcImpl, AuralTimelineImpl}
 
 import scala.language.higherKinds
 
 object AuralObj {
-  import de.sciss.synth.proc.{Action => _Action, Ensemble => _Ensemble, Proc => _Proc, Timeline => _Timeline}
+  import de.sciss.synth.proc.{Action => _Action, Ensemble => _Ensemble, Proc => _Proc, Timeline => _Timeline, Folder => _Folder}
 
   trait Factory {
     def typeID: Int
@@ -110,10 +110,6 @@ object AuralObj {
     def empty[S <: SSys[S]](obj: _Timeline[S])(implicit tx: S#Tx, context: AuralContext[S]): Manual[S] =
       AuralTimelineImpl.empty(obj)
 
-    sealed trait Update[S <: Sys[S]] {
-      def timeline: Timeline[S]
-    }
-
     trait Manual[S <: Sys[S]] extends Timeline[S] {
       // def addObject   (timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
       // def removeObject(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
@@ -121,6 +117,9 @@ object AuralObj {
       def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit
     }
 
+    sealed trait Update[S <: Sys[S]] {
+      def timeline: Timeline[S]
+    }
     final case class ViewAdded[S <: Sys[S]](timeline: Timeline[S], timed: S#ID, view: AuralObj[S])
       extends Update[S]
 
@@ -145,6 +144,26 @@ object AuralObj {
 
   // ---- ensemble ----
 
+  object FolderLike {
+    sealed trait Update[S <: Sys[S], Repr <: FolderLike[S, Repr]] {
+      def parent: Repr
+    }
+    final case class ViewAdded[S <: Sys[S], Repr <: FolderLike[S, Repr]](parent: Repr, view: AuralObj[S])
+      extends Update[S, Repr]
+
+    final case class ViewRemoved[S <: Sys[S], Repr <: FolderLike[S, Repr]](parent: Repr, view: AuralObj[S])
+      extends Update[S, Repr]
+  }
+  trait FolderLike[S <: Sys[S], Repr <: FolderLike[S, Repr]] extends AuralObj[S] {
+    def folder(implicit tx: S#Tx): _Folder[S]
+
+    def contents: Observable[S#Tx, FolderLike.Update[S, Repr]]
+
+    def views(implicit tx: S#Tx): Set[AuralObj[S]]
+
+    def getView(obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]]
+  }
+
   object Ensemble extends AuralObj.Factory {
     type Repr[S <: Sys[S]] = _Ensemble[S]
 
@@ -153,10 +172,22 @@ object AuralObj {
     def apply[S <: SSys[S]](obj: _Ensemble[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Ensemble[S] =
       AuralEnsembleImpl(obj)
   }
-  trait Ensemble[S <: Sys[S]] extends AuralObj[S] {
+  trait Ensemble[S <: Sys[S]] extends FolderLike[S, Ensemble[S]] {
     override def obj: stm.Source[S#Tx, _Ensemble[S]]
+  }
 
-    def views(implicit tx: S#Tx): Set[AuralObj[S]]
+  // ---- folder ----
+
+  object Folder extends AuralObj.Factory {
+    type Repr[S <: Sys[S]] = _Folder[S]
+
+    def typeID = _Folder.typeID
+
+    def apply[S <: SSys[S]](obj: _Folder[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Folder[S] =
+      AuralFolderImpl(obj)
+  }
+  trait Folder[S <: Sys[S]] extends FolderLike[S, Folder[S]] {
+    override def obj: stm.Source[S#Tx, _Folder[S]]
   }
 
   // ---- action ----

@@ -41,7 +41,7 @@ object AuralObjImpl {
 
   private var map = scala.Predef.Map[Int, Factory](
     // AudioGrapheme   .typeID -> AudioGrapheme,
-    // Folder          .typeID -> Folder,
+    Folder          .typeID -> AuralObj.Folder,
     Proc            .typeID -> AuralObj.Proc, // AuralProcImpl
     Timeline        .typeID -> AuralObj.Timeline,
     Ensemble        .typeID -> AuralObj.Ensemble,
