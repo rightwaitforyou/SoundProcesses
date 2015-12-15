@@ -58,5 +58,8 @@ object Timeline extends Obj.Type {
 trait Timeline[S <: Sys[S]] extends BiGroup[S, Obj[S]] {
   override def modifiableOption: Option[Timeline.Modifiable[S]]
 
+  def isEmpty (implicit tx: S#Tx): Boolean
+  def nonEmpty(implicit tx: S#Tx): Boolean
+
   // def sampleRate: Double
 }

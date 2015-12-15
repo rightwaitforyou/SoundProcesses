@@ -67,6 +67,9 @@ object TimelineImpl {
 
     override def modifiableOption: Option[Timeline.Modifiable[S]] = Some(this)
 
+    def isEmpty (implicit tx: S#Tx): Boolean = tree.isEmpty
+    def nonEmpty(implicit tx: S#Tx): Boolean = !isEmpty
+
     def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
       new Impl(Targets[Out]) { out =>
         val tree = newTree()
