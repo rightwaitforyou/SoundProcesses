@@ -21,13 +21,21 @@ import de.sciss.lucre.stm
 import de.sciss.audiowidgets.TimelineModel
 
 object TransportView {
-  def apply[S <: Sys[S]](transport: Transport[S] /*.Realtime[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] */,
-                         timelineModel: TimelineModel, hasMillis: Boolean, hasLoop: Boolean)
+  /** Creates a new transport view.
+    *
+    * @param transport        the transport to control
+    * @param timelineModel    the model whose position is used for play and updated after stop
+    * @param hasMillis        if `true` display milliseconds
+    * @param hasLoop          if `true` add a loop button
+    * @param hasShortcuts     if `true` add keyboard accelerators
+    */
+  def apply[S <: Sys[S]](transport: Transport[S], timelineModel: TimelineModel,
+                         hasMillis: Boolean = true, hasLoop: Boolean = true, hasShortcuts: Boolean = true)
                         (implicit tx: S#Tx, cursor: stm.Cursor[S]): TransportView[S] =
-    Impl[S](transport, timelineModel, hasMillis = hasMillis, hasLoop = hasLoop)
+    Impl[S](transport, timelineModel, hasMillis = hasMillis, hasLoop = hasLoop, hasShortcuts = hasShortcuts)
 }
 
 trait TransportView[S <: Sys[S]] extends View[S] {
-  def transport /* ( implicit tx: S#Tx ) */ : /* Workspace.*/ Transport[S]
+  def transport    : Transport[S]
   def timelineModel: TimelineModel
 }

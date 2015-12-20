@@ -34,7 +34,7 @@ import scala.swing.{Action, BoxPanel, Component, Orientation, Swing}
 
 object TransportViewImpl {
   def apply[S <: Sys[S]](transport: Transport[S] /* .Realtime[S, Obj.T[S, Proc.Elem], Transport.Proc.Update[S]] */,
-                         model: TimelineModel, hasMillis: Boolean, hasLoop: Boolean)
+                         model: TimelineModel, hasMillis: Boolean, hasLoop: Boolean, hasShortcuts: Boolean)
                         (implicit tx: S#Tx, cursor: Cursor[S]): TransportView[S] = {
     val view    = new Impl(transport, model)
     val srk     = 1000 / TimeRef.SampleRate // transport.sampleRate
@@ -50,7 +50,7 @@ object TransportViewImpl {
     val initPlaying = transport.isPlaying // .playing.value
     val initMillis = (transport.position * srk).toLong
     deferTx {
-      view.guiInit(initPlaying, initMillis, hasMillis = hasMillis, hasLoop = hasLoop)
+      view.guiInit(initPlaying, initMillis, hasMillis = hasMillis, hasLoop = hasLoop, hasShortcuts = hasShortcuts)
     }
     view
   }
@@ -181,7 +181,8 @@ object TransportViewImpl {
       case _ =>
     }
 
-    def guiInit(initPlaying: Boolean, initMillis: Long, hasMillis: Boolean, hasLoop: Boolean): Unit = {
+    def guiInit(initPlaying: Boolean, initMillis: Long, hasMillis: Boolean, hasLoop: Boolean,
+                hasShortcuts: Boolean): Unit = {
       val timeDisplay = TimeDisplay(timelineModel, hasMillis = hasMillis)
 
       val actions0 = Vector(
@@ -201,16 +202,19 @@ object TransportViewImpl {
         contents += HStrut(8)
         contents += transportStrip
       }
-      transportPane.addAction("play-stop", focus = FocusType.Window, action = new Action("play-stop") {
-        accelerator = Some(KeyStrokes.plain + Key.Space)
-        def apply(): Unit = playOrStop()
-      })
-      transportPane.addAction("rtz", focus = FocusType.Window, action = new Action("rtz") {
-        accelerator = Some(KeyStrokes.plain + Key.Enter)
-        enabled     = modOpt.isDefined
-        def apply(): Unit =
-          transportStrip.button(GoToBegin).foreach(_.doClick())
-      })
+
+      if (hasShortcuts) {
+        transportPane.addAction("play-stop", focus = FocusType.Window, action = new Action("play-stop") {
+          accelerator = Some(KeyStrokes.plain + Key.Space)
+          def apply(): Unit = playOrStop()
+        })
+        transportPane.addAction("rtz", focus = FocusType.Window, action = new Action("rtz") {
+          accelerator = Some(KeyStrokes.plain + Key.Enter)
+          enabled     = modOpt.isDefined
+          def apply(): Unit =
+            transportStrip.button(GoToBegin).foreach(_.doClick())
+        })
+      }
 
       playTimer = new javax.swing.Timer(47,
         Swing.ActionListener(modOpt.fold((_: ActionEvent) => ()) { mod => (e: ActionEvent) =>

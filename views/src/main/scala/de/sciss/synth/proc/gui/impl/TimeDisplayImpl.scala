@@ -15,8 +15,12 @@ package de.sciss.synth.proc
 package gui
 package impl
 
+import java.awt.{Cursor, Color}
+
+import de.sciss.audiowidgets.impl.ActionGoToTime
 import de.sciss.audiowidgets.{TimelineModel, LCDPanel, LCDColors, LCDFont, AxisFormat}
 import de.sciss.desktop.impl.DynamicComponentImpl
+import scala.swing.event.{MouseExited, MouseEntered, MouseClicked}
 import scala.swing.{Swing, Orientation, BoxPanel, Component, Label}
 import Swing._
 import de.sciss.model.Change
@@ -47,25 +51,23 @@ final class TimeDisplayImpl(model: TimelineModel, hasMillis: Boolean) extends Ti
     protected def componentHidden(): Unit =
       model.removeListener(tlmListener)
 
-    //    override protected def paintComponent(g2: java.awt.Graphics2D): Unit = {
-    //      val atOrig  = g2.getTransform
-    //      try {
-    //        // stupid lcd font has wrong ascent
-    //        g2.translate(0, 3)
-    //        // g2.setColor(java.awt.Color.red)
-    //        // g2.fillRect(0, 0, 100, 100)
-    //        super.paintComponent(g2)
-    //      } finally {
-    //        g2.setTransform(atOrig)
-    //      }
-    //    }
-
     font        = LCDFont() // .deriveFont(11.5f)
     foreground  = LCDColors.defaultFg
     updateText(model.position)
 
     maximumSize = preferredSize
     minimumSize = preferredSize
+
+    model.modifiableOption.foreach { mod =>
+      listenTo(mouse.clicks)
+      listenTo(mouse.moves)
+      reactions += {
+        case MouseEntered(_, _, _) => foreground = Color.blue
+        case MouseExited (_, _, _) => foreground = LCDColors.defaultFg
+        case MouseClicked(_, _, _, _, false)  => new ActionGoToTime(mod, null).apply()
+      }
+      cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+    }
   }
   //      lcd.setMinimumSize(lcd.getPreferredSize)
   //      lcd.setMaximumSize(lcd.getPreferredSize)

@@ -16,7 +16,7 @@ package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Obj, IdentifierMap}
+import de.sciss.lucre.stm.{TxnLike, Obj, IdentifierMap}
 import de.sciss.lucre.synth.{Txn, Server, Sys}
 import de.sciss.span.Span
 import de.sciss.synth.proc
@@ -58,6 +58,7 @@ object TransportImpl {
     extends Transport[S] with ObservableImpl[S, Transport.Update[S]] with AuralSystem.Client {
 
     import scheduler.cursor
+    import TxnLike.peer
 
     private final class PlayTime(val wallClock0: Long, val pos0: Long) {
       override def toString = s"[pos0 = $pos0 / ${TimeRef.framesToSecs(pos0)}, time0 = $wallClock0]"
@@ -88,7 +89,6 @@ object TransportImpl {
     def getView(obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]] = viewMap.get(obj.id)
 
     def play()(implicit tx: S#Tx): Unit = {
-      implicit val ptx = tx.peer
       val timeBase0 = timeBaseRef()
       if (timeBase0.isPlaying) return
 
@@ -103,11 +103,10 @@ object TransportImpl {
     private def playViews()(implicit tx: S#Tx): Unit = {
       val tr = mkTimeRef()
       logT(s"transport - playViews - $tr")
-      viewSet.foreach(_.play(tr, ()))(tx.peer)
+      viewSet.foreach(_.play(tr, ()))
     }
 
     def stop()(implicit tx: S#Tx): Unit = {
-      implicit val ptx = tx.peer
       val timeBase0 = timeBaseRef()
       if (!timeBase0.isPlaying) return
 
@@ -120,12 +119,11 @@ object TransportImpl {
     }
 
     private def stopViews()(implicit tx: S#Tx): Unit =
-      viewSet.foreach(_.stop())(tx.peer)
+      viewSet.foreach(_.stop())
 
-    def position(implicit tx: S#Tx): Long = timeBaseRef.get(tx.peer).currentPos
+    def position(implicit tx: S#Tx): Long = timeBaseRef().currentPos
 
-    def seek(position: Long)(implicit tx: S#Tx): Unit = {
-      implicit val ptx = tx.peer
+    def seek(position: Long)(implicit tx: S#Tx): Unit = if (this.position != position) {
       val p = isPlaying
       if (p) stopViews()
 
@@ -137,14 +135,14 @@ object TransportImpl {
       fire(Transport.Seek(this, timeBase1.pos0, isPlaying = p))
     }
 
-    def isPlaying(implicit tx: S#Tx): Boolean = timeBaseRef.get(tx.peer).isPlaying
+    def isPlaying(implicit tx: S#Tx): Boolean = timeBaseRef().isPlaying
 
     def addObject(obj: Obj[S])(implicit tx: S#Tx): Unit = {
       val id = obj.id
       if (objMap.contains(id)) throw new IllegalArgumentException(s"Object $obj was already added to transport")
       val objH = tx.newHandle(obj)
       objMap.put(id, objH)
-      objSet.add(objH)(tx.peer)
+      objSet.add(objH)
       fire(Transport.ObjectAdded(this, obj))
 
       contextOption.foreach { implicit context =>
@@ -154,7 +152,6 @@ object TransportImpl {
     }
 
     def removeObject(obj: Obj[S])(implicit tx: S#Tx): Unit = {
-      implicit val ptx = tx.peer
       val id    = obj.id
       // we need objH to find the index in objSeq
       val objH  = objMap.get(id).getOrElse {
@@ -179,13 +176,12 @@ object TransportImpl {
     private def mkView(obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
       val view = AuralObj(obj)
       viewMap.put(obj.id, view)
-      viewSet.add(view)(tx.peer)
+      viewSet.add(view)
       fire(Transport.ViewAdded(this, view))
       view
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {
-      implicit val ptx = tx.peer
       auralSystem.foreach(_.removeClient(this))
       objMap.dispose()
       objSet.foreach { obj =>
@@ -196,7 +192,6 @@ object TransportImpl {
     }
 
     private def disposeViews()(implicit tx: S#Tx): Unit = {
-      implicit val itx = tx.peer
       viewMap.dispose()
       viewSet.foreach { view =>
         fire(Transport.ViewRemoved(this, view))
@@ -209,7 +204,7 @@ object TransportImpl {
 
     private val contextRef = Ref(Option.empty[AuralContext[S]])
 
-    def contextOption(implicit tx: S#Tx): Option[AuralContext[S]] = contextRef.get(tx.peer)
+    def contextOption(implicit tx: S#Tx): Option[AuralContext[S]] = contextRef()
 
     def auralStarted(server: Server)(implicit tx: Txn): Unit = {
       // XXX TODO -- what was the reasoning for the txn decoupling?
@@ -224,7 +219,6 @@ object TransportImpl {
 
     def auralStartedTx(server: Server)(implicit tx: S#Tx, auralContext: AuralContext[S]): Unit = {
       logT(s"transport - aural-system started")
-      implicit val ptx = tx.peer
       contextRef.set(Some(auralContext))
       objSet.foreach { objH =>
         val obj = objH()
@@ -244,7 +238,7 @@ object TransportImpl {
 
     private def auralStoppedTx()(implicit tx: S#Tx): Unit = {
       logT(s"transport - aural-system stopped")
-      contextRef.set(None)(tx.peer)
+      contextRef() = None
       disposeViews()
     }
   }
