@@ -215,12 +215,12 @@ object GraphemeImpl {
               Segment.Const(Span.from(floorTime), floorCurveVals)
           }
 
-        case av: Value.Audio =>
-          val span = pin.eventAfter(floorTime) match {
-            case Some(ceilTime) => Span(floorTime, ceilTime)
-            case _              => Span.from(floorTime)
-          }
-          Segment.Audio(span, av)
+//        case av: Value.Audio =>
+//          val span = pin.eventAfter(floorTime) match {
+//            case Some(ceilTime) => Span(floorTime, ceilTime)
+//            case _              => Span.from(floorTime)
+//          }
+//          Segment.Audio(span, av)
       }
     }
 
@@ -242,8 +242,8 @@ object GraphemeImpl {
             case floorCurve: Value.Curve =>
               val floorCurveVals: Vec[Double] = floorCurve.values.map(_._1)(breakOut)
               segmentFromSpan(floorTime, floorCurveVals, addTime, addValue)
-            case av: Value.Audio =>
-              Segment.Audio(Span(floorTime, addTime), av)
+//            case av: Value.Audio =>
+//              Segment.Audio(Span(floorTime, addTime), av)
           }
           Vector(s)
         case _ =>

@@ -400,7 +400,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         after(1.0) { implicit tx =>
           val spec  = AudioFile.readSpec(f)
           assert(spec.fileType == AudioFileType.Wave64 && spec.numChannels == 2)
-          val gr    = Grapheme.Expr.Audio[S](artH(), spec, 0L, 1.0)
+          val gr    = AudioCue.Obj[S](artH(), spec, 0L, 1.0)
           val pPlay = proc {
             val sig   = graph.DiskIn.ar("disk")
             Out.ar(0, sig)  // let it be heard
@@ -603,7 +603,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       }
       val loc     = ArtifactLocation.newConst[S](f.parent)
       val artif   = Artifact(loc, f) // loc.add(f)
-      val oAudio  = Grapheme.Expr.Audio[S](artif, spec, offset = 0L, gain = 2.0)
+      val oAudio  = AudioCue.Obj[S](artif, spec, offset = 0L, gain = 2.0)
 
       _proc.attr.put("metal", oAudio)
 
@@ -648,10 +648,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val spec    = AudioFile.readSpec(f)
       println(spec)
       val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
-      val vAudio  = Grapheme.Value.Audio(f, spec, offset = aOff, gain = 2.0)
+      val vAudio  = AudioCue(f, spec, offset = aOff, gain = 2.0)
 //      val gAudio  = Grapheme[S](spec.numChannels)
 //      gAudio.add(0L: LongObj[S], vAudio: Grapheme.Expr[S]) // ... çoit trop complexe ...
-      val gAudio = Grapheme.Expr.Audio.newConst[S](vAudio)
+      val gAudio = AudioCue.Obj.newConst[S](vAudio)
       // sAudio.add(Scan.Link.Grapheme(gAudio))
       _proc1.name = "tape"
       _proc1.attr.put("sig", gAudio)

@@ -64,7 +64,7 @@ object AsyncBounceTest {
       })
       af.write(aBuf)
       af.close()
-      val gr      = Grapheme.Expr.Audio[S](artif, aSpec, 0L, 1.0)
+      val gr      = AudioCue.Obj[S](artif, aSpec, 0L, 1.0)
       obj.attr.put("foo", gr)
 
       val group     = Timeline[S]

@@ -15,18 +15,13 @@ package de.sciss
 package synth
 package proc
 
-import java.io.File
-
-import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.bitemp.BiPin
 import de.sciss.lucre.event.{Publisher, Targets}
-import de.sciss.lucre.expr.{Expr => _Expr, Type, DoubleObj, LongObj}
-import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Elem, Obj, Sys, Copy}
+import de.sciss.lucre.expr.{DoubleObj, Expr => _Expr, LongObj, Type}
+import de.sciss.lucre.stm.{Copy, Elem, Obj, Sys}
 import de.sciss.lucre.{event => evt, expr}
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer, Serializer, Writable}
 import de.sciss.span.Span
-import de.sciss.synth.io.AudioFileSpec
 import de.sciss.synth.proc.impl.{GraphemeImpl => Impl}
 import de.sciss.{model => m}
 
@@ -47,7 +42,7 @@ object Grapheme extends Obj.Type {
 
   // 0 reserved for variables
   private final val curveCookie = 1
-  private final val audioCookie = 2
+//  private final val audioCookie = 2
 
   override def init(): Unit = {
     super.init()
@@ -63,7 +58,7 @@ object Grapheme extends Obj.Type {
       def read(in: DataInput): Value =
         (in.readByte().toInt: @switch) match {
           case `curveCookie`  => Curve.readIdentified(in)
-          case `audioCookie`  => Audio.readIdentified(in)
+//          case `audioCookie`  => Audio.readIdentified(in)
           case cookie         => sys.error("Unexpected cookie " + cookie)
         }
     }
@@ -110,44 +105,44 @@ object Grapheme extends Obj.Type {
       }
     }
 
-    object Audio {
-      implicit object serializer extends ImmutableSerializer[Audio] {
-        def write(v: Audio, out: DataOutput): Unit = v.write(out)
-        def read(in: DataInput): Audio = {
-          val cookie = in.readByte()
-          if (cookie != audioCookie) sys.error(s"Unexpected cookie $cookie")
-          readIdentified(in)
-        }
-      }
-      private[Value] def readIdentified(in: DataInput): Audio = {
-        val artifact  = new File(in.readUTF()) // Artifact.read(in, access)
-        val spec      = AudioFileSpec.Serializer.read(in)
-        val offset    = in.readLong()
-        val gain      = in.readDouble()
-        Audio(artifact, spec, offset, gain)
-      }
-    }
-
-    /** An audio region segment.
-      *
-      * @param  artifact  the audio file
-      * @param  spec      the audio file specification, e.g. retrieved via `AudioFile.readSpec`
-      * @param  offset    the file offset in sample frames
-      * @param  gain      the gain factor (linear, where 1.0 is original volume)
-      */
-    final case class Audio(artifact: Artifact.Value, spec: AudioFileSpec, offset: Long, gain: Double)
-      extends Value {
-
-      def numChannels = spec.numChannels
-
-      def write(out: DataOutput): Unit = {
-        out.writeByte(audioCookie)
-        out.writeUTF(artifact.getPath) // artifact.write(out)
-        AudioFileSpec.Serializer.write(spec, out)
-        out.writeLong(offset)
-        out.writeDouble(gain)
-      }
-    }
+//    object Audio {
+//      implicit object serializer extends ImmutableSerializer[Audio] {
+//        def write(v: Audio, out: DataOutput): Unit = v.write(out)
+//        def read(in: DataInput): Audio = {
+//          val cookie = in.readByte()
+//          if (cookie != audioCookie) sys.error(s"Unexpected cookie $cookie")
+//          readIdentified(in)
+//        }
+//      }
+//      private[Value] def readIdentified(in: DataInput): Audio = {
+//        val artifact  = new File(in.readUTF()) // Artifact.read(in, access)
+//        val spec      = AudioFileSpec.Serializer.read(in)
+//        val offset    = in.readLong()
+//        val gain      = in.readDouble()
+//        Audio(artifact, spec, offset, gain)
+//      }
+//    }
+//
+//    /** An audio region segment.
+//      *
+//      * @param  artifact  the audio file
+//      * @param  spec      the audio file specification, e.g. retrieved via `AudioFile.readSpec`
+//      * @param  offset    the file offset in sample frames
+//      * @param  gain      the gain factor (linear, where 1.0 is original volume)
+//      */
+//    final case class Audio(artifact: Artifact.Value, spec: AudioFileSpec, offset: Long, gain: Double)
+//      extends Value {
+//
+//      def numChannels = spec.numChannels
+//
+//      def write(out: DataOutput): Unit = {
+//        out.writeByte(audioCookie)
+//        out.writeUTF(artifact.getPath) // artifact.write(out)
+//        AudioFileSpec.Serializer.write(spec, out)
+//        out.writeLong(offset)
+//        out.writeDouble(gain)
+//      }
+//    }
   }
 
   /** An evaluated and flattened scan element. This is either an immutable value such as a constant or
@@ -169,9 +164,9 @@ object Grapheme extends Obj.Type {
     final case class Curve(span: Span, values: Vec[(Double, Double, synth.Curve)]) extends Defined {
       def numChannels = values.size
     }
-    final case class Audio(span: Span.HasStart, value: Value.Audio) extends Defined {
-      def numChannels = value.numChannels
-    }
+//    final case class Audio(span: Span.HasStart, value: Value.Audio) extends Defined {
+//      def numChannels = value.numChannels
+//    }
     final case class Undefined(span: Span.HasStart) extends Segment {
       def isDefined = false
     }
@@ -188,7 +183,7 @@ object Grapheme extends Obj.Type {
     override def init(): Unit = {
       super.init()
       Curve.init()
-      Audio.init()
+//      Audio.init()
     }
 
     protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
@@ -265,69 +260,69 @@ object Grapheme extends Obj.Type {
     }
     sealed trait Curve[S <: Sys[S]] extends Expr[S] with _Expr[S, Value.Curve]
 
-    object Audio extends expr.impl.ExprTypeImpl[Value.Audio, Expr.Audio] {
-      // final val typeID = 11
-      final val typeID = 13
-
-      import Expr.{Audio => Repr}
-
-      // override def init(): Unit = ()  // prevent double registration
-
-      private[this] lazy val _init: Unit = registerExtension(ApplyAudio)
-
-      override def init(): Unit = {
-        super.init()
-        _init
-      }
-
-      protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
-        new _Const[S](id, value)
-
-      protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]], connect: Boolean)
-                                      (implicit tx: S#Tx): Var[S] = {
-        val res = new _Var[S](targets, vr)
-        if (connect) res.connect()
-        res
-      }
-
-      private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
-        extends ConstImpl[S] with Repr[S]
-
-      private[this] final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
-        extends VarImpl[S] with Repr[S]
-
-      def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: LongObj[S], gain: DoubleObj[S])
-                                (implicit tx: S#Tx): Audio[S] = {
-        val targets = evt.Targets[S]
-        new ApplyAudio(targets, artifact, spec, offset, gain).connect()
-      }
-
-      def unapply[S <: Sys[S]](expr: Expr[S]): Option[(Artifact[S], AudioFileSpec, LongObj[S], DoubleObj[S])] = {
-        if (expr.isInstanceOf[ApplyAudio[_]]) {
-          val a = expr.asInstanceOf[ApplyAudio[S]]
-          Some((a.artifact, a.spec, a.offset, a.gain))
-        } else {
-          None
-        }
-      }
-
-      def valueSerializer: ImmutableSerializer[Value.Audio] = Value.Audio.serializer
-
-//      def readValue(in: DataInput): Value.Audio = Value.Audio.serializer.read(in)
-//      def writeValue(v: Value.Audio, out: DataOutput): Unit = v.write(out)
-
-//      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
-//                                           targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
-//        require(cookie == audioCookie, s"Unexpected cookie $cookie")
-//        readIdentifiedTuple(in, access, targets)
+//    object Audio extends expr.impl.ExprTypeImpl[Value.Audio, Expr.Audio] {
+//      // final val typeID = 11
+//      final val typeID = 13
+//
+//      import Expr.{Audio => Repr}
+//
+//      // override def init(): Unit = ()  // prevent double registration
+//
+//      private[this] lazy val _init: Unit = registerExtension(ApplyAudio)
+//
+//      override def init(): Unit = {
+//        super.init()
+//        _init
 //      }
-    }
-    sealed trait Audio[S <: Sys[S]] extends Expr[S] with _Expr[S, Value.Audio] {
-//      def artifact: Artifact[S]
-//      def offset  : _Expr[S, Long  ]
-//      def gain    : DoubleObj[S]
-//      def spec    : AudioFileSpec
-    }
+//
+//      protected def mkConst[S <: Sys[S]](id: S#ID, value: A)(implicit tx: S#Tx): Const[S] =
+//        new _Const[S](id, value)
+//
+//      protected def mkVar[S <: Sys[S]](targets: Targets[S], vr: S#Var[Ex[S]], connect: Boolean)
+//                                      (implicit tx: S#Tx): Var[S] = {
+//        val res = new _Var[S](targets, vr)
+//        if (connect) res.connect()
+//        res
+//      }
+//
+//      private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
+//        extends ConstImpl[S] with Repr[S]
+//
+//      private[this] final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
+//        extends VarImpl[S] with Repr[S]
+//
+//      def apply[S <: Sys[S]](artifact: Artifact[S], spec: AudioFileSpec, offset: LongObj[S], gain: DoubleObj[S])
+//                                (implicit tx: S#Tx): Audio[S] = {
+//        val targets = evt.Targets[S]
+//        new ApplyAudio(targets, artifact, spec, offset, gain).connect()
+//      }
+//
+//      def unapply[S <: Sys[S]](expr: Expr[S]): Option[(Artifact[S], AudioFileSpec, LongObj[S], DoubleObj[S])] = {
+//        if (expr.isInstanceOf[ApplyAudio[_]]) {
+//          val a = expr.asInstanceOf[ApplyAudio[S]]
+//          Some((a.artifact, a.spec, a.offset, a.gain))
+//        } else {
+//          None
+//        }
+//      }
+//
+//      def valueSerializer: ImmutableSerializer[Value.Audio] = Value.Audio.serializer
+//
+////      def readValue(in: DataInput): Value.Audio = Value.Audio.serializer.read(in)
+////      def writeValue(v: Value.Audio, out: DataOutput): Unit = v.write(out)
+//
+////      override protected def readNode[S <: Sys[S]](cookie: Int, in: DataInput, access: S#Acc,
+////                                           targets: evt.Targets[S])(implicit tx: S#Tx): Audio[S] with evt.Node[S] = {
+////        require(cookie == audioCookie, s"Unexpected cookie $cookie")
+////        readIdentifiedTuple(in, access, targets)
+////      }
+//    }
+//    sealed trait Audio[S <: Sys[S]] extends Expr[S] with _Expr[S, Value.Audio] {
+////      def artifact: Artifact[S]
+////      def offset  : _Expr[S, Long  ]
+////      def gain    : DoubleObj[S]
+////      def spec    : AudioFileSpec
+//    }
 
     private object ApplyCurve extends Type.Extension1[Curve] {
       def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
@@ -419,93 +414,93 @@ object Grapheme extends Obj.Type {
       override def toString: String = s"Elem.Curve$id"
     }
 
-    private object ApplyAudio extends Type.Extension1[Audio] {
-      def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
-                                    (implicit tx: S#Tx): Audio[S] = {
-        val artifact  = Artifact .read(in, access)
-        val spec      = AudioFileSpec.Serializer.read(in)
-        val offset    = LongObj  .read(in, access)
-        val gain      = DoubleObj.read(in, access)
-        new ApplyAudio(targets, artifact, spec, offset, gain)
-      }
-
-      def name: String = "ApplyAudio"
-
-      val opHi = audioCookie
-      val opLo = audioCookie
-    }
-    private final class ApplyAudio[S <: Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
-                                                   val spec: AudioFileSpec, val offset: LongObj[S],
-                                                   val gain: DoubleObj[S])
-      extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
-
-      def tpe: stm.Obj.Type = Audio
-
-      def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
-        new ApplyAudio(Targets[Out], context(artifact), spec, context(offset), context(gain)).connect()
-
-      def value(implicit tx: S#Tx): Value.Audio = {
-        val artVal    = artifact.value
-        val offsetVal = offset  .value
-        val gainVal   = gain    .value
-        Value.Audio(artVal, spec, offsetVal, gainVal)
-      }
-
-      def connect()(implicit tx: S#Tx): this.type = {
-        artifact.changed ---> changed
-        offset  .changed ---> changed
-        gain    .changed ---> changed
-        this
-      }
-
-      private[this] def disconnect()(implicit tx: S#Tx): Unit = {
-        artifact.changed -/-> changed
-        offset  .changed -/-> changed
-        gain    .changed -/-> changed
-      }
-
-      object changed extends Changed {
-        def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Audio]] = {
-          val artEvt = artifact.changed
-          val artOpt = if (pull.contains(artEvt)) pull(artEvt) else None
-          val (artBefore, artNow) = artOpt.fold({
-            val art = artifact.value
-            (art, art)
-          })(_.toTuple)
-
-          val offsetEvt = offset.changed
-          val offsetOpt = if (pull.contains(offsetEvt)) pull(offsetEvt) else None
-          val (offsetBefore, offsetNow) = offsetOpt.fold({
-            val ov = offset.value
-            (ov, ov)
-          })(_.toTuple)
-
-          val gainEvt = gain.changed
-          val gainOpt = if (pull.contains(gainEvt)) pull(gainEvt) else None
-          val (gainBefore, gainNow) = gainOpt.fold({
-            val gv = gain.value
-            (gv, gv)
-          })(_.toTuple)
-
-          val before  = Value.Audio(artBefore, spec, offsetBefore, gainBefore)
-          val now     = Value.Audio(artNow   , spec, offsetNow   , gainNow   )
-          if (before == now) None else Some(model.Change(before, now))
-        }
-      }
-
-      protected def writeData(out: DataOutput): Unit = {
-        out.writeByte(1)  // 'node not var'
-        out.writeInt(audioCookie) // op-id
-        artifact.write(out)
-        AudioFileSpec.Serializer.write(spec, out)
-        offset.write(out)
-        gain.write(out)
-      }
-
-      protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
-
-      override def toString: String = s"Elem.Audio$id"
-    }
+//    private object ApplyAudio extends Type.Extension1[Audio] {
+//      def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
+//                                    (implicit tx: S#Tx): Audio[S] = {
+//        val artifact  = Artifact .read(in, access)
+//        val spec      = AudioFileSpec.Serializer.read(in)
+//        val offset    = LongObj  .read(in, access)
+//        val gain      = DoubleObj.read(in, access)
+//        new ApplyAudio(targets, artifact, spec, offset, gain)
+//      }
+//
+//      def name: String = "ApplyAudio"
+//
+//      val opHi = audioCookie
+//      val opLo = audioCookie
+//    }
+//    private final class ApplyAudio[S <: Sys[S]](protected val targets: evt.Targets[S], val artifact: Artifact[S],
+//                                                   val spec: AudioFileSpec, val offset: LongObj[S],
+//                                                   val gain: DoubleObj[S])
+//      extends expr.impl.NodeImpl[S, Value.Audio] with Audio[S] {
+//
+//      def tpe: stm.Obj.Type = Audio
+//
+//      def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
+//        new ApplyAudio(Targets[Out], context(artifact), spec, context(offset), context(gain)).connect()
+//
+//      def value(implicit tx: S#Tx): Value.Audio = {
+//        val artVal    = artifact.value
+//        val offsetVal = offset  .value
+//        val gainVal   = gain    .value
+//        Value.Audio(artVal, spec, offsetVal, gainVal)
+//      }
+//
+//      def connect()(implicit tx: S#Tx): this.type = {
+//        artifact.changed ---> changed
+//        offset  .changed ---> changed
+//        gain    .changed ---> changed
+//        this
+//      }
+//
+//      private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+//        artifact.changed -/-> changed
+//        offset  .changed -/-> changed
+//        gain    .changed -/-> changed
+//      }
+//
+//      object changed extends Changed {
+//        def pullUpdate(pull: evt.Pull[S])(implicit tx: S#Tx): Option[m.Change[Value.Audio]] = {
+//          val artEvt = artifact.changed
+//          val artOpt = if (pull.contains(artEvt)) pull(artEvt) else None
+//          val (artBefore, artNow) = artOpt.fold({
+//            val art = artifact.value
+//            (art, art)
+//          })(_.toTuple)
+//
+//          val offsetEvt = offset.changed
+//          val offsetOpt = if (pull.contains(offsetEvt)) pull(offsetEvt) else None
+//          val (offsetBefore, offsetNow) = offsetOpt.fold({
+//            val ov = offset.value
+//            (ov, ov)
+//          })(_.toTuple)
+//
+//          val gainEvt = gain.changed
+//          val gainOpt = if (pull.contains(gainEvt)) pull(gainEvt) else None
+//          val (gainBefore, gainNow) = gainOpt.fold({
+//            val gv = gain.value
+//            (gv, gv)
+//          })(_.toTuple)
+//
+//          val before  = Value.Audio(artBefore, spec, offsetBefore, gainBefore)
+//          val now     = Value.Audio(artNow   , spec, offsetNow   , gainNow   )
+//          if (before == now) None else Some(model.Change(before, now))
+//        }
+//      }
+//
+//      protected def writeData(out: DataOutput): Unit = {
+//        out.writeByte(1)  // 'node not var'
+//        out.writeInt(audioCookie) // op-id
+//        artifact.write(out)
+//        AudioFileSpec.Serializer.write(spec, out)
+//        offset.write(out)
+//        gain.write(out)
+//      }
+//
+//      protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
+//
+//      override def toString: String = s"Elem.Audio$id"
+//    }
 
     // ---- bi-type ----
 

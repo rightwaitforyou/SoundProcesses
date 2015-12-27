@@ -18,7 +18,7 @@ import de.sciss.lucre.synth.{ControlBus, Buffer, Synth, Resource, Txn}
 import de.sciss.synth.{addToHead, ControlSet, SynthGraph}
 
 object AudioArtifactScalarWriter {
-  def apply(bus: ControlBus, audioVal: Grapheme.Value.Audio)(implicit tx: Txn): Resource = {
+  def apply(bus: ControlBus, audioVal: AudioCue)(implicit tx: Txn): Resource = {
     val numChannels = audioVal.spec.numChannels
     val sg  = SynthGraph {
       import de.sciss.synth._
@@ -38,7 +38,7 @@ object AudioArtifactScalarWriter {
     res
   }
 
-  private final class Impl(synth: Synth, bus: ControlBus, audioVal: Grapheme.Value.Audio)
+  private final class Impl(synth: Synth, bus: ControlBus, audioVal: AudioCue)
     extends Resource.Proxy {
 
     protected def resourcePeer: Resource = synth

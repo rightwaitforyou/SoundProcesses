@@ -56,7 +56,7 @@ class AttributesSpec extends ConfluentEventSpec {
       attr.put("d-vec"  , DoubleVector.newConst(Vector(1.2, 3.4, 5.6)))
       val loc = ArtifactLocation.newConst[S](file("foo"))
       val art = Artifact(loc, Artifact.Child("bar")) // loc.add(file("foo") / "bar")
-      attr.put("audio"  , Grapheme.Expr.Audio(art, spec, offset = n, gain = d))
+      attr.put("audio"  , AudioCue.Obj(art, spec, offset = n, gain = d))
       attr.put("loc",     loc)
       val group = Timeline[S]
       attr.put("group",   group)
@@ -76,8 +76,8 @@ class AttributesSpec extends ConfluentEventSpec {
       assert(attr.$[FadeSpec.Obj]("fade"   ).map(_.value) === Some(fade))
       assert(attr.$[DoubleVector]("d-vec"  ).map(_.value) === Some(Vector(1.2, 3.4, 5.6)))
       assert(attr.$[Timeline    ]("group"  ) === Some(group))
-      assert(attr.$[Grapheme.Expr.Audio]("audio").map(_.value) ===
-        Some(Grapheme.Value.Audio(file("foo") / "bar", spec, 1234L, 123.4)))
+      assert(attr.$[AudioCue.Obj]("audio").map(_.value) ===
+        Some(AudioCue(file("foo") / "bar", spec, 1234L, 123.4)))
       assert(attr.$[ArtifactLocation]("loc").map(_.directory) === Some(file("foo")))
     }
   }

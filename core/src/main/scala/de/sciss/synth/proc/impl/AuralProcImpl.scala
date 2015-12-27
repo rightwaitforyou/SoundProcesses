@@ -378,7 +378,7 @@ object AuralProcImpl {
           case a: DoubleVector[S] =>
             val v = a.value   // XXX TODO: would be better to write a.peer.size.value
             (v.size.toLong, 1)
-          case a: Grapheme.Expr.Audio[S] =>
+          case a: AudioCue.Obj[S] =>
             // val spec = a.spec
             val spec = a.value.spec
             (spec.numFrames, spec.numChannels)
@@ -417,7 +417,7 @@ object AuralProcImpl {
       val valueOpt  = procObj.attr.get(key)
       valueOpt.fold(-1) {
         case a: DoubleVector[S] => a.value.size // XXX TODO: would be better to write a.peer.size.value
-        case a: Grapheme.Expr.Audio [S] =>
+        case a: AudioCue.Obj[S] =>
           a.value.spec.numChannels
         case _: FadeSpec.Obj[S] => 4
         case a: Output[S] =>
@@ -463,7 +463,7 @@ object AuralProcImpl {
               val _buf = Buffer(server)(numFrames = bufSize, numChannels = 1)
               (_buf, 0f)
             } {
-              case a: Grapheme.Expr.Audio[S] =>
+              case a: AudioCue.Obj[S] =>
                 val audioVal  = a.value
                 val spec      = audioVal.spec
                 val path      = audioVal.artifact.getAbsolutePath
@@ -503,7 +503,7 @@ object AuralProcImpl {
           val rb = procCached().attr.get(key).fold[Buffer] {
             sys.error(s"Missing attribute $key for buffer content")
           } {
-            case a: Grapheme.Expr.Audio[S] =>
+            case a: AudioCue.Obj[S] =>
               val audioVal  = a.value
               val spec      = audioVal.spec
               val path      = audioVal.artifact.getAbsolutePath
@@ -617,7 +617,7 @@ object AuralProcImpl {
         b.obj.attr.get(key).fold[Unit] {
           sys.error(s"Missing attribute $key for buffer content")
         } {
-          case a: Grapheme.Expr.Audio[S] =>
+          case a: AudioCue.Obj[S] =>
             val audioVal  = a.value
             val spec      = audioVal.spec
             val f         = audioVal.artifact
