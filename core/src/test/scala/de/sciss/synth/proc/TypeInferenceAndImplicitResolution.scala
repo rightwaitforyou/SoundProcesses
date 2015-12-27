@@ -7,15 +7,15 @@ import de.sciss.lucre.stm.Sys
   */
 object TypeInferenceAndImplicitResolution {
   def test[S <: Sys[S]]()(implicit tx: S#Tx): Unit = {
-    val graph: Grapheme.Expr.Audio[S] = sys.error("Not necessary for compilation")
+    val graph: AudioCue.Obj[S] = sys.error("Not necessary for compilation")
     val peer  = graph // AudioGraphemeElem(graph)
     val obj   = peer // Obj(peer)
 
     val ph    = tx.newHandle(peer)
     val oh    = tx.newHandle(obj)
 
-    val pr: Grapheme.Expr.Audio[S] /* AudioGraphemeElem[S] */ = ph()
-    val or: Grapheme.Expr.Audio[S] /* Obj.T[S, AudioGraphemeElem] */ = oh()
+    val pr: AudioCue.Obj[S] /* AudioGraphemeElem[S] */ = ph()
+    val or: AudioCue.Obj[S] /* Obj.T[S, AudioGraphemeElem] */ = oh()
 
     println(s"If this compiles, $pr and $or are fine.")
   }
