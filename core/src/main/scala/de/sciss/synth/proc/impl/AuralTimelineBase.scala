@@ -1,3 +1,16 @@
+/*
+ *  AuralTimelineBase.scala
+ *  (SoundProcesses)
+ *
+ *  Copyright (c) 2010-2015 Hanns Holger Rutz. All rights reserved.
+ *
+ *	This software is published under the GNU General Public License v2+
+ *
+ *
+ *  For further information, please contact Hanns Holger Rutz at
+ *  contact@sciss.de
+ */
+
 package de.sciss.synth.proc
 package impl
 
@@ -40,45 +53,102 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   // ---- impl ----
 
+  private[this] var tlObserver: Disposable[S#Tx] = _
+
   final def typeID: Int = Timeline.typeID
 
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
 
-  protected def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
+  protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
     BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
 
-  /** Called during `play`. Sub-classes should intersect
-    * the current elements and for each of them call `playView`.
-    */
-  protected def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = ???
+  protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
+    val toStart = intersect(timeRef.frame)
+    playViews(toStart, timeRef, target)
+  }
 
-  /** Called during preparation of armed elements. This
-    * happens either during initial `prepare` or during grid-events.
-    * Given the `prepareSpan`, the sub-class should
-    *
-    * - find the elements using an `intersect`
-    * - for each build a view and store in the `viewMap` as well as its view-tree (if maintained)
-    * - for each view call `prepareChild`
-    * - accumulate the results of `prepareChild` into a `Map` that is returned.
-    *
-    * The map will become part of `IPreparing`. The returned `Boolean` indicates
-    * if elements were found (`true`) or not (`false`).
-    */
-  protected def processPrepare(prepareSpan: Span, timeRef: Apply)
-                              (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = ???
+  @inline
+  private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf] =
+    BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
-  /** If the sub-type maintains a tree structure for the views, this method
-    * should simply clear that structure without performing any additional clean-up on the views.
-    */
-  protected def clearViewsTree()(implicit tx: S#Tx): Unit = ???
+  protected final def processPrepare(prepareSpan: Span, timeRef: Apply)
+                                    (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
+    val tl          = obj()
+    // search for new regions starting within the look-ahead period
+    val it          = tl.rangeSearch(start = prepareSpan, stop = Span.All)
+    val reschedule  = it.nonEmpty
+    val prepObs     = prepareFromIterator(timeRef, it)
+    (prepObs, reschedule)
+  }
 
-  /** Called when a next interesting frame has been reached.
-    * The method should look for and invoke the events such as
-    * starting or stopping a view.
-    */
-  protected def processEvent(timeRef: Apply)(implicit tx: S#Tx): Unit = ???
+  // consumes the iterator
+  private[this] def prepareFromIterator(timeRef: TimeRef.Apply, it: Iterator[Timeline.Leaf[S]])
+                                       (implicit tx: S#Tx): Map[Elem, Disposable[S#Tx]] =
+    it.flatMap { case (span, elems) =>
+      val childTime = timeRef.intersect(span)
+      val sub: Vec[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) Vector.empty else {
+        val childViews = elems.map { timed =>
+          val child     = timed.value
+          val childView = makeView(child)
+          viewMap.put(timed.id, childView)  // XXX TODO -- yeah, not nice inside a `map`
+          (tx.newHandle(timed.id), childView)
+        }
+        tree.add(span -> childViews)(iSys(tx))
+        childViews.flatMap { case (_, childView) =>
+          prepareChild(childView, childTime)
+        } // (breakOut)
+      }
+      sub
+    } .toMap // (breakOut)
 
-  private[this] var tlObserver: Disposable[S#Tx] = _
+  protected final def clearViewsTree()(implicit tx: S#Tx): Unit =
+    tree.clear()(iSys(tx))
+
+  protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
+    val (toStart, toStop) = eventsAt(timeRef.frame)
+
+    // this is a pretty tricky decision...
+    // do we first free the stopped views and then launch the started ones?
+    // or vice versa?
+    //
+    // we stick now to stop-then-start because it seems advantageous
+    // for aural-attr-target as we don't build up unnecessary temporary
+    // attr-set/attr-map synths. however, I'm not sure this doesn't
+    // cause a problem where the stop action schedules on immediate
+    // bundle and the start action requires a sync'ed bundle? or is
+    // this currently prevented automatically? we might have to
+    // reverse this decision.
+
+    //        playViews(toStart, tr, play.target)
+    //        stopAndDisposeViews(toStop)
+
+    stopAndDisposeViews(toStop)
+    playViews(toStart, timeRef, play.target)
+  }
+
+  private[this] def stopAndDisposeViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
+    // logA("timeline - stopViews")
+    implicit val itx: I#Tx = iSys(tx)
+    // Note: `toList` makes sure the iterator is not
+    // invalidated when `stopAndDisposeView` removes element from `tree`!
+    if (it.hasNext) it.toList.foreach { case (span, views) =>
+      views.foreach { case (_, view) => stopAndDisposeView(span, view) }
+    }
+  }
+
+  private[this] def playViews(it: Iterator[Leaf], timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit =
+    if (it.hasNext) it.foreach { case (span, views) =>
+      val tr = timeRef.intersect(span)
+      views.foreach { case (idH, elem) =>
+        playView(idH(), elem, tr, target)
+      }
+    }
+
+  // this can be easily implemented with two rectangular range searches
+  // return: (things-that-start, things-that-stop)
+  @inline
+  private[this] def eventsAt(frame: Long)(implicit tx: S#Tx): (Iterator[Leaf], Iterator[Leaf]) =
+    BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
 
   def init(tl: Timeline[S])(implicit tx: S#Tx): this.type = {
     tlObserver = tl.changed.react { implicit tx => upd =>
@@ -226,16 +296,6 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       case _ =>
     }
   }
-
-//  private[this] def stopAndDisposeViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
-//    // logA("timeline - stopViews")
-//    implicit val itx: I#Tx = iSys(tx)
-//    // Note: `toList` makes sure the iterator is not
-//    // invalidated when `stopAndDisposeView` removes element from `tree`!
-//    if (it.hasNext) it.toList.foreach { case (span, views) =>
-//      views.foreach { case (_, view) => stopAndDisposeView(span, view) }
-//    }
-//  }
 
   private[this] def stopAndDisposeView(span: SpanLike, view: Elem)(implicit tx: S#Tx): Unit = {
     logA(s"timeline - stopAndDispose - $span - $view")

@@ -1,5 +1,5 @@
 /*
- *  AuralScheduledImpl.scala
+ *  AuralScheduledBase.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2015 Hanns Holger Rutz. All rights reserved.
@@ -86,7 +86,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * The method should look for and invoke the events such as
     * starting or stopping a view.
     */
-  protected def processEvent(timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit
+  protected def processEvent(play: IPlaying, timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit
 
   /** If the sub-type maintains a tree structure for the views, this method
     * should simply clear that structure without performing any additional clean-up on the views.
@@ -292,7 +292,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     internalState match {
       case play: IPlaying =>
         val tr = play.timeRef.updateFrame(frame)
-        processEvent(tr)
+        processEvent(play, tr)
         scheduleNextEvent(frame)
       case _ =>
     }

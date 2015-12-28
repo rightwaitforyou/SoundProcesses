@@ -1,5 +1,5 @@
 /*
- *  AuralTimelineImpl.scala
+ *  AuralTimelineBase_OLD.scala
  *  (SoundProcesses)
  *
  *  Copyright (c) 2010-2015 Hanns Holger Rutz. All rights reserved.
