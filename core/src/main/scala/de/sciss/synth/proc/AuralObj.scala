@@ -14,7 +14,7 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
-import de.sciss.lucre.expr.Expr
+import de.sciss.lucre.expr.{SpanLikeObj, Expr}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Obj, TxnLike, Sys}
 import de.sciss.lucre.synth.{NodeRef, Sys => SSys}
@@ -113,8 +113,8 @@ object AuralObj {
     trait Manual[S <: Sys[S]] extends Timeline[S] {
       // def addObject   (timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
       // def removeObject(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Unit
-      def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit
-      def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit
+      def addObject   (id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit
+      def removeObject(id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit
     }
 
     sealed trait Update[S <: Sys[S]] {

@@ -17,23 +17,19 @@ package impl
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.geom.LongPoint2D
-import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Disposable, IdentifierMap, Obj, TxnLike}
+import de.sciss.lucre.stm.{Disposable, IdentifierMap, TxnLike}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
 import de.sciss.synth.proc.{logAural => logA}
 
-import scala.collection.immutable.{IndexedSeq => Vec}
 import scala.concurrent.stm.{Ref, TSet}
 
 object AuralScheduledBase {
-  type Leaf[S <: Sys[S], Elem] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
-
   private final val LOOK_AHEAD  = (1.0 * TimeRef.SampleRate).toLong  // one second. XXX TODO -- make configurable
   private final val STEP_GRID   = (0.5 * TimeRef.SampleRate).toLong  // XXX TODO -- make configurable
 
-  private final class Scheduled(val token: Int, val frame: Long) {
+  final class Scheduled(val token: Int, val frame: Long) {
     override def toString = s"[token = $token, frame = $frame / ${TimeRef.framesToSecs(frame)}]"
     def isEmpty: Boolean = token == -1
   }
@@ -41,44 +37,66 @@ object AuralScheduledBase {
   @inline
   def spanToPoint(span: SpanLike): LongPoint2D = BiGroupImpl.spanToPoint(span)
 }
-trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[S, Target]]
-  extends /* AuralObj.Scheduled.Manual[S] with */ ObservableImpl[S, AuralView.State] { impl =>
+trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
+  extends ObservableImpl[S, AuralView.State] { impl =>
 
   import TxnLike.peer
 
-  //  private[this] implicit def itx(implicit tx: S#Tx): I#Tx = iSys(tx)
-
-  private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
-
   // ---- abstract ----
 
-// TTT
-//  def obj: stm.Source[S#Tx, Scheduled[S]]
-//
-//  protected def tree: SkipOctree[I, LongSpace.TwoDim, (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])]
-
+  /** A map from the model object's identifier to its view.
+    * This should be created upon initialization of the sub-class.
+    * It will be cleared in `dispose`.
+    */
   protected def viewMap: IdentifierMap[S#ID, S#Tx, Elem]
 
   implicit protected val context: AuralContext[S]
 
-  protected def iSys: S#Tx => I#Tx
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewAdded`.
+    */
+  protected def viewAdded(timed: S#ID, view: Elem)(implicit tx: S#Tx): Unit
 
-  protected def makeView   (obj: Obj[S]                 )(implicit tx: S#Tx): Elem
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewRemoved`.
+    */
+  protected def viewRemoved(view: Elem)(implicit tx: S#Tx): Unit
 
-  //  protected def prepareView(view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  //  protected def playView   (view: Elem, timeRef: TimeRef)(implicit tx: S#Tx): Unit
-  //  protected def stopView   (view: Elem                  )(implicit tx: S#Tx): Unit
+  /** Called during preparation of armed elements. This
+    * happens either during initial `prepare` or during grid-events.
+    * Given the `prepareSpan`, the sub-class should
+    *
+    * - find the elements using an `intersect`
+    * - for each build a view and store in the `viewMap` as well as its view-tree (if maintained)
+    * - for each view call `prepareChild`
+    * - accumulate the results of `prepareChild` into a `Map` that is returned.
+    *
+    * The map will become part of `IPreparing`. The returned `Boolean` indicates
+    * if elements were found (`true`) or not (`false`).
+    */
+  protected def processPrepare(prepareSpan: Span, timeRef: TimeRef.Apply)
+                              (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean)
 
-  protected def viewAdded  (timed: S#ID, view: Elem     )(implicit tx: S#Tx): Unit
-  protected def viewRemoved(             view: Elem     )(implicit tx: S#Tx): Unit
+  /** Called during `play`. Sub-classes should intersect
+    * the current elements and for each of them call `playView`.
+    */
+  protected def processPlay(timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit
 
-  protected def processEvent  (timeRef: TimeRef.Apply                )(implicit tx: S#Tx): Unit
-  protected def processPlay   (timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit
-  protected def processPrepare(timeRef: TimeRef.Apply                )(implicit tx: S#Tx): Map[Elem, Disposable[S#Tx]]
-  protected def processGrid   (searchSpan: Span)(implicit tx: S#Tx): Boolean
+  /** Called when a next interesting frame has been reached.
+    * The method should look for and invoke the events such as
+    * starting or stopping a view.
+    */
+  protected def processEvent(timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit
 
+  /** If the sub-type maintains a tree structure for the views, this method
+    * should simply clear that structure without performing any additional clean-up on the views.
+    */
   protected def clearViewsTree()(implicit tx: S#Tx): Unit
 
+  /** Report the next interesting frame greater than the given frame for which
+    * `eventReached` (internal) and `processEvent` will be called.
+    * If no such event exists, the method must return `Long.MaxValue`.
+    */
   protected def eventAfter(frame: Long)(implicit tx: S#Tx): Long
 
   // ---- impl ----
@@ -118,227 +136,54 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
     def external = Playing
   }
 
-  // TTT final def typeID: Int = Scheduled.typeID
-
   import context.{scheduler => sched}
 
   private[this] val internalRef       = Ref[InternalState](IStopped)
   private[this] val prepareSpanRef    = Ref(Span(0L, 0L))
 
   private[this] val playingViews      = TSet.empty[Elem]
-// TTT
-//  private[this] var tlObserver        = null: Disposable[S#Tx]
   private[this] val schedEvtToken     = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
   private[this] val schedGridToken    = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
 
   final def state(implicit tx: S#Tx): AuralView.State = internalRef().external
 
   protected final def internalState(implicit tx: S#Tx): InternalState = internalRef()
+  protected final def internalState_=(value: InternalState)(implicit tx: S#Tx): Unit = internalRef() = value
 
-  final def views(implicit tx: S#Tx): Set[Elem] = playingViews.single.toSet
+  final def views(implicit tx: S#Tx): Set[Elem] = playingViews.toSet
 
-// TTT
-//  final def getView(timed: Scheduled.Timed[S])(implicit tx: S#Tx): Option[Elem] = viewMap.get(timed.id)
+  // ---- utility methods for sub-types ----
 
-// TTT
-//  def init(tl: Scheduled[S])(implicit tx: S#Tx): this.type = {
-//    tlObserver = tl.changed.react { implicit tx => upd =>
-//      upd.changes.foreach {
-//        case Scheduled.Added  (span, timed)    => elemAdded  (timed.id, span, timed.value)
-//        case Scheduled.Removed(span, timed)    => elemRemoved(timed.id, span, timed.value)
-//        case Scheduled.Moved  (spanCh, timed)  =>
-//          // for simplicity just remove and re-add
-//          // ; in the future this could be optimized
-//          // (e.g., not deleting and re-creating the AuralObj)
-//          elemRemoved(timed.id, spanCh.before, timed.value)
-//          elemAdded  (timed.id, spanCh.now   , timed.value)
-//      }
-//    }
-//    this
-//  }
-
-// TTT
-//  final def addObject   (id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit =
-//    elemAdded  (id, span.value, obj)
-//
-//  final def removeObject(id: S#ID, span: Expr[S, SpanLike], obj: Obj[S])(implicit tx: S#Tx): Unit =
-//    elemRemoved(id, span.value, obj)
-
-// TTT
-//  private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-//    val st = internalState
-//    if (st.external == Stopped || !span.overlaps(prepareSpanRef())) return
-//
-//    logA(s"timeline - elemAdded($span, $obj)")
-//
-//    // create a view for the element and add it to the tree and map
-//    val childView = makeView(obj) // AuralObj(obj)
-//    viewMap.put(tid, childView)
-//    tree.transformAt(spanToPoint(span)) { opt =>
-//      // import expr.IdentifierSerializer
-//      val tup       = (tx.newHandle(tid), childView)
-//      val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
-//      Some(newViews)
-//    } (iSys(tx))
-//
-//    st match {
-//      case prep: IPreparing =>
-//        val childTime = prep.timeRef.intersect(span)
-//        val prepOpt   = prepareChild(childView, childTime)
-//        prepOpt.foreach { case (_, childObs) =>
-//          val map1      = prep.map + (childView -> childObs)
-//          val prep1     = prep.copy(map = map1)
-//          internalRef() = prep1
-//          val st0       = prep.external
-//          if (st0 == Prepared) fire(Preparing)
-//        }
-//
-//      case play: IPlaying =>
-//        // calculate current frame
-//        val tr0           = play.shiftTo(sched.time)
-//
-//        // if we're playing and the element span intersects contains
-//        // the current frame, play that new element
-//        val currentFrame  = tr0.frame
-//        val elemPlays     = span.contains(currentFrame)
-//
-//        if (elemPlays) {
-//          val tr1 = tr0.intersect(span)
-//          playView(tid, childView, tr1, play.target)
-//        }
-//
-//        // re-validate the next scheduling position
-//        val oldSched    = schedEvtToken()
-//        val oldTarget   = oldSched.frame
-//        val reschedule  = if (elemPlays) {
-//          // reschedule if the span has a stop and elem.stop < oldTarget
-//          span match {
-//            case hs: Span.HasStop => hs.stop < oldTarget
-//            case _ => false
-//          }
-//        } else {
-//          // reschedule if the span has a start and that start is greater than the current frame,
-//          // and elem.start < oldTarget
-//          span match {
-//            case hs: Span.HasStart => hs.start > currentFrame && hs.start < oldTarget
-//            case _ => false
-//          }
-//        }
-//
-//        if (reschedule) {
-//          logA("...reschedule")
-//          scheduleNextEvent(currentFrame)
-//        }
-//
-//      case _ => assert(false, st)
-//    }
-//  }
-
-// TTT
-//  private[this] def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit =
-//    viewMap.get(tid).foreach { view =>
-//      // finding the object in the view-map implies that it
-//      // is currently preparing or playing
-//      logA(s"timeline - elemRemoved($span, $obj)")
-//      elemRemoved1(tid, span, obj, view)
-//    }
-
-// TTT
-//  private[this] def elemRemoved1(tid: S#ID, span: SpanLike, obj: Obj[S], childView: Elem)
-//                                (implicit tx: S#Tx): Unit = {
-//    // remove view for the element from tree and map
-//    viewMap.remove(tid)
-//    stopAndDisposeView(span, childView)
-//    internalState match {
-//      case _: IPreparing =>
-//        childPreparedOrRemoved(childView) // might change state to `Prepared`
-//
-//      case play: IPlaying =>
-//        // TODO - a bit of DRY re elemAdded
-//        // calculate current frame
-//        val tr0           = play.shiftTo(sched.time)
-//        val currentFrame  = tr0.frame
-//
-//        // if we're playing and the element span intersects contains
-//        // the current frame, play that new element
-//        val elemPlays     = span.contains(currentFrame)
-//
-//        // re-validate the next scheduling position
-//        val oldSched    = schedEvtToken()
-//        val oldTarget   = oldSched.frame
-//        val reschedule  = if (elemPlays) {
-//          // reschedule if the span has a stop and elem.stop == oldTarget
-//          span match {
-//            case hs: Span.HasStop => hs.stop == oldTarget
-//            case _ => false
-//          }
-//        } else {
-//          // reschedule if the span has a start and that start is greater than the current frame,
-//          // and elem.start == oldTarget
-//          span match {
-//            case hs: Span.HasStart => hs.start > currentFrame && hs.start == oldTarget
-//            case _ => false
-//          }
-//        }
-//
-//        if (reschedule) {
-//          logA("...reschedule")
-//          scheduleNextEvent(currentFrame)
-//        }
-//
-//      case _ =>
-//    }
-//  }
-
-  final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-    if (state != Stopped) return
-    val tForce    = timeRef.force
-    val newState  = prepareNoFire(tForce)
-    fire(newState.external)
+  /** Should be called from `processPlay`. It calls `play` on the view
+    * and adds it to the list of playing views. Finally it calls `viewAdded`.
+    * Note: `timeRef` must already have been updated through
+    * appropriate intersection.
+    */
+  protected final def playView(timed: S#ID, view: Elem, timeRef: TimeRef, target: Target)
+                              (implicit tx: S#Tx): Unit = {
+    logA(s"timeline - playView: $timed - $timeRef")
+    view.play(timeRef, target)
+    playingViews.add(view)
+    viewAdded(timed, view)
   }
 
-  private[this] def prepareNoFire(timeRef: TimeRef.Apply)(implicit tx: S#Tx): InternalState = {
-// TTT
-//    val tl            = obj()
-    val startFrame    = timeRef.frame
-    val stopFrame     = startFrame + LOOK_AHEAD + STEP_GRID
-    val prepareSpan   = Span(startFrame, stopFrame)
-
-    // this can happen if `play` is called with a
-    // different `timeRef` from what was previously prepared
-    /* TTT if (!tree.isEmpty(iSys(tx))) */ freeNodesAndCancelSchedule()
-
-// TTT
-//    val it            = tl.intersect(prepareSpan)
-    val prepObs: Map[Elem, Disposable[S#Tx]] = processPrepare(timeRef) // prepareFromIterator(timeRef, it)
-
-    val st            = new IPreparing(prepObs, timeRef)
-    internalRef()     = st
-    prepareSpanRef()  = prepareSpan
-    st
+  /** Should be called from `processEvent` for views that should be
+    * stopped and disposed. The caller is responsible for removing
+    * the view also from a view-tree if such structure is maintained.
+    * This method ends by calling `viewRemoved`.
+    */
+  protected final def stopView(view: Elem)(implicit tx: S#Tx): Unit = {
+    view.stop()
+    view.dispose()
+    playingViews.remove(view)
+    viewRemoved(view)
   }
 
-// TTT
-//  // consumes the iterator
-//  private[this] def prepareFromIterator(timeRef: TimeRef.Apply, it: Iterator[Scheduled.Leaf[S]])
-//                                       (implicit tx: S#Tx): Map[Elem, Disposable[S#Tx]] =
-//    it.flatMap { case (span, elems) =>
-//      val childTime = timeRef.intersect(span)
-//      val sub: Vec[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) Vector.empty else {
-//        val childViews = elems.map { timed =>
-//          val child     = timed.value
-//          val childView = makeView(child)
-//          viewMap.put(timed.id, childView)  // XXX TODO -- yeah, not nice inside a `map`
-//          (tx.newHandle(timed.id), childView)
-//        }
-//        tree.add(span -> childViews)(iSys(tx))
-//        childViews.flatMap { case (_, childView) =>
-//          prepareChild(childView, childTime)
-//        } // (breakOut)
-//      }
-//      sub
-//    } .toMap // (breakOut)
-
+  /** Should be called from `processPrepare`. If the child can be instantly
+    * prepared, `None` is returned. Otherwise the child is observed until it
+    * is prepared and the method returns `Some(elem, observer)` that must
+    * be passed back from `processPrepare` (they'll show up in `IPreparing`).
+    */
   protected final def prepareChild(childView: Elem, childTime: TimeRef)
                                   (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
     logA(s"timeline - prepare $childView - $childTime")
@@ -354,7 +199,7 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
   }
 
   // called by `prepareChild` for each child view when it becomes ready
-  private[this] def childPreparedOrRemoved(childView: Elem)(implicit tx: S#Tx): Unit =
+  protected final def childPreparedOrRemoved(childView: Elem)(implicit tx: S#Tx): Unit =
     internalState match {
       case prep: IPreparing =>
         prep.map.get(childView).foreach { obs =>
@@ -368,7 +213,43 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
       case _ =>
     }
 
-  def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
+  // ----
+
+  final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    if (state != Stopped) return
+    val tForce    = timeRef.force
+    val newState  = prepareNoFire(tForce)
+    fire(newState.external)
+  }
+
+  /* Makes sure no more nodes are playing, then calls `processPrepare`.
+   * Finally sets internal state to `IPreparing` and updates `prepareSpanRef`.
+   */
+  private[this] def prepareNoFire(timeRef: TimeRef.Apply)(implicit tx: S#Tx): InternalState = {
+    val startFrame    = timeRef.frame
+    val stopFrame     = startFrame + LOOK_AHEAD + STEP_GRID
+    val prepareSpan   = Span(startFrame, stopFrame)
+
+    // this can happen if `play` is called with a
+    // different `timeRef` from what was previously prepared
+    /* TTT if (!tree.isEmpty(iSys(tx))) */ freeNodesAndCancelSchedule()
+
+    val (prepObs, _)  = processPrepare(prepareSpan, timeRef)
+
+    val st            = new IPreparing(prepObs, timeRef)
+    internalRef()     = st
+    prepareSpanRef()  = prepareSpan
+    st
+  }
+
+  protected final def scheduledEvent()(implicit tx: S#Tx): Scheduled  = schedEvtToken()
+  protected final def prepareSpan   ()(implicit tx: S#Tx): Span       = prepareSpanRef()
+
+  /** Ensures state is consistent, then checks preparation of children.
+    * If all is good, sets internal state to `IPlaying` and calls `processPlay`.
+    * Next instructs scheduler and sets external state to `Playing`.
+    */
+  final def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
     val st = state
     if (st == Playing) return
 
@@ -387,61 +268,10 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
     fire(Playing)
   }
 
-// TTT
-//  private[this] def playViews(it: Iterator[Leaf], timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit =
-//    if (it.hasNext) it.foreach { case (span, views) =>
-//      val tr = timeRef.intersect(span)
-//      views.foreach(view => playView(view._1(), view._2, tr, target))
-//    }
-
-  // note: `timeRef` should already have been updated
-  protected final def playView(timed: S#ID, view: Elem, timeRef: TimeRef, target: Target)
-                              (implicit tx: S#Tx): Unit = {
-    logA(s"timeline - playView: $timed - $timeRef")
-    view.play(timeRef, target)
-    playingViews.add(view)
-    viewAdded(timed, view)
-  }
-
-// TTT
-//  private[this] def stopAndDisposeViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
-//    // logA("timeline - stopViews")
-//    implicit val itx: I#Tx = iSys(tx)
-//    // Note: `toList` makes sure the iterator is not
-//    // invalidated when `stopAndDisposeView` removes element from `tree`!
-//    if (it.hasNext) it.toList.foreach { case (span, views) =>
-//      views.foreach { case (_, view) => stopAndDisposeView(span, view) }
-//    }
-//  }
-
-// TTT
-//  private[this] def stopAndDisposeView(span: SpanLike, view: Elem)(implicit tx: S#Tx): Unit = {
-//    logA(s"timeline - stopAndDispose - $span - $view")
-//
-//    // note: this doesn't have to check for `IPreparing`, as it is called only
-//    // via `eventReached`, thus during playing. correct?
-//
-//    view.stop()
-//    view.dispose()
-//
-//    playingViews  .remove(view)
-//    // preparingViews.remove(view).foreach(_.dispose())
-//    tree.transformAt(spanToPoint(span)) { opt =>
-//      opt.flatMap { case (span1, views) =>
-//        val i = views.indexWhere(_._2 == view)
-//        val views1 = if (i >= 0) {
-//          views.patch(i, Nil, 1)
-//        } else {
-//          Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
-//          views
-//        }
-//        if (views1.isEmpty) None else Some(span1 -> views1)
-//      }
-//    } (iSys(tx))
-//    viewRemoved(view)
-//  }
-
-  private[this] def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
+  /** Calls `eventAfter` to determine the next interesting frame. If that
+    * frame exists, schedules the execution of `eventReached`.
+    */
+  protected final def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
     val targetFrame = eventAfter(currentFrame)
     val token = if (targetFrame == Long.MaxValue) -1 else {
       logA(s"timeline - scheduleNextEvent($currentFrame) -> $targetFrame")
@@ -454,6 +284,9 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
     if (oldSched.token != -1) sched.cancel(oldSched.token)
   }
 
+  /* Processes next interesting event that has been reached. If the internal
+   * state is playing, calls `processEvent` followed by `scheduleNextEvent`.
+   */
   private[this] def eventReached(frame: Long)(implicit tx: S#Tx): Unit = {
     logA(s"timeline - eventReached($frame)")
     internalState match {
@@ -465,6 +298,7 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
     }
   }
 
+  /* Schedules ahead `STEP_GRID` frames to execute `gridReached`. */
   private[this] def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
     val targetTime  = sched.time   + STEP_GRID
     val targetFrame = currentFrame + STEP_GRID
@@ -475,24 +309,20 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
     schedGridToken() = new Scheduled(token, targetFrame)
   }
 
+  /* If internal state is playing, calls `processPrepare` with the new prepare-span.
+   * That is `LOOK_AHEAD` ahead of the `frame` we stopped at.
+   */
   private[this] def gridReached(frame: Long)(implicit tx: S#Tx): Unit = {
     logA(s"timeline - gridReached($frame)")
     internalState match {
       case play: IPlaying =>
-        val startFrame  = frame       + LOOK_AHEAD
-        val stopFrame   = startFrame  + STEP_GRID
-        val prepareSpan = Span(frame, stopFrame)
-        prepareSpanRef() = prepareSpan
-        val searchSpan  = Span(startFrame, stopFrame)
-        val reschedule  = processGrid(searchSpan)
-// TTT
-//        val tl          = obj()
-//        // search for new regions starting within the look-ahead period
-//        val it          = tl.rangeSearch(start = searchSpan, stop = Span.All)
-//        val tr0         = play.shiftTo(sched.time)
-//        val reschedule  = it.nonEmpty
-//        prepareFromIterator(tr0, it)
-        //      println(s"tree.size = ${tree.size(iSys(tx))}")
+        val startFrame      = frame       + LOOK_AHEAD
+        val stopFrame       = startFrame  + STEP_GRID
+        val prepareSpan     = Span(frame, stopFrame)
+        prepareSpanRef()    = prepareSpan
+        val searchSpan      = Span(startFrame, stopFrame)
+        val tr0             = play.shiftTo(sched.time)
+        val (_, reschedule) = processPrepare(searchSpan, tr0)
         // XXX TODO -- a refinement could look for eventAfter,
         // however then we need additional fiddling around in
         // `elemAdded` and `elemRemoved`...
@@ -506,48 +336,35 @@ trait AuralScheduledBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView
     }
   }
 
-  def stop()(implicit tx: S#Tx): Unit = if (state != Stopped) {
+  final def stop()(implicit tx: S#Tx): Unit = if (state != Stopped) {
     freeNodesAndCancelSchedule()
     fire(Stopped)
   }
 
+  /** Sub-classes may override this and call `super.dispose()`
+    * if they wish to free additional observers, e.g. the
+    * timeline or grapheme observer.
+    */
   def dispose()(implicit tx: S#Tx): Unit = {
-// TTT
-//    if (tlObserver != null) tlObserver.dispose()
     freeNodesAndCancelSchedule()
     // XXX TODO - we really need an iterator for id-map
-    // viewMap.foreach { view => contents.fire(AuralObj.Scheduled.ViewRemoved(this, view)) }
+    // viewMap.foreach { view => contents.fire(AuralObj.Timeline.ViewRemoved(this, view)) }
     viewMap.dispose()
   }
 
+  /* Stops playing views and disposes them. Cancels scheduled actions.
+   * Then calls `clearViewsTree`. Puts internal state to `IStopped`.
+   */
   private[this] def freeNodesAndCancelSchedule()(implicit tx: S#Tx): Unit = {
-    // implicit val itx = iSys(tx)
-
     playingViews.foreach { view =>
-      view.stop() // stopView   (view) // view.stop()
-      viewRemoved(view) // contents.viewRemoved(view)
+      view.stop()
+      viewRemoved(view)
     }
     sched.cancel(schedEvtToken ().token)
     sched.cancel(schedGridToken().token)
-    playingViews   .clear()
-// TTT
-//    tree           .clear()(iSys(tx))
+    playingViews.clear()
     clearViewsTree()
 
     internalRef.swap(IStopped).dispose()
   }
-
-  // ---- bi-group functionality TODO - DRY ----
-
-// TTT
-//  @inline
-//  private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf] =
-//    BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
-
-// TTT
-//  // this can be easily implemented with two rectangular range searches
-//  // return: (things-that-start, things-that-stop)
-//  @inline
-//  private[this] def eventsAt(frame: Long)(implicit tx: S#Tx): (Iterator[Leaf], Iterator[Leaf]) =
-//    BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
 }

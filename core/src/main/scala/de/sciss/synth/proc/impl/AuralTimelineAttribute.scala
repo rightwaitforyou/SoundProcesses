@@ -18,7 +18,7 @@ import de.sciss.lucre.bitemp.BiGroup
 import de.sciss.lucre.data.SkipOctree
 import de.sciss.lucre.geom.LongSpace
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{TxnLike, IdentifierMap, Obj}
+import de.sciss.lucre.stm.{Disposable, TxnLike, IdentifierMap, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.synth.proc.AuralAttribute.{Factory, Observer}
 
