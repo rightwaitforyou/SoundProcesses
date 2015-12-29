@@ -17,7 +17,7 @@ package impl
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.geom.LongPoint2D
-import de.sciss.lucre.stm.{Disposable, IdentifierMap, TxnLike}
+import de.sciss.lucre.stm.{Disposable, TxnLike}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
@@ -44,30 +44,20 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   // ---- abstract ----
 
-  /** A map from the model object's identifier to its view.
-    * This should be created upon initialization of the sub-class.
-    * It will be cleared in `dispose`.
-    */
-  protected def viewMap: IdentifierMap[S#ID, S#Tx, Elem]
+  //  /** A map from the model object's identifier to its view.
+  //    * This should be created upon initialization of the sub-class.
+  //    * It will be cleared in `dispose`.
+  //    */
+  //  protected def viewMap: IdentifierMap[S#ID, S#Tx, Elem]
 
   implicit protected val context: AuralContext[S]
-
-  /** A notification method that may be used to `fire` an event
-    * such as `AuralObj.Timeline.ViewAdded`.
-    */
-  protected def viewAdded(timed: S#ID, view: Elem)(implicit tx: S#Tx): Unit
-
-  /** A notification method that may be used to `fire` an event
-    * such as `AuralObj.Timeline.ViewRemoved`.
-    */
-  protected def viewRemoved(view: Elem)(implicit tx: S#Tx): Unit
 
   /** Called during preparation of armed elements. This
     * happens either during initial `prepare` or during grid-events.
     * Given the `prepareSpan`, the sub-class should
     *
     * - find the elements using an `intersect`
-    * - for each build a view and store in the `viewMap` as well as its view-tree (if maintained)
+    * - for each build a view and store it somewhere
     * - for each view call `prepareChild`
     * - accumulate the results of `prepareChild` into a `Map` that is returned.
     *
@@ -98,6 +88,11 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * If no such event exists, the method must return `Long.MaxValue`.
     */
   protected def eventAfter(frame: Long)(implicit tx: S#Tx): Long
+
+  /** An opaque type passed into `playView` that may be used by an overriding implementation.
+    * Otherwise it may simply be set to `Unit`.
+    */
+  protected type ViewID
 
   // ---- impl ----
 
@@ -155,28 +150,31 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   // ---- utility methods for sub-types ----
 
   /** Should be called from `processPlay`. It calls `play` on the view
-    * and adds it to the list of playing views. Finally it calls `viewAdded`.
+    * and adds it to the list of playing views.
     * Note: `timeRef` must already have been updated through
     * appropriate intersection.
+    *
+    * Sub-classes may override this if they call `super.playView`
     */
-  protected final def playView(timed: S#ID, view: Elem, timeRef: TimeRef, target: Target)
-                              (implicit tx: S#Tx): Unit = {
-    logA(s"timeline - playView: $timed - $timeRef")
+  protected def playView(id: ViewID, view: Elem, timeRef: TimeRef, target: Target)
+                        (implicit tx: S#Tx): Unit = {
+    logA(s"timeline - playView: $view - $timeRef")
     view.play(timeRef, target)
     playingViews.add(view)
-    viewAdded(timed, view)
+    // viewAdded(timed, view)
   }
 
   /** Should be called from `processEvent` for views that should be
     * stopped and disposed. The caller is responsible for removing
     * the view also from a view-tree if such structure is maintained.
-    * This method ends by calling `viewRemoved`.
+    * NOT: This method ends by calling `viewRemoved`.
     */
-  protected final def stopView(view: Elem)(implicit tx: S#Tx): Unit = {
+  protected def stopView(view: Elem)(implicit tx: S#Tx): Unit = {
+    logA(s"timeline - stopView: $view")
     view.stop()
     view.dispose()
     playingViews.remove(view)
-    viewRemoved(view)
+    // viewRemoved(view)
   }
 
   /** Should be called from `processPrepare`. If the child can be instantly
@@ -345,24 +343,20 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * if they wish to free additional observers, e.g. the
     * timeline or grapheme observer.
     */
-  def dispose()(implicit tx: S#Tx): Unit = {
+  def dispose()(implicit tx: S#Tx): Unit =
     freeNodesAndCancelSchedule()
-    // XXX TODO - we really need an iterator for id-map
-    // viewMap.foreach { view => contents.fire(AuralObj.Timeline.ViewRemoved(this, view)) }
-    viewMap.dispose()
-  }
 
   /* Stops playing views and disposes them. Cancels scheduled actions.
    * Then calls `clearViewsTree`. Puts internal state to `IStopped`.
    */
   private[this] def freeNodesAndCancelSchedule()(implicit tx: S#Tx): Unit = {
     playingViews.foreach { view =>
-      view.stop()
-      viewRemoved(view)
+      stopView(view)
     }
     sched.cancel(schedEvtToken ().token)
     sched.cancel(schedGridToken().token)
-    playingViews.clear()
+    assert(playingViews.isEmpty)
+    // playingViews.clear()
     clearViewsTree()
 
     internalRef.swap(IStopped).dispose()

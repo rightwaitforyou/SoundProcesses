@@ -58,6 +58,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   final def typeID: Int = Grapheme.typeID
 
+  protected type ViewID = Unit
+
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
 
   protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
@@ -98,7 +100,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val sub: Option[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) None else {
       val childView = makeView(child)
       val id        = child.id
-      viewMap.put(id, childView)  // XXX TODO -- yeah, not nice inside a `map`
+      ??? // viewMap.put(id, childView)  // XXX TODO -- yeah, not nice inside a `map`
       // (tx.newHandle(id), childView)
       ??? // tree.add(span -> childViews)(iSys(tx))
       prepareChild(childView, childTime)
@@ -145,7 +147,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     if (it.hasNext) it.foreach { case (span, views) =>
       val tr = timeRef.intersect(span)
       views.foreach { case (idH, elem) =>
-        playView(idH(), elem, tr, target)
+        playView((), elem, tr, target)
       }
     }
 
@@ -158,7 +160,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   def init(tl: Grapheme[S])(implicit tx: S#Tx): this.type = {
     grObserver = tl.changed.react { implicit tx => upd =>
       upd.changes.foreach {
-        case Grapheme.Added  (time, entry)    => ??? // elemAdded  (timed.id, span, timed.value)
+        case Grapheme.Added  (time, entry)    => elemAdded  (???, time, entry.value)
         case Grapheme.Removed(time, entry)    => ??? // elemRemoved(timed.id, span, timed.value)
         case Grapheme.Moved  (timeCh, entry)  =>
           // for simplicity just remove and re-add
@@ -172,23 +174,20 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     this
   }
 
-//  final def getView(timed: Grapheme.Timed[S])(implicit tx: S#Tx): Option[Elem] = viewMap.get(timed.id)
+  private[this] def elemAdded(tid: S#ID, start: Long, obj: Obj[S])(implicit tx: S#Tx): Unit = {
+    val st    = internalState
+    if (st.external == Stopped) return
+    val gr    = this.obj()
+    val stop  = gr.eventAfter(start)
+    val span  = stop.fold[SpanLike](Span.from(start))(Span(start, _))
 
-  final def addObject(id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit =
-    elemAdded(id, span.value, obj)
-
-  final def removeObject(id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit =
-    elemRemoved(id, span.value, obj)
-
-  private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-    val st = internalState
-    if (st.external == Stopped || !span.overlaps(prepareSpan())) return
+    if (!span.overlaps(prepareSpan())) return
 
     logA(s"timeline - elemAdded($span, $obj)")
 
     // create a view for the element and add it to the tree and map
     val childView = makeView(obj) // AuralObj(obj)
-    viewMap.put(tid, childView)
+    ??? // viewMap.put(tid, childView)
     tree.transformAt(spanToPoint(span)) { opt =>
       // import expr.IdentifierSerializer
       val tup       = (tx.newHandle(tid), childView)
@@ -219,12 +218,12 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
         if (elemPlays) {
           val tr1 = tr0.intersect(span)
-          playView(tid, childView, tr1, play.target)
+          playView((), childView, tr1, play.target)
         }
 
         // re-validate the next scheduling position
         val oldSched    = scheduledEvent() // schedEvtToken()
-      val oldTarget   = oldSched.frame
+        val oldTarget   = oldSched.frame
         val reschedule  = if (elemPlays) {
           // reschedule if the span has a stop and elem.stop < oldTarget
           span match {
@@ -249,18 +248,20 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  private[this] def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit =
-    viewMap.get(tid).foreach { view =>
-      // finding the object in the view-map implies that it
-      // is currently preparing or playing
-      logA(s"timeline - elemRemoved($span, $obj)")
-      elemRemoved1(tid, span, obj, view)
-    }
+  private[this] def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
+    ???
+//    viewMap.get(tid).foreach { view =>
+//      // finding the object in the view-map implies that it
+//      // is currently preparing or playing
+//      logA(s"timeline - elemRemoved($span, $obj)")
+//      elemRemoved1(tid, span, obj, view)
+//    }
+  }
 
   private[this] def elemRemoved1(tid: S#ID, span: SpanLike, obj: Obj[S], childView: Elem)
                                 (implicit tx: S#Tx): Unit = {
     // remove view for the element from tree and map
-    viewMap.remove(tid)
+    ??? // viewMap.remove(tid)
     stopAndDisposeView(span, childView)
     internalState match {
       case _: IPreparing =>

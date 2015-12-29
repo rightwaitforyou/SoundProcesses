@@ -20,7 +20,7 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.SpanLikeObj
 import de.sciss.lucre.geom.{LongPoint2D, LongSpace}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Disposable, Obj}
+import de.sciss.lucre.stm.{IdentifierMap, Disposable, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc.AuralView.{Preparing, Prepared, Stopped}
@@ -51,13 +51,38 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected def makeView(obj: Obj[S])(implicit tx: S#Tx): Elem
 
+  protected def viewMap: IdentifierMap[S#ID, S#Tx, Elem]
+
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewAdded`.
+    */
+  protected def viewAdded(timed: S#ID, view: Elem)(implicit tx: S#Tx): Unit
+
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewRemoved`.
+    */
+  protected def viewRemoved(view: Elem)(implicit tx: S#Tx): Unit
+
   // ---- impl ----
 
   private[this] var tlObserver: Disposable[S#Tx] = _
 
   final def typeID: Int = Timeline.typeID
 
+  protected type ViewID = S#ID
+
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
+
+  override protected def stopView(view: Elem)(implicit tx: S#Tx): Unit = {
+    super.stopView(view)
+    viewRemoved(view)
+  }
+
+  override protected def playView(id: S#ID, view: Elem, timeRef: TimeRef, target: Target)
+                                 (implicit tx: S#Tx): Unit = {
+    super.playView(id, view, timeRef, target)
+    viewAdded(id, view)
+  }
 
   protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
     BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
