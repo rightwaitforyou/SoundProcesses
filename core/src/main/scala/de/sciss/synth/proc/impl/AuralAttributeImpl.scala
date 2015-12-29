@@ -136,6 +136,8 @@ object AuralAttributeImpl {
     def typeID = IntObj.typeID
 
     protected def mkValue(value: Int): AuralAttribute.Value = value.toFloat
+
+    override def toString = s"IntAttribute($key)@${hashCode.toHexString}"
   }
 
   // ------------------- DoubleObj ------------------- 
@@ -156,6 +158,8 @@ object AuralAttributeImpl {
     def typeID = DoubleObj.typeID
 
     protected def mkValue(value: Double): AuralAttribute.Value = value.toFloat
+
+    override def toString = s"DoubleAttribute($key)@${hashCode.toHexString}"
   }
 
   // ------------------- BooleanObj ------------------- 
@@ -176,6 +180,8 @@ object AuralAttributeImpl {
     def typeID = BooleanObj.typeID
 
     protected def mkValue(value: Boolean): AuralAttribute.Value = if (value) 1f else 0f
+
+    override def toString = s"BooleanAttribute($key)@${hashCode.toHexString}"
   }
 
   // ------------------- FadeSpec.Obj ------------------- 
@@ -203,6 +209,8 @@ object AuralAttributeImpl {
         case _                    => 0f
       }, spec.floor
     )
+
+    override def toString = s"FadeSpecAttribute($key)@${hashCode.toHexString}"
   }
 
   // ------------------- DoubleVector ------------------- 
@@ -225,55 +233,9 @@ object AuralAttributeImpl {
     def preferredNumChannels(implicit tx: S#Tx): Int = obj().value.size
 
     protected def mkValue(vec: Vec[Double]): AuralAttribute.Value = vec.map(_.toFloat)
+
+    override def toString = s"DoubleVectorAttribute($key)@${hashCode.toHexString}"
   }
-
-  // ------------------- AudioGrapheme ------------------- 
-
-//  private[this] object AudioGraphemeAttribute extends Factory {
-//    type Repr[S <: stm.Sys[S]] = Grapheme.Expr.Audio[S]
-//
-//    def typeID = Grapheme.Expr.Audio.typeID
-//
-//    def apply[S <: Sys[S]](value: Grapheme.Expr.Audio[S])
-//                          (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
-//      new AudioGraphemeAttribute().init(value)
-//  }
-//  private[this] final class AudioGraphemeAttribute[S <: Sys[S]]()
-//                                                               (implicit context: AuralContext[S])
-//    extends AuralAttribute[S] {
-//
-//    def preferredNumChannels(implicit tx: S#Tx): Int = audioH().value.numChannels
-//
-//    def init(audio: Grapheme.Expr.Audio[S])(implicit tx: S#Tx): this.type = {
-//      ...
-//    }
-//
-//    def play(timeRef: TimeRef, builder: AuralAttributeTarget, numChannels: Int)(implicit tx: S#Tx): Unit = {
-//      val ctlName   = graph.Attribute.controlName(key)
-//        val audioVal  = a.value
-//        val spec      = audioVal.spec
-//        if (spec.numFrames != 1) {
-//          sys.error(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
-//          // Console.err.println(s"Audio grapheme $a must have exactly 1 frame to be used as scalar attribute")
-//          // throw MissingIn(AttributeKey(key))
-//        }
-//        val numCh = spec.numChannels // numChL.toInt
-//        if (numCh > 4096) sys.error(s"Audio grapheme size ($numCh) must be <= 4096 to be used as scalar attribute")
-//        chanCheck(numCh)
-//        val bus = Bus.control(server, numCh)
-//        val res = BusNodeSetter.mapper(ctlName, bus, b.node)
-//        b.addUser(res)
-//        val w = AudioArtifactScalarWriter(bus, audioVal)
-//        b.addResource(w)
-//      ...
-//    }
-//
-//    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ...
-//
-//    def dispose()(implicit tx: S#Tx): Unit = {
-//      ...
-//    }
-//  }
 }
 trait AuralAttributeImpl[S <: Sys[S]] extends AuralAttribute[S] with ObservableImpl[S, AuralView.State] {
   import TxnLike.peer

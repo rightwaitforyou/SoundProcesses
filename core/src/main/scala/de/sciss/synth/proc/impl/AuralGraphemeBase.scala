@@ -66,26 +66,34 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  protected final def processPrepare(prepareSpan: Span, timeRef: Apply, initial: Boolean)
+  protected final def processPrepare(span: Span, timeRef: Apply, initial: Boolean)
                                     (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
-    val gr = obj()
+    val gr    = obj()
+    val opt0  = if (initial) gr.floor(span.start) else gr.ceil(span.start)
+    opt0.fold(Map.empty[Elem, Disposable[S#Tx]] -> false) { e0 =>
+      @tailrec
+      def loop(start: Long, child: Obj[S], m: Map[Elem, Disposable[S#Tx]]): Map[Elem, Disposable[S#Tx]] = {
+        gr.ceil(start + 1) match {
+          case Some(succ) =>
+            val stop      = succ.key.value
+            val childSpan = Span(start, stop)
+            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
+            val mNext     = prepObs.fold(m)(m + _)
+            if (stop < span.stop)
+              loop(start = stop, child = succ.value, m = mNext)
+            else
+              mNext
 
-    ??? // initial
-
-    // search for new elements starting within the look-ahead period
-    @tailrec
-    def loop(frame: Long, m: Map[Elem, Disposable[S#Tx]], reschedule: Boolean): (Map[Elem, Disposable[S#Tx]], Boolean) =
-      gr.ceil(frame) match {
-        case Some(entry) =>
-          val frame2 = entry.key.value
-          if (!prepareSpan.contains(frame2)) (m, reschedule) else {
-            val prepObs = prepareFromEntry(timeRef, ???, entry.value)
-            loop(frame2 + 1, prepObs.fold(m)(m + _), reschedule = true)
-          }
-        case None => (m, reschedule)
+          case None =>
+            val childSpan = Span.from(start)
+            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
+            val mNext     = prepObs.fold(m)(m + _)
+            mNext
+        }
       }
 
-    loop(prepareSpan.start, Map.empty, reschedule = false)
+      loop(e0.key.value, e0.value, Map.empty) -> true
+    }
   }
 
   private[this] def prepareFromEntry(timeRef: TimeRef.Apply, span: SpanLike, child: Obj[S])
@@ -109,24 +117,6 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       .head
     playView1(toStart, timeRef, play.target)
   }
-
-//  private[this] def stopAndDisposeViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
-//    // logA("timeline - stopViews")
-//    implicit val itx: I#Tx = iSys(tx)
-//    // Note: `toList` makes sure the iterator is not
-//    // invalidated when `stopAndDisposeView` removes element from `tree`!
-//    if (it.hasNext) it.toList.foreach { case (span, views) =>
-//      views.foreach { case (_, view) => stopAndDisposeView(span, view) }
-//    }
-//  }
-//
-//  private[this] def playViews(it: Iterator[Leaf], timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit =
-//    if (it.hasNext) it.foreach { case (span, views) =>
-//      val tr = timeRef.intersect(span)
-//      views.foreach { case (idH, elem) =>
-//        playView((), elem, tr, target)
-//      }
-//    }
 
   def init(tl: Grapheme[S])(implicit tx: S#Tx): this.type = {
     grObserver = tl.changed.react { implicit tx => upd =>

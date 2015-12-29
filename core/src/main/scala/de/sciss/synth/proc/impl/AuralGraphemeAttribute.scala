@@ -84,25 +84,25 @@ final class AuralGraphemeAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
       return cache
     }
 
-    val timeline  = obj()
-    val time0     = timeline.firstEvent.getOrElse(-1L)
+    val gr      = obj()
+    val time0   = gr.firstEvent.getOrElse(-1L)
     if (time0 < 0L) {
       // println(s"preferredNumChannels - empty: -1")
       return -1
     }
 
-    val entries = timeline.intersect(time0)
+    val entries = gr.intersect(time0)
     if (entries.isEmpty) {
       // println(s"preferredNumChannels - empty: -1")
       return -1
     }
 
-    val elems = ??? : Vector[Obj[S]] // entries.flatMap(_._2.map(_.value)).toVector
+    val elems = entries.map(_.value)  // _2.map(_.value)).toVector
     val views = elems.map(makeView)
     prefChansElemRef.swap(views).foreach(_.dispose())
 
     @tailrec
-    def loop(views: Vector[Elem], res: Int): Int = views match {
+    def loop(views: Vec[Elem], res: Int): Int = views match {
       case head +: tail =>
         val ch = head.preferredNumChannels
         // if there is any child with `-1` (undefined), we have to return
