@@ -20,7 +20,7 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.AuralView.{Prepared, Preparing, Stopped}
+import de.sciss.synth.proc.AuralView.{Prepared, Preparing}
 import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
@@ -31,6 +31,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   extends AuralScheduledBase[S, Target, Elem] with ObservableImpl[S, AuralView.State] { impl =>
 
   import context.{scheduler => sched}
+  import AuralScheduledBase.LOOK_AHEAD
 
   // ---- abstract ----
 
@@ -147,19 +148,23 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   private[this] def elemAdded(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = {
-    val st    = internalState
-    if (st.external == Stopped) return
+    val st = internalState
+    if (st == IStopped) return
     val gr    = this.obj()
     val stop  = gr.eventAfter(start)
     val span  = stop.fold[SpanLike](Span.from(start))(Span(start, _))
     val prepS = prepareSpan()
 
-    if (!span.overlaps(prepS)) {
-      if (start > prepS.start) {  // check if we need to reschedule grid
-        val oldGrid = scheduledGrid()
-        if (oldGrid.isEmpty || span.contains(oldGrid.frame + AuralScheduledBase.LOOK_AHEAD)) {
-          ???
-        }
+    if (!span.overlaps(prepS)) {            // we don't need to prepare or play it.
+      if (start > prepS.start) st match {   // but we have to check if we need to reschedule grid.
+        case play: IPlaying =>
+          val oldGrid = scheduledGrid()
+          if (oldGrid.isEmpty || start < oldGrid.frame + LOOK_AHEAD) {
+            val tr0           = play.shiftTo(sched.time)
+            val currentFrame  = tr0.frame
+            scheduleNextGrid(currentFrame)
+          }
+        case _ =>
       }
       return
     }
@@ -209,7 +214,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         // re-validate the next scheduling position
         val oldEvt      = scheduledEvent() // schedEvtToken()
         val oldEvtFrame = oldEvt.frame
-        val reschedule  = if (elemPlays) {
+        val schedEvt    = if (elemPlays) {
           // reschedule if the span has a stop and elem.stop < oldTarget
           span match {
             case hs: Span.HasStop => hs.stop < oldEvtFrame
@@ -224,9 +229,19 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
           }
         }
 
-        if (reschedule) {
-          logA("...reschedule")
+        if (schedEvt) {
+          logA("...reschedule event")
           scheduleNextEvent(currentFrame)
+        }
+
+        val schedGrid = !elemPlays && start > prepS.start && {
+          val oldGrid = scheduledGrid()
+          oldGrid.isEmpty || start < oldGrid.frame + LOOK_AHEAD
+        }
+
+        if (schedGrid) {
+          logA("...reschedule grid")
+          scheduleNextGrid(currentFrame)
         }
 
       case _ => assert(false, st)

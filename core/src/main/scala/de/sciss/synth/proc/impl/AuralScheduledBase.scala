@@ -26,8 +26,11 @@ import de.sciss.synth.proc.{logAural => logA}
 import scala.concurrent.stm.{Ref, TSet}
 
 object AuralScheduledBase {
-  final val LOOK_AHEAD          = (1.0 * TimeRef.SampleRate).toLong  // one second. XXX TODO -- make configurable
-  private final val STEP_GRID   = (0.5 * TimeRef.SampleRate).toLong  // XXX TODO -- make configurable
+  final         val LOOK_AHEAD      = (1.0 * TimeRef.SampleRate).toLong  // one second. XXX TODO -- make configurable
+  private final val PREP_FRAMES     = (0.5 * TimeRef.SampleRate).toLong  // XXX TODO -- make configurable
+  private final val LOOK_STOP       = LOOK_AHEAD + PREP_FRAMES
+
+  private val EmptyScheduled = new Scheduled(-1, Long.MaxValue)
 
   final class Scheduled(val token: Int, val frame: Long) {
     override def toString = s"[token = $token, frame = $frame / ${TimeRef.framesToSecs(frame)}]"
@@ -116,19 +119,23 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   // ---- impl ----
 
-  import AuralScheduledBase.{LOOK_AHEAD, STEP_GRID, Scheduled}
+  import AuralScheduledBase.{LOOK_AHEAD, PREP_FRAMES, LOOK_STOP, Scheduled, EmptyScheduled}
 
   protected sealed trait InternalState extends Disposable[S#Tx] {
     def external: AuralView.State
   }
 
-  protected object IStopped extends InternalState {
+  protected case object IStopped extends InternalState {
     def dispose()(implicit tx: S#Tx): Unit = ()
     def external = Stopped
   }
 
+  protected sealed trait ITimedState extends InternalState {
+    def timeRef: TimeRef
+  }
+
   protected final class IPreparing(val map: Map[Elem, Disposable[S#Tx]], val timeRef: TimeRef)
-    extends InternalState {
+    extends ITimedState {
 
     def copy(map: Map[Elem, Disposable[S#Tx]]): IPreparing = new IPreparing(map, timeRef)
 
@@ -140,7 +147,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   }
 
   protected final class IPlaying(val wallClock: Long, val timeRef: TimeRef.Apply, val target: Target)
-    extends InternalState {
+    extends ITimedState {
 
     override def toString = s"IPlaying($wallClock, $timeRef, $target)"
 
@@ -157,8 +164,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   private[this] val prepareSpanRef    = Ref[Span.HasStart](Span(0L, 0L))
 
   private[this] val playingViews      = TSet.empty[Elem]
-  private[this] val schedEvtToken     = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
-  private[this] val schedGridToken    = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
+  private[this] val schedEvtToken     = Ref(EmptyScheduled)
+  private[this] val schedGridToken    = Ref(EmptyScheduled)
 
   final def state(implicit tx: S#Tx): AuralView.State = internalRef().external
 
@@ -245,7 +252,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    */
   private[this] def prepareNoFire(timeRef: TimeRef.Apply)(implicit tx: S#Tx): InternalState = {
     val startFrame    = timeRef.frame
-    val stopFrame     = startFrame + LOOK_AHEAD + STEP_GRID
+    val stopFrame     = startFrame + LOOK_STOP
     val prepareSpan   = Span(startFrame, stopFrame)
 
     // this can happen if `play` is called with a
@@ -275,14 +282,14 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     val tForce    = timeRef.force
     val frame     = timeRef.frame
 
-    if (st == Stopped || prepareSpanRef() != Span(frame, frame + LOOK_AHEAD + STEP_GRID)) prepareNoFire(tForce)
+    if (st == Stopped || prepareSpanRef() != Span(frame, frame + LOOK_STOP)) prepareNoFire(tForce)
 
     val st1 = new IPlaying(sched.time, tForce, target)
     internalRef.swap(st1).dispose()
 
     processPlay(tForce, target)
     scheduleNextEvent(frame)
-    scheduleNextGrid_OLD (frame)
+    scheduleNextGrid (frame)
 
     fire(Playing)
   }
@@ -317,17 +324,17 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
-  protected final def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
-    ???
-  }
-
   /* Schedules ahead `STEP_GRID` frames to execute `gridReached`. */
-  private[this] def scheduleNextGrid_OLD(currentFrame: Long)(implicit tx: S#Tx): Unit = {
-    val targetTime  = sched.time   + STEP_GRID
-    val targetFrame = currentFrame + STEP_GRID
-    logA(s"timeline - scheduleNextGrid($currentFrame) -> $targetFrame")
-    val token       = sched.schedule(targetTime) { implicit tx =>
-      gridReached(frame = targetFrame)
+  protected final def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
+    val modelFrame  = modelEventAfter(currentFrame + LOOK_STOP - 1)
+    val targetFrame = if (modelFrame  == Long.MaxValue) Long.MaxValue else modelFrame - LOOK_AHEAD
+    val token       = if (targetFrame == Long.MaxValue) -1 else {
+      val targetTime  = sched.time + (targetFrame - currentFrame)
+      // val targetFrame = currentFrame + STEP_GRID
+      logA(s"timeline - scheduleNextGrid($currentFrame) -> $targetFrame")
+      sched.schedule(targetTime) { implicit tx =>
+        gridReached(frame = targetFrame)
+      }
     }
     val oldSched = schedGridToken.swap(new Scheduled(token, targetFrame))
     if (oldSched.token != -1) sched.cancel(oldSched.token)
@@ -341,7 +348,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     internalState match {
       case play: IPlaying =>
         val startFrame      = frame       + LOOK_AHEAD
-        val stopFrame       = startFrame  + STEP_GRID
+        val stopFrame       = startFrame  + PREP_FRAMES
         val prepareSpan     = Span(frame, stopFrame)
         prepareSpanRef()    = prepareSpan
         val searchSpan      = Span(startFrame, stopFrame)
@@ -350,7 +357,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
         // XXX TODO -- a refinement could look for eventAfter,
         // however then we need additional fiddling around in
         // `elemAdded` and `elemRemoved`...
-        scheduleNextGrid_OLD(frame)
+        scheduleNextGrid(frame)
         if (prepRes.nonEmpty) {
           logA("...reschedule")
           scheduleNextEvent(frame)
