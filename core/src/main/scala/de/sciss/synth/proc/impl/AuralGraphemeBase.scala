@@ -15,15 +15,14 @@ package de.sciss.synth.proc
 package impl
 
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
-import de.sciss.lucre.data.SkipOctree
+import de.sciss.lucre.data.{SkipList, SkipOctree}
 import de.sciss.lucre.event.impl.ObservableImpl
-import de.sciss.lucre.expr.SpanLikeObj
 import de.sciss.lucre.geom.{LongPoint2D, LongSpace}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.AuralView.{Preparing, Prepared, Stopped}
+import de.sciss.synth.proc.AuralView.{Prepared, Preparing, Stopped}
 import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
@@ -31,7 +30,7 @@ import scala.annotation.tailrec
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 object AuralGraphemeBase {
-  type Leaf[S <: Sys[S], Elem] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
+  type Leaf[S <: Sys[S], Elem] = Vec[(stm.Source[S#Tx, S#ID], Elem)]
 
   @inline
   def spanToPoint(span: SpanLike): LongPoint2D = BiGroupImpl.spanToPoint(span)
@@ -46,7 +45,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   def obj: stm.Source[S#Tx, Grapheme[S]]
 
-  protected def tree: SkipOctree[I, LongSpace.TwoDim, (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])]
+  // protected def tree: SkipOctree[I, LongSpace.TwoDim, (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])]
+  protected def tree: SkipList.Map[I, Long, Vec[(stm.Source[S#Tx, S#ID], Elem)]]
 
   protected def iSys: S#Tx => I#Tx
 
@@ -63,7 +63,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
 
   protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
-    BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
+    ??? // BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
 
   protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
     val toStart = intersect(timeRef.frame)
@@ -71,8 +71,10 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   @inline
-  private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf] =
-    BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
+  private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf] = {
+    // tree.floor(frame)
+    ??? // BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
+  }
 
   protected final def processPrepare(prepareSpan: Span, timeRef: Apply)
                                     (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
@@ -109,7 +111,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   protected final def clearViewsTree()(implicit tx: S#Tx): Unit =
-    tree.clear()(iSys(tx))
+    ??? // tree.clear()(iSys(tx))
 
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
     val (toStart, toStop) = eventsAt(timeRef.frame)
@@ -129,7 +131,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     //        playViews(toStart, tr, play.target)
     //        stopAndDisposeViews(toStop)
 
-    stopAndDisposeViews(toStop)
+    ??? // views.foreach(stopAndDisposeView)
     playViews(toStart, timeRef, play.target)
   }
 
@@ -155,12 +157,12 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   // return: (things-that-start, things-that-stop)
   @inline
   private[this] def eventsAt(frame: Long)(implicit tx: S#Tx): (Iterator[Leaf], Iterator[Leaf]) =
-    BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
+    ??? // BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
 
   def init(tl: Grapheme[S])(implicit tx: S#Tx): this.type = {
     grObserver = tl.changed.react { implicit tx => upd =>
       upd.changes.foreach {
-        case Grapheme.Added  (time, entry)    => elemAdded  (???, time, entry.value)
+        case Grapheme.Added  (time, entry)    => elemAdded(time, entry.value)
         case Grapheme.Removed(time, entry)    => ??? // elemRemoved(timed.id, span, timed.value)
         case Grapheme.Moved  (timeCh, entry)  =>
           // for simplicity just remove and re-add
@@ -168,13 +170,13 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
           // (e.g., not deleting and re-creating the AuralObj)
           ???
 //          elemRemoved(timed.id, spanCh.before, timed.value)
-//          elemAdded  (timed.id, spanCh.now   , timed.value)
+          elemAdded(timeCh.now, entry.value)
       }
     }
     this
   }
 
-  private[this] def elemAdded(tid: S#ID, start: Long, obj: Obj[S])(implicit tx: S#Tx): Unit = {
+  private[this] def elemAdded(start: Long, obj: Obj[S])(implicit tx: S#Tx): Unit = {
     val st    = internalState
     if (st.external == Stopped) return
     val gr    = this.obj()
@@ -185,15 +187,21 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
     logA(s"timeline - elemAdded($span, $obj)")
 
-    // create a view for the element and add it to the tree and map
-    val childView = makeView(obj) // AuralObj(obj)
-    ??? // viewMap.put(tid, childView)
-    tree.transformAt(spanToPoint(span)) { opt =>
-      // import expr.IdentifierSerializer
-      val tup       = (tx.newHandle(tid), childView)
-      val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
-      Some(newViews)
-    } (iSys(tx))
+    // Create a view for the element.
+    val childView = makeView(obj)
+
+    // because the assertion is with the span overlap
+    // that internal state is either preparing or playing,
+    // the view will always be stored, either in
+    // `IPreparing` (XXX TODO: NOT) or in `playingViews`.
+    //
+    //    viewMap.put(tid, childView)
+    //    tree.transformAt(spanToPoint(span)) { opt =>
+    //      // import expr.IdentifierSerializer
+    //      val tup       = (tx.newHandle(tid), childView)
+    //      val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
+    //      Some(newViews)
+    //    } (iSys(tx))
 
     st match {
       case prep: IPreparing =>
@@ -218,6 +226,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
         if (elemPlays) {
           val tr1 = tr0.intersect(span)
+          views.foreach(stopView) // there ought to be either zero or one view
           playView((), childView, tr1, play.target)
         }
 
@@ -311,18 +320,19 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     // via `eventReached`, thus during playing. correct?
 
     // preparingViews.remove(view).foreach(_.dispose())
-    tree.transformAt(spanToPoint(span)) { opt =>
-      opt.flatMap { case (span1, views) =>
-        val i = views.indexWhere(_._2 == view)
-        val views1 = if (i >= 0) {
-          views.patch(i, Nil, 1)
-        } else {
-          Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
-          views
-        }
-        if (views1.isEmpty) None else Some(span1 -> views1)
-      }
-    } (iSys(tx))
+    ???
+//    tree.transformAt(spanToPoint(span)) { opt =>
+//      opt.flatMap { case (span1, views) =>
+//        val i = views.indexWhere(_._2 == view)
+//        val views1 = if (i >= 0) {
+//          views.patch(i, Nil, 1)
+//        } else {
+//          Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
+//          views
+//        }
+//        if (views1.isEmpty) None else Some(span1 -> views1)
+//      }
+//    } (iSys(tx))
 
     stopView(view)
   }
