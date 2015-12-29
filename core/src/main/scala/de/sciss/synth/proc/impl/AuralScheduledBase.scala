@@ -26,7 +26,7 @@ import de.sciss.synth.proc.{logAural => logA}
 import scala.concurrent.stm.{Ref, TSet}
 
 object AuralScheduledBase {
-  private final val LOOK_AHEAD  = (1.0 * TimeRef.SampleRate).toLong  // one second. XXX TODO -- make configurable
+  final val LOOK_AHEAD          = (1.0 * TimeRef.SampleRate).toLong  // one second. XXX TODO -- make configurable
   private final val STEP_GRID   = (0.5 * TimeRef.SampleRate).toLong  // XXX TODO -- make configurable
 
   final class Scheduled(val token: Int, val frame: Long) {
@@ -71,7 +71,15 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     *                 start no earlier than `prepareSpan`.
     */
   protected def processPrepare(prepareSpan: Span, timeRef: TimeRef.Apply, initial: Boolean)
-                              (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean)
+                              (implicit tx: S#Tx): PrepareResult
+
+  /** The result of `processPrepare`.
+    *
+    * @param async      the views whose preparation is ongoing (view and observer pairs)
+    * @param nonEmpty   `true` if at least one view was prepared, `false` otherwise
+    */
+  protected final class PrepareResult(val async: Map[Elem, Disposable[S#Tx]],
+                                      val nonEmpty: Boolean)
 
   /** Called during `play`. Sub-classes should intersect
     * the current elements and for each of them call `playView`.
@@ -94,6 +102,12 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * If no such event exists, the method must return `Long.MaxValue`.
     */
   protected def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long
+
+  /** Report the next interesting frame greater than the given frame for which
+    * `gridReached` (internal) and `processPrepare` will be called.
+    * If no such event exists, the method must return `Long.MaxValue`.
+    */
+  protected def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long
 
   /** An opaque type passed into `playView` that may be used by an overriding implementation.
     * Otherwise it may simply be set to `Unit`.
@@ -140,7 +154,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   import context.{scheduler => sched}
 
   private[this] val internalRef       = Ref[InternalState](IStopped)
-  private[this] val prepareSpanRef    = Ref(Span(0L, 0L))
+  private[this] val prepareSpanRef    = Ref[Span.HasStart](Span(0L, 0L))
 
   private[this] val playingViews      = TSet.empty[Elem]
   private[this] val schedEvtToken     = Ref(new Scheduled(-1, Long.MaxValue))   // (-1, MaxValue) indicate no scheduled function
@@ -238,16 +252,17 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     // different `timeRef` from what was previously prepared
     /* TTT if (!tree.isEmpty(iSys(tx))) */ freeNodesAndCancelSchedule()
 
-    val (prepObs, _)  = processPrepare(prepareSpan, timeRef, initial = true)
+    val prepRes       = processPrepare(prepareSpan, timeRef, initial = true)
 
-    val st            = new IPreparing(prepObs, timeRef)
+    val st            = new IPreparing(prepRes.async, timeRef)
     internalRef()     = st
-    prepareSpanRef()  = prepareSpan
+    prepareSpanRef()  = prepareSpan // if (prepRes.nextStart != Long.MaxValue) Span(startFrame, prepRes.nextStart) else Span.from(startFrame)
     st
   }
 
-  protected final def scheduledEvent()(implicit tx: S#Tx): Scheduled  = schedEvtToken()
-  protected final def prepareSpan   ()(implicit tx: S#Tx): Span       = prepareSpanRef()
+  protected final def scheduledEvent()(implicit tx: S#Tx): Scheduled      = schedEvtToken()
+  protected final def scheduledGrid ()(implicit tx: S#Tx): Scheduled      = schedGridToken()
+  protected final def prepareSpan   ()(implicit tx: S#Tx): Span.HasStart  = prepareSpanRef()
 
   /** Ensures state is consistent, then checks preparation of children.
     * If all is good, sets internal state to `IPlaying` and calls `processPlay`.
@@ -267,7 +282,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     processPlay(tForce, target)
     scheduleNextEvent(frame)
-    scheduleNextGrid (frame)
+    scheduleNextGrid_OLD (frame)
 
     fire(Playing)
   }
@@ -302,15 +317,20 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
+  protected final def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
+    ???
+  }
+
   /* Schedules ahead `STEP_GRID` frames to execute `gridReached`. */
-  private[this] def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
+  private[this] def scheduleNextGrid_OLD(currentFrame: Long)(implicit tx: S#Tx): Unit = {
     val targetTime  = sched.time   + STEP_GRID
     val targetFrame = currentFrame + STEP_GRID
     logA(s"timeline - scheduleNextGrid($currentFrame) -> $targetFrame")
     val token       = sched.schedule(targetTime) { implicit tx =>
       gridReached(frame = targetFrame)
     }
-    schedGridToken() = new Scheduled(token, targetFrame)
+    val oldSched = schedGridToken.swap(new Scheduled(token, targetFrame))
+    if (oldSched.token != -1) sched.cancel(oldSched.token)
   }
 
   /* If internal state is playing, calls `processPrepare` with the new prepare-span.
@@ -326,12 +346,12 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
         prepareSpanRef()    = prepareSpan
         val searchSpan      = Span(startFrame, stopFrame)
         val tr0             = play.shiftTo(sched.time)
-        val (_, reschedule) = processPrepare(searchSpan, tr0, initial = false)
+        val prepRes         = processPrepare(searchSpan, tr0, initial = false)
         // XXX TODO -- a refinement could look for eventAfter,
         // however then we need additional fiddling around in
         // `elemAdded` and `elemRemoved`...
-        scheduleNextGrid(frame)
-        if (reschedule) {
+        scheduleNextGrid_OLD(frame)
+        if (prepRes.nonEmpty) {
           logA("...reschedule")
           scheduleNextEvent(frame)
         }

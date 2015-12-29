@@ -87,6 +87,9 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
     BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
 
+  protected final def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long =
+    obj().eventAfter(frame).getOrElse(Long.MaxValue)
+
   protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
     val toStart = intersect(timeRef.frame)
     playViews(toStart, timeRef, target)
@@ -97,15 +100,16 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
   protected final def processPrepare(span: Span, timeRef: Apply, initial: Boolean)
-                                    (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
+                                    (implicit tx: S#Tx): PrepareResult = {
     val tl          = obj()
     // search for new regions starting within the look-ahead period
     val startSpan   = if (initial) Span.until(span.stop) else span
     val stopSpan    = Span.from(span.start)
     val it          = tl.rangeSearch(start = startSpan, stop = stopSpan)
-    val reschedule  = it.nonEmpty
+    val nonEmpty    = it.nonEmpty
     val prepObs     = prepareFromIterator(timeRef, it)
-    (prepObs, reschedule)
+    // val nextStart   = tl.eventAfter(span.stop - 1).getOrElse(Long.MaxValue)
+    new PrepareResult(async = prepObs, nonEmpty = nonEmpty /* , nextStart = nextStart */)
   }
 
   // consumes the iterator

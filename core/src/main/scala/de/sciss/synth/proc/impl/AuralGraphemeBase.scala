@@ -51,13 +51,11 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected type ViewID = Unit
 
-  protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long = {
-    // println(s"----eventAfter($frame)----")
-    // println(tree.debugPrint()(iSys(tx)))
-    val res = tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
-    // println(s"----res: ${if (res == Long.MaxValue) "INF" else res.toString}----")
-    res
-  }
+  protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
+    tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
+
+  protected final def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long =
+    obj().eventAfter(frame).getOrElse(Long.MaxValue)
 
   protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
@@ -72,15 +70,17 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   protected final def processPrepare(span: Span, timeRef: Apply, initial: Boolean)
-                                    (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
+                                    (implicit tx: S#Tx): PrepareResult = {
     // println(s"processPrepare($span, $timeRef, initial = $initial")
     val gr    = obj()
     val opt0  = if (initial) gr.floor(span.start) else gr.ceil(span.start)
-    opt0.fold(Map.empty[Elem, Disposable[S#Tx]] -> false) { e0 =>
+    opt0.fold(new PrepareResult(Map.empty, nonEmpty = false /* , nextStart = Long.MaxValue */)) { e0 =>
       @tailrec
       def loop(start: Long, child: Obj[S],
-               m: Map[Elem, Disposable[S#Tx]], nonEmpty: Boolean): (Map[Elem, Disposable[S#Tx]], Boolean) =
-        if (start >= span.stop) (m, nonEmpty) else gr.ceil(start + 1) match {
+               m: Map[Elem, Disposable[S#Tx]], nonEmpty: Boolean): PrepareResult =
+        if (start >= span.stop)
+          new PrepareResult(m, nonEmpty = nonEmpty /* , nextStart = start */)
+        else gr.ceil(start + 1) match {
           case Some(succ) =>
             val stop      = succ.key.value
             val childSpan = Span(start, stop)
@@ -92,7 +92,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
             val childSpan = Span.from(start)
             val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
             val mNext     = prepObs.fold(m)(m + _)
-            mNext -> true
+            new PrepareResult(mNext, nonEmpty = true /* , nextStart = Long.MaxValue */)
         }
 
       loop(e0.key.value, e0.value, Map.empty, nonEmpty = false)
@@ -152,8 +152,17 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val gr    = this.obj()
     val stop  = gr.eventAfter(start)
     val span  = stop.fold[SpanLike](Span.from(start))(Span(start, _))
+    val prepS = prepareSpan()
 
-    if (!span.overlaps(prepareSpan())) return
+    if (!span.overlaps(prepS)) {
+      if (start > prepS.start) {  // check if we need to reschedule grid
+        val oldGrid = scheduledGrid()
+        if (oldGrid.isEmpty || span.contains(oldGrid.frame + AuralScheduledBase.LOOK_AHEAD)) {
+          ???
+        }
+      }
+      return
+    }
 
     logA(s"timeline - elemAdded($span, $child)")
 
@@ -198,19 +207,19 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         }
 
         // re-validate the next scheduling position
-        val oldSched    = scheduledEvent() // schedEvtToken()
-        val oldTarget   = oldSched.frame
+        val oldEvt      = scheduledEvent() // schedEvtToken()
+        val oldEvtFrame = oldEvt.frame
         val reschedule  = if (elemPlays) {
           // reschedule if the span has a stop and elem.stop < oldTarget
           span match {
-            case hs: Span.HasStop => hs.stop < oldTarget
+            case hs: Span.HasStop => hs.stop < oldEvtFrame
             case _ => false
           }
         } else {
           // reschedule if the span has a start and that start is greater than the current frame,
           // and elem.start < oldTarget
           span match {
-            case hs: Span.HasStart => hs.start > currentFrame && hs.start < oldTarget
+            case hs: Span.HasStart => hs.start > currentFrame && hs.start < oldEvtFrame
             case _ => false
           }
         }
