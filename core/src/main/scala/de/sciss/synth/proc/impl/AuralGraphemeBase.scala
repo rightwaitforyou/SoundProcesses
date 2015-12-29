@@ -52,10 +52,10 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected type ViewID = Unit
 
   protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long = {
-    println(s"----eventAfter($frame)----")
+    // println(s"----eventAfter($frame)----")
     // println(tree.debugPrint()(iSys(tx)))
     val res = tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
-    println(s"----res: $res----")
+    // println(s"----res: ${if (res == Long.MaxValue) "INF" else res.toString}----")
     res
   }
 
@@ -73,42 +73,40 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected final def processPrepare(span: Span, timeRef: Apply, initial: Boolean)
                                     (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
+    // println(s"processPrepare($span, $timeRef, initial = $initial")
     val gr    = obj()
     val opt0  = if (initial) gr.floor(span.start) else gr.ceil(span.start)
     opt0.fold(Map.empty[Elem, Disposable[S#Tx]] -> false) { e0 =>
       @tailrec
-      def loop(start: Long, child: Obj[S], m: Map[Elem, Disposable[S#Tx]]): Map[Elem, Disposable[S#Tx]] = {
-        gr.ceil(start + 1) match {
+      def loop(start: Long, child: Obj[S],
+               m: Map[Elem, Disposable[S#Tx]], nonEmpty: Boolean): (Map[Elem, Disposable[S#Tx]], Boolean) =
+        if (start >= span.stop) (m, nonEmpty) else gr.ceil(start + 1) match {
           case Some(succ) =>
             val stop      = succ.key.value
             val childSpan = Span(start, stop)
             val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
             val mNext     = prepObs.fold(m)(m + _)
-            if (stop < span.stop)
-              loop(start = stop, child = succ.value, m = mNext)
-            else
-              mNext
+            loop(start = stop, child = succ.value, m = mNext, nonEmpty = true)
 
           case None =>
             val childSpan = Span.from(start)
             val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
             val mNext     = prepObs.fold(m)(m + _)
-            mNext
+            mNext -> true
         }
-      }
 
-      loop(e0.key.value, e0.value, Map.empty) -> true
+      loop(e0.key.value, e0.value, Map.empty, nonEmpty = false)
     }
   }
 
   private[this] def prepareFromEntry(timeRef: TimeRef.Apply, span: Span.HasStart, child: Obj[S])
                                     (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
-    println(s"prepareFromEntry($timeRef, $span, $child)")
+    // println(s"prepareFromEntry($timeRef, $span, $child)")
     val childTime = timeRef.intersect(span)
     val sub: Option[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) None else {
       val childView   = makeView(child)
       val childViews  = Vector.empty :+ childView
-      println(s"tree.add(${span.start}) - prepareFromEntry")
+      // println(s"tree.add(${span.start} -> $childView) - prepareFromEntry")
       tree.add(span.start -> childViews)(iSys(tx))
       prepareChild(childView, childTime)
     }
@@ -116,7 +114,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   protected final def clearViewsTree()(implicit tx: S#Tx): Unit = {
-    println("tree.clear()")
+    // println("tree.clear()")
     tree.clear()(iSys(tx))
   }
 
@@ -170,7 +168,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     //    viewMap.put(tid, childView)
     val oldEntries = tree.get(start)(iSys(tx)).getOrElse(Vector.empty)
     val newEntries = oldEntries :+ childView
-    println(s"tree.add($start) - elemAdded")
+    // println(s"tree.add($start -> $childView) - elemAdded")
     tree.add(start -> newEntries)(iSys(tx))
 
     st match {

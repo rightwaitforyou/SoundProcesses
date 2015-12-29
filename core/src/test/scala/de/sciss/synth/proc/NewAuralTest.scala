@@ -41,8 +41,8 @@ object NewAuralTest extends App {
   }
 }
 class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
-//  showAuralLog      = true
-//  showTransportLog  = true
+  showAuralLog      = true
+  showTransportLog  = true
   // de.sciss.lucre.synth.showLog = true
 
   val as = AuralSystem()
@@ -241,6 +241,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val f1  = DoubleObj.newConst[S](441.0)
       val f2  = out
       val f3  = DoubleObj.newConst[S](661.5)
+      //      val pin = BiPin.Modifiable[S, Obj]
+      //      pin.add(frame(0.0), f1)
+      //      pin.add(frame(2.0), f2)
+      //      pin.add(frame(8.0), f3)
       val pin = Grapheme[S]
       pin.add(LongObj.newConst(frame(0.0)), f1)
       pin.add(LongObj.newConst(frame(2.0)), f2)
