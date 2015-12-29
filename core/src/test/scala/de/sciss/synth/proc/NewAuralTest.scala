@@ -41,8 +41,8 @@ object NewAuralTest extends App {
   }
 }
 class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
-  showAuralLog      = true
-  showTransportLog  = true
+//  showAuralLog      = true
+//  showTransportLog  = true
   // de.sciss.lucre.synth.showLog = true
 
   val as = AuralSystem()

@@ -170,9 +170,12 @@ object SchedulerImpl {
       val reschedule    = targetTime < oldInfo.targetTime
 
       if (reschedule) {   // implies that prio does not have an entry at `timeClip` yet
+        // println(s"............... SCHEDULE t = $targetTime; token = $token - REPLACE")
+        assert(!prio.contains(targetTime))
         prio.add(targetTime -> Set(token))
       } else {
         val newSet = prio.get(targetTime).fold(Set(token))(_ + token)
+        // println(s"............... SCHEDULE t = $targetTime; token = $token - ADD > $newSet")
         prio.add(targetTime -> newSet)
       }
 
@@ -194,19 +197,32 @@ object SchedulerImpl {
       //      } { sch =>
       tokenMap.remove(token).foreach { sch =>
         val t     = sch.time
-        val set0  = prio.get(t).getOrElse(
-          throw new AssertionError(s"Token $token found but no entry at $t in priority queue")
-        )
-        val set1  = set0 - token
-        if (set1.isEmpty) {
-          prio.remove(t)
-          // if entry became empty, see if it was
-          // scheduled; if so, re-submit
-          val info = infoVar()
-          if (info.targetTime == t) scheduleNext()
+        // println(s"............... REMOVED TOKEN $token; t = $t")
 
-        } else {
-          prio.add(t -> set1)
+        // NOTE: the following assertion is wrong.
+        // because in `eventReached`, we remove from prio
+        // first before iterating over the tokens. If
+        // there are two tokens A, B and the function for A
+        // cancels B (invoking `cancel`), then obviously
+        // the `prio.get(t)` will return `None`.
+
+//        val set0  = prio.get(t).getOrElse(
+//          throw new AssertionError(s"Token $token found but no entry at $t in priority queue")
+//        )
+        prio.get(t).foreach { set0 =>
+          val set1  = set0 - token
+          if (set1.isEmpty) {
+            // println(s"............... .... > EMPTY")
+            prio.remove(t)
+            // if entry became empty, see if it was
+            // scheduled; if so, re-submit
+            val info = infoVar()
+            if (info.targetTime == t) scheduleNext()
+
+          } else {
+            // println(s"............... .... > $set1")
+            prio.add(t -> set1)
+          }
         }
       }
     }
@@ -225,8 +241,11 @@ object SchedulerImpl {
       time = t
 
       prio.remove(t).foreach { tokens =>
+        // println(s"............... REMOVED PRIO t = $t; tokens = $tokens")
         tokens.foreach { token =>
+          // println(s"............... .... >>>> TOKEN $token")
           tokenMap.remove(token).foreach { sched =>
+            // println(s"............... .... TOKEN $token")
             try {
               sched.fun(tx)
             } catch {
@@ -235,6 +254,7 @@ object SchedulerImpl {
                 e.printStackTrace()
             }
           }
+          // println(s"............... .... <<<< TOKEN $token")
         }
       }
 

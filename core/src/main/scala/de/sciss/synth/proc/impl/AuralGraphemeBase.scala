@@ -51,8 +51,13 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected type ViewID = Unit
 
-  protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
-    tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
+  protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long = {
+    println(s"----eventAfter($frame)----")
+    // println(tree.debugPrint()(iSys(tx)))
+    val res = tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
+    println(s"----res: $res----")
+    res
+  }
 
   protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
@@ -96,20 +101,24 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  private[this] def prepareFromEntry(timeRef: TimeRef.Apply, span: SpanLike, child: Obj[S])
+  private[this] def prepareFromEntry(timeRef: TimeRef.Apply, span: Span.HasStart, child: Obj[S])
                                     (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
+    println(s"prepareFromEntry($timeRef, $span, $child)")
     val childTime = timeRef.intersect(span)
     val sub: Option[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) None else {
       val childView   = makeView(child)
       val childViews  = Vector.empty :+ childView
-      tree.add(childTime.frame -> childViews)(iSys(tx))
+      println(s"tree.add(${span.start}) - prepareFromEntry")
+      tree.add(span.start -> childViews)(iSys(tx))
       prepareChild(childView, childTime)
     }
     sub
   }
 
-  protected final def clearViewsTree()(implicit tx: S#Tx): Unit =
+  protected final def clearViewsTree()(implicit tx: S#Tx): Unit = {
+    println("tree.clear()")
     tree.clear()(iSys(tx))
+  }
 
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
     val toStart = tree.get(timeRef.frame)(iSys(tx))
@@ -161,6 +170,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     //    viewMap.put(tid, childView)
     val oldEntries = tree.get(start)(iSys(tx)).getOrElse(Vector.empty)
     val newEntries = oldEntries :+ childView
+    println(s"tree.add($start) - elemAdded")
     tree.add(start -> newEntries)(iSys(tx))
 
     st match {
