@@ -63,8 +63,14 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     *
     * The map will become part of `IPreparing`. The returned `Boolean` indicates
     * if elements were found (`true`) or not (`false`).
+    *
+    * @param initial  if `true` this is an initial preparation which means the method
+    *                 must include views that start before `prepareSpan` if their span
+    *                 overlaps with `prepareSpan`. If `false` this is a follow up from
+    *                 `gridReached` and the search must be restricted to views that
+    *                 start no earlier than `prepareSpan`.
     */
-  protected def processPrepare(prepareSpan: Span, timeRef: TimeRef.Apply)
+  protected def processPrepare(prepareSpan: Span, timeRef: TimeRef.Apply, initial: Boolean)
                               (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean)
 
   /** Called during `play`. Sub-classes should intersect
@@ -232,7 +238,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     // different `timeRef` from what was previously prepared
     /* TTT if (!tree.isEmpty(iSys(tx))) */ freeNodesAndCancelSchedule()
 
-    val (prepObs, _)  = processPrepare(prepareSpan, timeRef)
+    val (prepObs, _)  = processPrepare(prepareSpan, timeRef, initial = true)
 
     val st            = new IPreparing(prepObs, timeRef)
     internalRef()     = st
@@ -320,7 +326,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
         prepareSpanRef()    = prepareSpan
         val searchSpan      = Span(startFrame, stopFrame)
         val tr0             = play.shiftTo(sched.time)
-        val (_, reschedule) = processPrepare(searchSpan, tr0)
+        val (_, reschedule) = processPrepare(searchSpan, tr0, initial = false)
         // XXX TODO -- a refinement could look for eventAfter,
         // however then we need additional fiddling around in
         // `elemAdded` and `elemRemoved`...

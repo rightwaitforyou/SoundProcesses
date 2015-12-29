@@ -66,9 +66,11 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  protected final def processPrepare(prepareSpan: Span, timeRef: Apply)
+  protected final def processPrepare(prepareSpan: Span, timeRef: Apply, initial: Boolean)
                                     (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
     val gr = obj()
+
+    ??? // initial
 
     // search for new elements starting within the look-ahead period
     @tailrec

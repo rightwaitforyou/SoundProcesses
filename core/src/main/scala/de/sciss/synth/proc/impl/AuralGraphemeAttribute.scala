@@ -14,11 +14,9 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.bitemp.BiGroup
-import de.sciss.lucre.data.{SkipList, SkipOctree}
-import de.sciss.lucre.geom.LongSpace
+import de.sciss.lucre.data.SkipList
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Disposable, TxnLike, IdentifierMap, Obj}
+import de.sciss.lucre.stm.{IdentifierMap, Obj, TxnLike}
 import de.sciss.lucre.synth.Sys
 import de.sciss.synth.proc.AuralAttribute.{Factory, Observer}
 

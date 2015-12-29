@@ -96,11 +96,13 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf] =
     BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
-  protected final def processPrepare(prepareSpan: Span, timeRef: Apply)
+  protected final def processPrepare(prepareSpan: Span, timeRef: Apply, initial: Boolean)
                                     (implicit tx: S#Tx): (Map[Elem, Disposable[S#Tx]], Boolean) = {
     val tl          = obj()
     // search for new regions starting within the look-ahead period
-    val it          = tl.rangeSearch(start = prepareSpan, stop = Span.All)
+    val startSpan   = if (initial) Span.until(prepareSpan.stop) else prepareSpan
+    val stopSpan    = Span.from(prepareSpan.start)
+    val it          = tl.rangeSearch(start = startSpan, stop = stopSpan)
     val reschedule  = it.nonEmpty
     val prepObs     = prepareFromIterator(timeRef, it)
     (prepObs, reschedule)
