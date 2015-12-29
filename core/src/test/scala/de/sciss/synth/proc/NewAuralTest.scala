@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
-import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
+import de.sciss.lucre.expr.{LongObj, BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.stm.store.BerkeleyDB
@@ -81,6 +81,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test15" => test15()
       case "--test16" => test16()
       case "--test17" => test17()
+      case "--test18" => test18()
       case _         =>
         println("WARNING: No option given, using --test1")
         test1()
@@ -211,6 +212,51 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 18
+
+  def test18()(implicit context: AuralContext[S]): Unit = {
+    println("----test18----")
+    println(
+      """
+        |Expected behaviour:
+        |An attribute should accept a grapheme
+        |with time-varying elements as input.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val p1 = proc {
+        val freq  = graph.Attribute.ar("key")
+        val sin   = SinOsc.ar(freq)
+        Out.ar(0, Pan2.ar(sin * 0.1))
+      }
+
+      val p2 = proc {
+        val freq = LFTri.ar(2).linexp(-1, 1, 441.0, 882.0)
+        graph.ScanOut(freq)
+      }
+      val out = addOutput(p2)
+
+      val f1  = DoubleObj.newConst[S](441.0)
+      val f2  = out
+      val f3  = DoubleObj.newConst[S](661.5)
+      val pin = Grapheme[S]
+      pin.add(LongObj.newConst(frame(0.0)), f1)
+      pin.add(LongObj.newConst(frame(2.0)), f2)
+      pin.add(LongObj.newConst(frame(6.0)), f3)
+
+      val attr = p1.attr
+      attr.put("key", pin)
+
+      val t = Transport[S]
+      t.addObject(p1)
+      t.addObject(p2)
+      t.play()
+
+      stopAndQuit(8.0)
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 17
 

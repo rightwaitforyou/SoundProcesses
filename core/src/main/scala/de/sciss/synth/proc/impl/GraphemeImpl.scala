@@ -52,7 +52,7 @@ object GraphemeImpl {
     }
   }
 
-  def modifiable[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = {
+  def modifiable[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = {
     val targets = evt.Targets[S]
     new Impl[S](targets) {
       val tree: Tree[S, Obj[S]] = newTree()

@@ -47,15 +47,15 @@ object AuralAttributeImpl {
   }
 
   private[this] var map = Map[Int, Factory](
-    IntObj              .typeID -> IntAttribute,
-    DoubleObj           .typeID -> DoubleAttribute,
-    BooleanObj          .typeID -> BooleanAttribute,
-    FadeSpec.Obj        .typeID -> FadeSpecAttribute,
-    DoubleVector        .typeID -> DoubleVectorAttribute,
-//    Grapheme.Expr.Audio .typeID -> AudioGraphemeAttribute,
-    Output              .typeID -> AuralOutputAttribute,
-    Folder              .typeID -> AuralFolderAttribute,
-    Timeline            .typeID -> AuralTimelineAttribute
+    IntObj      .typeID -> IntAttribute,
+    DoubleObj   .typeID -> DoubleAttribute,
+    BooleanObj  .typeID -> BooleanAttribute,
+    FadeSpec    .typeID -> FadeSpecAttribute,
+    DoubleVector.typeID -> DoubleVectorAttribute,
+    Grapheme    .typeID -> AuralGraphemeAttribute,
+    Output      .typeID -> AuralOutputAttribute,
+    Folder      .typeID -> AuralFolderAttribute,
+    Timeline    .typeID -> AuralTimelineAttribute
   )
 
   // private[this] final class PlayRef[S <: Sys[S]](val target: Target)

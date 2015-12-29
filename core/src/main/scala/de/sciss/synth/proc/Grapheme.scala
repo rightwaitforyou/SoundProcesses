@@ -27,7 +27,7 @@ object Grapheme extends Obj.Type {
 
   trait Modifiable[S <: Sys[S]] extends Grapheme[S] with BiPin.Modifiable[S, Obj[S]]
 
-  def apply[S <: Sys[S]](numChannels: Int)(implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S](numChannels)
+  def apply[S <: Sys[S]](implicit tx: S#Tx): Modifiable[S] = Impl.modifiable[S]
 
   object Modifiable {
     def read[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Modifiable[S] =
@@ -46,6 +46,18 @@ object Grapheme extends Obj.Type {
 
   override def readIdentifiedObj[S <: Sys[S]](in: DataInput, access: S#Acc)(implicit tx: S#Tx): Obj[S] =
     Impl.readIdentifiedObj(in, access)
+
+  // ---- types from BiPin ----
+
+  type Leaf   [S <: Sys[S]] = BiPin.Leaf   [S, Obj[S]]
+  type Entry  [S <: Sys[S]] = BiPin.Entry  [S, Obj[S]]
+
+  type Added  [S <: Sys[S]] = BiPin.Added  [S, Obj[S]]
+  val  Added                = BiPin.Added
+  type Removed[S <: Sys[S]] = BiPin.Removed[S, Obj[S]]
+  val  Removed              = BiPin.Removed
+  type Moved  [S <: Sys[S]] = BiPin.Moved  [S, Obj[S]]
+  val  Moved                = BiPin.Moved
 }
 trait Grapheme[S <: Sys[S]] extends BiPin[S, Obj[S]] {
   import Grapheme.Modifiable
