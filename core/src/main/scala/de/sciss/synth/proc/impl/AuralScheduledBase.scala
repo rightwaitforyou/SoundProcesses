@@ -93,7 +93,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * `eventReached` (internal) and `processEvent` will be called.
     * If no such event exists, the method must return `Long.MaxValue`.
     */
-  protected def eventAfter(frame: Long)(implicit tx: S#Tx): Long
+  protected def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long
 
   /** An opaque type passed into `playView` that may be used by an overriding implementation.
     * Otherwise it may simply be set to `Unit`.
@@ -276,7 +276,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * frame exists, schedules the execution of `eventReached`.
     */
   protected final def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
-    val targetFrame = eventAfter(currentFrame)
+    val targetFrame = viewEventAfter(currentFrame)
     val token = if (targetFrame == Long.MaxValue) -1 else {
       logA(s"timeline - scheduleNextEvent($currentFrame) -> $targetFrame")
       val targetTime = sched.time + (targetFrame - currentFrame)

@@ -51,7 +51,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected type ViewID = Unit
 
-  protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long = {
+  protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long = {
     // println(s"----eventAfter($frame)----")
     // println(tree.debugPrint()(iSys(tx)))
     val res = tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)

@@ -84,7 +84,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     viewAdded(id, view)
   }
 
-  protected final def eventAfter(frame: Long)(implicit tx: S#Tx): Long =
+  protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
     BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
 
   protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
