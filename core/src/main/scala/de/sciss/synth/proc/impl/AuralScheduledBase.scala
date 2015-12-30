@@ -401,36 +401,47 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   // ---- helper methods for elemAdded ----
 
-  /** This is usually called from the implementation's `elemAdded` to check if a view
-    * should be created now. This method takes care of re-scheduling grid if necessary.
-    * If the method returns `true`, the caller should build the view and then proceed
-    * to `elemAddedPreparePlay`.
-    */
-  protected final def elemAddedHasView(st: ITimedState, span: SpanLike)(implicit tx: S#Tx): Boolean = {
-    val prepS = prepareSpan()
-    span.overlaps(prepS) && {            // we don't need to prepare or play it.
-      if (span.compareStart(prepS.start) == 1) st match {   // but we have to check if we need to reschedule grid.
-        case play: IPlaying =>
-          val oldGrid = scheduledGrid()
-          if (oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1) {
-            val tr0           = play.shiftTo(sched.time)
-            val currentFrame  = tr0.frame
-            scheduleNextGrid(currentFrame)
-          }
-        case _ =>
-      }
-      false
+  protected final def elemAdded(st: ITimedState, vid: ViewID, span: SpanLike)(mkView: => Elem)
+                               (implicit tx: S#Tx): Unit =
+    st match {
+      case prep: IPreparing => elemAddedPrepare(prep,      span)(mkView)
+      case play: IPlaying   => elemAddedPlay   (play, vid, span)(mkView)
     }
-  }
 
-  protected final def elemAddedPreparePlay(st: ITimedState, vid: ViewID, span: SpanLike, childView: Elem)
-                                          (implicit tx: S#Tx): Unit = st match {
-    case prep: IPreparing => elemAddedPrepare(prep,      span, childView)
-    case play: IPlaying   => elemAddedPlay   (play, vid, span, childView)
-  }
+//  /** This is usually called from the implementation's `elemAdded` to check if a view
+//    * should be created now. This method takes care of re-scheduling grid if necessary.
+//    * If the method returns `true`, the caller should build the view and then proceed
+//    * to `elemAddedPreparePlay`.
+//    */
+//  protected final def elemAddedHasView(st: ITimedState, span: SpanLike)(implicit tx: S#Tx): Boolean = {
+//    val prepS = prepareSpan()
+//    span.overlaps(prepS) && {            // we don't need to prepare or play it.
+//      if (span.compareStart(prepS.start) == 1) st match {   // but we have to check if we need to reschedule grid.
+//        case play: IPlaying =>
+//          val oldGrid = scheduledGrid()
+//          if (oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1) {
+//            val tr0           = play.shiftTo(sched.time)
+//            val currentFrame  = tr0.frame
+//            scheduleNextGrid(currentFrame)
+//          }
+//        case _ =>
+//      }
+//      false
+//    }
+//  }
 
-  private[this] def elemAddedPrepare(prep: IPreparing, span: SpanLike, childView: Elem)(implicit tx: S#Tx): Unit = {
+//  protected final def elemAddedPreparePlay(st: ITimedState, vid: ViewID, span: SpanLike, childView: Elem)
+//                                          (implicit tx: S#Tx): Unit = st match {
+//    case prep: IPreparing => elemAddedPrepare(prep,      span, childView)
+//    case play: IPlaying   => elemAddedPlay   (play, vid, span, childView)
+//  }
+
+  private[this] def elemAddedPrepare(prep: IPreparing, span: SpanLike)(mkView: => Elem)(implicit tx: S#Tx): Unit = {
+    val prepS     = prepareSpan()
+    if (!span.overlaps(prepS)) return
+
     val childTime = prep.timeRef.intersect(span)
+    val childView = mkView
     val prepOpt   = prepareChild(childView, childTime)
     prepOpt.foreach { case (_, childObs) =>
       val map1      = prep.map + (childView -> childObs)
@@ -441,7 +452,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
-  private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, childView: Elem)
+  private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike)(mkView: => Elem)
                                        (implicit tx: S#Tx): Unit = {
     // calculate current frame
     val tr0           = play.shiftTo(sched.time)
@@ -452,7 +463,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     val elemPlays     = span.contains(currentFrame)
 
     if (elemPlays) {
-      val tr1 = tr0.intersect(span)
+      val tr1       = tr0.intersect(span)
+      val childView = mkView
       playView(vid, childView, tr1, play.target)
     }
 

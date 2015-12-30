@@ -207,7 +207,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = internalState match {
     case IStopped =>
     case st: ITimedState =>
-      if (elemAddedHasView(st, span)) {
+      elemAdded(st, tid, span) {
         logA(s"timeline - elemAdded($span, $obj)")
 
         // create a view for the element and add it to the tree and map
@@ -220,7 +220,8 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
           Some(newViews)
         } (iSys(tx))
 
-        elemAddedPreparePlay(st, tid, span, childView)
+        // elemAddedPreparePlay(st, tid, span, childView)
+        childView
     }
   }
 

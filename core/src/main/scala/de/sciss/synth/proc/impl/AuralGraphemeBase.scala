@@ -157,7 +157,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       val gr    = obj()
       val stop  = gr.eventAfter(start)
       val span  = stop.fold[SpanLike](Span.from(start))(Span(start, _))
-      if (elemAddedHasView(st, span)) {
+      elemAdded(st, (), span) {
         logA(s"timeline - elemAdded($span, $child)")
 
         // Create a view for the element.
@@ -174,7 +174,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         // println(s"tree.add($start -> $childView) - elemAdded")
         tree.add(start -> newEntries)(iSys(tx))
 
-        elemAddedPreparePlay(st, (), span, childView)
+        // elemAddedPreparePlay(st, (), span, childView)
+        childView
       }
   }
 
