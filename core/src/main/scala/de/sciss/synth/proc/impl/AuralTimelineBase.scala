@@ -20,10 +20,9 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.SpanLikeObj
 import de.sciss.lucre.geom.{LongPoint2D, LongSpace}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{IdentifierMap, Disposable, Obj}
+import de.sciss.lucre.stm.{Disposable, IdentifierMap, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.AuralView.{Preparing, Prepared, Stopped}
 import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
@@ -205,72 +204,23 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   final def removeObject(id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit =
     elemRemoved(id, span.value, obj)
 
-  private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = {
-    val st = internalState
-    if (st.external == Stopped || !span.overlaps(prepareSpan())) return
+  private[this] def elemAdded(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit = internalState match {
+    case IStopped =>
+    case st: ITimedState =>
+      if (elemAddedHasView(st, span)) {
+        logA(s"timeline - elemAdded($span, $obj)")
 
-    logA(s"timeline - elemAdded($span, $obj)")
+        // create a view for the element and add it to the tree and map
+        val childView = makeView(obj) // AuralObj(obj)
+        viewMap.put(tid, childView)
+        tree.transformAt(spanToPoint(span)) { opt =>
+          // import expr.IdentifierSerializer
+          val tup       = (tx.newHandle(tid), childView)
+          val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
+          Some(newViews)
+        } (iSys(tx))
 
-    // create a view for the element and add it to the tree and map
-    val childView = makeView(obj) // AuralObj(obj)
-    viewMap.put(tid, childView)
-    tree.transformAt(spanToPoint(span)) { opt =>
-      // import expr.IdentifierSerializer
-      val tup       = (tx.newHandle(tid), childView)
-      val newViews  = opt.fold(span -> Vec(tup)) { case (span1, views) => (span1, views :+ tup) }
-      Some(newViews)
-    } (iSys(tx))
-
-    st match {
-      case prep: IPreparing =>
-        val childTime = prep.timeRef.intersect(span)
-        val prepOpt   = prepareChild(childView, childTime)
-        prepOpt.foreach { case (_, childObs) =>
-          val map1      = prep.map + (childView -> childObs)
-          val prep1     = prep.copy(map = map1)
-          internalState = prep1
-          val st0       = prep.external
-          if (st0 == Prepared) fire(Preparing)
-        }
-
-      case play: IPlaying =>
-        // calculate current frame
-        val tr0           = play.shiftTo(sched.time)
-
-        // if we're playing and the element span intersects contains
-        // the current frame, play that new element
-        val currentFrame  = tr0.frame
-        val elemPlays     = span.contains(currentFrame)
-
-        if (elemPlays) {
-          val tr1 = tr0.intersect(span)
-          playView(tid, childView, tr1, play.target)
-        }
-
-        // re-validate the next scheduling position
-        val oldSched    = scheduledEvent() // schedEvtToken()
-        val oldTarget   = oldSched.frame
-        val reschedule  = if (elemPlays) {
-          // reschedule if the span has a stop and elem.stop < oldTarget
-          span match {
-            case hs: Span.HasStop => hs.stop < oldTarget
-            case _ => false
-          }
-        } else {
-          // reschedule if the span has a start and that start is greater than the current frame,
-          // and elem.start < oldTarget
-          span match {
-            case hs: Span.HasStart => hs.start > currentFrame && hs.start < oldTarget
-            case _ => false
-          }
-        }
-
-        if (reschedule) {
-          logA("...reschedule")
-          scheduleNextEvent(currentFrame)
-        }
-
-      case _ => assert(false, st)
+        elemAddedPreparePlay(st, tid, span, childView)
     }
   }
 

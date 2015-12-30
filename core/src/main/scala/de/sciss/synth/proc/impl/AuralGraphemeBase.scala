@@ -20,7 +20,6 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.AuralView.{Prepared, Preparing}
 import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
@@ -31,7 +30,6 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   extends AuralScheduledBase[S, Target, Elem] with ObservableImpl[S, AuralView.State] { impl =>
 
   import context.{scheduler => sched}
-  import AuralScheduledBase.LOOK_AHEAD
 
   // ---- abstract ----
 
@@ -66,7 +64,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         Span(startTime, stopTime  )
       }
       val tr0       = timeRef.intersect(span)
-      playView1(toStart, tr0, target)
+      playView((), toStart, tr0, target)
     }
   }
 
@@ -123,7 +121,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val toStart = tree.get(timeRef.frame)(iSys(tx))
       .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.frame}"))
       .head
-    playView1(toStart, timeRef, play.target)
+    playView((), toStart, timeRef, play.target)
   }
 
   def init(tl: Grapheme[S])(implicit tx: S#Tx): this.type = {
@@ -142,10 +140,16 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     this
   }
 
-  private[this] def playView1(view: Elem, timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
+  override protected def playView(id: Unit, view: Elem, timeRef: TimeRef, target: Target)
+                                 (implicit tx: S#Tx): Unit = {
     views.foreach(stopView) // there ought to be either zero or one view
-    playView((), view, timeRef, target)
+    super.playView(id, view, timeRef, target)
   }
+
+//  private[this] def playView1(view: Elem, timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
+//    views.foreach(stopView) // there ought to be either zero or one view
+//    playView((), view, timeRef, target)
+//  }
 
   private[this] def elemAdded(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = internalState match {
     case IStopped =>
@@ -170,91 +174,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         // println(s"tree.add($start -> $childView) - elemAdded")
         tree.add(start -> newEntries)(iSys(tx))
 
-        st match {
-          case prep: IPreparing => elemAddedPrepare(prep, span, childView)
-          case play: IPlaying =>
-        }
+        elemAddedPreparePlay(st, (), span, childView)
       }
-  }
-
-  protected final def elemAddedHasView(st: ITimedState, span: SpanLike)(implicit tx: S#Tx): Boolean = {
-    val prepS = prepareSpan()
-    span.overlaps(prepS) && {            // we don't need to prepare or play it.
-      if (span.compareStart(prepS.start) == 1) st match {   // but we have to check if we need to reschedule grid.
-        case play: IPlaying =>
-          val oldGrid = scheduledGrid()
-          if (oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1) {
-            val tr0           = play.shiftTo(sched.time)
-            val currentFrame  = tr0.frame
-            scheduleNextGrid(currentFrame)
-          }
-        case _ =>
-      }
-      false
-    }
-  }
-
-  protected final def elemAddedPrepare(prep: IPreparing, span: SpanLike, childView: Elem)(implicit tx: S#Tx): Unit = {
-    val childTime = prep.timeRef.intersect(span)
-    val prepOpt   = prepareChild(childView, childTime)
-    prepOpt.foreach { case (_, childObs) =>
-      val map1      = prep.map + (childView -> childObs)
-      val prep1     = prep.copy(map = map1)
-      internalState = prep1
-      val st0       = prep.external
-      if (st0 == Prepared) fire(Preparing)
-    }
-  }
-
-  protected final def elemAddedPlay(play: IPlaying, span: SpanLike, childView: Elem)(implicit tx: S#Tx): Unit = {
-    // calculate current frame
-    val tr0           = play.shiftTo(sched.time)
-
-    // if we're playing and the element span intersects contains
-    // the current frame, play that new element
-    val currentFrame  = tr0.frame
-    val elemPlays     = span.contains(currentFrame)
-
-    if (elemPlays) {
-      val tr1 = tr0.intersect(span)
-      playView1(childView, tr1, play.target)
-    }
-
-    // re-validate the next scheduling position
-    val oldEvt      = scheduledEvent() // schedEvtToken()
-    val oldEvtFrame = oldEvt.frame
-    val schedEvt    = if (elemPlays) {
-      // reschedule if the span has a stop and elem.stop < oldTarget
-      span match {
-        case hs: Span.HasStop => hs.stop < oldEvtFrame
-        case _ => false
-      }
-    } else {
-      // reschedule if the span has a start and that start is greater than the current frame,
-      // and elem.start < oldTarget
-      span match {
-        case hs: Span.HasStart => hs.start > currentFrame && hs.start < oldEvtFrame
-        case _ => false
-      }
-    }
-
-    if (schedEvt) {
-      logA("...reschedule event")
-      scheduleNextEvent(currentFrame)
-    }
-
-    val schedGrid = !elemPlays && {
-      val prepS = prepareSpan()
-      span.compareStart(prepS.start) == 1 && {
-        val oldGrid = scheduledGrid()
-        oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1
-      }
-    }
-
-    if (schedGrid) {
-      logA("...reschedule grid")
-      scheduleNextGrid(currentFrame)
-    }
   }
 
   private[this] def elemRemoved(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = {

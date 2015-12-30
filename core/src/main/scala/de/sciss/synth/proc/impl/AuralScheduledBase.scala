@@ -398,4 +398,98 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     internalRef.swap(IStopped).dispose()
   }
+
+  // ---- helper methods for elemAdded ----
+
+  /** This is usually called from the implementation's `elemAdded` to check if a view
+    * should be created now. This method takes care of re-scheduling grid if necessary.
+    * If the method returns `true`, the caller should build the view and then proceed
+    * to `elemAddedPreparePlay`.
+    */
+  protected final def elemAddedHasView(st: ITimedState, span: SpanLike)(implicit tx: S#Tx): Boolean = {
+    val prepS = prepareSpan()
+    span.overlaps(prepS) && {            // we don't need to prepare or play it.
+      if (span.compareStart(prepS.start) == 1) st match {   // but we have to check if we need to reschedule grid.
+        case play: IPlaying =>
+          val oldGrid = scheduledGrid()
+          if (oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1) {
+            val tr0           = play.shiftTo(sched.time)
+            val currentFrame  = tr0.frame
+            scheduleNextGrid(currentFrame)
+          }
+        case _ =>
+      }
+      false
+    }
+  }
+
+  protected final def elemAddedPreparePlay(st: ITimedState, vid: ViewID, span: SpanLike, childView: Elem)
+                                          (implicit tx: S#Tx): Unit = st match {
+    case prep: IPreparing => elemAddedPrepare(prep,      span, childView)
+    case play: IPlaying   => elemAddedPlay   (play, vid, span, childView)
+  }
+
+  private[this] def elemAddedPrepare(prep: IPreparing, span: SpanLike, childView: Elem)(implicit tx: S#Tx): Unit = {
+    val childTime = prep.timeRef.intersect(span)
+    val prepOpt   = prepareChild(childView, childTime)
+    prepOpt.foreach { case (_, childObs) =>
+      val map1      = prep.map + (childView -> childObs)
+      val prep1     = prep.copy(map = map1)
+      internalState = prep1
+      val st0       = prep.external
+      if (st0 == Prepared) fire(Preparing)
+    }
+  }
+
+  private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, childView: Elem)
+                                       (implicit tx: S#Tx): Unit = {
+    // calculate current frame
+    val tr0           = play.shiftTo(sched.time)
+
+    // if we're playing and the element span intersects contains
+    // the current frame, play that new element
+    val currentFrame  = tr0.frame
+    val elemPlays     = span.contains(currentFrame)
+
+    if (elemPlays) {
+      val tr1 = tr0.intersect(span)
+      playView(vid, childView, tr1, play.target)
+    }
+
+    // re-validate the next scheduling position
+    val oldEvt      = scheduledEvent() // schedEvtToken()
+    val oldEvtFrame = oldEvt.frame
+    val schedEvt    = if (elemPlays) {
+      // reschedule if the span has a stop and elem.stop < oldTarget
+      span match {
+        case hs: Span.HasStop => hs.stop < oldEvtFrame
+        case _ => false
+      }
+    } else {
+      // reschedule if the span has a start and that start is greater than the current frame,
+      // and elem.start < oldTarget
+      span match {
+        case hs: Span.HasStart => hs.start > currentFrame && hs.start < oldEvtFrame
+        case _ => false
+      }
+    }
+
+    if (schedEvt) {
+      logA("...reschedule event")
+      scheduleNextEvent(currentFrame)
+    }
+
+    val schedGrid = !elemPlays && {
+      val prepS = prepareSpan()
+      span.compareStart(prepS.start) == 1 && {
+        val oldGrid = scheduledGrid()
+        oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1
+      }
+    }
+
+    if (schedGrid) {
+      logA("...reschedule grid")
+      scheduleNextGrid(currentFrame)
+    }
+  }
 }
