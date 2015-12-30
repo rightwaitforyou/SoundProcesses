@@ -269,6 +269,10 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   protected final def scheduledEvent()(implicit tx: S#Tx): Scheduled      = schedEvtToken()
   protected final def scheduledGrid ()(implicit tx: S#Tx): Scheduled      = schedGridToken()
+
+  /** Note: the prepare span will always start from current-frame and have
+    * a duration of at least `LOOK_STOP`. I.e. during playback it contains the current play position.
+    */
   protected final def prepareSpan   ()(implicit tx: S#Tx): Span.HasStart  = prepareSpanRef()
 
   /** Ensures state is consistent, then checks preparation of children.
