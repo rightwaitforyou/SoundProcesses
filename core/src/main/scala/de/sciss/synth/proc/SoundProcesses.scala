@@ -81,6 +81,7 @@ object SoundProcesses {
     FadeSpec.init()
     Folder  .init()
     Grapheme.init()
+    AudioCue.init()
     Proc    .init()
     Output  .init()
     Timeline.init()

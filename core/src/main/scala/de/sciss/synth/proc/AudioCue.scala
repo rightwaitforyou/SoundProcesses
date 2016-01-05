@@ -27,6 +27,8 @@ import de.sciss.synth.io.AudioFileSpec
 object AudioCue {
   final val typeID = 13
 
+  def init(): Unit = Obj.init()
+
   private final val COOKIE = 0x4143 // 'AC'
 
   implicit object serializer extends ImmutableSerializer[AudioCue] {
