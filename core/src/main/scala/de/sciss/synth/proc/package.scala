@@ -27,15 +27,15 @@ package object proc {
   var showTransportLog  = false
 
   @elidable(CONFIG) private[proc] def logAural(what: => String): Unit =
-    if (showAuralLog) Console.out.println(logHeader.format(new Date()) + "aural " + what)
+    if (showAuralLog) Console.out.println(s"${logHeader.format(new Date())}aural $what")
 
   @elidable(CONFIG) private[proc] def logTransport(what: => String): Unit =
-    if (showTransportLog) Console.out.println(logHeader.format(new Date()) + "transport " + what)
+    if (showTransportLog) Console.out.println(s"${logHeader.format(new Date())}transport $what")
 
   @elidable(CONFIG) private[proc] def log(what: => String): Unit =
     if (showLog) Console.out.println(logHeader.format(new Date()) + what)
 
-//  // ---- types ----
+  //  // ---- types ----
 //
 //  type Folder[S <: Sys[S]] = expr.List.Modifiable[S, Obj[S]]
 }
