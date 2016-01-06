@@ -128,8 +128,11 @@ object AuralProcImpl {
       }
       val attr = proc.attr
       observers ::= attr.changed.react { implicit tx => upd => upd.changes.foreach {
-        case Obj.AttrAdded  (key, value) => attrAdded  (key, value)
-        case Obj.AttrRemoved(key, value) => attrRemoved(key, value)
+        case Obj.AttrAdded   (key, value) => attrAdded  (key, value)
+        case Obj.AttrRemoved (key, value) => attrRemoved(key, value)
+        case Obj.AttrReplaced(key, before, now) =>
+          attrRemoved(key, before)
+          attrAdded  (key, now   )
       }}
 
       tryBuild()
