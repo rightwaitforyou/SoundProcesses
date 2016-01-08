@@ -472,12 +472,13 @@ object AuralProcImpl {
                 val path      = audioVal.artifact.getAbsolutePath
                 val offset    = audioVal.offset
                 val _gain     = audioVal.gain
+                val offset0   = (timeRef.offsetOrZero * spec.sampleRate / SampleRate + 0.5).toLong
                 val _buf      = if (info.isNative) {
                   // XXX DIRTY HACK
                   val offset1 = if (key.contains("!rnd")) {
                     offset + (math.random * (spec.numFrames - offset)).toLong
                   } else {
-                    offset
+                    offset + offset0
                   }
                   // println(s"OFFSET = $offset1")
                   Buffer.diskIn(server)(
@@ -487,10 +488,11 @@ object AuralProcImpl {
                     numChannels   = spec.numChannels
                   )
                 } else {
+                  val offset1 = offset + offset0
                   val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
                   val trig = new StreamBuffer(key = key, idx = idx, synth = nr.node, buf = __buf, path = path,
-                    fileFrames = spec.numFrames, interp = info.interp, startFrame = offset, loop = false,
-                    resetFrame = offset)
+                    fileFrames = spec.numFrames, interp = info.interp, startFrame = offset1, loop = false,
+                    resetFrame = offset1)
                   nr.addUser(trig)
                   __buf
                 }
