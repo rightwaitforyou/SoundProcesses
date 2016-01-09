@@ -304,6 +304,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   override def dispose()(implicit tx: S#Tx): Unit = {
     super.dispose()
-    tlObserver.dispose()
+    // this may be the case for `AuralTimelineImpl.empty` where `init` is not called.
+    if (tlObserver != null) tlObserver.dispose()
   }
 }

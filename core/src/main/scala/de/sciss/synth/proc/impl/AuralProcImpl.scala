@@ -470,15 +470,15 @@ object AuralProcImpl {
                 val audioVal  = a.value
                 val spec      = audioVal.spec
                 val path      = audioVal.artifact.getAbsolutePath
-                val offset    = audioVal.offset
                 val _gain     = audioVal.gain
-                val offset0   = (timeRef.offsetOrZero * spec.sampleRate / SampleRate + 0.5).toLong
+                val offsetT   = ((audioVal.offset + timeRef.offsetOrZero) * spec.sampleRate / SampleRate + 0.5).toLong
                 val _buf      = if (info.isNative) {
                   // XXX DIRTY HACK
                   val offset1 = if (key.contains("!rnd")) {
-                    offset + (math.random * (spec.numFrames - offset)).toLong
+                    val fOffset = audioVal.fileOffset
+                    fOffset + (math.random * (spec.numFrames - fOffset)).toLong
                   } else {
-                    offset + offset0
+                    offsetT
                   }
                   // println(s"OFFSET = $offset1")
                   Buffer.diskIn(server)(
@@ -488,11 +488,10 @@ object AuralProcImpl {
                     numChannels   = spec.numChannels
                   )
                 } else {
-                  val offset1 = offset + offset0
                   val __buf = Buffer(server)(numFrames = bufSize, numChannels = spec.numChannels)
                   val trig = new StreamBuffer(key = key, idx = idx, synth = nr.node, buf = __buf, path = path,
-                    fileFrames = spec.numFrames, interp = info.interp, startFrame = offset1, loop = false,
-                    resetFrame = offset1)
+                    fileFrames = spec.numFrames, interp = info.interp, startFrame = offsetT, loop = false,
+                    resetFrame = offsetT)
                   nr.addUser(trig)
                   __buf
                 }
@@ -512,7 +511,7 @@ object AuralProcImpl {
               val audioVal  = a.value
               val spec      = audioVal.spec
               val path      = audioVal.artifact.getAbsolutePath
-              val offset    = audioVal.offset
+              val offset    = audioVal.fileOffset
               // XXX TODO - for now, gain is ignored.
               // one might add an auxiliary control proxy e.g. Buffer(...).gain
               // val _gain     = audioElem.gain    .value
@@ -626,7 +625,7 @@ object AuralProcImpl {
             val audioVal  = a.value
             val spec      = audioVal.spec
             val f         = audioVal.artifact
-            val offset    = audioVal.offset
+            val offset    = audioVal.fileOffset
             // XXX TODO - for now, gain is ignored.
             // one might add an auxiliary control proxy e.g. Buffer(...).gain
             // val _gain     = audioElem.gain    .value

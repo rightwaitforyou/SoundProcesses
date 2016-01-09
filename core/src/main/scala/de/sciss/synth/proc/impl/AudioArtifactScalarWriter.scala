@@ -48,7 +48,7 @@ object AudioArtifactScalarWriter {
       val path      = file.getAbsolutePath
       val target    = server.defaultGroup // XXX
       val rb        = Buffer(server)(numFrames = 1, numChannels = bus.numChannels)
-      rb.read(path, fileStartFrame = audioVal.offset, numFrames = 1)
+      rb.read(path, fileStartFrame = audioVal.fileOffset, numFrames = 1)
       val args      = List[ControlSet]("buf" -> rb.id, "amp" -> audioVal.gain)
 
       // val rs = rd.play(target = target, args = args, buffers = rb :: Nil)
