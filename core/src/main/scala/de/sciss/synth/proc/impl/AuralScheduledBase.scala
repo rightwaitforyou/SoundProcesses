@@ -545,6 +545,9 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     val schedGrid = !elemPlays && {
       val prepS = prepareSpan()
+      // XXX TODO --- here is a mistake. We must also cover the
+      // case where the element should be prepared immediately (NewAuralTest --test5)
+      ???
       span.compareStart(prepS.start) == 1 && {
         val oldGrid = scheduledGrid()
         oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1
