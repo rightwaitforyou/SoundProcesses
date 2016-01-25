@@ -314,6 +314,10 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |An attribute should accept a timeline
         |with time-varying elements as input.
         |
+        |We first hear a constant frequency of 441 Hz.
+        |Then modulated by a triangle.
+        |Then constant at 661.5 Hz.
+        |
         |""".stripMargin)
 
     cursor.step { implicit tx =>

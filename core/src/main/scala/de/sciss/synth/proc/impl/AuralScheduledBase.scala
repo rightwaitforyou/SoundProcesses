@@ -217,12 +217,11 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * is prepared and the method returns `Some(elem, observer)` that must
    * be passed back from `processPrepare` (they'll show up in `IPreparing`).
    */
-  private[this] def prepareChild(childView: Elem, childTime: TimeRef)
+  private[this] def prepareChild(childView: Elem, childTime: TimeRef, observer: Boolean)
                                 (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
     logA(s"timeline - prepare $childView - $childTime")
     childView.prepare(childTime)
-    val isPrepared = childView.state == Prepared
-    if (isPrepared) None else {
+    if (!observer || childView.state == Prepared) None else {
       val childObs = childView.react { implicit tx => {
         case Prepared => childPreparedOrRemoved(childView)
         case _        =>
@@ -269,20 +268,18 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     val it = processPrepare(prepareSpan, timeRef, initial = true)
     val async = it.flatMap { case (vid, span, obj) =>
-      val h         = mkView(vid, span, obj)
-      val childView = elemFromHandle(h)
-      val childTime = timeRef.intersect(span)
-      prepareChild(childView, childTime)
+      val (_, prep) = mkViewAndPrepare(timeRef, vid, span, obj, observer = true)
+      prep
     } .toMap
 
     val st            = new IPreparing(async, timeRef)
-    internalRef()     = st
-    prepareSpanRef()  = prepareSpan // if (prepRes.nextStart != Long.MaxValue) Span(startFrame, prepRes.nextStart) else Span.from(startFrame)
+    internalRef   ()  = st
+    prepareSpanRef()  = prepareSpan
     st
   }
 
-  protected final def scheduledEvent()(implicit tx: S#Tx): Scheduled      = schedEvtToken()
-  protected final def scheduledGrid ()(implicit tx: S#Tx): Scheduled      = schedGridToken()
+  protected final def scheduledEvent()(implicit tx: S#Tx): Scheduled = schedEvtToken ()
+  protected final def scheduledGrid ()(implicit tx: S#Tx): Scheduled = schedGridToken()
 
   /** Note: the prepare span will always start from current-frame and have
     * a duration of at least `LOOK_STOP`. I.e. during playback it contains the current play position.
@@ -371,12 +368,18 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
         prepareSpanRef()    = prepareSpan
         val searchSpan      = Span(startFrame, stopFrame)
         val tr0             = play.shiftTo(sched.time)
-        val prepRes         = processPrepare(searchSpan, tr0, initial = false)
+        val it              = processPrepare(searchSpan, tr0, initial = false)
+        val reschedule      = it.nonEmpty
+
+        it.foreach { case (vid, span, obj) =>
+          mkViewAndPrepare(tr0, vid, span, obj, observer = false)
+        }
+
         // XXX TODO -- a refinement could look for eventAfter,
         // however then we need additional fiddling around in
         // `elemAdded` and `elemRemoved`...
         scheduleNextGrid(frame)
-        if (prepRes.nonEmpty) {
+        if (reschedule) {
           logA("...reschedule")
           scheduleNextEvent(frame)
         }
@@ -481,10 +484,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     val prepS     = prepareSpan()
     if (!span.overlaps(prepS)) return
 
-    val childTime = prep.timeRef.intersect(span)
-    val childH    = mkView(vid, span, obj)
-    val childView = elemFromHandle(childH)
-    val prepOpt   = prepareChild(childView, childTime)
+    val (childView, prepOpt) = mkViewAndPrepare(prep.timeRef, vid, span, obj, observer = true)
     prepOpt.foreach { case (_, childObs) =>
       val map1      = prep.map + (childView -> childObs)
       val prep1     = prep.copy(map = map1)
@@ -492,6 +492,16 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
       val st0       = prep.external
       if (st0 == Prepared) fire(Preparing)
     }
+  }
+
+  private[this] final def mkViewAndPrepare(timeRef: TimeRef, vid: ViewID, span: SpanLike, obj: Obj[S],
+                                           observer: Boolean)
+                                          (implicit tx: S#Tx): (Elem, Option[(Elem, Disposable[S#Tx])]) = {
+    val childTime = timeRef.intersect(span)
+    val h         = mkView(vid, span, obj)
+    val view      = elemFromHandle(h)
+    val prep      = prepareChild(view, childTime, observer = observer)
+    (view, prep)
   }
 
   private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, obj: Obj[S])
