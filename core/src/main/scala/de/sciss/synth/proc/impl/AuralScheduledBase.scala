@@ -69,9 +69,9 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     *                 start no earlier than `prepareSpan`.
     */
   protected def processPrepare(prepareSpan: Span, timeRef: TimeRef.Apply, initial: Boolean)
-                              (implicit tx: S#Tx): PrepareResult
+                              (implicit tx: S#Tx): Iterator[PrepareResult]
 
-  protected type PrepareResult = Iterator[(ViewID, SpanLike, Obj[S])]
+  protected type PrepareResult = (ViewID, SpanLike, Obj[S])
 
   /** Called during `play`. Sub-classes should intersect
     * the current elements and for each of them call `playView`.

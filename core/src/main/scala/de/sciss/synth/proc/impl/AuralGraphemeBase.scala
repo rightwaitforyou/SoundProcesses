@@ -40,7 +40,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected def iSys: S#Tx => I#Tx
 
-  protected def makeView(obj: Obj[S])(implicit tx: S#Tx): Elem
+  protected def makeViewElem(obj: Obj[S])(implicit tx: S#Tx): Elem
 
   // ---- impl ----
 
@@ -65,54 +65,61 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         Span(startTime, stopTime  )
       }
       val tr0       = timeRef.intersect(span)
-      ??? // playView((), toStart, tr0, target)
+      playView(toStart, tr0, target)
     }
   }
 
-  protected final def processPrepare(span: Span, timeRef: Apply, initial: Boolean)
-                                    (implicit tx: S#Tx): PrepareResult = {
+  protected final def processPrepare(spanP: Span, timeRef: Apply, initial: Boolean)
+                                    (implicit tx: S#Tx): Iterator[PrepareResult] = {
     // println(s"processPrepare($span, $timeRef, initial = $initial")
     val gr    = obj()
-    val opt0  = if (initial) gr.floor(span.start) else gr.ceil(span.start)
-    ???
-//    opt0.fold(new PrepareResult(Map.empty, nonEmpty = false /* , nextStart = Long.MaxValue */)) { e0 =>
-//      @tailrec
-//      def loop(start: Long, child: Obj[S],
-//               m: Map[Elem, Disposable[S#Tx]], nonEmpty: Boolean): PrepareResult =
-//        if (start >= span.stop)
-//          new PrepareResult(m, nonEmpty = nonEmpty /* , nextStart = start */)
-//        else gr.ceil(start + 1) match {
-//          case Some(succ) =>
-//            val stop      = succ.key.value
-//            val childSpan = Span(start, stop)
-//            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
-//            val mNext     = prepObs.fold(m)(m + _)
-//            loop(start = stop, child = succ.value, m = mNext, nonEmpty = true)
-//
-//          case None =>
-//            val childSpan = Span.from(start)
-//            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
-//            val mNext     = prepObs.fold(m)(m + _)
-//            new PrepareResult(mNext, nonEmpty = true /* , nextStart = Long.MaxValue */)
-//        }
-//
-//      loop(e0.key.value, e0.value, Map.empty, nonEmpty = false)
-//    }
-  }
+    val opt0  = if (initial) gr.floor(spanP.start) else gr.ceil(spanP.start)
+    opt0.fold[Iterator[PrepareResult]](Iterator.empty) { e0 =>
+      new Iterator[PrepareResult] {
+        // updated in `advance`:
+        private[this] var _child    : Obj[S]                  = _
+        private[this] var _childSpan: Span.HasStart           = _
+        private[this] var _ended    : Boolean                 = _
+        private[this] var _succOpt  : Option[(Obj[S], Long)]  = _
 
-//  private[this] def prepareFromEntry(timeRef: TimeRef.Apply, span: Span.HasStart, child: Obj[S])
-//                                    (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
-//    // println(s"prepareFromEntry($timeRef, $span, $child)")
-//    val childTime = timeRef.intersect(span)
-//    val sub: Option[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) None else {
-//      val childView   = makeView(child)
-//      val childViews  = Vector.empty :+ childView
-//      // println(s"tree.add(${span.start} -> $childView) - prepareFromEntry")
-//      tree.add(span.start -> childViews)(iSys(tx))
-//      prepareChild(childView, childTime)
-//    }
-//    sub
-//  }
+        def hasNext(): Boolean = !_ended
+
+        private[this] def advance(child: Obj[S], start: Long): Unit =
+          if (start >= spanP.stop) {
+            _succOpt = None
+            _ended   = true
+          } else {
+            _child = child
+            gr.ceil(start + 1) match {
+              case Some(succ) =>
+                val stop      = succ.key.value
+                _childSpan    = Span(start, stop)
+                val childTime = timeRef.intersect(_childSpan)
+                _ended        = childTime.span.nonEmpty
+                _succOpt      = if (_ended) None else Some((succ.value, stop))
+
+              case None =>
+                _childSpan    = Span.from(start)
+                val childTime = timeRef.intersect(_childSpan)
+                _ended        = childTime.span.nonEmpty
+                _succOpt      = None
+            }
+          }
+
+        advance(e0.value, e0.key.value)
+
+        def next(): (ViewID, SpanLike, Obj[S]) = {
+          if (_ended) throw new NoSuchElementException("next on empty iterator")
+
+          val res = ((), _childSpan, _child)
+          _succOpt.fold[Unit] { _ended = true } { case (succ, stop) =>
+            advance(succ, stop)
+          }
+          res
+        }
+      }
+    }
+  }
 
   //  protected final def clearViewsTree()(implicit tx: S#Tx): Unit = {
   //    // println("tree.clear()")
@@ -153,7 +160,9 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 //    playView((), view, timeRef, target)
 //  }
 
-  protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = ???
+  protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+    ??? // tree.get()
+  }
 
   protected def elemFromHandle(h: ElemHandle): Elem = h
 
@@ -163,7 +172,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
   protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
 
-  protected def mkView(vid: Unit, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle = ???
+  protected def mkView(vid: Unit, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle =
+    makeViewElem(obj)
 
   private[this] def elemAdded(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = internalState match {
     case IStopped =>

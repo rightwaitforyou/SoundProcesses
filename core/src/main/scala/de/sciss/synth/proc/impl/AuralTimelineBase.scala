@@ -86,7 +86,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
   protected final def processPrepare(span: Span, timeRef: Apply, initial: Boolean)
-                                    (implicit tx: S#Tx): PrepareResult = {
+                                    (implicit tx: S#Tx): Iterator[PrepareResult] = {
     val tl          = obj()
     // search for new regions starting within the look-ahead period
     val startSpan   = if (initial) Span.until(span.stop) else span
@@ -223,7 +223,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected final def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
     import h._
-    logA(s"timeline - stopAndDispose - $span - $view")
+    logA(s"timeline - removeView - $span - $view")
 
     // note: this doesn't have to check for `IPreparing`, as it is called only
     // via `eventReached`, thus during playing. correct?
@@ -235,7 +235,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         val views1 = if (i >= 0) {
           views.patch(i, Nil, 1)
         } else {
-          Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
+          Console.err.println(s"Warning: timeline - removeView - view for $obj not in tree")
           views
         }
         if (views1.isEmpty) None else Some(span1 -> views1)

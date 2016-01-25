@@ -72,7 +72,7 @@ final class AuralGraphemeAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
   private[this] val prefChansElemRef  = Ref[Vec[Elem]](Vector.empty)
   private[this] val prefChansNumRef   = Ref(-2)   // -2 = cache invalid. across contents of `prefChansElemRef`
 
-  protected def makeView(obj: Obj[S])(implicit tx: S#Tx): Elem = AuralAttribute(key, obj, attr)
+  protected def makeViewElem(obj: Obj[S])(implicit tx: S#Tx): Elem = AuralAttribute(key, obj, attr)
 
 //  protected def viewAdded  (timed: S#ID, view: Elem)(implicit tx: S#Tx): Unit = ()
 //  protected def viewRemoved(             view: Elem)(implicit tx: S#Tx): Unit = ()
@@ -98,7 +98,7 @@ final class AuralGraphemeAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
     }
 
     val elems = entries.map(_.value)  // _2.map(_.value)).toVector
-    val views = elems.map(makeView)
+    val views = elems.map(makeViewElem)
     prefChansElemRef.swap(views).foreach(_.dispose())
 
     @tailrec
