@@ -265,7 +265,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     // this can happen if `play` is called with a
     // different `timeRef` from what was previously prepared
-    /* TTT if (!tree.isEmpty(iSys(tx))) */ freeNodesAndCancelSchedule()
+    /* TTT if (!tree.isEmpty(iSys(tx))) */ stopViewsAndCancelSchedule()
 
     val it = processPrepare(prepareSpan, timeRef, initial = true)
     val async = it.flatMap { case (vid, span, obj) =>
@@ -386,7 +386,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   }
 
   final def stop()(implicit tx: S#Tx): Unit = if (state != Stopped) {
-    freeNodesAndCancelSchedule()
+    stopViewsAndCancelSchedule()
     fire(Stopped)
   }
 
@@ -395,20 +395,22 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * timeline or grapheme observer.
     */
   def dispose()(implicit tx: S#Tx): Unit =
-    freeNodesAndCancelSchedule()
+    stopViewsAndCancelSchedule()
 
   /* Stops playing views and disposes them. Cancels scheduled actions.
    * Then calls `clearViewsTree`. Puts internal state to `IStopped`.
    */
-  private[this] def freeNodesAndCancelSchedule()(implicit tx: S#Tx): Unit = {
+  private[this] def stopViewsAndCancelSchedule()(implicit tx: S#Tx): Unit = {
     internalRef.swap(IStopped).dispose()
+    stopViews()
+    sched.cancel(schedEvtToken ().token)
+    sched.cancel(schedGridToken().token)
+  }
+
+  protected final def stopViews()(implicit tx: S#Tx): Unit =
     playingRef.foreach { view =>
       stopView(view)
     }
-    sched.cancel(schedEvtToken ().token)
-    sched.cancel(schedGridToken().token)
-    assert(playingRef.isEmpty)
-  }
 
   // ---- helper methods for elemAdded ----
 

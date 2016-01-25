@@ -24,16 +24,13 @@ import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
-import scala.annotation.tailrec
 import scala.collection.immutable.{IndexedSeq => Vec}
 
 object AuralGraphemeBase {
-  protected final case class ElemHandle[S <: Sys[S], Elem](span: SpanLike, view: Elem)
+  protected final case class ElemHandle[S <: Sys[S], Elem](start: Long, view: Elem)
 }
 trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[S, Target]]
   extends AuralScheduledBase[S, Target, Elem] with ObservableImpl[S, AuralView.State] { impl =>
-
-  import context.{scheduler => sched}
 
   // ---- abstract ----
 
@@ -55,8 +52,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected type ViewID     = Unit
   protected type ElemHandle = AuralGraphemeBase.ElemHandle[S, Elem]
 
-  private[this] final def ElemHandle(span: SpanLike, view: Elem): ElemHandle =
-    AuralGraphemeBase.ElemHandle(span, view)
+  private[this] final def ElemHandle(start: Long, view: Elem): ElemHandle =
+    AuralGraphemeBase.ElemHandle(start, view)
 
   protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
     tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
@@ -70,7 +67,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       val toStart   = entries.head
       val stop      = viewEventAfter(start)
       val span      = if (stop == Long.MaxValue) Span.From(start) else Span(start, stop)
-      val h         = ElemHandle(span, toStart)
+      val h         = ElemHandle(start, toStart)
       val tr0       = timeRef.intersect(span)
       playView(h, tr0, target)
     }
@@ -138,10 +135,10 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val toStart = tree.get(start)(iSys(tx))
       .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.frame}"))
       .head
-    val stop    = viewEventAfter(start)
-    val span    = if (stop == Long.MaxValue) Span.From(start) else Span(start, stop)
-    val h       = ElemHandle(span, toStart)
-    ??? // stopView
+    // val stop    = viewEventAfter(start)
+    // val span    = if (stop == Long.MaxValue) Span.From(start) else Span(start, stop)
+    val h       = ElemHandle(start, toStart)
+    stopViews()
     playView(h, timeRef, play.target)
   }
 
@@ -172,17 +169,14 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 //    playView((), view, timeRef, target)
 //  }
 
-  protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = h.span match {
-    case hs: Span.HasStart =>
-      implicit val itx = iSys(tx)
-      val start = hs.start
-      val seq0  = tree.get(start).get
-      val idx   = seq0.indexOf(h.view)
-      if (idx < 0) throw new IllegalStateException(s"View ${h.view} not found.")
-      val seq1  = seq0.patch(idx, Nil, 1)
-      if (seq1.isEmpty) tree.remove(start) else tree.add(start -> seq1)
-
-    case _ => throw new IllegalStateException(s"Span ${h.span} should have start")
+  protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+    implicit val itx = iSys(tx)
+    val start = h.start
+    val seq0  = tree.get(start).get
+    val idx   = seq0.indexOf(h.view)
+    if (idx < 0) throw new IllegalStateException(s"View ${h.view} not found.")
+    val seq1  = seq0.patch(idx, Nil, 1)
+    if (seq1.isEmpty) tree.remove(start) else tree.add(start -> seq1)
   }
 
   protected def elemFromHandle(h: ElemHandle): Elem = h.view
@@ -193,10 +187,14 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
   protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
 
-  protected def mkView(vid: Unit, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle = {
-    val view = makeViewElem(obj)
-    ElemHandle(span, view)
-  }
+  protected def mkView(vid: Unit, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle =
+    span match {
+      case hs: Span.HasStart =>
+        val view = makeViewElem(obj)
+        ElemHandle(hs.start, view)
+      case _ =>
+        throw new IllegalArgumentException(s"Span should have start: $span")
+    }
 
   private[this] def elemAdded(pin: BiPin[S, Obj[S]], start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = {
     val span = pin.eventAfter(start).fold[SpanLike](Span.From(start))(Span(start, _))
@@ -206,9 +204,10 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private[this] def elemRemoved(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
     tree.get(start).foreach { seq =>
-      seq.find(_.obj() == child).foreach { h =>
+      seq.find(_.obj() == child).foreach { view =>
         logA(s"timeline - elemRemoved($start, $child)")
-        ??? // elemRemoved(h)
+        val h = ElemHandle(start, view)
+        elemRemoved(h)
       }
     }
 
@@ -221,22 +220,12 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   protected def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
-                               (implicit tx: S#Tx): Boolean = {
-    if (elemPlays) {
-      // reschedule if the span has a stop and elem.stop == oldTarget
-      h.span match {
-        case hs: Span.HasStop => hs.stop == oldTarget
-        case _ => false
-      }
-    } else {
+                               (implicit tx: S#Tx): Boolean =
+    !elemPlays && {
       // reschedule if the span has a start and that start is greater than the current frame,
       // and elem.start == oldTarget
-      h.span match {
-        case hs: Span.HasStart => hs.start > currentFrame && hs.start == oldTarget
-        case _ => false
-      }
+      h.start > currentFrame && h.start == oldTarget
     }
-  }
 
   override def dispose()(implicit tx: S#Tx): Unit = {
     super.dispose()
