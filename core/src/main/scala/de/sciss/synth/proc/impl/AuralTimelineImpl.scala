@@ -21,6 +21,7 @@ import de.sciss.lucre.geom.LongSpace
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{IdentifierMap, Obj}
 import de.sciss.lucre.synth.Sys
+import de.sciss.span.SpanLike
 
 object AuralTimelineImpl {
    private type Leaf[S <: Sys[S]] = AuralTimelineBase.Leaf[S, AuralObj[S]]
@@ -49,14 +50,14 @@ object AuralTimelineImpl {
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
     val tree = SkipOctree.empty[I1, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
 
-    val viewMap = tx.newInMemoryIDMap[AuralObj[S]]
+    val viewMap = tx.newInMemoryIDMap[(stm.Source[S#Tx, S#ID], SpanLike, AuralObj[S])]
     val res = new Impl[S, I1](tx.newHandle(tlObj), tree, viewMap)
     res
   }
 
   private final class Impl[S <: Sys[S], I <: stm.Sys[I]](val obj: stm.Source[S#Tx, Timeline[S]],
                                                          protected val tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]],
-                                                         protected val viewMap: IdentifierMap[S#ID, S#Tx, AuralObj[S]])
+                                                         protected val viewMap: IdentifierMap[S#ID, S#Tx, (stm.Source[S#Tx, S#ID], SpanLike, AuralObj[S])])
                                                         (implicit protected val context: AuralContext[S],
                                                          protected val iSys: S#Tx => I#Tx)
     extends AuralTimelineBase[S, I, Unit, AuralObj[S]] with AuralObj.Timeline.Manual[S] { impl =>
@@ -71,7 +72,7 @@ object AuralTimelineImpl {
         fire(AuralObj.Timeline.ViewRemoved(impl, view))
     }
 
-    protected def viewAdded  (timed: S#ID, view: AuralObj[S])(implicit tx: S#Tx): Unit = contents.viewAdded  (timed, view)
-    protected def viewRemoved(             view: AuralObj[S])(implicit tx: S#Tx): Unit = contents.viewRemoved(       view)
+    protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewAdded  (h._1(), h._3)
+    protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewRemoved(h._3)
   }
 }

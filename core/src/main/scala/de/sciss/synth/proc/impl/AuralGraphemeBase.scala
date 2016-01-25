@@ -48,7 +48,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   final def typeID: Int = Grapheme.typeID
 
-  protected type ViewID = Unit
+  protected type ViewID     = Unit
+  protected type ElemHandle = Elem
 
   protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
     tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
@@ -64,7 +65,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         Span(startTime, stopTime  )
       }
       val tr0       = timeRef.intersect(span)
-      playView((), toStart, tr0, target)
+      ??? // playView((), toStart, tr0, target)
     }
   }
 
@@ -121,7 +122,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val toStart = tree.get(timeRef.frame)(iSys(tx))
       .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.frame}"))
       .head
-    playView((), toStart, timeRef, play.target)
+    ??? // playView((), toStart, timeRef, play.target)
   }
 
   def init(tl: Grapheme[S])(implicit tx: S#Tx): this.type = {
@@ -140,16 +141,28 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     this
   }
 
-  override protected def playView(id: Unit, view: Elem, timeRef: TimeRef, target: Target)
-                                 (implicit tx: S#Tx): Unit = {
-    views.foreach(stopView) // there ought to be either zero or one view
-    super.playView(id, view, timeRef, target)
-  }
+//  override protected def playView(id: Unit, view: Elem, timeRef: TimeRef, target: Target)
+//                                 (implicit tx: S#Tx): Unit = {
+//    views.foreach(stopView) // there ought to be either zero or one view
+//    super.playView(id, view, timeRef, target)
+//  }
 
 //  private[this] def playView1(view: Elem, timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
 //    views.foreach(stopView) // there ought to be either zero or one view
 //    playView((), view, timeRef, target)
 //  }
+
+  protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = ???
+
+  protected def elemFromHandle(h: ElemHandle): Elem = h
+
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewAdded`.
+    */
+  protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
+  protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
+
+  protected def mkView(vid: Unit, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle = ???
 
   private[this] def elemAdded(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = internalState match {
     case IStopped =>
@@ -157,26 +170,27 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       val gr    = obj()
       val stop  = gr.eventAfter(start)
       val span  = stop.fold[SpanLike](Span.from(start))(Span(start, _))
-      elemAdded(st, (), span) {
-        logA(s"timeline - elemAdded($span, $child)")
-
-        // Create a view for the element.
-        val childView = makeView(child)
-
-        // because the assertion is with the span overlap
-        // that internal state is either preparing or playing,
-        // the view will always be stored, either in
-        // `IPreparing` (XXX TODO: NOT) or in `playingViews`.
-        //
-        //    viewMap.put(tid, childView)
-        val oldEntries = tree.get(start)(iSys(tx)).getOrElse(Vector.empty)
-        val newEntries = oldEntries :+ childView
-        // println(s"tree.add($start -> $childView) - elemAdded")
-        tree.add(start -> newEntries)(iSys(tx))
-
-        // elemAddedPreparePlay(st, (), span, childView)
-        childView
-      }
+      ???
+//      elemAdded(st, (), span) {
+//        logA(s"timeline - elemAdded($span, $child)")
+//
+//        // Create a view for the element.
+//        val childView = makeView(child)
+//
+//        // because the assertion is with the span overlap
+//        // that internal state is either preparing or playing,
+//        // the view will always be stored, either in
+//        // `IPreparing` (XXX TODO: NOT) or in `playingViews`.
+//        //
+//        //    viewMap.put(tid, childView)
+//        val oldEntries = tree.get(start)(iSys(tx)).getOrElse(Vector.empty)
+//        val newEntries = oldEntries :+ childView
+//        // println(s"tree.add($start -> $childView) - elemAdded")
+//        tree.add(start -> newEntries)(iSys(tx))
+//
+//        // elemAddedPreparePlay(st, (), span, childView)
+//        childView
+//      }
   }
 
   private[this] def elemRemoved(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = {
@@ -256,7 +270,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 //      }
 //    } (iSys(tx))
 
-    stopView(view)
+    ??? // stopView(view)
   }
 
   override def dispose()(implicit tx: S#Tx): Unit = {

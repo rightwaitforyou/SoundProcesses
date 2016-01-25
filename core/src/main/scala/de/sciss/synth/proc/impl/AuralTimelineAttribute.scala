@@ -20,6 +20,7 @@ import de.sciss.lucre.geom.LongSpace
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, TxnLike, IdentifierMap, Obj}
 import de.sciss.lucre.synth.Sys
+import de.sciss.span.SpanLike
 import de.sciss.synth.proc.AuralAttribute.{Factory, Observer}
 
 import scala.annotation.tailrec
@@ -51,7 +52,7 @@ object AuralTimelineAttribute extends Factory {
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
     val tree = SkipOctree.empty[I1, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
 
-    val viewMap = tx.newInMemoryIDMap[AuralAttribute[S]]
+    val viewMap = tx.newInMemoryIDMap[(stm.Source[S#Tx, S#ID], SpanLike, AuralAttribute[S])]
     new AuralTimelineAttribute(key, tx.newHandle(value), observer, tree, viewMap)
   }
 }
@@ -59,7 +60,7 @@ final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
          val obj: stm.Source[S#Tx, Timeline[S]],
          observer: Observer[S],
          protected val tree: SkipOctree[I, LongSpace.TwoDim, AuralTimelineAttribute.Leaf[S]],
-         protected val viewMap: IdentifierMap[S#ID, S#Tx, AuralAttribute[S]])
+         protected val viewMap: IdentifierMap[S#ID, S#Tx, (stm.Source[S#Tx, S#ID], SpanLike, AuralAttribute[S])])
         (implicit protected val context: AuralContext[S], protected val iSys: S#Tx => I#Tx)
   extends AuralTimelineBase[S, I, AuralAttribute.Target[S], AuralAttribute[S]]
   with AuralAttribute[S]
@@ -78,8 +79,8 @@ final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
 
   protected def makeView(obj: Obj[S])(implicit tx: S#Tx): Elem = AuralAttribute(key, obj, attr)
 
-  protected def viewAdded  (timed: S#ID, view: Elem)(implicit tx: S#Tx): Unit = ()
-  protected def viewRemoved(             view: Elem)(implicit tx: S#Tx): Unit = ()
+  protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
+  protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
 
   def preferredNumChannels(implicit tx: S#Tx): Int = {
     val cache = prefChansNumRef()

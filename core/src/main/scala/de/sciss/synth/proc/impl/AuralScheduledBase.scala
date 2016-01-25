@@ -17,12 +17,13 @@ package impl
 import de.sciss.lucre.bitemp.impl.BiGroupImpl
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.geom.LongPoint2D
-import de.sciss.lucre.stm.{Disposable, TxnLike}
+import de.sciss.lucre.stm.{Obj, Disposable, TxnLike}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc.AuralView.{Playing, Prepared, Preparing, Stopped}
 import de.sciss.synth.proc.{logAural => logA}
 
+import scala.collection.breakOut
 import scala.concurrent.stm.{Ref, TSet}
 
 object AuralScheduledBase {
@@ -117,6 +118,24 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     */
   protected type ViewID
 
+  protected type ElemHandle
+
+  protected def elemFromHandle(h: ElemHandle): Elem
+
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewAdded`.
+    */
+  protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit
+
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewRemoved`.
+    */
+  protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit
+
+  protected def mkView(vid: ViewID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle
+
+  protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit
+
   // ---- impl ----
 
   import AuralScheduledBase.{LOOK_AHEAD, PREP_FRAMES, LOOK_STOP, Scheduled, EmptyScheduled}
@@ -163,7 +182,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   private[this] val internalRef       = Ref[InternalState](IStopped)
   private[this] val prepareSpanRef    = Ref[Span.HasStart](Span(0L, 0L))
 
-  private[this] val playingViews      = TSet.empty[Elem]
+  private[this] val playingViews      = TSet.empty[ElemHandle]
   private[this] val schedEvtToken     = Ref(EmptyScheduled)
   private[this] val schedGridToken    = Ref(EmptyScheduled)
 
@@ -172,7 +191,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   protected final def internalState(implicit tx: S#Tx): InternalState = internalRef()
   protected final def internalState_=(value: InternalState)(implicit tx: S#Tx): Unit = internalRef() = value
 
-  final def views(implicit tx: S#Tx): Set[Elem] = playingViews.toSet
+  final def views(implicit tx: S#Tx): Set[Elem] = playingViews.map(elemFromHandle)(breakOut) // toSet
 
   // ---- utility methods for sub-types ----
 
@@ -183,12 +202,13 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     *
     * Sub-classes may override this if they call `super.playView`
     */
-  protected def playView(id: ViewID, view: Elem, timeRef: TimeRef, target: Target)
+  protected final def playView(h: ElemHandle, timeRef: TimeRef, target: Target)
                         (implicit tx: S#Tx): Unit = {
+    val view = elemFromHandle(h)
     logA(s"timeline - playView: $view - $timeRef")
     view.play(timeRef, target)
-    playingViews.add(view)
-    // viewAdded(timed, view)
+    playingViews.add(h)
+    viewPlaying(h)
   }
 
   /** Should be called from `processEvent` for views that should be
@@ -196,12 +216,14 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * the view also from a view-tree if such structure is maintained.
     * NOT: This method ends by calling `viewRemoved`.
     */
-  protected def stopView(view: Elem)(implicit tx: S#Tx): Unit = {
+  protected final def stopView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+    val view = elemFromHandle(h)
     logA(s"timeline - stopView: $view")
     view.stop()
+    viewStopped(h)
     view.dispose()
-    playingViews.remove(view)
-    // viewRemoved(view)
+    playingViews.remove(h)
+    removeView(h)
   }
 
   /** Should be called from `processPrepare`. If the child can be instantly
@@ -401,11 +423,11 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   // ---- helper methods for elemAdded ----
 
-  protected final def elemAdded(st: ITimedState, vid: ViewID, span: SpanLike)(mkView: => Elem)
-                               (implicit tx: S#Tx): Unit =
-    st match {
-      case prep: IPreparing => elemAddedPrepare(prep,      span)(mkView)
-      case play: IPlaying   => elemAddedPlay   (play, vid, span)(mkView)
+  protected final def elemAdded(vid: ViewID, span: SpanLike, obj: Obj[S])
+                               (implicit tx: S#Tx): Unit = internalState match {
+      case prep: IPreparing => elemAddedPrepare(prep, vid, span, obj)
+      case play: IPlaying   => elemAddedPlay   (play, vid, span, obj)
+      case       IStopped   =>
     }
 
 //  /** This is usually called from the implementation's `elemAdded` to check if a view
@@ -436,12 +458,14 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 //    case play: IPlaying   => elemAddedPlay   (play, vid, span, childView)
 //  }
 
-  private[this] def elemAddedPrepare(prep: IPreparing, span: SpanLike)(mkView: => Elem)(implicit tx: S#Tx): Unit = {
+  private[this] def elemAddedPrepare(prep: IPreparing, vid: ViewID, span: SpanLike, obj: Obj[S])
+                                    (implicit tx: S#Tx): Unit = {
     val prepS     = prepareSpan()
     if (!span.overlaps(prepS)) return
 
     val childTime = prep.timeRef.intersect(span)
-    val childView = mkView
+    val childH    = mkView(vid, span, obj)
+    val childView = elemFromHandle(childH)
     val prepOpt   = prepareChild(childView, childTime)
     prepOpt.foreach { case (_, childObs) =>
       val map1      = prep.map + (childView -> childObs)
@@ -452,7 +476,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
-  private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike)(mkView: => Elem)
+  private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, obj: Obj[S])
                                        (implicit tx: S#Tx): Unit = {
     // calculate current frame
     val tr0           = play.shiftTo(sched.time)
@@ -464,8 +488,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     if (elemPlays) {
       val tr1       = tr0.intersect(span)
-      val childView = mkView
-      playView(vid, childView, tr1, play.target)
+      val childView = mkView(vid, span, obj)
+      playView(childView, tr1, play.target)
     }
 
     // re-validate the next scheduling position
