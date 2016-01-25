@@ -52,15 +52,13 @@ object AuralTimelineAttribute extends Factory {
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
     val tree = SkipOctree.empty[I1, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
 
-    val viewMap = tx.newInMemoryIDMap[(stm.Source[S#Tx, S#ID], SpanLike, AuralAttribute[S])]
-    new AuralTimelineAttribute(key, tx.newHandle(value), observer, tree, viewMap)
+    new AuralTimelineAttribute(key, tx.newHandle(value), observer, tree)
   }
 }
 final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String,
          val obj: stm.Source[S#Tx, Timeline[S]],
          observer: Observer[S],
-         protected val tree: SkipOctree[I, LongSpace.TwoDim, AuralTimelineAttribute.Leaf[S]],
-         protected val viewMap: IdentifierMap[S#ID, S#Tx, (stm.Source[S#Tx, S#ID], SpanLike, AuralAttribute[S])])
+         protected val tree: SkipOctree[I, LongSpace.TwoDim, AuralTimelineAttribute.Leaf[S]])
         (implicit protected val context: AuralContext[S], protected val iSys: S#Tx => I#Tx)
   extends AuralTimelineBase[S, I, AuralAttribute.Target[S], AuralAttribute[S]]
   with AuralAttribute[S]
@@ -77,7 +75,7 @@ final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
   private[this] val prefChansElemRef  = Ref[Vec[Elem]](Vector.empty)
   private[this] val prefChansNumRef   = Ref(-2)   // -2 = cache invalid. across contents of `prefChansElemRef`
 
-  protected def makeView(obj: Obj[S])(implicit tx: S#Tx): Elem = AuralAttribute(key, obj, attr)
+  protected def makeViewElem(obj: Obj[S])(implicit tx: S#Tx): Elem = AuralAttribute(key, obj, attr)
 
   protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
   protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
@@ -103,7 +101,7 @@ final class AuralTimelineAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String
     }
 
     val elems = entries.flatMap(_._2.map(_.value)).toVector
-    val views = elems.map(makeView)
+    val views = elems.map(makeViewElem)
     prefChansElemRef.swap(views).foreach(_.dispose())
 
     @tailrec

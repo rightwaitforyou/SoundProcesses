@@ -96,11 +96,6 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     */
   protected def processEvent(play: IPlaying, timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit
 
-  /** If the sub-type maintains a tree structure for the views, this method
-    * should simply clear that structure without performing any additional clean-up on the views.
-    */
-  protected def clearViewsTree()(implicit tx: S#Tx): Unit
-
   /** Report the next interesting frame greater than the given frame for which
     * `eventReached` (internal) and `processEvent` will be called.
     * If no such event exists, the method must return `Long.MaxValue`.
@@ -415,8 +410,6 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     sched.cancel(schedEvtToken ().token)
     sched.cancel(schedGridToken().token)
     assert(playingViews.isEmpty)
-    // playingViews.clear()
-    clearViewsTree()
 
     internalRef.swap(IStopped).dispose()
   }

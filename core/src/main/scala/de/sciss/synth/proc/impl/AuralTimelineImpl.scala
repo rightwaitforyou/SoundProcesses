@@ -50,19 +50,17 @@ object AuralTimelineImpl {
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Leaf[S]]
     val tree = SkipOctree.empty[I1, LongSpace.TwoDim, Leaf[S]](BiGroup.MaxSquare)
 
-    val viewMap = tx.newInMemoryIDMap[(stm.Source[S#Tx, S#ID], SpanLike, AuralObj[S])]
-    val res = new Impl[S, I1](tx.newHandle(tlObj), tree, viewMap)
+    val res = new Impl[S, I1](tx.newHandle(tlObj), tree)
     res
   }
 
   private final class Impl[S <: Sys[S], I <: stm.Sys[I]](val obj: stm.Source[S#Tx, Timeline[S]],
-                                                         protected val tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]],
-                                                         protected val viewMap: IdentifierMap[S#ID, S#Tx, (stm.Source[S#Tx, S#ID], SpanLike, AuralObj[S])])
+                                                         protected val tree: SkipOctree[I, LongSpace.TwoDim, Leaf[S]])
                                                         (implicit protected val context: AuralContext[S],
                                                          protected val iSys: S#Tx => I#Tx)
     extends AuralTimelineBase[S, I, Unit, AuralObj[S]] with AuralObj.Timeline.Manual[S] { impl =>
 
-    protected def makeView(obj: Obj[S])(implicit tx: S#Tx): AuralObj[S] = AuralObj(obj)
+    protected def makeViewElem(obj: Obj[S])(implicit tx: S#Tx): AuralObj[S] = AuralObj(obj)
 
     object contents extends ObservableImpl[S, AuralObj.Timeline.Update[S]] {
       def viewAdded(timed: S#ID, view: AuralObj[S])(implicit tx: S#Tx): Unit =
@@ -72,7 +70,7 @@ object AuralTimelineImpl {
         fire(AuralObj.Timeline.ViewRemoved(impl, view))
     }
 
-    protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewAdded  (h._1(), h._3)
-    protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewRemoved(h._3)
+    protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewAdded  (h.idH(), h.view)
+    protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewRemoved(h.view)
   }
 }

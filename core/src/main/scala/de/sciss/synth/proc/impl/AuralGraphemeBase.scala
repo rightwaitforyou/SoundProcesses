@@ -113,10 +113,10 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     sub
   }
 
-  protected final def clearViewsTree()(implicit tx: S#Tx): Unit = {
-    // println("tree.clear()")
-    tree.clear()(iSys(tx))
-  }
+  //  protected final def clearViewsTree()(implicit tx: S#Tx): Unit = {
+  //    // println("tree.clear()")
+  //    tree.clear()(iSys(tx))
+  //  }
 
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
     val toStart = tree.get(timeRef.frame)(iSys(tx))
