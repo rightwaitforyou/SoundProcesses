@@ -18,6 +18,7 @@ import de.sciss.lucre.data.SkipList
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{IdentifierMap, Obj, TxnLike}
 import de.sciss.lucre.synth.Sys
+import de.sciss.span.SpanLike
 import de.sciss.synth.proc.AuralAttribute.{Factory, Observer}
 
 import scala.annotation.tailrec
@@ -47,15 +48,15 @@ object AuralGraphemeAttribute extends Factory {
     implicit val dummyKeySer = DummySerializerFactory[system.I].dummySerializer[Vec[AuralAttribute[S]]]
     val tree = SkipList.Map.empty[I1, Long, Vec[AuralAttribute[S]]]
 
-    val viewMap = tx.newInMemoryIDMap[AuralAttribute[S]]
-    new AuralGraphemeAttribute(key, tx.newHandle(value), observer, tree, viewMap)
+    // val viewMap = tx.newInMemoryIDMap[AuralAttribute[S]]
+    new AuralGraphemeAttribute(key, tx.newHandle(value), observer, tree /* , viewMap */)
   }
 }
 final class AuralGraphemeAttribute[S <: Sys[S], I <: stm.Sys[I]](val key: String,
                                                                  val obj: stm.Source[S#Tx, Grapheme[S]],
                                                                  observer: Observer[S],
-                                                                 protected val tree: SkipList.Map[I, Long, Vec[AuralAttribute[S]]],
-                                                                 protected val viewMap: IdentifierMap[S#ID, S#Tx, AuralAttribute[S]])
+                                                                 protected val tree: SkipList.Map[I, Long, Vec[AuralAttribute[S]]])
+//                                                                 protected val viewMap: IdentifierMap[S#ID, S#Tx, AuralAttribute[S]])
                                                                 (implicit protected val context: AuralContext[S], protected val iSys: S#Tx => I#Tx)
   extends AuralGraphemeBase[S, I, AuralAttribute.Target[S], AuralAttribute[S]]
   with AuralAttribute[S]
