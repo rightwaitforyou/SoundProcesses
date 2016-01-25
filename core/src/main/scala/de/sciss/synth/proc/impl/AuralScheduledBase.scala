@@ -48,12 +48,6 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   // ---- abstract ----
 
-  //  /** A map from the model object's identifier to its view.
-  //    * This should be created upon initialization of the sub-class.
-  //    * It will be cleared in `dispose`.
-  //    */
-  //  protected def viewMap: IdentifierMap[S#ID, S#Tx, Elem]
-
   implicit protected val context: AuralContext[S]
 
   /** Called during preparation of armed elements. This
@@ -65,8 +59,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * - for each view call `prepareChild`
     * - accumulate the results of `prepareChild` into a `Map` that is returned.
     *
-    * The map will become part of `IPreparing`. The returned `Boolean` indicates
-    * if elements were found (`true`) or not (`false`).
+    * The map will become part of `IPreparing`. (NOT: The returned `Boolean` indicates
+    * if elements were found (`true`) or not (`false`)).
     *
     * @param initial  if `true` this is an initial preparation which means the method
     *                 must include views that start before `prepareSpan` if their span
@@ -77,13 +71,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   protected def processPrepare(prepareSpan: Span, timeRef: TimeRef.Apply, initial: Boolean)
                               (implicit tx: S#Tx): PrepareResult
 
-  /** The result of `processPrepare`.
-    *
-    * @param async      the views whose preparation is ongoing (view and observer pairs)
-    * @param nonEmpty   `true` if at least one view was prepared, `false` otherwise
-    */
-  protected final class PrepareResult(val async: Map[Elem, Disposable[S#Tx]],
-                                      val nonEmpty: Boolean)
+  protected type PrepareResult = Iterator[(ViewID, SpanLike, Obj[S])]
 
   /** Called during `play`. Sub-classes should intersect
     * the current elements and for each of them call `playView`.
@@ -131,6 +119,9 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit
 
+  protected def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
+                               (implicit tx: S#Tx): Boolean
+
   // ---- impl ----
 
   import AuralScheduledBase.{LOOK_AHEAD, PREP_FRAMES, LOOK_STOP, Scheduled, EmptyScheduled}
@@ -177,7 +168,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   private[this] val internalRef       = Ref[InternalState](IStopped)
   private[this] val prepareSpanRef    = Ref[Span.HasStart](Span(0L, 0L))
 
-  private[this] val playingViews      = TSet.empty[ElemHandle]
+  private[this] val playingRef        = TSet.empty[ElemHandle]
   private[this] val schedEvtToken     = Ref(EmptyScheduled)
   private[this] val schedGridToken    = Ref(EmptyScheduled)
 
@@ -186,7 +177,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   protected final def internalState(implicit tx: S#Tx): InternalState = internalRef()
   protected final def internalState_=(value: InternalState)(implicit tx: S#Tx): Unit = internalRef() = value
 
-  final def views(implicit tx: S#Tx): Set[Elem] = playingViews.map(elemFromHandle)(breakOut) // toSet
+  final def views(implicit tx: S#Tx): Set[Elem] = playingRef.map(elemFromHandle)(breakOut) // toSet
 
   // ---- utility methods for sub-types ----
 
@@ -198,11 +189,11 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * Sub-classes may override this if they call `super.playView`
     */
   protected final def playView(h: ElemHandle, timeRef: TimeRef, target: Target)
-                        (implicit tx: S#Tx): Unit = {
+                              (implicit tx: S#Tx): Unit = {
     val view = elemFromHandle(h)
     logA(s"timeline - playView: $view - $timeRef")
     view.play(timeRef, target)
-    playingViews.add(h)
+    playingRef.add(h)
     viewPlaying(h)
   }
 
@@ -217,17 +208,17 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     view.stop()
     viewStopped(h)
     view.dispose()
-    playingViews.remove(h)
+    playingRef.remove(h)
     removeView(h)
   }
 
-  /** Should be called from `processPrepare`. If the child can be instantly
-    * prepared, `None` is returned. Otherwise the child is observed until it
-    * is prepared and the method returns `Some(elem, observer)` that must
-    * be passed back from `processPrepare` (they'll show up in `IPreparing`).
-    */
-  protected final def prepareChild(childView: Elem, childTime: TimeRef)
-                                  (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
+  /* Should be called from `processPrepare`. If the child can be instantly
+   * prepared, `None` is returned. Otherwise the child is observed until it
+   * is prepared and the method returns `Some(elem, observer)` that must
+   * be passed back from `processPrepare` (they'll show up in `IPreparing`).
+   */
+  private[this] def prepareChild(childView: Elem, childTime: TimeRef)
+                                (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
     logA(s"timeline - prepare $childView - $childTime")
     childView.prepare(childTime)
     val isPrepared = childView.state == Prepared
@@ -276,9 +267,15 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     // different `timeRef` from what was previously prepared
     /* TTT if (!tree.isEmpty(iSys(tx))) */ freeNodesAndCancelSchedule()
 
-    val prepRes       = processPrepare(prepareSpan, timeRef, initial = true)
+    val it = processPrepare(prepareSpan, timeRef, initial = true)
+    val async = it.flatMap { case (vid, span, obj) =>
+      val h         = mkView(vid, span, obj)
+      val childView = elemFromHandle(h)
+      val childTime = timeRef.intersect(span)
+      prepareChild(childView, childTime)
+    } .toMap
 
-    val st            = new IPreparing(prepRes.async, timeRef)
+    val st            = new IPreparing(async, timeRef)
     internalRef()     = st
     prepareSpanRef()  = prepareSpan // if (prepRes.nextStart != Long.MaxValue) Span(startFrame, prepRes.nextStart) else Span.from(startFrame)
     st
@@ -404,14 +401,13 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * Then calls `clearViewsTree`. Puts internal state to `IStopped`.
    */
   private[this] def freeNodesAndCancelSchedule()(implicit tx: S#Tx): Unit = {
-    playingViews.foreach { view =>
+    internalRef.swap(IStopped).dispose()
+    playingRef.foreach { view =>
       stopView(view)
     }
     sched.cancel(schedEvtToken ().token)
     sched.cancel(schedGridToken().token)
-    assert(playingViews.isEmpty)
-
-    internalRef.swap(IStopped).dispose()
+    assert(playingRef.isEmpty)
   }
 
   // ---- helper methods for elemAdded ----
@@ -423,7 +419,34 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
       case       IStopped   =>
     }
 
-//  /** This is usually called from the implementation's `elemAdded` to check if a view
+  protected final def elemRemoved(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+    val elemPlays = playingRef.contains(h)
+    // remove view for the element from tree and map
+    stopView(h)
+    internalState match {
+      case _: IPreparing =>
+        val childView = elemFromHandle(h)
+        childPreparedOrRemoved(childView) // might change state to `Prepared`
+
+      case play: IPlaying =>
+        // calculate current frame
+        val tr0           = play.shiftTo(sched.time)
+        val currentFrame  = tr0.frame
+
+        // re-validate the next scheduling position
+        val oldSched    = scheduledEvent()
+        val oldTarget   = oldSched.frame
+        val reschedule = checkReschedule(h, currentFrame = currentFrame, oldTarget = oldTarget, elemPlays = elemPlays)
+        if (reschedule) {
+          logA("...reschedule")
+          scheduleNextEvent(currentFrame)
+        }
+
+      case _ =>
+    }
+  }
+
+  //  /** This is usually called from the implementation's `elemAdded` to check if a view
 //    * should be created now. This method takes care of re-scheduling grid if necessary.
 //    * If the method returns `true`, the caller should build the view and then proceed
 //    * to `elemAddedPreparePlay`.

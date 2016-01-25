@@ -74,44 +74,45 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     // println(s"processPrepare($span, $timeRef, initial = $initial")
     val gr    = obj()
     val opt0  = if (initial) gr.floor(span.start) else gr.ceil(span.start)
-    opt0.fold(new PrepareResult(Map.empty, nonEmpty = false /* , nextStart = Long.MaxValue */)) { e0 =>
-      @tailrec
-      def loop(start: Long, child: Obj[S],
-               m: Map[Elem, Disposable[S#Tx]], nonEmpty: Boolean): PrepareResult =
-        if (start >= span.stop)
-          new PrepareResult(m, nonEmpty = nonEmpty /* , nextStart = start */)
-        else gr.ceil(start + 1) match {
-          case Some(succ) =>
-            val stop      = succ.key.value
-            val childSpan = Span(start, stop)
-            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
-            val mNext     = prepObs.fold(m)(m + _)
-            loop(start = stop, child = succ.value, m = mNext, nonEmpty = true)
-
-          case None =>
-            val childSpan = Span.from(start)
-            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
-            val mNext     = prepObs.fold(m)(m + _)
-            new PrepareResult(mNext, nonEmpty = true /* , nextStart = Long.MaxValue */)
-        }
-
-      loop(e0.key.value, e0.value, Map.empty, nonEmpty = false)
-    }
+    ???
+//    opt0.fold(new PrepareResult(Map.empty, nonEmpty = false /* , nextStart = Long.MaxValue */)) { e0 =>
+//      @tailrec
+//      def loop(start: Long, child: Obj[S],
+//               m: Map[Elem, Disposable[S#Tx]], nonEmpty: Boolean): PrepareResult =
+//        if (start >= span.stop)
+//          new PrepareResult(m, nonEmpty = nonEmpty /* , nextStart = start */)
+//        else gr.ceil(start + 1) match {
+//          case Some(succ) =>
+//            val stop      = succ.key.value
+//            val childSpan = Span(start, stop)
+//            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
+//            val mNext     = prepObs.fold(m)(m + _)
+//            loop(start = stop, child = succ.value, m = mNext, nonEmpty = true)
+//
+//          case None =>
+//            val childSpan = Span.from(start)
+//            val prepObs   = prepareFromEntry(timeRef, childSpan, child = child)
+//            val mNext     = prepObs.fold(m)(m + _)
+//            new PrepareResult(mNext, nonEmpty = true /* , nextStart = Long.MaxValue */)
+//        }
+//
+//      loop(e0.key.value, e0.value, Map.empty, nonEmpty = false)
+//    }
   }
 
-  private[this] def prepareFromEntry(timeRef: TimeRef.Apply, span: Span.HasStart, child: Obj[S])
-                                    (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
-    // println(s"prepareFromEntry($timeRef, $span, $child)")
-    val childTime = timeRef.intersect(span)
-    val sub: Option[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) None else {
-      val childView   = makeView(child)
-      val childViews  = Vector.empty :+ childView
-      // println(s"tree.add(${span.start} -> $childView) - prepareFromEntry")
-      tree.add(span.start -> childViews)(iSys(tx))
-      prepareChild(childView, childTime)
-    }
-    sub
-  }
+//  private[this] def prepareFromEntry(timeRef: TimeRef.Apply, span: Span.HasStart, child: Obj[S])
+//                                    (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
+//    // println(s"prepareFromEntry($timeRef, $span, $child)")
+//    val childTime = timeRef.intersect(span)
+//    val sub: Option[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) None else {
+//      val childView   = makeView(child)
+//      val childViews  = Vector.empty :+ childView
+//      // println(s"tree.add(${span.start} -> $childView) - prepareFromEntry")
+//      tree.add(span.start -> childViews)(iSys(tx))
+//      prepareChild(childView, childTime)
+//    }
+//    sub
+//  }
 
   //  protected final def clearViewsTree()(implicit tx: S#Tx): Unit = {
   //    // println("tree.clear()")
@@ -198,79 +199,27 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       // finding the object in the view-map implies that it
       // is currently preparing or playing
       logA(s"timeline - elemRemoved($start, $child)")
-      elemRemoved1(start, child, view)
+      elemRemoved(view)
     }
   }
 
-  private[this] def elemRemoved1(start: Long, child: Obj[S], childView: Elem)
-                                (implicit tx: S#Tx): Unit = {
-    // remove view for the element from tree and map
-    ??? // viewMap.remove(tid)
+  protected def checkReschedule(h: Elem, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
+                               (implicit tx: S#Tx): Boolean = {
     val span: SpanLike = ???
-    stopAndDisposeView(span, childView)
-    internalState match {
-      case _: IPreparing =>
-        childPreparedOrRemoved(childView) // might change state to `Prepared`
-
-      case play: IPlaying =>
-        // TODO - a bit of DRY re elemAdded
-        // calculate current frame
-        val tr0           = play.shiftTo(sched.time)
-        val currentFrame  = tr0.frame
-
-        // if we're playing and the element span intersects contains
-        // the current frame, play that new element
-        val elemPlays     = span.contains(currentFrame)
-
-        // re-validate the next scheduling position
-        val oldSched    = scheduledEvent()
-        val oldTarget   = oldSched.frame
-        val reschedule  = if (elemPlays) {
-          // reschedule if the span has a stop and elem.stop == oldTarget
-          span match {
-            case hs: Span.HasStop => hs.stop == oldTarget
-            case _ => false
-          }
-        } else {
-          // reschedule if the span has a start and that start is greater than the current frame,
-          // and elem.start == oldTarget
-          span match {
-            case hs: Span.HasStart => hs.start > currentFrame && hs.start == oldTarget
-            case _ => false
-          }
-        }
-
-        if (reschedule) {
-          logA("...reschedule")
-          scheduleNextEvent(currentFrame)
-        }
-
-      case _ =>
+    if (elemPlays) {
+      // reschedule if the span has a stop and elem.stop == oldTarget
+      span match {
+        case hs: Span.HasStop => hs.stop == oldTarget
+        case _ => false
+      }
+    } else {
+      // reschedule if the span has a start and that start is greater than the current frame,
+      // and elem.start == oldTarget
+      span match {
+        case hs: Span.HasStart => hs.start > currentFrame && hs.start == oldTarget
+        case _ => false
+      }
     }
-  }
-
-  private[this] def stopAndDisposeView(span: SpanLike, view: Elem)(implicit tx: S#Tx): Unit = {
-    logA(s"timeline - stopAndDispose - $span - $view")
-
-    // note: this doesn't have to check for `IPreparing`, as it is called only
-    // via `eventReached`, thus during playing. correct?
-
-    // preparingViews.remove(view).foreach(_.dispose())
-    ???
-//    tree.transformAt(spanToPoint(span)) { opt =>
-//      opt.flatMap { case (span1, views) =>
-//        val i = views.indexWhere(_._2 == view)
-//        val views1 = if (i >= 0) {
-//          views.patch(i, Nil, 1)
-//        } else {
-//          Console.err.println(s"Warning: timeline - elemRemoved - view for $obj not in tree")
-//          views
-//        }
-//        if (views1.isEmpty) None else Some(span1 -> views1)
-//      }
-//    } (iSys(tx))
-
-    ??? // stopView(view)
   }
 
   override def dispose()(implicit tx: S#Tx): Unit = {

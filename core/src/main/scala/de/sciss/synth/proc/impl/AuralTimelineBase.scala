@@ -40,7 +40,6 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   extends AuralScheduledBase[S, Target, Elem] with ObservableImpl[S, AuralView.State] { impl =>
 
   import AuralTimelineBase.spanToPoint
-  import context.{scheduler => sched}
 
   // ---- abstract ----
 
@@ -93,30 +92,16 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val startSpan   = if (initial) Span.until(span.stop) else span
     val stopSpan    = Span.from(span.start)
     val it          = tl.rangeSearch(start = startSpan, stop = stopSpan)
-    val nonEmpty    = it.nonEmpty
-    val prepObs     = prepareFromIterator(timeRef, it)
-    // val nextStart   = tl.eventAfter(span.stop - 1).getOrElse(Long.MaxValue)
-    new PrepareResult(async = prepObs, nonEmpty = nonEmpty /* , nextStart = nextStart */)
-  }
-
-  // consumes the iterator
-  private[this] def prepareFromIterator(timeRef: TimeRef.Apply, it: Iterator[Timeline.Leaf[S]])
-                                       (implicit tx: S#Tx): Map[Elem, Disposable[S#Tx]] =
-    it.flatMap { case (span, elems) =>
-      val childTime = timeRef.intersect(span)
-      val sub: Vec[(Elem, Disposable[S#Tx])] = if (childTime.span.isEmpty) Vector.empty else {
-        val childViews = elems.map { timed =>
-          mkView(timed.id, span, timed.value)
+    it.flatMap { case (childSpan, elems) =>
+      val childTime = timeRef.intersect(childSpan)
+      val sub: Vec[(ViewID, SpanLike, Obj[S])] = if (childTime.span.isEmpty) Vector.empty else {
+        elems.map { timed =>
+          (timed.id, childSpan, timed.value)
         }
-        childViews.flatMap { h =>
-          prepareChild(h.view, childTime)
-        } // (breakOut)
       }
       sub
-    } .toMap // (breakOut)
-
-  //  protected final def clearViewsTree()(implicit tx: S#Tx): Unit =
-  //    tree.clear()(iSys(tx))
+    }
+  }
 
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
     val (toStart, toStop) = eventsAt(timeRef.frame)
@@ -136,11 +121,11 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     //        playViews(toStart, tr, play.target)
     //        stopAndDisposeViews(toStop)
 
-    stopAndDisposeViews(toStop)
+    stopViews(toStop)
     playViews(toStart, timeRef, play.target)
   }
 
-  private[this] def stopAndDisposeViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
+  private[this] def stopViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
     // logA("timeline - stopViews")
     implicit val itx: I#Tx = iSys(tx)
     // Note: `toList` makes sure the iterator is not
@@ -216,59 +201,27 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       // finding the object in the view-map implies that it
       // is currently preparing or playing
       logA(s"timeline - elemRemoved($span, $obj)")
-      elemRemoved1(tid, h)
+      elemRemoved(h)
     }
 
-  private[this] def elemRemoved1(tid: S#ID, h: ElemHandle)
-                                (implicit tx: S#Tx): Unit = {
-    // remove view for the element from tree and map
-    stopView(h)
-    // viewMap.remove(tid)
-    // stopAndDisposeView(span, childView)
-    internalState match {
-      case _: IPreparing =>
-        val childView = h.view
-        childPreparedOrRemoved(childView) // might change state to `Prepared`
-
-      case play: IPlaying =>
-        // TODO - a bit of DRY re elemAdded
-        // calculate current frame
-        val tr0           = play.shiftTo(sched.time)
-        val currentFrame  = tr0.frame
-        val span          = h.span
-
-        // if we're playing and the element span intersects contains
-        // the current frame, play that new element
-        val elemPlays     = span.contains(currentFrame)
-
-        // re-validate the next scheduling position
-        val oldSched    = scheduledEvent()
-        val oldTarget   = oldSched.frame
-        val reschedule  = if (elemPlays) {
-          // reschedule if the span has a stop and elem.stop == oldTarget
-          span match {
-            case hs: Span.HasStop => hs.stop == oldTarget
-            case _ => false
-          }
-        } else {
-          // reschedule if the span has a start and that start is greater than the current frame,
-          // and elem.start == oldTarget
-          span match {
-            case hs: Span.HasStart => hs.start > currentFrame && hs.start == oldTarget
-            case _ => false
-          }
-        }
-
-        if (reschedule) {
-          logA("...reschedule")
-          scheduleNextEvent(currentFrame)
-        }
-
-      case _ =>
+  protected final def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
+                                     (implicit tx: S#Tx): Boolean =
+    if (elemPlays) {
+      // reschedule if the span has a stop and elem.stop == oldTarget
+      h.span match {
+        case hs: Span.HasStop => hs.stop == oldTarget
+        case _ => false
+      }
+    } else {
+      // reschedule if the span has a start and that start is greater than the current frame,
+      // and elem.start == oldTarget
+      h.span match {
+        case hs: Span.HasStart => hs.start > currentFrame && hs.start == oldTarget
+        case _ => false
+      }
     }
-  }
 
-  protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+  protected final def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
     import h._
     logA(s"timeline - stopAndDispose - $span - $view")
 
