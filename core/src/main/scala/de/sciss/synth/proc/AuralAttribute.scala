@@ -59,9 +59,7 @@ object AuralAttribute {
   }
   trait Target[S <: Sys[S]] {
     def put   (attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
-
-    // def add   (attr: AuralAttribute[S])(implicit tx: S#Tx): Unit
-    def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit
+    def remove(attr: AuralAttribute[S]              )(implicit tx: S#Tx): Unit
   }
 
   // ---- Value ----
@@ -101,9 +99,6 @@ object AuralAttribute {
   final case class Stream(source: NodeRef, bus: AudioBus) extends Value {
     def isScalar = false
   }
-
-//  // trait Instance[S <: Sys[S]] extends Disposable[S#Tx]
-//  trait Instance extends Disposable[Txn]
 }
 trait AuralAttribute[S <: Sys[S]] extends AuralView[S, AuralAttribute.Target[S]] {
   def key: String

@@ -34,7 +34,6 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
 
   private val map       = TMap.empty[AuralAttribute[S], Connected]
   private val stateRef  = Ref[State](Empty)
-//  private val attrs     = TSet.empty[AuralAttribute[S]]
 
   private final class Connected(val value: Value,
                                 val users: List[DynamicUser], val resources: List[Resource])
@@ -182,7 +181,7 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
             cc.dispose()
             Empty.put(aa, cc.value)
           case x =>
-            assert(x > 2)
+            assert(x > 1, s"map.size is $x")
             this
         }
       }
@@ -241,21 +240,9 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
     }
   }
 
-  // def dispose()(implicit tx: S#Tx): Unit = ...
-
-//  // this is a no-op, we just use removal
-//  def add   ()(implicit tx: Txn): Unit = ()
-//  def remove()(implicit tx: Txn): Unit = attrs.foreach(_.dispose())
-
   def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit =
     stateRef.transform(_.put(attr, value))(tx.peer)
 
-  def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
+  def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
     stateRef.transform(_.remove(attr))(tx.peer)
-    // attrs.remove(attr)
-    // if (!attrs.remove(attr)) throw new IllegalStateException(s"AuralAttribute[S] $attr was not added")
-  }
-
-  //  def add(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
-  //    if (!attrs.add(attr)) throw new IllegalStateException(s"AuralAttribute[S] $attr was already added")
 }
