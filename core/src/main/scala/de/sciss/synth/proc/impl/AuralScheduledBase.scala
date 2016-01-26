@@ -523,6 +523,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     if (schedGrid) {
       logA("...reschedule grid")
+      ??? // mistake here -- do not refer to `currentFrame` but the previous frame passed to `scheduleNextGrid`
       scheduleNextGrid(currentFrame)
     }
   }
