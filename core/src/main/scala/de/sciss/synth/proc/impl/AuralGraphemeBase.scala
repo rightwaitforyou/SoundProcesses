@@ -145,14 +145,20 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         case Grapheme.Added  (time, entry)    =>
           elemAdded  (upd.pin, time, entry.value)
         case Grapheme.Removed(time, entry)    =>
-          elemRemoved(         time, entry.value)
+          val wasPlaying = elemRemoved(upd.pin, time, entry.value)
+          if (wasPlaying) {
+            ???
+          }
 
-        case Grapheme.Moved  (timeCh, entry)  =>
+        case Grapheme.Moved(timeCh, entry)  =>
           // for simplicity just remove and re-add
           // ; in the future this could be optimized
           // (e.g., not deleting and re-creating the AuralObj)
-          elemRemoved(         timeCh.before, entry.value)
-          elemAdded  (upd.pin, timeCh.now   , entry.value)
+          val wasPlaying = elemRemoved(upd.pin, timeCh.before, entry.value)
+          val isPlaying  = elemAdded  (upd.pin, timeCh.now   , entry.value)
+          if (wasPlaying && !isPlaying) {
+            ???
+          }
       }
     }
     this
@@ -202,22 +208,26 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     ElemHandle(start, view)
   }
 
-  private[this] def elemAdded(pin: BiPin[S, Obj[S]], start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = {
+  private[this] def elemAdded(pin: BiPin[S, Obj[S]], start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
     val span = pin.eventAfter(start).fold[SpanLike](Span.From(start))(Span(start, _))
     elemAdded((), span = span, obj = child)
+    val elemPlays = playingRef().exists(_.start == start)
+    elemPlays
   }
 
-  private[this] def elemRemoved(start: Long, child: Obj[S])(implicit tx: S#Tx): Unit = {
+  private[this] def elemRemoved(pin: BiPin[S, Obj[S]], start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
     // implicit val itx = iSys(tx)
-    for {
+    val opt = for {
       seq  <- tree.get(start)(iSys(tx))
       view <- seq.find(_.obj() == child)
-    } {
+    } yield {
       logA(s"timeline - elemRemoved($start, $child)")
       val h         = ElemHandle(start, view)
       val elemPlays = playingRef().contains(h)
       elemRemoved(h, elemPlays = elemPlays)
+      elemPlays
     }
+    opt.contains(true)
   }
 
   protected def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
