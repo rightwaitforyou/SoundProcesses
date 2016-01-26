@@ -19,9 +19,8 @@ import de.sciss.lucre.data.SkipOctree
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.geom.LongSpace
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{IdentifierMap, Obj}
+import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.synth.Sys
-import de.sciss.span.SpanLike
 
 object AuralTimelineImpl {
    private type Leaf[S <: Sys[S]] = AuralTimelineBase.Leaf[S, AuralObj[S]]

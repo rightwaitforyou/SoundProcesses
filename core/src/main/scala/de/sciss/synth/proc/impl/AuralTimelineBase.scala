@@ -20,13 +20,15 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.SpanLikeObj
 import de.sciss.lucre.geom.{LongPoint2D, LongSpace}
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Disposable, IdentifierMap, Obj}
+import de.sciss.lucre.stm.{TxnLike, Disposable, IdentifierMap, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
 import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
-import scala.collection.immutable.{IndexedSeq => Vec}
+import scala.collection.breakOut
+import scala.collection.immutable.{IndexedSeq => Vec, Set => ISet}
+import scala.concurrent.stm.TSet
 
 object AuralTimelineBase {
   type Leaf[S <: Sys[S], Elem] = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
@@ -40,6 +42,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   extends AuralScheduledBase[S, Target, Elem] with ObservableImpl[S, AuralView.State] { impl =>
 
   import AuralTimelineBase.spanToPoint
+  import TxnLike.peer
 
   // ---- abstract ----
 
@@ -51,7 +54,22 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected def makeViewElem(obj: Obj[S])(implicit tx: S#Tx): Elem
 
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewAdded`.
+    */
+  protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit
+
+  /** A notification method that may be used to `fire` an event
+    * such as `AuralObj.Timeline.ViewRemoved`.
+    */
+  protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit
+
   // ---- impl ----
+
+  private[this] val playingRef        = TSet.empty[ElemHandle]
+
+  private[this] var viewMap   : IdentifierMap[S#ID, S#Tx, ElemHandle] = _
+  private[this] var tlObserver: Disposable[S#Tx] = _
 
   protected type ElemHandle = AuralTimelineBase.ElemHandle[S, Elem]
 
@@ -60,15 +78,13 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected def elemFromHandle(h: ElemHandle): Elem = h.view
 
-  private[this] var tlObserver: Disposable[S#Tx] = _
+  final def views(implicit tx: S#Tx): ISet[Elem] = playingRef.map(elemFromHandle)(breakOut) // toSet
 
   final def typeID: Int = Timeline.typeID
 
   protected type ViewID = S#ID
 
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
-
-  private[this] var viewMap: IdentifierMap[S#ID, S#Tx, ElemHandle] = _
 
   protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
     BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
@@ -102,6 +118,30 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       sub
     }
   }
+
+  protected final def playView(h: ElemHandle, timeRef: TimeRef, target: Target)
+                              (implicit tx: S#Tx): Unit = {
+    val view = elemFromHandle(h)
+    logA(s"timeline - playView: $view - $timeRef")
+    view.play(timeRef, target)
+    playingRef.add(h)
+    viewPlaying(h)
+  }
+
+  protected final def stopView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+    val view = elemFromHandle(h)
+    logA(s"scheduled - stopView: $view")
+    view.stop()
+    viewStopped(h)
+    view.dispose()
+    playingRef.remove(h)
+    removeView(h)
+  }
+
+  protected final def stopViews()(implicit tx: S#Tx): Unit =
+    playingRef.foreach { view =>
+      stopView(view)
+    }
 
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
     val (toStart, toStop) = eventsAt(timeRef.frame)
@@ -201,7 +241,8 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       // finding the object in the view-map implies that it
       // is currently preparing or playing
       logA(s"timeline - elemRemoved($span, $obj)")
-      elemRemoved(h)
+      val elemPlays = playingRef.contains(h)
+      elemRemoved(h, elemPlays = elemPlays)
     }
 
   protected final def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
@@ -221,7 +262,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       }
     }
 
-  protected final def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+  private[this] def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
     import h._
     logA(s"timeline - removeView - $span - $view")
 

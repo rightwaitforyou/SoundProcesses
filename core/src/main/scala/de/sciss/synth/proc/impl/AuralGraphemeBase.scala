@@ -125,11 +125,6 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  //  protected final def clearViewsTree()(implicit tx: S#Tx): Unit = {
-  //    // println("tree.clear()")
-  //    tree.clear()(iSys(tx))
-  //  }
-
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
     val start   = timeRef.frame
     val toStart = tree.get(start)(iSys(tx))
@@ -163,16 +158,19 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     this
   }
 
-//  override protected def playView(id: Unit, view: Elem, timeRef: TimeRef, target: Target)
-//                                 (implicit tx: S#Tx): Unit = {
-//    views.foreach(stopView) // there ought to be either zero or one view
-//    super.playView(id, view, timeRef, target)
-//  }
 
-//  private[this] def playView1(view: Elem, timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
-//    views.foreach(stopView) // there ought to be either zero or one view
-//    playView((), view, timeRef, target)
-//  }
+
+  protected def playView(h: ElemHandle, timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
+    ???
+  }
+
+  protected def stopView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+    ???
+  }
+
+  protected def stopViews()(implicit tx: S#Tx): Unit = {
+    ???
+  }
 
   protected def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
@@ -185,12 +183,6 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   protected def elemFromHandle(h: ElemHandle): Elem = h.view
-
-  /** A notification method that may be used to `fire` an event
-    * such as `AuralObj.Timeline.ViewAdded`.
-    */
-  protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
-  protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = ()
 
   protected def mkView(vid: Unit, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle =
     span match {
@@ -217,16 +209,10 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       seq.find(_.obj() == child).foreach { view =>
         logA(s"timeline - elemRemoved($start, $child)")
         val h = ElemHandle(start, view)
-        elemRemoved(h)
+        val elemPlays: Boolean = ???
+        elemRemoved(h, elemPlays = elemPlays)
       }
     }
-
-//    views.find(_.obj() == child).foreach { view =>
-//      // finding the object in the view-map implies that it
-//      // is currently preparing or playing
-//      logA(s"timeline - elemRemoved($start, $child)")
-//      elemRemoved(view)
-//    }
   }
 
   protected def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
