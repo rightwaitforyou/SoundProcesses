@@ -312,7 +312,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /** Calls `eventAfter` to determine the next interesting frame. If that
     * frame exists, schedules the execution of `eventReached`.
     */
-  protected final def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
+  private[this] def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
     val targetFrame = viewEventAfter(currentFrame)
     val token = if (targetFrame == Long.MaxValue) -1 else {
       logA(s"timeline - scheduleNextEvent($currentFrame) -> $targetFrame")
@@ -340,12 +340,16 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   }
 
   /* Schedules ahead `STEP_GRID` frames to execute `gridReached`. */
-  protected final def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
+  private[this] def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
     val modelFrame  = modelEventAfter(currentFrame + LOOK_STOP - 1)
     val targetFrame = if (modelFrame  == Long.MaxValue) Long.MaxValue else modelFrame - LOOK_AHEAD
-    val token       = if (targetFrame == Long.MaxValue) -1 else {
-      val targetTime  = sched.time + (targetFrame - currentFrame)
-      // val targetFrame = currentFrame + STEP_GRID
+    scheduleGrid(currentFrame = currentFrame, targetFrame = targetFrame)
+  }
+
+  /* `targetFrame` may be `Long.MaxValue` in which case the old schedule is simply cancelled. */
+  private[this] def scheduleGrid(currentFrame: Long, targetFrame: Long)(implicit tx: S#Tx): Unit = {
+    val token = if (targetFrame == Long.MaxValue) -1 else {
+      val targetTime = sched.time + (targetFrame - currentFrame)
       logA(s"timeline - scheduleNextGrid($currentFrame) -> $targetFrame")
       sched.schedule(targetTime) { implicit tx =>
         gridReached(frame = targetFrame)
@@ -523,8 +527,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     if (schedGrid) {
       logA("...reschedule grid")
-      ??? // mistake here -- do not refer to `currentFrame` but the previous frame passed to `scheduleNextGrid`
-      scheduleNextGrid(currentFrame)
+      val Span.HasStart(targetFrame) = span
+      scheduleGrid(currentFrame = currentFrame, targetFrame = targetFrame)
     }
   }
 }
