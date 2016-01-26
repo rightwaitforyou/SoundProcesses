@@ -145,19 +145,19 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         case Grapheme.Added  (time, entry)    =>
           elemAdded  (upd.pin, time, entry.value)
         case Grapheme.Removed(time, entry)    =>
-          val wasPlaying = elemRemoved(upd.pin, time, entry.value)
+          val wasPlaying = elemRemoved(time, entry.value)
           if (wasPlaying) {
-            ???
+            playingElemRemoved(upd.pin, time)
           }
 
         case Grapheme.Moved(timeCh, entry)  =>
           // for simplicity just remove and re-add
           // ; in the future this could be optimized
           // (e.g., not deleting and re-creating the AuralObj)
-          val wasPlaying = elemRemoved(upd.pin, timeCh.before, entry.value)
+          val wasPlaying = elemRemoved(         timeCh.before, entry.value)
           val isPlaying  = elemAdded  (upd.pin, timeCh.now   , entry.value)
           if (wasPlaying && !isPlaying) {
-            ???
+            playingElemRemoved(upd.pin, timeCh.before)
           }
       }
     }
@@ -215,7 +215,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     elemPlays
   }
 
-  private[this] def elemRemoved(pin: BiPin[S, Obj[S]], start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
+  private[this] def elemRemoved(start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
     // implicit val itx = iSys(tx)
     val opt = for {
       seq  <- tree.get(start)(iSys(tx))
@@ -229,6 +229,15 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
     opt.contains(true)
   }
+
+  // If a playing element has been removed, check if there is another one
+  // 'below' it now. If so, create a view for it. 
+  private[this] def playingElemRemoved(pin: BiPin[S, Obj[S]], frame: Long)(implicit tx: S#Tx): Unit =
+    pin.floor(frame).foreach { entry =>
+      val child = entry.value
+      val start = entry.key.value
+      elemAdded(pin, start = start, child = child)
+    }
 
   protected def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
                                (implicit tx: S#Tx): Boolean =
