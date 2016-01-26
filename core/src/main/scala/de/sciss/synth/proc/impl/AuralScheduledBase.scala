@@ -341,14 +341,14 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   /* Schedules ahead `STEP_GRID` frames to execute `gridReached`. */
   private[this] def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
-    val modelFrame  = modelEventAfter(currentFrame + LOOK_STOP - 1)
-    val targetFrame = if (modelFrame  == Long.MaxValue) Long.MaxValue else modelFrame - LOOK_AHEAD
-    scheduleGrid(currentFrame = currentFrame, targetFrame = targetFrame)
+    val modelFrame = modelEventAfter(currentFrame + LOOK_STOP - 1)
+    scheduleGrid(currentFrame = currentFrame, modelFrame = modelFrame)
   }
 
-  /* `targetFrame` may be `Long.MaxValue` in which case the old schedule is simply cancelled. */
-  private[this] def scheduleGrid(currentFrame: Long, targetFrame: Long)(implicit tx: S#Tx): Unit = {
-    val token = if (targetFrame == Long.MaxValue) -1 else {
+  /* `modelFrame` may be `Long.MaxValue` in which case the old schedule is simply cancelled. */
+  private[this] def scheduleGrid(currentFrame: Long, modelFrame: Long)(implicit tx: S#Tx): Unit = {
+    val targetFrame = if (modelFrame == Long.MaxValue) Long.MaxValue else modelFrame - LOOK_AHEAD
+    val token       = if (targetFrame == Long.MaxValue) -1 else {
       val targetTime = sched.time + (targetFrame - currentFrame)
       logA(s"timeline - scheduleNextGrid($currentFrame) -> $targetFrame")
       sched.schedule(targetTime) { implicit tx =>
@@ -482,6 +482,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, obj: Obj[S])
                                        (implicit tx: S#Tx): Unit = {
+    import Implicits.SpanComparisons
+
     // calculate current frame
     val timeRef       = play.shiftTo(sched.time)
 
@@ -489,35 +491,16 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     // the current frame, play that new element
     val currentFrame  = timeRef.frame
     val elemPlays     = span.contains(currentFrame)
-
-    if (elemPlays) {
-      val childTime = timeRef.intersect(span)
-      val childView = mkView(vid, span, obj)
-      playView(childView, childTime, play.target)
-    }
-
-    import Implicits.SpanComparisons
+    val elemPrepares  = !elemPlays && (span stopsAfter currentFrame) && (span startsBefore (currentFrame + LOOK_STOP))
 
     // re-validate the next scheduling position
-    val oldEvt      = scheduledEvent() // schedEvtToken()
-    val oldEvtFrame = oldEvt.frame
     val schedEvt    = if (elemPlays) {
       // reschedule if the span has a stop and elem.stop < oldTarget
-      span stopsBefore oldEvtFrame
+      span stopsBefore scheduledEvent().frame
     } else {
       // reschedule if the span has a start and that start is greater than the current frame,
       // and elem.start < oldTarget
-      (span startsAfter currentFrame) && (span startsBefore oldEvtFrame)
-    }
-
-    if (schedEvt) {
-      logA("...reschedule event")
-      scheduleNextEvent(currentFrame)
-    }
-
-    val elemPrepares = !elemPlays && (span stopsAfter currentFrame) && (span startsBefore prepareSpan().stop)
-    if (elemPrepares) {
-      mkViewAndPrepare(timeRef, vid, span, obj, observer = false)
+      (span startsAfter currentFrame) && (span startsBefore scheduledEvent().frame)
     }
 
     val schedGrid = !elemPlays && !elemPrepares && (span startsAfter currentFrame) && {
@@ -525,10 +508,27 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
       oldGrid.isEmpty || (span startsBefore (oldGrid.frame + LOOK_AHEAD))
     }
 
+    // react accordingly
+
+    if (elemPlays) {
+      val childTime = timeRef.intersect(span)
+      val childView = mkView(vid, span, obj)
+      playView(childView, childTime, play.target)
+    }
+
+    if (elemPrepares) {
+      mkViewAndPrepare(timeRef, vid, span, obj, observer = false)
+    }
+
+    if (schedEvt) {
+      logA("...reschedule event")
+      scheduleNextEvent(currentFrame)
+    }
+
     if (schedGrid) {
       logA("...reschedule grid")
-      val Span.HasStart(targetFrame) = span
-      scheduleGrid(currentFrame = currentFrame, targetFrame = targetFrame)
+      val Span.HasStart(modelFrame) = span
+      scheduleGrid(currentFrame = currentFrame, modelFrame = modelFrame)
     }
   }
 }
