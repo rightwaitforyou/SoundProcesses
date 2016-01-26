@@ -304,7 +304,9 @@ object SynthGraphObj extends expr.impl.ExprTypeImpl[SynthGraph, SynthGraphObj] {
       val mute  = graph.Attribute.kr(ObjKeys.attrMute, 0.0)
       val env   = graph.FadeInOut.ar
       val amp   = env * ((1 - mute) * gain)
-      graph.ScanOut(Proc.scanMainOut, sig * amp)
+      val out   = sig * amp
+      // (out \ 0).poll(label = "disk")
+      graph.ScanOut(out)
     }
 
   private val emptySynthGraph = SynthGraph {}
