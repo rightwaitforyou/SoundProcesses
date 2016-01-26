@@ -166,7 +166,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   import context.{scheduler => sched}
 
   private[this] val internalRef       = Ref[InternalState](IStopped)
-  private[this] val prepareSpanRef    = Ref[Span.HasStart](Span(0L, 0L))
+  private[this] val prepareSpanRef    = Ref(Span(0L, 0L))
 
   private[this] val playingRef        = TSet.empty[ElemHandle]
   private[this] val schedEvtToken     = Ref(EmptyScheduled)
@@ -284,7 +284,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /** Note: the prepare span will always start from current-frame and have
     * a duration of at least `LOOK_STOP`. I.e. during playback it contains the current play position.
     */
-  protected final def prepareSpan   ()(implicit tx: S#Tx): Span.HasStart  = prepareSpanRef()
+  protected final def prepareSpan()(implicit tx: S#Tx): Span = prepareSpanRef()
 
   /** Ensures state is consistent, then checks preparation of children.
     * If all is good, sets internal state to `IPlaying` and calls `processPlay`.
@@ -367,12 +367,12 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
         val prepareSpan     = Span(frame, stopFrame)
         prepareSpanRef()    = prepareSpan
         val searchSpan      = Span(startFrame, stopFrame)
-        val tr0             = play.shiftTo(sched.time)
-        val it              = processPrepare(searchSpan, tr0, initial = false)
+        val timeRef         = play.shiftTo(sched.time)
+        val it              = processPrepare(searchSpan, timeRef, initial = false)
         val reschedule      = it.nonEmpty
 
         it.foreach { case (vid, span, obj) =>
-          mkViewAndPrepare(tr0, vid, span, obj, observer = false)
+          mkViewAndPrepare(timeRef, vid, span, obj, observer = false)
         }
 
         // XXX TODO -- a refinement could look for eventAfter,
@@ -435,8 +435,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
       case play: IPlaying =>
         // calculate current frame
-        val tr0           = play.shiftTo(sched.time)
-        val currentFrame  = tr0.frame
+        val timeRef       = play.shiftTo(sched.time)
+        val currentFrame  = timeRef.frame
 
         // re-validate the next scheduling position
         val oldSched    = scheduledEvent()
@@ -450,34 +450,6 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
       case _ =>
     }
   }
-
-  //  /** This is usually called from the implementation's `elemAdded` to check if a view
-//    * should be created now. This method takes care of re-scheduling grid if necessary.
-//    * If the method returns `true`, the caller should build the view and then proceed
-//    * to `elemAddedPreparePlay`.
-//    */
-//  protected final def elemAddedHasView(st: ITimedState, span: SpanLike)(implicit tx: S#Tx): Boolean = {
-//    val prepS = prepareSpan()
-//    span.overlaps(prepS) && {            // we don't need to prepare or play it.
-//      if (span.compareStart(prepS.start) == 1) st match {   // but we have to check if we need to reschedule grid.
-//        case play: IPlaying =>
-//          val oldGrid = scheduledGrid()
-//          if (oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1) {
-//            val tr0           = play.shiftTo(sched.time)
-//            val currentFrame  = tr0.frame
-//            scheduleNextGrid(currentFrame)
-//          }
-//        case _ =>
-//      }
-//      false
-//    }
-//  }
-
-//  protected final def elemAddedPreparePlay(st: ITimedState, vid: ViewID, span: SpanLike, childView: Elem)
-//                                          (implicit tx: S#Tx): Unit = st match {
-//    case prep: IPreparing => elemAddedPrepare(prep,      span, childView)
-//    case play: IPlaying   => elemAddedPlay   (play, vid, span, childView)
-//  }
 
   private[this] def elemAddedPrepare(prep: IPreparing, vid: ViewID, span: SpanLike, obj: Obj[S])
                                     (implicit tx: S#Tx): Unit = {
@@ -507,35 +479,31 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, obj: Obj[S])
                                        (implicit tx: S#Tx): Unit = {
     // calculate current frame
-    val tr0           = play.shiftTo(sched.time)
+    val timeRef       = play.shiftTo(sched.time)
 
     // if we're playing and the element span intersects contains
     // the current frame, play that new element
-    val currentFrame  = tr0.frame
+    val currentFrame  = timeRef.frame
     val elemPlays     = span.contains(currentFrame)
 
     if (elemPlays) {
-      val tr1       = tr0.intersect(span)
+      val childTime = timeRef.intersect(span)
       val childView = mkView(vid, span, obj)
-      playView(childView, tr1, play.target)
+      playView(childView, childTime, play.target)
     }
+
+    import Implicits.SpanComparisons
 
     // re-validate the next scheduling position
     val oldEvt      = scheduledEvent() // schedEvtToken()
     val oldEvtFrame = oldEvt.frame
     val schedEvt    = if (elemPlays) {
       // reschedule if the span has a stop and elem.stop < oldTarget
-      span match {
-        case hs: Span.HasStop => hs.stop < oldEvtFrame
-        case _ => false
-      }
+      span stopsBefore oldEvtFrame
     } else {
       // reschedule if the span has a start and that start is greater than the current frame,
       // and elem.start < oldTarget
-      span match {
-        case hs: Span.HasStart => hs.start > currentFrame && hs.start < oldEvtFrame
-        case _ => false
-      }
+      (span startsAfter currentFrame) && (span startsBefore oldEvtFrame)
     }
 
     if (schedEvt) {
@@ -543,15 +511,14 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
       scheduleNextEvent(currentFrame)
     }
 
-    val schedGrid = !elemPlays && {
-      val prepS = prepareSpan()
-      // XXX TODO --- here is a mistake. We must also cover the
-      // case where the element should be prepared immediately (NewAuralTest --test5)
-      ???
-      span.compareStart(prepS.start) == 1 && {
-        val oldGrid = scheduledGrid()
-        oldGrid.isEmpty || span.compareStart(oldGrid.frame + LOOK_AHEAD) == -1
-      }
+    val elemPrepares = !elemPlays && (span stopsAfter currentFrame) && (span startsBefore prepareSpan().stop)
+    if (elemPrepares) {
+      mkViewAndPrepare(timeRef, vid, span, obj, observer = false)
+    }
+
+    val schedGrid = !elemPlays && !elemPrepares && (span startsAfter currentFrame) && {
+      val oldGrid = scheduledGrid()
+      oldGrid.isEmpty || (span startsBefore (oldGrid.frame + LOOK_AHEAD))
     }
 
     if (schedGrid) {

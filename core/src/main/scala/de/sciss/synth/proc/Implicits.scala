@@ -15,6 +15,7 @@ package de.sciss.synth.proc
 
 import de.sciss.lucre.expr.{BooleanObj, Expr, StringObj}
 import de.sciss.lucre.stm.{Obj, Sys}
+import de.sciss.span.SpanLike
 
 import scala.language.implicitConversions
 
@@ -25,7 +26,19 @@ object Implicits {
     /** Interprets the number as a duration in seconds, and converts it to sample frames,
       * based on the standard `Timeline` sample-rate.
       */
-    def secframes: Long = (d * TimeRef.SampleRate + 0.5).toLong
+    def secondsToFrames: Long = (d * TimeRef.SampleRate + 0.5).toLong
+  }
+  
+  implicit class SpanComparisons(val `this`: SpanLike) extends AnyVal {
+    import `this`.{compareStart, compareStop}
+
+    def startsBefore(frame: Long): Boolean = compareStart(frame) <  0
+    def startsAt    (frame: Long): Boolean = compareStart(frame) == 0
+    def startsAfter (frame: Long): Boolean = compareStart(frame) >  0
+
+    def stopsBefore (frame: Long): Boolean = compareStop (frame) <  0
+    def stopsAt     (frame: Long): Boolean = compareStop (frame) == 0
+    def stopsAfter  (frame: Long): Boolean = compareStop (frame) >  0
   }
 
 // SCAN
