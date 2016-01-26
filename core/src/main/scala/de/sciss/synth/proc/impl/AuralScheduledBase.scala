@@ -191,7 +191,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   protected final def playView(h: ElemHandle, timeRef: TimeRef, target: Target)
                               (implicit tx: S#Tx): Unit = {
     val view = elemFromHandle(h)
-    logA(s"timeline - playView: $view - $timeRef")
+    logA(s"scheduled - playView: $view - $timeRef")
     view.play(timeRef, target)
     playingRef.add(h)
     viewPlaying(h)
@@ -204,7 +204,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     */
   protected final def stopView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
     val view = elemFromHandle(h)
-    logA(s"timeline - stopView: $view")
+    logA(s"scheduled - stopView: $view")
     view.stop()
     viewStopped(h)
     view.dispose()
@@ -219,7 +219,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    */
   private[this] def prepareChild(childView: Elem, childTime: TimeRef, observer: Boolean)
                                 (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
-    logA(s"timeline - prepare $childView - $childTime")
+    logA(s"scheduled - prepare $childView - $childTime")
     childView.prepare(childTime)
     if (!observer || childView.state == Prepared) None else {
       val childObs = childView.react { implicit tx => {
@@ -315,7 +315,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   private[this] def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
     val targetFrame = viewEventAfter(currentFrame)
     val token = if (targetFrame == Long.MaxValue) -1 else {
-      logA(s"timeline - scheduleNextEvent($currentFrame) -> $targetFrame")
+      logA(s"scheduled - scheduleNextEvent($currentFrame) -> $targetFrame")
       val targetTime = sched.time + (targetFrame - currentFrame)
       sched.schedule(targetTime) { implicit tx =>
         eventReached(frame = targetFrame)
@@ -329,7 +329,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * state is playing, calls `processEvent` followed by `scheduleNextEvent`.
    */
   private[this] def eventReached(frame: Long)(implicit tx: S#Tx): Unit = {
-    logA(s"timeline - eventReached($frame)")
+    logA(s"scheduled - eventReached($frame)")
     internalState match {
       case play: IPlaying =>
         val tr = play.timeRef.updateFrame(frame)
@@ -350,7 +350,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     val targetFrame = if (modelFrame == Long.MaxValue) Long.MaxValue else modelFrame - LOOK_AHEAD
     val token       = if (targetFrame == Long.MaxValue) -1 else {
       val targetTime = sched.time + (targetFrame - currentFrame)
-      logA(s"timeline - scheduleNextGrid($currentFrame) -> $targetFrame")
+      logA(s"scheduled - scheduleGrid($currentFrame, $modelFrame) -> $targetFrame")
       sched.schedule(targetTime) { implicit tx =>
         gridReached(frame = targetFrame)
       }
@@ -363,7 +363,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * That is `LOOK_AHEAD` ahead of the `frame` we stopped at.
    */
   private[this] def gridReached(frame: Long)(implicit tx: S#Tx): Unit = {
-    logA(s"timeline - gridReached($frame)")
+    logA(s"scheduled - gridReached($frame)")
     internalState match {
       case play: IPlaying =>
         val startFrame      = frame       + LOOK_AHEAD

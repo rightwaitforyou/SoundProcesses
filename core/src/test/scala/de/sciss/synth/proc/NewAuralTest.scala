@@ -2,7 +2,7 @@ package de.sciss.synth.proc
 
 import de.sciss.file._
 import de.sciss.lucre.artifact.{Artifact, ArtifactLocation}
-import de.sciss.lucre.expr.{LongObj, BooleanObj, DoubleObj, IntObj, SpanLikeObj}
+import de.sciss.lucre.expr.{BooleanObj, DoubleObj, IntObj, SpanLikeObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.stm.store.BerkeleyDB
@@ -228,6 +228,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
     cursor.step { implicit tx =>
       val p1 = proc {
         val freq  = graph.Attribute.ar("key")
+        // freq.poll(label = "key")
         val sin   = SinOsc.ar(freq)
         Out.ar(0, Pan2.ar(sin * 0.1))
       }
@@ -241,17 +242,13 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val f1  = DoubleObj.newConst[S](441.0)
       val f2  = out
       val f3  = DoubleObj.newConst[S](661.5)
-      //      val pin = BiPin.Modifiable[S, Obj]
-      //      pin.add(frame(0.0), f1)
-      //      pin.add(frame(2.0), f2)
-      //      pin.add(frame(8.0), f3)
-      val pin = Grapheme[S]
-      pin.add(LongObj.newConst(frame(0.0)), f1)
-      pin.add(LongObj.newConst(frame(2.0)), f2)
-      pin.add(LongObj.newConst(frame(6.0)), f3)
+      val gr  = Grapheme[S]
+      gr.add(frame(0.0), f1)
+      gr.add(frame(2.0), f2)
+      gr.add(frame(6.0), f3)
 
       val attr = p1.attr
-      attr.put("key", pin)
+      attr.put("key", gr)
 
       val t = Transport[S]
       t.addObject(p1)

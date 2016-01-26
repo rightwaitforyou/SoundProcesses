@@ -99,13 +99,13 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
                 val stop      = succ.key.value
                 _childSpan    = Span(start, stop)
                 val childTime = timeRef.intersect(_childSpan)
-                _ended        = childTime.span.nonEmpty
+                _ended        = childTime.span.isEmpty
                 _succOpt      = if (_ended) None else Some((succ.value, stop))
 
               case None =>
                 _childSpan    = Span.from(start)
                 val childTime = timeRef.intersect(_childSpan)
-                _ended        = childTime.span.nonEmpty
+                _ended        = childTime.span.isEmpty
                 _succOpt      = None
             }
           }
@@ -145,14 +145,19 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   def init(gr: Grapheme[S])(implicit tx: S#Tx): this.type = {
     grObserver = gr.changed.react { implicit tx => upd =>
       upd.changes.foreach {
-        case Grapheme.Added  (time, entry)    => elemAdded  (upd.pin, time, entry.value)
-        case Grapheme.Removed(time, entry)    => elemRemoved(         time, entry.value)
+        case Grapheme.Added  (time, entry)    =>
+          elemAdded  (upd.pin, time, entry.value)
+        case Grapheme.Removed(time, entry)    =>
+          elemRemoved(         time, entry.value)
+          // XXX TODO --- check for new current value?
+
         case Grapheme.Moved  (timeCh, entry)  =>
           // for simplicity just remove and re-add
           // ; in the future this could be optimized
           // (e.g., not deleting and re-creating the AuralObj)
           elemRemoved(         timeCh.before, entry.value)
           elemAdded  (upd.pin, timeCh.now   , entry.value)
+          // XXX TODO --- check for new current value?
       }
     }
     this
@@ -190,8 +195,13 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected def mkView(vid: Unit, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle =
     span match {
       case hs: Span.HasStart =>
-        val view = makeViewElem(obj)
-        ElemHandle(hs.start, view)
+        implicit val itx = iSys(tx)
+        val view  = makeViewElem(obj)
+        val start = hs.start
+        val seq0  = tree.get(start).getOrElse(Vector.empty)
+        val seq1  = seq0 :+ view
+        tree.add(start -> seq1)
+        ElemHandle(start, view)
       case _ =>
         throw new IllegalArgumentException(s"Span should have start: $span")
     }
