@@ -40,6 +40,10 @@ For compiling the tests, the following additional resolver may be needed:
 
     resolvers += "Oracle Repository" at "http://download.oracle.com/maven"
 
+## contributing
+
+Please see the file [CONTRIBUTING.md](CONTRIBUTING.md)
+
 ## usage
 
 Project is still experimental, and documentation is still missing. There is a graphical front-end [Mellite](https://github.com/Sciss/Mellite) (also experimental)...

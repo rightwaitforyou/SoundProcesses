@@ -173,7 +173,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   protected def stopView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
-    require(playingRef().contains(h))
+    require(playingRef() == Some(h))
     stopViews()
   }
 
@@ -223,11 +223,11 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     } yield {
       logA(s"timeline - elemRemoved($start, $child)")
       val h         = ElemHandle(start, view)
-      val elemPlays = playingRef().contains(h)
+      val elemPlays = playingRef() == Some(h)
       elemRemoved(h, elemPlays = elemPlays)
       elemPlays
     }
-    opt.contains(true)
+    opt == Some(true)
   }
 
   // If a playing element has been removed, check if there is another one
