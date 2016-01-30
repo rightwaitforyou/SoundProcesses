@@ -85,20 +85,20 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
 
-  protected final def viewEventAfter(frameZ: Long)(implicit tx: S#Tx): Long =
-    BiGroupImpl.eventAfter(tree)(frameZ)(iSys(tx)).getOrElse(Long.MaxValue)
+  protected final def viewEventAfter(offset: Long)(implicit tx: S#Tx): Long =
+    BiGroupImpl.eventAfter(tree)(offset)(iSys(tx)).getOrElse(Long.MaxValue)
 
-  protected final def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long =
-    obj().eventAfter(frame).getOrElse(Long.MaxValue)
+  protected final def modelEventAfter(offset: Long)(implicit tx: S#Tx): Long =
+    obj().eventAfter(offset).getOrElse(Long.MaxValue)
 
   protected final def processPlay(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
-    val toStart = intersect(timeRef.frame)
+    val toStart = intersect(timeRef.offset)
     playViews(toStart, timeRef, target)
   }
 
   @inline
-  private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf] =
-    BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
+  private[this] def intersect(offset: Long)(implicit tx: S#Tx): Iterator[Leaf] =
+    BiGroupImpl.intersectTime(tree)(offset)(iSys(tx))
 
   protected final def processPrepare(span: Span, timeRef: TimeRef, initial: Boolean)
                                     (implicit tx: S#Tx): Iterator[PrepareResult] = {
@@ -187,8 +187,8 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   // this can be easily implemented with two rectangular range searches
   // return: (things-that-start, things-that-stop)
   @inline
-  private[this] def eventsAt(frameZ: Long)(implicit tx: S#Tx): (Iterator[Leaf], Iterator[Leaf]) =
-    BiGroupImpl.eventsAt(tree)(frameZ)(iSys(tx))
+  private[this] def eventsAt(offset: Long)(implicit tx: S#Tx): (Iterator[Leaf], Iterator[Leaf]) =
+    BiGroupImpl.eventsAt(tree)(offset)(iSys(tx))
 
   def init(tl: Timeline[S])(implicit tx: S#Tx): this.type = {
     viewMap     = tx.newInMemoryIDMap[ElemHandle]

@@ -52,7 +52,7 @@ object TimeRef {
     val offset        = 0L
     val isDefined     = false
 
-    def force         = new TimeRef(Span.From(0L), 0L)
+    def force         = new TimeRef(Span.From(0L), offset = 0L)
   }
 
   /** A time reference specifies the temporal context
@@ -83,25 +83,26 @@ object TimeRef {
   }
 }
 
-final case class TimeRef(span: Span.HasStart, frame: Long) extends TimeRef.Option {
-  /** The relative offset of the frame to the span's start in frames. */
-  def offset: Long = frame - span.start
+final case class TimeRef(span: Span.HasStart, val offset: Long) extends TimeRef.Option {
+  // def offset: Long = frame - span.start
+  def frame : Long = offset + span.start
 
   def isDefined = true
   def force     = this
 
   def shift(deltaFrames: Long): TimeRef = {
     val span1 = span.shift(deltaFrames)
-    new TimeRef(span1, frame + deltaFrames)
+    // new TimeRef(span1, frame + deltaFrames)
+    new TimeRef(span1, offset = offset)
   }
 
-  def updateOffset(newOffset: Long): TimeRef = new TimeRef(span, frame = span.start + offset)
+  def updateOffset(newOffset: Long): TimeRef = new TimeRef(span, offset = newOffset)
 
   def child(that: SpanLike): TimeRef.Option = {
     val spanZ = span.shift(-span.start)
     val span1 = spanZ.intersect(that)
     span1 match {
-      case s: Span.HasStart => new TimeRef(s, frame)
+      case s: Span.HasStart => new TimeRef(s, offset = offset - s.start)
       case _                => TimeRef.Undefined
     }
   }

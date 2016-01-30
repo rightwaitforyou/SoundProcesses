@@ -705,7 +705,7 @@ object AuralProcImpl {
       }
 
       // XXX TODO - it would be nicer if these were added optionally
-      if (timeRef.frame        != 0) builder.addControl(graph.Time    .key -> (timeRef.frame        / SampleRate))
+      if (timeRef.frame  != 0) builder.addControl(graph.Time    .key -> (timeRef.frame  / SampleRate))
       if (timeRef.offset != 0) builder.addControl(graph.Offset  .key -> (timeRef.offset / SampleRate))
       timeRef.span match {
         case Span(start, stop) =>
