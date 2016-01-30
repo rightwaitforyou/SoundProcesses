@@ -647,7 +647,6 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val f       = userHome / "Music" / "tapes" / "Bronze1CutLp.aif" // "MetallScheibe5TestN.aif"
       val spec    = AudioFile.readSpec(f)
       println(spec)
-      // val vAudio  = Grapheme.Value.Audio(f, spec, offset = 0L, gain = 2.0)
 
       val _proc = proc {
         val buf   = graph.Buffer("metal")
@@ -705,10 +704,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       // val aOff    = ((5 * 60 + 14) * spec.sampleRate).toLong  // "So I took a turn..."
       val aOff    = frame(5 * 60 + 14)
       val vAudio  = AudioCue(f, spec, offset = aOff, gain = 2.0)
-//      val gAudio  = Grapheme[S](spec.numChannels)
-//      gAudio.add(0L: LongObj[S], vAudio: Grapheme.Expr[S]) // ... çoit trop complexe ...
       val gAudio = AudioCue.Obj.newConst[S](vAudio)
-      // sAudio.add(Scan.Link.Grapheme(gAudio))
       _proc1.name = "tape"
       _proc1.attr.put("sig", gAudio)
 

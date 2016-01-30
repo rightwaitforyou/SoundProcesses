@@ -19,7 +19,7 @@ object TimeRef {
   /** `Undefined` with general type */
   def undefined: Option = Undefined
 
-  final val SampleRate = 14112000.0 // lcm(88.2k, 96k); note: value is copied in AuralContextImpl
+  final val SampleRate = 14112000.0 // lcm(88.2k, 96k)
 
   /** Utility method that generates a string representation of
     * the time in seconds of a given frame index.
