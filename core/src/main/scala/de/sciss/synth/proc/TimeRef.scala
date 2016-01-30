@@ -52,6 +52,8 @@ object TimeRef {
     val offset        = 0L
     val isDefined     = false
 
+    def hasEnded      = true
+
     def force         = new TimeRef(Span.From(0L), offset = 0L)
   }
 
@@ -66,8 +68,11 @@ object TimeRef {
     /** The overall played span. */
     def span : SpanLike
 
-    /** `true` for `TimeRef.Apply`, `false` for `TimeRef.Undefined`. */
+    /** `true` for `TimeRef`, `false` for `TimeRef.Undefined`. */
     def isDefined: Boolean
+
+    /** `true` for a `TimeRef` whose `offset` is smaller than its span start, `false` for `TimeRef.Undefined`. */
+    def hasEnded: Boolean
 
     /** Offsets within the logical span of the object.
       * For an undefined time reference, this will report zero,
@@ -90,22 +95,40 @@ final case class TimeRef(span: Span.HasStart, val offset: Long) extends TimeRef.
   def isDefined = true
   def force     = this
 
-  def shift(deltaFrames: Long): TimeRef = {
-    val span1 = span.shift(deltaFrames)
-    // new TimeRef(span1, frame + deltaFrames)
-    new TimeRef(span1, offset = offset)
-  }
+  //  def shift(deltaFrames: Long): TimeRef = {
+  //    val span1 = span.shift(deltaFrames)
+  //    new TimeRef(span1, frame = frame + deltaFrames)
+  //  }
+
+  def shift(deltaFrames: Long): TimeRef =
+    new TimeRef(span, offset = offset + deltaFrames)
 
   def updateOffset(newOffset: Long): TimeRef = new TimeRef(span, offset = newOffset)
 
-  def child(that: SpanLike): TimeRef.Option = {
-    val spanZ = span.shift(-span.start)
-    val span1 = spanZ.intersect(that)
-    span1 match {
+//  def child(that: SpanLike): TimeRef.Option = {
+//    val spanZ = span.shift(-span.start)
+//    val span1 = spanZ.intersect(that)
+//    span1 match {
+//      case s: Span.HasStart => new TimeRef(s, offset = offset - s.start)
+//      case _                => TimeRef.Undefined
+//    }
+//  }
+
+  def child(that: SpanLike): TimeRef.Option =
+    that match {
       case s: Span.HasStart => new TimeRef(s, offset = offset - s.start)
-      case _                => TimeRef.Undefined
+      case _  => // Until or Void or All
+        val spanZ = span.shift(-span.start)   // move it to "zero"
+        val span1 = spanZ.intersect(that)     // enforce a start of zero or void
+        span1 match {
+          case s: Span.HasStart =>
+            assert(s.start == 0L)
+            new TimeRef(s, offset = offset)
+          case _ => TimeRef.Undefined  // was void
+        }
     }
-  }
+
+  def hasEnded: Boolean = span.compareStop(offset) <= 0
 
   import TimeRef.{spanToSecs, framesToSecs}
 

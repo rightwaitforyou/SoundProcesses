@@ -103,13 +103,13 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
                 val stop      = succ.key.value
                 _childSpan    = Span(start, stop)
                 val childTime = timeRef.child(_childSpan)
-                _ended        = childTime.span.isEmpty
+                _ended        = childTime.hasEnded // .span.isEmpty
                 _succOpt      = if (_ended) None else Some((succ.value, stop))
 
               case None =>
                 _childSpan    = Span.from(start)
                 val childTime = timeRef.child(_childSpan)
-                _ended        = childTime.span.isEmpty
+                _ended        = childTime.hasEnded // span.isEmpty
                 _succOpt      = None
             }
           }

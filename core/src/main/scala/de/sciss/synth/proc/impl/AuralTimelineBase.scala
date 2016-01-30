@@ -109,7 +109,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val it          = tl.rangeSearch(start = startSpan, stop = stopSpan)
     it.flatMap { case (childSpan, elems) =>
       val childTime = timeRef.child(childSpan)
-      val sub: Vec[(ViewID, SpanLike, Obj[S])] = if (childTime.span.isEmpty) Vector.empty else {
+      val sub: Vec[(ViewID, SpanLike, Obj[S])] = if (childTime.hasEnded /* span.isEmpty */) Vector.empty else {
         elems.map { timed =>
           (timed.id, childSpan, timed.value)
         }
