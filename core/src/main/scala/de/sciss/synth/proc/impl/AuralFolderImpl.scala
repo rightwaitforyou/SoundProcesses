@@ -40,6 +40,6 @@ object AuralFolderImpl {
       }
 
     protected def performPlay(timeRef: TimeRef)(implicit tx: S#Tx): Unit =
-      startTransport(timeRef.offsetOrZero)
+      startTransport(timeRef.offset)
   }
 }

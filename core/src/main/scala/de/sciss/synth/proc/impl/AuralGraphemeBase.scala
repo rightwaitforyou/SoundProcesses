@@ -60,20 +60,20 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private[this] final def ElemHandle(start: Long, view: Elem): ElemHandle =
     AuralGraphemeBase.ElemHandle(start, view)
 
-  protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
-    tree.ceil(frame + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
+  protected final def viewEventAfter(offset: Long)(implicit tx: S#Tx): Long =
+    tree.ceil(offset + 1)(iSys(tx)).fold(Long.MaxValue)(_._1)
 
-  protected final def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long =
-    obj().eventAfter(frame).getOrElse(Long.MaxValue)
+  protected final def modelEventAfter(offset: Long)(implicit tx: S#Tx): Long =
+    obj().eventAfter(offset).getOrElse(Long.MaxValue)
 
   protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
-    tree.floor(timeRef.frame).foreach { case (start, entries) =>
+    tree.floor(timeRef.offset).foreach { case (start, entries) =>
       val toStart   = entries.head
       val stop      = viewEventAfter(start)
       val span      = if (stop == Long.MaxValue) Span.From(start) else Span(start, stop)
       val h         = ElemHandle(start, toStart)
-      val tr0       = timeRef.intersect(span)
+      val tr0       = timeRef.child(span)
       playView(h, tr0, target)
     }
   }
@@ -103,13 +103,13 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
               case Some(succ) =>
                 val stop      = succ.key.value
                 _childSpan    = Span(start, stop)
-                val childTime = timeRef.intersect(_childSpan)
+                val childTime = timeRef.child(_childSpan)
                 _ended        = childTime.span.isEmpty
                 _succOpt      = if (_ended) None else Some((succ.value, stop))
 
               case None =>
                 _childSpan    = Span.from(start)
-                val childTime = timeRef.intersect(_childSpan)
+                val childTime = timeRef.child(_childSpan)
                 _ended        = childTime.span.isEmpty
                 _succOpt      = None
             }
@@ -131,9 +131,9 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
-    val start   = timeRef.frame
+    val start   = timeRef.offset
     val toStart = tree.get(start)(iSys(tx))
-      .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.frame}"))
+      .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.offset}"))
       .head
     val h       = ElemHandle(start, toStart)
     playView(h, timeRef, play.target)
@@ -232,19 +232,19 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   // If a playing element has been removed, check if there is another one
   // 'below' it now. If so, create a view for it. 
-  private[this] def playingElemRemoved(pin: BiPin[S, Obj[S]], frame: Long)(implicit tx: S#Tx): Unit =
-    pin.floor(frame).foreach { entry =>
+  private[this] def playingElemRemoved(pin: BiPin[S, Obj[S]], offset: Long)(implicit tx: S#Tx): Unit =
+    pin.floor(offset).foreach { entry =>
       val child = entry.value
       val start = entry.key.value
       elemAdded(pin, start = start, child = child)
     }
 
-  protected def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
+  protected def checkReschedule(h: ElemHandle, currentOffset: Long, oldTarget: Long, elemPlays: Boolean)
                                (implicit tx: S#Tx): Boolean =
     !elemPlays && {
       // reschedule if the span has a start and that start is greater than the current frame,
       // and elem.start == oldTarget
-      h.start > currentFrame && h.start == oldTarget
+      h.start > currentOffset && h.start == oldTarget
     }
 
   override def dispose()(implicit tx: S#Tx): Unit = {

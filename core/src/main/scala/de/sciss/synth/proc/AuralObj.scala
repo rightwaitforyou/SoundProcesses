@@ -14,17 +14,16 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
-import de.sciss.lucre.expr.{SpanLikeObj, Expr}
+import de.sciss.lucre.expr.SpanLikeObj
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{Obj, TxnLike, Sys}
+import de.sciss.lucre.stm.{Obj, Sys, TxnLike}
 import de.sciss.lucre.synth.{NodeRef, Sys => SSys}
-import de.sciss.span.SpanLike
-import de.sciss.synth.proc.impl.{AuralObjImpl => Impl, AuralFolderImpl, AuralActionImpl, AuralEnsembleImpl, AuralProcImpl, AuralTimelineImpl}
+import de.sciss.synth.proc.impl.{AuralActionImpl, AuralEnsembleImpl, AuralFolderImpl, AuralObjImpl => Impl, AuralProcImpl, AuralTimelineImpl}
 
 import scala.language.higherKinds
 
 object AuralObj {
-  import de.sciss.synth.proc.{Action => _Action, Ensemble => _Ensemble, Proc => _Proc, Timeline => _Timeline, Folder => _Folder}
+  import de.sciss.synth.proc.{Action => _Action, Ensemble => _Ensemble, Folder => _Folder, Proc => _Proc, Timeline => _Timeline}
 
   trait Factory {
     def typeID: Int
@@ -59,10 +58,10 @@ object AuralObj {
   case object TargetPrepared extends TargetState {
     def completed = AuralView.Prepared
   }
-  final case class TargetPlaying(wallClock: Long, timeRef: TimeRef) extends TargetState {
+  final case class TargetPlaying(wallClock: Long, timeRef: TimeRef.Apply) extends TargetState {
     def completed = AuralView.Playing
 
-    def shiftTo(newWallClock: Long): TimeRef = {
+    def shiftTo(newWallClock: Long): TimeRef.Apply = {
       val delta = newWallClock - wallClock
       timeRef.shift(delta)
     }

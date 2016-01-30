@@ -32,8 +32,8 @@ object AuralScheduledBase {
 
   private val EmptyScheduled = new Scheduled(-1, Long.MaxValue)
 
-  final class Scheduled(val token: Int, val frame: Long) {
-    override def toString = s"[token = $token, frame = $frame / ${TimeRef.framesToSecs(frame)}]"
+  final class Scheduled(val token: Int, val offset: Long) {
+    override def toString = s"[token = $token, offset = $offset / ${TimeRef.framesToSecs(offset)}]"
     def isEmpty: Boolean = token == -1
   }
 
@@ -87,13 +87,13 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * `eventReached` (internal) and `processEvent` will be called.
     * If no such event exists, the method must return `Long.MaxValue`.
     */
-  protected def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long
+  protected def viewEventAfter(offset: Long)(implicit tx: S#Tx): Long
 
   /** Report the next interesting frame greater than the given frame for which
     * `gridReached` (internal) and `processPrepare` will be called.
     * If no such event exists, the method must return `Long.MaxValue`.
     */
-  protected def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long
+  protected def modelEventAfter(offset: Long)(implicit tx: S#Tx): Long
 
   /** An opaque type passed into `playView` that may be used by an overriding implementation.
     * Otherwise it may simply be set to `Unit`.
@@ -106,7 +106,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   protected def mkView(vid: ViewID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): ElemHandle
 
-  protected def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
+  protected def checkReschedule(h: ElemHandle, currentOffset: Long, oldTarget: Long, elemPlays: Boolean)
                                (implicit tx: S#Tx): Boolean
 
   /** Should be called from `processPlay`. It calls `play` on the view
@@ -145,7 +145,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     def timeRef: TimeRef
   }
 
-  protected final class IPreparing(val map: Map[Elem, Disposable[S#Tx]], val timeRef: TimeRef)
+  protected final class IPreparing(val map: Map[Elem, Disposable[S#Tx]], val timeRef: TimeRef.Apply)
     extends ITimedState {
 
     def copy(map: Map[Elem, Disposable[S#Tx]]): IPreparing = new IPreparing(map, timeRef)
@@ -230,7 +230,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * Finally sets internal state to `IPreparing` and updates `prepareSpanRef`.
    */
   private[this] def prepareNoFire(timeRef: TimeRef.Apply)(implicit tx: S#Tx): InternalState = {
-    val startFrame    = timeRef.frame
+    val startFrame    = timeRef.offset
     val stopFrame     = startFrame + LOOK_STOP
     val prepareSpan   = Span(startFrame, stopFrame)
 
@@ -267,16 +267,16 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     if (st == Playing) return
 
     val tForce    = timeRef.force
-    val frame     = timeRef.frame
+    val offset    = timeRef.offset
 
-    if (st == Stopped || prepareSpanRef() != Span(frame, frame + LOOK_STOP)) prepareNoFire(tForce)
+    if (st == Stopped || prepareSpanRef() != Span(offset, offset + LOOK_STOP)) prepareNoFire(tForce)
 
     val st1 = new IPlaying(sched.time, tForce, target)
     internalRef.swap(st1).dispose()
 
     processPlay(tForce, target)
-    scheduleNextEvent(frame)
-    scheduleNextGrid (frame)
+    scheduleNextEvent(offset)
+    scheduleNextGrid (offset)
 
     fire(Playing)
   }
@@ -284,63 +284,64 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /** Calls `eventAfter` to determine the next interesting frame. If that
     * frame exists, schedules the execution of `eventReached`.
     */
-  private[this] def scheduleNextEvent(currentFrame: Long)(implicit tx: S#Tx): Unit = {
-    val targetFrame = viewEventAfter(currentFrame)
-    val token = if (targetFrame == Long.MaxValue) -1 else {
-      logA(s"scheduled - scheduleNextEvent($currentFrame) -> $targetFrame")
-      val targetTime = sched.time + (targetFrame - currentFrame)
+  private[this] def scheduleNextEvent(currentOffset: Long)(implicit tx: S#Tx): Unit = {
+    val targetOffset = viewEventAfter(currentOffset)
+    val token = if (targetOffset == Long.MaxValue) -1 else {
+      logA(s"scheduled - scheduleNextEvent($currentOffset) -> $targetOffset")
+      val targetTime = sched.time + (targetOffset - currentOffset)
       sched.schedule(targetTime) { implicit tx =>
-        eventReached(frame = targetFrame)
+        eventReached(offset = targetOffset)
       }
     }
-    val oldSched = schedEvtToken.swap(new Scheduled(token, targetFrame))
+    val oldSched = schedEvtToken.swap(new Scheduled(token, targetOffset))
     if (oldSched.token != -1) sched.cancel(oldSched.token)
   }
 
   /* Processes next interesting event that has been reached. If the internal
    * state is playing, calls `processEvent` followed by `scheduleNextEvent`.
    */
-  private[this] def eventReached(frame: Long)(implicit tx: S#Tx): Unit = {
-    logA(s"scheduled - eventReached($frame)")
+  private[this] def eventReached(offset: Long)(implicit tx: S#Tx): Unit = {
+    logA(s"scheduled - eventReached($offset)")
     internalState match {
       case play: IPlaying =>
-        val tr = play.timeRef.updateFrame(frame)
+        val tr0 = play.timeRef
+        val tr  = tr0.updateOffset(offset)
         processEvent(play, tr)
-        scheduleNextEvent(frame)
+        scheduleNextEvent(offset)
       case _ =>
     }
   }
 
   /* Schedules ahead `STEP_GRID` frames to execute `gridReached`. */
-  private[this] def scheduleNextGrid(currentFrame: Long)(implicit tx: S#Tx): Unit = {
-    val modelFrame = modelEventAfter(currentFrame + LOOK_STOP - 1)
-    scheduleGrid(currentFrame = currentFrame, modelFrame = modelFrame)
+  private[this] def scheduleNextGrid(currentOffset: Long)(implicit tx: S#Tx): Unit = {
+    val modelOffset = modelEventAfter(currentOffset + LOOK_STOP - 1)
+    scheduleGrid(currentOffset = currentOffset, modelOffset = modelOffset)
   }
 
   /* `modelFrame` may be `Long.MaxValue` in which case the old schedule is simply cancelled. */
-  private[this] def scheduleGrid(currentFrame: Long, modelFrame: Long)(implicit tx: S#Tx): Unit = {
-    val targetFrame = if (modelFrame == Long.MaxValue) Long.MaxValue else modelFrame - LOOK_AHEAD
-    val token       = if (targetFrame == Long.MaxValue) -1 else {
-      val targetTime = sched.time + (targetFrame - currentFrame)
-      logA(s"scheduled - scheduleGrid($currentFrame, $modelFrame) -> $targetFrame")
+  private[this] def scheduleGrid(currentOffset: Long, modelOffset: Long)(implicit tx: S#Tx): Unit = {
+    val targetOffset  = if (modelOffset == Long.MaxValue) Long.MaxValue else modelOffset - LOOK_AHEAD
+    val token         = if (targetOffset == Long.MaxValue) -1 else {
+      val targetTime = sched.time + (targetOffset - currentOffset)
+      logA(s"scheduled - scheduleGrid($currentOffset, $modelOffset) -> $targetOffset")
       sched.schedule(targetTime) { implicit tx =>
-        gridReached(frame = targetFrame)
+        gridReached(offset = targetOffset)
       }
     }
-    val oldSched = schedGridToken.swap(new Scheduled(token, targetFrame))
+    val oldSched = schedGridToken.swap(new Scheduled(token, targetOffset))
     if (oldSched.token != -1) sched.cancel(oldSched.token)
   }
 
   /* If internal state is playing, calls `processPrepare` with the new prepare-span.
    * That is `LOOK_AHEAD` ahead of the `frame` we stopped at.
    */
-  private[this] def gridReached(frame: Long)(implicit tx: S#Tx): Unit = {
-    logA(s"scheduled - gridReached($frame)")
+  private[this] def gridReached(offset: Long)(implicit tx: S#Tx): Unit = {
+    logA(s"scheduled - gridReached($offset)")
     internalState match {
       case play: IPlaying =>
-        val startFrame      = frame       + LOOK_AHEAD
+        val startFrame      = offset      + LOOK_AHEAD
         val stopFrame       = startFrame  + PREP_FRAMES
-        val prepareSpan     = Span(frame, stopFrame)
+        val prepareSpan     = Span(offset, stopFrame)
         prepareSpanRef()    = prepareSpan
         val searchSpan      = Span(startFrame, stopFrame)
         val timeRef         = play.shiftTo(sched.time)
@@ -354,10 +355,10 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
         // XXX TODO -- a refinement could look for eventAfter,
         // however then we need additional fiddling around in
         // `elemAdded` and `elemRemoved`...
-        scheduleNextGrid(frame)
+        scheduleNextGrid(offset)
         if (reschedule) {
           logA("...reschedule")
-          scheduleNextEvent(frame)
+          scheduleNextEvent(offset)
         }
 
       case _ =>
@@ -407,15 +408,16 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
       case play: IPlaying =>
         // calculate current frame
         val timeRef       = play.shiftTo(sched.time)
-        val currentFrame  = timeRef.frame
+        val currentOffset = timeRef.offset
 
         // re-validate the next scheduling position
         val oldSched    = scheduledEvent()
-        val oldTarget   = oldSched.frame
-        val reschedule = checkReschedule(h, currentFrame = currentFrame, oldTarget = oldTarget, elemPlays = elemPlays)
+        val oldTarget   = oldSched.offset
+        val reschedule  = checkReschedule(h, currentOffset = currentOffset, oldTarget = oldTarget,
+                                             elemPlays = elemPlays)
         if (reschedule) {
           logA("...reschedule")
-          scheduleNextEvent(currentFrame)
+          scheduleNextEvent(currentOffset)
         }
 
       case _ =>
@@ -437,10 +439,10 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
-  private[this] final def mkViewAndPrepare(timeRef: TimeRef, vid: ViewID, span: SpanLike, obj: Obj[S],
+  private[this] final def mkViewAndPrepare(timeRef: TimeRef.Apply, vid: ViewID, span: SpanLike, obj: Obj[S],
                                            observer: Boolean)
                                           (implicit tx: S#Tx): (Elem, Option[(Elem, Disposable[S#Tx])]) = {
-    val childTime = timeRef.intersect(span)
+    val childTime = timeRef.child(span)
     val h         = mkView(vid, span, obj)
     val view      = elemFromHandle(h)
     val prep      = prepareChild(view, childTime, observer = observer)
@@ -456,29 +458,29 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     // if we're playing and the element span intersects contains
     // the current frame, play that new element
-    val currentFrame  = timeRef.frame
-    val elemPlays     = span.contains(currentFrame)
-    val elemPrepares  = !elemPlays && (span stopsAfter currentFrame) && (span startsBefore (currentFrame + LOOK_STOP))
+    val currentOffset = timeRef.offset
+    val elemPlays     = span.contains(currentOffset)
+    val elemPrepares  = !elemPlays && (span stopsAfter currentOffset) && (span startsBefore (currentOffset + LOOK_STOP))
 
     // re-validate the next scheduling position
     val schedEvt    = if (elemPlays) {
       // reschedule if the span has a stop and elem.stop < oldTarget
-      span stopsBefore scheduledEvent().frame
+      span stopsBefore scheduledEvent().offset
     } else {
       // reschedule if the span has a start and that start is greater than the current frame,
       // and elem.start < oldTarget
-      (span startsAfter currentFrame) && (span startsBefore scheduledEvent().frame)
+      (span startsAfter currentOffset) && (span startsBefore scheduledEvent().offset)
     }
 
-    val schedGrid = !elemPlays && !elemPrepares && (span startsAfter currentFrame) && {
+    val schedGrid = !elemPlays && !elemPrepares && (span startsAfter currentOffset) && {
       val oldGrid = scheduledGrid()
-      oldGrid.isEmpty || (span startsBefore (oldGrid.frame + LOOK_AHEAD))
+      oldGrid.isEmpty || (span startsBefore (oldGrid.offset + LOOK_AHEAD))
     }
 
     // react accordingly
 
     if (elemPlays) {
-      val childTime = timeRef.intersect(span)
+      val childTime = timeRef.child(span)
       val childView = mkView(vid, span, obj)
       playView(childView, childTime, play.target)
     }
@@ -489,13 +491,13 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
     if (schedEvt) {
       logA("...reschedule event")
-      scheduleNextEvent(currentFrame)
+      scheduleNextEvent(currentOffset)
     }
 
     if (schedGrid) {
       logA("...reschedule grid")
       val Span.HasStart(modelFrame) = span
-      scheduleGrid(currentFrame = currentFrame, modelFrame = modelFrame)
+      scheduleGrid(currentOffset = currentOffset, modelOffset = modelFrame)
     }
   }
 }

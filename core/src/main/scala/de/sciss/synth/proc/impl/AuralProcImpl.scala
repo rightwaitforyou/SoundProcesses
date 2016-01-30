@@ -471,7 +471,7 @@ object AuralProcImpl {
                 val spec      = audioVal.spec
                 val path      = audioVal.artifact.getAbsolutePath
                 val _gain     = audioVal.gain
-                val offsetT   = ((audioVal.offset + timeRef.offsetOrZero) * spec.sampleRate / SampleRate + 0.5).toLong
+                val offsetT   = ((audioVal.offset + timeRef.offset) * spec.sampleRate / SampleRate + 0.5).toLong
                 val _buf      = if (info.isNative) {
                   // XXX DIRTY HACK
                   val offset1 = if (key.contains("!rnd")) {
@@ -561,13 +561,14 @@ object AuralProcImpl {
     }
 
     final def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
-      val ts = TargetPlaying(sched.time, timeRef)
+      val tr  = timeRef.force
+      val ts  = TargetPlaying(sched.time, tr)
       targetStateRef() = ts
       buildState match {
         case s: UGB.Complete[S] =>
           state match {
-            case Stopped   => prepareAndLaunch(s, timeRef)
-            case Prepared  => launch          (s, timeRef)
+            case Stopped   => prepareAndLaunch(s, tr)
+            case Prepared  => launch          (s, tr)
             case _ =>
           }
 
@@ -644,7 +645,7 @@ object AuralProcImpl {
     }
 
     // ---- asynchronous preparation ----
-    private[this] def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)
+    private[this] def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef.Apply)
                                       (implicit tx: S#Tx): Unit = {
       val p = procCached()
       logA(s"begin prepare $p (${hashCode.toHexString})")
@@ -684,7 +685,7 @@ object AuralProcImpl {
     }
 
     // ---- synchronous preparation ----
-    protected def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    protected def launch(ugen: UGB.Complete[S], timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit = {
       val p = procCached()
       logA(s"begin launch  $p (${hashCode.toHexString})")
 
@@ -705,7 +706,7 @@ object AuralProcImpl {
 
       // XXX TODO - it would be nicer if these were added optionally
       if (timeRef.frame        != 0) builder.addControl(graph.Time    .key -> (timeRef.frame        / SampleRate))
-      if (timeRef.offsetOrZero != 0) builder.addControl(graph.Offset  .key -> (timeRef.offsetOrZero / SampleRate))
+      if (timeRef.offset != 0) builder.addControl(graph.Offset  .key -> (timeRef.offset / SampleRate))
       timeRef.span match {
         case Span(start, stop) =>
           builder.addControl(graph.Duration.key -> ((stop - start) / SampleRate))

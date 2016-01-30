@@ -49,38 +49,30 @@ object TimeRef {
     val frame         = 0L
     /** The span is of an undefined time reference is void. */
     val span          = Span.Void
-    val offsetOrZero  = 0L
+    val offset        = 0L
     val isDefined     = false
 
-    def shift      (deltaFrames: Long    ): this.type = this
-    def updateFrame(newFrame   : Long    ): this.type = this
-    def intersect  (span       : SpanLike): this.type = this
-
-    def force     = new Apply(Span.From(0L), 0L)
+    def force         = new Apply(Span.From(0L), 0L)
   }
-  final case class Apply(span: Span.NonVoid, frame: Long) extends TimeRef {
-    def offsetOrZero = span match {
-      case hs: Span.HasStart => frame - hs.start
-      case _ => 0L
-    }
+  final case class Apply(span: Span.HasStart, frame: Long) extends TimeRef {
+    /** The relative offset of the frame to the span's start in frames. */
+    def offset: Long = frame - span.start
+
     def isDefined = true
     def force     = this
 
     def shift(deltaFrames: Long): Apply = {
-      // XXX TODO - this should become obsolete with Span v1.3.0
-      val span1 = span match {
-        case s: Span.Open     => s.shift(deltaFrames)
-        case s: Span          => s.shift(deltaFrames)
-      }
+      val span1 = span.shift(deltaFrames)
       new Apply(span1, frame + deltaFrames)
     }
 
-    def updateFrame(newFrame: Long): Apply = new Apply(span, newFrame)
+    def updateOffset(newOffset: Long): Apply = new Apply(span, frame = span.start + offset)
 
-    def intersect(span: SpanLike): TimeRef = {
-      val span1 = this.span.intersect(span)
+    def child(that: SpanLike): TimeRef = {
+      val spanZ = span.shift(-span.start)
+      val span1 = spanZ.intersect(that)
       span1 match {
-        case s: Span.NonVoid  => new Apply(s, frame)
+        case s: Span.HasStart => new Apply(s, frame)
         case _                => Undefined
       }
     }
@@ -88,7 +80,7 @@ object TimeRef {
     override def toString = s"TimeRef(span = $span / ${spanToSecs(span)}, frame = $frame / ${framesToSecs(frame)})"
   }
 
-  def apply(span: Span.NonVoid, frame: Long) = new Apply(span, frame)
+  def apply(span: Span.HasStart, frame: Long) = new Apply(span, frame)
   def unapply(r: Apply): Option[(Span.NonVoid, Long)] = Some((r.span, r.frame))
 }
 
@@ -103,8 +95,6 @@ sealed trait TimeRef {
   /** The overall played span. */
   def span : SpanLike
 
-  /** The current position. */
-  def frame: Long
   /** `true` for `TimeRef.Apply`, `false` for `TimeRef.Undefined`. */
   def isDefined: Boolean
 
@@ -113,11 +103,7 @@ sealed trait TimeRef {
     * otherwise it is equal to `frame - span.start`. If the
     * span does not have a defined start, it will also report zero.
     */
-  def offsetOrZero: Long
-
-  def shift      (deltaFrames: Long    ): TimeRef
-  def intersect  (span       : SpanLike): TimeRef
-  def updateFrame(newFrame   : Long    ): TimeRef
+  def offset: Long
 
   /** If the reference is undefined, translates it into a defined one beginning at zero
     * with a span from zero. Otherwise returns the reference unmodified.

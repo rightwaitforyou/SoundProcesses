@@ -86,8 +86,8 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   private type Leaf = (SpanLike, Vec[(stm.Source[S#Tx, S#ID], Elem)])
 
-  protected final def viewEventAfter(frame: Long)(implicit tx: S#Tx): Long =
-    BiGroupImpl.eventAfter(tree)(frame)(iSys(tx)).getOrElse(Long.MaxValue)
+  protected final def viewEventAfter(frameZ: Long)(implicit tx: S#Tx): Long =
+    BiGroupImpl.eventAfter(tree)(frameZ)(iSys(tx)).getOrElse(Long.MaxValue)
 
   protected final def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long =
     obj().eventAfter(frame).getOrElse(Long.MaxValue)
@@ -109,7 +109,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     val stopSpan    = Span.from(span.start)
     val it          = tl.rangeSearch(start = startSpan, stop = stopSpan)
     it.flatMap { case (childSpan, elems) =>
-      val childTime = timeRef.intersect(childSpan)
+      val childTime = timeRef.child(childSpan)
       val sub: Vec[(ViewID, SpanLike, Obj[S])] = if (childTime.span.isEmpty) Vector.empty else {
         elems.map { timed =>
           (timed.id, childSpan, timed.value)
@@ -144,7 +144,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
 
   protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
-    val (toStart, toStop) = eventsAt(timeRef.frame)
+    val (toStart, toStop) = eventsAt(timeRef.offset)
 
     // this is a pretty tricky decision...
     // do we first free the stopped views and then launch the started ones?
@@ -179,7 +179,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   private[this] def playViews(it: Iterator[Leaf], timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit =
     if (it.hasNext) it.foreach { case (span, views) =>
-      val tr = timeRef.intersect(span)
+      val tr = timeRef.child(span)
       views.foreach { case (idH, elem) =>
         playView(ElemHandle(idH, span, elem), tr, target)
       }
@@ -188,8 +188,8 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   // this can be easily implemented with two rectangular range searches
   // return: (things-that-start, things-that-stop)
   @inline
-  private[this] def eventsAt(frame: Long)(implicit tx: S#Tx): (Iterator[Leaf], Iterator[Leaf]) =
-    BiGroupImpl.eventsAt(tree)(frame)(iSys(tx))
+  private[this] def eventsAt(frameZ: Long)(implicit tx: S#Tx): (Iterator[Leaf], Iterator[Leaf]) =
+    BiGroupImpl.eventsAt(tree)(frameZ)(iSys(tx))
 
   def init(tl: Timeline[S])(implicit tx: S#Tx): this.type = {
     viewMap     = tx.newInMemoryIDMap[ElemHandle]
@@ -245,7 +245,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       elemRemoved(h, elemPlays = elemPlays)
     }
 
-  protected final def checkReschedule(h: ElemHandle, currentFrame: Long, oldTarget: Long, elemPlays: Boolean)
+  protected final def checkReschedule(h: ElemHandle, currentOffset: Long, oldTarget: Long, elemPlays: Boolean)
                                      (implicit tx: S#Tx): Boolean =
     if (elemPlays) {
       // reschedule if the span has a stop and elem.stop == oldTarget
@@ -257,7 +257,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       // reschedule if the span has a start and that start is greater than the current frame,
       // and elem.start == oldTarget
       h.span match {
-        case hs: Span.HasStart => hs.start > currentFrame && hs.start == oldTarget
+        case hs: Span.HasStart => hs.start > currentOffset && hs.start == oldTarget
         case _ => false
       }
     }
