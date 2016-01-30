@@ -42,11 +42,11 @@ object AuralActionImpl extends AuralObj.Factory {
 
     private val stateRef = Ref[AuralView.State](AuralView.Stopped)
 
-    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    def prepare(timeRef: TimeRef.Option)(implicit tx: S#Tx): Unit = {
       // nothing to do. XXX TODO - set state and fire
     }
 
-    def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
+    def play(timeRef: TimeRef.Option, unit: Unit)(implicit tx: S#Tx): Unit = {
       val oldState = stateRef.swap(AuralView.Playing)(tx.peer) // XXX TODO fire update
       if (oldState != AuralView.Playing) {
         val actionObj = obj()

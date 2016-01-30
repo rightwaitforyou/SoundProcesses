@@ -67,7 +67,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     *                 `gridReached` and the search must be restricted to views that
     *                 start no earlier than `prepareSpan`.
     */
-  protected def processPrepare(prepareSpan: Span, timeRef: TimeRef.Apply, initial: Boolean)
+  protected def processPrepare(prepareSpan: Span, timeRef: TimeRef, initial: Boolean)
                               (implicit tx: S#Tx): Iterator[PrepareResult]
 
   protected type PrepareResult = (ViewID, SpanLike, Obj[S])
@@ -75,13 +75,13 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /** Called during `play`. Sub-classes should intersect
     * the current elements and for each of them call `playView`.
     */
-  protected def processPlay(timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit
+  protected def processPlay(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit
 
   /** Called when a next interesting frame has been reached.
     * The method should look for and invoke the events such as
     * starting or stopping a view.
     */
-  protected def processEvent(play: IPlaying, timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit
+  protected def processEvent(play: IPlaying, timeRef: TimeRef)(implicit tx: S#Tx): Unit
 
   /** Report the next interesting frame greater than the given frame for which
     * `eventReached` (internal) and `processEvent` will be called.
@@ -116,7 +116,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     *
     * Sub-classes may override this if they call `super.playView`
     */
-  protected def playView(h: ElemHandle, timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit
+  protected def playView(h: ElemHandle, timeRef: TimeRef.Option, target: Target)(implicit tx: S#Tx): Unit
 
   /** Should be called from `processEvent` for views that should be
     * stopped and disposed. The caller is responsible for removing
@@ -142,10 +142,10 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   }
 
   protected sealed trait ITimedState extends InternalState {
-    def timeRef: TimeRef
+    def timeRef: TimeRef.Option
   }
 
-  protected final class IPreparing(val map: Map[Elem, Disposable[S#Tx]], val timeRef: TimeRef.Apply)
+  protected final class IPreparing(val map: Map[Elem, Disposable[S#Tx]], val timeRef: TimeRef)
     extends ITimedState {
 
     def copy(map: Map[Elem, Disposable[S#Tx]]): IPreparing = new IPreparing(map, timeRef)
@@ -157,12 +157,12 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     def external = if (map.isEmpty) Prepared else Preparing
   }
 
-  protected final class IPlaying(val wallClock: Long, val timeRef: TimeRef.Apply, val target: Target)
+  protected final class IPlaying(val wallClock: Long, val timeRef: TimeRef, val target: Target)
     extends ITimedState {
 
     override def toString = s"IPlaying($wallClock, $timeRef, $target)"
 
-    def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
+    def shiftTo(newWallClock: Long): TimeRef = timeRef.shift(newWallClock - wallClock)
 
     def dispose()(implicit tx: S#Tx): Unit = ()
 
@@ -189,7 +189,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * is prepared and the method returns `Some(elem, observer)` that must
    * be passed back from `processPrepare` (they'll show up in `IPreparing`).
    */
-  private[this] def prepareChild(childView: Elem, childTime: TimeRef, observer: Boolean)
+  private[this] def prepareChild(childView: Elem, childTime: TimeRef.Option, observer: Boolean)
                                 (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
     logA(s"scheduled - prepare $childView - $childTime")
     childView.prepare(childTime)
@@ -219,7 +219,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
 
   // ----
 
-  final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+  final def prepare(timeRef: TimeRef.Option)(implicit tx: S#Tx): Unit = {
     if (state != Stopped) return
     val tForce    = timeRef.force
     val newState  = prepareNoFire(tForce)
@@ -229,7 +229,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /* Makes sure no more nodes are playing, then calls `processPrepare`.
    * Finally sets internal state to `IPreparing` and updates `prepareSpanRef`.
    */
-  private[this] def prepareNoFire(timeRef: TimeRef.Apply)(implicit tx: S#Tx): InternalState = {
+  private[this] def prepareNoFire(timeRef: TimeRef)(implicit tx: S#Tx): InternalState = {
     val startFrame    = timeRef.offset
     val stopFrame     = startFrame + LOOK_STOP
     val prepareSpan   = Span(startFrame, stopFrame)
@@ -262,7 +262,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     * If all is good, sets internal state to `IPlaying` and calls `processPlay`.
     * Next instructs scheduler and sets external state to `Playing`.
     */
-  final def play(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
+  final def play(timeRef: TimeRef.Option, target: Target)(implicit tx: S#Tx): Unit = {
     val st = state
     if (st == Playing) return
 
@@ -439,7 +439,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
-  private[this] final def mkViewAndPrepare(timeRef: TimeRef.Apply, vid: ViewID, span: SpanLike, obj: Obj[S],
+  private[this] final def mkViewAndPrepare(timeRef: TimeRef, vid: ViewID, span: SpanLike, obj: Obj[S],
                                            observer: Boolean)
                                           (implicit tx: S#Tx): (Elem, Option[(Elem, Disposable[S#Tx])]) = {
     val childTime = timeRef.child(span)

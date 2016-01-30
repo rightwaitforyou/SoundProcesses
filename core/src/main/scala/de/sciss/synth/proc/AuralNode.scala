@@ -18,7 +18,7 @@ import de.sciss.lucre.synth.{Group, NodeRef, Synth, Sys => SSys, Txn}
 import de.sciss.synth.proc.impl.{AuralNodeImpl => Impl}
 
 object AuralNode {
-  def apply[S <: SSys[S]](timeRef: TimeRef.Apply, wallClock: Long, synth: Synth)(implicit tx: Txn): Builder[S] =
+  def apply[S <: SSys[S]](timeRef: TimeRef, wallClock: Long, synth: Synth)(implicit tx: Txn): Builder[S] =
     Impl[S](timeRef, wallClock, synth)
 
   trait Builder[S <: Sys[S]] extends AuralNode[S] {

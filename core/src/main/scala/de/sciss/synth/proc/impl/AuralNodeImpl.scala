@@ -11,17 +11,17 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth.proc.impl
+package de.sciss.synth.proc
+package impl
 
 import de.sciss.lucre.stm.TxnLike
 import de.sciss.lucre.synth.{DynamicUser, Group, Node, Resource, Synth, Sys, Txn}
-import de.sciss.synth.proc.{AuralNode, TimeRef}
 import de.sciss.synth.{ControlSet, addBefore, addToHead}
 
 import scala.concurrent.stm.Ref
 
 object AuralNodeImpl {
-  def apply[S <: Sys[S]](timeRef: TimeRef.Apply, wallClock: Long, synth: Synth)(implicit tx: Txn): AuralNode.Builder[S] = {
+  def apply[S <: Sys[S]](timeRef: TimeRef, wallClock: Long, synth: Synth)(implicit tx: Txn): AuralNode.Builder[S] = {
     // XXX TODO -- probably we can throw `users` and `resources` together as disposables
     val res = new Impl[S](timeRef, wallClock, synth)
     synth.server.addVertex(res)
@@ -39,7 +39,7 @@ object AuralNodeImpl {
                                      core: Option[Group] = None,
                                      post: Option[Group] = None, back: Option[Group] = None)
 
-  private final class Impl[S <: Sys[S]](val timeRef: TimeRef.Apply, wallClock: Long, synth: Synth)
+  private final class Impl[S <: Sys[S]](val timeRef: TimeRef, wallClock: Long, synth: Synth)
     extends AuralNode.Builder[S] {
 
     import TxnLike.peer

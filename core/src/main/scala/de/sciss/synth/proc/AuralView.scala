@@ -36,8 +36,8 @@ trait AuralView[S <: Sys[S], -Target] extends Observable[S#Tx, AuralView.State] 
 
   def state(implicit tx: S#Tx): AuralView.State
 
-  def prepare(timeRef: TimeRef                )(implicit tx: S#Tx): Unit
-  def play   (timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit
+  def prepare(timeRef: TimeRef.Option                )(implicit tx: S#Tx): Unit
+  def play   (timeRef: TimeRef.Option, target: Target)(implicit tx: S#Tx): Unit
 
   def stop()(implicit tx: S#Tx): Unit
 }

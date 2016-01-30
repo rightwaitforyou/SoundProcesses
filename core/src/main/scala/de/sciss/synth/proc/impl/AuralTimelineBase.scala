@@ -23,7 +23,6 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{TxnLike, Disposable, IdentifierMap, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.breakOut
@@ -92,7 +91,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected final def modelEventAfter(frame: Long)(implicit tx: S#Tx): Long =
     obj().eventAfter(frame).getOrElse(Long.MaxValue)
 
-  protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
+  protected final def processPlay(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
     val toStart = intersect(timeRef.frame)
     playViews(toStart, timeRef, target)
   }
@@ -101,7 +100,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   private[this] def intersect(frame: Long)(implicit tx: S#Tx): Iterator[Leaf] =
     BiGroupImpl.intersectTime(tree)(frame)(iSys(tx))
 
-  protected final def processPrepare(span: Span, timeRef: Apply, initial: Boolean)
+  protected final def processPrepare(span: Span, timeRef: TimeRef, initial: Boolean)
                                     (implicit tx: S#Tx): Iterator[PrepareResult] = {
     val tl          = obj()
     // search for new regions starting within the look-ahead period
@@ -119,7 +118,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  protected final def playView(h: ElemHandle, timeRef: TimeRef, target: Target)
+  protected final def playView(h: ElemHandle, timeRef: TimeRef.Option, target: Target)
                               (implicit tx: S#Tx): Unit = {
     val view = elemFromHandle(h)
     logA(s"timeline - playView: $view - $timeRef")
@@ -143,7 +142,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       stopView(view)
     }
 
-  protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
+  protected final def processEvent(play: IPlaying, timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
     val (toStart, toStop) = eventsAt(timeRef.offset)
 
     // this is a pretty tricky decision...
@@ -177,7 +176,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  private[this] def playViews(it: Iterator[Leaf], timeRef: TimeRef.Apply, target: Target)(implicit tx: S#Tx): Unit =
+  private[this] def playViews(it: Iterator[Leaf], timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit =
     if (it.hasNext) it.foreach { case (span, views) =>
       val tr = timeRef.child(span)
       views.foreach { case (idH, elem) =>

@@ -21,7 +21,6 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{TxnLike, Disposable, Obj}
 import de.sciss.lucre.synth.Sys
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth.proc.TimeRef.Apply
 import de.sciss.synth.proc.{logAural => logA}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
@@ -66,7 +65,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected final def modelEventAfter(offset: Long)(implicit tx: S#Tx): Long =
     obj().eventAfter(offset).getOrElse(Long.MaxValue)
 
-  protected final def processPlay(timeRef: Apply, target: Target)(implicit tx: S#Tx): Unit = {
+  protected final def processPlay(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
     tree.floor(timeRef.offset).foreach { case (start, entries) =>
       val toStart   = entries.head
@@ -78,7 +77,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  protected final def processPrepare(spanP: Span, timeRef: Apply, initial: Boolean)
+  protected final def processPrepare(spanP: Span, timeRef: TimeRef, initial: Boolean)
                                     (implicit tx: S#Tx): Iterator[PrepareResult] = {
     // println(s"processPrepare($span, $timeRef, initial = $initial")
     val gr    = obj()
@@ -130,7 +129,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  protected final def processEvent(play: IPlaying, timeRef: Apply)(implicit tx: S#Tx): Unit = {
+  protected final def processEvent(play: IPlaying, timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
     val start   = timeRef.offset
     val toStart = tree.get(start)(iSys(tx))
       .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.offset}"))
@@ -164,7 +163,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     this
   }
 
-  protected def playView(h: ElemHandle, timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
+  protected def playView(h: ElemHandle, timeRef: TimeRef.Option, target: Target)(implicit tx: S#Tx): Unit = {
     val view = elemFromHandle(h)
     logA(s"grapheme - playView: $view - $timeRef")
     stopViews()

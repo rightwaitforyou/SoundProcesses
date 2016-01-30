@@ -63,10 +63,10 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     def external = if (map.isEmpty) Prepared else Preparing
   }
 
-  private[this] case class IPlaying(wallClock: Long,timeRef: TimeRef.Apply, target: Target[S])
+  private[this] case class IPlaying(wallClock: Long, timeRef: TimeRef, target: Target[S])
     extends InternalState {
 
-    def shiftTo(newWallClock: Long): TimeRef.Apply = timeRef.shift(newWallClock - wallClock)
+    def shiftTo(newWallClock: Long): TimeRef = timeRef.shift(newWallClock - wallClock)
 
     def dispose()(implicit tx: S#Tx): Unit = ()
 
@@ -154,14 +154,14 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
 
   def state(implicit tx: S#Tx): AuralView.State = internalRef().external
 
-  def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+  def prepare(timeRef: TimeRef.Option)(implicit tx: S#Tx): Unit = {
     if (state != Stopped) return
     val tForce    = timeRef.force
     val newState  = prepareNoFire(tForce)
     fire(newState.external)
   }
 
-  private[this] def prepareNoFire(timeRef: TimeRef.Apply)(implicit tx: S#Tx): InternalState = {
+  private[this] def prepareNoFire(timeRef: TimeRef)(implicit tx: S#Tx): InternalState = {
     // prepareTimeRef() = timeRef
 
     // this can happen if `play` is called with a
@@ -207,7 +207,7 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
       case _ =>
     }
 
-  def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit = {
+  def play(timeRef: TimeRef.Option, target: Target[S])(implicit tx: S#Tx): Unit = {
     val st0 = state
     if (st0 == Playing) return
 

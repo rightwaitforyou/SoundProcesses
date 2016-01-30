@@ -88,13 +88,13 @@ trait AuralFolderLikeImpl[S <: Sys[S], Repr <: Obj[S], View <: AuralObj.FolderLi
     transport.play()        // XXX TODO -- should we be able to pass the timeRef?
   }
 
-  final def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
+  final def play(timeRef: TimeRef.Option, unit: Unit)(implicit tx: S#Tx): Unit = {
     if (state == AuralView.Playing) return
-    performPlay(timeRef)
+    performPlay(timeRef.force)
     state = AuralView.Playing
   }
 
-  final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+  final def prepare(timeRef: TimeRef.Option)(implicit tx: S#Tx): Unit = {
     if (state != AuralView.Stopped) return
     Console.err.println("TODO: AuralObj.FolderLike.prepare") // XXX TODO
     state = AuralView.Prepared

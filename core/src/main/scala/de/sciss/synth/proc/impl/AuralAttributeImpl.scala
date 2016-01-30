@@ -76,9 +76,9 @@ object AuralAttributeImpl {
     private[this] var obs: Disposable[S#Tx] = _
     private /* [this] */ val playRef = Ref[Option[Target[S]]](None)  // private[this] crashes Scala 2.10 !
 
-    final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = state = Prepared
+    final def prepare(timeRef: TimeRef.Option)(implicit tx: S#Tx): Unit = state = Prepared
 
-    final def play(timeRef: TimeRef, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
+    final def play(timeRef: TimeRef.Option, target: Target[S])(implicit tx: S#Tx): Unit /* Instance */ = {
       require(playRef.swap(Some(target))(tx.peer).isEmpty)
       // target.add(this)
       state = Playing

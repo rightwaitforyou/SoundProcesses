@@ -58,10 +58,10 @@ object AuralObj {
   case object TargetPrepared extends TargetState {
     def completed = AuralView.Prepared
   }
-  final case class TargetPlaying(wallClock: Long, timeRef: TimeRef.Apply) extends TargetState {
+  final case class TargetPlaying(wallClock: Long, timeRef: TimeRef) extends TargetState {
     def completed = AuralView.Playing
 
-    def shiftTo(newWallClock: Long): TimeRef.Apply = {
+    def shiftTo(newWallClock: Long): TimeRef = {
       val delta = newWallClock - wallClock
       timeRef.shift(delta)
     }

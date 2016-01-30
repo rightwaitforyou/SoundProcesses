@@ -555,12 +555,12 @@ object AuralProcImpl {
       }
     }
 
-    final def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    final def prepare(timeRef: TimeRef.Option)(implicit tx: S#Tx): Unit = {
       targetStateRef() = TargetPrepared
       // XXX TODO
     }
 
-    final def play(timeRef: TimeRef, unit: Unit)(implicit tx: S#Tx): Unit = {
+    final def play(timeRef: TimeRef.Option, unit: Unit)(implicit tx: S#Tx): Unit = {
       val tr  = timeRef.force
       val ts  = TargetPlaying(sched.time, tr)
       targetStateRef() = ts
@@ -645,7 +645,7 @@ object AuralProcImpl {
     }
 
     // ---- asynchronous preparation ----
-    private[this] def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef.Apply)
+    private[this] def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)
                                       (implicit tx: S#Tx): Unit = {
       val p = procCached()
       logA(s"begin prepare $p (${hashCode.toHexString})")
@@ -685,7 +685,7 @@ object AuralProcImpl {
     }
 
     // ---- synchronous preparation ----
-    protected def launch(ugen: UGB.Complete[S], timeRef: TimeRef.Apply)(implicit tx: S#Tx): Unit = {
+    protected def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p = procCached()
       logA(s"begin launch  $p (${hashCode.toHexString})")
 
