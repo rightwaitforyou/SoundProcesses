@@ -216,7 +216,49 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   ////////////////////////////////////////////////////////////////////////////////////// 18
 
   def test18()(implicit context: AuralContext[S]): Unit = {
+    showTransportLog  = false
     println("----test18----")
+    println(
+      """
+        |Expected behaviour:
+        |Actions are scheduled on a timeline,
+        |printing "bang" messages once at 1.0s,
+        |twice at 2.2s, once at 3.3s.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val t = Transport[S]
+
+      val body = new Action.Body {
+        def apply[T <: stm.Sys[T]](universe: Universe[T])(implicit tx: T#Tx): Unit = {
+          val secs = seconds(t.position(tx.asInstanceOf[S#Tx]))
+          println(f"bang at $secs%1.3f sec.")
+        }
+      }
+      Action.registerPredef("test.action", body)
+      val action = Action.predef[S]("test.action")
+
+      val tl = Timeline[S]
+
+      def time(sec: Double) = Span(frame(sec), frame(sec + 0.1))
+
+      tl.add(time(1.0), action)
+      tl.add(time(2.2), action)
+      tl.add(time(2.2), action)
+      tl.add(time(3.3), action)
+
+      t.addObject(tl)
+      t.play()
+
+      stopAndQuit(5.0)
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////////// 17
+
+  def test17()(implicit context: AuralContext[S]): Unit = {
+    println("----test17----")
     println(
       """
         |Expected behaviour:
@@ -256,48 +298,6 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       t.play()
 
       stopAndQuit(8.0)
-    }
-  }
-
-  ////////////////////////////////////////////////////////////////////////////////////// 17
-
-  def test17()(implicit context: AuralContext[S]): Unit = {
-    showTransportLog  = false
-    println("----test17----")
-    println(
-      """
-        |Expected behaviour:
-        |Actions are scheduled on a timeline,
-        |printing "bang" messages once at 1.0s,
-        |twice at 2.2s, once at 3.3s.
-        |
-        |""".stripMargin)
-
-    cursor.step { implicit tx =>
-      val t = Transport[S]
-
-      val body = new Action.Body {
-        def apply[T <: stm.Sys[T]](universe: Universe[T])(implicit tx: T#Tx): Unit = {
-          val secs = seconds(t.position(tx.asInstanceOf[S#Tx]))
-          println(f"bang at $secs%1.3f sec.")
-        }
-      }
-      Action.registerPredef("test.action", body)
-      val action = Action.predef[S]("test.action")
-
-      val tl = Timeline[S]
-
-      def time(sec: Double) = Span(frame(sec), frame(sec + 0.1))
-
-      tl.add(time(1.0), action)
-      tl.add(time(2.2), action)
-      tl.add(time(2.2), action)
-      tl.add(time(3.3), action)
-
-      t.addObject(tl)
-      t.play()
-
-      stopAndQuit(5.0)
     }
   }
 
@@ -668,7 +668,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       println("--issue play--")
       procAural.play()
 
-      after(20.0) { implicit tx =>
+      after(10.0) { implicit tx =>
         procAural.stop()
         stopAndQuit(1.0)
       }

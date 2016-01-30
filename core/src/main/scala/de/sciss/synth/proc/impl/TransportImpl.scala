@@ -16,11 +16,13 @@ package impl
 
 import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.stm
-import de.sciss.lucre.stm.{IdentifierMap, Obj, TxnLike}
-import de.sciss.lucre.synth.{Server, Sys, Txn}
-import de.sciss.synth.proc.{logTransport => logT}
+import de.sciss.lucre.stm.{TxnLike, Obj, IdentifierMap}
+import de.sciss.lucre.synth.{Txn, Server, Sys}
+import de.sciss.span.Span
+import de.sciss.synth.proc
+import proc.{logTransport => logT}
 
-import scala.concurrent.stm.{Ref, TSet}
+import scala.concurrent.stm.{TSet, Ref}
 
 object TransportImpl {
   def apply[S <: Sys[S]](auralSystem: AuralSystem, scheduler: Scheduler[S])
@@ -55,8 +57,8 @@ object TransportImpl {
                                        (implicit workspace: WorkspaceHandle[S])
     extends Transport[S] with ObservableImpl[S, Transport.Update[S]] with AuralSystem.Client {
 
-    import TxnLike.peer
     import scheduler.cursor
+    import TxnLike.peer
 
     private[this] final class PlayTime(val wallClock0: Long, val pos0: Long) {
       override def toString = s"[pos0 = $pos0 / ${TimeRef.framesToSecs(pos0)}, time0 = $wallClock0]"
@@ -99,8 +101,9 @@ object TransportImpl {
     }
 
     private[this] def playViews()(implicit tx: S#Tx): Unit = {
-      logT(s"transport - playViews")
-      viewSet.foreach(_.play(TimeRef.Undefined, ()))
+      val tr = mkTimeRef()
+      logT(s"transport - playViews - $tr")
+      viewSet.foreach(_.play(tr, ()))
     }
 
     def stop()(implicit tx: S#Tx): Unit = {
@@ -144,7 +147,7 @@ object TransportImpl {
 
       contextOption.foreach { implicit context =>
         val view = mkView(obj)
-        if (isPlaying) view.play(TimeRef.Undefined, ())
+        if (isPlaying) view.play(mkTimeRef(), ())
       }
     }
 
@@ -167,6 +170,8 @@ object TransportImpl {
 
       fire(Transport.ObjectRemoved(this, obj))
     }
+
+    private[this] def mkTimeRef()(implicit tx: S#Tx) = TimeRef(Span.from(0L), offset = position)
 
     private[this] def mkView(obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
       val view = AuralObj(obj)
