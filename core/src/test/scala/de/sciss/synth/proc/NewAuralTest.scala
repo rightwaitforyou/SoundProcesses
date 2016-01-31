@@ -8,7 +8,7 @@ import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.stm.store.BerkeleyDB
 import de.sciss.lucre.synth.{Server, Sys}
 import de.sciss.span.{Span, SpanLike}
-import de.sciss.synth
+import de.sciss.{numbers, synth}
 import de.sciss.synth.Curve.{exponential, linear}
 import de.sciss.synth.io.{AudioFile, AudioFileType}
 import de.sciss.synth.proc.Action.Universe
@@ -82,6 +82,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test16" => test16()
       case "--test17" => test17()
       case "--test18" => test18()
+      case "--test19" => test19()
       case _         =>
         println("WARNING: No option given, using --test1")
         test1()
@@ -213,11 +214,11 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
 
-  ////////////////////////////////////////////////////////////////////////////////////// 18
+  ////////////////////////////////////////////////////////////////////////////////////// 19
 
-  def test18()(implicit context: AuralContext[S]): Unit = {
+  def test19()(implicit context: AuralContext[S]): Unit = {
     showTransportLog  = false
-    println("----test18----")
+    println("----test19----")
     println(
       """
         |Expected behaviour:
@@ -252,6 +253,55 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       t.play()
 
       stopAndQuit(5.0)
+    }
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////////// 18
+
+  def test18()(implicit context: AuralContext[S]): Unit = {
+    println("----test18----")
+    println(
+      """
+        |Expected behaviour:
+        |Timeline and grapheme objects nest properly
+        |We have a proc starting after four
+        |seconds with a six step frequency sequence
+        |changing at seconds spacing.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val p = proc {
+        val freq  = graph.Attribute.ar("key")
+        val sin   = SinOsc.ar(freq)
+        Out.ar(0, Pan2.ar(sin * 0.1))
+      }
+
+      val tl  = Timeline[S]
+      tl.add(Span.from(frame(4.0)), p)
+
+      import numbers.Implicits._
+      def freq(midi: Int) = DoubleObj.newConst[S](midi.midicps)
+      val gr = Grapheme[S]
+      val in = Grapheme[S]
+      gr.add(frame(-1.0), freq(100))
+      gr.add(frame( 0.0), freq( 70))
+      gr.add(frame( 1.0), freq( 72))
+      gr.add(frame( 2.0), in)
+      in.add(frame(-1.0), freq(100))
+      in.add(frame( 0.0), freq( 74))
+      in.add(frame( 1.0), freq( 76))
+      in.add(frame( 2.0), freq( 78))
+      gr.add(frame( 5.0), freq( 80))
+
+      val attr = p.attr
+      attr.put("key", gr)
+
+      val t = Transport[S]
+      t.addObject(tl)
+      t.play()
+
+      stopAndQuit(10.0)
     }
   }
 
