@@ -277,7 +277,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         Out.ar(0, Pan2.ar(sin * 0.1))
       }
 
-      val tl  = Timeline[S]
+      val tl = Timeline[S]
       tl.add(Span.from(frame(4.0)), p)
 
       import numbers.Implicits._

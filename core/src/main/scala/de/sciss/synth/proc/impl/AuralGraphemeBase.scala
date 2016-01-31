@@ -68,13 +68,26 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   protected final def processPlay(timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
     tree.floor(timeRef.offset).foreach { case (start, entries) =>
-      val toStart   = entries.head
-      val stop      = viewEventAfter(start)
-      val span      = if (stop == Long.MaxValue) Span.From(start) else Span(start, stop)
-      val h         = ElemHandle(start, toStart)
-      val tr0       = timeRef.child(span)
-      playView(h, tr0, target)
+      playEntry(entries, start = start, timeRef = timeRef, target = target)
     }
+  }
+
+  protected final def processEvent(play: IPlaying, timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
+    val start   = timeRef.offset
+    val entries = tree.get(start)(iSys(tx))
+      .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.offset}"))
+    playEntry(entries, start = start, timeRef = timeRef, target = play.target)
+  }
+
+  private[this] def playEntry(entries: Vec[Elem], start: Long, timeRef: TimeRef, target: Target)
+                             (implicit tx: S#Tx): Unit = {
+    // val start     = timeRef.offset
+    val toStart   = entries.head
+    val stop      = viewEventAfter(start)
+    val span      = if (stop == Long.MaxValue) Span.From(start) else Span(start, stop)
+    val h         = ElemHandle(start, toStart)
+    val childTime = timeRef.child(span)
+    playView(h, childTime, target)
   }
 
   protected final def processPrepare(spanP: Span, timeRef: TimeRef, initial: Boolean)
@@ -127,15 +140,6 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
         }
       }
     }
-  }
-
-  protected final def processEvent(play: IPlaying, timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
-    val start   = timeRef.offset
-    val toStart = tree.get(start)(iSys(tx))
-      .getOrElse(throw new IllegalStateException(s"No element at event ${timeRef.offset}"))
-      .head
-    val h       = ElemHandle(start, toStart)
-    playView(h, timeRef, play.target)
   }
 
   def init(gr: Grapheme[S])(implicit tx: S#Tx): this.type = {
