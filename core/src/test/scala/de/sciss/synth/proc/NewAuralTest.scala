@@ -267,6 +267,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
         |We have a proc starting after four
         |seconds with a six step frequency sequence
         |changing at seconds spacing.
+        |After ten seconds, we dynamically add
+        |a new grapheme, going back in whole tones two steps.
         |
         |""".stripMargin)
 
@@ -281,7 +283,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       tl.add(Span.from(frame(4.0)), p)
 
       import numbers.Implicits._
-      def freq(midi: Int) = DoubleObj.newConst[S](midi.midicps)
+      def freq(midi: Int)(implicit tx: S#Tx) = DoubleObj.newConst[S](midi.midicps)
+
       val gr = Grapheme[S]
       val in = Grapheme[S]
       gr.add(frame(-1.0), freq(100))
@@ -301,7 +304,20 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       t.addObject(tl)
       t.play()
 
-      stopAndQuit(10.0)
+      val pH = tx.newHandle(p)
+
+      // stopAndQuit(10.0)
+      after(10.0) { implicit tx =>
+        val p     = pH()
+        val attr  = p.attr
+        val gr = Grapheme[S]
+        gr.add(frame(-1.0 + 6.0), freq(100))
+        gr.add(frame( 0.0 + 6.0), freq( 78))
+        gr.add(frame( 1.0 + 6.0), freq( 76))
+        attr.put("key", gr)
+
+        stopAndQuit(3.0)
+      }
     }
   }
 
