@@ -244,8 +244,8 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       val genOut = pGen.outputs.add(Proc.mainOut)
 
       val pDif = proc {
-        // val sig = graph.ScanInFix(1)
-        val sig = graph.ScanIn()
+        val sig = graph.ScanInFix(1)
+        // val sig = graph.ScanIn()
         Out.ar(0, Pan2.ar(sig * 0.2))
       }
       pDif.name = "dif"
@@ -253,9 +253,9 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       pDif.attr.put(Proc.mainIn, difIn)
 
       val pFlt = proc {
-        // val sig = graph.ScanInFix(1)
-        val sig = graph.ScanIn()
-        val flt = HPF.ar(sig, 1000)
+        val sig = graph.ScanInFix(1)
+        // val sig = graph.ScanIn()
+        val flt = HPF.ar(sig, 2000)
         graph.ScanOut(flt)
       }
       pFlt.name = "flt"
