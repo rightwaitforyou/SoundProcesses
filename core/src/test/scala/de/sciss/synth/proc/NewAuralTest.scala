@@ -83,6 +83,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test17" => test17()
       case "--test18" => test18()
       case "--test19" => test19()
+      case "--test20" => test20()
       case _         =>
         println("WARNING: No option given, using --test1")
         test1()
@@ -213,6 +214,76 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 20
+
+  def test20()(implicit context: AuralContext[S]): Unit = {
+    println("----test20----")
+    println(
+      """
+        |Expected behaviour:
+        |We set up a source and sink and
+        |timeline connections between them,
+        |temporarily interrupted by an inserted filter.
+        |Two seconds after start, we hear unfiltered pink noise,
+        |two seconds later the high pass filter begins,
+        |another two seconds later the filter is removed again.
+        |Then transport is stopped and restarted in the last section,
+        |we hear again unfiltered noise.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val tl = Timeline[S]
+
+      val pGen = proc {
+        val sig = PinkNoise.ar
+        graph.ScanOut(sig)
+      }
+      pGen.name = "gen"
+      val genOut = pGen.outputs.add(Proc.mainOut)
+
+      val pDif = proc {
+        // val sig = graph.ScanInFix(1)
+        val sig = graph.ScanIn()
+        Out.ar(0, Pan2.ar(sig * 0.2))
+      }
+      pDif.name = "dif"
+      val difIn = Timeline[S]
+      pDif.attr.put(Proc.mainIn, difIn)
+
+      val pFlt = proc {
+        // val sig = graph.ScanInFix(1)
+        val sig = graph.ScanIn()
+        val flt = HPF.ar(sig, 1000)
+        graph.ScanOut(flt)
+      }
+      pFlt.name = "flt"
+      val fltOut = pFlt.outputs.add(Proc.mainOut)
+      val fltIn = Timeline[S]
+      pFlt.attr.put(Proc.mainIn, fltIn)
+
+      difIn.add(Span.until(            frame(2.0)), genOut)
+      difIn.add(Span      (frame(2.0), frame(4.0)), fltOut)
+      difIn.add(Span.from (frame(4.0)            ), genOut)
+
+      fltIn.add(Span.until(            frame(2.0)), genOut)
+
+      tl   .add(Span.from (frame(2.0)            ), pGen  )
+      tl   .add(Span.from (frame(2.0)            ), pDif  )
+      tl   .add(Span      (frame(4.0), frame(6.0)), pFlt  )
+
+      val t = Transport[S]
+      t.addObject(tl)
+      t.play()
+
+      after(8.0) { implicit tx =>
+        t.stop()
+        t.play()
+        stopAndQuit(3.0)
+      }
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 19
 

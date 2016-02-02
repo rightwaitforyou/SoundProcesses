@@ -56,8 +56,8 @@ object Proc extends Obj.Type {
   /** Source code of the graph function. */
   final val attrSource = "graph-source"
 
-  final val scanMainIn  = "in"
-  final val scanMainOut = "out"
+  final val mainIn  = "in"
+  final val mainOut = "out"
 
   /** Audio input file (tape) grapheme. */
   final val graphAudio = "sig"

@@ -60,7 +60,8 @@ object SchedulerImpl {
 
     def isInf: Boolean = targetTime == Long.MaxValue
 
-    override def toString = s"[issueTime = $issueTime, targetTime = $targetTime]"
+    import TimeRef.{framesAndSecs => fas}
+    override def toString = s"[issueTime = ${fas(issueTime)}, targetTime = ${fas(targetTime)}]"
   }
 
   private val infInfo = new Info(issueTime = 0L, targetTime = Long.MaxValue)
@@ -112,11 +113,11 @@ object SchedulerImpl {
       infoVar()         = info
       val jitter        = calcFrame() - info.issueTime
       val actualDelayN  = math.max(0L, ((info.delay - jitter) / sampleRateN).toLong)
-      logT(s"scheduled: $info; logicalDelay (f) = ${info.delay}, actualDelay (ns) = $actualDelayN")
+      logT(f"scheduled:     $info; log dly = ${TimeRef.framesAndSecs(info.delay)}, act dly = ${actualDelayN * 1.0e-9}%1.3fs")
       tx.afterCommit {
         SoundProcesses.scheduledExecutorService.schedule(new Runnable {
           def run(): Unit = {
-            logT(s"scheduled: execute $info")
+            logT(s"scheduled: exe $info")
             cursor.step { implicit tx =>
               eventReached(info)
             }
@@ -179,7 +180,8 @@ object SchedulerImpl {
         prio.add(targetTime -> newSet)
       }
 
-      logT(s"schedule: token = $token, time = $t, old-target ${oldInfo.targetTime}, new-target = $targetTime, submit? $reschedule")
+      import TimeRef.{framesAndSecs => fas}
+      logT(s"schedule: token = $token, time = $t, old tgt ${fas(oldInfo.targetTime)}, new tgt = ${fas(targetTime)}, submit? $reschedule")
 
       if (reschedule) {
         val newInfo = new Info(issueTime = t, targetTime = targetTime)

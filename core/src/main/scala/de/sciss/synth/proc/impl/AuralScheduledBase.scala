@@ -287,7 +287,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   private[this] def scheduleNextEvent(currentOffset: Long)(implicit tx: S#Tx): Unit = {
     val targetOffset = viewEventAfter(currentOffset)
     val token = if (targetOffset == Long.MaxValue) -1 else {
-      logA(s"scheduled - scheduleNextEvent($currentOffset) -> $targetOffset")
+      import TimeRef.{framesAndSecs => fas}
+      logA(s"scheduled - scheduleNextEvent(${fas(currentOffset)}) -> ${fas(targetOffset)}")
       val targetTime = sched.time + (targetOffset - currentOffset)
       sched.schedule(targetTime) { implicit tx =>
         eventReached(offset = targetOffset)
@@ -301,7 +302,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * state is playing, calls `processEvent` followed by `scheduleNextEvent`.
    */
   private[this] def eventReached(offset: Long)(implicit tx: S#Tx): Unit = {
-    logA(s"scheduled - eventReached($offset)")
+    import TimeRef.{framesAndSecs => fas}
+    logA(s"scheduled - eventReached(${fas(offset)})")
     internalState match {
       case play: IPlaying =>
         val tr0 = play.timeRef
@@ -323,7 +325,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     val targetOffset  = if (modelOffset == Long.MaxValue) Long.MaxValue else modelOffset - LOOK_AHEAD
     val token         = if (targetOffset == Long.MaxValue) -1 else {
       val targetTime = sched.time + (targetOffset - currentOffset)
-      logA(s"scheduled - scheduleGrid($currentOffset, $modelOffset) -> $targetOffset")
+      import TimeRef.{framesAndSecs => fas}
+      logA(s"scheduled - scheduleGrid(${fas(currentOffset)}, ${fas(modelOffset)}) -> ${fas(targetOffset)}")
       sched.schedule(targetTime) { implicit tx =>
         gridReached(offset = targetOffset)
       }
@@ -336,7 +339,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * That is `LOOK_AHEAD` ahead of the `frame` we stopped at.
    */
   private[this] def gridReached(offset: Long)(implicit tx: S#Tx): Unit = {
-    logA(s"scheduled - gridReached($offset)")
+    import TimeRef.{framesAndSecs => fas}
+    logA(s"scheduled - gridReached(${fas(offset)})")
     internalState match {
       case play: IPlaying =>
         val startFrame      = offset      + LOOK_AHEAD

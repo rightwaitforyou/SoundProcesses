@@ -61,7 +61,7 @@ object TransportImpl {
     import TxnLike.peer
 
     private[this] final class PlayTime(val wallClock0: Long, val pos0: Long) {
-      override def toString = s"[pos0 = $pos0 / ${TimeRef.framesToSecs(pos0)}, time0 = $wallClock0]"
+      override def toString = s"[pos0 = ${TimeRef.framesAndSecs(pos0)}, time0 = $wallClock0]"
 
       def isPlaying: Boolean = wallClock0 != Long.MinValue
 

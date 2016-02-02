@@ -29,6 +29,14 @@ object TimeRef {
     f"$s%1.3f"
   }
 
+  /** Utility method that generates a string representation of
+    * the time both in frames and in seconds.
+    */
+  def framesAndSecs(n: Long): String = {
+    val frames = if (n == Long.MinValue) "-inf" else if (n == Long.MaxValue) "inf" else n.toString
+    s"$frames / ${framesToSecs(n)}s"
+  }
+
   def spanToSecs(span: SpanLike): String = span match {
     case Span.Void => "(void)"
     case Span.All => "(all)"
@@ -43,6 +51,8 @@ object TimeRef {
       }
       s"(${start}s - ${stop}s)"
   }
+
+  def spanAndSecs(span: SpanLike): String = s"$span / ${spanToSecs(span)}"
 
   case object Undefined extends Option {
     /** For convenience, an undefined time references reports a frame of zero. */
@@ -89,30 +99,16 @@ object TimeRef {
 }
 
 final case class TimeRef(span: Span.HasStart, val offset: Long) extends TimeRef.Option {
-  // def offset: Long = frame - span.start
+
   def frame : Long = offset + span.start
 
   def isDefined = true
   def force     = this
 
-  //  def shift(deltaFrames: Long): TimeRef = {
-  //    val span1 = span.shift(deltaFrames)
-  //    new TimeRef(span1, frame = frame + deltaFrames)
-  //  }
-
   def shift(deltaFrames: Long): TimeRef =
     new TimeRef(span, offset = offset + deltaFrames)
 
   def updateOffset(newOffset: Long): TimeRef = new TimeRef(span, offset = newOffset)
-
-//  def child(that: SpanLike): TimeRef.Option = {
-//    val spanZ = span.shift(-span.start)
-//    val span1 = spanZ.intersect(that)
-//    span1 match {
-//      case s: Span.HasStart => new TimeRef(s, offset = offset - s.start)
-//      case _                => TimeRef.Undefined
-//    }
-//  }
 
   def child(that: SpanLike): TimeRef.Option =
     that match {
@@ -130,7 +126,7 @@ final case class TimeRef(span: Span.HasStart, val offset: Long) extends TimeRef.
 
   def hasEnded: Boolean = span.compareStop(offset) <= 0
 
-  import TimeRef.{spanToSecs, framesToSecs}
+  import TimeRef.{spanAndSecs, framesAndSecs}
 
-  override def toString = s"TimeRef(span = $span / ${spanToSecs(span)}, frame = $frame / ${framesToSecs(frame)})"
+  override def toString = s"TimeRef(span = ${spanAndSecs(span)}, frame = ${framesAndSecs(frame)})"
 }

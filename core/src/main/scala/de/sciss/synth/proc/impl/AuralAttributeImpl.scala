@@ -103,8 +103,6 @@ object AuralAttributeImpl {
       this
     }
 
-//    def prepare(timeRef: TimeRef)(implicit tx: S#Tx): Unit = ()
-
     private[this] def stopNoFire()(implicit tx: S#Tx): Unit =
       playRef.swap(None).foreach(_.remove(this))
 
@@ -203,12 +201,15 @@ object AuralAttributeImpl {
 
     def preferredNumChannels(implicit tx: S#Tx): Int = 4
 
-    protected def mkValue(spec: FadeSpec): AuralAttribute.Value = Vector[Float](
-      (spec.numFrames / TimeRef.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
-        case Curve.parametric(c)  => c
-        case _                    => 0f
-      }, spec.floor
-    )
+    protected def mkValue(spec: FadeSpec): AuralAttribute.Value = {
+      val v = Vector[Float](
+        (spec.numFrames / TimeRef.SampleRate).toFloat, spec.curve.id.toFloat, spec.curve match {
+          case Curve.parametric(c)  => c
+          case _                    => 0f
+        }, spec.floor
+      )
+      v
+    }
 
     override def toString = s"FadeSpecAttribute($key)@${hashCode.toHexString}"
   }
