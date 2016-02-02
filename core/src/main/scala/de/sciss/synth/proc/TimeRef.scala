@@ -26,7 +26,7 @@ object TimeRef {
     */
   def framesToSecs(n: Long): String = if (n == Long.MinValue) "-inf" else if (n == Long.MaxValue) "inf" else {
     val s = n / SampleRate
-    f"$s%1.3f"
+    f"$s%1.3fs"
   }
 
   /** Utility method that generates a string representation of
@@ -34,7 +34,7 @@ object TimeRef {
     */
   def framesAndSecs(n: Long): String = {
     val frames = if (n == Long.MinValue) "-inf" else if (n == Long.MaxValue) "inf" else n.toString
-    s"$frames / ${framesToSecs(n)}s"
+    s"$frames / ${framesToSecs(n)}"
   }
 
   def spanToSecs(span: SpanLike): String = span match {
@@ -49,7 +49,7 @@ object TimeRef {
         case hs: Span.HasStop => framesToSecs(hs.stop)
         case _ => "inf"
       }
-      s"(${start}s - ${stop}s)"
+      s"($start - $stop)"
   }
 
   def spanAndSecs(span: SpanLike): String = s"$span / ${spanToSecs(span)}"

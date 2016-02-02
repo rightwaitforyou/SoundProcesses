@@ -33,7 +33,7 @@ object AuralScheduledBase {
   private val EmptyScheduled = new Scheduled(-1, Long.MaxValue)
 
   final class Scheduled(val token: Int, val offset: Long) {
-    override def toString = s"[token = $token, offset = $offset / ${TimeRef.framesToSecs(offset)}]"
+    override def toString = s"[token = $token, offset = ${TimeRef.framesAndSecs(offset)}]"
     def isEmpty: Boolean = token == -1
   }
 

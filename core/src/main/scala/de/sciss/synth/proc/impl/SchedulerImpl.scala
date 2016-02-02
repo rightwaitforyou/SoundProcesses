@@ -181,7 +181,7 @@ object SchedulerImpl {
       }
 
       import TimeRef.{framesAndSecs => fas}
-      logT(s"schedule: token = $token, time = $t, old tgt ${fas(oldInfo.targetTime)}, new tgt = ${fas(targetTime)}, submit? $reschedule")
+      logT(s"schedule: token = $token, time = ${fas(t)}, old tgt ${fas(oldInfo.targetTime)}, new tgt = ${fas(targetTime)}, submit? $reschedule")
 
       if (reschedule) {
         val newInfo = new Info(issueTime = t, targetTime = targetTime)
