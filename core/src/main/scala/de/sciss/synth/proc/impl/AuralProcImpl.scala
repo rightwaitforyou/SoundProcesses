@@ -69,6 +69,12 @@ object AuralProcImpl {
 
     override def toString = s"AuralObj.Proc@${hashCode().toHexString}"
 
+    object attr extends ObservableImpl[S, AuralObj.Proc.AttrUpdate[S]] {
+      def apply(update: AuralObj.Proc.AttrUpdate[S])(implicit tx: S#Tx): Unit = fire(update)
+    }
+
+    def getAttr(key: String)(implicit tx: S#Tx): Option[AuralAttribute[S]] = attrMap.get(key)
+
     /* The ongoing build aural node build process, as stored in `playingRef`. */
     private[this] sealed trait PlayingRef extends Disposable[S#Tx] {
       def nodeOption: Option[AuralNode[S]]
@@ -239,7 +245,10 @@ object AuralProcImpl {
 
     private[this] def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
-      attrMap.remove(key).foreach(_.dispose())
+      attrMap.remove(key).foreach { view =>
+        view.dispose()
+        attr(AuralObj.Proc.AttrRemoved(this, key))
+      }
     }
 
     // ----
@@ -335,7 +344,12 @@ object AuralProcImpl {
     }
 
     private[this] def mkAuralAttribute(key: String, value: Obj[S])(implicit tx: S#Tx): AuralAttribute[S] =
-      attrMap.getOrElseUpdate(key, AuralAttribute(key, value, this))
+      attrMap.get(key).getOrElse {
+        val view = AuralAttribute(key, value, this)
+        attrMap.put(key, view)
+        attr(AuralObj.Proc.AttrAdded(this, key, view))
+        view
+      }
 
     // AuralAttribute.Observer
     final def attrNumChannelsChanged(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit = {

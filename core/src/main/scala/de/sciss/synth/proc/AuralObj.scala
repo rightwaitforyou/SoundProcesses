@@ -80,6 +80,16 @@ object AuralObj {
 
     def apply[S <: SSys[S]](obj: _Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] =
       AuralProcImpl(obj)
+
+    sealed trait AttrUpdate[S <: Sys[S]] {
+      def proc: Proc[S]
+      def key: String
+    }
+
+    final case class AttrAdded  [S <: Sys[S]](proc: Proc[S], key: String, view: AuralAttribute[S])
+      extends AttrUpdate[S]
+
+    final case class AttrRemoved[S <: Sys[S]](proc: Proc[S], key: String) extends AttrUpdate[S]
   }
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
     override def obj: stm.Source[S#Tx, _Proc[S]]
@@ -93,6 +103,10 @@ object AuralObj {
     def targetState(implicit tx: S#Tx): AuralView.State
 
     implicit def context: AuralContext[S]
+
+    def attr: Observable[S#Tx, Proc.AttrUpdate[S]]
+
+    def getAttr(key: String)(implicit tx: S#Tx): Option[AuralAttribute[S]]
   }
 
   // ---- timeline ----
@@ -138,7 +152,8 @@ object AuralObj {
       */
     def views(implicit tx: S#Tx): Set[AuralObj[S]]
 
-    def getView(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Option[AuralObj[S]]
+    def getView    (timed: _Timeline.Timed[S])(implicit tx: S#Tx): Option[AuralObj[S]]
+    def getViewById(id   : S#ID              )(implicit tx: S#Tx): Option[AuralObj[S]]
   }
 
   // ---- ensemble ----
@@ -160,7 +175,8 @@ object AuralObj {
 
     def views(implicit tx: S#Tx): Set[AuralObj[S]]
 
-    def getView(obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]]
+    def getView    (obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]]
+    def getViewById(id : S#ID  )(implicit tx: S#Tx): Option[AuralObj[S]]
   }
 
   object Ensemble extends AuralObj.Factory {

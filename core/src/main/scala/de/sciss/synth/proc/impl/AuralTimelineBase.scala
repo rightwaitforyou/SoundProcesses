@@ -208,7 +208,10 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
   }
 
   final def getView(timed: Timeline.Timed[S])(implicit tx: S#Tx): Option[Elem] =
-    viewMap.get(timed.id).map(_.view)
+    getViewById(timed.id)
+
+  final def getViewById(id: S#ID)(implicit tx: S#Tx): Option[Elem] =
+    viewMap.get(id).map(_.view)
 
   final def addObject(id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit =
     elemAdded(id, span.value, obj)
