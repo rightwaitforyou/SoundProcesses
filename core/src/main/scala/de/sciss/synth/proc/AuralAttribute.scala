@@ -104,4 +104,6 @@ trait AuralAttribute[S <: Sys[S]] extends AuralView[S, AuralAttribute.Target[S]]
   def key: String
 
   def preferredNumChannels(implicit tx: S#Tx): Int
+
+  def targetOption(implicit tx: S#Tx): Option[AuralAttribute.Target[S]]
 }

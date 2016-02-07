@@ -50,6 +50,8 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
   private[this] val playRef   = Ref(Option.empty[Target[S]])
   private[this] val aObsRef   = Ref(Option.empty[Disposable[S#Tx]])
 
+  def targetOption(implicit tx: S#Tx): Option[Target[S]] = playRef()
+
   def preferredNumChannels(implicit tx: S#Tx): Int =
     auralRef().fold(-1)(_.bus.numChannels)
 

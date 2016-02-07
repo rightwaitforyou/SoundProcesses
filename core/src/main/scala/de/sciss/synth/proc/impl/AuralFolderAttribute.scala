@@ -79,6 +79,11 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
   private[this] var obs: Disposable[S#Tx] = _
   private[this] val prefChansRef = Ref(-2)    // -2 = cache invalid
 
+  def targetOption(implicit tx: S#Tx): Option[Target[S]] = internalRef() match {
+    case IPlaying(_, _, target) => Some(target)
+    case _                      => None
+  }
+
   def preferredNumChannels(implicit tx: S#Tx): Int = {
     @tailrec
     def loop(views: Vector[Elem], res: Int): Int = views match {

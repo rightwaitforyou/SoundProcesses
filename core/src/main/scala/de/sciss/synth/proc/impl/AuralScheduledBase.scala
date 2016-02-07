@@ -182,6 +182,11 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   protected final def internalState(implicit tx: S#Tx): InternalState = internalRef()
   protected final def internalState_=(value: InternalState)(implicit tx: S#Tx): Unit = internalRef() = value
 
+  final def targetOption(implicit tx: S#Tx): Option[Target] = internalState match {
+    case p: IPlaying  => Some(p.target)
+    case _            => None
+  }
+
   // ---- utility methods for sub-types ----
 
   /* Should be called from `processPrepare`. If the child can be instantly
