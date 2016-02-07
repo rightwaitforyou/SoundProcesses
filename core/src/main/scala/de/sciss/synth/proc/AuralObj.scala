@@ -81,15 +81,30 @@ object AuralObj {
     def apply[S <: SSys[S]](obj: _Proc[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj.Proc[S] =
       AuralProcImpl(obj)
 
-    sealed trait AttrUpdate[S <: Sys[S]] {
+    sealed trait Update[S <: Sys[S]] {
       def proc: Proc[S]
       def key: String
     }
+    sealed trait AttrUpdate[S <: Sys[S]] extends Update[S] {
+      def attr: AuralAttribute[S]
+      final def key: String = attr.key
+    }
+    sealed trait OutputUpdate[S <: Sys[S]] extends Update[S] {
+      def output: AuralOutput[S]
+      final def key: String = output.key
+    }
 
-    final case class AttrAdded  [S <: Sys[S]](proc: Proc[S], key: String, view: AuralAttribute[S])
+    final case class AttrAdded  [S <: Sys[S]](proc: Proc[S], attr: AuralAttribute[S])
       extends AttrUpdate[S]
 
-    final case class AttrRemoved[S <: Sys[S]](proc: Proc[S], key: String) extends AttrUpdate[S]
+    final case class AttrRemoved[S <: Sys[S]](proc: Proc[S], attr: AuralAttribute[S])
+      extends AttrUpdate[S]
+
+    final case class OutputAdded  [S <: Sys[S]](proc: Proc[S], output: AuralOutput[S])
+      extends OutputUpdate[S]
+
+    final case class OutputRemoved[S <: Sys[S]](proc: Proc[S], output: AuralOutput[S])
+      extends OutputUpdate[S]
   }
   trait Proc[S <: Sys[S]] extends AuralObj[S] {
     override def obj: stm.Source[S#Tx, _Proc[S]]
@@ -104,9 +119,10 @@ object AuralObj {
 
     implicit def context: AuralContext[S]
 
-    def attr: Observable[S#Tx, Proc.AttrUpdate[S]]
+    def ports: Observable[S#Tx, Proc.Update[S]]
 
-    def getAttr(key: String)(implicit tx: S#Tx): Option[AuralAttribute[S]]
+    def getAttr  (key: String)(implicit tx: S#Tx): Option[AuralAttribute[S]]
+    def getOutput(key: String)(implicit tx: S#Tx): Option[AuralOutput   [S]]
   }
 
   // ---- container ----

@@ -14,13 +14,13 @@
 package de.sciss.synth.proc
 
 import de.sciss.lucre.event.Observable
-import de.sciss.lucre.stm.Disposable
-import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys}
+import de.sciss.lucre.stm.{Disposable, Sys}
+import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys => SSys}
 import de.sciss.synth.proc.impl.{AuralOutputImpl => Impl}
 
 object AuralOutput {
   /** Creates a new aural scan view and registers it with the context under `scan.id`. */
-  def apply[S <: Sys[S]](view: AuralObj.Proc[S], output: Output[S], bus: AudioBus)
+  def apply[S <: SSys[S]](view: AuralObj.Proc[S], output: Output[S], bus: AudioBus)
                         (implicit tx: S#Tx, context: AuralContext[S]): AuralOutput.Owned[S] =
     Impl(view = view, output = output, bus = bus)
 

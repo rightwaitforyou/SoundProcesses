@@ -69,11 +69,12 @@ object AuralProcImpl {
 
     override def toString = s"AuralObj.Proc@${hashCode().toHexString}"
 
-    object attr extends ObservableImpl[S, AuralObj.Proc.AttrUpdate[S]] {
-      def apply(update: AuralObj.Proc.AttrUpdate[S])(implicit tx: S#Tx): Unit = fire(update)
+    object ports extends ObservableImpl[S, AuralObj.Proc.Update[S]] {
+      def apply(update: AuralObj.Proc.Update[S])(implicit tx: S#Tx): Unit = fire(update)
     }
 
-    def getAttr(key: String)(implicit tx: S#Tx): Option[AuralAttribute[S]] = attrMap.get(key)
+    def getAttr  (key: String)(implicit tx: S#Tx): Option[AuralAttribute[S]] = attrMap     .get(key)
+    def getOutput(key: String)(implicit tx: S#Tx): Option[AuralOutput   [S]] = auralOutputs.get(key)
 
     /* The ongoing build aural node build process, as stored in `playingRef`. */
     private[this] sealed trait PlayingRef extends Disposable[S#Tx] {
@@ -193,6 +194,7 @@ object AuralProcImpl {
       view.dispose() // this will call `context.removeAux`
       val exists = auralOutputs.remove(view.key)
       if (exists.isEmpty) throw new IllegalStateException(s"AuralOutput ${view.key} was not in map")
+      ports(AuralObj.Proc.OutputRemoved(this, view))
     }
 
     // ---- attr events ----
@@ -246,8 +248,8 @@ object AuralProcImpl {
     private[this] def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
       attrMap.remove(key).foreach { view =>
+        ports(AuralObj.Proc.AttrRemoved(this, view))
         view.dispose()
-        attr(AuralObj.Proc.AttrRemoved(this, key))
       }
     }
 
@@ -272,11 +274,17 @@ object AuralProcImpl {
 
     // does _not_ dispose playingRef
     private[this] def disposeBuild()(implicit tx: S#Tx): Unit = {
-      auralOutputs.foreach { case (_, view) => view.dispose() }
+      auralOutputs.foreach { case (_, view) =>
+        ports(AuralObj.Proc.OutputRemoved(this, view))
+        view.dispose()
+      }
       auralOutputs.clear()
       outputBuses .clear()
 
-      attrMap .foreach(_._2.dispose())
+      attrMap .foreach { case (_, view) =>
+        ports(AuralObj.Proc.AttrRemoved(this, view))
+        view.dispose()
+      }
       attrMap .clear()
     }
 
@@ -340,6 +348,7 @@ object AuralProcImpl {
       // context.putAux[AuralOutput[S]](output.id, view)
       val old = auralOutputs.put(output.key, view)
       if (old.isDefined) throw new IllegalStateException(s"AuralOutput already exists for ${output.key}")
+      ports(AuralObj.Proc.OutputAdded(this, view))
       view
     }
 
@@ -347,7 +356,7 @@ object AuralProcImpl {
       attrMap.get(key).getOrElse {
         val view = AuralAttribute(key, value, this)
         attrMap.put(key, view)
-        attr(AuralObj.Proc.AttrAdded(this, key, view))
+        ports(AuralObj.Proc.AttrAdded(this, view))
         view
       }
 
