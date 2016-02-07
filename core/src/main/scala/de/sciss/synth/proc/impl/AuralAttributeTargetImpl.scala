@@ -14,6 +14,7 @@
 package de.sciss.synth.proc
 package impl
 
+import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.stm.TxnLike
 import de.sciss.lucre.synth.{AudioBus, BusNodeSetter, DynamicUser, NodeRef, Resource, Synth, Sys, Txn}
 import de.sciss.synth
@@ -22,21 +23,23 @@ import de.sciss.synth.{ControlSet, SynthGraph}
 
 import scala.concurrent.stm.{Ref, TMap}
 
-final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: String, targetBus: AudioBus)
-  extends AuralAttribute.Target[S] /* with DynamicUser */ {
+final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], val key: String, targetBus: AudioBus)
+  extends AuralAttribute.Target[S] with ObservableImpl[S, Value] {
 
   override def toString = s"AuralAttribute.Target($target, $key, $targetBus)"
 
   import TxnLike.peer
   import targetBus.{numChannels, server}
 
-  private def ctlName   = graph.Attribute.controlName(key)
+  private[this] def ctlName   = graph.Attribute.controlName(key)
 
-  private val map       = TMap.empty[AuralAttribute[S], Connected]
-  private val stateRef  = Ref[State](Empty)
+  private[this] val map       = TMap.empty[AuralAttribute[S], Connected]
+  private[this] val stateRef  = Ref[State](Empty)
 
-  private final class Connected(val value: Value,
-                                val users: List[DynamicUser], val resources: List[Resource])
+  def valueOption(implicit tx: S#Tx): Option[Value] = stateRef().valueOption
+
+  private[this] final class Connected(val value: Value,
+                                      val users: List[DynamicUser], val resources: List[Resource])
     extends DynamicUser {
 
     def attach()(implicit tx: S#Tx): this.type = {
@@ -58,19 +61,21 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
     override def toString = s"Connected($value, $users)"
   }
 
-  private sealed trait State {
+  private[this] sealed trait State {
     def put   (attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State
     def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State
+
+    def valueOption(implicit tx: S#Tx): Option[Value]
   }
 
-  private final class AddRemoveEdge(edge: NodeRef.Edge) extends DynamicUser {
+  private[this] final class AddRemoveEdge(edge: NodeRef.Edge) extends DynamicUser {
     def add   ()(implicit tx: Txn): Unit = server.addEdge   (edge)
     def remove()(implicit tx: Txn): Unit = server.removeEdge(edge)
 
     override def toString = s"AddRemoveEdge($edge)"
   }
 
-  private final class AddRemoveVertex(vertex: NodeRef) extends DynamicUser {
+  private[this] final class AddRemoveVertex(vertex: NodeRef) extends DynamicUser {
     def add   ()(implicit tx: Txn): Unit = server.addVertex(vertex)
     def remove()(implicit tx: Txn): Unit = {
       server.removeVertex(vertex)
@@ -80,8 +85,8 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
     override def toString = s"AddRemoveVertex($vertex)"
   }
 
-  private def putSingleScalar(attr: AuralAttribute[S], value: Scalar)
-                             (implicit tx: S#Tx): State = {
+  private[this] def putSingleScalar(attr: AuralAttribute[S], value: Scalar)
+                                   (implicit tx: S#Tx): State = {
     val ctlSet = value.toControl(ctlName, numChannels = numChannels)
     // target.node.set(ctlSet)
     target.addControl(ctlSet)
@@ -91,8 +96,8 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
     new Single(attr, cc)
   }
 
-  private def putSingleStream(attr: AuralAttribute[S], value: Stream)
-                             (implicit tx: S#Tx): State = {
+  private[this] def putSingleStream(attr: AuralAttribute[S], value: Stream)
+                                   (implicit tx: S#Tx): State = {
     val edge      = NodeRef.Edge(value.source, target)
     val edgeUser  = new AddRemoveEdge(edge)
     val busUser   = BusNodeSetter.mapper(ctlName, value.bus, target.node)
@@ -104,7 +109,7 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
 
   // ----
 
-  private object Empty extends State {
+  private[this] object Empty extends State {
     def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State =
       value match {
         case sc: Scalar => putSingleScalar(attr, sc)
@@ -114,12 +119,22 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
     def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): State =
       this // throw new NoSuchElementException(attr.toString)
 
+    def valueOption(implicit tx: S#Tx): Option[Value] = None
+
     override def toString = "Empty"
   }
 
   // ----
 
-  private final class Single(attr1: AuralAttribute[S], con1: Connected) extends State {
+  private[this] final class Single(attr1: AuralAttribute[S], con1: Connected) extends State {
+    def valueOption(implicit tx: S#Tx): Option[Value] = {
+      val value = con1.value match {
+        case vs: Scalar => vs
+        case vs: Stream => Stream(target, targetBus)
+      }
+      Some(value)
+    }
+
     def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State =
       if (attr == attr1) {
         Empty.put(attr, value)
@@ -162,7 +177,9 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
 
   // ----
 
-  private final class Multiple(tgtBusUser: DynamicUser) extends State {
+  private[this] final class Multiple(tgtBusUser: DynamicUser) extends State {
+    def valueOption(implicit tx: S#Tx): Option[Value] = Some(Stream(target, targetBus))
+
     def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): State = {
       val con = mkVertex(value)
       map.put(attr, con).foreach(_.dispose())
@@ -192,7 +209,7 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
   
   // ----
 
-  private def mkVertex(value: Value)(implicit tx: S#Tx): Connected = {
+  private[this] def mkVertex(value: Value)(implicit tx: S#Tx): Connected = {
     def make(syn: Synth, users0: List[DynamicUser]): Connected = {
       val vertexUser  = new AddRemoveVertex(syn)
       val outEdge     = NodeRef.Edge(syn, target)
@@ -240,9 +257,21 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], key: 
     }
   }
 
-  def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit =
-    stateRef.transform(_.put(attr, value))(tx.peer)
+  def put(attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit = {
+    val oldState = stateRef()
+    val newState = oldState.put(attr, value)
+    updateState(oldState, newState)
+  }
 
-  def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit =
-    stateRef.transform(_.remove(attr))(tx.peer)
+  def remove(attr: AuralAttribute[S])(implicit tx: S#Tx): Unit = {
+    val oldState = stateRef()
+    val newState = oldState.remove(attr)
+    updateState(oldState, newState)
+  }
+
+  private[this] def updateState(before: State, now: State)(implicit tx: S#Tx): Unit =
+    if (before != now) {
+      stateRef() = now
+      now.valueOption.foreach(fire)
+    }
 }

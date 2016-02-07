@@ -13,6 +13,7 @@
 
 package de.sciss.synth.proc
 
+import de.sciss.lucre.event.Observable
 import de.sciss.lucre.stm.{Obj, Sys}
 import de.sciss.lucre.synth.{AudioBus, NodeRef, Sys => SSys}
 import de.sciss.synth.ControlSet
@@ -57,7 +58,23 @@ object AuralAttribute {
       res
     }
   }
-  trait Target[S <: Sys[S]] {
+
+  /** An `AuralAttribute.Target` describes the mechanism by which
+    * the attribute inputs can contribute their values. It is internally
+    * connected to the process's node. One or multiple inputs then
+    * supply their values by calling `put` and detach themselves by
+    * calling `remove`. The target automatically manages summing multiple
+    * inputs. While the `Value` parameter for `put` corresponds to
+    * a particular attribute input, its `valueOption` gives the
+    * overall signal output as sent to the node. For instance,
+    * a stream input will have a bus to which is ''writes'', whereas
+    * the target itself may provide a bus from this node ''reads''.
+    */
+  trait Target[S <: Sys[S]] extends Observable[S#Tx, Value] {
+    def key: String
+
+    def valueOption(implicit tx: S#Tx): Option[Value]
+
     def put   (attr: AuralAttribute[S], value: Value)(implicit tx: S#Tx): Unit
     def remove(attr: AuralAttribute[S]              )(implicit tx: S#Tx): Unit
   }
