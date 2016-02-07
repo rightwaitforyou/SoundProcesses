@@ -20,7 +20,7 @@ trait Outputs[S <: Sys[S]] {
 
   def keys(implicit tx: S#Tx): Set[String]
 
-  def iterator(implicit tx: S#Tx): Iterator[(String, Output[S])]
+  def iterator(implicit tx: S#Tx): Iterator[Output[S]]
 
   /** Adds a new scan by the given key. If a span by that name already exists, the old scan is returned. */
   def add   (key: String)(implicit tx: S#Tx): Output[S]

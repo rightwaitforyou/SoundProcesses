@@ -43,6 +43,8 @@ object Transport {
     def transport: Transport[S]
   }
 
+  final case class AuralStarted[S <: Sys[S]](transport: Transport[S], context: AuralContext[S]) extends Update[S]
+
   sealed trait StateUpdate[S <: Sys[S]] extends Update[S] {
     def position: Long
   }

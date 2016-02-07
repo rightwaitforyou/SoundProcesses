@@ -20,8 +20,6 @@ import de.sciss.lucre.stm.impl.ObjSerializer
 import de.sciss.lucre.stm.{Copy, Elem, NoSys, Obj, Sys}
 import de.sciss.serial.{DataInput, Serializer}
 
-import scala.language.higherKinds
-
 object FolderImpl {
 
   def apply[S <: Sys[S]](implicit tx: S#Tx): Folder[S] =

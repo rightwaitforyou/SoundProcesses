@@ -23,7 +23,6 @@ import de.sciss.lucre.{event => evt}
 import de.sciss.serial.{DataInput, DataOutput, Serializer}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
-import scala.language.higherKinds
 
 object ProcImpl {
   private final val SER_VERSION = 0x5074  // was "Pr"
@@ -93,7 +92,7 @@ object ProcImpl {
 
     def keys(implicit tx: S#Tx): Set[String] = outputsMap.keysIterator.toSet
 
-    def iterator(implicit tx: S#Tx): Iterator[(String, Output[S])] = outputsMap.iterator
+    def iterator(implicit tx: S#Tx): Iterator[Output[S]] = outputsMap.iterator.map(_._2)
   }
 
   private sealed trait Impl[S <: Sys[S]]

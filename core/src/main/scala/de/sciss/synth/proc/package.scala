@@ -18,7 +18,6 @@ import java.util.{Date, Locale}
 
 import scala.annotation.elidable
 import scala.annotation.elidable.CONFIG
-import scala.language.{existentials, higherKinds}
 
 package object proc {
   private lazy val logHeader = new SimpleDateFormat("[d MMM yyyy, HH:mm''ss.SSS] 'proc' - ", Locale.US)
@@ -34,8 +33,4 @@ package object proc {
 
   @elidable(CONFIG) private[proc] def log(what: => String): Unit =
     if (showLog) Console.out.println(logHeader.format(new Date()) + what)
-
-  //  // ---- types ----
-//
-//  type Folder[S <: Sys[S]] = expr.List.Modifiable[S, Obj[S]]
 }

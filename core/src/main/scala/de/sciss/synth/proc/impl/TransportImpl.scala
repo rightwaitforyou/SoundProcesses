@@ -20,6 +20,7 @@ import de.sciss.lucre.stm.{TxnLike, Obj, IdentifierMap}
 import de.sciss.lucre.synth.{Txn, Server, Sys}
 import de.sciss.span.Span
 import de.sciss.synth.proc
+import de.sciss.synth.proc.Transport.AuralStarted
 import proc.{logTransport => logT}
 
 import scala.concurrent.stm.{TSet, Ref}
@@ -220,6 +221,7 @@ object TransportImpl {
     def auralStartedTx(server: Server)(implicit tx: S#Tx, auralContext: AuralContext[S]): Unit = {
       logT(s"transport - aural-system started")
       contextRef.set(Some(auralContext))
+      fire(AuralStarted(this, auralContext))
       objSet.foreach { objH =>
         val obj = objH()
         mkView(obj)
@@ -227,14 +229,12 @@ object TransportImpl {
       if (isPlaying) playViews()
     }
 
-    def auralStopped()(implicit tx: Txn): Unit = {
-      // XXX TODO -- what was the reasoning for the txn decoupling?
+    def auralStopped()(implicit tx: Txn): Unit =
       tx.afterCommit {
         SoundProcesses.atomic { implicit tx: S#Tx =>
           auralStoppedTx()
         }
       }
-    }
 
     private[this] def auralStoppedTx()(implicit tx: S#Tx): Unit = {
       logT(s"transport - aural-system stopped")

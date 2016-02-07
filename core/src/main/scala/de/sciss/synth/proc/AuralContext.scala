@@ -18,8 +18,6 @@ import de.sciss.lucre.stm.{Disposable, Obj, Sys}
 import de.sciss.lucre.synth.{Server, Sys => SSys}
 import de.sciss.synth.proc.impl.{AuralContextImpl => Impl}
 
-import scala.language.higherKinds
-
 object AuralContext {
   def apply[S <: SSys[S]](server: Server, scheduler: Scheduler[S])
                         (implicit tx: S#Tx, workspaceHandle: WorkspaceHandle[S]): AuralContext[S] =

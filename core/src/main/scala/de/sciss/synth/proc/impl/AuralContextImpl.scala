@@ -20,7 +20,6 @@ import de.sciss.lucre.synth.{Server, Sys}
 import de.sciss.synth.proc.AuralContext.{AuxAdded, AuxUpdate}
 
 import scala.concurrent.stm.Ref
-import scala.language.higherKinds
 
 object AuralContextImpl {
   def apply[S <: Sys[S]](server: Server, sched: Scheduler[S])
