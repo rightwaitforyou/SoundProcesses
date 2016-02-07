@@ -18,7 +18,7 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr
 import de.sciss.lucre.stm.{Disposable, Obj}
 import de.sciss.lucre.synth.Sys
-import de.sciss.synth.proc.AuralObj.FolderLike
+import de.sciss.synth.proc.AuralObj.Container
 
 import scala.concurrent.stm.Ref
 
@@ -51,16 +51,16 @@ trait AuralFolderLikeImpl[S <: Sys[S], Repr <: Obj[S], View <: AuralObj.FolderLi
   final def init(obj: Repr)(implicit tx: S#Tx): this.type = {
     observer      = mkObserver(obj)
     transportObs  = transport.react { implicit tx => {
-      case Transport.ViewAdded  (t, view) => contents(FolderLike.ViewAdded  [S, View](impl, view))
-      case Transport.ViewRemoved(t, view) => contents(FolderLike.ViewRemoved[S, View](impl, view))
+      case Transport.ViewAdded  (t, view) => contents(Container.ViewAdded  [S, View](impl, view.obj().id, view))
+      case Transport.ViewRemoved(t, view) => contents(Container.ViewRemoved[S, View](impl, view.obj().id, view))
       case _ =>
     }}
 
     this
   }
 
-  object contents extends ObservableImpl[S, FolderLike.Update[S, View]] {
-    def apply(update: FolderLike.Update[S, View])(implicit tx: S#Tx): Unit = fire(update)
+  object contents extends ObservableImpl[S, Container.Update[S, View]] {
+    def apply(update: Container.Update[S, View])(implicit tx: S#Tx): Unit = fire(update)
   }
 
   final def views(implicit tx: S#Tx): Set[AuralObj[S]] = transport.views

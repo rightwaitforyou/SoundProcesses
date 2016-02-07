@@ -21,6 +21,7 @@ import de.sciss.lucre.geom.LongSpace
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.Obj
 import de.sciss.lucre.synth.Sys
+import de.sciss.synth.proc.AuralObj.Container
 
 object AuralTimelineImpl {
    private type Leaf[S <: Sys[S]] = AuralTimelineBase.Leaf[S, AuralObj[S]]
@@ -61,15 +62,15 @@ object AuralTimelineImpl {
 
     protected def makeViewElem(obj: Obj[S])(implicit tx: S#Tx): AuralObj[S] = AuralObj(obj)
 
-    object contents extends ObservableImpl[S, AuralObj.Timeline.Update[S]] {
-      def viewAdded(timed: S#ID, view: AuralObj[S])(implicit tx: S#Tx): Unit =
-        fire(AuralObj.Timeline.ViewAdded(impl, timed, view))
+    object contents extends ObservableImpl[S, Container.Update[S, AuralObj.Timeline[S]]] {
+      def viewAdded(id: S#ID, view: AuralObj[S])(implicit tx: S#Tx): Unit =
+        fire(Container.ViewAdded(impl, id, view))
 
-      def viewRemoved(view: AuralObj[S])(implicit tx: S#Tx): Unit =
-        fire(AuralObj.Timeline.ViewRemoved(impl, view))
+      def viewRemoved(id: S#ID, view: AuralObj[S])(implicit tx: S#Tx): Unit =
+        fire(Container.ViewRemoved(impl, id, view))
     }
 
     protected def viewPlaying(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewAdded  (h.idH(), h.view)
-    protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewRemoved(h.view)
+    protected def viewStopped(h: ElemHandle)(implicit tx: S#Tx): Unit = contents.viewRemoved(h.idH(), h.view)
   }
 }

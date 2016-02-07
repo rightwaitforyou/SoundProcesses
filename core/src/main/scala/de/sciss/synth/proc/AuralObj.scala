@@ -109,6 +109,32 @@ object AuralObj {
     def getAttr(key: String)(implicit tx: S#Tx): Option[AuralAttribute[S]]
   }
 
+  // ---- container ----
+
+  object Container {
+    sealed trait Update[S <: Sys[S], +Repr] {
+      def container: Repr
+    }
+    final case class ViewAdded[S <: Sys[S], Repr](container: Repr, id: S#ID, view: AuralObj[S])
+      extends Update[S, Repr]
+
+    final case class ViewRemoved[S <: Sys[S], Repr](container: Repr, id: S#ID, view: AuralObj[S])
+      extends Update[S, Repr]
+  }
+  trait Container[S <: Sys[S], +Repr <: Container[S, Repr]] extends AuralObj[S] {
+    /** Monitors the _active_ views, i.e. views which are
+      * intersecting with the current transport position.
+      */
+    def contents: Observable[S#Tx, Container.Update[S, Repr]]
+
+    /** Returns the set of _active_ views, i.e. views which are intersecting
+      * with the current transport position.
+      */
+    def views(implicit tx: S#Tx): Set[AuralObj[S]]
+
+    def getViewById(id: S#ID)(implicit tx: S#Tx): Option[AuralObj[S]]
+  }
+
   // ---- timeline ----
 
   object Timeline extends AuralObj.Factory {
@@ -129,54 +155,19 @@ object AuralObj {
       def addObject   (id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit
       def removeObject(id: S#ID, span: SpanLikeObj[S], obj: Obj[S])(implicit tx: S#Tx): Unit
     }
-
-    sealed trait Update[S <: Sys[S]] {
-      def timeline: Timeline[S]
-    }
-    final case class ViewAdded[S <: Sys[S]](timeline: Timeline[S], timed: S#ID, view: AuralObj[S])
-      extends Update[S]
-
-    final case class ViewRemoved[S <: Sys[S]](timeline: Timeline[S], view: AuralObj[S])
-      extends Update[S]
   }
-  trait Timeline[S <: Sys[S]] extends AuralObj[S] {
+  trait Timeline[S <: Sys[S]] extends Container[S, Timeline[S]] {
     override def obj: stm.Source[S#Tx, _Timeline[S]]
 
-    /** Monitors the _active_ views, i.e. views which are
-      * intersecting with the current transport position.
-      */
-    def contents: Observable[S#Tx, Timeline.Update[S]]
-
-    /** Returns the set of _active_ views, i.e. views which are intersecting
-      * with the current transport position.
-      */
-    def views(implicit tx: S#Tx): Set[AuralObj[S]]
-
-    def getView    (timed: _Timeline.Timed[S])(implicit tx: S#Tx): Option[AuralObj[S]]
-    def getViewById(id   : S#ID              )(implicit tx: S#Tx): Option[AuralObj[S]]
+    def getView(timed: _Timeline.Timed[S])(implicit tx: S#Tx): Option[AuralObj[S]]
   }
 
   // ---- ensemble ----
 
-  object FolderLike {
-    sealed trait Update[S <: Sys[S], Repr <: FolderLike[S, Repr]] {
-      def parent: Repr
-    }
-    final case class ViewAdded[S <: Sys[S], Repr <: FolderLike[S, Repr]](parent: Repr, view: AuralObj[S])
-      extends Update[S, Repr]
-
-    final case class ViewRemoved[S <: Sys[S], Repr <: FolderLike[S, Repr]](parent: Repr, view: AuralObj[S])
-      extends Update[S, Repr]
-  }
-  trait FolderLike[S <: Sys[S], Repr <: FolderLike[S, Repr]] extends AuralObj[S] {
+  trait FolderLike[S <: Sys[S], Repr <: FolderLike[S, Repr]] extends Container[S, Repr] {
     def folder(implicit tx: S#Tx): _Folder[S]
 
-    def contents: Observable[S#Tx, FolderLike.Update[S, Repr]]
-
-    def views(implicit tx: S#Tx): Set[AuralObj[S]]
-
-    def getView    (obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]]
-    def getViewById(id : S#ID  )(implicit tx: S#Tx): Option[AuralObj[S]]
+    def getView(obj: Obj[S])(implicit tx: S#Tx): Option[AuralObj[S]]
   }
 
   object Ensemble extends AuralObj.Factory {
