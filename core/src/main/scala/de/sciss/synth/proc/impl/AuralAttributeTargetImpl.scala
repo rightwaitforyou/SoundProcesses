@@ -130,7 +130,10 @@ final class AuralAttributeTargetImpl[S <: Sys[S]](target: NodeRef.Full[S], val k
     def valueOption(implicit tx: S#Tx): Option[Value] = {
       val value = con1.value match {
         case vs: Scalar => vs
-        case vs: Stream => Stream(target, targetBus)
+        case vs: Stream =>
+          // N.B. for a single stream, we do not cross-map to the
+          // target-bus, but simply use the input bus!
+          Stream(vs.source /* target */, vs.bus /* targetBus */)
       }
       Some(value)
     }

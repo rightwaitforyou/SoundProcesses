@@ -48,7 +48,7 @@ class ActionResponder[S <: Sys[S]](objH: stm.Source[S#Tx, Obj[S]], key: String, 
   private val Name    = replyName(key)
   private val NodeID  = synth.peer.id
   private val trigResp = message.Responder(synth.server.peer) {
-    case m @ osc.Message(Name, NodeID, 0, raw @ _*) =>
+    case osc.Message(Name, NodeID, 0, raw @ _*) =>
       if (DEBUG) println(s"ActionResponder($key, $NodeID) - received trigger")
       // logAural(m.toString)
       val values: Vec[Float] = raw.collect {
