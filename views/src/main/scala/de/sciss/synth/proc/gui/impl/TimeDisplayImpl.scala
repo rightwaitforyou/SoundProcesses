@@ -16,6 +16,7 @@ package gui
 package impl
 
 import java.awt.{Cursor, Color}
+import javax.swing.UIManager
 
 import de.sciss.audiowidgets.impl.ActionGoToTime
 import de.sciss.audiowidgets.{TimelineModel, LCDPanel, LCDColors, LCDFont, AxisFormat}
@@ -32,6 +33,7 @@ final class TimeDisplayImpl(model: TimelineModel, hasMillis: Boolean) extends Ti
 
     private val decimals  = if (hasMillis)  3 else 0
     private val pad       = if (hasMillis) 12 else 8
+    private[this] final val isDark = UIManager.getBoolean("dark-skin")
 
     private def updateText(frame: Long): Unit = {
       val secs = frame / model.sampleRate
@@ -51,8 +53,9 @@ final class TimeDisplayImpl(model: TimelineModel, hasMillis: Boolean) extends Ti
     protected def componentHidden(): Unit =
       model.removeListener(tlmListener)
 
+    peer.putClientProperty("styleId", "noshade")
     font        = LCDFont() // .deriveFont(11.5f)
-    foreground  = LCDColors.defaultFg
+    foreground  = if (isDark) LCDColors.blueFg else LCDColors.defaultFg
     updateText(model.position)
 
     maximumSize = preferredSize
@@ -62,8 +65,8 @@ final class TimeDisplayImpl(model: TimelineModel, hasMillis: Boolean) extends Ti
       listenTo(mouse.clicks)
       listenTo(mouse.moves)
       reactions += {
-        case MouseEntered(_, _, _) => foreground = Color.blue
-        case MouseExited (_, _, _) => foreground = LCDColors.defaultFg
+        case MouseEntered(_, _, _) => foreground = if (isDark) new Color(0x80, 0x80, 0xFF) else Color.blue
+        case MouseExited (_, _, _) => foreground = if (isDark) LCDColors.blueFg else LCDColors.defaultFg
         case MouseClicked(_, _, _, _, false)  => new ActionGoToTime(mod, null).apply()
       }
       cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
