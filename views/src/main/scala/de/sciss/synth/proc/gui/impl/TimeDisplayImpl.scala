@@ -33,7 +33,10 @@ final class TimeDisplayImpl(model: TimelineModel, hasMillis: Boolean) extends Ti
 
     private val decimals  = if (hasMillis)  3 else 0
     private val pad       = if (hasMillis) 12 else 8
-    private[this] final val isDark = UIManager.getBoolean("dark-skin")
+
+    private[this] final val isDark  = UIManager.getBoolean("dark-skin")
+    private[this] final val fgNorm  = if (isDark) LCDColors.blueFg else LCDColors.defaultFg
+    private[this] final val fgHover = if (isDark) new Color(0x5E, 0x97, 0xFF) else Color.blue
 
     private def updateText(frame: Long): Unit = {
       val secs = frame / model.sampleRate
@@ -55,7 +58,7 @@ final class TimeDisplayImpl(model: TimelineModel, hasMillis: Boolean) extends Ti
 
     peer.putClientProperty("styleId", "noshade")
     font        = LCDFont() // .deriveFont(11.5f)
-    foreground  = if (isDark) LCDColors.blueFg else LCDColors.defaultFg
+    foreground  = fgNorm
     updateText(model.position)
 
     maximumSize = preferredSize
@@ -65,8 +68,8 @@ final class TimeDisplayImpl(model: TimelineModel, hasMillis: Boolean) extends Ti
       listenTo(mouse.clicks)
       listenTo(mouse.moves)
       reactions += {
-        case MouseEntered(_, _, _) => foreground = if (isDark) new Color(0x80, 0x80, 0xFF) else Color.blue
-        case MouseExited (_, _, _) => foreground = if (isDark) LCDColors.blueFg else LCDColors.defaultFg
+        case MouseEntered(_, _, _) => foreground = fgHover
+        case MouseExited (_, _, _) => foreground = fgNorm
         case MouseClicked(_, _, _, _, false)  => new ActionGoToTime(mod, null).apply()
       }
       cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)

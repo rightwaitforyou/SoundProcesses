@@ -16,10 +16,11 @@ lazy val commonSettings = Seq(
 
 lazy val lucreVersion               = "3.3.1-SNAPSHOT"
 lazy val scalaColliderVersion       = "1.18.1"
-lazy val scalaColliderSwingVersion  = "1.27.0"
+lazy val scalaColliderSwingVersion  = "1.27.1"
 lazy val spanVersion                = "1.3.1"
 lazy val lucreSwingVersion          = "1.3.0"
-lazy val audioWidgetsVersion        = "1.9.2-SNAPSHOT"
+lazy val swingPlusVersion           = "0.2.1"
+lazy val audioWidgetsVersion        = "1.9.2"
 lazy val fileUtilVersion            = "1.1.1"
 lazy val topologyVersion            = "1.0.0"
 
@@ -28,7 +29,7 @@ lazy val topologyVersion            = "1.0.0"
 lazy val scalaTestVersion          = "2.2.6"
 lazy val loggingEnabled            = true
 lazy val bdb                       = "bdb"  // either "bdb" or "bdb6"
-lazy val scoptVersion              = "3.3.0"
+lazy val scoptVersion              = "3.4.0"
 
 scalacOptions in ThisBuild ++= {
   // "-Xlint" -- produces problems with implicit objects and traits in package object
@@ -98,6 +99,7 @@ lazy val views = Project(id = s"$baseNameL-views", base = file("views"))
     description := "Views for Sound Processes",
     libraryDependencies ++= Seq(
       "de.sciss" %% "lucreswing"         % lucreSwingVersion,
+      "de.sciss" %% "swingplus"          % swingPlusVersion,
       "de.sciss" %% "audiowidgets-swing" % audioWidgetsVersion,
       "de.sciss" %% "audiowidgets-app"   % audioWidgetsVersion
     )
