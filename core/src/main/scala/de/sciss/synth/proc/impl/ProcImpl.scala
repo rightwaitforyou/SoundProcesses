@@ -83,7 +83,7 @@ object ProcImpl {
 
     def add(key: String)(implicit tx: S#Tx): Output[S] =
       get(key).getOrElse {
-        val res = Output[S](proc, key)
+        val res = OutputImpl[S](proc, key)
         add(key, res)
         res
       }

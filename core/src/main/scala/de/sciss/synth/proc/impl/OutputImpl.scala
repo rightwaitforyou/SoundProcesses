@@ -61,7 +61,7 @@ object OutputImpl {
 
     def tpe: Obj.Type = Output
 
-    override def toString: String = s"Output$id"
+    override def toString: String = s"Output($id, $proc, $key)"
 
     def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] = {
       val out = new Impl(txOut.newID(), context(proc), key)
