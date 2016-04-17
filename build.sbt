@@ -1,7 +1,7 @@
 lazy val baseName  = "SoundProcesses"
 lazy val baseNameL = baseName.toLowerCase
 
-lazy val projectVersion = "3.4.1-SNAPSHOT"
+lazy val projectVersion = "3.4.1"
 
 lazy val commonSettings = Seq(
   version            := projectVersion,
