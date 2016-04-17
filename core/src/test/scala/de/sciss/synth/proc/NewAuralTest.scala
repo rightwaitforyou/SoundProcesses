@@ -84,6 +84,7 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
       case "--test18" => test18()
       case "--test19" => test19()
       case "--test20" => test20()
+      case "--test21" => test21()
       case _         =>
         println("WARNING: No option given, using --test1")
         test1()
@@ -214,6 +215,51 @@ class NewAuralTest[S <: Sys[S]](name: String)(implicit cursor: stm.Cursor[S]) {
 
   //////////////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////////////
+
+  ////////////////////////////////////////////////////////////////////////////////////// 21
+
+  def test21()(implicit context: AuralContext[S]): Unit = {
+    println("----test21----")
+    println(
+      """
+        |Expected behaviour:
+        |We set up a source and sink and
+        |timeline connections between them.
+        |Two seconds after start, we hear pink noise.
+        |
+        |""".stripMargin)
+
+    cursor.step { implicit tx =>
+      val tl = Timeline[S]
+
+      val pGen = proc {
+        val sig = PinkNoise.ar(Seq(1, 1))
+        graph.ScanOut(sig)
+      }
+      pGen.name = "gen"
+      val genOut = pGen.outputs.add(Proc.mainOut)
+
+      val pDif = proc {
+        val sig = graph.ScanInFix(2)
+        Out.ar(0, sig * 0.2)
+      }
+      pDif.name = "dif"
+      val difIn = Timeline[S]
+      pDif.attr.put(Proc.mainIn, difIn)
+
+      difIn.add(Span.from(frame(0.0)), genOut)
+      tl.add(Span(frame(2.0), frame(9.0)), pGen)
+      tl.add(Span(frame(2.0), frame(8.0)), pDif)
+      //      tl.add(Span.from(frame(2.0)), pGen)
+      //      tl.add(Span.from(frame(2.0)), pDif)
+
+      val t = Transport[S]
+      t.addObject(tl)
+      t.play()
+
+      stopAndQuit(4.0)
+    }
+  }
 
   ////////////////////////////////////////////////////////////////////////////////////// 20
 
