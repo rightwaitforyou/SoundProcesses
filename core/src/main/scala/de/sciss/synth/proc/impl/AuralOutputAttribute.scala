@@ -17,7 +17,7 @@ import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, TxnLike}
 import de.sciss.lucre.synth.Sys
 import de.sciss.synth.proc.AuralAttribute.{Factory, Observer, Target}
-import de.sciss.synth.proc.AuralContext.AuxAdded
+import de.sciss.synth.proc.AuxContext
 import de.sciss.synth.proc.AuralView.{Playing, Prepared, Stopped}
 import de.sciss.synth.proc.{AuralAttribute, AuralContext, AuralOutput, Output, TimeRef}
 
@@ -58,11 +58,12 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
   def init(output: Output[S])(implicit tx: S#Tx): this.type = {
     val id  = output.id // idH()
     obs = context.observeAux[AuralOutput[S]](id) { implicit tx => {
-        case AuxAdded(_, auralOutput) =>
+      case AuxContext.Added(_, auralOutput) =>
         auralSeen(auralOutput)
         playRef().foreach(update(_, auralOutput))
         observer.attrNumChannelsChanged(this)
-      }}
+      case AuxContext.Removed(_) => // XXX TODO: ignore?
+    }}
     context.getAux[AuralOutput[S]](id).foreach(auralSeen)
     this
   }

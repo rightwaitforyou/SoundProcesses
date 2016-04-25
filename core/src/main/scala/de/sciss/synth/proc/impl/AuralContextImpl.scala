@@ -14,10 +14,8 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, IdentifierMap, Obj}
 import de.sciss.lucre.synth.{Server, Sys}
-import de.sciss.synth.proc.AuralContext.{AuxAdded, AuxUpdate}
 
 import scala.concurrent.stm.Ref
 
@@ -26,8 +24,7 @@ object AuralContextImpl {
                         (implicit tx: S#Tx, workspaceHandle: WorkspaceHandle[S]): AuralContext[S] = {
     val objMap  = tx.newInMemoryIDMap[Entry[S]]
     val auxMap  = tx.newInMemoryIDMap[Any]
-    val obsMap  = tx.newInMemoryIDMap[List[AuxObserver[S]]]
-    val res     = new Impl[S](objMap, auxMap, obsMap, sched, server)
+    val res     = new Impl[S](objMap, auxMap, sched, server, tx)
     logAural(s"create context ${res.hashCode().toHexString}")
     // (new Throwable).printStackTrace()
     res
@@ -37,20 +34,14 @@ object AuralContextImpl {
     val count = Ref(0)
   }
 
-  private trait AuxObserver[S <: Sys[S]]
-    extends Disposable[S#Tx] {
-
-    def fun: S#Tx => AuxUpdate[S, Any] => Unit
-  }
-
   private final class Impl[S <: Sys[S]](objMap: IdentifierMap[S#ID, S#Tx, Entry[S]],
-                                        auxMap: IdentifierMap[S#ID, S#Tx, Any],
-                                        auxObservers: IdentifierMap[S#ID, S#Tx, List[AuxObserver[S]]],
-                                        val scheduler: Scheduler[S],
-                                        val server: Server)(implicit val workspaceHandle: WorkspaceHandle[S])
-    extends AuralContext[S] /* with ObservableImpl[S, AuralContext.Update[S]] */ {
+                                           protected val auxMap: IdentifierMap[S#ID, S#Tx, Any],
+                                           val scheduler: Scheduler[S],
+                                           val server: Server, tx0: S#Tx)
+                                          (implicit val workspaceHandle: WorkspaceHandle[S])
+    extends AuralContext[S] with AuxContextImpl[S] {
 
-    // private val waiting = TxnLocal(Map.empty[S#ID, List[PartialFunction[Any, Unit]]])
+    protected val auxObservers = tx0.newInMemoryIDMap[List[AuxObserver]]
 
     def acquire[A <: Disposable[S#Tx]](obj: Obj[S])(init: => A)(implicit tx: S#Tx): A = {
       val id = obj.id
@@ -74,44 +65,6 @@ object AuralContextImpl {
         objMap.remove(id)
         e.data.dispose()
       }
-    }
-
-    private final class AuxObserverImpl(idH: stm.Source[S#Tx, S#ID],
-                                        val fun: S#Tx => AuxUpdate[S, Any] => Unit)
-      extends AuxObserver[S] {
-
-      def dispose()(implicit tx: S#Tx): Unit = {
-        val id    = idH()
-        val list0 = auxObservers.getOrElse(id, Nil)
-        val list1 = list0.filterNot(_ == this)
-        if (list1.isEmpty) auxObservers.remove(id) else auxObservers.put(id, list1)
-      }
-    }
-
-    def observeAux[A](id: S#ID)(fun: S#Tx => AuxUpdate[S, A] => Unit)(implicit tx: S#Tx): Disposable[S#Tx] = {
-      val list0 = auxObservers.getOrElse(id, Nil)
-      val obs   = new AuxObserverImpl(tx.newHandle(id), fun.asInstanceOf[S#Tx => AuxUpdate[S, Any] => Unit])
-      val list1 = obs :: list0
-      auxObservers.put(id, list1)
-      obs
-    }
-
-    def putAux[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit = {
-      auxMap.put(id, value)
-      implicit val itx = tx.peer
-      val list = auxObservers.getOrElse(id, Nil)
-        if (list.nonEmpty) {
-          val upd = AuxAdded(id, value)
-          list.foreach { obs =>
-          obs.fun(tx)(upd)
-        }
-      }
-    }
-
-    def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A] = auxMap.get(id).asInstanceOf[Option[A]]
-
-    def removeAux(id: S#ID)(implicit tx: S#Tx): Unit = {
-      auxMap.remove(id)
     }
   }
 }

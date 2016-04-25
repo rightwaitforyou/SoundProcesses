@@ -28,14 +28,8 @@ object AuralContext {
     val sched = Scheduler[S]
     apply(server, sched)
   }
-
-  sealed trait AuxUpdate[S <: Sys[S], +A]
-  final case class AuxAdded  [S <: Sys[S], A](id: S#ID, value: A) extends AuxUpdate[S, A]
-  // final case class AuxRemoved[S <: Sys[S], A](id: S#ID, value: A) extends AuxUpdate[S, A]
 }
-trait AuralContext[S <: Sys[S]] /* extends Observable[S#Tx, AuralContext.Update[S]] */ {
-  import AuralContext.AuxUpdate
-
+trait AuralContext[S <: Sys[S]] extends AuxContext[S] {
   def server: Server
 
   def acquire[A <: Disposable[S#Tx]](obj: Obj[S])(init: => A)(implicit tx: S#Tx): A
@@ -43,17 +37,6 @@ trait AuralContext[S <: Sys[S]] /* extends Observable[S#Tx, AuralContext.Update[
   def release(obj: Obj[S])(implicit tx: S#Tx): Unit
 
   def get[A](obj: Obj[S])(implicit tx: S#Tx): Option[A]
-
-  def putAux[A](id: S#ID, value: A)(implicit tx: S#Tx): Unit
-
-  def getAux[A](id: S#ID)(implicit tx: S#Tx): Option[A]
-
-  /** Waits for the auxiliary object to appear. If the object
-    * appears the function is applied, otherwise nothing happens.
-    */
-  def observeAux[A](id: S#ID)(fun: S#Tx => AuxUpdate[S, A] => Unit)(implicit tx: S#Tx): Disposable[S#Tx]
-
-  def removeAux(id: S#ID)(implicit tx: S#Tx): Unit
 
   val scheduler: Scheduler[S]
 
