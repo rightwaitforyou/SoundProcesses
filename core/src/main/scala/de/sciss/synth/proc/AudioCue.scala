@@ -17,12 +17,15 @@ import de.sciss.file.File
 import de.sciss.lucre
 import de.sciss.lucre.artifact.Artifact
 import de.sciss.lucre.event.{Pull, Targets}
-import de.sciss.lucre.expr.{Expr => _Expr, LongExtensions, DoubleObj, LongObj, Type}
+import de.sciss.lucre.expr.{DoubleObj, LongExtensions, LongObj, Type, Expr => _Expr}
 import de.sciss.lucre.stm.{Copy, Elem, Sys}
 import de.sciss.lucre.{expr, stm}
 import de.sciss.model.Change
 import de.sciss.serial.{DataInput, DataOutput, ImmutableSerializer}
 import de.sciss.synth.io.AudioFileSpec
+import de.sciss.synth.proc
+
+import scala.annotation.switch
 
 object AudioCue {
   final val typeID = 13
@@ -111,7 +114,7 @@ object AudioCue {
 
       def readExtension[S <: Sys[S]](opID: Int, in: DataInput, access: S#Acc, targets: Targets[S])
                                     (implicit tx: S#Tx): Obj[S] = {
-        opID match {
+        (opID: @switch) match {
           case `applyOpID` =>
             val artifact  = Artifact .read(in, access)
             val spec      = AudioFileSpec.Serializer.read(in)
@@ -119,9 +122,13 @@ object AudioCue {
             val gain      = DoubleObj.read(in, access)
             new Apply(targets, artifact = artifact, specValue = spec, offset = offset, gain = gain)
           case `replaceOffsetOpID` =>
-            val peer      = Obj.read(in, access)
+            val peer      = Obj      .read(in, access)
             val offset    = LongObj  .read(in, access)
             new ReplaceOffset(targets, peer = peer, offset = offset)
+          case `shiftOpID` =>
+            val peer      = Obj      .read(in, access)
+            val amount    = LongObj  .read(in, access)
+            new Shift(targets, peer = peer, amount = amount)
           case other =>
             sys.error(s"Unknown op-id $other")
         }
@@ -332,6 +339,9 @@ object AudioCue {
 
       def shift(amount: LongObj[S])(implicit tx: S#Tx): Ex[S] = (ex, amount) match {
         case (_Expr.Const(c), _Expr.Const(amountC)) => newConst(c.copy(offset = c.offset + amountC))
+        case (s: Shift[S], _) =>
+          import proc.Ops.longObjOps
+          new Shift(Targets[S], peer = s.peer, amount = s.amount + amount).connect()
         case _ =>
           new Shift(Targets[S], peer = ex, amount = amount).connect()
       }

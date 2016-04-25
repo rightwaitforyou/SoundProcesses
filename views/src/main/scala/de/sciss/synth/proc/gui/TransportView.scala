@@ -35,7 +35,7 @@ object TransportView {
     Impl[S](transport, timelineModel, hasMillis = hasMillis, hasLoop = hasLoop, hasShortcuts = hasShortcuts)
 }
 
-trait TransportView[S <: Sys[S]] extends View[S] {
+trait TransportView[S <: stm.Sys[S]] extends View[S] {
   def transport    : Transport[S]
   def timelineModel: TimelineModel
 }
