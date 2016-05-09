@@ -46,7 +46,7 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
 
   def typeID = Folder.typeID
 
-  private[this] sealed trait InternalState extends Disposable[S#Tx] {
+  private sealed trait InternalState extends Disposable[S#Tx] {
     def external: AuralView.State
   }
 
@@ -55,7 +55,7 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     def external = Stopped
   }
 
-  private[this] case class IPreparing(map: Map[Elem, Disposable[S#Tx]], timeRef: TimeRef)
+  private final case class IPreparing(map: Map[Elem, Disposable[S#Tx]], timeRef: TimeRef)
     extends InternalState {
 
     def dispose()(implicit tx: S#Tx): Unit = map.foreach(_._2.dispose())
@@ -63,7 +63,7 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     def external = if (map.isEmpty) Prepared else Preparing
   }
 
-  private[this] case class IPlaying(wallClock: Long, timeRef: TimeRef, target: Target[S])
+  private final case class IPlaying(wallClock: Long, timeRef: TimeRef, target: Target[S])
     extends InternalState {
 
     def shiftTo(newWallClock: Long): TimeRef = timeRef.shift(newWallClock - wallClock)
@@ -107,12 +107,12 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
   def attrNumChannelsChanged(attr: Elem)(implicit tx: S#Tx): Unit =
     invalidateNumChans()
 
-  private[this] def invalidateNumChans()(implicit tx: S#Tx): Unit = {
+  private def invalidateNumChans()(implicit tx: S#Tx): Unit = {
     prefChansRef() = -2
     observer.attrNumChannelsChanged(this)
   }
 
-  private[this] def mkView(child: Obj[S])(implicit tx: S#Tx): Elem =
+  private def mkView(child: Obj[S])(implicit tx: S#Tx): Elem =
     AuralAttribute(key, child, attr)
 
   def init(folder: Folder[S])(implicit tx: S#Tx): this.type = {
@@ -166,7 +166,7 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     fire(newState.external)
   }
 
-  private[this] def prepareNoFire(timeRef: TimeRef)(implicit tx: S#Tx): InternalState = {
+  private def prepareNoFire(timeRef: TimeRef)(implicit tx: S#Tx): InternalState = {
     // prepareTimeRef() = timeRef
 
     // this can happen if `play` is called with a
@@ -183,8 +183,8 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     st
   }
 
-  private[this] def prepareChild(childView: Elem, childTime: TimeRef)
-                                (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
+  private def prepareChild(childView: Elem, childTime: TimeRef)
+                          (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
     childView.prepare(childTime)
     val isPrepared = childView.state == Prepared
     if (isPrepared) None else {
@@ -198,7 +198,7 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
   }
 
   // called by `prepareChild` for each child view when it becomes ready
-  private[this] def childPreparedOrRemoved(childView: Elem)(implicit tx: S#Tx): Unit =
+  private def childPreparedOrRemoved(childView: Elem)(implicit tx: S#Tx): Unit =
     internalRef() match {
       case prep: IPreparing =>
         prep.map.get(childView).foreach { obs =>
@@ -234,7 +234,7 @@ final class AuralFolderAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     fire(Stopped)
   }
 
-  private[this] def stopNoFire()(implicit tx: S#Tx): Unit = {
+  private def stopNoFire()(implicit tx: S#Tx): Unit = {
     clearPlayState()  // first this, so no more child observers
     val childViews = childAttrRef()
     childViews.foreach(_.stop())

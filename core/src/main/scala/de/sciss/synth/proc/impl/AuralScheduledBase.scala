@@ -194,8 +194,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
    * is prepared and the method returns `Some(elem, observer)` that must
    * be passed back from `processPrepare` (they'll show up in `IPreparing`).
    */
-  private[this] def prepareChild(childView: Elem, childTime: TimeRef.Option, observer: Boolean)
-                                (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
+  private def prepareChild(childView: Elem, childTime: TimeRef.Option, observer: Boolean)
+                          (implicit tx: S#Tx): Option[(Elem, Disposable[S#Tx])] = {
     logA(s"scheduled - prepare $childView - $childTime")
     childView.prepare(childTime)
     if (!observer || childView.state == Prepared) None else {
@@ -234,7 +234,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /* Makes sure no more nodes are playing, then calls `processPrepare`.
    * Finally sets internal state to `IPreparing` and updates `prepareSpanRef`.
    */
-  private[this] def prepareNoFire(timeRef: TimeRef)(implicit tx: S#Tx): InternalState = {
+  private def prepareNoFire(timeRef: TimeRef)(implicit tx: S#Tx): InternalState = {
     val startFrame    = timeRef.offset
     val stopFrame     = startFrame + LOOK_STOP
     val prepareSpan   = Span(startFrame, stopFrame)
@@ -289,7 +289,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /** Calls `eventAfter` to determine the next interesting frame. If that
     * frame exists, schedules the execution of `eventReached`.
     */
-  private[this] def scheduleNextEvent(currentOffset: Long)(implicit tx: S#Tx): Unit = {
+  private def scheduleNextEvent(currentOffset: Long)(implicit tx: S#Tx): Unit = {
     val targetOffset = viewEventAfter(currentOffset)
     val token = if (targetOffset == Long.MaxValue) -1 else {
       import TimeRef.{framesAndSecs => fas}
@@ -306,7 +306,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /* Processes next interesting event that has been reached. If the internal
    * state is playing, calls `processEvent` followed by `scheduleNextEvent`.
    */
-  private[this] def eventReached(offset: Long)(implicit tx: S#Tx): Unit = {
+  private def eventReached(offset: Long)(implicit tx: S#Tx): Unit = {
     import TimeRef.{framesAndSecs => fas}
     logA(s"scheduled - eventReached(${fas(offset)})")
     internalState match {
@@ -320,13 +320,13 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   }
 
   /* Schedules ahead `STEP_GRID` frames to execute `gridReached`. */
-  private[this] def scheduleNextGrid(currentOffset: Long)(implicit tx: S#Tx): Unit = {
+  private def scheduleNextGrid(currentOffset: Long)(implicit tx: S#Tx): Unit = {
     val modelOffset = modelEventAfter(currentOffset + LOOK_STOP - 1)
     scheduleGrid(currentOffset = currentOffset, modelOffset = modelOffset)
   }
 
   /* `modelFrame` may be `Long.MaxValue` in which case the old schedule is simply cancelled. */
-  private[this] def scheduleGrid(currentOffset: Long, modelOffset: Long)(implicit tx: S#Tx): Unit = {
+  private def scheduleGrid(currentOffset: Long, modelOffset: Long)(implicit tx: S#Tx): Unit = {
     val targetOffset  = if (modelOffset == Long.MaxValue) Long.MaxValue else modelOffset - LOOK_AHEAD
     val token         = if (targetOffset == Long.MaxValue) -1 else {
       val targetTime = sched.time + (targetOffset - currentOffset)
@@ -343,7 +343,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /* If internal state is playing, calls `processPrepare` with the new prepare-span.
    * That is `LOOK_AHEAD` ahead of the `frame` we stopped at.
    */
-  private[this] def gridReached(offset: Long)(implicit tx: S#Tx): Unit = {
+  private def gridReached(offset: Long)(implicit tx: S#Tx): Unit = {
     import TimeRef.{framesAndSecs => fas}
     logA(s"scheduled - gridReached(${fas(offset)})")
     internalState match {
@@ -389,7 +389,7 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
   /* Stops playing views and disposes them. Cancels scheduled actions.
    * Then calls `clearViewsTree`. Puts internal state to `IStopped`.
    */
-  private[this] def stopViewsAndCancelSchedule()(implicit tx: S#Tx): Unit = {
+  private def stopViewsAndCancelSchedule()(implicit tx: S#Tx): Unit = {
     internalRef.swap(IStopped).dispose()
     stopViews()
     sched.cancel(schedEvtToken ().token)
@@ -433,8 +433,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
-  private[this] def elemAddedPrepare(prep: IPreparing, vid: ViewID, span: SpanLike, obj: Obj[S])
-                                    (implicit tx: S#Tx): Unit = {
+  private def elemAddedPrepare(prep: IPreparing, vid: ViewID, span: SpanLike, obj: Obj[S])
+                              (implicit tx: S#Tx): Unit = {
     val prepS     = prepareSpan()
     if (!span.overlaps(prepS)) return
 
@@ -448,9 +448,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     }
   }
 
-  private[this] final def mkViewAndPrepare(timeRef: TimeRef, vid: ViewID, span: SpanLike, obj: Obj[S],
-                                           observer: Boolean)
-                                          (implicit tx: S#Tx): (Elem, Option[(Elem, Disposable[S#Tx])]) = {
+  private final def mkViewAndPrepare(timeRef: TimeRef, vid: ViewID, span: SpanLike, obj: Obj[S], observer: Boolean)
+                                    (implicit tx: S#Tx): (Elem, Option[(Elem, Disposable[S#Tx])]) = {
     val childTime = timeRef.child(span)
     val h         = mkView(vid, span, obj)
     val view      = elemFromHandle(h)
@@ -458,8 +457,8 @@ trait AuralScheduledBase[S <: Sys[S], Target, Elem <: AuralView[S, Target]]
     (view, prep)
   }
 
-  private[this] final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, obj: Obj[S])
-                                       (implicit tx: S#Tx): Unit = {
+  private final def elemAddedPlay(play: IPlaying, vid: ViewID, span: SpanLike, obj: Obj[S])
+                                 (implicit tx: S#Tx): Unit = {
     import Implicits.SpanComparisons
 
     // calculate current frame

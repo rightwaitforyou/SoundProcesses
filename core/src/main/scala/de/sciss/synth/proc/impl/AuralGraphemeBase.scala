@@ -56,7 +56,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected type ElemHandle = AuralGraphemeBase.ElemHandle[S, Elem]
 
-  private[this] final def ElemHandle(start: Long, view: Elem): ElemHandle =
+  private final def ElemHandle(start: Long, view: Elem): ElemHandle =
     AuralGraphemeBase.ElemHandle(start, view)
 
   protected final def viewEventAfter(offset: Long)(implicit tx: S#Tx): Long =
@@ -79,8 +79,8 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     playEntry(entries, start = start, timeRef = timeRef, target = play.target)
   }
 
-  private[this] def playEntry(entries: Vec[Elem], start: Long, timeRef: TimeRef, target: Target)
-                             (implicit tx: S#Tx): Unit = {
+  private def playEntry(entries: Vec[Elem], start: Long, timeRef: TimeRef, target: Target)
+                       (implicit tx: S#Tx): Unit = {
     // val start     = timeRef.offset
     val toStart   = entries.head
     val stop      = viewEventAfter(start)
@@ -105,7 +105,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
         def hasNext(): Boolean = !_ended
 
-        private[this] def advance(child: Obj[S], start: Long): Unit =
+        private def advance(child: Obj[S], start: Long): Unit =
           if (start >= spanP.stop) {
             _succOpt = None
             _ended   = true
@@ -189,7 +189,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       removeView(h)
     }
 
-  private[this] def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+  private def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
     implicit val itx = iSys(tx)
     val start = h.start
     val seq0  = tree.get(start).get
@@ -211,14 +211,14 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     ElemHandle(start, view)
   }
 
-  private[this] def elemAdded(pin: BiPin[S, Obj[S]], start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
+  private def elemAdded(pin: BiPin[S, Obj[S]], start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
     val span = pin.eventAfter(start).fold[SpanLike](Span.From(start))(Span(start, _))
     elemAdded((), span = span, obj = child)
     val elemPlays = playingRef().exists(_.start == start)
     elemPlays
   }
 
-  private[this] def elemRemoved(start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
+  private def elemRemoved(start: Long, child: Obj[S])(implicit tx: S#Tx): Boolean = {
     // implicit val itx = iSys(tx)
     val opt = for {
       seq  <- tree.get(start)(iSys(tx))
@@ -235,7 +235,7 @@ trait AuralGraphemeBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   // If a playing element has been removed, check if there is another one
   // 'below' it now. If so, create a view for it. 
-  private[this] def playingElemRemoved(pin: BiPin[S, Obj[S]], offset: Long)(implicit tx: S#Tx): Unit =
+  private def playingElemRemoved(pin: BiPin[S, Obj[S]], offset: Long)(implicit tx: S#Tx): Unit =
     pin.floor(offset).foreach { entry =>
       val child = entry.value
       val start = entry.key.value

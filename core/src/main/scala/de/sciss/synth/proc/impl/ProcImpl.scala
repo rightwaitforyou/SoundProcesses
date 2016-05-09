@@ -153,7 +153,7 @@ object ProcImpl {
       this
     }
 
-    private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+    private def disconnect()(implicit tx: S#Tx): Unit = {
       graph.changed -/-> changed
       // inputs        -/-> changed
       // outputs       -/-> changed

@@ -75,7 +75,7 @@ trait AuralFolderLikeImpl[S <: Sys[S], Repr <: Obj[S], View <: AuralObj.FolderLi
 
   final def state(implicit tx: S#Tx): AuralView.State = currentStateRef.get(tx.peer)
 
-  private[this] def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
+  private def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
     val old = currentStateRef.swap(value)(tx.peer)
     if (value != old) {
       // println(s"------ENSEMBLE STATE $old > $value")

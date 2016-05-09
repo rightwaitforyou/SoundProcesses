@@ -61,7 +61,7 @@ object TransportImpl {
     import scheduler.cursor
     import TxnLike.peer
 
-    private[this] final class PlayTime(val wallClock0: Long, val pos0: Long) {
+    private final class PlayTime(val wallClock0: Long, val pos0: Long) {
       override def toString = s"[pos0 = ${TimeRef.framesAndSecs(pos0)}, time0 = $wallClock0]"
 
       def isPlaying: Boolean = wallClock0 != Long.MinValue
@@ -102,7 +102,7 @@ object TransportImpl {
       fire(Transport.Play(this, timeBase1.pos0))
     }
 
-    private[this] def playViews()(implicit tx: S#Tx): Unit = {
+    private def playViews()(implicit tx: S#Tx): Unit = {
       val tr = mkTimeRef()
       logT(s"transport - playViews - $tr")
       viewSet.foreach(_.play(tr, ()))
@@ -120,7 +120,7 @@ object TransportImpl {
       fire(Transport.Stop(this, timeBase1.pos0))
     }
 
-    private[this] def stopViews()(implicit tx: S#Tx): Unit =
+    private def stopViews()(implicit tx: S#Tx): Unit =
       viewSet.foreach(_.stop())
 
     def position(implicit tx: S#Tx): Long = timeBaseRef().currentPos
@@ -173,9 +173,9 @@ object TransportImpl {
       fire(Transport.ObjectRemoved(this, obj))
     }
 
-    private[this] def mkTimeRef()(implicit tx: S#Tx) = TimeRef(Span.from(0L), offset = position)
+    private def mkTimeRef()(implicit tx: S#Tx) = TimeRef(Span.from(0L), offset = position)
 
-    private[this] def mkView(obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
+    private def mkView(obj: Obj[S])(implicit tx: S#Tx, context: AuralContext[S]): AuralObj[S] = {
       val view = AuralObj(obj)
       viewMap.put(obj.id, view)
       viewSet.add(view)
@@ -193,7 +193,7 @@ object TransportImpl {
       disposeViews()
     }
 
-    private[this] def disposeViews()(implicit tx: S#Tx): Unit = {
+    private def disposeViews()(implicit tx: S#Tx): Unit = {
       viewMap.dispose()
       viewSet.foreach { view =>
         fire(Transport.ViewRemoved(this, view))
@@ -237,7 +237,7 @@ object TransportImpl {
         }
       }
 
-    private[this] def auralStoppedTx()(implicit tx: S#Tx): Unit = {
+    private def auralStoppedTx()(implicit tx: S#Tx): Unit = {
       logT(s"transport - aural-system stopped")
       contextRef() = None
       disposeViews()

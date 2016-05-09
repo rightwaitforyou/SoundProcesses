@@ -68,7 +68,7 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     this
   }
 
-  private[this] def auralSeen(auralOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
+  private def auralSeen(auralOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
     auralRef() = Some(auralOutput)
     val aObs = auralOutput.react { implicit tx => {
       case AuralOutput.Play(n) =>
@@ -93,11 +93,11 @@ final class AuralOutputAttribute[S <: Sys[S]](val key: String, val obj: stm.Sour
     state = Stopped
   }
 
-  private[this] def stopNoFire()(implicit tx: S#Tx): Unit = {
+  private def stopNoFire()(implicit tx: S#Tx): Unit = {
     playRef.swap(None).foreach(_.remove(this))
   }
 
-  private[this] def update(target: Target[S], audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
+  private def update(target: Target[S], audioOutput: AuralOutput[S])(implicit tx: S#Tx): Unit = {
     val nodeRefOpt = audioOutput.view.nodeOption
     nodeRefOpt.foreach { nodeRef =>
       target.put(this, AuralAttribute.Stream(nodeRef, audioOutput.bus))

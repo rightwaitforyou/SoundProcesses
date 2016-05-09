@@ -81,13 +81,13 @@ object AudioCue {
       res
     }
 
-    private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
+    private final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
       extends ConstImpl[S] with Repr[S] {
 
       def spec(implicit tx: S#Tx): AudioFileSpec = constValue.spec
     }
 
-    private[this] final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
+    private final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
       extends VarImpl[S] with Repr[S] {
 
       def spec(implicit tx: S#Tx): AudioFileSpec = ref().spec
@@ -208,7 +208,7 @@ object AudioCue {
         this
       }
 
-      private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+      private def disconnect()(implicit tx: S#Tx): Unit = {
         artifact.changed -/-> changed
         offset  .changed -/-> changed
         gain    .changed -/-> changed
@@ -272,7 +272,7 @@ object AudioCue {
         this
       }
 
-      private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+      private def disconnect()(implicit tx: S#Tx): Unit = {
         peer.changed -/-> changed
         num .changed -/-> changed
       }
@@ -319,7 +319,7 @@ object AudioCue {
         new Shift(Targets[Out], peer = context(peer), amount = context(amount)).connect()
     }
 
-    private[this] final class Offset[S <: Sys[S]]
+    private final class Offset[S <: Sys[S]]
 
     final class Ops[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
       import me.{`this` => ex}

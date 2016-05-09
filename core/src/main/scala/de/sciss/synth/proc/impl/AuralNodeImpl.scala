@@ -46,7 +46,6 @@ object AuralNodeImpl {
 
     private[this] val users       = Ref(List.empty[DynamicUser])
     private[this] val resources   = Ref(List.empty[Resource   ])
-    // private[this] val disposables = Ref(List.empty[Disposable[S#Tx]])
     private[this] val groupsRef   = Ref(Option.empty[AllGroups])
 
     // we only add to `setMap` before `play`, thus does not need to be transactional
@@ -93,7 +92,8 @@ object AuralNodeImpl {
         Some(res)
       }
 
-    @inline private[this] def preGroupOption(implicit tx: S#Tx): Option[Group] =
+    @inline
+    private[this] def preGroupOption(implicit tx: S#Tx): Option[Group] =
       groupsRef.get(tx.peer).flatMap(_.pre)
 
     def preGroup()(implicit tx: S#Tx): Group =
@@ -107,10 +107,10 @@ object AuralNodeImpl {
         res
       }
 
-    private[this] def anchorNode()(implicit tx: S#Tx): Node =
+    private def anchorNode()(implicit tx: S#Tx): Node =
       groupsRef().flatMap(_.core) getOrElse synth
 
-    private[this] def moveAllTo(all: AllGroups, newGroup: Group)(implicit tx: S#Tx): Unit = {
+    private def moveAllTo(all: AllGroups, newGroup: Group)(implicit tx: S#Tx): Unit = {
       val core = anchorNode()
       core.moveToTail(newGroup)
       all.pre .foreach(_.moveBefore(core))

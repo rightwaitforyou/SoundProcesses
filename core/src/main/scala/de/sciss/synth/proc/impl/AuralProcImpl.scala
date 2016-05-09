@@ -77,7 +77,7 @@ object AuralProcImpl {
     def getOutput(key: String)(implicit tx: S#Tx): Option[AuralOutput   [S]] = auralOutputs.get(key)
 
     /* The ongoing build aural node build process, as stored in `playingRef`. */
-    private[this] sealed trait PlayingRef extends Disposable[S#Tx] {
+    private sealed trait PlayingRef extends Disposable[S#Tx] {
       def nodeOption: Option[AuralNode[S]]
     }
 
@@ -85,7 +85,7 @@ object AuralProcImpl {
       def dispose()(implicit tx: S#Tx) = ()
       def nodeOption = None
     }
-    private[this] final class PlayingNode(val node: AuralNode[S]) extends PlayingRef {
+    private final class PlayingNode(val node: AuralNode[S]) extends PlayingRef {
       def dispose()(implicit tx: S#Tx): Unit = {
         auralOutputs.foreach { case (_, view) =>
           view.stop()
@@ -98,7 +98,7 @@ object AuralProcImpl {
 
       def nodeOption = Some(node)
     }
-    private[this] final class PlayingPrepare(val resources: List[AsyncResource[S]]) extends PlayingRef {
+    private final class PlayingPrepare(val resources: List[AsyncResource[S]]) extends PlayingRef {
       def dispose()(implicit tx: S#Tx): Unit = resources.foreach(_.dispose())
       def nodeOption = None
     }
@@ -113,7 +113,7 @@ object AuralProcImpl {
     final def state      (implicit tx: S#Tx): AuralView.State = currentStateRef()
     final def targetState(implicit tx: S#Tx): AuralView.State = targetStateRef ().completed
 
-    private[this] def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
+    private def state_=(value: AuralView.State)(implicit tx: S#Tx): Unit = {
       val old = currentStateRef.swap(value)
       if (value != old) {
         fire(value)
@@ -156,7 +156,7 @@ object AuralProcImpl {
       }
     }
 
-    private[this] def newSynthGraph()(implicit tx: S#Tx): Unit = {
+    private def newSynthGraph()(implicit tx: S#Tx): Unit = {
       logA(s"newSynthGraph ${procCached()}")
 
       if (state == Playing) stopForRebuild()
@@ -171,7 +171,7 @@ object AuralProcImpl {
 
     // ---- scan events ----
 
-    private[this] def outputAdded(output: Output[S])(implicit tx: S#Tx): Unit = {
+    private def outputAdded(output: Output[S])(implicit tx: S#Tx): Unit = {
       logA(s"outputAdded  to   ${procCached()} (${output.key})")
       val key = output.key
       outputBuses.get(key).foreach { bus =>
@@ -180,7 +180,7 @@ object AuralProcImpl {
       }
     }
 
-    private[this] def outputRemoved(output: Output[S])(implicit tx: S#Tx): Unit = {
+    private def outputRemoved(output: Output[S])(implicit tx: S#Tx): Unit = {
       logA(s"outputRemoved from ${procCached()} (${output.key})")
       context.getAux[AuralOutput[S]](output.id).foreach(disposeAuralOutput)
 //      val key = output.key
@@ -199,7 +199,7 @@ object AuralProcImpl {
 
     // ---- attr events ----
 
-    private[this] def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+    private def attrAdded(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       val st          = buildState
       val aKey        = UGB.AttributeKey(key)
       val rejected    = st.rejectedInputs.contains(aKey)
@@ -245,7 +245,7 @@ object AuralProcImpl {
       }
     }
 
-    private[this] def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
+    private def attrRemoved(key: String, value: Obj[S])(implicit tx: S#Tx): Unit = {
       logA(s"AttrRemoved from ${procCached()} ($key)")
       attrMap.remove(key).foreach { view =>
         ports(AuralObj.Proc.AttrRemoved(this, view))
@@ -256,7 +256,7 @@ object AuralProcImpl {
     // ----
 
     // creates an `AuralOutput` and registers it with the aural context.
-    private[this] def addUsedOutput(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
+    private def addUsedOutput(key: String, numChannels: Int)(implicit tx: S#Tx): Unit = {
       val outputs = procCached().outputs
       val bus     = Bus.audio(server, numChannels = numChannels) // mkBus(key, numChannels)
       outputBuses.put(key, bus).foreach(_ => throw new IllegalStateException(s"Output bus for $key already defined"))
@@ -273,7 +273,7 @@ object AuralProcImpl {
     }
 
     // does _not_ dispose playingRef
-    private[this] def disposeBuild()(implicit tx: S#Tx): Unit = {
+    private def disposeBuild()(implicit tx: S#Tx): Unit = {
       auralOutputs.foreach { case (_, view) =>
         ports(AuralObj.Proc.OutputRemoved(this, view))
         view.dispose()
@@ -288,7 +288,7 @@ object AuralProcImpl {
       attrMap .clear()
     }
 
-    private[this] def buildState(implicit tx: S#Tx): UGB.State[S] = buildStateRef()
+    private def buildState(implicit tx: S#Tx): UGB.State[S] = buildStateRef()
 
     /* If the ugen graph is incomplete, tries to (incrementally)
      * build it. Calls `buildAdvanced` with the old and new
@@ -315,7 +315,7 @@ object AuralProcImpl {
      * If the now-state indicates that the ugen-graph is complete,
      * it calls `play` on the proc-views whose target-state is to play.
      */
-    private[this] def buildAdvanced(before: UGB.State[S], now: UGB.State[S])(implicit tx: S#Tx): Unit = {
+    private def buildAdvanced(before: UGB.State[S], now: UGB.State[S])(implicit tx: S#Tx): Unit = {
 
       // handle newly rejected inputs
       if (now.rejectedInputs.isEmpty) {
@@ -342,7 +342,7 @@ object AuralProcImpl {
     }
 
     /* Creates a new aural output */
-    private[this] def mkAuralOutput(output: Output[S], bus: AudioBus)(implicit tx: S#Tx): AuralOutput.Owned[S] = {
+    private def mkAuralOutput(output: Output[S], bus: AudioBus)(implicit tx: S#Tx): AuralOutput.Owned[S] = {
       val view  = AuralOutput(view = this, output = output, bus = bus)
       // this is done by the `AuralOutput` constructor:
       // context.putAux[AuralOutput[S]](output.id, view)
@@ -352,7 +352,7 @@ object AuralProcImpl {
       view
     }
 
-    private[this] def mkAuralAttribute(key: String, value: Obj[S])(implicit tx: S#Tx): AuralAttribute[S] =
+    private def mkAuralAttribute(key: String, value: Obj[S])(implicit tx: S#Tx): AuralAttribute[S] =
       attrMap.get(key).getOrElse {
         val view = AuralAttribute(key, value, this)
         attrMap.put(key, view)
@@ -422,7 +422,7 @@ object AuralProcImpl {
       case _ => throw new IllegalStateException(s"Unsupported input request $in")
     }
 
-    private[this] def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus] =
+    private def getOutputBus(key: String)(implicit tx: S#Tx): Option[AudioBus] =
       outputBuses.get(key)
 
     final protected def procCached()(implicit tx: S#Tx): Proc[S] = {
@@ -438,7 +438,7 @@ object AuralProcImpl {
     private[this] def getAuralOutput(output: Output[S])(implicit tx: S#Tx): Option[AuralOutput[S]] =
       context.getAux[AuralOutput[S]](output.id)
 
-    private[this] def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
+    private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
       val procObj   = procCached()
       val valueOpt  = procObj.attr.get(key)
       valueOpt.fold(-1) {
@@ -600,7 +600,7 @@ object AuralProcImpl {
     }
 
     // same as `play` but reusing previous `timeRef`
-    private[this] def playAfterRebuild()(implicit tx: S#Tx): Unit = {
+    private def playAfterRebuild()(implicit tx: S#Tx): Unit = {
       if (state != Stopped) return
 
       (buildState, targetStateRef()) match {
@@ -616,7 +616,7 @@ object AuralProcImpl {
     }
 
     // same as `stop` but not touching target state
-    private[this] def stopForRebuild()(implicit tx: S#Tx): Unit = {
+    private def stopForRebuild()(implicit tx: S#Tx): Unit = {
       freePlayingRef()
       state = Stopped
     }
@@ -668,8 +668,7 @@ object AuralProcImpl {
     }
 
     // ---- asynchronous preparation ----
-    private[this] def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)
-                                      (implicit tx: S#Tx): Unit = {
+    private def prepareAndLaunch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
       val p = procCached()
       logA(s"begin prepare $p (${hashCode.toHexString})")
 
@@ -698,14 +697,13 @@ object AuralProcImpl {
       }
     }
 
-    private[this] def prepared(ugen: UGB.Complete[S])(implicit tx: S#Tx): Unit = {
+    private def prepared(ugen: UGB.Complete[S])(implicit tx: S#Tx): Unit =
       targetStateRef() match {
         case tp: TargetPlaying =>
           launch(ugen, tp.shiftTo(sched.time)) // XXX TODO - yes or no, shift time?
         case _ =>
           state = Prepared
       }
-    }
 
     // ---- synchronous preparation ----
     protected def launch(ugen: UGB.Complete[S], timeRef: TimeRef)(implicit tx: S#Tx): Unit = {
@@ -757,7 +755,7 @@ object AuralProcImpl {
       state = Playing
     }
 
-    private[this] def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
+    private def setPlayingPrepare(resources: List[AsyncResource[S]])(implicit tx: S#Tx): PlayingPrepare = {
       val res = new PlayingPrepare(resources)
       val old = playingRef.swap(res)
       old.dispose()
@@ -765,7 +763,7 @@ object AuralProcImpl {
       res
     }
 
-    private[this] def freePlayingRef()(implicit tx: S#Tx): Unit = {
+    private def freePlayingRef()(implicit tx: S#Tx): Unit = {
       val old = playingRef.swap(PlayingNone)
       old.dispose()
     }

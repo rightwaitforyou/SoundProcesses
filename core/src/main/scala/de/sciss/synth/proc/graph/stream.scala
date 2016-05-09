@@ -41,22 +41,37 @@ object VDiskIn {
   def ar(key: String, speed: synth.GE = 1, loop: synth.GE = 0, interp: Int = 4, maxSpeed: Double = 0.0): VDiskIn = {
     // XXX TODO: match against UserValue ?
     val maxSpeed1 = speed match {
-      case Constant(c)  => c
+      case Constant(c)  => math.abs(c)
       case _            => maxSpeed
     }
     apply(audio, key = key, speed = speed, loop = loop, interp = interp, maxSpeed = maxSpeed1)
   }
 }
+
+/** A SoundProcesses aware variant of `VDiskIn`. It takes its streaming buffer input from
+  * an attribute with the given `key`.
+  *
+  * @param key      key into the containing object's attribute map, where an `AudioCue` is to be found.
+  * @param speed    speed factor as in `ugen.VDiskIn`. If a negative constant value is given,
+  *                 the actual factor is `BufRateScale.kr * -speed`, thus `-1` indicates playback
+  *                 at correct sample rate.
+  * @param interp   same as in `ugen.VDiskIn`. Additionally, a value of zero indicates that
+  *                 interpolation should be chosen according to `speed`. This is useful in conjunction
+  *                 with negative speed values where interpolation might depend on actual SRC.
+  * @param maxSpeed maximum expected speed, which will be used in consideration of the buffer size needed.
+  *                 if zero (default), and `speed` is a constant, this will be aligned with `speed`.
+  */
 final case class VDiskIn(rate: Rate, key: String, speed: synth.GE, loop: synth.GE, interp: Int, maxSpeed: Double)
   extends Stream with IsIndividual {
 
-  if (interp != 1 && interp != 2 && interp != 4) sys.error(s"Unsupported interpolation: $interp")
+  if (interp != 0 && interp != 1 && interp != 2 && interp != 4) sys.error(s"Unsupported interpolation: $interp")
 
   // VDiskIn uses cubic interpolation. Thus provide native streaming if that interpolation
   // is chosen; otherwise use the `StreamBuffer` functionality.
   // protected def info = UGenGraphBuilder.StreamIn(maxSpeed, if (interp == 4) -1 else interp)
 
   protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike = {
+    ???
     val reader = if (interp == 4) {
       ugen.VDiskIn(rate, numChannels = numChannels, buf = buf, speed = speed, loop = loop)
     } else {

@@ -55,7 +55,7 @@ object Implicits {
 // SCAN
 //  // Scala 2.10.4 has a compiler bug that prevents putting this
 //  // code inside a value class
-//  private[this] def getScanLinks[S <: Sys[S]](in: Iterator[Scan.Link[S]])
+//  private def getScanLinks[S <: Sys[S]](in: Iterator[Scan.Link[S]])
 //                                             (implicit tx: S#Tx): Set[Scan.Link.Scan[S]] =
 //    in.collect {
 //      case l @ Scan.Link.Scan(_) => l

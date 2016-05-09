@@ -35,10 +35,10 @@ object CurveObj extends ExprTypeImpl[Curve, CurveObj] {
     res
   }
 
-  private[this] final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
+  private final class _Const[S <: Sys[S]](val id: S#ID, val constValue: A)
     extends ConstImpl[S] with Repr[S]
 
-  private[this] final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
+  private final class _Var[S <: Sys[S]](val targets: Targets[S], val ref: S#Var[Ex[S]])
     extends VarImpl[S] with Repr[S]
 }
 trait CurveObj[S <: Sys[S]] extends Expr[S, Curve]

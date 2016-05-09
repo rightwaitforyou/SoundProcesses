@@ -17,15 +17,15 @@ lazy val commonSettings = Seq(
 lazy val lucreVersion               = "3.3.1"
 lazy val scalaColliderVersion       = "1.18.1"
 lazy val spanVersion                = "1.3.1"
-lazy val lucreSwingVersion          = "1.4.0-SNAPSHOT"
+lazy val lucreSwingVersion          = "1.4.0"
 lazy val swingPlusVersion           = "0.2.1"
-lazy val audioWidgetsVersion        = "1.10.0-SNAPSHOT"
+lazy val audioWidgetsVersion        = "1.10.0"
 lazy val fileUtilVersion            = "1.1.1"
 lazy val topologyVersion            = "1.0.0"
 
 // ---- test-only ----
 
-lazy val scalaColliderSwingVersion = "1.29.0-SNAPSHOT"
+lazy val scalaColliderSwingVersion = "1.29.0"
 lazy val scalaTestVersion          = "2.2.6"
 lazy val loggingEnabled            = true
 lazy val bdb                       = "bdb"  // either "bdb" or "bdb6"

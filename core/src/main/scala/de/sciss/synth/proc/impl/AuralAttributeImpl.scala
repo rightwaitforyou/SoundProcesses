@@ -58,11 +58,11 @@ object AuralAttributeImpl {
     Timeline    .typeID -> AuralTimelineAttribute
   )
 
-  // private[this] final class PlayRef[S <: Sys[S]](val target: Target)
+  // private final class PlayRef[S <: Sys[S]](val target: Target)
 
-  // private[this] type PlayRef[S <: Sys[S]] = Target
+  // private type PlayRef[S <: Sys[S]] = Target
 
-  private[this] trait ExprImpl[S <: Sys[S], A]
+  private trait ExprImpl[S <: Sys[S], A]
     extends AuralAttributeImpl[S] { attr =>
 
     // ---- abstract ----
@@ -92,7 +92,7 @@ object AuralAttributeImpl {
       state = Stopped
     }
 
-    private[this] def update(target: Target[S], value: A)(implicit tx: S#Tx): Unit = {
+    private def update(target: Target[S], value: A)(implicit tx: S#Tx): Unit = {
       // import p.target
       val ctlVal = mkValue(value)
       target.put(this, ctlVal)
@@ -105,7 +105,7 @@ object AuralAttributeImpl {
       this
     }
 
-    private[this] def stopNoFire()(implicit tx: S#Tx): Unit =
+    private def stopNoFire()(implicit tx: S#Tx): Unit =
       playRef.swap(None).foreach(_.remove(this))
 
     def dispose()(implicit tx: S#Tx): Unit = {
@@ -114,7 +114,7 @@ object AuralAttributeImpl {
     }
   }
 
-  private[this] trait NumberImpl[S <: Sys[S], A] extends ExprImpl[S, A] {
+  private trait NumberImpl[S <: Sys[S], A] extends ExprImpl[S, A] {
     final def preferredNumChannels(implicit tx: S#Tx): Int = 1
   }
   
@@ -129,8 +129,7 @@ object AuralAttributeImpl {
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
       new IntAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class IntAttribute[S <: Sys[S]](val key: String,
-                                                      val obj: stm.Source[S#Tx, IntObj[S]])
+  private final class IntAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, IntObj[S]])
     extends NumberImpl[S, Int] {
 
     def typeID = IntObj.typeID
@@ -151,8 +150,7 @@ object AuralAttributeImpl {
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
       new DoubleAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class DoubleAttribute[S <: Sys[S]](val key: String,
-                                                         val obj: stm.Source[S#Tx, DoubleObj[S]])
+  private final class DoubleAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, DoubleObj[S]])
     extends NumberImpl[S, Double] {
 
     def typeID = DoubleObj.typeID
@@ -173,8 +171,7 @@ object AuralAttributeImpl {
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
       new BooleanAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class BooleanAttribute[S <: Sys[S]](val key: String,
-                                                          val obj: stm.Source[S#Tx, BooleanObj[S]])
+  private final class BooleanAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, BooleanObj[S]])
     extends NumberImpl[S, Boolean] {
 
     def typeID = BooleanObj.typeID
@@ -195,8 +192,7 @@ object AuralAttributeImpl {
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
       new FadeSpecAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class FadeSpecAttribute[S <: Sys[S]](val key: String,
-                                                           val obj: stm.Source[S#Tx, FadeSpec.Obj[S]])
+  private final class FadeSpecAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, FadeSpec.Obj[S]])
     extends ExprImpl[S, FadeSpec] {
 
     def typeID = FadeSpec.Obj.typeID
@@ -227,8 +223,7 @@ object AuralAttributeImpl {
                           (implicit tx: S#Tx, context: AuralContext[S]): AuralAttribute[S] =
       new DoubleVectorAttribute(key, tx.newHandle(value)).init(value)
   }
-  private[this] final class DoubleVectorAttribute[S <: Sys[S]](val key: String,
-                                                               val obj: stm.Source[S#Tx, DoubleVector[S]])
+  private final class DoubleVectorAttribute[S <: Sys[S]](val key: String, val obj: stm.Source[S#Tx, DoubleVector[S]])
     extends ExprImpl[S, Vec[Double]] {
 
     def typeID = DoubleVector.typeID

@@ -92,7 +92,7 @@ object EnsembleImpl {
       this
     }
 
-    private[this] def disconnect()(implicit tx: S#Tx): Unit = {
+    private def disconnect()(implicit tx: S#Tx): Unit = {
       _folder .changed -/-> changed
       _offset .changed -/-> changed
       _playing.changed -/-> changed

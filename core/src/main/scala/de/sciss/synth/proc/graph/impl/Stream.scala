@@ -20,7 +20,7 @@ import de.sciss.synth.proc.UGenGraphBuilder.Input
 import synth._
 
 object Stream {
-  /* private[proc] */ def controlName(key: String, idx: Int): String = s"$$str${idx}_$key"
+  def controlName(key: String, idx: Int): String = s"$$str${idx}_$key"
 
   trait Info extends Stream {
     protected def maxSpeed  = 0.0
@@ -32,13 +32,12 @@ trait Stream extends synth.GE.Lazy {
 
   protected def key: String
 
-  // protected def info: UGenGraphBuilder.StreamIn
   protected def maxSpeed: Double
   protected def interp  : Int
 
   def makeUGens: UGenInLike = {
     val b = UGenGraphBuilder.get
-    val interp1       = if (interp == 4) -1 else interp
+    val interp1       = if (interp == 4) -1 else interp // see Input.Stream.Spec ('native')
     val spec          = Input.Stream.Spec(maxSpeed = maxSpeed, interp = interp1)
     val info          = b.requestInput(Input.Stream(key, spec))
     val idx           = if (spec.isEmpty) 0 else info.specs.size - 1

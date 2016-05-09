@@ -72,7 +72,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
 
   protected type ElemHandle = AuralTimelineBase.ElemHandle[S, Elem]
 
-  private[this] def ElemHandle(idH: stm.Source[S#Tx, S#ID], span: SpanLike, view: Elem): ElemHandle =
+  private def ElemHandle(idH: stm.Source[S#Tx, S#ID], span: SpanLike, view: Elem): ElemHandle =
     new AuralTimelineBase.ElemHandle(idH, span, view)
 
   protected def elemFromHandle(h: ElemHandle): Elem = h.view
@@ -164,7 +164,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     playViews(toStart, timeRef, play.target)
   }
 
-  private[this] def stopViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
+  private def stopViews(it: Iterator[Leaf])(implicit tx: S#Tx): Unit = {
     // logA("timeline - stopViews")
     implicit val itx: I#Tx = iSys(tx)
     // Note: `toList` makes sure the iterator is not
@@ -176,7 +176,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     }
   }
 
-  private[this] def playViews(it: Iterator[Leaf], timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit =
+  private def playViews(it: Iterator[Leaf], timeRef: TimeRef, target: Target)(implicit tx: S#Tx): Unit =
     if (it.hasNext) it.foreach { case (span, views) =>
       val tr = timeRef.child(span)
       views.foreach { case (idH, elem) =>
@@ -238,7 +238,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
     h
   }
 
-  private[this] def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit =
+  private def elemRemoved(tid: S#ID, span: SpanLike, obj: Obj[S])(implicit tx: S#Tx): Unit =
     viewMap.get(tid).foreach { h =>
       // finding the object in the view-map implies that it
       // is currently preparing or playing
@@ -264,7 +264,7 @@ trait AuralTimelineBase[S <: Sys[S], I <: stm.Sys[I], Target, Elem <: AuralView[
       }
     }
 
-  private[this] def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
+  private def removeView(h: ElemHandle)(implicit tx: S#Tx): Unit = {
     import h._
     logA(s"timeline - removeView - $span - $view")
 
