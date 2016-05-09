@@ -14,11 +14,11 @@
 package de.sciss.synth.proc
 package impl
 
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{Server, Sys}
 import de.sciss.synth.impl.BasicUGenGraphBuilder
 import de.sciss.synth.proc.UGenGraphBuilder.Input
 import de.sciss.synth.ugen.ControlProxyLike
-import de.sciss.synth.{UGen, Lazy, SynthGraph, UGenGraph}
+import de.sciss.synth.{Lazy, SynthGraph, UGen, UGenGraph}
 
 import scala.collection.immutable.{IndexedSeq => Vec}
 
@@ -83,12 +83,14 @@ object UGenGraphBuilderImpl {
 
     override def toString = s"UGenGraphBuilder.Incomplete@${hashCode.toHexString} (active)"
 
-    private var remaining       = in.remaining
-    private var controlProxies  = in.controlProxies
+    private[this] var remaining       = in.remaining
+    private[this] var controlProxies  = in.controlProxies
 
     var outputs                 = in.outputs
     var acceptedInputs          = in.acceptedInputs
     var rejectedInputs          = Set.empty[UGenGraphBuilder.Key]
+
+    def server: Server = context.server
 
     def retry(context: Context[S])(implicit tx: S#Tx): State[S] =
       throw new IllegalStateException("Cannot retry an ongoing build")

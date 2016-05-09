@@ -20,7 +20,7 @@ import de.sciss.lucre.event.impl.ObservableImpl
 import de.sciss.lucre.expr.{DoubleVector, StringObj}
 import de.sciss.lucre.stm
 import de.sciss.lucre.stm.{Disposable, Obj, TxnLike}
-import de.sciss.lucre.synth.{AudioBus, Buffer, Bus, BusNodeSetter, NodeRef, Synth, Sys}
+import de.sciss.lucre.synth.{AudioBus, Buffer, Bus, BusNodeSetter, NodeRef, Server, Synth, Sys}
 import de.sciss.numbers
 import de.sciss.span.Span
 import de.sciss.synth.ControlSet
@@ -49,7 +49,7 @@ object AuralProcImpl {
     with ObservableImpl[S, AuralView.State] {
 
     import TxnLike.peer
-    import context.{scheduler => sched, server}
+    import context.{scheduler => sched}
     import sched.cursor
 
     private[this] val buildStateRef = Ref.make[UGB.State[S]]()
@@ -68,6 +68,8 @@ object AuralProcImpl {
     final def obj: stm.Source[S#Tx, Proc[S]] = _obj
 
     override def toString = s"AuralObj.Proc@${hashCode().toHexString}"
+
+    final def server: Server = context.server
 
     object ports extends ObservableImpl[S, AuralObj.Proc.Update[S]] {
       def apply(update: AuralObj.Proc.Update[S])(implicit tx: S#Tx): Unit = fire(update)
@@ -377,7 +379,6 @@ object AuralProcImpl {
           view.preferredNumChannels
         }
 
-        // val found = requestAttrNumChannels(i.name)
         import i.{defaultNumChannels => defNum, requiredNumChannels => reqNum}
         if ((found < 0 && i.defaultNumChannels < 0) || (found >= 0 && reqNum >= 0 && found != reqNum)) {
           // throw new IllegalStateException(s"Attribute ${i.name} requires $reqNum channels (found $found)")
@@ -387,8 +388,8 @@ object AuralProcImpl {
         UGB.Input.Attribute.Value(res)
 
       case i: UGB.Input.Stream =>
-        val numCh0  = requestAttrNumChannels(i.name)
-        val numCh   = if (numCh0 < 0) 1 else numCh0     // simply default to 1
+        val value0  = requestAttrStreamValue(i.name)
+        val value1  = if (value0.numChannels < 0) value0.copy(numChannels = 1) else value0 // simply default to 1
         val newSpecs0 = st.acceptedInputs.get(i.key) match {
           case Some((_, v: UGB.Input.Stream.Value))   => v.specs
           case _                                      => Nil
@@ -396,7 +397,8 @@ object AuralProcImpl {
         val newSpecs = if (i.spec.isEmpty) newSpecs0 else {
           i.spec :: newSpecs0
         }
-        UGB.Input.Stream.Value(numChannels = numCh, specs = newSpecs)
+        val value2 = if (newSpecs.isEmpty) value1 else value1.copy(specs = newSpecs)
+        value2
 
       case i: UGB.Input.Buffer =>
         val procObj = procCached()
@@ -438,17 +440,24 @@ object AuralProcImpl {
     private[this] def getAuralOutput(output: Output[S])(implicit tx: S#Tx): Option[AuralOutput[S]] =
       context.getAux[AuralOutput[S]](output.id)
 
-    private def requestAttrNumChannels(key: String)(implicit tx: S#Tx): Int = {
+    @inline
+    private[this] def requestAttrStreamValue(key: String)(implicit tx: S#Tx): UGB.Input.Stream.Value = {
       val procObj   = procCached()
       val valueOpt  = procObj.attr.get(key)
-      valueOpt.fold(-1) {
-        case a: DoubleVector[S] => a.value.size // XXX TODO: would be better to write a.peer.size.value
+
+      def simple(numCh: Int) =
+        UGB.Input.Stream.Value(numChannels = numCh, sampleRate = server.sampleRate, specs = Nil)
+
+      valueOpt.fold(simple(-1)) {
+        case a: DoubleVector[S] =>
+          simple(a.value.size) // XXX TODO: would be better to write a.peer.size.value
         case a: AudioCue.Obj[S] =>
-          a.value.spec.numChannels
-        case _: FadeSpec.Obj[S] => 4
+          val spec = a.value.spec
+          UGB.Input.Stream.Value(numChannels = spec.numChannels, sampleRate = spec.sampleRate, specs = Nil)
+        case _: FadeSpec.Obj[S] => simple(4)
         case a: Output[S] =>
-          getAuralOutput(a).fold(-1)(_.bus.numChannels)
-        case _ => -1
+          simple(getAuralOutput(a).fold(-1)(_.bus.numChannels))
+        case _ => simple(-1)
       }
     }
 
@@ -468,7 +477,7 @@ object AuralProcImpl {
             a.play(timeRef = timeRef, target = target)
           }
 
-        case UGB.Input.Stream.Value(numChannels, specs) =>  // ------------------ streaming
+        case UGB.Input.Stream.Value(numChannels, _, specs) =>  // ------------------ streaming
           val infoSeq = if (specs.isEmpty) UGB.Input.Stream.EmptySpec :: Nil else specs
 
           infoSeq.zipWithIndex.foreach { case (info, idx) =>

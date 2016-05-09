@@ -11,15 +11,16 @@
  *  contact@sciss.de
  */
 
-package de.sciss.synth
-package proc
+package de.sciss.synth.proc
 package graph
 
+import de.sciss.lucre.synth.Server
 import de.sciss.synth
+import de.sciss.synth.{GE, IsIndividual, Rate, UGenInLike, WritesBuffer, audio, control, scalar, ugen}
 import de.sciss.synth.proc.UGenGraphBuilder.Input
-import synth.ugen.Constant
+import de.sciss.synth.proc.graph.impl.Stream
 import de.sciss.synth.proc.impl.StreamBuffer
-import impl.Stream
+import de.sciss.synth.ugen.Constant
 
 // ---- ugen wrappers ----
 
@@ -33,12 +34,27 @@ final case class DiskIn(rate: Rate, key: String, loop: synth.GE)
   protected def maxSpeed  = 1.0
   protected def interp    = -1
 
-  protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
+  protected def makeUGen(server: Server, numChannels: Int, sampleRate: Double, idx: Int,
+                         buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.DiskIn(rate, numChannels = numChannels, buf = buf, loop = loop) * gain
 }
 
 object VDiskIn {
-  def ar(key: String, speed: synth.GE = 1, loop: synth.GE = 0, interp: Int = 4, maxSpeed: Double = 0.0): VDiskIn = {
+  /** A SoundProcesses aware variant of `VDiskIn`. It takes its streaming buffer input from
+    * an attribute with the given `key`. Default values provide automatic sample-rate-conversion
+    * to match the audio server.
+    *
+    * @param key      key into the containing object's attribute map, where an `AudioCue` is to be found.
+    * @param speed    speed factor as in `ugen.VDiskIn`. If a negative constant value is given,
+    *                 the actual factor is `BufRateScale.kr * -speed`, thus `-1` indicates playback
+    *                 at correct sample rate.
+    * @param interp   same as in `ugen.VDiskIn`. Additionally, a value of `-1` indicates that
+    *                 interpolation should be chosen according to `speed`. This is useful in conjunction
+    *                 with negative speed values where interpolation might depend on actual SRC.
+    * @param maxSpeed maximum expected speed, which will be used in consideration of the buffer size needed.
+    *                 if zero (default), and `speed` is a constant, this will be aligned with `speed`.
+    */
+  def ar(key: String, speed: synth.GE = -1, loop: synth.GE = 0, interp: Int = -1, maxSpeed: Double = 0.0): VDiskIn = {
     // XXX TODO: match against UserValue ?
     val maxSpeed1 = speed match {
       case Constant(c)  => math.abs(c)
@@ -49,13 +65,14 @@ object VDiskIn {
 }
 
 /** A SoundProcesses aware variant of `VDiskIn`. It takes its streaming buffer input from
-  * an attribute with the given `key`.
+  * an attribute with the given `key`. Default values provide automatic sample-rate-conversion
+  * to match the audio server.
   *
   * @param key      key into the containing object's attribute map, where an `AudioCue` is to be found.
   * @param speed    speed factor as in `ugen.VDiskIn`. If a negative constant value is given,
   *                 the actual factor is `BufRateScale.kr * -speed`, thus `-1` indicates playback
   *                 at correct sample rate.
-  * @param interp   same as in `ugen.VDiskIn`. Additionally, a value of zero indicates that
+  * @param interp   same as in `ugen.VDiskIn`. Additionally, a value of `-1` indicates that
   *                 interpolation should be chosen according to `speed`. This is useful in conjunction
   *                 with negative speed values where interpolation might depend on actual SRC.
   * @param maxSpeed maximum expected speed, which will be used in consideration of the buffer size needed.
@@ -64,18 +81,26 @@ object VDiskIn {
 final case class VDiskIn(rate: Rate, key: String, speed: synth.GE, loop: synth.GE, interp: Int, maxSpeed: Double)
   extends Stream with IsIndividual {
 
-  if (interp != 0 && interp != 1 && interp != 2 && interp != 4) sys.error(s"Unsupported interpolation: $interp")
+  if (interp != -1 && interp != 1 && interp != 2 && interp != 4) sys.error(s"Unsupported interpolation: $interp")
 
   // VDiskIn uses cubic interpolation. Thus provide native streaming if that interpolation
   // is chosen; otherwise use the `StreamBuffer` functionality.
-  // protected def info = UGenGraphBuilder.StreamIn(maxSpeed, if (interp == 4) -1 else interp)
 
-  protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike = {
-    ???
-    val reader = if (interp == 4) {
-      ugen.VDiskIn(rate, numChannels = numChannels, buf = buf, speed = speed, loop = loop)
+  protected def makeUGen(server: Server, numChannels: Int, sampleRate: Double, idx: Int,
+                         buf: synth.GE, gain: synth.GE): UGenInLike = {
+    val speed1: GE = speed match {
+      case Constant(v) if v < 0 => sampleRate / server.sampleRate * -v
+      case other                => other
+    }
+    val constSpeed = speed1 == Constant.C1
+    // if we know that speed is exactly one, we can go for no-interpolation
+    val interp1 = if (interp != -1) interp else if (constSpeed) 1 else 4
+    val reader = if (interp1 == 4) {
+      ugen.VDiskIn(rate, numChannels = numChannels, buf = buf, speed = speed1, loop = loop)
+    } else if (interp1 == 1 && constSpeed) {
+      ugen.DiskIn(rate, numChannels = numChannels, buf = buf, loop = loop)
     } else {
-      StreamBuffer.makeUGen(key = key, idx = idx, buf = buf, numChannels = numChannels, speed = speed, interp = interp)
+      StreamBuffer.makeUGen(key = key, idx = idx, buf = buf, numChannels = numChannels, speed = speed1, interp = interp1)
     }
     reader * gain
   }
@@ -103,6 +128,7 @@ final case class DiskOut(rate: Rate, key: String, in: GE)
   extends synth.GE.Lazy with WritesBuffer {
 
   protected def makeUGens: UGenInLike = {
+    import synth._
     val b         = UGenGraphBuilder.get
     val ins       = in.expand.flatOutputs
     b.requestInput(Input.DiskOut(key, numChannels = ins.size))
@@ -117,7 +143,8 @@ object BufChannels {
   def kr(key: String): BufChannels = apply(control, key = key)
 }
 final case class BufChannels(rate: Rate, key: String) extends Stream.Info {
-  protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
+  protected def makeUGen(server: Server, numChannels: Int, sampleRate: Double, idx: Int,
+                         buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufChannels(rate, buf) // or just Constant(numChannels), ha?
 }
 
@@ -126,7 +153,8 @@ object BufRateScale {
   def kr(key: String): BufRateScale = apply(control, key = key)
 }
 final case class BufRateScale(rate: Rate, key: String) extends Stream.Info {
-  protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
+  protected def makeUGen(server: Server, numChannels: Int, sampleRate: Double, idx: Int,
+                         buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufRateScale(rate, buf)
 }
 
@@ -135,6 +163,7 @@ object BufSampleRate {
   def kr(key: String): BufSampleRate = apply(control, key = key)
 }
 final case class BufSampleRate(rate: Rate, key: String) extends Stream.Info {
-  protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike =
+  protected def makeUGen(server: Server, numChannels: Int, sampleRate: Double, idx: Int,
+                         buf: synth.GE, gain: synth.GE): UGenInLike =
     ugen.BufSampleRate(rate, buf)
 }

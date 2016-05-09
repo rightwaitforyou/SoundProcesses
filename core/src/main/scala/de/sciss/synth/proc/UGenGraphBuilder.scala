@@ -13,7 +13,7 @@
 
 package de.sciss.synth.proc
 
-import de.sciss.lucre.synth.Sys
+import de.sciss.lucre.synth.{Server, Sys}
 import de.sciss.synth.UGenGraph
 
 import scala.util.control.ControlThrowable
@@ -45,6 +45,8 @@ object UGenGraphBuilder {
   case class ScanIn(numChannels: Int, fixed: Boolean)
 
   trait Context[S <: Sys[S]] {
+    def server: Server
+
     def requestInput[Res](req: UGenGraphBuilder.Input { type Value = Res }, state: Incomplete[S])
                          (implicit tx: S#Tx): Res
   }
@@ -133,7 +135,7 @@ object UGenGraphBuilder {
 
         override def toString = f"$productPrefix(maxSpeed = $maxSpeed%1.1f, interp = $interp)"
       }
-      final case class Value(numChannels: Int, specs: List[Spec]) extends UGenGraphBuilder.Value {
+      final case class Value(numChannels: Int, sampleRate: Double, specs: List[Spec]) extends UGenGraphBuilder.Value {
         override def productPrefix = "Input.Stream.Value"
         override def toString = s"$productPrefix(numChannels = $numChannels, spec = ${specs.mkString("[", ",", "]")})"
         def async = false
@@ -240,6 +242,8 @@ object UGenGraphBuilder {
 }
 trait UGenGraphBuilder extends UGenGraph.Builder {
   import UGenGraphBuilder._
+
+  def server: Server
 
   /** Called by graph elements during their expansion, this method forwards a request
     * for input specifications to the `UGenGraphBuilder.Context`. The context should

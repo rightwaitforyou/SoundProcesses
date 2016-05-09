@@ -13,11 +13,11 @@
 
 package de.sciss.synth.proc.graph.impl
 
+import de.sciss.lucre.synth.Server
 import de.sciss.synth
 import de.sciss.synth.UGenInLike
 import de.sciss.synth.proc.UGenGraphBuilder
 import de.sciss.synth.proc.UGenGraphBuilder.Input
-import synth._
 
 object Stream {
   def controlName(key: String, idx: Int): String = s"$$str${idx}_$key"
@@ -28,7 +28,8 @@ object Stream {
   }
 }
 trait Stream extends synth.GE.Lazy {
-  protected def makeUGen(numChannels: Int, idx: Int, buf: synth.GE, gain: synth.GE): UGenInLike
+  protected def makeUGen(server: Server, numChannels: Int, sampleRate: Double, idx: Int, buf: synth.GE,
+                         gain: synth.GE): UGenInLike
 
   protected def key: String
 
@@ -37,6 +38,8 @@ trait Stream extends synth.GE.Lazy {
 
   def makeUGens: UGenInLike = {
     val b = UGenGraphBuilder.get
+    import synth._
+
     val interp1       = if (interp == 4) -1 else interp // see Input.Stream.Spec ('native')
     val spec          = Input.Stream.Spec(maxSpeed = maxSpeed, interp = interp1)
     val info          = b.requestInput(Input.Stream(key, spec))
@@ -46,6 +49,7 @@ trait Stream extends synth.GE.Lazy {
     val ctl           = ctlName.ir(Seq(0, 0))
     val buf           = ctl \ 0
     val gain          = ctl \ 1
-    makeUGen(numChannels = info.numChannels, idx = idx, buf = buf, gain = gain)
+    makeUGen(server = b.server, numChannels = info.numChannels, sampleRate = info.sampleRate,
+      idx = idx, buf = buf, gain = gain)
   }
 }
