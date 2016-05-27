@@ -532,7 +532,8 @@ object AuralProcImpl {
               case a => sys.error(s"Cannot use attribute $a as an audio stream")
             }
             nr.addControl(ctlName -> Seq[Float](rb.id, gain): ControlSet)
-            nr.addResource(rb)
+            val late = Buffer.disposeWithNode(rb, nr)
+            nr.addResource(late)
           }
 
         case UGB.Input.Buffer.Value(numFr, numCh, false) =>   // ----------------------- random access buffer
@@ -558,7 +559,8 @@ object AuralProcImpl {
           }
           val ctlName    = graph.Buffer.controlName(key)
           nr.addControl(ctlName -> rb.id)
-          nr.addResource(rb)
+          val late = Buffer.disposeWithNode(rb, nr)
+          nr.addResource(late)
 
         case UGB.Input.Action.Value =>   // ----------------------- action
           val resp = new ActionResponder(objH = obj /* tx.newHandle(nr.obj) */, key = key, synth = nr.node)
@@ -580,7 +582,8 @@ object AuralProcImpl {
           }
           val ctlName    = graph.DiskOut.controlName(key)
           nr.addControl(ctlName -> rb.id)
-          nr.addResource(rb)
+          val late = Buffer.disposeWithNode(rb, nr)
+          nr.addResource(late)
 
         case _ =>
           throw new IllegalStateException(s"Unsupported input attribute request $value")

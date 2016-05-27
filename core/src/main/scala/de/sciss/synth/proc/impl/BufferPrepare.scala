@@ -16,14 +16,15 @@ package impl
 
 import java.io.File
 
-import de.sciss.lucre.synth.{NodeRef, Sys, Buffer, Txn}
+import de.sciss.lucre.stm.TxnLike
+import de.sciss.lucre.synth.{Buffer, NodeRef, Sys, Txn}
 import de.sciss.osc
 import de.sciss.processor.impl.ProcessorImpl
 import de.sciss.synth.io.AudioFileSpec
 
-import scala.concurrent.{blocking, Await, duration, TimeoutException}
+import scala.concurrent.{Await, TimeoutException, blocking, duration}
 import duration.Duration
-import scala.concurrent.stm.{TxnExecutor, Ref}
+import scala.concurrent.stm.{Ref, TxnExecutor}
 import TxnExecutor.{defaultAtomic => atomic}
 
 object BufferPrepare {
@@ -100,15 +101,21 @@ object BufferPrepare {
       buf
     }
 
+    private[this] val installed = Ref(false)
+
     def install(b: NodeRef.Full[S])(implicit tx: S#Tx): Unit = {
+      import TxnLike.peer
+      require(!installed.swap(true))
       val ctlName = graph.Buffer.controlName(key)
       b.addControl(ctlName -> buf.id)
-      b.addResource(buf)
+      val late = Buffer.disposeWithNode(buf, b)
+      b.addResource(late)
     }
 
     def dispose()(implicit tx: S#Tx): Unit = {
+      import TxnLike.peer
       tx.afterCommit(abort())
-      if (buf.isOnline) buf.dispose()
+      if (buf.isOnline && !installed()) buf.dispose()
     }
   }
 }

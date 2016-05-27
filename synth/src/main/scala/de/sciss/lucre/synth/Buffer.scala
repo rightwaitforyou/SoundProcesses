@@ -13,6 +13,7 @@
 
 package de.sciss.lucre.synth
 
+import de.sciss.lucre.synth.Resource.TimeStamp
 import de.sciss.synth.{Buffer => SBuffer}
 import de.sciss.synth.io.{AudioFileType, SampleFormat}
 import de.sciss.lucre.synth.impl.BufferImpl
@@ -41,6 +42,23 @@ object Buffer {
   private def validateCueBufferSize(minSize: Int, value: Int): Unit = {
     require(isPowerOfTwo(value) && value >= minSize && value <= 131072,
       s"Must be a power of two and in ($minSize, 131072): $value")
+  }
+
+  /** Utility resource creation that defers buffer disposal until point where node has been freed. */
+  def disposeWithNode(buf: Buffer, nr: NodeRef): Resource = new Resource with Proxy {
+    override val self: Buffer = buf
+
+    def isOnline(implicit tx: Txn): Boolean = self.isOnline
+
+    private[synth] def timeStamp                    (implicit tx: Txn): TimeStamp = self.timeStamp
+    private[synth] def timeStamp_=(value: TimeStamp)(implicit tx: Txn): Unit      = self.timeStamp = value
+
+    def server: Server = self.server
+
+    def dispose()(implicit tx: Txn): Unit = nr.node.onEndTxn { implicit tx =>
+      // println(s"disposeWithNode($buf, $nr)")
+      self.dispose()
+    }
   }
 
   def diskIn(server: Server)(path: String, startFrame: Long = 0L, numFrames: Int = defaultCueBufferSize,
