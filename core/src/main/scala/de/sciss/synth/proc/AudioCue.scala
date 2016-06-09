@@ -287,6 +287,15 @@ object AudioCue {
       protected def disposeData()(implicit tx: S#Tx): Unit = disconnect()
     }
 
+    object ReplaceOffset {
+      def unapply[S <: Sys[S]](ex: Ex[S]): Option[(Ex[S], LongObj[S])] = ex match {
+        case s: ReplaceOffset[S] => Some((s.peer, s.offset))
+        case _ => None
+      }
+      def apply[S <: Sys[S]](peer: Ex[S], offset: LongObj[S])(implicit tx: S#Tx): ReplaceOffset[S] = {
+        new ReplaceOffset(Targets[S], peer, offset).connect()
+      }
+    }
     final class ReplaceOffset[S <: Sys[S]](protected val targets: Targets[S],
                                            val peer: Ex[S],
                                            val offset: LongObj[S])
@@ -303,6 +312,15 @@ object AudioCue {
         new ReplaceOffset(Targets[Out], peer = context(peer), offset = context(offset)).connect()
     }
 
+    object Shift {
+      def unapply[S <: Sys[S]](ex: Ex[S]): Option[(Ex[S], LongObj[S])] = ex match {
+        case s: Shift[S] => Some((s.peer, s.amount))
+        case _ => None
+      }
+      def apply[S <: Sys[S]](peer: Ex[S], amount: LongObj[S])(implicit tx: S#Tx): Shift[S] = {
+        new Shift(Targets[S], peer, amount).connect()
+      }
+    }
     final class Shift[S <: Sys[S]](protected val targets: Targets[S],
                                    val peer: Ex[S],
                                    val amount: LongObj[S])
@@ -318,8 +336,6 @@ object AudioCue {
       def copy[Out <: Sys[Out]]()(implicit tx: S#Tx, txOut: Out#Tx, context: Copy[S, Out]): Elem[Out] =
         new Shift(Targets[Out], peer = context(peer), amount = context(amount)).connect()
     }
-
-    private final class Offset[S <: Sys[S]]
 
     final class Ops[S <: Sys[S]](val `this`: Ex[S]) extends AnyVal { me =>
       import me.{`this` => ex}
@@ -341,7 +357,13 @@ object AudioCue {
         case (_Expr.Const(c), _Expr.Const(amountC)) => newConst(c.copy(offset = c.offset + amountC))
         case (s: Shift[S], _) =>
           import proc.Ops.longObjOps
-          new Shift(Targets[S], peer = s.peer, amount = s.amount + amount).connect()
+//          s.amount match {
+//            case LongObj.Var(amtVr) =>
+//              amtVr() = amtVr() + amount
+//              ex
+//            case _ =>
+              new Shift(Targets[S], peer = s.peer, amount = s.amount + amount).connect()
+//          }
         case _ =>
           new Shift(Targets[S], peer = ex, amount = amount).connect()
       }
